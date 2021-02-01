@@ -72,6 +72,13 @@ A common secret is transfered to the OpenCL device with a fixed grid size. Each 
 The CPU is now able to hash the x,y coordinate of the EC-key to create (Bitcoin/Altcoin) addresses.
 The CPU doesn't spend most of its time for EC-key generation and can be used more efficient for hashing and database lookups.
 
+#### Performance
+GPU | gridNumBits | keys / s
+------------ | ------------- | -------------
+Nvidia RTX 2060 | 18 | 2.16 M keys / s
+Nvidia Quadro P2000 | 18 | 506 k keys /s
+Nvidia Quadro M2000M | 16 | 206 k keys /s
+
 ## Collision probability
 It's impossible to find collisions, isn't it? 
 Please find the answear somewhere else:
