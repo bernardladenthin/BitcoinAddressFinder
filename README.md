@@ -12,8 +12,8 @@ Copyright (c) 2017-2021 Bernard Ladenthin.
 * Check with a high performance database containing addresses if generated address are already in use.
 * Portable, plattform independend, runs on JVM.
 * EC-Key generation via
-** Multiple CPU Threads
-** Multiple OpenCL devices (optional)
+  * Multiple CPU Threads
+  * Multiple OpenCL devices (optional)
 
 ## Address database
 The addresses will be inserted in a high performance database [LMDB](https://github.com/LMDB).
@@ -22,20 +22,20 @@ The database can be used to check if a generated addresses is ever used.
 ### Import
 The importer read multiple txt/text files containing the following addresses in arbitrary order. Each line can contain a different format.
 * P2PKH
-** bitcoin
-** bitcoin cash
-** bitcoin gold
-** blackcoin
-** dash
-** dogecoin
-** feathercoin
-** litecoin
-** namecoin
-** novacoin
-** reddcoin
-** vertcoin
+  * bitcoin
+  * bitcoin cash
+  * bitcoin gold
+  * blackcoin
+  * dash
+  * dogecoin
+  * feathercoin
+  * litecoin
+  * namecoin
+  * novacoin
+  * reddcoin
+  * vertcoin
 * P2WPKH
-** bitcoin Bech32
+  * bitcoin Bech32
 
 ### Create the database by yourself
 Useful txt/text file provider:
