@@ -111,7 +111,7 @@ The OpenCL mode has a Built-in self-test (BIST) to compare the OpenCL results wi
 The effective keys / s using uncompressed and compressed keys. OpenCL creates uncompressed keys only. A compressed key can be deduced easily from the uncompressed key.
 
 GPU | privateKeyMaxNumBits | gridNumBits | effective keys / s
------------- | ------------- | -------------
+------------ | ------------- | ------------- | -------------
 Nvidia RTX 2060 | 256 | 18 | 2160 k keys / s
 Nvidia Quadro P2000 | 256 | 18 | 505 k keys /s
 Nvidia Quadro P2000 | 64 | 18 | more than 1000 k keys /s (CPU was at its limit)
