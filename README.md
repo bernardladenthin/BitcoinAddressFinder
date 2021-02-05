@@ -9,7 +9,7 @@ Copyright (c) 2017-2021 Bernard Ladenthin.
 * Unit tested (trusted) open source which can be compiled easily from yourself.
 * Vanitygen of bitcoin addresses using regex pattern.
 * Runs completely offline. No internet required or used. You can run it in a bunker with an electric generator somewhere in nowhere and nobody knows it.
-* No synchronisation necessary to run multiple instances. Random numbers are used and a search organization is not necessary. Yust start on multiple computers.
+* No synchronisation necessary to run multiple instances. Random numbers are used and a search organization is not necessary. Just start on multiple computers.
 * Check with a high performance database containing addresses if generated address are already in use.
 * Portable, plattform independend, runs on JVM.
 * Generate uncompressed and compressed keys at once.
@@ -123,12 +123,14 @@ Nvidia GTX 1050 Ti Mobile | 256 | 16 | 550 k keys /s
 It's impossible to find collisions, isn't it? 
 Please find the answear for vulnerability questions somewhere else:
 * https://crypto.stackexchange.com/questions/33821/how-to-deal-with-collisions-in-bitcoin-addresses
+* https://github.com/treyyoder/bitcoin-wallet-finder
 
 ## Similar projects
 * The [LBC](https://lbc.cryptoguru.org/) is optimized to find keys for the [Bitcoin Puzzle Transaction](https://privatekeys.pw/puzzles/bitcoin-puzzle-tx). It require communication to a server, doesn't support altcoin and pattern matching.
 * https://privatekeys.pw/scanner/bitcoin
 * https://allprivatekeys.com/get-lucky
 * https://allprivatekeys.com/vanity-address
+* https://github.com/treyyoder/bitcoin-wallet-finder
 
 -----
 ## Legal
