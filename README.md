@@ -36,6 +36,7 @@ The importer read multiple txt/text files containing the following addresses in 
   * novacoin
   * reddcoin
   * vertcoin
+  * ZCash
 * P2WPKH
   * bitcoin Bech32
 
@@ -54,7 +55,7 @@ The exporter writes all addresses in different formats:
 Last update: February 2, 2021
 * Light (3GB)
   * Contains Bitcoin addresses whith amount and many altcoin addresses with amount.
-  * Unique entries: 53595905
+  * Unique entries: 64152698
   * Link (1.5GB packed): http://ladenthin.net/lmdb_light.zip
   * Checksums:
     * CRC32: F105D7D2
