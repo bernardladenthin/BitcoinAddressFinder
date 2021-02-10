@@ -1,6 +1,6 @@
 # BitcoinAddressFinder
 A high performance bitcoin address finder.
-The main goal is to generate as fast as possible (Bitcoin/Altcoin) addresses using the JVM and OpenCL and check if the address (RIPEMD160 hash) was used/not used before. This includes possible collisions.
+The main goal is to generate as fast as possible (Bitcoin/Altcoin) addresses using the JVM combined with OpenCL and check if the address (RIPEMD160 hash) was used/not used before. This includes possible hash collisions.
 
 Copyright (c) 2017-2021 Bernard Ladenthin.
 

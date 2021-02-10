@@ -1,6 +1,6 @@
 {
     "command": "Find",
-	"finder" : {
+    "finder" : {
         "consumerJava" : {
             "lmdbConfigurationReadOnly" : {
                 "lmdbDirectory" : "lmdb",
@@ -50,5 +50,5 @@
                 "privateKeyMaxNumBits" : 256
             }
         ]
-	}
+    }
 }

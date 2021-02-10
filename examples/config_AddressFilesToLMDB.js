@@ -1,6 +1,6 @@
 {
     "command": "AddressFilesToLMDB",
-	"addressFilesToLMDB" : {
+    "addressFilesToLMDB" : {
         "addressesFiles" : [
             "addresses/fileContainingAddresses0.txt",
             "addresses/fileContainingAddresses1.tsv",
@@ -9,13 +9,13 @@
         "lmdbConfigurationWrite" : {
             "logStatsOnInit" : true,
             "logStatsOnClose" : true,
-			"deleteEmptyAddresses" : false,
+            "deleteEmptyAddresses" : false,
             "useStaticAmount" : true,
             "staticAmount" : 0,
             "lmdbDirectory" : "lmdb",
-			"initialMapSizeInMiB" : 16,
+            "initialMapSizeInMiB" : 16,
             "increaseMapAutomatically" : true,
             "increaseSizeInMiB" : 1
         }
-	}
+    }
 }
