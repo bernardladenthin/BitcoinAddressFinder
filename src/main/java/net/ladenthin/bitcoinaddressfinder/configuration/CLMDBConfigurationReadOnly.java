@@ -28,4 +28,14 @@ public class CLMDBConfigurationReadOnly {
      * The LMDB proxy (see {@link org.lmdbjava.ByteBufferProxy}).
      */
     public boolean useProxyOptimal = true;
+    
+    /**
+     * Log the lmdb stats on init. This enforces a read of the whole database. It's in memory afterwards. This option may take a 
+     */
+    public boolean logStatsOnInit = false;
+    
+    /**
+     * Log the lmdb stats on close.
+     */
+    public boolean logStatsOnClose = false;
 }

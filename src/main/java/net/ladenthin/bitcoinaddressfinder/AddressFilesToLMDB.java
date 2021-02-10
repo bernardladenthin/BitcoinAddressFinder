@@ -62,8 +62,6 @@ public class AddressFilesToLMDB implements Runnable {
         persistence.init();
         logger.info("Init done.");
 
-        logLMDBStats();
-
         try {
             logger.info("check if all configured address files exists");
             for (String addressesFilePath : addressFilesToLMDB.addressesFiles) {
@@ -107,26 +105,11 @@ public class AddressFilesToLMDB implements Runnable {
             for (String error : readStatistic.errors) {
                 logger.info("Error in line: " + error);
             }
-
-            logLMDBStats();
-
         } catch (IOException e) {
             throw new RuntimeException(e);
         } finally {
             persistence.close();
         }
-    }
-
-    private void logLMDBStats() {
-        logger.info("##### BEGIN: LMDB stats #####");
-        logger.info("... this may take a lot of time ...");
-        logger.info("DatabaseSize: " + new ByteConversion().bytesToMib(persistence.getDatabaseSize()) + " MiB");
-        logger.info("IncreasedCounter: " + persistence.getIncreasedCounter());
-        logger.info("IncreasedSum: " + new ByteConversion().bytesToMib(persistence.getIncreasedSum()) + " MiB");
-        // Attention: slow!
-        long count = persistence.count();
-        logger.info("LMDB contains " + count + " unique entries.");
-        logger.info("##### END: LMDB stats #####");
     }
 
     private void logProgress() {

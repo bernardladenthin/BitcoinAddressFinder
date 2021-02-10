@@ -1,6 +1,6 @@
 # BitcoinAddressFinder
 A high performance bitcoin address finder.
-The main goal is to generate as fast as possible (Bitcoin/Altcoin) addresses using the JVM and OpenCL and check if the address was used/not used before.
+The main goal is to generate as fast as possible (Bitcoin/Altcoin) addresses using the JVM and OpenCL and check if the address (RIPEMD160 hash) was used/not used before. This includes possible collisions.
 
 Copyright (c) 2017-2021 Bernard Ladenthin.
 
@@ -52,27 +52,26 @@ The exporter writes all addresses in different formats:
 * DynamicWidthBase58BitcoinAddressWithAmount: The addresses will be written with amount.
 
 ### Use my prepared database
-Last update: February 2, 2021
-* Light (3GB)
+* Light (3GiB), Last update: February 10, 2021
   * Contains Bitcoin addresses whith amount and many altcoin addresses with amount.
-  * Unique entries: 64152698
-  * Link (1.5GB packed): http://ladenthin.net/lmdb_light.zip
+  * Unique entries: 65170711
+  * Link (1.8GiB packed): http://ladenthin.net/lmdb_light.zip
   * Checksums:
-    * CRC32: F105D7D2
-    * MD5: 67205F0663C1704A9718E04763547003
-    * RIPEMD-160: 105123329E19E42317873D5DFCEB99B089983CE0
-    * SHA-1: 65BE8590B525339192683AD0123F5CEADE8408FA
-    * SHA-256: C9EE740E8AADFB89DAB5B009792FDA8A880241D2A689FC31E461B78D0E198575
-    * SHA3-224: B28D4499F5A2CFA2424243BC01E2DFE9C57D38ABDB841E9872674899
-    * SHA3-256: B1C491D8E2111DB654632A20CE4D90F0CB6BB5B839AD57B8B9F34C4A38D5C610
-    * SHA3-384: C28AF0ECE7A4A4CCBA3804954B72023E1598BB7D584D203AD54827148FAD7FD959F46AF2B652530219CD1530D71E9271
-    * SHA3-512: 495264374AC4AA3E4A360D23650E31CF2CF3FD39C13AFF3BB1AF413029FBFC8C1D355D6BDD38DA47212A2C392190D06F44716F1F2A667FFF6D7C6BB9EE382E29
-  * Mapsize: 2944 MiB
-  * Static amount of 1 is used to allow better compression.
-* Full (41GB)
+    * CRC32: 7195F4B7
+    * MD5: 7D30D0589FE36AD1688118D3DA7F02F7
+    * RIPEMD-160: FF8C8D925E48A740A044A511E973450EC2E4F285
+    * SHA-1: FF471DF78C8A6555E70BB89B0AC66345181CCABE
+    * SHA-256: 7AE7B71986D6267523A48E831AA00538E40A985AD415ADB7D5803084F5C6351C
+    * SHA3-224: 5D00BE0AC0B1DCC40EC890E63ADB7DB74122E4E5FCAE45AF52ACC391
+    * SHA3-256: A0E39E8CC7A9B1D6AFE961515A54ECF510F9412A58C6F0E5774D71241D94A7A5
+    * SHA3-384: B8DCC266E8E5F7776DC93A65BA8B5C9CD383E78F445D5A09B395EB1BB5B5F8D555945CA6807769BF22F8925957EE99F0
+    * SHA3-512: 92F8AF64BAFAB5556D0569F3AD30718258C5EA3E15CE9AF054C419A398A0494A3E3F21BBB9A8C21C9D29294B4EF5DE3D98B0851392D28DCD4FA5F6CC59C4424C
+  * Mapsize: 2752 MiB
+  * Static amount of 0 is used to allow better compression.
+* Full (41GiB), Last update: February 2, 2021
   * Contains all Bitcoin addresses which are ever used and many altcoin addresses with and without amount.
   * Unique entries: 769941703
-  * Link (18.9GB packed): http://ladenthin.net/lmdb_full.zip
+  * Link (18.9GiB packed): http://ladenthin.net/lmdb_full.zip
   * Checksums:
     * CRC32: E7301034
     * MD5: 9FCFA57CEA79EDFE7D2A6614E03CD3B2
@@ -98,7 +97,8 @@ Last update: February 2, 2021
 Find personal vanity addresses and check if addresses already exists in the lmdb can be used together.
 
 ### Key range
-A key range can be defined (e.g. 64-bit) whereas the first 192-bit (256-bit - 64-bit) are zeroed. This can be used to creaty keys in a specific range to find keys in a known range (e.g. [Bitcoin Puzzle Transaction](https://privatekeys.pw/puzzles/bitcoin-puzzle-tx)).
+A key range can be defined (e.g. 64-bit) whereas the first (e.g. 192-bit (256-bit - 64-bit)) are zeroed. This can be used to creaty keys in a specific range to find keys in a known range (e.g. [Bitcoin Puzzle Transaction](https://privatekeys.pw/puzzles/bitcoin-puzzle-tx)).
+This can be also used to proof that the software works.
 
 ### OpenCL
 To increase the performance of the EC-key generation OpenCL can be used.
@@ -132,6 +132,10 @@ Please find the answear for vulnerability questions somewhere else:
 * https://allprivatekeys.com/get-lucky
 * https://allprivatekeys.com/vanity-address
 * https://github.com/treyyoder/bitcoin-wallet-finder
+* https://github.com/albertobsd/keyhunt
+* https://github.com/mvrc42/bitp0wn
+* https://github.com/JeanLucPons/BTCCollider
+* https://github.com/JeanLucPons/VanitySearch
 
 -----
 ## Legal

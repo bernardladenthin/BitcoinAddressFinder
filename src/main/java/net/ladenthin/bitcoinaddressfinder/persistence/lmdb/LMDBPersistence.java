@@ -50,11 +50,15 @@ import org.lmdbjava.ByteBufferProxy;
 import static org.lmdbjava.DbiFlags.MDB_CREATE;
 import static org.lmdbjava.Env.create;
 import org.lmdbjava.EnvInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class LMDBPersistence implements Persistence {
 
     private static final String DB_NAME_HASH160_TO_COINT = "hash160toCoin";
     private static final int DB_COUNT = 1;
+    
+    private final Logger logger = LoggerFactory.getLogger(LMDBPersistence.class);
 
     private final PersistenceUtils persistenceUtils;
     private final CLMDBConfigurationWrite lmdbConfigurationWrite;
@@ -111,6 +115,8 @@ public class LMDBPersistence implements Persistence {
         } else {
             throw new IllegalArgumentException();
         }
+        
+        logStatsOnInitByConfig();
     }
 
     /**
@@ -126,9 +132,36 @@ public class LMDBPersistence implements Persistence {
             return ByteBufferProxy.PROXY_SAFE;
         }
     }
+    
+    private void logStatsOnInitByConfig() {
+        if (lmdbConfigurationWrite != null) {
+            if (lmdbConfigurationWrite.logStatsOnInit) {
+                logStats();
+            }
+        }
+        if (lmdbConfigurationReadOnly != null) {
+            if (lmdbConfigurationReadOnly.logStatsOnInit) {
+                logStats();
+            }
+        }
+    }
+    
+    private void logStatsOnCloseByConfig() {
+        if (lmdbConfigurationWrite != null) {
+            if (lmdbConfigurationWrite.logStatsOnClose) {
+                logStats();
+            }
+        }
+        if (lmdbConfigurationReadOnly != null) {
+            if (lmdbConfigurationReadOnly.logStatsOnClose) {
+                logStats();
+            }
+        }
+    }
 
     @Override
     public void close() {
+        logStatsOnCloseByConfig();
         lmdb_h160ToAmount.close();
     }
 
@@ -262,15 +295,6 @@ public class LMDBPersistence implements Persistence {
     }
 
     @Override
-    public String getStatsAsString() {
-        return getStats().toString();
-    }
-
-    public Stat getStats() {
-        return env.stat();
-    }
-
-    @Override
     public long count() {
         long count = 0;
         try (Txn<ByteBuffer> txn = env.txnRead()) {
@@ -305,5 +329,19 @@ public class LMDBPersistence implements Persistence {
     @Override
     public long getIncreasedSum() {
         return increasedSum;
+    }
+    
+    @Override
+    public void logStats() {
+        logger.info("##### BEGIN: LMDB stats #####");
+        logger.info("... this may take a lot of time ...");
+        logger.info("DatabaseSize: " + new ByteConversion().bytesToMib(getDatabaseSize()) + " MiB");
+        logger.info("IncreasedCounter: " + getIncreasedCounter());
+        logger.info("IncreasedSum: " + new ByteConversion().bytesToMib(getIncreasedSum()) + " MiB");
+        logger.info("Stat: " + env.stat());
+        // Attention: slow!
+        long count = count();
+        logger.info("LMDB contains " + count + " unique entries.");
+        logger.info("##### END: LMDB stats #####");
     }
 }

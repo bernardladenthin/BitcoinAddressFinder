@@ -99,7 +99,6 @@ public class ConsumerJava implements Consumer {
         PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
         persistence = new LMDBPersistence(consumerJava.lmdbConfigurationReadOnly, persistenceUtils);
         persistence.init();
-        logger.info("Stats: " + persistence.getStatsAsString());
     }
 
     private String createStatisticsMessage(long uptime, long keys, long keysSumOfTimeToCheckContains, long emptyConsumer, long hits) {
