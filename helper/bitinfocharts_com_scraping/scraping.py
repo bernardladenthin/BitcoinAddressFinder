@@ -51,7 +51,7 @@ def writeToFile(addressSet, filename):
         outF.write("\n")
     outF.close()
 
-driver = webdriver.Chrome('C:\\Users\\Bernard\\Desktop\\chromedriver87.exe')
+driver = webdriver.Chrome('C:\\Users\\Bernard\\Desktop\\chromedriver88.exe')
 # manual input for captcha
 #driver.get("https://bitinfocharts.com/de/top-100-richest-bitcoin-addresses.html")
 #time.sleep(30)
