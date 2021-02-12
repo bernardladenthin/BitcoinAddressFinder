@@ -54,8 +54,11 @@ The exporter writes all addresses in different formats:
 ### Use my prepared database
 * Light (3GiB), Last update: February 10, 2021
   * Contains Bitcoin addresses whith amount and many altcoin addresses with amount.
+  * Static amount of 0 is used to allow best compression.
   * Unique entries: 65170711
+  * Mapsize: 2752 MiB
   * Link (1.8GiB packed): http://ladenthin.net/lmdb_light.zip
+  * Time to create the database: ~4 hours
   * Checksums:
     * CRC32: 7195F4B7
     * MD5: 7D30D0589FE36AD1688118D3DA7F02F7
@@ -66,24 +69,23 @@ The exporter writes all addresses in different formats:
     * SHA3-256: A0E39E8CC7A9B1D6AFE961515A54ECF510F9412A58C6F0E5774D71241D94A7A5
     * SHA3-384: B8DCC266E8E5F7776DC93A65BA8B5C9CD383E78F445D5A09B395EB1BB5B5F8D555945CA6807769BF22F8925957EE99F0
     * SHA3-512: 92F8AF64BAFAB5556D0569F3AD30718258C5EA3E15CE9AF054C419A398A0494A3E3F21BBB9A8C21C9D29294B4EF5DE3D98B0851392D28DCD4FA5F6CC59C4424C
-  * Mapsize: 2752 MiB
-  * Static amount of 0 is used to allow better compression.
 * Full (41GiB), Last update: February 2, 2021
   * Contains all Bitcoin addresses which are ever used and many altcoin addresses with and without amount.
-  * Unique entries: 769941703
+  * Static amount of 0 is used to allow best compression.
+  * Unique entries: 781419881
+  * Mapsize: 32992 MiB
   * Link (18.9GiB packed): http://ladenthin.net/lmdb_full.zip
+  * Time to create the database: ~34 hours
   * Checksums:
-    * CRC32: E7301034
-    * MD5: 9FCFA57CEA79EDFE7D2A6614E03CD3B2
-    * RIPEMD-160: E00E67B0182C0F6239AF75C6B21EA537B32D97A3
-    * SHA-1: A1262B72760BA1E0B07887BF93698C1DF97B05E8
-    * SHA-256: D66FF291A685A6CCE0E0D0CBF039335BB10EAB9B4F4AF2C575A67F4DAE8DB0DA
-    * SHA3-224: 32229857893B18925F056D75C6E1CFD4805F5EA27FE23B9967BDB76D
-    * SHA3-256: C679A3410ADEB4C1DE3973B67974A0E9EB27B487BCB72712FE9D1F47939790A3
-    * SHA3-384: 2B67B1AA3A48ACCB9F7F9350500FFF7CE27A9D5CBD76C42A512E44F24A5CDC32AEF056829173ADE8E97E05F228F0B11D
-    * SHA3-512: 68D66A9360842C559E9B9F012B611AFD1ACE69686627A818D67772A3BC3DEA61D79DB55337A635B8D069460ACABCB375D4C6310490DAD6E22A52E830EABC2111
-  * Mapsize: 40960 MiB
-  * Static amount of 1 is used to allow better compression.
+    * CRC32: 04D50A18
+    * MD5: 6E8968DBF4A698C908BFAC5A2315F52D
+    * RIPEMD-160: C5BFDBDDE6FCD829E15F893D874E2C203798D1DD
+    * SHA-1: 226F309BDB355C8867256434568A3E752E6BF94C
+    * SHA-256: 6130F9879C6C14B4BE2C27403B5910BACA517366D32578134B65FF68853FA574
+    * SHA3-224: 61666FA472D9B3477FF98E845781BD564192C19BF4371C9BF22F7B49
+    * SHA3-256: BB516A17C8DBC2357E610B70445DC1606AE57927B22B8763DE186D52B96C6CF9
+    * SHA3-384: B65FB4EDF10FC496300F7AD70C17C3DF3E351F4FB7F117AD11AFB67F155123291DCF28B4E417227BB0C9491E6FBEE6C8
+    * SHA3-512: B30959C4A21B187782EFB04C268B392555F774C3025DE51BE34FE63249D42724AA907650C53A1C67D38D5A63D74E5E99A80DBF8630F8D611C709FE9DCD6706FF
 
 ## Pages and projects to get lists (dumps) of PubkeyHash addresses
 * https://github.com/mycroft/chainstate
@@ -124,7 +126,9 @@ Nvidia GTX 1050 Ti Mobile | 256 | 16 | 550 k keys /s
 It's impossible to find collisions, isn't it? 
 Please find the answear for vulnerability questions somewhere else:
 * https://crypto.stackexchange.com/questions/33821/how-to-deal-with-collisions-in-bitcoin-addresses
-* https://github.com/treyyoder/bitcoin-wallet-finder
+* https://github.com/treyyoder/bitcoin-wallet-finder#results
+* https://github.com/Frankenmint/PKGenerator_Checker#instructions
+* https://github.com/Xefrok/BitBruteForce-Wallet#requeriments
 
 ## Similar projects
 * The [LBC](https://lbc.cryptoguru.org/) is optimized to find keys for the [Bitcoin Puzzle Transaction](https://privatekeys.pw/puzzles/bitcoin-puzzle-tx). It require communication to a server, doesn't support altcoin and pattern matching.
@@ -136,16 +140,23 @@ Please find the answear for vulnerability questions somewhere else:
 * https://github.com/mvrc42/bitp0wn
 * https://github.com/JeanLucPons/BTCCollider
 * https://github.com/JeanLucPons/VanitySearch
+* https://github.com/JamieAcharya/Bitcoin-Private-Key-Finder
+* https://github.com/mingfunwong/all-bitcoin-private-key
+* https://github.com/Frankenmint/PKGenerator_Checker
+* https://github.com/Henshall/BitcoinPrivateKeyHunter
+* https://github.com/Xefrok/BitBruteForce-Wallet
+* https://github.com/Isaacdelly/Plutus
 
 -----
 ## Legal
 This software should not be configured and used to find (Bitcoin/Altcoin) address hash (RIPEMD-160) collisions and use (steal) credit from third-party (Bitcoin/Altcoin) addresses.
 This mode might be allowed to recover lost private keys of your own public addresses only.
 
-Another legal use case is a check if the (Bitcoin/Altcoin) addresses hash (RIPEMD-160) is already in use to prevent yourself from a known hash (RIPEMD-160) collision and double use is allowed.
+Another legal use case is a check if the (Bitcoin/Altcoin) addresses hash (RIPEMD-160) is already in use to prevent yourself from a known hash (RIPEMD-160) collision and double use.
 
-Some configurations are not allowed in some countries:
+Some configurations are not allowed in some countries (definitely not complete):
 * Germany: § 202c Vorbereiten des Ausspähens und Abfangens von Daten
+* United States of America (USA): Computer Fraud and Abuse Act (CFAA)
 
 ## License
 
