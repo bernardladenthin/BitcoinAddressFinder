@@ -4,7 +4,9 @@
         "consumerJava" : {
             "lmdbConfigurationReadOnly" : {
                 "lmdbDirectory" : "lmdb",
-                "useProxyOptimal" : true
+                "useProxyOptimal" : true,
+                "logStatsOnInit" : true,
+                "logStatsOnClose" : false
             },
             "threads" : 8,
             "delayEmptyConsumer" : 50,
