@@ -52,12 +52,12 @@ The exporter writes all addresses in different formats:
 * DynamicWidthBase58BitcoinAddressWithAmount: The addresses will be written with amount.
 
 ### Use my prepared database
-* Light (3GiB), Last update: February 10, 2021
+* Light (2.68 GiB), Last update: February 10, 2021
   * Contains Bitcoin addresses whith amount and many altcoin addresses with amount.
   * Static amount of 0 is used to allow best compression.
   * Unique entries: 65170711
   * Mapsize: 2752 MiB
-  * Link (1.8GiB packed): http://ladenthin.net/lmdb_light.zip
+  * Link (1.8 GiB packed): http://ladenthin.net/lmdb_light.zip
   * Time to create the database: ~4 hours
   * Checksums:
     * CRC32: 7195F4B7
@@ -69,12 +69,12 @@ The exporter writes all addresses in different formats:
     * SHA3-256: A0E39E8CC7A9B1D6AFE961515A54ECF510F9412A58C6F0E5774D71241D94A7A5
     * SHA3-384: B8DCC266E8E5F7776DC93A65BA8B5C9CD383E78F445D5A09B395EB1BB5B5F8D555945CA6807769BF22F8925957EE99F0
     * SHA3-512: 92F8AF64BAFAB5556D0569F3AD30718258C5EA3E15CE9AF054C419A398A0494A3E3F21BBB9A8C21C9D29294B4EF5DE3D98B0851392D28DCD4FA5F6CC59C4424C
-* Full (41GiB), Last update: February 10, 2021
+* Full (32.2 GiB), Last update: February 10, 2021
   * Contains all Bitcoin addresses which are ever used and many altcoin addresses with and without amount.
   * Static amount of 0 is used to allow best compression.
   * Unique entries: 781419881
   * Mapsize: 32992 MiB
-  * Link (18.9GiB packed): http://ladenthin.net/lmdb_full.zip
+  * Link (17.5 GiB packed): http://ladenthin.net/lmdb_full.zip
   * Time to create the database: ~34 hours
   * Checksums:
     * CRC32: 04D50A18
