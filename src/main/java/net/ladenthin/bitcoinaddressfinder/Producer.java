@@ -26,7 +26,7 @@ public interface Producer extends Runnable {
      * Initialize the producer to procue keys with
      * {@link #produceKeys(int, java.util.Random)} continuously.
      */
-    void initProducers();
+    void initProducer();
 
     /**
      * Create multiple keys for a specific bit length using {@link Random} and

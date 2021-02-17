@@ -33,7 +33,7 @@ public class ProducerJava extends AbstractProducer {
     }
 
     @Override
-    public void initProducers() {
+    public void initProducer() {
     }
 
     @Override

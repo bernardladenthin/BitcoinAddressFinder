@@ -28,11 +28,13 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 
-public class AddressFilesToLMDB implements Runnable {
+public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     private final Logger logger = LoggerFactory.getLogger(AddressFilesToLMDB.class);
 
@@ -47,9 +49,12 @@ public class AddressFilesToLMDB implements Runnable {
     private final ReadStatistic readStatistic = new ReadStatistic();
     
     private final static long PROGRESS_LOG = 100_000;
+    
+    private final AtomicBoolean shouldRun;
 
-    public AddressFilesToLMDB(CAddressFilesToLMDB addressFilesToLMDB) {
+    public AddressFilesToLMDB(CAddressFilesToLMDB addressFilesToLMDB, AtomicBoolean shouldRun) {
         this.addressFilesToLMDB = addressFilesToLMDB;
+        this.shouldRun = shouldRun;
     }
 
     @Override
@@ -58,49 +63,34 @@ public class AddressFilesToLMDB implements Runnable {
 
         PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
         persistence = new LMDBPersistence(addressFilesToLMDB.lmdbConfigurationWrite, persistenceUtils);
-        logger.info("Init lmdb ...");
+        logger.info("Init LMDB ...");
         persistence.init();
-        logger.info("Init done.");
+        logger.info("... init LMDB done.");
 
         try {
-            logger.info("check if all configured address files exists");
-            for (String addressesFilePath : addressFilesToLMDB.addressesFiles) {
-                File addressesFile = new File(addressesFilePath);
-                if (!addressesFile.exists()) {
-                    throw new IllegalArgumentException("The address file does not exists: " + addressesFile.getAbsolutePath());
-                }
-                logger.info("address files exists: " + addressesFile.getAbsolutePath());
-            }
+            FileHelper fileHelper = new FileHelper();
+            List<File> files = fileHelper.stringsToFiles(addressFilesToLMDB.addressesFiles);
+            fileHelper.assertFilesExists(files);
             
-            logger.info("writeAllAmounts ...");
-            for (String addressesFilePath : addressFilesToLMDB.addressesFiles) {
-                File addressesFile = new File(addressesFilePath);
-                AddressFile addressFile = new AddressFile(networkParameters);
-                logger.info("process " + addressesFilePath);
-                
-                addressFile.readFromFile(
-                    addressesFile,
+            logger.info("Iterate address files ...");
+            for (File file : files) {
+                AddressFile addressFile = new AddressFile(
+                    file,
                     readStatistic,
-                    addressToCoin -> {
-                        ByteBuffer hash160 = addressToCoin.getHash160();
-                        persistence.putNewAmount(hash160, addressToCoin.getCoin());
-                        addressCounter.incrementAndGet();
-
-                        if (addressCounter.get() % PROGRESS_LOG == 0) {
-                            logProgress();
-                        }
-                    },
-                    unsupported -> {
-                        if (readStatistic.unsupported % PROGRESS_LOG == 0) {
-                            logProgress();
-                        }
-                    }
+                    networkParameters,
+                    this::supported,
+                    this::unsupported,
+                    shouldRun
                 );
+                
+                logger.info("process " + file.getAbsolutePath());
+                addressFile.readFile();
+                logger.info("finished: " + file.getAbsolutePath());
+                
                 logProgress();
-                logger.info("finished: " + addressesFilePath);
             }
             logProgress();
-            logger.info("writeAllAmounts done");
+            logger.info("... iterate address files done.");
 
             for (String error : readStatistic.errors) {
                 logger.info("Error in line: " + error);
@@ -111,6 +101,22 @@ public class AddressFilesToLMDB implements Runnable {
             persistence.close();
         }
     }
+    
+    private void supported(AddressToCoin addressToCoin) {
+        ByteBuffer hash160 = addressToCoin.getHash160();
+        persistence.putNewAmount(hash160, addressToCoin.getCoin());
+        addressCounter.incrementAndGet();
+
+        if (addressCounter.get() % PROGRESS_LOG == 0) {
+            logProgress();
+        }
+    }
+
+    private void unsupported(String line) {
+        if (readStatistic.unsupported % PROGRESS_LOG == 0) {
+            logProgress();
+        }
+    }
 
     private void logProgress() {
         logger.info("Progress: " + addressCounter.get() + " addresses. Unsupported: " + readStatistic.unsupported + ". Errors: " + readStatistic.errors.size() + ". Current File progress: " + String.format("%.2f", readStatistic.currentFileProgress) + "%.");
@@ -119,5 +125,9 @@ public class AddressFilesToLMDB implements Runnable {
     private void createNetworkParameter() {
         networkParameters = MainNetParams.get();
         Context.getOrCreate(networkParameters);
+    }
+
+    @Override
+    public void interrupt() {
     }
 }

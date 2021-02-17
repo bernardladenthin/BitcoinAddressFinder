@@ -26,15 +26,23 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.LMDBToAddressFile;
 import net.ladenthin.bitcoinaddressfinder.OpenCLInfo;
 import net.ladenthin.bitcoinaddressfinder.Finder;
+import net.ladenthin.bitcoinaddressfinder.Interruptable;
 
 // VM option: -Dorg.slf4j.simpleLogger.defaultLogLevel=trace
-public class Main implements Runnable {
+public class Main implements Runnable, Interruptable {
 
     private final static Logger logger = LoggerFactory.getLogger(Main.class);
+
+    private final List<Interruptable> interruptables = new ArrayList<>();
+
+    protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
     private final CConfiguration configuration;
     
@@ -68,17 +76,23 @@ public class Main implements Runnable {
     @Override
     public void run() {
         logger.info(configuration.command.name());
+        
+        addSchutdownHook();
+        
         switch (configuration.command) {
             case Find:
-                Finder finder = new Finder(configuration.finder);
+                Finder finder = new Finder(configuration.finder, shouldRun);
+                interruptables.add(finder);
                 finder.startRunner();
                 break;
             case LMDBToAddressFile:
-                LMDBToAddressFile lmdbToAddressFile = new LMDBToAddressFile(configuration.lmdbToAddressFile);
+                LMDBToAddressFile lmdbToAddressFile = new LMDBToAddressFile(configuration.lmdbToAddressFile, shouldRun);
+                interruptables.add(lmdbToAddressFile);
                 lmdbToAddressFile.run();
                 break;
             case AddressFilesToLMDB:
-                AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(configuration.addressFilesToLMDB);
+                AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(configuration.addressFilesToLMDB, shouldRun);
+                interruptables.add(addressFilesToLMDB);
                 addressFilesToLMDB.run();
                 break;
             case OpenCLInfo:
@@ -86,6 +100,20 @@ public class Main implements Runnable {
                 break;
             default:
                 throw new UnsupportedOperationException("Command: " + configuration.command.name() + " currently not supported." );
+        }
+        
+    }
+    
+    private void addSchutdownHook() {
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            interrupt();
+        }));
+    }
+    
+    public void interrupt() {
+        shouldRun.set(false);
+        for (Interruptable interruptable : interruptables) {
+            interruptable.interrupt();
         }
     }
 }

@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFileOutputFormat;
 
 public interface Persistence {
@@ -41,7 +42,7 @@ public interface Persistence {
      * @param addressFileOutputFormat the format
      * @throws IOException 
      */
-    void writeAllAmountsToAddressFile(File file, CAddressFileOutputFormat addressFileOutputFormat) throws IOException;
+    void writeAllAmountsToAddressFile(File file, CAddressFileOutputFormat addressFileOutputFormat, AtomicBoolean shouldRun) throws IOException;
 
     /**
      * @param hash160 the hash160 to change its amount

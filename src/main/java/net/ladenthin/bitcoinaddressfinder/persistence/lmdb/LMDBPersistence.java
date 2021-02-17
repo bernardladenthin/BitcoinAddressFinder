@@ -27,7 +27,6 @@ import org.lmdbjava.Dbi;
 import org.lmdbjava.Env;
 import org.lmdbjava.EnvFlags;
 import org.lmdbjava.KeyRange;
-import org.lmdbjava.Stat;
 import org.lmdbjava.Txn;
 
 import java.io.File;
@@ -36,6 +35,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.AddressTxtLine;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.ByteConversion;
@@ -197,11 +197,14 @@ public class LMDBPersistence implements Persistence {
     }
 
     @Override
-    public void writeAllAmountsToAddressFile(File file, CAddressFileOutputFormat addressFileOutputFormat) throws IOException {
+    public void writeAllAmountsToAddressFile(File file, CAddressFileOutputFormat addressFileOutputFormat, AtomicBoolean shouldRun) throws IOException {
         try (Txn<ByteBuffer> txn = env.txnRead()) {
             try (CursorIterable<ByteBuffer> iterable = lmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
                 try (FileWriter writer = new FileWriter(file)) {
                     for (final CursorIterable.KeyVal<ByteBuffer> kv : iterable) {
+                        if (!shouldRun.get()) {
+                            return;
+                        }
                         ByteBuffer addressAsByteBuffer = kv.key();
                         LegacyAddress address = keyUtility.byteBufferToAddress(addressAsByteBuffer);
                         final String line;

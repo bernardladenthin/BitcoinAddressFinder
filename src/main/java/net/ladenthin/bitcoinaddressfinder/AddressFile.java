@@ -19,54 +19,40 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import org.bitcoinj.core.NetworkParameters;
-import org.lmdbjava.LmdbException;
 
-public class AddressFile {
+public class AddressFile extends AbstractPlaintextFile {
 
     @Nonnull
     private final NetworkParameters networkParameters;
-
     @Nonnull
-    private KeyUtility keyUtility;
+    private final KeyUtility keyUtility;
+    @Nonnull
+    private final Consumer<AddressToCoin> addressConsumer;
+    @Nonnull
+    private final Consumer<String> unsupportedConsumer;
 
-    public AddressFile(@Nonnull NetworkParameters networkParameters) {
+    public AddressFile(@Nonnull File file, ReadStatistic readStatistic, @Nonnull NetworkParameters networkParameters, @Nonnull Consumer<AddressToCoin> addressConsumer, @Nonnull Consumer<String> unsupportedConsumer, AtomicBoolean shouldRun) {
+        super(file, readStatistic, shouldRun);
         this.networkParameters = networkParameters;
+        this.addressConsumer = addressConsumer;
+        this.unsupportedConsumer = unsupportedConsumer;
         keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(true));
     }
 
-    public void readFromFile(@Nonnull File file, ReadStatistic readStatistic, @Nonnull Consumer<AddressToCoin> addressConsumer, @Nonnull Consumer<String> unsupportedConsumer) throws IOException {
-        try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
-            AddressTxtLine addressTxtLine = new AddressTxtLine();
-            for(;;) {
-                String line = raf.readLine();
-                if (line == null) {
-                    return;
-                }
-                readStatistic.currentFileProgress = ((double)(Math.max(raf.getFilePointer(),1)) / (double)raf.length()) * 100.0d;
-                
-                try {
-                    AddressToCoin addressToCoin = addressTxtLine.fromLine(line, keyUtility);
-                    if (addressToCoin != null) {
-                        addressConsumer.accept(addressToCoin);
-                        readStatistic.successful++;
-                    } else {
-                        unsupportedConsumer.accept(line);
-                        readStatistic.unsupported++;
-                    }
-                } catch(LmdbException e) {
-                    // do not catch expections from LMDB (e. g. MapFullException).
-                    throw e;
-                } catch (Exception e) {
-                    System.err.println("Error in line: " + line);
-                    e.printStackTrace();
-                    readStatistic.errors.add(line);
-                }
-            }
+    @Override
+    protected void processLine(String line) {
+        AddressTxtLine addressTxtLine = new AddressTxtLine();
+        AddressToCoin addressToCoin = addressTxtLine.fromLine(line, keyUtility);
+        if (addressToCoin != null) {
+            addressConsumer.accept(addressToCoin);
+            readStatistic.successful++;
+        } else {
+            unsupportedConsumer.accept(line);
+            readStatistic.unsupported++;
         }
     }
 }

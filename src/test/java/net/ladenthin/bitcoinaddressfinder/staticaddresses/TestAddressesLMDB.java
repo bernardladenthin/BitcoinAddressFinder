@@ -21,6 +21,7 @@ package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
@@ -40,7 +41,7 @@ public class TestAddressesLMDB {
         File lmdbFolder = folder.newFolder("lmdb");
         String lmdbFolderPath = lmdbFolder.getAbsolutePath();
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.lmdbDirectory = lmdbFolderPath;
-        AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(addressFilesToLMDBConfigurationWrite);
+        AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(addressFilesToLMDBConfigurationWrite, new AtomicBoolean(true));
         addressFilesToLMDB.run();
         return lmdbFolder;
     }

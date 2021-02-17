@@ -23,6 +23,7 @@ import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
@@ -55,7 +56,7 @@ public class AddressFileToLMDBTest extends LMDBBase {
         File lmdbFolder = folder.newFolder("lmdb");
         String lmdbFolderPath = lmdbFolder.getAbsolutePath();
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.lmdbDirectory = lmdbFolderPath;
-        AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(addressFilesToLMDBConfigurationWrite);
+        AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(addressFilesToLMDBConfigurationWrite, new AtomicBoolean(true));
         addressFilesToLMDB.run();
     }
 

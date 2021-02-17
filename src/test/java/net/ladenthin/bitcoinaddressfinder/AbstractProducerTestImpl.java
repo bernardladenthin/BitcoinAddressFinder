@@ -28,7 +28,7 @@ public class AbstractProducerTestImpl extends AbstractProducer {
     }
 
     @Override
-    public void initProducers() {
+    public void initProducer() {
         
     }
 

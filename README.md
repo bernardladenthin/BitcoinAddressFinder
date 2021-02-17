@@ -94,6 +94,7 @@ The exporter writes all addresses in different formats:
 * https://balances.crypto-nerdz.org/
 
 ## Find addresses
+**Attention**: Do not use this software in a productive, non safe environment. A safe environment might be a dedicated computer with an air gap / disconnected network. A side-channel attack is possible and the software is optimized for performance and not constant-time. You may use a [paper wallet](https://en.bitcoin.it/wiki/Paper_wallet) for created vanity keys.
 
 ### Mixed modes
 Find personal vanity addresses and check if addresses already exists in the lmdb can be used together.

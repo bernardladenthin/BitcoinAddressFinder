@@ -1,6 +1,6 @@
 // @formatter:off
 /**
- * Copyright 2020 Bernard Ladenthin bernard.ladenthin@gmail.com
+ * Copyright 2021 Bernard Ladenthin bernard.ladenthin@gmail.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,10 +21,9 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CFinder {
-
-    public CConsumerJava consumerJava;
-    public List<CProducerJava> producerJava = new ArrayList<>();
-    public List<CProducerJavaBrainwallet> producerJavaBrainwallet = new ArrayList<>();
-    public List<CProducerOpenCL> producerOpenCL = new ArrayList<>();
+public class CProducerJavaBrainwallet extends CProducer {
+    /**
+     * The list of strings files which should be read.
+     */
+    public List<String> brainwalletStringsFiles = new ArrayList<>();
 }

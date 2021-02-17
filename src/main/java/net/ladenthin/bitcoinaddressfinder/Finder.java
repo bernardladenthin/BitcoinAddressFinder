@@ -26,33 +26,36 @@ import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javax.annotation.Nullable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaBrainwallet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Finder {
+public class Finder implements Interruptable {
 
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
 
     private final CFinder finder;
 
-    protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
+    private final AtomicBoolean shouldRun;
     
     private final List<ProducerOpenCL> openCLProducers = new ArrayList<>();
     private final List<ProducerJava> javaProducers = new ArrayList<>();
+    private final List<ProducerJavaBrainwallet> javaProducersBrainwallet = new ArrayList<>();
 
+    @Nullable
     private ConsumerJava consumerJava;
 
-    public Finder(CFinder finder) {
+    public Finder(CFinder finder, AtomicBoolean shouldRun) {
         this.finder = finder;
+        this.shouldRun = shouldRun;
     }
 
     public void startRunner() {
         ExecutorService producerExecutorService = Executors.newCachedThreadPool();
-
-        addSchutdownHook();
 
         if (finder.consumerJava != null) {
             consumerJava = new ConsumerJava(finder.consumerJava, shouldRun);
@@ -74,8 +77,18 @@ public class Finder {
                 cProducerJava.assertGridNumBitsCorrect();
                 ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, consumerJava.keyUtility, random);
                 javaProducers.add(producerJava);
-                producerJava.initProducers();
+                producerJava.initProducer();
                 producerExecutorService.submit(producerJava);
+            }
+        }
+
+        if (finder.producerJavaBrainwallet != null) {
+            for (CProducerJavaBrainwallet cProducerJavaBrainwallet : finder.producerJavaBrainwallet) {
+                cProducerJavaBrainwallet.assertGridNumBitsCorrect();
+                ProducerJavaBrainwallet producerJavaBrainwallet = new ProducerJavaBrainwallet(cProducerJavaBrainwallet, shouldRun, consumerJava, consumerJava.keyUtility, random);
+                javaProducersBrainwallet.add(producerJavaBrainwallet);
+                producerJavaBrainwallet.initProducer();
+                producerExecutorService.submit(producerJavaBrainwallet);
             }
         }
 
@@ -84,29 +97,30 @@ public class Finder {
                 cProducerOpenCL.assertGridNumBitsCorrect();
                 ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, shouldRun, consumerJava, consumerJava.keyUtility, random);
                 openCLProducers.add(producerOpenCL);
-                producerOpenCL.initProducers();
+                producerOpenCL.initProducer();
                 producerExecutorService.submit(producerOpenCL);
             }
         }
     }
-
-    protected void addSchutdownHook() {
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            shouldRun.set(false);
+    
+    
+    public void interrupt() {
+        if (consumerJava != null) {
             consumerJava.timer.cancel();
-            logger.info("Shut down, please wait for remaining tasks.");
-            
-            for (ProducerOpenCL openCLProducer : openCLProducers) {
-                openCLProducer.waitTillProducerNotRunning();
-                openCLProducer.releaseProducers();
-            }
-            
-            for (ProducerJava producerJava : javaProducers) {
-                producerJava.waitTillProducerNotRunning();
-                producerJava.releaseProducers();
-            }
-            logger.info("All producers released.");
-        }));
+        }
+        logger.info("Shut down, please wait for remaining tasks.");
+
+        for (ProducerOpenCL openCLProducer : openCLProducers) {
+            openCLProducer.waitTillProducerNotRunning();
+            openCLProducer.releaseProducers();
+        }
+
+        for (ProducerJava producerJava : javaProducers) {
+            producerJava.waitTillProducerNotRunning();
+            producerJava.releaseProducers();
+        }
+        logger.info("All producers released.");
     }
+
 
 }

@@ -39,7 +39,7 @@ public class ProducerOpenCL extends AbstractProducer {
     }
 
     @Override
-    public void initProducers() {
+    public void initProducer() {
         resultReaderThreadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads);
         
         openCLContext = new OpenCLContext(producerOpenCL);

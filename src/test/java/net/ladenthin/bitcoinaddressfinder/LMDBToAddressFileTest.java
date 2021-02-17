@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFileOutputFormat;
 import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
@@ -52,7 +53,7 @@ public class LMDBToAddressFileTest extends LMDBBase {
 
         // act
         File file = folder.newFile();
-        persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.DynamicWidthBase58BitcoinAddressWithAmount);
+        persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.DynamicWidthBase58BitcoinAddressWithAmount, new AtomicBoolean(true));
 
         // assert
         try {
@@ -88,7 +89,7 @@ public class LMDBToAddressFileTest extends LMDBBase {
 
         // act
         File file = folder.newFile();
-        persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.FixedWidthBase58BitcoinAddress);
+        persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.FixedWidthBase58BitcoinAddress, new AtomicBoolean(true));
 
         // assert
         try {
@@ -124,7 +125,7 @@ public class LMDBToAddressFileTest extends LMDBBase {
 
         // act
         File file = folder.newFile();
-        persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.HexHash);
+        persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.HexHash, new AtomicBoolean(true));
 
         // assert
         try {

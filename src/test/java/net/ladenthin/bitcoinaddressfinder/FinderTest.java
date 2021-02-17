@@ -23,6 +23,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 
 public class FinderTest {
@@ -30,13 +31,12 @@ public class FinderTest {
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
 
-
     @Test
-    public void addSchutdownHook_noExceptionThrown() throws IOException {
+    public void interrupt_noExceptionThrown() throws IOException {
         
         CFinder cFinder = new CFinder();
-        Finder finder = new Finder(cFinder);
-        finder.addSchutdownHook();
+        Finder finder = new Finder(cFinder, new AtomicBoolean(true));
+        finder.interrupt();
     }
 
 }

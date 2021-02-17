@@ -28,20 +28,24 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBToAddressFile;
 
-public class LMDBToAddressFile implements Runnable {
+public class LMDBToAddressFile implements Runnable, Interruptable {
 
     private final Logger logger = LoggerFactory.getLogger(LMDBToAddressFile.class);
 
     private final CLMDBToAddressFile lmdbToAddressFile;
+    
+    private final AtomicBoolean shouldRun;
 
     private NetworkParameters networkParameters;
 
     private LMDBPersistence persistence;
 
-    public LMDBToAddressFile(CLMDBToAddressFile lmdbToAddressFile) {
+    public LMDBToAddressFile(CLMDBToAddressFile lmdbToAddressFile, AtomicBoolean shouldRun) {
         this.lmdbToAddressFile = lmdbToAddressFile;
+        this.shouldRun = shouldRun;
     }
 
     @Override
@@ -55,7 +59,7 @@ public class LMDBToAddressFile implements Runnable {
             File addressesFile = new File(lmdbToAddressFile.addressesFile);
             // delete before write all addresses
             addressesFile.delete();
-            persistence.writeAllAmountsToAddressFile(addressesFile, lmdbToAddressFile.addressFileOutputFormat);
+            persistence.writeAllAmountsToAddressFile(addressesFile, lmdbToAddressFile.addressFileOutputFormat, shouldRun);
             logger.info("writeAllAmounts done");
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -67,5 +71,9 @@ public class LMDBToAddressFile implements Runnable {
     private void createNetworkParameter() {
         networkParameters = MainNetParams.get();
         Context.getOrCreate(networkParameters);
+    }
+
+    @Override
+    public void interrupt() {
     }
 }
