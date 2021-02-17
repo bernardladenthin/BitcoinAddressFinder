@@ -66,7 +66,7 @@ public class ProducerJavaBrainwalletTest {
     }
     
     @Test
-    public void produceKeys_filesConfigured_noKeysCreated() throws IOException, InterruptedException {
+    public void produceKeys_filesConfigured_keysCreated() throws IOException, InterruptedException {
         final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
         CProducerJavaBrainwallet cProducerJavaBrainwallet = new CProducerJavaBrainwallet();
