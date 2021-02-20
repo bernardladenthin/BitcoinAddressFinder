@@ -18,7 +18,6 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,6 +43,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.ECKey;
+import org.bitcoinj.crypto.MnemonicException;
 
 public class ConsumerJava implements Consumer {
 
@@ -180,7 +180,7 @@ public class ConsumerJava implements Consumer {
         }
     }
     
-    void consumeKeys(ByteBuffer threadLocalReuseableByteBuffer) {
+    void consumeKeys(ByteBuffer threadLocalReuseableByteBuffer) throws MnemonicException.MnemonicLengthException {
         PublicKeyBytes[] publicKeyBytesArray = keysQueue.poll();
         while (publicKeyBytesArray != null) {
             for (PublicKeyBytes publicKeyBytes : publicKeyBytesArray) {

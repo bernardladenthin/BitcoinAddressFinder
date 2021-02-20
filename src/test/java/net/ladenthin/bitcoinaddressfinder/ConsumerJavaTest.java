@@ -41,6 +41,7 @@ import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.ECKey;
+import org.bitcoinj.crypto.MnemonicException;
 import org.bitcoinj.params.MainNetParams;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -110,7 +111,7 @@ public class ConsumerJavaTest {
 
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
-    public void runProber_testAddressGiven_hitExpected(boolean compressed, boolean useStaticAmount) throws IOException, InterruptedException {
+    public void runProber_testAddressGiven_hitExpected(boolean compressed, boolean useStaticAmount) throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
@@ -170,7 +171,7 @@ public class ConsumerJavaTest {
 
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
-    public void runProber_unknownAddressGiven_missExpected(boolean compressed, boolean useStaticAmount) throws IOException, InterruptedException {
+    public void runProber_unknownAddressGiven_missExpected(boolean compressed, boolean useStaticAmount) throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
@@ -216,7 +217,7 @@ public class ConsumerJavaTest {
     }
 
     @Test
-    public void consumeKeys_invalidSecretGiven_continueExpectedAndNoExceptionThrown() throws IOException, InterruptedException, DecoderException {
+    public void consumeKeys_invalidSecretGiven_continueExpectedAndNoExceptionThrown() throws IOException, InterruptedException, DecoderException, MnemonicException.MnemonicLengthException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
@@ -243,7 +244,7 @@ public class ConsumerJavaTest {
     
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED, location = CommonDataProvider.class)
-    public void consumeKeys_invalidPublicKeyHashUncompressedGiven_ThrowException(boolean compressed) throws IOException, InterruptedException, DecoderException {
+    public void consumeKeys_invalidPublicKeyHashUncompressedGiven_ThrowException(boolean compressed) throws IOException, InterruptedException, DecoderException, MnemonicException.MnemonicLengthException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
@@ -300,7 +301,7 @@ public class ConsumerJavaTest {
     
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED, location = CommonDataProvider.class)
-    public void consumeKeys_testVanityPattern_patternMatches(boolean compressed) throws IOException, InterruptedException, DecoderException {
+    public void consumeKeys_testVanityPattern_patternMatches(boolean compressed) throws IOException, InterruptedException, DecoderException, MnemonicException.MnemonicLengthException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
@@ -347,14 +348,14 @@ public class ConsumerJavaTest {
             assertThat(arguments.get(2), is(equalTo("hit: safe log: publicKeyBytes.getCompressed(): 02af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45")));
             assertThat(arguments.get(3), is(equalTo("hit: safe log: hash160Uncompressed: 2a6f34a72c181bdd4e6d91ffa69e84fd6c49b207")));
             assertThat(arguments.get(4), is(equalTo("hit: safe log: hash160Compressed: c065379323a549fc3547bcb1937d5dcb48df2396")));
-            assertThat(arguments.get(5), is(equalTo("vanity pattern match: privateKeyBigInteger: [73] privateKeyBytes: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 73]] privateKeyHex: [0000000000000000000000000000000000000000000000000000000000000049] WiF: [KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU7fj3itoEY] publicKeyAsHex: [02af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45] publicKeyHash160Hex: [c065379323a549fc3547bcb1937d5dcb48df2396] publicKeyHash160Base58: [1JYHzX3ndZEcnjrWSQ9VC7324TJ9BAoGy4] Compressed: [true]")));
+            assertThat(arguments.get(5), is(equalTo("vanity pattern match: privateKeyBigInteger: [73] privateKeyBytes: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 73]] privateKeyHex: [0000000000000000000000000000000000000000000000000000000000000049] WiF: [KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU7fj3itoEY] publicKeyAsHex: [02af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45] publicKeyHash160Hex: [c065379323a549fc3547bcb1937d5dcb48df2396] publicKeyHash160Base58: [1JYHzX3ndZEcnjrWSQ9VC7324TJ9BAoGy4] Compressed: [true] Mnemonic: [abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abuse, differ]")));
         } else {
             assertThat(arguments.get(0), is(equalTo("hit: safe log: publicKeyBytes.getSecretKey(): 73")));
             assertThat(arguments.get(1), is(equalTo("hit: safe log: publicKeyBytes.getUncompressed(): 04af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45f98a3fd831eb2b749a93b0e6f35cfb40c8cd5aa667a15581bc2feded498fd9c6")));
             assertThat(arguments.get(2), is(equalTo("hit: safe log: publicKeyBytes.getCompressed(): 02af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45")));
             assertThat(arguments.get(3), is(equalTo("hit: safe log: hash160Uncompressed: 2a6f34a72c181bdd4e6d91ffa69e84fd6c49b207")));
             assertThat(arguments.get(4), is(equalTo("hit: safe log: hash160Compressed: c065379323a549fc3547bcb1937d5dcb48df2396")));
-            assertThat(arguments.get(5), is(equalTo("vanity pattern match: privateKeyBigInteger: [73] privateKeyBytes: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 73]] privateKeyHex: [0000000000000000000000000000000000000000000000000000000000000049] WiF: [5HpHagT65TZzG1PH3CSu63k8DbpvD8s5ip4nEB3kEsreJwwNRRr] publicKeyAsHex: [04af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45f98a3fd831eb2b749a93b0e6f35cfb40c8cd5aa667a15581bc2feded498fd9c6] publicKeyHash160Hex: [2a6f34a72c181bdd4e6d91ffa69e84fd6c49b207] publicKeyHash160Base58: [14sNbmEhgiGX6BZe9Q5PCgTQT3576mniZt] Compressed: [false]")));
+            assertThat(arguments.get(5), is(equalTo("vanity pattern match: privateKeyBigInteger: [73] privateKeyBytes: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 73]] privateKeyHex: [0000000000000000000000000000000000000000000000000000000000000049] WiF: [5HpHagT65TZzG1PH3CSu63k8DbpvD8s5ip4nEB3kEsreJwwNRRr] publicKeyAsHex: [04af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45f98a3fd831eb2b749a93b0e6f35cfb40c8cd5aa667a15581bc2feded498fd9c6] publicKeyHash160Hex: [2a6f34a72c181bdd4e6d91ffa69e84fd6c49b207] publicKeyHash160Base58: [14sNbmEhgiGX6BZe9Q5PCgTQT3576mniZt] Compressed: [false] Mnemonic: [abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abuse, differ]")));
         }
     }
 
