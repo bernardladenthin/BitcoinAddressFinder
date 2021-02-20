@@ -148,6 +148,9 @@ Please find the answear for vulnerability questions somewhere else:
 * https://github.com/Xefrok/BitBruteForce-Wallet
 * https://github.com/Isaacdelly/Plutus
 
+## Known issues
+If you have a laptop like HP ZBook G3/G4/G5 "hybrid graphics" mode is very slow because of the shared memory. Please select in the BIOS "discrete graphics".
+
 -----
 ## Legal
 This software should not be configured and used to find (Bitcoin/Altcoin) address hash (RIPEMD-160) collisions and use (steal) credit from third-party (Bitcoin/Altcoin) addresses.
