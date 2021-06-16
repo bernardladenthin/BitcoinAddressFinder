@@ -20,8 +20,10 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.nio.ByteBuffer;
 import javax.annotation.Nonnull;
+import lombok.EqualsAndHashCode;
 import org.bitcoinj.core.Coin;
 
+@EqualsAndHashCode
 public class AddressToCoin {
 
     @Nonnull
@@ -44,9 +46,11 @@ public class AddressToCoin {
         return hash160;
     }
 
+    // handcraftet to print the ByteBuffer pretty
     @Override
     public String toString() {
-        return new ByteBufferUtility(false).getHexFromByteBuffer(hash160);
+        return "AddressToCoin{" + "hash160=" + new ByteBufferUtility(false).getHexFromByteBuffer(hash160) + ", coin=" + coin + '}';
     }
+    
 
 }

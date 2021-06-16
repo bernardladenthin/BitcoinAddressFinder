@@ -20,12 +20,15 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import com.google.common.hash.Hashing;
 import java.math.BigInteger;
-import java.util.Objects;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Utils;
 import org.bouncycastle.crypto.digests.RIPEMD160Digest;
 
+@ToString
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class PublicKeyBytes {
     
     /**
@@ -89,6 +92,7 @@ public class PublicKeyBytes {
      */
     private String compressedKeyHashBase58;
     
+    @EqualsAndHashCode.Include
     private final BigInteger secretKey;
     
     // [4, 121, -66, 102, 126, -7, -36, -69, -84, 85, -96, 98, -107, -50, -121, 11, 7, 2, -101, -4, -37, 45, -50, 40, -39, 89, -14, -127, 91, 22, -8, 23, -104, 72, 58, -38, 119, 38, -93, -60, 101, 93, -92, -5, -4, 14, 17, 8, -88, -3, 23, -76, 72, -90, -123, 84, 25, -100, 71, -48, -113, -5, 16, -44, -72]
@@ -200,35 +204,4 @@ public class PublicKeyBytes {
         }
         return compressedKeyHashBase58;
     }
-
-    @Override
-    public int hashCode() {
-        int hash = 5;
-        hash = 17 * hash + Objects.hashCode(this.secretKey);
-        return hash;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj) {
-            return true;
-        }
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final PublicKeyBytes other = (PublicKeyBytes) obj;
-        if (!Objects.equals(this.secretKey, other.secretKey)) {
-            return false;
-        }
-        return true;
-    }
-
-    @Override
-    public String toString() {
-        return "PublicKeyBytes{" + "uncompressed=" + uncompressed + ", compressed=" + compressed + ", uncompressedKeyHash=" + uncompressedKeyHash + ", compressedKeyHash=" + compressedKeyHash + ", uncompressedKeyHashBase58=" + uncompressedKeyHashBase58 + ", compressedKeyHashBase58=" + compressedKeyHashBase58 + ", secretKey=" + secretKey + '}';
-    }
-    
 }

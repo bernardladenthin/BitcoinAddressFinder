@@ -44,23 +44,44 @@ public class PublicKeyBytesTest {
         ECKey keyCompressed = new TestAddresses42(1, true).getECKeys().get(0);
         
         // act
-        PublicKeyBytes publicKeyBytes = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey());
-        PublicKeyBytes publicKeyBytesGivenCompressed = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey(), keyCompressed.getPubKey());
+        PublicKeyBytes publicKeyBytesUncompressed = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey());
+        PublicKeyBytes publicKeyBytesCompressed = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey(), keyCompressed.getPubKey());
         
         // assert
-        assertThat(publicKeyBytes.getUncompressed(), is(equalTo(keyUncompressed.getPubKey())));
-        assertThat(publicKeyBytes.getUncompressedKeyHash(), is(equalTo(keyUncompressed.getPubKeyHash())));
-        assertThat(Utils.sha256hash160(publicKeyBytesGivenCompressed.getUncompressed()), is(equalTo(keyUncompressed.getPubKeyHash())));
-        assertThat(publicKeyBytesGivenCompressed.getUncompressedKeyHash(), is(equalTo(keyUncompressed.getPubKeyHash())));
-        assertThat(publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(networkParameters, keyUncompressed.getPubKeyHash()).toBase58())));
-        assertThat(publicKeyBytesGivenCompressed.getUncompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(networkParameters, keyUncompressed.getPubKeyHash()).toBase58())));
+        assertThat(publicKeyBytesUncompressed.getUncompressed(), is(equalTo(keyUncompressed.getPubKey())));
+        assertThat(publicKeyBytesUncompressed.getUncompressedKeyHash(), is(equalTo(keyUncompressed.getPubKeyHash())));
+        assertThat(Utils.sha256hash160(publicKeyBytesCompressed.getUncompressed()), is(equalTo(keyUncompressed.getPubKeyHash())));
+        assertThat(publicKeyBytesCompressed.getUncompressedKeyHash(), is(equalTo(keyUncompressed.getPubKeyHash())));
+        assertThat(publicKeyBytesUncompressed.getUncompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(networkParameters, keyUncompressed.getPubKeyHash()).toBase58())));
+        assertThat(publicKeyBytesCompressed.getUncompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(networkParameters, keyUncompressed.getPubKeyHash()).toBase58())));
         
-        assertThat(publicKeyBytes.getCompressed(), is(equalTo(keyCompressed.getPubKey())));
-        assertThat(publicKeyBytes.getCompressedKeyHash(), is(equalTo(keyCompressed.getPubKeyHash())));
-        assertThat(Utils.sha256hash160(publicKeyBytesGivenCompressed.getCompressed()), is(equalTo(keyCompressed.getPubKeyHash())));
-        assertThat(publicKeyBytesGivenCompressed.getCompressedKeyHash(), is(equalTo(keyCompressed.getPubKeyHash())));
-        assertThat(publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(networkParameters, keyCompressed.getPubKeyHash()).toBase58())));
-        assertThat(publicKeyBytesGivenCompressed.getCompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(networkParameters, keyCompressed.getPubKeyHash()).toBase58())));
+        assertThat(publicKeyBytesUncompressed.getCompressed(), is(equalTo(keyCompressed.getPubKey())));
+        assertThat(publicKeyBytesUncompressed.getCompressedKeyHash(), is(equalTo(keyCompressed.getPubKeyHash())));
+        assertThat(Utils.sha256hash160(publicKeyBytesCompressed.getCompressed()), is(equalTo(keyCompressed.getPubKeyHash())));
+        assertThat(publicKeyBytesCompressed.getCompressedKeyHash(), is(equalTo(keyCompressed.getPubKeyHash())));
+        assertThat(publicKeyBytesUncompressed.getCompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(networkParameters, keyCompressed.getPubKeyHash()).toBase58())));
+        assertThat(publicKeyBytesCompressed.getCompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(networkParameters, keyCompressed.getPubKeyHash()).toBase58())));
+    }
+    
+    @Test
+    public void createPublicKeyBytes_publicKeyGiven_ToStringAndEqualsAndHashCode() throws IOException, InterruptedException {
+        // arrange
+        ECKey keyUncompressed = new TestAddresses42(1, false).getECKeys().get(0);
+        ECKey keyCompressed = new TestAddresses42(1, true).getECKeys().get(0);
+        
+        // act
+        PublicKeyBytes publicKeyBytesUncompressed = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey());
+        PublicKeyBytes publicKeyBytesUncompressed2 = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey());
+        PublicKeyBytes publicKeyBytesCompressed = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey(), keyCompressed.getPubKey());
+        PublicKeyBytes publicKeyBytesCompressed2 = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey(), keyCompressed.getPubKey());
+        
+        // assert
+        EqualHashCodeToStringTestHelper equalHashCodeToStringTestHelper = new EqualHashCodeToStringTestHelper(publicKeyBytesUncompressed, publicKeyBytesUncompressed2, publicKeyBytesCompressed, publicKeyBytesCompressed2);
+        equalHashCodeToStringTestHelper.assertEqualsHashCodeToStringAIsEqualToB();
+
+        // toString
+        assertThat(publicKeyBytesUncompressed.toString(), is(equalTo(publicKeyBytesCompressed.toString())));
+        assertThat(publicKeyBytesUncompressed.toString(), is(equalTo("PublicKeyBytes(uncompressed=[4, -72, -92, -69, -93, 30, -111, -120, 55, 18, -89, 70, 66, 24, -63, 62, 52, 48, 39, 34, 88, -110, -57, 21, -14, 53, -101, 74, 58, 26, -82, 40, 22, 107, -6, 83, -14, -15, -1, 14, -5, 118, -120, 121, -19, -126, 80, -9, 111, -100, 126, -61, 59, -5, -41, 2, -78, 29, 121, -12, -40, -80, -68, 93, 4], compressed=[2, -72, -92, -69, -93, 30, -111, -120, 55, 18, -89, 70, 66, 24, -63, 62, 52, 48, 39, 34, 88, -110, -57, 21, -14, 53, -101, 74, 58, 26, -82, 40, 22], uncompressedKeyHash=[115, -42, -93, -80, 127, 72, -114, 18, -7, 23, 87, 22, -7, 92, 94, 24, -62, 101, 105, 63], compressedKeyHash=[105, 112, -34, -93, 92, 72, -31, -57, -114, -109, 17, 23, -6, -72, 51, 53, 76, -35, -7, -76], uncompressedKeyHashBase58=null, compressedKeyHashBase58=null, secretKey=24250429618215260598957696001935175135959229619080974590971174872813112994997)")));
     }
     
     @Test
