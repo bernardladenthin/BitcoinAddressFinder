@@ -1,5 +1,5 @@
 # BitcoinAddressFinder
-A high performance bitcoin address finder.
+Free high performance tool for fast scanning random Bitcoin, Bitcoin Cash, Bitcoin SV, Litecoin, Dogecoin, Dash, Zcash (and many more) private keys and finding addresses with balance.
 The main goal is to generate as fast as possible (Bitcoin/Altcoin) addresses using the JVM combined with OpenCL and check if the address (RIPEMD160 hash) was used/not used before. This includes possible hash collisions.
 
 Copyright (c) 2017-2021 Bernard Ladenthin.
@@ -52,31 +52,30 @@ The exporter writes all addresses in different formats:
 * DynamicWidthBase58BitcoinAddressWithAmount: The addresses will be written with amount.
 
 ### Use my prepared database
-* Light (2.68 GiB), Last update: February 10, 2021
+* Light (3.21 GiB), Last update: June 8, 2021
   * Contains Bitcoin addresses whith amount and many altcoin addresses with amount.
   * Static amount of 0 is used to allow best compression.
-  * Unique entries: 65170711
-  * Mapsize: 2752 MiB
-  * Link (1.8 GiB packed): http://ladenthin.net/lmdb_light.zip
+  * Unique entries: 78059862
+  * Mapsize: 3296 MiB
   * Time to create the database: ~4 hours
-  * Checksums:
-    * CRC32: 7195F4B7
-    * MD5: 7D30D0589FE36AD1688118D3DA7F02F7
-    * RIPEMD-160: FF8C8D925E48A740A044A511E973450EC2E4F285
-    * SHA-1: FF471DF78C8A6555E70BB89B0AC66345181CCABE
-    * SHA-256: 7AE7B71986D6267523A48E831AA00538E40A985AD415ADB7D5803084F5C6351C
-    * SHA3-224: 5D00BE0AC0B1DCC40EC890E63ADB7DB74122E4E5FCAE45AF52ACC391
-    * SHA3-256: A0E39E8CC7A9B1D6AFE961515A54ECF510F9412A58C6F0E5774D71241D94A7A5
-    * SHA3-384: B8DCC266E8E5F7776DC93A65BA8B5C9CD383E78F445D5A09B395EB1BB5B5F8D555945CA6807769BF22F8925957EE99F0
-    * SHA3-512: 92F8AF64BAFAB5556D0569F3AD30718258C5EA3E15CE9AF054C419A398A0494A3E3F21BBB9A8C21C9D29294B4EF5DE3D98B0851392D28DCD4FA5F6CC59C4424C
+  * Link (2.1 GiB zip archive): http://ladenthin.net/lmdb_light.zip
+    * CRC32: BA810113
+    * MD5: 8E714F1730999B01607E7992F27DB670
+    * RIPEMD-160: 09BAF4AE9F4FDD4944484563F3A70839358E7A75
+    * SHA-1: F7E8384092D53A08F7806A33CFB7514D5E3A17D1
+    * SHA-256: 3D25517D77153C2AB9C7F3BCDA1282B239DBE4C13AD08474D83E061B10732C69
+    * SHA3-224: 1CD23DFC992BE384A2C8F3DFC830B4D291A27AA4032AF6C7BED4D4D9
+    * SHA3-256: 8B2398B8F207D8F3033AEAFB8B23C30E7CC3B96E1AF0BBD1C5538156C4AE3A16
+    * SHA3-384: 1187076FFAEABFAB9256B68254EA8553963A2604A5FA4748D3BC7B877BDFED071234E213D500B677B6B3B18488A6FC52
+    * SHA3-512: 20B00BB3A31C76104F65810FAB079D70809D8751FC329B5626120A1F5F08F9D3F2853067007CBFA4CB1C9A0910EDA31813F86A59962D3DAC2CAD3BAAC678453A
+
 * Full (32.2 GiB), Last update: February 10, 2021
   * Contains all Bitcoin addresses which are ever used and many altcoin addresses with and without amount.
   * Static amount of 0 is used to allow best compression.
   * Unique entries: 781419881
   * Mapsize: 32992 MiB
-  * Link (17.5 GiB packed): http://ladenthin.net/lmdb_full.zip
   * Time to create the database: ~34 hours
-  * Checksums:
+  * Link (17.5 GiB zip archive): http://ladenthin.net/lmdb_full.zip
     * CRC32: 04D50A18
     * MD5: 6E8968DBF4A698C908BFAC5A2315F52D
     * RIPEMD-160: C5BFDBDDE6FCD829E15F893D874E2C203798D1DD
