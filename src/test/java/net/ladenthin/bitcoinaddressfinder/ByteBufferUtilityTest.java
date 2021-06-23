@@ -61,8 +61,31 @@ public class ByteBufferUtilityTest {
     }
     
     @Test
+    public void freeByteBuffer_cleanerIsNull_noExceptionThrown() throws IOException, IllegalArgumentException, IllegalAccessException, NoSuchFieldException {
+        // arrange
+        byte[] bytesGiven = createDummyByteArray(7);
+        
+        final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
+        
+        ByteBuffer bytesAsByteBuffer = byteBufferUtility.byteArrayToByteBuffer(bytesGiven);
+        DirectBuffer directBuffer = (DirectBuffer)bytesAsByteBuffer;
+        
+        ByteBuffer duplicate = bytesAsByteBuffer.duplicate();
+        DirectBuffer directBufferDuplicate = (DirectBuffer)duplicate;
+
+        // pre assert
+        assertThat(directBuffer.cleaner(), is(not(nullValue())));
+        assertThat(directBufferDuplicate.cleaner(), is(nullValue()));
+        
+        // act
+        byteBufferUtility.freeByteBuffer(bytesAsByteBuffer);
+
+        // assert
+    }
+    
+    @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT, location = CommonDataProvider.class)
-    public void freeByteBuffer_freeAGivenByteBufferGiven_noExceptionThrown(boolean allocateDirect) throws IOException, IllegalArgumentException, IllegalAccessException, NoSuchFieldException {
+    public void freeByteBuffer_freeAGivenByteBuffer_noExceptionThrown(boolean allocateDirect) throws IOException, IllegalArgumentException, IllegalAccessException, NoSuchFieldException {
         // arrange
         byte[] bytesGiven = createDummyByteArray(7);
         
