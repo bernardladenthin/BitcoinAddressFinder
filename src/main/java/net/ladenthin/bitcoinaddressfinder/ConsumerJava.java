@@ -176,7 +176,7 @@ public class ConsumerJava implements Consumer {
         }
         
         if (threadLocalReuseableByteBuffer != null) {
-            ByteBufferUtility.freeByteBuffer(threadLocalReuseableByteBuffer);
+            byteBufferUtility.freeByteBuffer(threadLocalReuseableByteBuffer);
         }
     }
     

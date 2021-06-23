@@ -36,13 +36,18 @@ public class ByteBufferUtility {
     
     /**
      * https://stackoverflow.com/questions/8462200/examples-of-forcing-freeing-of-native-memory-direct-bytebuffer-has-allocated-us
-     * @param byteBuffer the ByteBuffer to free 
+     * @param byteBuffer nullable, the ByteBuffer to free 
      */
-    public static void freeByteBuffer(ByteBuffer byteBuffer) {
+    public void freeByteBuffer(ByteBuffer byteBuffer) {
         if (byteBuffer == null) {
             return;
         }
-        Cleaner cleaner = ((DirectBuffer) byteBuffer).cleaner();
+        if (! (byteBuffer instanceof DirectBuffer)) {
+            return;
+        }
+        DirectBuffer directBuffer = (DirectBuffer) byteBuffer;
+        
+        Cleaner cleaner = directBuffer.cleaner();
         if (cleaner != null) {
             cleaner.clean();
         }

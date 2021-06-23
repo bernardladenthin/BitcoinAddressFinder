@@ -18,7 +18,10 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import com.tngtech.java.junit.dataprovider.DataProviderRunner;
+import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import org.junit.Before;
@@ -26,12 +29,79 @@ import org.junit.Test;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
+import org.junit.runner.RunWith;
+import sun.misc.Cleaner;
+import sun.nio.ch.DirectBuffer;
 
+@RunWith(DataProviderRunner.class)
 public class ByteBufferUtilityTest {
-
+    
+    /**
+     * It does not matter if the value is true or false.
+     */
+    private final static boolean ALLOCATE_DIRECT_DOES_NOT_MATTER = false;
+    
     @Before
     public void init() throws IOException {
     }
+    
+    
+    // <editor-fold defaultstate="collapsed" desc="freeByteBuffer">
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT, location = CommonDataProvider.class)
+    public void freeByteBuffer_nullGiven_noExceptionThrown(boolean allocateDirect) throws IOException {
+        // arrange
+        
+        final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(allocateDirect);
+
+        // act
+        byteBufferUtility.freeByteBuffer(null);
+
+        // assert
+    }
+    
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT, location = CommonDataProvider.class)
+    public void freeByteBuffer_freeAGivenByteBufferGiven_noExceptionThrown(boolean allocateDirect) throws IOException, IllegalArgumentException, IllegalAccessException, NoSuchFieldException {
+        // arrange
+        byte[] bytesGiven = createDummyByteArray(7);
+        
+        final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(allocateDirect);
+        ByteBuffer bytesAsByteBuffer = byteBufferUtility.byteArrayToByteBuffer(bytesGiven);
+
+        // pre assert
+        if (allocateDirect) {
+            long address = getAddressFromDirectBuffer((DirectBuffer)bytesAsByteBuffer);
+            assertThat(address, is(not(equalTo(0L))));
+        }
+        
+        // act
+        byteBufferUtility.freeByteBuffer(bytesAsByteBuffer);
+
+        // assert
+        if (allocateDirect) {
+            long address = getAddressFromDirectBuffer((DirectBuffer)bytesAsByteBuffer);
+            assertThat(address, is(equalTo(0L)));
+        }
+    }
+    
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT, location = CommonDataProvider.class)
+    public void freeByteBuffer_freeAGivenByteBufferGivenTwice_noExceptionThrown(boolean allocateDirect) throws IOException {
+        // arrange
+        byte[] bytesGiven = createDummyByteArray(7);
+        
+        final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(allocateDirect);
+        ByteBuffer bytesAsByteBuffer = byteBufferUtility.byteArrayToByteBuffer(bytesGiven);
+
+        // act
+        byteBufferUtility.freeByteBuffer(bytesAsByteBuffer);
+        byteBufferUtility.freeByteBuffer(bytesAsByteBuffer);
+
+        // assert
+    }
+    
+    // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="helper methods">
     private ByteBuffer createDummyByteBuffer(int size) {
@@ -81,30 +151,65 @@ public class ByteBufferUtilityTest {
 
     // <editor-fold defaultstate="collapsed" desc="byteArrayToByteBuffer">
     @Test
-    public void byteArrayToByteBuffer_wrapped_allBytesEquals() throws IOException {
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT, location = CommonDataProvider.class)
+    public void byteArrayToByteBuffer_wrapped_allBytesEquals(boolean allocateDirect) throws IOException {
         // arrange
         byte[] bytes = createDummyByteArray(7);
 
         // act
-        ByteBuffer byteBuffer = new ByteBufferUtility(false).byteArrayToByteBuffer(bytes);
+        ByteBuffer byteBuffer = new ByteBufferUtility(allocateDirect).byteArrayToByteBuffer(bytes);
 
         // assert
-        byte[] bytesFromByteBuffer = new ByteBufferUtility(false).byteBufferToBytes(byteBuffer);
-        assertThat(Arrays.toString(bytesFromByteBuffer), is(equalTo("[0, 1, 2, 3, 4, 5, 6]")));
-    }
-
-    @Test
-    public void byteArrayToByteBuffer_allocatedDirect_allBytesEquals() throws IOException {
-        // arrange
-        byte[] bytes = createDummyByteArray(7);
-
-        // act
-        ByteBuffer byteBuffer = new ByteBufferUtility(true).byteArrayToByteBuffer(bytes);
-
-        // assert
-        byte[] bytesFromByteBuffer = new ByteBufferUtility(true).byteBufferToBytes(byteBuffer);
+        assertThat(byteBuffer.isDirect(), is(equalTo(allocateDirect)));
+        byte[] bytesFromByteBuffer = new ByteBufferUtility(ALLOCATE_DIRECT_DOES_NOT_MATTER).byteBufferToBytes(byteBuffer);
         assertThat(Arrays.toString(bytesFromByteBuffer), is(equalTo("[0, 1, 2, 3, 4, 5, 6]")));
     }
     // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="ByteBuffer Hex conversion">
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT, location = CommonDataProvider.class)
+    public void getHexFromByteBuffer_byteBufferProvided_returnHex(boolean allocateDirect) throws IOException {
+        // arrange
+        String hexExpected = "00010203040506";
+        byte[] bytesGiven = createDummyByteArray(7);
+        
+        final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(allocateDirect);
+        ByteBuffer bytesAsByteBuffer = byteBufferUtility.byteArrayToByteBuffer(bytesGiven);
+
+        // act
+        String hex = byteBufferUtility.getHexFromByteBuffer(bytesAsByteBuffer);
+
+        // assert
+        assertThat(hex, is(equalTo(hexExpected)));
+    }
+
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT, location = CommonDataProvider.class)
+    public void getByteBufferFromHex_HexProvided_returnByteBuffer(boolean allocateDirect) throws IOException {
+        // arrange
+        String hexGiven = "00010203040506";
+        byte[] bytesExpected = createDummyByteArray(7);
+
+        // act
+        ByteBuffer byteBuffer = new ByteBufferUtility(allocateDirect).getByteBufferFromHex(hexGiven);
+
+        // assert
+        assertThat(byteBuffer.isDirect(), is(equalTo(allocateDirect)));
+        byte[] bytesFromByteBuffer = new ByteBufferUtility(ALLOCATE_DIRECT_DOES_NOT_MATTER).byteBufferToBytes(byteBuffer);
+        assertThat(bytesFromByteBuffer, is(equalTo(bytesExpected)));
+    }
+    // </editor-fold>
+    
+    private long getAddressFromDirectBuffer(DirectBuffer directBuffer) throws IllegalArgumentException, NoSuchFieldException, SecurityException, IllegalAccessException {
+        Cleaner cleaner = directBuffer.cleaner();
+        Field thunkField = cleaner.getClass().getDeclaredField("thunk");
+        thunkField.setAccessible(true);
+        Object deallocator = thunkField.get(cleaner);
+        
+        Field addressField = deallocator.getClass().getDeclaredField("address");
+        addressField.setAccessible(true);
+        return addressField.getLong(deallocator);
+    }
 
 }

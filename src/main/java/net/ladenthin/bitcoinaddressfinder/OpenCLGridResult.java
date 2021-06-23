@@ -23,6 +23,8 @@ import java.nio.ByteBuffer;
 
 public class OpenCLGridResult {
 
+    private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
+    
     private final BigInteger secretKeyBase;
     private final int workSize;
     private ByteBuffer result;
@@ -47,7 +49,7 @@ public class OpenCLGridResult {
     
     public void freeResult() {
         // free and do not use anymore
-        ByteBufferUtility.freeByteBuffer(result);
+        byteBufferUtility.freeByteBuffer(result);
         result = null;
     }
     

@@ -404,4 +404,18 @@ public class CommonDataProvider {
         }
         return objectArray;
     }
+    
+    /**
+     * For {@link ByteBufferUtility}.
+     * Use allocate direct.
+     */
+    public final static String DATA_PROVIDER_ALLOCATE_DIRECT = "allocateDirect";
+
+    @DataProvider
+    public static Object[][] allocateDirect() {
+        return new Object[][]{
+            {true},
+            {false},
+        };
+    }
 }
