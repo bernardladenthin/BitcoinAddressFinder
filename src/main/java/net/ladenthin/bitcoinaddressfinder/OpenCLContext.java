@@ -71,15 +71,15 @@ public class OpenCLContext {
     private List<String> getResourceNames() {
         List<String> resourceNames = new ArrayList<>();
         resourceNames.add("inc_defines.h");
-        resourceNames.add("inc_vendor.h");
-        resourceNames.add("inc_types.h");
-        resourceNames.add("inc_platform.h");
-        resourceNames.add("inc_platform.cl");
-        resourceNames.add("inc_common.h");
-        resourceNames.add("inc_common.cl");
+        resourceNames.add("copyfromhashcat/inc_vendor.h");
+        resourceNames.add("copyfromhashcat/inc_types.h");
+        resourceNames.add("copyfromhashcat/inc_platform.h");
+        resourceNames.add("copyfromhashcat/inc_platform.cl");
+        resourceNames.add("copyfromhashcat/inc_common.h");
+        resourceNames.add("copyfromhashcat/inc_common.cl");
 
-        resourceNames.add("inc_ecc_secp256k1.h");
-        resourceNames.add("inc_ecc_secp256k1.cl");
+        resourceNames.add("copyfromhashcat/inc_ecc_secp256k1.h");
+        resourceNames.add("copyfromhashcat/inc_ecc_secp256k1.cl");
         resourceNames.add("inc_ecc_secp256k1custom.cl");
         return resourceNames;
     }

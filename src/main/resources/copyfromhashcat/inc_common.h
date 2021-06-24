@@ -62,6 +62,7 @@
   MAYBE_UNUSED           const u32            digests_cnt,          \
   MAYBE_UNUSED           const u32            digests_offset_host,  \
   MAYBE_UNUSED           const u32            combs_mode,           \
+  MAYBE_UNUSED           const u32            salt_repeat,          \
   MAYBE_UNUSED           const u64            pws_pos,              \
   MAYBE_UNUSED           const u64            gid_max
 #else
@@ -100,6 +101,7 @@
   MAYBE_UNUSED           const u32            digests_cnt,          \
   MAYBE_UNUSED           const u32            digests_offset_host,  \
   MAYBE_UNUSED           const u32            combs_mode,           \
+  MAYBE_UNUSED           const u32            salt_repeat,          \
   MAYBE_UNUSED           const u64            pws_pos,              \
   MAYBE_UNUSED           const u64            gid_max
 #endif
@@ -234,6 +236,13 @@ DECLSPEC int hash_comp (const u32 *d1, GLOBAL_AS const u32 *d2);
 DECLSPEC int find_hash (const u32 *digest, const u32 digests_cnt, GLOBAL_AS const digest_t *digests_buf);
 #endif
 
+DECLSPEC int hc_enc_scan (const u32 *buf, const int len);
+DECLSPEC int hc_enc_scan_global (GLOBAL_AS const u32 *buf, const int len);
+DECLSPEC void hc_enc_init (hc_enc_t *hc_enc);
+DECLSPEC int hc_enc_has_next (hc_enc_t *hc_enc, const int sz);
+DECLSPEC int hc_enc_next (hc_enc_t *hc_enc, const u32 *src_buf, const int src_len, const int src_sz, u32 *dst_buf, const int dst_sz);
+DECLSPEC int hc_enc_next_global (hc_enc_t *hc_enc, GLOBAL_AS const u32 *src_buf, const int src_len, const int src_sz, u32 *dst_buf, const int dst_sz);
+
 DECLSPEC int pkcs_padding_bs8 (const u32 *data_buf, const int data_len);
 DECLSPEC int pkcs_padding_bs16 (const u32 *data_buf, const int data_len);
 DECLSPEC int asn1_detect (const u32 *buf, const int len);
@@ -247,7 +256,7 @@ DECLSPEC int is_valid_hex_32 (const u32 v);
 DECLSPEC int is_valid_base58_8 (const u8 v);
 DECLSPEC int is_valid_base58_32 (const u32 v);
 DECLSPEC int hc_find_keyboard_layout_map (const u32 search, const int search_len, LOCAL_AS keyboard_layout_mapping_t *s_keyboard_layout_mapping_buf, const int keyboard_layout_mapping_cnt);
-DECLSPEC int hc_execute_keyboard_layout_mapping (u32 *w0, u32 *w1, u32 *w2, u32 *w3, const int pw_len, LOCAL_AS keyboard_layout_mapping_t *s_keyboard_layout_mapping_buf, const int keyboard_layout_mapping_cnt);
+DECLSPEC int hc_execute_keyboard_layout_mapping (u32 *w, const int pw_len, LOCAL_AS keyboard_layout_mapping_t *s_keyboard_layout_mapping_buf, const int keyboard_layout_mapping_cnt);
 DECLSPEC void make_utf16be (const u32x *in, u32x *out1, u32x *out2);
 DECLSPEC void make_utf16beN (const u32x *in, u32x *out1, u32x *out2);
 DECLSPEC void make_utf16le (const u32x *in, u32x *out1, u32x *out2);
