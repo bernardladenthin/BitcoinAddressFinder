@@ -4,6 +4,9 @@ The main goal is to generate as fast as possible (Bitcoin/Altcoin) addresses usi
 
 Copyright (c) 2017-2021 Bernard Ladenthin.
 
+## Requirments
+* Java 8, newer versions are not supported and doesn't work (see #8).
+
 ## Features
 * Support blockchain addresses which are based on [secp256k1](https://en.bitcoin.it/wiki/Secp256k1).
 * Unit tested (trusted) open source which can be compiled easily from yourself.
