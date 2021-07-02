@@ -7,6 +7,24 @@ Copyright (c) 2017-2021 Bernard Ladenthin.
 ## Requirments
 * Java 8, newer versions are not supported and doesn't work (see #8).
 
+## Quickstart
+1. Download the binary (jar) from https://github.com/bernardladenthin/BitcoinAddressFinder/releases
+2. Download and extract the light database from https://github.com/bernardladenthin/BitcoinAddressFinder#use-my-prepared-database
+3. Download a configuration set like
+  1. https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/logbackConfiguration.xml
+  2. https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/config_Find_1OpenCLDevice.js
+  3. https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/run_Find_1OpenCLDevice.bat
+4. Put all in one directory like the following structure
+  * Downloads
+    * lmdb
+      * data.mdb
+      * lock.mdb
+    * bitcoinaddressfinder-1.0.0-SNAPSHOT-jar-with-dependencies.jar
+    * logbackConfiguration.xml
+    * config_Find_1OpenCLDevice.js
+    * run_Find_1OpenCLDevice.bat
+5. Run the file run_Find_1OpenCLDevice.bat
+
 ## Features
 * Support blockchain addresses which are based on [secp256k1](https://en.bitcoin.it/wiki/Secp256k1).
 * Unit tested (trusted) open source which can be compiled easily from yourself.
@@ -167,3 +185,5 @@ Some configurations are not allowed in some countries (definitely not complete):
 ## License
 
 It is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full license text.
+Some subprojects have a different license.
+
