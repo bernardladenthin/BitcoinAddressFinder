@@ -167,6 +167,7 @@ Please find the answear for vulnerability questions somewhere else:
 * https://github.com/Henshall/BitcoinPrivateKeyHunter
 * https://github.com/Xefrok/BitBruteForce-Wallet
 * https://github.com/Isaacdelly/Plutus
+* https://github.com/Noname400/Hunt-to-Mnemonic
 
 ## Known issues
 If you have a laptop like HP ZBook G3/G4/G5 "hybrid graphics" mode is very slow because of the shared memory. Please select in the BIOS "discrete graphics".
