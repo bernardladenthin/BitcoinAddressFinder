@@ -21,6 +21,8 @@ package net.ladenthin.bitcoinaddressfinder;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.*;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
 import org.apache.commons.codec.DecoderException;
@@ -134,23 +136,13 @@ public class AddressTxtLineTest {
     }
 
     @Test
-    public void fromLine_StaticReddcoinP2PKHAddress_returnPublicKeyHash() throws IOException {
-        // act
-        StaticReddcoinP2PKHAddress staticReddcoinP2PKHAddress = new StaticReddcoinP2PKHAddress();
-        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticReddcoinP2PKHAddress.publicAddress, keyUtility);
-
-        // assert
-        assertThat(addressToCoin.getHash160(), is(equalTo(staticReddcoinP2PKHAddress.byteBuffer_publicKeyHash)));
-        assertThatDefaultCoinIsSet(addressToCoin);
-    }
-
-    @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_STATIC_P2PKH_ADDRESSES, location = CommonDataProvider.class)
     public void fromLine_StaticP2PKHAddress_returnPublicKeyHash(StaticP2PKHAddress address) throws IOException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(address.getPublicAddress(), keyUtility);
 
         // assert
+        assertThat(new ByteBufferUtility(true).getHexFromByteBuffer(addressToCoin.getHash160()), is(equalTo(address.getPublicKeyHashAsHex())));
         assertThat(addressToCoin.getHash160(), is(equalTo(address.getPublicKeyHashAsByteBuffer())));
         assertThatDefaultCoinIsSet(addressToCoin);
     }
@@ -162,6 +154,7 @@ public class AddressTxtLineTest {
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(address.getPublicAddress(), keyUtility);
 
         // assert
+        assertThat(new ByteBufferUtility(true).getHexFromByteBuffer(addressToCoin.getHash160()), is(equalTo(address.getScriptHashAsHex())));
         assertThat(addressToCoin.getHash160(), is(equalTo(address.getScriptHashAsByteBuffer())));
         assertThatDefaultCoinIsSet(addressToCoin);
     }

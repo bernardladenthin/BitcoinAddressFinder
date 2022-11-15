@@ -60,6 +60,10 @@ public enum StaticP2PKHAddress {
      */
     Dogecoin("DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L", "830a7420e63d76244ff7cbd1c248e94c14463259"),
     /**
+     * https://bitinfocharts.com/de/feathercoin/address/7E2vzSfb8o3N8E3PEZ6A48sp6bUGUTA8ro
+     */
+    Feathercoin("7E2vzSfb8o3N8E3PEZ6A48sp6bUGUTA8ro", "7842e48f5012d40ec702ec41d377559bc51f817a"),
+    /**
      * https://privatekeys.pw/litecoin/address/LQTpS3VaYTjCr4s9Y1t5zbeY26zevf7Fb3
      */
     Litecoin("LQTpS3VaYTjCr4s9Y1t5zbeY26zevf7Fb3", "3977ea726e43b1db5c1f3ddd634d56ade26eb0a2"),
@@ -72,9 +76,9 @@ public enum StaticP2PKHAddress {
      */
     Novacoin("4aLpet1cqwr6TuEb8grfAnpvD1eJbTqyvN", "e261b8251b26231b0e2d62d7f6698d7acee1dbae"),
     /**
-     * https://bitinfocharts.com/de/feathercoin/address/7E2vzSfb8o3N8E3PEZ6A48sp6bUGUTA8ro
+     * https://bitinfocharts.com/de/reddcoin/address/RdLmuVt2ByWxXhiqhKSk4aV9UPLj6Lu3HL
      */
-    Feathercoin("7E2vzSfb8o3N8E3PEZ6A48sp6bUGUTA8ro", "7842e48f5012d40ec702ec41d377559bc51f817a"),
+    Reddcoin("RdLmuVt2ByWxXhiqhKSk4aV9UPLj6Lu3HL", "33d101e6da33f9d1da43069cfd7bf370208c9c37"),
     /**
      * https://bitinfocharts.com/de/vertcoin/address/VfukW89WKT9h3YjHZdSAAuGNVGELY31wyj
      */
