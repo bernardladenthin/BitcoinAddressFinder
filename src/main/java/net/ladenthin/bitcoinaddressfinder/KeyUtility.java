@@ -54,7 +54,7 @@ public class KeyUtility {
      */
     public ByteBuffer getHash160ByteBufferFromBase58String(String base58) {
         LegacyAddress address = LegacyAddress.fromBase58(networkParameters, base58);
-        byte[] hash160 = address.getHash160();
+        byte[] hash160 = address.getHash();
         return byteBufferUtility.byteArrayToByteBuffer(hash160);
     }
 
@@ -101,7 +101,7 @@ public class KeyUtility {
 
     // <editor-fold defaultstate="collapsed" desc="ByteBuffer LegacyAddress conversion">
     public ByteBuffer addressToByteBuffer(LegacyAddress address) {
-        ByteBuffer byteBuffer = byteBufferUtility.byteArrayToByteBuffer(address.getHash160());
+        ByteBuffer byteBuffer = byteBufferUtility.byteArrayToByteBuffer(address.getHash());
         return byteBuffer;
     }
 
@@ -109,7 +109,7 @@ public class KeyUtility {
      * Require networkParameters.
      */
     public LegacyAddress byteBufferToAddress(ByteBuffer byteBuffer) {
-        return new LegacyAddress(networkParameters, byteBufferUtility.byteBufferToBytes(byteBuffer));
+        return LegacyAddress.fromPubKeyHash(networkParameters, byteBufferUtility.byteBufferToBytes(byteBuffer));
     }
     // </editor-fold>
 
