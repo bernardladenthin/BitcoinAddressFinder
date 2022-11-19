@@ -73,39 +73,47 @@ The exporter writes all addresses in different formats:
 * DynamicWidthBase58BitcoinAddressWithAmount: The addresses will be written with amount.
 
 ### Use my prepared database
-* Light (3.21 GiB), Last update: June 8, 2021
+* Light (4.60 GiB), Last update: November 15, 2022
   * Contains Bitcoin addresses whith amount and many altcoin addresses with amount.
   * Static amount of 0 is used to allow best compression.
-  * Unique entries: 78059862
-  * Mapsize: 3296 MiB
-  * Time to create the database: ~4 hours
-  * Link (2.1 GiB zip archive): http://ladenthin.net/lmdb_light.zip
-    * CRC32: BA810113
-    * MD5: 8E714F1730999B01607E7992F27DB670
-    * RIPEMD-160: 09BAF4AE9F4FDD4944484563F3A70839358E7A75
-    * SHA-1: F7E8384092D53A08F7806A33CFB7514D5E3A17D1
-    * SHA-256: 3D25517D77153C2AB9C7F3BCDA1282B239DBE4C13AD08474D83E061B10732C69
-    * SHA3-224: 1CD23DFC992BE384A2C8F3DFC830B4D291A27AA4032AF6C7BED4D4D9
-    * SHA3-256: 8B2398B8F207D8F3033AEAFB8B23C30E7CC3B96E1AF0BBD1C5538156C4AE3A16
-    * SHA3-384: 1187076FFAEABFAB9256B68254EA8553963A2604A5FA4748D3BC7B877BDFED071234E213D500B677B6B3B18488A6FC52
-    * SHA3-512: 20B00BB3A31C76104F65810FAB079D70809D8751FC329B5626120A1F5F08F9D3F2853067007CBFA4CB1C9A0910EDA31813F86A59962D3DAC2CAD3BAAC678453A
+  * Unique entries: 111983796
+  * Mapsize: 4712 MiB
+  * Time to create the database: ~6 hours
+  * Link (3.1 GiB zip archive): http://ladenthin.net/lmdb_light.zip
+  <details>
+    <summary>Checksums</summary>
+    * CRC32: 82f0a398
+    * MD5: ed2cec10b9013ba72b3e1d073df2206c
+    * RIPEMD-160: a5c8836d7c3106d0d68486331ef319dad7560d44
+    * SHA-1: bf73bb546744f15a3f436fc6d3288cf618e0fc87
+    * SHA-256: 70386188fb8bd15e057ca74a0ceb941e07b1e8a6f3a3e00d30642c0a4502781f
+    * SHA-512: 24afc89d4713ce7cdff176dd924daa02024d1e33f66db25dfc12b253529b4e86867e20e5624a551de25a18f73fe8ec4d7346313ed0b5f3aee56529fcc40dd992
+    * SHA3-224: 99b53de575124826e9ab426a61e204a82328b5c13b6d5529464df808
+    * SHA3-256: 5c581df215ec3b599244f3d5e835509ba49b65c345c6ee0a367e1b75bedb5142
+    * SHA3-384: e80f23680958ea5c017999776405342442e81c1878b7167bf341c01148268a10d32d308f3b2b4db677d8f4ceabd95500
+    * SHA3-512: 1f7f8d3541bd2caf01a0a35730a901635cbac83dd0a9c933b56980dba50db28ea5ef2227d1fd1804e528d6ded815af5696bddf366f97030fae07cd3f6efafc10
+</details>
 
-* Full (32.2 GiB), Last update: February 10, 2021
+* Full (40.0 GiB), Last update: November 15, 2022
   * Contains all Bitcoin addresses which are ever used and many altcoin addresses with and without amount.
   * Static amount of 0 is used to allow best compression.
-  * Unique entries: 781419881
-  * Mapsize: 32992 MiB
-  * Time to create the database: ~34 hours
-  * Link (17.5 GiB zip archive): http://ladenthin.net/lmdb_full.zip
-    * CRC32: 04D50A18
-    * MD5: 6E8968DBF4A698C908BFAC5A2315F52D
-    * RIPEMD-160: C5BFDBDDE6FCD829E15F893D874E2C203798D1DD
-    * SHA-1: 226F309BDB355C8867256434568A3E752E6BF94C
-    * SHA-256: 6130F9879C6C14B4BE2C27403B5910BACA517366D32578134B65FF68853FA574
-    * SHA3-224: 61666FA472D9B3477FF98E845781BD564192C19BF4371C9BF22F7B49
-    * SHA3-256: BB516A17C8DBC2357E610B70445DC1606AE57927B22B8763DE186D52B96C6CF9
-    * SHA3-384: B65FB4EDF10FC496300F7AD70C17C3DF3E351F4FB7F117AD11AFB67F155123291DCF28B4E417227BB0C9491E6FBEE6C8
-    * SHA3-512: B30959C4A21B187782EFB04C268B392555F774C3025DE51BE34FE63249D42724AA907650C53A1C67D38D5A63D74E5E99A80DBF8630F8D611C709FE9DCD6706FF
+  * Unique entries: 1088415723
+  * Mapsize: 40976 MiB
+  * Time to create the database: ~44 hours
+  * Link (25.6 GiB zip archive): http://ladenthin.net/lmdb_full.zip
+  <details>
+    <summary>Checksums</summary>
+    * CRC32: b5f5c25e
+    * MD5: 5f2af15377d1b58f93ddd83e9a0456c4
+    * RIPEMD-160: 2683367e6387e274123fc932863a7f4b6330d42e
+    * SHA-1: cf046e92c1077cb0306a74d2b413b3ecd91430e6
+    * SHA-256: ac05a34d878ba50f87d866bad97e515fe855d4653c5d9f9acdfae9bb44b83a05
+    * SHA-512: d73112eb22e5d2c9d4be3f6f8021609b01e3427625a5b93a8caa2f1d8302c893765709562ef8f856077bc9ada1395f781ebbd80c2101f43bd4a5f74f270d6ddc
+    * SHA3-224: a19b7d951b1c20b1022dabaf2b47de68f6299ceeba73723e2036ed81
+    * SHA3-256: e9f124a3c4130012eeb0ed29de19c8da8231974c37b91251ec4a564278f9fae6
+    * SHA3-384: 58ca5fb2246e2a5ad76cf2197d37d867117fc4018e5ebeb5a144f24a1eac706fb2b56fe07e4fd1394abfb0f15a2a670d
+    * SHA3-512: a10aa63918f30940e6048d0145a8c7b8a04dd0bc6586852879050c25f042137f93b196dd34e862ccb02ddd8fe3dbe74316e8fda834cecd0cf8bf48ba26d127a2
+</details>
 
 ## Pages and projects to get lists (dumps) of PubkeyHash addresses
 * https://github.com/mycroft/chainstate
