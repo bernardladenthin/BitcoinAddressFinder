@@ -73,6 +73,7 @@ The exporter writes all addresses in different formats:
 * DynamicWidthBase58BitcoinAddressWithAmount: The addresses will be written with amount.
 
 ### Use my prepared database
+#### Light database
 * Light (4.60 GiB), Last update: November 15, 2022
   * Contains Bitcoin addresses whith amount and many altcoin addresses with amount.
   * Static amount of 0 is used to allow best compression.
@@ -80,8 +81,10 @@ The exporter writes all addresses in different formats:
   * Mapsize: 4712 MiB
   * Time to create the database: ~6 hours
   * Link (3.1 GiB zip archive): http://ladenthin.net/lmdb_light.zip
-  <details>
-    <summary>Checksums</summary>
+
+<details>
+<summary>Checksums</summary>
+
 * CRC32: 82f0a398
 * MD5: ed2cec10b9013ba72b3e1d073df2206c
 * RIPEMD-160: a5c8836d7c3106d0d68486331ef319dad7560d44
@@ -92,8 +95,10 @@ The exporter writes all addresses in different formats:
 * SHA3-256: 5c581df215ec3b599244f3d5e835509ba49b65c345c6ee0a367e1b75bedb5142
 * SHA3-384: e80f23680958ea5c017999776405342442e81c1878b7167bf341c01148268a10d32d308f3b2b4db677d8f4ceabd95500
 * SHA3-512: 1f7f8d3541bd2caf01a0a35730a901635cbac83dd0a9c933b56980dba50db28ea5ef2227d1fd1804e528d6ded815af5696bddf366f97030fae07cd3f6efafc10
+
 </details>
 
+#### Full database
 * Full (40.0 GiB), Last update: November 15, 2022
   * Contains all Bitcoin addresses which are ever used and many altcoin addresses with and without amount.
   * Static amount of 0 is used to allow best compression.
@@ -101,8 +106,10 @@ The exporter writes all addresses in different formats:
   * Mapsize: 40976 MiB
   * Time to create the database: ~44 hours
   * Link (25.6 GiB zip archive): http://ladenthin.net/lmdb_full.zip
-  <details>
-    <summary>Checksums</summary>
+
+<details>
+<summary>Checksums</summary>
+
 * CRC32: b5f5c25e
 * MD5: 5f2af15377d1b58f93ddd83e9a0456c4
 * RIPEMD-160: 2683367e6387e274123fc932863a7f4b6330d42e
@@ -113,6 +120,7 @@ The exporter writes all addresses in different formats:
 * SHA3-256: e9f124a3c4130012eeb0ed29de19c8da8231974c37b91251ec4a564278f9fae6
 * SHA3-384: 58ca5fb2246e2a5ad76cf2197d37d867117fc4018e5ebeb5a144f24a1eac706fb2b56fe07e4fd1394abfb0f15a2a670d
 * SHA3-512: a10aa63918f30940e6048d0145a8c7b8a04dd0bc6586852879050c25f042137f93b196dd34e862ccb02ddd8fe3dbe74316e8fda834cecd0cf8bf48ba26d127a2
+
 </details>
 
 ## Pages and projects to get lists (dumps) of PubkeyHash addresses
