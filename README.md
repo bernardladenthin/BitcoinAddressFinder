@@ -1,4 +1,5 @@
 # BitcoinAddressFinder
+[![Java CI with Maven](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/maven.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/maven.yml)
 [![Coverage Status](https://coveralls.io/repos/github/bernardladenthin/BitcoinAddressFinder/badge.svg?branch=main)](https://coveralls.io/github/bernardladenthin/BitcoinAddressFinder?branch=main)
 [![Codecov](https://codecov.io/github/bernardladenthin/BitcoinAddressFinder/coverage.png)](https://codecov.io/gh/bernardladenthin/BitcoinAddressFinder)
 
