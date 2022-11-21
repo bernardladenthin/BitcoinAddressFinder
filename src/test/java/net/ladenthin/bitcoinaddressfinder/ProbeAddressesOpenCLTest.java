@@ -83,7 +83,9 @@ public class ProbeAddressesOpenCLTest {
     }
 
     @Test
+    @OpenCLTest
     public void joclTest() {
+        new OpenCLPlatform().assumeOpenCLAvailable();
 
         /**
          * The source code of the OpenCL program to execute
@@ -395,8 +397,10 @@ public class ProbeAddressesOpenCLTest {
 
     
     @Test
+    @OpenCLTest
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_LOWER_THAN_25, location = CommonDataProvider.class)
     public void createKeys_bitsLowerThan25_use32BitNevertheless(int bitSize) throws IOException {
+        new OpenCLPlatform().assumeOpenCLAvailable();
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
         
@@ -415,7 +419,9 @@ public class ProbeAddressesOpenCLTest {
     }
     
     @Test
+    @OpenCLTest
     public void createKeys_bitsLowerThanGridSize_useMoreNevertheless() throws IOException {
+        new OpenCLPlatform().assumeOpenCLAvailable();
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
         
@@ -434,9 +440,9 @@ public class ProbeAddressesOpenCLTest {
     }
     
     @Test
+    @OpenCLTest
     public void setSrcPrivateKeyChunk_aBigIntegerHaveLeadingZeros_Copy32BytesOnlyAndNoExceptionThrown() throws IOException {
-        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
-        KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
+        new OpenCLPlatform().assumeOpenCLAvailable();
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
@@ -458,7 +464,9 @@ public class ProbeAddressesOpenCLTest {
     }
     
     @Test
+    @OpenCLTest
     public void hashcatOpenClGrid() throws IOException {
+        new OpenCLPlatform().assumeOpenCLAvailable();
         
         final boolean souts = false;
         

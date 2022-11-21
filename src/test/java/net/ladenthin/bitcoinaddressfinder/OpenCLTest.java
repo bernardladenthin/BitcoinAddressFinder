@@ -1,6 +1,6 @@
 // @formatter:off
 /**
- * Copyright 2020 Bernard Ladenthin bernard.ladenthin@gmail.com
+ * Copyright 2022 Bernard Ladenthin bernard.ladenthin@gmail.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,15 +18,13 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.io.IOException;
-import org.junit.Test;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-public class OpenCLInfoTest {
+@Retention(RetentionPolicy.SOURCE)
+@Target(ElementType.METHOD)
+public @interface OpenCLTest {
     
-    @Test
-    @OpenCLTest
-    public void openClInfoTest() throws IOException {
-        new OpenCLPlatform().assumeOpenCLAvailable();
-        OpenCLInfo.openClInfo();
-    }
 }
