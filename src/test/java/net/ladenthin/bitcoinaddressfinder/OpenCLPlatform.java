@@ -30,10 +30,14 @@ public class OpenCLPlatform {
             Field field = org.jocl.CL.class.getDeclaredField("nativeLibraryLoaded");
             field.setAccessible(true);
             return field.getBoolean(null);
+        } catch(java.lang.UnsatisfiedLinkError e) {
+            return false;
+        } catch (java.lang.NoClassDefFoundError e) {
+            return false;
         } catch (Exception e) {
             e.printStackTrace();
+            return false;
         }
-        return false;
     }
     
     public void assumeOpenCLAvailable() {
