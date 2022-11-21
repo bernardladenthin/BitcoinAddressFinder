@@ -19,20 +19,21 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import static java.lang.Boolean.TRUE;
+import java.lang.reflect.Field;
 import static org.hamcrest.Matchers.is;
-import org.jocl.CL;
-import static org.jocl.CL.clGetPlatformIDs;
 import org.junit.Assume;
 
 public class OpenCLPlatform {
     public boolean isOpenCLAvailable() {
-        CL.setExceptionsEnabled(true);
-
-        // Obtain the number of platforms
-        int numPlatformsArray[] = new int[1];
-        clGetPlatformIDs(0, null, numPlatformsArray);
-        int numPlatforms = numPlatformsArray[0];
-        return numPlatforms > 0;
+        try {
+            Class.forName("org.jocl.CL");
+            Field field = org.jocl.CL.class.getDeclaredField("nativeLibraryLoaded");
+            field.setAccessible(true);
+            return field.getBoolean(null);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
     }
     
     public void assumeOpenCLAvailable() {
