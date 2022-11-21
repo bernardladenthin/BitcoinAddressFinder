@@ -106,7 +106,7 @@ public class AddressTxtLine {
             // Base58 P2SH
             // 7: dash
             // A: dogecoin
-            // 9: dogecoin
+            // 9: dogecoin multisig
             // M: litecoin
             // 3: litecoin deprecated / bitcoin
             // t: Zcash

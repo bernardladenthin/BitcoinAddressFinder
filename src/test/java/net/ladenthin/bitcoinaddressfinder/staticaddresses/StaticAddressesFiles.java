@@ -47,10 +47,10 @@ public class StaticAddressesFiles implements AddressesFiles {
     
     public List<String> getSupportedAddresses() {
         List<String> addresses = new ArrayList<>();
-        for (StaticP2PKHAddress address : StaticP2PKHAddress.values()) {
+        for (PublicAddress address : StaticP2PKHAddress.values()) {
             addresses.add(address.getPublicAddress());
         }
-        for (StaticP2SHAddress address : StaticP2SHAddress.values()) {
+        for (PublicAddress address : StaticP2SHAddress.values()) {
             addresses.add(address.getPublicAddress());
         }
         return addresses;
@@ -58,7 +58,7 @@ public class StaticAddressesFiles implements AddressesFiles {
     
     public List<String> getUnsupportedAddresses() {
         List<String> addresses = new ArrayList<>();
-        for (StaticUnsupportedAddress address : StaticUnsupportedAddress.values()) {
+        for (PublicAddress address : StaticUnsupportedAddress.values()) {
             addresses.add(address.getPublicAddress());
         }
         return addresses;

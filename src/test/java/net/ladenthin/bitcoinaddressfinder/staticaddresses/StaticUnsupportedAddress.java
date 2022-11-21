@@ -18,7 +18,7 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 
-public enum StaticUnsupportedAddress {
+public enum StaticUnsupportedAddress implements PublicAddress {
 
     // P2SH (Pay to Script Hash)
     /**
@@ -50,7 +50,13 @@ public enum StaticUnsupportedAddress {
     /**
      * https://bitcoin.stackexchange.com/questions/110995/how-can-i-find-samples-for-p2tr-transactions-on-mainnet
      */
-    BitcoinP2TR("bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3297");
+    BitcoinP2TR("bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3297"),
+
+    // litecoin Bech32 (P2WSH)
+    /**
+     * https://bitcoin.stackexchange.com/questions/110995/how-can-i-find-samples-for-p2tr-transactions-on-mainnet
+     */
+    LitecoinP2WSH("ltc1qd5wm03t5kcdupjuyq5jffpuacnaqahvfsdu8smf8z0u0pqdqpatqsdrn8h");
     
     private final String publicAddress;
 
@@ -58,6 +64,7 @@ public enum StaticUnsupportedAddress {
         this.publicAddress = publicAddress;
     }
 
+    @Override
     public String getPublicAddress() {
         return publicAddress;
     }

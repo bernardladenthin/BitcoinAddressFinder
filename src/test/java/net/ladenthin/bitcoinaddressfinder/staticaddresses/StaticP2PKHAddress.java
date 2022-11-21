@@ -25,7 +25,7 @@ import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.params.MainNetParams;
 import org.bouncycastle.util.encoders.Hex;
 
-public enum StaticP2PKHAddress {
+public enum StaticP2PKHAddress implements PublicAddress {
     
     /**
      * https://privatekeys.pw/bitcoin/address/1JRW4d8vHZseMEtYbgJ7MwPG1TasHUUVNq
@@ -96,6 +96,7 @@ public enum StaticP2PKHAddress {
         this.publicKeyHash = publicKeyHash;
     }
 
+    @Override
     public String getPublicAddress() {
         return publicAddress;
     }

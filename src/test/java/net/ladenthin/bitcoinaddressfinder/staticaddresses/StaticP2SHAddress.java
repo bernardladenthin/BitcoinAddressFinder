@@ -25,7 +25,7 @@ import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.params.MainNetParams;
 import org.bouncycastle.util.encoders.Hex;
 
-public enum StaticP2SHAddress {
+public enum StaticP2SHAddress implements PublicAddress {
 
     /**
      * https://bitcoin.stackexchange.com/questions/62781/litecoin-constants-and-prefixes
@@ -40,7 +40,7 @@ public enum StaticP2SHAddress {
     /**
      * https://privatekeys.pw/dogecoin/address/9tp7THhBG3fNNFka1AJm95DU3E4x3pwQA3
      */
-    DogecoinX("9tp7THhBG3fNNFka1AJm95DU3E4x3pwQA3", "1a11b73ad3dd99d77da9f858cf323205a84dd5da"),
+    DogecoinMultisig("9tp7THhBG3fNNFka1AJm95DU3E4x3pwQA3", "1a11b73ad3dd99d77da9f858cf323205a84dd5da"),
     /**
      * https://privatekeys.pw/dash/address/7dZe6LvtGPd2TLPpARzThqdF4YwAZvAKDv
      */
@@ -62,6 +62,7 @@ public enum StaticP2SHAddress {
         this.scriptHash = scriptHash;
     }
 
+    @Override
     public String getPublicAddress() {
         return publicAddress;
     }
