@@ -31,16 +31,14 @@ jobs:
         distribution: 'temurin'
         cache: maven
     - name: Build with Maven
-      run: mvn -B package --file pom.xml
+      run: mvn -B --update-snapshots test package jacoco:report --file pom.xml
 
     # Optional: Uploads the full dependency graph to GitHub to improve the quality of Dependabot alerts this repository can receive
     - name: Update dependency graph
       uses: advanced-security/maven-dependency-submission-action@0b9cd8f382c5d2016fa77ebf8a0f2804452fefef
 
-    - name: Coveralls GitHub Action
-      uses: coverallsapp/github-action@1.1.3
-      with:
-        github-token: ${{ secrets.CODECOV_TOKEN }}
+    - name: Coveralls Coverage Report Submission
+      run: mvn coveralls:report --define repoToken=${{ secrets.COVERALLS_TOKEN }}
 
     - name: Codecov
       uses: codecov/codecov-action@v3.1.1
