@@ -161,7 +161,7 @@
                     <version>4.3.0</version>
                     <dependencies>
                         <dependency>
-                            <group>javax.xml.bind</group>
+                            <groupId>javax.xml.bind</groupId>
                             <artifact>jaxb-api</artifact>
                             <version>2.3.1</version>
                         </dependency>
