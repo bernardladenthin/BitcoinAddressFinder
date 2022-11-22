@@ -19,11 +19,11 @@ jobs:
     runs-on: 'ubuntu-latest'
     steps:
     - uses: actions/checkout@v3
-    - name: Set up JDK $javaversion $javadistribution
+    - name: Set up JDK ${{ env.javaversion }} ${{ env.javadistribution }}
       uses: actions/setup-java@v3
       with:
-        java-version: $javaversion
-        distribution: $javadistribution
+        java-version: ${{ env.javaversion }}
+        distribution: ${{ env.javadistribution }}
         cache: maven
     - name: Build with Maven
       run: mvn -B --update-snapshots test package assembly:single --file pom.xml
