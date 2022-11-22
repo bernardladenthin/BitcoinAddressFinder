@@ -20,18 +20,25 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
     strategy:
+      # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstrategyfail-fast
+      fail-fast: false
+      # https://docs.github.com/en/actions/using-jobs/using-a-matrix-for-your-jobs
       matrix:
+        # https://github.com/actions/setup-java#supported-distributions
         java: [ '8', '11', '17', '19']
+        javadistribution: ['adopt', 'adopt-openj9', 'corretto', 'liberica', 'microsoft', 'temurin', 'zulu'] # internally 'adopt-hotspot' is the same as 'adopt'
+        # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
+        os: [macos-latest, ubuntu-latest, windows-latest]
 
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v3
     - name: Set up JDK ${{ matrix.java }}
       uses: actions/setup-java@v3
       with:
         java-version: ${{ matrix.java }}
-        distribution: 'temurin'
+        distribution: ${{ matrix.javadistribution }}
         cache: maven
     - name: Build with Maven
       run: mvn -B --update-snapshots test package assembly:single jacoco:report --file pom.xml
@@ -40,6 +47,7 @@ jobs:
     - name: Update dependency graph
       uses: advanced-security/maven-dependency-submission-action@0b9cd8f382c5d2016fa77ebf8a0f2804452fefef
 
+    # https://github.com/marketplace/actions/coveralls-github-action
     - name: Coveralls GitHub Action
       run: mvn coveralls:report --define repoToken=${{ secrets.COVERALLS_TOKEN }}
 # https://github.com/coverallsapp/github-action/issues/22
@@ -49,6 +57,7 @@ jobs:
 # Using lcov file: ./coverage/lcov.info
 # Error: Lcov file not found.
 
+    # https://github.com/codecov/codecov-action
     - name: Codecov GitHub Action
       uses: codecov/codecov-action@v3.1.1
       with:
