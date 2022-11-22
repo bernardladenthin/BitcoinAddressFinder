@@ -36,30 +36,4 @@ jobs:
         distribution: ${{ matrix.javadistribution }}
         cache: maven
     - name: Build with Maven
-      run: mvn -B --update-snapshots test package assembly:single jacoco:report --file pom.xml
-
-    # Optional: Uploads the full dependency graph to GitHub to improve the quality of Dependabot alerts this repository can receive
-    - name: Update dependency graph
-      uses: advanced-security/maven-dependency-submission-action@0b9cd8f382c5d2016fa77ebf8a0f2804452fefef
-
-    # https://github.com/marketplace/actions/coveralls-github-action
-    - name: Coveralls GitHub Action
-      run: mvn -B coveralls:report --define repoToken=${{ secrets.COVERALLS_TOKEN }}
-# https://github.com/coverallsapp/github-action/issues/22
-#      uses: coverallsapp/github-action@1.1.3
-#      with:
-#        github-token: ${{ secrets.COVERALLS_TOKEN }}
-# Using lcov file: ./coverage/lcov.info
-# Error: Lcov file not found.
-
-    # https://github.com/codecov/codecov-action
-    - name: Codecov GitHub Action
-      uses: codecov/codecov-action@v3.1.1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: Archive binary
-      uses: actions/upload-artifact@v3
-      with:
-        name: jar binaries
-        path: target/*.jar
+      run: mvn -B --update-snapshots test --file pom.xml
