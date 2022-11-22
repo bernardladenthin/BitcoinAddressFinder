@@ -22,6 +22,9 @@ jobs:
         javadistribution: ['adopt', 'adopt-openj9', 'corretto', 'liberica', 'microsoft', 'temurin', 'zulu'] # internally 'adopt-hotspot' is the same as 'adopt'
         # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
         os: [macos-latest, ubuntu-latest, windows-latest]
+        exclude:
+          - os: macos-latest
+          javadistribution: microsoft
 
     runs-on: ${{ matrix.os }}
     steps:
