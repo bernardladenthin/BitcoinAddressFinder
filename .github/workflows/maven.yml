@@ -49,7 +49,7 @@ jobs:
 
     # https://github.com/marketplace/actions/coveralls-github-action
     - name: Coveralls GitHub Action
-      run: mvn coveralls:report --define repoToken=${{ secrets.COVERALLS_TOKEN }}
+      run: mvn -B coveralls:report --define repoToken=${{ secrets.COVERALLS_TOKEN }}
 # https://github.com/coverallsapp/github-action/issues/22
 #      uses: coverallsapp/github-action@1.1.3
 #      with:
