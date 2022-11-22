@@ -1,12 +1,4 @@
-# This workflow will build a Java project with Maven, and cache/restore any dependencies to improve the workflow execution time
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-maven
-
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-
-name: Java CI with Maven
+name: matrix CI
 
 on:
   push:
@@ -26,7 +18,7 @@ jobs:
       # https://docs.github.com/en/actions/using-jobs/using-a-matrix-for-your-jobs
       matrix:
         # https://github.com/actions/setup-java#supported-distributions
-        java: [ '11', '17', '19']
+        javaversion: [ '11', '17', '19']
         javadistribution: ['adopt', 'adopt-openj9', 'corretto', 'liberica', 'microsoft', 'temurin', 'zulu'] # internally 'adopt-hotspot' is the same as 'adopt'
         # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
         os: [macos-latest, ubuntu-latest, windows-latest]
@@ -34,10 +26,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v3
-    - name: Set up JDK ${{ matrix.java }} ${{ matrix.javadistribution }}
+    - name: Set up JDK ${{ matrix.javaversion }} ${{ matrix.javadistribution }}
       uses: actions/setup-java@v3
       with:
-        java-version: ${{ matrix.java }}
+        java-version: ${{ matrix.javaversion }}
         distribution: ${{ matrix.javadistribution }}
         cache: maven
     - name: Build with Maven

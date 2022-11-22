@@ -1,0 +1,36 @@
+name: build assembly
+
+on:
+  push:
+    branches:
+      - main
+      - 'releases/*'
+  pull_request:
+    branches:
+      - '*'
+
+env:
+  javaversion: '17'
+  javadistribution: 'temurin'
+  os: 'ubuntu-latest'
+
+jobs:
+  build:
+
+    runs-on: ${{ env.os }}
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up JDK ${{ env.javaversion }} ${{ env.javadistribution }}
+      uses: actions/setup-java@v3
+      with:
+        java-version: ${{ env.javaversion }}
+        distribution: ${{ env.javadistribution }}
+        cache: maven
+    - name: Build with Maven
+      run: mvn -B --update-snapshots test package assembly:single --file pom.xml
+
+    - name: Archive binary
+      uses: actions/upload-artifact@v3
+      with:
+        name: jar binaries
+        path: target/*.jar
