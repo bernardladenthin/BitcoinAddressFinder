@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 import static org.jocl.CL.CL_DEVICE_ADDRESS_BITS;
 import static org.jocl.CL.CL_DEVICE_ERROR_CORRECTION_SUPPORT;
+import static org.jocl.CL.CL_DEVICE_EXTENSIONS;
 import static org.jocl.CL.CL_DEVICE_GLOBAL_MEM_SIZE;
 import static org.jocl.CL.CL_DEVICE_IMAGE2D_MAX_HEIGHT;
 import static org.jocl.CL.CL_DEVICE_IMAGE2D_MAX_WIDTH;
@@ -44,12 +45,14 @@ import static org.jocl.CL.CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS;
 import static org.jocl.CL.CL_DEVICE_MAX_WORK_ITEM_SIZES;
 import static org.jocl.CL.CL_DEVICE_MAX_WRITE_IMAGE_ARGS;
 import static org.jocl.CL.CL_DEVICE_NAME;
+import static org.jocl.CL.CL_DEVICE_PLATFORM;
 import static org.jocl.CL.CL_DEVICE_PREFERRED_VECTOR_WIDTH_CHAR;
 import static org.jocl.CL.CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE;
 import static org.jocl.CL.CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT;
 import static org.jocl.CL.CL_DEVICE_PREFERRED_VECTOR_WIDTH_INT;
 import static org.jocl.CL.CL_DEVICE_PREFERRED_VECTOR_WIDTH_LONG;
 import static org.jocl.CL.CL_DEVICE_PREFERRED_VECTOR_WIDTH_SHORT;
+import static org.jocl.CL.CL_DEVICE_PROFILE;
 import static org.jocl.CL.CL_DEVICE_QUEUE_PROPERTIES;
 import static org.jocl.CL.CL_DEVICE_SINGLE_FP_CONFIG;
 import static org.jocl.CL.CL_DEVICE_TYPE;
@@ -59,6 +62,7 @@ import static org.jocl.CL.CL_DEVICE_TYPE_CPU;
 import static org.jocl.CL.CL_DEVICE_TYPE_DEFAULT;
 import static org.jocl.CL.CL_DEVICE_TYPE_GPU;
 import static org.jocl.CL.CL_DEVICE_VENDOR;
+import static org.jocl.CL.CL_DEVICE_VERSION;
 import static org.jocl.CL.CL_DRIVER_VERSION;
 import static org.jocl.CL.CL_PLATFORM_NAME;
 import static org.jocl.CL.CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE;
@@ -120,6 +124,22 @@ public class OpenCLInfo {
             // CL_DRIVER_VERSION
             String driverVersion = getString(device, CL_DRIVER_VERSION);
             System.out.printf("CL_DRIVER_VERSION: \t\t\t%s\n", driverVersion);
+
+            // CL_DEVICE_PROFILE
+            String deviceProfile = getString(device, CL_DEVICE_PROFILE);
+            System.out.printf("CL_DEVICE_PROFILE: \t\t\t%s\n", deviceProfile);
+
+            // CL_DEVICE_VERSION
+            String deviceVersion = getString(device, CL_DEVICE_VERSION);
+            System.out.printf("CL_DEVICE_VERSION: \t\t\t%s\n", deviceVersion);
+
+            // CL_DEVICE_EXTENSIONS
+            String deviceExtensions = getString(device, CL_DEVICE_EXTENSIONS);
+            System.out.printf("CL_DEVICE_EXTENSIONS: \t\t\t%s\n", deviceExtensions);
+
+            // CL_DEVICE_PLATFORM
+            String devicePlatform = getString(device, CL_DEVICE_PLATFORM);
+            System.out.printf("CL_DEVICE_PLATFORM: \t\t\t%s\n", devicePlatform);
 
             // CL_DEVICE_TYPE
             long deviceType = getLong(device, CL_DEVICE_TYPE);
