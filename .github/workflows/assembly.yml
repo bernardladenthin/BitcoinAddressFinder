@@ -17,14 +17,14 @@ env:
 jobs:
   build:
 
-    runs-on: ${{ env.os }}
+    runs-on: $os
     steps:
     - uses: actions/checkout@v3
-    - name: Set up JDK ${{ env.javaversion }} ${{ env.javadistribution }}
+    - name: Set up JDK $javaversion $javadistribution
       uses: actions/setup-java@v3
       with:
-        java-version: ${{ env.javaversion }}
-        distribution: ${{ env.javadistribution }}
+        java-version: $javaversion
+        distribution: $javadistribution
         cache: maven
     - name: Build with Maven
       run: mvn -B --update-snapshots test package assembly:single --file pom.xml

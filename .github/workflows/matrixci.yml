@@ -23,8 +23,8 @@ jobs:
         # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
         os: [macos-latest, ubuntu-latest, windows-latest]
         exclude:
-          - os: macos-latest
-          javadistribution: microsoft
+          - javadistribution: microsoft
+          os: macos-latest
 
     runs-on: ${{ matrix.os }}
     steps:
