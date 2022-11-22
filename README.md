@@ -2,6 +2,7 @@
 [![Java CI with Maven](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/maven.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/maven.yml)
 [![Coverage Status](https://coveralls.io/repos/github/bernardladenthin/BitcoinAddressFinder/badge.svg?branch=main)](https://coveralls.io/github/bernardladenthin/BitcoinAddressFinder?branch=main)
 [![Codecov](https://codecov.io/github/bernardladenthin/BitcoinAddressFinder/coverage.png)](https://codecov.io/gh/bernardladenthin/BitcoinAddressFinder)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder?ref=badge_shield)
 
 Free high performance tool for fast scanning random Bitcoin, Bitcoin Cash, Bitcoin SV, Litecoin, Dogecoin, Dash, Zcash (and many more) private keys and finding addresses with balance.
 The main goal is to generate as fast as possible (Bitcoin/Altcoin) addresses using the JVM combined with OpenCL and check if the address (RIPEMD160 hash) was used/not used before. This includes possible hash collisions.
@@ -209,3 +210,6 @@ Some configurations are not allowed in some countries (definitely not complete):
 It is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full license text.
 Some subprojects have a different license.
 
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder?ref=badge_large)
