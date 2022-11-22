@@ -21,7 +21,12 @@ package net.ladenthin.bitcoinaddressfinder;
 import java.io.IOException;
 import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
+import org.apache.maven.artifact.versioning.ComparableVersion;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 import org.junit.Test;
 
 public class OpenCLBuilderTest {
@@ -36,5 +41,17 @@ public class OpenCLBuilderTest {
         System.out.println(openCLPlatforms);
         System.out.println("isOpenCLnativeLibraryLoadable: " + OpenCLBuilder.isOpenCLnativeLibraryLoadable());
         System.out.println("isOneOpenCL2DeviceAvailable: " + OpenCLBuilder.isOneOpenCL2_0OrGreaterDeviceAvailable(openCLPlatforms));
+    }
+    
+    @Test
+    public void isOpenCL2_0OrGreater_OpenCLVersion1_2Given_ReturnFalse() throws IOException {
+        OpenCLBuilder openCLBuilder = new OpenCLBuilder();
+        assertThat(openCLBuilder.isOpenCL2_0OrGreater(OpenCLDevice.getComparableVersionFromDeviceVersion("OpenCL 1.2")), is(equalTo(Boolean.FALSE)));
+    }
+    
+    @Test
+    public void isOpenCL2_0OrGreater_OpenCLVersion3_0_CUDA_Given_ReturnFalse() throws IOException {
+        OpenCLBuilder openCLBuilder = new OpenCLBuilder();
+        assertThat(openCLBuilder.isOpenCL2_0OrGreater(OpenCLDevice.getComparableVersionFromDeviceVersion("OpenCL 3.0 CUDA")), is(equalTo(Boolean.TRUE)));
     }
 }

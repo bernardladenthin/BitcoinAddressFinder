@@ -519,7 +519,13 @@ public class OpenCLDevice implements Serializable {
     }
     
     public ComparableVersion getDeviceVersionAsComparableVersion() {
-        ComparableVersion comparableVersion = new ComparableVersion(getDeviceVersion());
-        return comparableVersion;
+        return getComparableVersionFromDeviceVersion(getDeviceVersion());
+    }
+    
+    public static ComparableVersion getComparableVersionFromDeviceVersion(String deviceVersion) {
+        String s = deviceVersion;
+        s = s.replace("OpenCL ", "");
+        s = s.replace("CUDA", "");
+        return new ComparableVersion(s);
     }
 }

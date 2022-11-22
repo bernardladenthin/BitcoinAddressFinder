@@ -210,10 +210,18 @@ public class OpenCLBuilder {
         for (OpenCLPlatform openCLPlatform : openCLPlatforms) {
             List<OpenCLDevice> openCLDevices = openCLPlatform.getOpenCLDevices();
             for (OpenCLDevice openCLDevice : openCLDevices) {
-                if (new ComparableVersion("2.0").compareTo(openCLDevice.getDeviceVersionAsComparableVersion()) >= 0) {
+                if (isOpenCL2_0OrGreater(openCLDevice.getDeviceVersionAsComparableVersion())) {
                     return true;
                 }
             }
+        }
+        return false;
+    }
+
+    public static boolean isOpenCL2_0OrGreater(ComparableVersion openCLDeviceVersion) {
+        final ComparableVersion v2_0 = new ComparableVersion("2.0");
+        if (openCLDeviceVersion.compareTo(v2_0) >= 0) {
+            return true;
         }
         return false;
     }
