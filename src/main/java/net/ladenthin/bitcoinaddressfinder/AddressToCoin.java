@@ -20,9 +20,11 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.nio.ByteBuffer;
 import javax.annotation.Nonnull;
+import javax.annotation.concurrent.Immutable;
 import lombok.EqualsAndHashCode;
 import org.bitcoinj.core.Coin;
 
+@Immutable
 @EqualsAndHashCode
 public class AddressToCoin {
 

@@ -19,21 +19,21 @@
 package net.ladenthin.bitcoinaddressfinder.cli;
 
 import com.google.gson.Gson;
-import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
-import net.ladenthin.javacommons.StreamHelper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
-import net.ladenthin.bitcoinaddressfinder.LMDBToAddressFile;
-import net.ladenthin.bitcoinaddressfinder.OpenCLInfo;
 import net.ladenthin.bitcoinaddressfinder.Finder;
 import net.ladenthin.bitcoinaddressfinder.Interruptable;
+import net.ladenthin.bitcoinaddressfinder.LMDBToAddressFile;
+import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
+import net.ladenthin.javacommons.StreamHelper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 // VM option: -Dorg.slf4j.simpleLogger.defaultLogLevel=trace
 public class Main implements Runnable, Interruptable {
@@ -96,7 +96,9 @@ public class Main implements Runnable, Interruptable {
                 addressFilesToLMDB.run();
                 break;
             case OpenCLInfo:
-                OpenCLInfo.openClInfo();
+                OpenCLBuilder openCLBuilder = new OpenCLBuilder();
+                List<OpenCLPlatform> openCLPlatforms = openCLBuilder.build();
+                System.out.println(openCLPlatforms);
                 break;
             default:
                 throw new UnsupportedOperationException("Command: " + configuration.command.name() + " currently not supported." );

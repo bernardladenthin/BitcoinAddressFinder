@@ -19,14 +19,22 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.IOException;
+import java.util.List;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import org.junit.Test;
 
-public class OpenCLInfoTest {
+public class OpenCLBuilderTest {
     
     @Test
     @OpenCLTest
-    public void openClInfoTest() throws IOException {
-        new OpenCLPlatform().assumeOpenCLAvailable();
-        OpenCLInfo.openClInfo();
+    public void openCLBuilder() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadable();
+        
+        OpenCLBuilder openCLBuilder = new OpenCLBuilder();
+        List<OpenCLPlatform> openCLPlatforms = openCLBuilder.build();
+        System.out.println(openCLPlatforms);
+        System.out.println("isOpenCLnativeLibraryLoadable: " + OpenCLBuilder.isOpenCLnativeLibraryLoadable());
+        System.out.println("isOneOpenCL2DeviceAvailable: " + OpenCLBuilder.isOneOpenCL2_0OrGreaterDeviceAvailable(openCLPlatforms));
     }
 }

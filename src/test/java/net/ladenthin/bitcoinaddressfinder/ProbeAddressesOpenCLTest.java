@@ -37,9 +37,12 @@ import org.junit.rules.TemporaryFolder;
 import static org.jocl.CL.*;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.params.MainNetParams;
@@ -85,7 +88,7 @@ public class ProbeAddressesOpenCLTest {
     @Test
     @OpenCLTest
     public void joclTest() {
-        new OpenCLPlatform().assumeOpenCLAvailable();
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
         /**
          * The source code of the OpenCL program to execute
@@ -400,7 +403,7 @@ public class ProbeAddressesOpenCLTest {
     @OpenCLTest
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_LOWER_THAN_25, location = CommonDataProvider.class)
     public void createKeys_bitsLowerThan25_use32BitNevertheless(int bitSize) throws IOException {
-        new OpenCLPlatform().assumeOpenCLAvailable();
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
         
@@ -421,7 +424,7 @@ public class ProbeAddressesOpenCLTest {
     @Test
     @OpenCLTest
     public void createKeys_bitsLowerThanGridSize_useMoreNevertheless() throws IOException {
-        new OpenCLPlatform().assumeOpenCLAvailable();
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
         
@@ -442,7 +445,7 @@ public class ProbeAddressesOpenCLTest {
     @Test
     @OpenCLTest
     public void setSrcPrivateKeyChunk_aBigIntegerHaveLeadingZeros_Copy32BytesOnlyAndNoExceptionThrown() throws IOException {
-        new OpenCLPlatform().assumeOpenCLAvailable();
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
@@ -466,7 +469,7 @@ public class ProbeAddressesOpenCLTest {
     @Test
     @OpenCLTest
     public void hashcatOpenClGrid() throws IOException {
-        new OpenCLPlatform().assumeOpenCLAvailable();
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         
         final boolean souts = false;
         

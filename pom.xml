@@ -234,6 +234,11 @@
           <artifactId>bitcoin-cash-converter</artifactId>
           <version>1.0</version>
         </dependency>
+        <dependency>
+            <groupId>org.apache.maven</groupId>
+            <artifactId>maven-artifact</artifactId>
+            <version>3.8.6</version>
+        </dependency>
 
         <dependency>
             <groupId>junit</groupId>
