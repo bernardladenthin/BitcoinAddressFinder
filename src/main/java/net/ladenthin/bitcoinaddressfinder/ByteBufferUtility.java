@@ -19,8 +19,8 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.nio.ByteBuffer;
+import jdk.internal.ref.Cleaner;
 import org.bouncycastle.util.encoders.Hex;
-import sun.misc.Cleaner;
 import sun.nio.ch.DirectBuffer;
 
 public class ByteBufferUtility {
@@ -36,6 +36,9 @@ public class ByteBufferUtility {
     
     /**
      * https://stackoverflow.com/questions/8462200/examples-of-forcing-freeing-of-native-memory-direct-bytebuffer-has-allocated-us
+     * https://stackoverflow.com/questions/13003871/how-do-i-get-the-instance-of-sun-misc-unsafe
+     * https://stackoverflow.com/questions/29301755/got-securityexception-in-java
+     * https://bugs.openjdk.org/browse/JDK-8171377
      * @param byteBuffer nullable, the ByteBuffer to free 
      */
     public void freeByteBuffer(ByteBuffer byteBuffer) {

@@ -30,7 +30,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
 import org.junit.runner.RunWith;
-import sun.misc.Cleaner;
+import jdk.internal.ref.Cleaner;
 import sun.nio.ch.DirectBuffer;
 
 @RunWith(DataProviderRunner.class)

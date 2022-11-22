@@ -10,7 +10,7 @@ The main goal is to generate as fast as possible (Bitcoin/Altcoin) addresses usi
 Copyright (c) 2017-2021 Bernard Ladenthin.
 
 ## Requirments
-* Java 8, newer versions are not supported and doesn't work (see #8).
+* Java 11 or newer. Java 8 is not supported anymore.
 
 ## Quickstart
 1. Download the binary (jar) from https://github.com/bernardladenthin/BitcoinAddressFinder/releases
