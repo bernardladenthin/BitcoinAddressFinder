@@ -1,8 +1,13 @@
 # BitcoinAddressFinder
-[![Java CI with Maven](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/maven.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/maven.yml)
+[![CI Status](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/maven.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/maven.yml)
+[![Actions Status](https://github.com/bernardladenthin/BitcoinAddressFinder/workflows/CI/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions)
 [![Coverage Status](https://coveralls.io/repos/github/bernardladenthin/BitcoinAddressFinder/badge.svg?branch=main)](https://coveralls.io/github/bernardladenthin/BitcoinAddressFinder?branch=main)
 [![Codecov](https://codecov.io/github/bernardladenthin/BitcoinAddressFinder/coverage.png)](https://codecov.io/gh/bernardladenthin/BitcoinAddressFinder)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder?ref=badge_shield)
+
+[//]: # [![Security Score](https://snyk-widget.herokuapp.com/badge/mvn/net.ladenthin/bitcoinaddressfinder/badge.svg)](https://snyk.io/test/github/bernardladenthin/BitcoinAddressFinder)
+[//]: # [![Maven Central](https://maven-badges.herokuapp.com/maven-central/net.ladenthin/bitcoinaddressfinder/badge.svg#)](https://maven-badges.herokuapp.com/maven-central/net.ladenthin/bitcoinaddressfinder)
+[//]: # [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1234/badge)](https://bestpractices.coreinfrastructure.org/projects/1234)
 
 Free high performance tool for fast scanning random Bitcoin, Bitcoin Cash, Bitcoin SV, Litecoin, Dogecoin, Dash, Zcash (and many more) private keys and finding addresses with balance.
 The main goal is to generate as fast as possible (Bitcoin/Altcoin) addresses using the JVM combined with OpenCL and check if the address (RIPEMD160 hash) was used/not used before. This includes possible hash collisions.
