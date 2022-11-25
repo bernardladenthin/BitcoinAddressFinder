@@ -45,12 +45,6 @@ public enum StaticUnsupportedAddress implements PublicAddress {
      * https://privatekeys.pw/bitcoin/address/bc1qp762gmkychywl4elnuyuwph68hqw0uc2jkzu3ax48zfjkskslpsq8p66gf
      */
     BitcoinP2WSH("bc1qp762gmkychywl4elnuyuwph68hqw0uc2jkzu3ax48zfjkskslpsq8p66gf"),
-    
-    // P2TR (Pay-to-Taproot)
-    /**
-     * https://bitcoin.stackexchange.com/questions/110995/how-can-i-find-samples-for-p2tr-transactions-on-mainnet
-     */
-    BitcoinP2TR("bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3297"),
 
     // litecoin Bech32 (P2WSH)
     /**

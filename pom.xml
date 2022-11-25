@@ -14,9 +14,8 @@
     <description>Free high performance tool for fast scanning random Bitcoin, Bitcoin Cash, Bitcoin SV, Litecoin, Dogecoin, Dash, Zcash (and many more) private keys and finding addresses with balance.</description>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <slf4j.version>2.0.3</slf4j.version>
-        <!-- 1.4.0 and upwards is not Java 8 compatible -->
-        <logback.version>1.3.1</logback.version>
+        <slf4j.version>2.0.5</slf4j.version>
+        <logback.version>1.4.5</logback.version>
         <argLine>--illegal-access=permit -Dillegal-access=permit --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.io=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED --add-opens jdk.management/com.sun.management.internal=ALL-UNNAMED --add-opens java.base/jdk.internal.ref=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED</argLine>
     </properties>
     
@@ -180,7 +179,7 @@
         <dependency>
             <groupId>org.bitcoinj</groupId>
             <artifactId>bitcoinj-core</artifactId>
-            <version>0.15.10</version>
+            <version>0.16.1</version>
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>

@@ -157,7 +157,7 @@ public class AddressTxtLineTest {
         assertThatDefaultCoinIsSet(addressToCoin);
     }
 
-    @Test(expected = java.lang.IllegalStateException.class)
+    @Test(expected = AddressFormatException.class)
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BITCOIN_INVALID_P2WPKH_ADDRESSES, location = CommonDataProvider.class)
     public void fromLine_InvalidP2WPKHAddressGive_throwsException(String base58) throws IOException {
         // act

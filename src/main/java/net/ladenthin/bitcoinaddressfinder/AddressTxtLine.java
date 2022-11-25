@@ -78,21 +78,13 @@ public class AddressTxtLine {
             return null;
         } else if (address.startsWith("bc1")) {
             // bitcoin Bech32 (P2WPKH) or bitcoin Bech32 (P2WSH) or P2TR
-            //
-            // TODO: https://bitcoinj.org/release-notes bitcoinj Version 0.16:
-            // Implement Taproot BIP341 – send to P2TR addresses. Receiving to and spending from P2TR addresses and chains will be implemented in a future release.
-            // This may behave different in future, see https://github.com/bernardladenthin/BitcoinAddressFinder/issues/19
-            try{
-                SegwitAddress segwitAddress = SegwitAddress.fromBech32(keyUtility.networkParameters, address);
-                if (segwitAddress.getOutputScriptType() == Script.ScriptType.P2WSH) {
-                    return null;
-                }
-                byte[] hash = segwitAddress.getHash();
-                ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash);
-                return new AddressToCoin(hash160, amount);
-            } catch (AddressFormatException.InvalidChecksum e) {
+            SegwitAddress segwitAddress = SegwitAddress.fromBech32(keyUtility.networkParameters, address);
+            if (segwitAddress.getOutputScriptType() == Script.ScriptType.P2WSH) {
                 return null;
             }
+            byte[] hash = segwitAddress.getHash();
+            ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash);
+            return new AddressToCoin(hash160, amount);
         } else if (address.startsWith("ltc")) {
             // litecoin Bech32 (P2WPKH)
             //https://privatekeys.pw/litecoin/address/ltc1qd5wm03t5kcdupjuyq5jffpuacnaqahvfsdu8smf8z0u0pqdqpatqsdrn8h

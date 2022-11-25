@@ -52,7 +52,7 @@ public class PersistenceUtils {
     public ByteBuffer addressListToByteBufferDirect(List<LegacyAddress> addresses) {
         ByteBuffer byteBuffer = ByteBuffer.allocateDirect(LegacyAddress.LENGTH * addresses.size());
         for (LegacyAddress address : addresses) {
-            byteBuffer.put(address.getHash160());
+            byteBuffer.put(address.getHash());
         }
         byteBuffer.flip();
         return byteBuffer;
@@ -64,7 +64,7 @@ public class PersistenceUtils {
         for (int i = 0; i < count; i++) {
             byte[] hash160 = new byte[LegacyAddress.LENGTH];
             byteBuffer.get(hash160);
-            addresses.add(new LegacyAddress(networkParameters, hash160));
+            addresses.add(LegacyAddress.fromPubKeyHash(networkParameters, hash160));
         }
         return addresses;
     }
