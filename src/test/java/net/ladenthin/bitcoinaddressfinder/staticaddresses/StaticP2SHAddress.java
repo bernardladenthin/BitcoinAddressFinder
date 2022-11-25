@@ -33,12 +33,17 @@ public enum StaticP2SHAddress implements PublicAddress {
      * https://privatekeys.pw/bitcoin/address/3MSvaVbVFFLML86rt5eqgA9SvW23upaXdY
      */
     BitcoinAndLitecoinDeprecated("3MSvaVbVFFLML86rt5eqgA9SvW23upaXdY", "d8b83ad7bf8795b9ff61464fcf06f156c28e3e1f"),
-    
-    // P2TR (Pay-to-Taproot)
     /**
+     * P2TR (Pay-to-Taproot)
      * https://bitcoin.stackexchange.com/questions/110995/how-can-i-find-samples-for-p2tr-transactions-on-mainnet
      */
     BitcoinP2TR("bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3297", "a37c3903c8d0db6512e2b40b0dffa05e5a3ab73603ce8c9c4b7771e5412328f9"),
+    // 
+    /**
+     * P2SH (Pay to Witness Script Hash) 
+     * https://privatekeys.pw/bitcoin/address/bc1qp762gmkychywl4elnuyuwph68hqw0uc2jkzu3ax48zfjkskslpsq8p66gf
+     */
+    BitcoinP2WSH("bc1qp762gmkychywl4elnuyuwph68hqw0uc2jkzu3ax48zfjkskslpsq8p66gf", "0fb4a46ec4c5c8efd73f9f09c706fa3dc0e7f30a9585c8f4d538932b42d0f860"),
     /**
      * https://privatekeys.pw/dogecoin/address/A8c3xNz2mqsDLFwv5KL5fpH12QEwDaoTXo
      */

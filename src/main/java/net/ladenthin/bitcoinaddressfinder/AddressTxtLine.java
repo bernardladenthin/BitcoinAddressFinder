@@ -79,9 +79,6 @@ public class AddressTxtLine {
         } else if (address.startsWith("bc1")) {
             // bitcoin Bech32 (P2WPKH) or bitcoin Bech32 (P2WSH) or P2TR
             SegwitAddress segwitAddress = SegwitAddress.fromBech32(keyUtility.networkParameters, address);
-            if (segwitAddress.getOutputScriptType() == Script.ScriptType.P2WSH) {
-                return null;
-            }
             byte[] hash = segwitAddress.getHash();
             ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash);
             return new AddressToCoin(hash160, amount);

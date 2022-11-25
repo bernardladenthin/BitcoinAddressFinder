@@ -39,12 +39,6 @@ public enum StaticUnsupportedAddress implements PublicAddress {
      * https://privatekeys.pw/bitcoin-cash/address/d-414f1537e051163a5a558d5e9ee37439
      */
     BitcoinP2MS("d-414f1537e051163a5a558d5e9ee37439"),
-    
-    // P2SH (Pay to Witness Script Hash) 
-    /**
-     * https://privatekeys.pw/bitcoin/address/bc1qp762gmkychywl4elnuyuwph68hqw0uc2jkzu3ax48zfjkskslpsq8p66gf
-     */
-    BitcoinP2WSH("bc1qp762gmkychywl4elnuyuwph68hqw0uc2jkzu3ax48zfjkskslpsq8p66gf"),
 
     // litecoin Bech32 (P2WSH)
     /**
