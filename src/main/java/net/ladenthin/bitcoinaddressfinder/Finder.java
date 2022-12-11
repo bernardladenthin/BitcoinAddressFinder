@@ -88,7 +88,6 @@ public class Finder implements Interruptable {
                 cProducerJava.assertGridNumBitsCorrect();
                 ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, keyUtility, random);
                 javaProducers.add(producerJava);
-                producerJava.initProducer();
             }
         }
 
@@ -97,7 +96,6 @@ public class Finder implements Interruptable {
                 cProducerJavaBrainwallet.assertGridNumBitsCorrect();
                 ProducerJavaBrainwallet producerJavaBrainwallet = new ProducerJavaBrainwallet(cProducerJavaBrainwallet, shouldRun, consumerJava, keyUtility, random);
                 javaProducersBrainwallet.add(producerJavaBrainwallet);
-                producerJavaBrainwallet.initProducer();
             }
         }
 
@@ -106,8 +104,13 @@ public class Finder implements Interruptable {
                 cProducerOpenCL.assertGridNumBitsCorrect();
                 ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, shouldRun, consumerJava, keyUtility, random);
                 openCLProducers.add(producerOpenCL);
-                producerOpenCL.initProducer();
             }
+        }
+    }
+    
+    public void initProducer() {
+        for (Producer producer : getAllProducers()) {
+            producer.initProducer();
         }
     }
     

@@ -85,6 +85,7 @@ public class Main implements Runnable, Interruptable {
                 interruptables.add(finder);
                 finder.startConsumer();
                 finder.configureProducer();
+                finder.initProducer();
                 finder.startProducer();
                 break;
             case LMDBToAddressFile:
