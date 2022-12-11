@@ -22,8 +22,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.bitcoinj.core.NetworkParameters;
-import org.bitcoinj.params.MainNetParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,8 +53,7 @@ public class ConsumerJava implements Consumer {
 
     private Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    protected final NetworkParameters networkParameters = MainNetParams.get();
-    protected final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
+    private final KeyUtility keyUtility;
     protected final AtomicLong checkedKeys = new AtomicLong();
     protected final AtomicLong checkedKeysSumOfTimeToCheckContains = new AtomicLong();
     protected final AtomicLong emptyConsumer = new AtomicLong();
@@ -67,6 +64,7 @@ public class ConsumerJava implements Consumer {
     protected final Timer timer = new Timer();
 
     protected Persistence persistence;
+    private final PersistenceUtils persistenceUtils;
     
     private final List<Future<Void>> consumers = new ArrayList<>();
     protected final LinkedBlockingQueue<PublicKeyBytes[]> keysQueue;
@@ -76,10 +74,12 @@ public class ConsumerJava implements Consumer {
     protected final AtomicLong vanityHits = new AtomicLong();
     private final Pattern vanityPattern;
 
-    protected ConsumerJava(CConsumerJava consumerJava, AtomicBoolean shouldRun) {
+    protected ConsumerJava(CConsumerJava consumerJava, AtomicBoolean shouldRun, KeyUtility keyUtility, PersistenceUtils persistenceUtils) {
         this.consumerJava = consumerJava;
         this.keysQueue = new LinkedBlockingQueue<>(consumerJava.queueSize);
         this.shouldRun = shouldRun;
+        this.keyUtility = keyUtility;
+        this.persistenceUtils = persistenceUtils;
         if (consumerJava.enableVanity) {
             this.vanityPattern = Pattern.compile(consumerJava.vanityPattern);
         } else {
@@ -96,7 +96,6 @@ public class ConsumerJava implements Consumer {
     }
 
     protected void initLMDB() {
-        PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
         persistence = new LMDBPersistence(consumerJava.lmdbConfigurationReadOnly, persistenceUtils);
         persistence.init();
     }

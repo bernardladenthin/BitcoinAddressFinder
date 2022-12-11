@@ -21,10 +21,16 @@ package net.ladenthin.bitcoinaddressfinder;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import static org.hamcrest.Matchers.*;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaBrainwallet;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 
 public class FinderTest {
 
@@ -33,10 +39,40 @@ public class FinderTest {
 
     @Test
     public void interrupt_noExceptionThrown() throws IOException {
-        
+        // arrange
         CFinder cFinder = new CFinder();
         Finder finder = new Finder(cFinder, new AtomicBoolean(true));
+        // act
         finder.interrupt();
+        // assert
     }
+    
+    // <editor-fold defaultstate="collapsed" desc="getAllProducers">
+    @Test
+    public void getAllProducers_noProducersSet_returnEmptyList() throws IOException {
+        // arrange
+        CFinder cFinder = new CFinder();
+        Finder finder = new Finder(cFinder, new AtomicBoolean(true));
+        // act
+        List<Producer> allProducers = finder.getAllProducers();
+        // assert
+        assertThat(allProducers, is(empty()));
+    }
+    
+    @Test
+    public void getAllProducers_producersSet_returnList() throws IOException {
+        // arrange
+        CFinder cFinder = new CFinder();
+        cFinder.producerJava.add(new CProducerJava());
+        cFinder.producerJavaBrainwallet.add(new CProducerJavaBrainwallet());
+        cFinder.producerOpenCL.add(new CProducerOpenCL());
+        Finder finder = new Finder(cFinder, new AtomicBoolean(true));
+        finder.configureProducer();
+        // act
+        List<Producer> allProducers = finder.getAllProducers();
+        // assert
+        assertThat(allProducers, hasSize(3));
+    }
+    // </editor-fold>
 
 }

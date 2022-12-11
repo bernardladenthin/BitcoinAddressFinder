@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
+import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses1337;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
@@ -41,6 +42,7 @@ import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.ECKey;
+import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.crypto.MnemonicException;
 import org.bitcoinj.params.MainNetParams;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -60,6 +62,10 @@ public class ConsumerJavaTest {
 
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
+    
+    private final NetworkParameters networkParameters = MainNetParams.get();
+    private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
+    private final PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
 
     private ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
 
@@ -71,7 +77,7 @@ public class ConsumerJavaTest {
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = folder.newFolder().getAbsolutePath();
 
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
     }
 
@@ -81,7 +87,7 @@ public class ConsumerJavaTest {
 
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.printStatisticsEveryNSeconds = 1;
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun, keyUtility, persistenceUtils);
         Logger logger = mock(Logger.class);
         consumerJava.setLogger(logger);
 
@@ -105,7 +111,7 @@ public class ConsumerJavaTest {
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.printStatisticsEveryNSeconds = 0;
 
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun, keyUtility, persistenceUtils);
         consumerJava.startStatisticsTimer();
     }
 
@@ -124,13 +130,13 @@ public class ConsumerJavaTest {
 
         AtomicBoolean shouldRun = new AtomicBoolean(true);
 
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
 
         Random randomForProducer = new Random(TestAddresses42.RANDOM_SEED);
         
         CProducerJava cProducerJava = new CProducerJava();
-        ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, consumerJava.keyUtility, randomForProducer);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, keyUtility, randomForProducer);
 
         Logger logger = mock(Logger.class);
         consumerJava.setLogger(logger);
@@ -184,14 +190,14 @@ public class ConsumerJavaTest {
 
         AtomicBoolean shouldRun = new AtomicBoolean(true);
 
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
 
         Random randomForProducer = new Random(TestAddresses1337.RANDOM_SEED);
         
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.gridNumBits = 0;
-        ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, consumerJava.keyUtility, randomForProducer);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, keyUtility, randomForProducer);
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
@@ -230,7 +236,7 @@ public class ConsumerJavaTest {
 
         AtomicBoolean shouldRun = new AtomicBoolean(true);
 
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
 
         Logger logger = mock(Logger.class);
@@ -257,7 +263,7 @@ public class ConsumerJavaTest {
 
         AtomicBoolean shouldRun = new AtomicBoolean(true);
 
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
 
         Logger logger = mock(Logger.class);
@@ -322,7 +328,7 @@ public class ConsumerJavaTest {
 
         AtomicBoolean shouldRun = new AtomicBoolean(true);
 
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
 
         Logger logger = mock(Logger.class);

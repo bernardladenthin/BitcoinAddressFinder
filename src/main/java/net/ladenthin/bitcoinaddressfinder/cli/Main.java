@@ -83,7 +83,9 @@ public class Main implements Runnable, Interruptable {
             case Find:
                 Finder finder = new Finder(configuration.finder, shouldRun);
                 interruptables.add(finder);
-                finder.startRunner();
+                finder.startConsumer();
+                finder.configureProducer();
+                finder.startProducer();
                 break;
             case LMDBToAddressFile:
                 LMDBToAddressFile lmdbToAddressFile = new LMDBToAddressFile(configuration.lmdbToAddressFile, shouldRun);

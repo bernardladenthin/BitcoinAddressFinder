@@ -27,8 +27,11 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
+import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
+import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.params.MainNetParams;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -37,6 +40,10 @@ public class LMDBPersistencePerformanceTest {
     
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
+    
+    private final NetworkParameters networkParameters = MainNetParams.get();
+    private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
+    private final PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
     
     private final static int ARRAY_SIZE = 1024*8;
     private final static BigInteger PRIVATE_KEY = BigInteger.valueOf(1337);
@@ -69,7 +76,7 @@ public class LMDBPersistencePerformanceTest {
 
         AtomicBoolean shouldRun = new AtomicBoolean(true);
         
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun, keyUtility, persistenceUtils);
         ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) consumerJava.getLogger();
         logger.setLevel(Level.INFO);
         

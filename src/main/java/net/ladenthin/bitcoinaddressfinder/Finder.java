@@ -31,6 +31,9 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaBrainwallet;
+import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
+import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.params.MainNetParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,64 +48,74 @@ public class Finder implements Interruptable {
     private final List<ProducerOpenCL> openCLProducers = new ArrayList<>();
     private final List<ProducerJava> javaProducers = new ArrayList<>();
     private final List<ProducerJavaBrainwallet> javaProducersBrainwallet = new ArrayList<>();
+    
+    /**
+     * It is already thread local, no need for {@link java.util.concurrent.ThreadLocalRandom}.
+     */
+    private final Random random;
 
+    private final ExecutorService producerExecutorService = Executors.newCachedThreadPool();
+    
+    private final NetworkParameters networkParameters = MainNetParams.get();
+    private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
+    private final PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
+    
     @Nullable
     private ConsumerJava consumerJava;
 
     public Finder(CFinder finder, AtomicBoolean shouldRun) {
         this.finder = finder;
         this.shouldRun = shouldRun;
-    }
-
-    public void startRunner() {
-        ExecutorService producerExecutorService = Executors.newCachedThreadPool();
-
-        if (finder.consumerJava != null) {
-            consumerJava = new ConsumerJava(finder.consumerJava, shouldRun);
-            consumerJava.initLMDB();
-            consumerJava.startConsumer();
-            consumerJava.startStatisticsTimer();
-        }
-
-        // It is already thread local, no need for {@link java.util.concurrent.ThreadLocalRandom}.
-        final Random random;
         try {
             random = SecureRandom.getInstanceStrong();
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }
+    }
 
+    public void startConsumer() {
+        if (finder.consumerJava != null) {
+            consumerJava = new ConsumerJava(finder.consumerJava, shouldRun, keyUtility, persistenceUtils);
+            consumerJava.initLMDB();
+            consumerJava.startConsumer();
+            consumerJava.startStatisticsTimer();
+        }
+    }
+    
+    public void configureProducer() {
         if (finder.producerJava != null) {
             for (CProducerJava cProducerJava : finder.producerJava) {
                 cProducerJava.assertGridNumBitsCorrect();
-                ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, consumerJava.keyUtility, random);
+                ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, keyUtility, random);
                 javaProducers.add(producerJava);
                 producerJava.initProducer();
-                producerExecutorService.submit(producerJava);
             }
         }
 
         if (finder.producerJavaBrainwallet != null) {
             for (CProducerJavaBrainwallet cProducerJavaBrainwallet : finder.producerJavaBrainwallet) {
                 cProducerJavaBrainwallet.assertGridNumBitsCorrect();
-                ProducerJavaBrainwallet producerJavaBrainwallet = new ProducerJavaBrainwallet(cProducerJavaBrainwallet, shouldRun, consumerJava, consumerJava.keyUtility, random);
+                ProducerJavaBrainwallet producerJavaBrainwallet = new ProducerJavaBrainwallet(cProducerJavaBrainwallet, shouldRun, consumerJava, keyUtility, random);
                 javaProducersBrainwallet.add(producerJavaBrainwallet);
                 producerJavaBrainwallet.initProducer();
-                producerExecutorService.submit(producerJavaBrainwallet);
             }
         }
 
         if (finder.producerOpenCL != null) {
             for (CProducerOpenCL cProducerOpenCL : finder.producerOpenCL) {
                 cProducerOpenCL.assertGridNumBitsCorrect();
-                ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, shouldRun, consumerJava, consumerJava.keyUtility, random);
+                ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, shouldRun, consumerJava, keyUtility, random);
                 openCLProducers.add(producerOpenCL);
                 producerOpenCL.initProducer();
-                producerExecutorService.submit(producerOpenCL);
             }
         }
     }
     
+    public void startProducer() {
+        for (Producer producer : getAllProducers()) {
+            producerExecutorService.submit(producer);
+        }
+    }
     
     public void interrupt() {
         if (consumerJava != null) {
