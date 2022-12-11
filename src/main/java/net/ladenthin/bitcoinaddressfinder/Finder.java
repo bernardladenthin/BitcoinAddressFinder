@@ -109,18 +109,21 @@ public class Finder implements Interruptable {
             consumerJava.timer.cancel();
         }
         logger.info("Shut down, please wait for remaining tasks.");
-
-        for (ProducerOpenCL openCLProducer : openCLProducers) {
-            openCLProducer.waitTillProducerNotRunning();
-            openCLProducer.releaseProducers();
+        
+        for (Producer producer : getAllProducers()) {
+            producer.waitTillProducerNotRunning();
+            producer.releaseProducers();
         }
 
-        for (ProducerJava producerJava : javaProducers) {
-            producerJava.waitTillProducerNotRunning();
-            producerJava.releaseProducers();
-        }
         logger.info("All producers released.");
     }
-
+    
+    public List<Producer> getAllProducers() {
+        List<Producer> producers = new ArrayList<>();
+        producers.addAll(javaProducers);
+        producers.addAll(javaProducersBrainwallet);
+        producers.addAll(openCLProducers);
+        return producers;
+    }
 
 }
