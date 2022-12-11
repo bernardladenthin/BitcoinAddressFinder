@@ -60,9 +60,7 @@ public class FinderTest {
     }
     
     @Test
-    @OpenCLTest
     public void getAllProducers_producersSet_returnList() throws IOException {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadable();
         // arrange
         CFinder cFinder = new CFinder();
         cFinder.producerJava.add(new CProducerJava());
