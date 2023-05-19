@@ -60,9 +60,10 @@ public class ProducerOpenCL extends AbstractProducer {
             }
 
             final BigInteger secretBase = createSecretBase(producerOpenCL, secret, producerOpenCL.logSecretBase);
+            BigInteger[] privateKeys = {secretBase};
 
             waitTillFreeThreadsInPool();
-            OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
+            OpenCLGridResult createKeys = openCLContext.createKeys(privateKeys);
             
             resultReaderThreadPoolExecutor.submit(
                 () ->{
