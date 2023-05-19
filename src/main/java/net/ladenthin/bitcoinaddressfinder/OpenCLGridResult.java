@@ -24,19 +24,29 @@ import java.nio.ByteBuffer;
 public class OpenCLGridResult {
 
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
-    
-    private final BigInteger secretKeyBase;
+    private final BigInteger[] secretKeys;
     private final int workSize;
+    private final boolean chunkMode;
     private ByteBuffer result;
-    
-    OpenCLGridResult(BigInteger secretKeyBase, int workSize, ByteBuffer result) {
-        this.secretKeyBase = secretKeyBase;
+
+    OpenCLGridResult(BigInteger[] secretKeys, int workSize, ByteBuffer result, boolean chunkMode)
+            throws InvalidWorkSizeException {
+        checkPrivateKeysAndWorkSize(secretKeys, workSize, chunkMode);
+        this.secretKeys = secretKeys;
         this.workSize = workSize;
         this.result = result;
+        this.chunkMode = chunkMode;
     }
 
-    public BigInteger getSecretKeyBase() {
-        return secretKeyBase;
+    private void checkPrivateKeysAndWorkSize(BigInteger[] secretKeys, int workSize, boolean chunkMode)
+            throws InvalidWorkSizeException {
+        if (!chunkMode && (secretKeys.length != workSize)) {
+            throw new InvalidWorkSizeException(
+                    "When CHUNKMODE is DEACTIVATED, the number of the secretKeys (=" + secretKeys.length + ") must be EQUAL to the workSize (=" + workSize + ")!");
+        } else if (chunkMode && secretKeys.length > 1) {
+            // TODO use a logger
+            System.out.println("Too many secret keys (=" + secretKeys.length + ") when CHUNKMODE is ACTIVATED! Will use first secret key ONLY!");
+        }
     }
 
     public int getWorkSize() {
@@ -59,8 +69,15 @@ public class OpenCLGridResult {
     public PublicKeyBytes[] getPublicKeyBytes() {
         PublicKeyBytes[] publicKeys = new PublicKeyBytes[workSize];
         for (int i = 0; i < workSize; i++) {
-            PublicKeyBytes publicKeyBytes = getPublicKeyFromByteBufferXY(result, i, secretKeyBase);
-            publicKeys[i] = publicKeyBytes;
+            PublicKeyBytes publicKeyBytes;
+            if (chunkMode) {
+                publicKeyBytes = getPublicKeyFromByteBufferXY(result, i, secretKeys[0]);
+                publicKeys[i] = publicKeyBytes;
+            } else {
+                publicKeyBytes = getPublicKeyFromByteBufferXY(result, i, secretKeys[workSize - 1 - i]);
+                publicKeys[workSize - 1 - i] = publicKeyBytes;
+            }
+
         }
         return publicKeys;
     }
