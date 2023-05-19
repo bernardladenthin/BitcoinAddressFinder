@@ -13,7 +13,8 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 
 public class TestHelper {
 
@@ -45,7 +46,7 @@ public class TestHelper {
         BigInteger[] privateKeys = new BigInteger[arraySize];
         for (int i = 0; i < arraySize; i++) {
             privateKeys[i] = KeyUtility.createSecret(PRIVATE_KEY_MAX_BIT_LENGTH, new SecureRandom());
-            privateKeys[i] = ensureMinBitLength(privateKeys[i]);
+            KeyUtility.ensureMinByteLength(privateKeys[i]);
             if (!validateBitcoinPrivateKey(privateKeys[i].toString(HEX_RADIX))) {
                 System.out.println(i + ": NOT VALID: " + privateKeys[i].toString(HEX_RADIX));
             }
@@ -68,16 +69,6 @@ public class TestHelper {
         return privateKey.compareTo(minPrivateKey) >= 0 && privateKey.compareTo(maxPrivateKey) <= 0;
     }
 
-    private static BigInteger ensureMinBitLength(BigInteger privateKey) {
-        if (privateKey.bitLength() < PRIVATE_KEY_MAX_BIT_LENGTH) {
-            int paddingBits = PRIVATE_KEY_MAX_BIT_LENGTH - privateKey.bitLength();
-            BigInteger padding = BigInteger.ZERO.setBit(paddingBits);
-            return padding.or(privateKey);
-        } else {
-            return privateKey;
-        }
-    }
-
     public static BigInteger[] generateChunkOutOfSinglePrivateKey(BigInteger singlePrivateKey, int arraySize) {
         BigInteger[] chunk = new BigInteger[arraySize];
         chunk[0] = singlePrivateKey;
@@ -90,7 +81,7 @@ public class TestHelper {
     /**
      * Simulates the or operation in OpenCL when using the chunk mode
      * <p>
-     * This method will perform a bitwise OR-operation with the last 32 bits of a given BigInteger with a given value
+     * This method will perform a bitwise OR-operation with the last 32 bits of a given BigInteger with the given value
      * <p>
      * <strong>The content of this method was generated with OpenAI/ChatGPT</strong>
      *
@@ -98,7 +89,6 @@ public class TestHelper {
      * @param value  The value which in OpenCL would be the global_id
      * @return The updated number
      */
-    @SuppressWarnings("UnnecessaryLocalVariable")
     public static BigInteger bitwiseOrWithLast32Bits(BigInteger number, int value) {
         // Mask for the last 32 bits
         BigInteger mask = BigInteger.valueOf(0xFFFFFFFFL);
