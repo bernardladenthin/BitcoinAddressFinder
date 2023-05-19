@@ -78,15 +78,19 @@ public class OpenClTask {
     }
 
     public int getSrcSizeInBytes() {
-        return PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES;
+        if (cProducer.chunkMode) {
+            return PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES;
+        } else {
+            return PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES * cProducer.getWorkSize();
+        }
     }
 
     public int getDstSizeInBytes() {
         return PublicKeyBytes.TWO_COORDINATES_NUM_BYTES * cProducer.getWorkSize();
     }
 
-    public void setSrcPrivateKeyChunk(BigInteger privateKeyBase) {
-        byte[] privateKeyChunkAsByteArray = KeyUtility.bigIntegerToBytes(privateKeyBase);
+    public void setSrcPrivateKeys(BigInteger[] privateKeys) {
+        byte[] privateKeyChunkAsByteArray = KeyUtility.bigIntegersToBytes(privateKeys);
 
         // put key in reverse order because the ByteBuffer put writes in reverse order, a flip has no effect
         reverse(privateKeyChunkAsByteArray);

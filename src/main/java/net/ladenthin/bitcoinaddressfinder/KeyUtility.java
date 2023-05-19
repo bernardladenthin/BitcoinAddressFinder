@@ -231,4 +231,14 @@ public class KeyUtility {
         }
         return bytes;
     }
+
+    public static byte[] bigIntegersToBytes(BigInteger[] privateKeys) {
+        byte[] bytes = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES * privateKeys.length];
+        for (int i = 0; i < privateKeys.length; i++) {
+            byte[] loopBytes = bigIntegerToBytes(privateKeys[i]);
+            int offset = i * PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES;
+            System.arraycopy(loopBytes, 0, bytes, offset, loopBytes.length);
+        }
+        return bytes;
+    }
 }
