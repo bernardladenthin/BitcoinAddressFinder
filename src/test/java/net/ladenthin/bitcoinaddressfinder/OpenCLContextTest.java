@@ -85,7 +85,24 @@ public class OpenCLContextTest {
 
     @Test
     public void test_generate256PublicKeys_randomPrivateKeys_nonChunkMode() {
-        // TODO write test
+        //arrange
+        BigInteger[] privateKeysArray = TestHelper.generateRandomUncompressedPrivateKeys(CHUNK_SIZE);
+        OpenCLContext openCLContext = TestHelper.createOpenCLContext(false);
+
+        // act
+        OpenCLGridResult openCLGridResult = openCLContext.createKeys(privateKeysArray);
+        PublicKeyBytes[] publicKeysResult = openCLGridResult.getPublicKeyBytes();
+
+        // cleanup
+        openCLContext.release();
+        openCLGridResult.freeResult();
+
+        // assert
+        KeyUtility.ensureMinByteLength(privateKeysArray);
+        Map<String, String> resultKeysMap = TestHelper.createMapFromBigIntegerArrayAndPublicKeyBytesArray(privateKeysArray, publicKeysResult);
+        String[] expectedPublicKeysAsHexStringArray = TestHelper.uncompressedPublicKeysHexStringArrayFromPrivateKeysArray(privateKeysArray);
+        Map<String, String> expectedKeysMap = TestHelper.createMapFromSecretAndPublicKeys(privateKeysArray, expectedPublicKeysAsHexStringArray);
+        assertThatKeyMap(resultKeysMap).isEqualTo(expectedKeysMap);
     }
 
     @Ignore

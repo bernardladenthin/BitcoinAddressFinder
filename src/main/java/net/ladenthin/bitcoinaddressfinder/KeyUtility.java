@@ -241,4 +241,26 @@ public class KeyUtility {
         }
         return bytes;
     }
+
+    public static void ensureMinByteLength(BigInteger[] numberArray) {
+        for (int i = 0; i < numberArray.length; i++) {
+            String rawNumberAsHex = numberArray[i].toString(16);
+            if (rawNumberAsHex.length() < 64) {
+                int leadingZeroCount = 64 - (rawNumberAsHex.length());
+                StringBuilder sb = new StringBuilder();
+
+                // Add leading zeros
+                for (int ii = 0; ii < leadingZeroCount; ii++) {
+                    sb.append("0");
+                }
+                sb.append(rawNumberAsHex);
+                String val = sb.toString();
+                if(val.length() != 64){
+                    System.out.println("stress");
+                }
+                BigInteger bigInteger = new BigInteger(val, 16);
+                numberArray[i] = bigInteger;
+            }
+        }
+    }
 }
