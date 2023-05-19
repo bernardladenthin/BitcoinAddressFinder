@@ -3,7 +3,6 @@ package net.ladenthin.bitcoinaddressfinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.ECKey;
-import org.hamcrest.MatcherAssert;
 import org.hamcrest.Matchers;
 
 import java.io.IOException;
@@ -42,15 +41,11 @@ public class TestHelper {
         return Hex.encodeHexString(ECKey.publicKeyFromPrivate(privateKey, false));
     }
 
-    public static String uncompressedPublicKeyHexStringFromPrivateKey(String hexString) {
-        return uncompressedPublicKeyHexStringFromPrivateKey(new BigInteger(hexString, 16));
-    }
-
     public static BigInteger[] generateRandomUncompressedPrivateKeys(int arraySize) {
         BigInteger[] privateKeys = new BigInteger[arraySize];
         for (int i = 0; i < arraySize; i++) {
             privateKeys[i] = KeyUtility.createSecret(PRIVATE_KEY_MAX_BIT_LENGTH, new SecureRandom());
-            ensureMinBitLength(privateKeys[i]);
+            privateKeys[i] = ensureMinBitLength(privateKeys[i]);
             if (!validateBitcoinPrivateKey(privateKeys[i].toString(HEX_RADIX))) {
                 System.out.println(i + ": NOT VALID: " + privateKeys[i].toString(HEX_RADIX));
             }
@@ -70,18 +65,16 @@ public class TestHelper {
         // Check if the private key is within the valid range
         BigInteger minPrivateKey = BigInteger.ONE;
         BigInteger maxPrivateKey = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140", 16);
-        if (privateKey.compareTo(minPrivateKey) >= 0 && privateKey.compareTo(maxPrivateKey) <= 0) {
-            return true;
-        } else {
-            return false;
-        }
+        return privateKey.compareTo(minPrivateKey) >= 0 && privateKey.compareTo(maxPrivateKey) <= 0;
     }
 
-    private static void ensureMinBitLength(BigInteger privateKey) {
+    private static BigInteger ensureMinBitLength(BigInteger privateKey) {
         if (privateKey.bitLength() < PRIVATE_KEY_MAX_BIT_LENGTH) {
             int paddingBits = PRIVATE_KEY_MAX_BIT_LENGTH - privateKey.bitLength();
             BigInteger padding = BigInteger.ZERO.setBit(paddingBits);
-            privateKey = padding.or(privateKey);
+            return padding.or(privateKey);
+        } else {
+            return privateKey;
         }
     }
 
@@ -97,15 +90,15 @@ public class TestHelper {
     /**
      * Simulates the or operation in OpenCL when using the chunk mode
      * <p>
-     * This method will perform a bitwise OR-operation with the last 32 bits of a given BigInteger with the a given value
+     * This method will perform a bitwise OR-operation with the last 32 bits of a given BigInteger with a given value
      * <p>
      * <strong>The content of this method was generated with OpenAI/ChatGPT</strong>
      *
      * @param number The secret key as a BigInteger
      * @param value  The value which in OpenCL would be the global_id
      * @return The updated number
-     * @noinspection UnnecessaryLocalVariable
      */
+    @SuppressWarnings("UnnecessaryLocalVariable")
     public static BigInteger bitwiseOrWithLast32Bits(BigInteger number, int value) {
         // Mask for the last 32 bits
         BigInteger mask = BigInteger.valueOf(0xFFFFFFFFL);
@@ -150,14 +143,6 @@ public class TestHelper {
         return Hex.encodeHexString(publicKeyBytes.getUncompressed());
     }
 
-    public static String[] hexStringArrayFromPublicKeyBytesArray(PublicKeyBytes[] publicKeysResult) {
-        String[] hexStringArray = new String[publicKeysResult.length];
-        for (int i = 0; i < publicKeysResult.length; i++) {
-            hexStringArray[i] = hexStringFromPublicKeyBytes(publicKeysResult[i]);
-        }
-        return hexStringArray;
-    }
-
     public static Map<String, String> createMapFromBigIntegerArrayAndPublicKeyBytesArray(BigInteger[] keyArray, PublicKeyBytes[] valueArray) {
         Map<String, String> map = new HashMap<>();
         if (keyArray.length != valueArray.length) {
@@ -184,29 +169,8 @@ public class TestHelper {
         return map;
     }
 
-    public static <T> ActualArray<T> assertThatArray(T[] actualArray) {
-        return new ActualArray<>(actualArray);
-    }
-
     public static <K, V> ActualMap<K, V> assertThatKeyMap(Map<K, V> actualMap) {
-        return new ActualMap<K, V>(actualMap);
-    }
-
-    public static class ActualArray<T> {
-
-        private final T[] actualArray;
-
-        private ActualArray(T[] actualArray) {
-            this.actualArray = actualArray;
-        }
-
-        public void isEqualTo(T[] expectedArray) {
-            assertThat("None identical length of both arrays!", actualArray.length, is(equalTo(expectedArray.length)));
-            for (int i = 0; i < actualArray.length; i++) {
-                String reason = "Current Element: " + i + "/" + (actualArray.length - 1);
-                assertThat(reason, actualArray[i], is(equalTo(expectedArray[i])));
-            }
-        }
+        return new ActualMap<>(actualMap);
     }
 
     public static class ActualMap<K, V> {
