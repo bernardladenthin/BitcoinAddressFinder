@@ -151,8 +151,12 @@ public class OpenCLContext {
         clBuildProgram(program, 0, null, null, null, null);
         
         // Create the kernel
-        kernel = clCreateKernel(program, CHUNK_KERNEL_NAME, null);
-        
+        if (producerOpenCL.chunkMode) {
+            kernel = clCreateKernel(program, CHUNK_KERNEL_NAME, null);
+        } else {
+            kernel = clCreateKernel(program, NON_CHUNK_KERNEL_NAME, null);
+        }
+
         openClTask = new OpenClTask(context, producerOpenCL);
     }
 
@@ -168,11 +172,18 @@ public class OpenCLContext {
         clReleaseContext(context);
     }
 
-    public OpenCLGridResult createKeys(BigInteger privateKeyBase) {
-        openClTask.setSrcPrivateKeyChunk(privateKeyBase);
+    public OpenCLGridResult createKeys(BigInteger[] privateKeys) {
+        openClTask.setSrcPrivateKeys(privateKeys);
         ByteBuffer dstByteBuffer = openClTask.executeKernel(kernel, commandQueue);
 
-        OpenCLGridResult openCLGridResult = new OpenCLGridResult(privateKeyBase, producerOpenCL.getWorkSize(), dstByteBuffer);
+        OpenCLGridResult openCLGridResult = null;
+        try {
+            openCLGridResult = new OpenCLGridResult(privateKeys, producerOpenCL.getWorkSize(), dstByteBuffer,
+                    producerOpenCL.chunkMode);
+        } catch (InvalidWorkSizeException e) {
+            // TODO Handle a thrown InvalidWorkSizeException
+            e.printStackTrace();
+        }
         return openCLGridResult;
     }
 
