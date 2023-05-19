@@ -78,7 +78,7 @@ public abstract class AbstractProducer implements Producer {
     }
 
     public BigInteger createSecretBase(CProducer cProducer, BigInteger secret, boolean logSecretBase) {
-        BigInteger secretBase = cProducer.killBits(secret);
+        BigInteger secretBase = cProducer.setLeastSignificantBitToZero(secret);
         
         if(logSecretBase) {
             logger.info("secretBase: " + org.bouncycastle.util.encoders.Hex.toHexString(secretBase.toByteArray()) + "/" + cProducer.gridNumBits);
@@ -96,10 +96,6 @@ public abstract class AbstractProducer implements Producer {
     }
     
     public static BigInteger calculateSecretKey(BigInteger secretBase, int keyNumber) {
-        if (false) {
-            // works also but a or might be faster
-            return secretBase.add(BigInteger.valueOf(keyNumber));
-        }
         return secretBase.or(BigInteger.valueOf(keyNumber));
     }
     

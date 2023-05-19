@@ -55,6 +55,9 @@ public class CProducer {
      */
     public boolean logSecretBase;
 
+    /**
+     * @return {@code 1 << gridNumBits} in decimal
+     */
     public int getWorkSize() {
         return 1 << gridNumBits;
     }
@@ -65,9 +68,18 @@ public class CProducer {
         }
         return killBits;
     }
-    
-    public BigInteger killBits(BigInteger bigInteger) {
-        return bigInteger.andNot(getKillBits());
+
+    /**
+     * Sets the <strong>LEAST SIGNIFICANT BIT</strong> of the given value to 0 depending on the numbers of bits in the grid {@inheritDoc gridNumBits}
+     * <p>
+     * Example: 1011 becomes 1010 if numbers of bits in grid is 4
+     *
+     * @param value to be manipulated
+     * @return value with the LSB set to 0, rest remains untouched
+     */
+    public BigInteger setLeastSignificantBitToZero(BigInteger value) {
+        BigInteger killBits = getKillBits();
+        return value.andNot(killBits);
     }
     
     public void assertGridNumBitsCorrect() {
