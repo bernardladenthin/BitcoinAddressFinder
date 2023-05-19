@@ -63,7 +63,7 @@ public class KeyUtility {
         return address.toBase58();
     }
 
-    public BigInteger createSecret(int maximumBitLength, Random random) {
+    public static BigInteger createSecret(int maximumBitLength, Random random) {
         BigInteger secret = new BigInteger(maximumBitLength, random);
         return secret;
     }
