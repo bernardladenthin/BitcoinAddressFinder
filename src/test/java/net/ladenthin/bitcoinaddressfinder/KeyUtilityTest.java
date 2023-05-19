@@ -191,11 +191,11 @@ public class KeyUtilityTest {
         byte[] keyWithoutLeadingZeros = KeyUtility.bigIntegerToBytes(key);
 
         // assert
-        assertThat(keyWithoutLeadingZeros.length, is(equalTo(32)));
+        assertThat(keyWithoutLeadingZeros.length, is(equalTo(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES)));
         
         // copy back
         byte[] arrayWithLeadingZero = new byte[33];
-        System.arraycopy(keyWithoutLeadingZeros, 0, arrayWithLeadingZero, 1, 32);
+        System.arraycopy(keyWithoutLeadingZeros, 0, arrayWithLeadingZero, 1, PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES);
         
         // assert content equals
         assertThat(arrayWithLeadingZero, is(equalTo(maxPrivateKey)));
