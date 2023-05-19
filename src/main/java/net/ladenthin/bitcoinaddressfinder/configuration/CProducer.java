@@ -31,6 +31,14 @@ public class CProducer {
     public static final int MAX_GRID_NUM_BITS = 24;
     
     /**
+     * <code>chunkMode = TRUE</code> means, that we only provide a single privateKey and the OpenCL kernel will
+     * calculate new privateKeys ("chunks") out of the first one by doint bitwise or-operations with
+     * the global_ID of the kernel.
+     * <code>chunkMode = FALSE</code> means, that we will only use provided privateKeys and do not calculate new ones
+     */
+    public boolean chunkMode;
+
+    /**
      * (2<sup>{@code maxNumBits}</sup> - 1) can be set to a lower value to improve a search on specific ranges (e.g. the puzzle transaction https://privatekeys.pw/puzzles/bitcoin-puzzle-tx ).
      * {@code 1} can't be tested because {@link ECKey#fromPrivate} throws an {@link IllegalArgumentException}.
      * Range: {@code 2} (inclusive) to {@link PublicKeyBytes#PRIVATE_KEY_MAX_NUM_BITS} (inclusive).
