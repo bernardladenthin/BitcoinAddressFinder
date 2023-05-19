@@ -102,6 +102,11 @@ public class OpenCLContext {
         this.producerOpenCL = producerOpenCL;
     }
     
+    /**
+     * Sets all properties and parameters to finally create the OpenCL kernel.
+     *
+     * @throws IOException When an error occurs while reading a resource.
+     */
     public void init() throws IOException {
         
         // #################### general ####################
@@ -160,7 +165,7 @@ public class OpenCLContext {
         openClTask = new OpenClTask(context, producerOpenCL);
     }
 
-    OpenClTask getOpenClTask() {
+    protected OpenClTask getOpenClTask() {
         return openClTask;
     }
 
@@ -172,6 +177,15 @@ public class OpenCLContext {
         clReleaseContext(context);
     }
 
+    /**
+     * This method executes the OpenCL kernel to generate publicKeys. Depending on the parameter <strong>chunkMode</strong> it
+     * will automatically generate new privateKeys based on the first privateKey that was passed.
+     *
+     * @param privateKeys In case of <strong>chunkMode = true</strong> this method only needs
+     *                    one privateKey, but in case of <strong>chunkMode = false</strong>
+     *                    it needs exactly as many private keys as the work size.
+     * @return publicKeys as {@link OpenCLGridResult}
+     */
     public OpenCLGridResult createKeys(BigInteger[] privateKeys) {
         openClTask.setSrcPrivateKeys(privateKeys);
         ByteBuffer dstByteBuffer = openClTask.executeKernel(kernel, commandQueue);
