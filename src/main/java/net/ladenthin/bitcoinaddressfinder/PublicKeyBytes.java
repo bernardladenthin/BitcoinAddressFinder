@@ -114,13 +114,15 @@ public class PublicKeyBytes {
     public boolean isInvalid() {
         return isInvalid(secretKey);
     }
-    
+
+    /**
+     * Prevent an IllegalArgumentException
+     *
+     * @param secret to be checked if invalid
+     * @return <strong>true</strong> when secret equals 0000 or 0001
+     */
     public static boolean isInvalid(BigInteger secret) {
-        if (BigInteger.ZERO.equals(secret) || BigInteger.ONE.equals(secret)) {
-            // prevent an IllegalArgumentException
-            return true;
-        }
-        return false;
+        return BigInteger.ZERO.equals(secret) || BigInteger.ONE.equals(secret);
     }
     
     public PublicKeyBytes(BigInteger secretKey, byte[] uncompressed) {
