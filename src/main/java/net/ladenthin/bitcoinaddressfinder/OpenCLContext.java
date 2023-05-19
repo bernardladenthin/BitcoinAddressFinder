@@ -84,6 +84,7 @@ public class OpenCLContext {
         return resourceNames;
     }
 
+    private final static String NON_CHUNK_KERNEL_NAME = "generateKeysKernel_grid";
     private final static String CHUNK_KERNEL_NAME = "generateKeyChunkKernel_grid";
     private final static boolean EXCEPTIONS_ENABLED = true;
     
