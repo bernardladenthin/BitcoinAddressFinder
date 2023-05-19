@@ -151,7 +151,7 @@ __kernel void generateKeysKernel_transform_public(__global u32 *r, __global cons
     r[8] = r_local[8];
 }
 
-__kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
+__kernel void generateKeyChunkKernel_grid(__global u32 *r, __global const u32 *k)
 {
     u32 x_local[PUBLIC_KEY_LENGTH_WITHOUT_PARITY];
     u32 y_local[PUBLIC_KEY_LENGTH_WITHOUT_PARITY];

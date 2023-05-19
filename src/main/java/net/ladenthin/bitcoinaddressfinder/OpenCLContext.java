@@ -83,8 +83,8 @@ public class OpenCLContext {
         resourceNames.add("inc_ecc_secp256k1custom.cl");
         return resourceNames;
     }
-    
-    private final static String KERNEL_NAME = "generateKeysKernel_grid";
+
+    private final static String CHUNK_KERNEL_NAME = "generateKeyChunkKernel_grid";
     private final static boolean EXCEPTIONS_ENABLED = true;
     
     private final CProducerOpenCL producerOpenCL;
@@ -150,7 +150,7 @@ public class OpenCLContext {
         clBuildProgram(program, 0, null, null, null, null);
         
         // Create the kernel
-        kernel = clCreateKernel(program, KERNEL_NAME, null);
+        kernel = clCreateKernel(program, CHUNK_KERNEL_NAME, null);
         
         openClTask = new OpenClTask(context, producerOpenCL);
     }
