@@ -19,7 +19,6 @@ public class OpenCLContextTest {
     public static final int CHUNK_SIZE = 256;
 
     private static final String PRIVATE_KEY_HEX_STRING = "c297e4944f46f3b9f04cf4b3984f49bd4ee40dec33991066fa15cdb227933469";
-    private static final String SHORT_PRIVATE_KEY_HEX_STRING = "b5e704f9052318d6476e50521850634fac256bb46aa6b791f17163dc980e70";
 
     private static final String PUBLIC_KEY_HEX_STRING = "045f399867ee13c5ac525259f036c90f455b11d667acfcdfc36791288547633611e8416a53aea83bd55691a5721775a581bd1e8e09dd3db4021a6f6daebdbcc9da";
     private static final boolean CHUNK_MODE = true;
