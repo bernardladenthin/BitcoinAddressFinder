@@ -187,7 +187,6 @@ public class OpenCLContext {
      * @return publicKeys as {@link OpenCLGridResult}
      */
     public OpenCLGridResult createKeys(BigInteger[] privateKeys) {
-        KeyUtility.ensureMinByteLength(privateKeys);
         openClTask.setSrcPrivateKeys(privateKeys);
         ByteBuffer dstByteBuffer = openClTask.executeKernel(kernel, commandQueue);
 

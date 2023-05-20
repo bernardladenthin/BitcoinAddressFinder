@@ -240,39 +240,4 @@ public class KeyUtility {
         }
         return bytes;
     }
-
-    /**
-     * Makes sure, that the given BigInteger will have at least 32 bytes. This method will add leading zeros to ensure this.
-     *
-     * @param number the BigInteger to check
-     * @return the BigInteger with at least 32 bytes.
-     */
-    public static BigInteger ensureMinByteLength(BigInteger number) {
-        String rawNumberAsHex = number.toString(16);
-        if (rawNumberAsHex.length() < 64) {
-            int leadingZeroCount = 64 - (rawNumberAsHex.length());
-            StringBuilder sb = new StringBuilder();
-
-            // Add leading zeros
-            for (int ii = 0; ii < leadingZeroCount; ii++) {
-                sb.append("0");
-            }
-            sb.append(rawNumberAsHex);
-            String val = sb.toString();
-            number = new BigInteger(val, 16);
-        }
-        return number;
-    }
-
-    /**
-     * Makes sure, that all {@link BigInteger} in the given array will have at least 32 bytes.
-     * This method will add leading zeros to ensure this.
-     *
-     * @param numberArray the array containing {@link BigInteger} to check
-     */
-    public static void ensureMinByteLength(BigInteger[] numberArray) {
-        for (int i = 0; i < numberArray.length; i++) {
-            numberArray[i] = ensureMinByteLength(numberArray[i]);
-        }
-    }
 }

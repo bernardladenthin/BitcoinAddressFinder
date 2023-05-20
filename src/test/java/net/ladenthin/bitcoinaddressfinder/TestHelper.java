@@ -8,9 +8,7 @@ import org.hamcrest.Matchers;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.SecureRandom;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -43,30 +41,32 @@ public class TestHelper {
     }
 
     public static BigInteger[] generateRandomUncompressedPrivateKeys(int arraySize) {
-        BigInteger[] privateKeys = new BigInteger[arraySize];
-        for (int i = 0; i < arraySize; i++) {
-            privateKeys[i] = KeyUtility.createSecret(PRIVATE_KEY_MAX_BIT_LENGTH, new SecureRandom());
-            KeyUtility.ensureMinByteLength(privateKeys[i]);
-            if (!validateBitcoinPrivateKey(privateKeys[i].toString(HEX_RADIX))) {
-                System.out.println(i + ": NOT VALID: " + privateKeys[i].toString(HEX_RADIX));
+        List<BigInteger> privateKeysList = new LinkedList<>();
+        while (privateKeysList.size() < arraySize) {
+            BigInteger candidate = KeyUtility.createSecret(PRIVATE_KEY_MAX_BIT_LENGTH, new SecureRandom());
+            if (validBitcoinPrivateKey(candidate)) {
+                privateKeysList.add(candidate);
             }
         }
-        return privateKeys;
+        BigInteger[] privateKeysArray = new BigInteger[arraySize];
+        for (int i = 0; i < arraySize; i++) {
+            privateKeysArray[i] = privateKeysList.get(i);
+        }
+        return privateKeysArray;
     }
 
-    public static boolean validateBitcoinPrivateKey(String privateKeyHex) {
-        BigInteger privateKey;
-        try {
-            privateKey = new BigInteger(privateKeyHex, 16);
-        } catch (NumberFormatException e) {
-            // Invalid hexadecimal string format
-            return false;
-        }
-
+    @SuppressWarnings("RedundantIfStatement")
+    public static boolean validBitcoinPrivateKey(BigInteger candidate) {
         // Check if the private key is within the valid range
         BigInteger minPrivateKey = BigInteger.ONE;
         BigInteger maxPrivateKey = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140", 16);
-        return privateKey.compareTo(minPrivateKey) >= 0 && privateKey.compareTo(maxPrivateKey) <= 0;
+        if (!(candidate.compareTo(minPrivateKey) >= 0 && candidate.compareTo(maxPrivateKey) <= 0)) {
+            return false;
+        }
+        if (candidate.toString(2).length() != 256) {
+            return false;
+        }
+        return true;
     }
 
     public static BigInteger[] generateChunkOutOfSinglePrivateKey(BigInteger singlePrivateKey, int arraySize) {
