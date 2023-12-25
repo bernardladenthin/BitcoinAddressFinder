@@ -89,6 +89,9 @@ public class AddressTxtLine {
         } else if (address.startsWith("p")) {
             // p: bitcoin cash / CashAddr (P2SH), this is a unique format and does not work
             return null;
+        } else if (address.startsWith("dgb1")) {
+            // dgb1: digibyte P2WPKH or P2SH
+            return null;
         } else if (address.startsWith("7") || address.startsWith("A") || address.startsWith("9") || address.startsWith("M") || address.startsWith("3") || address.startsWith("t") || address.startsWith("X") || address.startsWith("D") || address.startsWith("L") || address.startsWith("G") || address.startsWith("B") || address.startsWith("V") || address.startsWith("N") || address.startsWith("4") || address.startsWith("R")) {
             // prefix clashes for signs: 7
             //
@@ -102,7 +105,7 @@ public class AddressTxtLine {
             //
             // Base58 P2PKH
             // X: dash
-            // D: dogecoin
+            // D: dogecoin / digibyte
             // L: litecoin
             // G: bitcoin gold
             // B: blackcoin

@@ -61,6 +61,7 @@ The importer read multiple txt/text files containing the following addresses in 
   * bitcoin gold
   * blackcoin
   * dash
+  * digibyte
   * dogecoin
   * feathercoin
   * litecoin

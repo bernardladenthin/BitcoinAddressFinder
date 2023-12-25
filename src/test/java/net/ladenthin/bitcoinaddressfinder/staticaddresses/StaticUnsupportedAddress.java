@@ -25,6 +25,10 @@ public enum StaticUnsupportedAddress implements PublicAddress {
      * https://privatekeys.pw/bitcoin-cash/address/prseh0a4aejjcewhc665wjqhppgwrz2lw5txgn666a
      */
     BitcoinCashP2SH("prseh0a4aejjcewhc665wjqhppgwrz2lw5txgn666a"),
+    /**
+     * https://dgb.tokenview.io/en/address/dgb1qnjf7e2a5ezft480kxzmhgg66pnzqk0aawxa06u
+     */
+    DigibyteP2SH("dgb1qnjf7e2a5ezft480kxzmhgg66pnzqk0aawxa06u"),
 
     // P2MS (Pay to Multisig)
     /**

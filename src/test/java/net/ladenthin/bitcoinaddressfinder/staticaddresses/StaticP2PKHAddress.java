@@ -56,6 +56,10 @@ public enum StaticP2PKHAddress implements PublicAddress {
      */
     Dash("XdAUmwtig27HBG6WfYyHAzP8n6XC9jESEw", "1b2a522cc8d42b0be7ceb8db711416794d50c846"),
     /**
+     * https://dgb.tokenview.io/en/address/DUFy8rH6dxkGutvo43WZryXjR3DU612sjh
+     */
+    Digibyte("DUFy8rH6dxkGutvo43WZryXjR3DU612sjh", "fd979fe2f333d8a6cc0cb21eeb34d958a2691aa8"),
+    /**
      * https://privatekeys.pw/dogecoin/address/DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L
      */
     Dogecoin("DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L", "830a7420e63d76244ff7cbd1c248e94c14463259"),
