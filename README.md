@@ -13,7 +13,7 @@
 Free high performance tool for fast scanning random Bitcoin, Bitcoin Cash, Bitcoin SV, Litecoin, Dogecoin, Dash, Zcash (and many more) private keys and finding addresses with balance.
 The main goal is to generate as fast as possible (Bitcoin/Altcoin) addresses using the JVM combined with OpenCL and check if the address (RIPEMD160 hash) was used/not used before. This includes possible hash collisions.
 
-Copyright (c) 2017-2021 Bernard Ladenthin.
+Copyright (c) 2017-2024 Bernard Ladenthin.
 
 ## Requirments
 * Java 11 or newer. Java 8 is not supported anymore.
@@ -85,53 +85,57 @@ The exporter writes all addresses in different formats:
 * DynamicWidthBase58BitcoinAddressWithAmount: The addresses will be written with amount.
 
 ### Use my prepared database
+I am in the process of preparing databases filled with numerous Bitcoin and altcoin addresses (refer to the Import Support section for more information).
+The sources of this information are confidential; however, you have the permission to extract any and all addresses.
+Should there be any information you find lacking or have questions about, do not hesitate to ask.
+
 #### Light database
-* Light (4.60 GiB), Last update: November 15, 2022
+* Light (5.17 GiB), Last update: March 2, 2024
   * Contains Bitcoin addresses whith amount and many altcoin addresses with amount.
   * Static amount of 0 is used to allow best compression.
-  * Unique entries: 111983796
-  * Mapsize: 4712 MiB
-  * Time to create the database: ~6 hours
-  * Link (3.1 GiB zip archive): http://ladenthin.net/lmdb_light.zip
+  * Unique entries: 124168047
+  * Mapsize: 5304 MiB
+  * Time to create the database: ~9 hours
+  * Link (3.5 GiB zip archive): http://ladenthin.net/lmdb_light.zip
 
 <details>
 <summary>Checksums</summary>
 
-* CRC32: 82f0a398
-* MD5: ed2cec10b9013ba72b3e1d073df2206c
-* RIPEMD-160: a5c8836d7c3106d0d68486331ef319dad7560d44
-* SHA-1: bf73bb546744f15a3f436fc6d3288cf618e0fc87
-* SHA-256: 70386188fb8bd15e057ca74a0ceb941e07b1e8a6f3a3e00d30642c0a4502781f
-* SHA-512: 24afc89d4713ce7cdff176dd924daa02024d1e33f66db25dfc12b253529b4e86867e20e5624a551de25a18f73fe8ec4d7346313ed0b5f3aee56529fcc40dd992
-* SHA3-224: 99b53de575124826e9ab426a61e204a82328b5c13b6d5529464df808
-* SHA3-256: 5c581df215ec3b599244f3d5e835509ba49b65c345c6ee0a367e1b75bedb5142
-* SHA3-384: e80f23680958ea5c017999776405342442e81c1878b7167bf341c01148268a10d32d308f3b2b4db677d8f4ceabd95500
-* SHA3-512: 1f7f8d3541bd2caf01a0a35730a901635cbac83dd0a9c933b56980dba50db28ea5ef2227d1fd1804e528d6ded815af5696bddf366f97030fae07cd3f6efafc10
+* CRC32: F07496A4
+* MD5: C9831606135AD658EB11FE31F8A0679F
+* RIPEMD-160: 729842D70E7ADAF406AFA8410704581E03482B77
+* SHA-1: F0206973E3016BCE9437365978DDA8A26F75A6BE
+* SHA-256: 0BF8B4DF03218A28E7FD8A6FE96558B884415E8337FA754FF46AA3E9CB417C22
+* SHA-512: 6BA96CCBFDEE5D047A02F5439DBDA5FA5C9ABAB3E7C90BF321688F3D404EC7D7316D946523449CCA7FF3179E77C6F16BD332D79FE3A990E1A9B8E57587BC24BB
+* SHA3-224: B09C0381467B950B3A296E071B7DFE3E70B6324570E5D903A1FE84FF
+* SHA3-256: 639A1A1993372748517F40423D86115D71A563D274A5CFB6E0CF4057AF68FCEF
+* SHA3-384: CAF8E2B43F7CCB9E34504E427A5986278A952D9CF95DC7A56B9A7562251DF9BAEAA525ACAEACA0D6BD9580BADAFDACA7
+* SHA3-512: 2DF9777AC1FDE59AD0C9D3642F97BD69E0870C61ADDD0D54C3A928EA6846F89CDF82F8A0B397581038A09716BC2ACCB753EF5967691A800489D681D6CCF1B135
 
 </details>
 
 #### Full database
-* Full (40.0 GiB), Last update: November 15, 2022
+* Full (54.7 GiB), Last update: March 2, 2024
   * Contains all Bitcoin addresses which are ever used and many altcoin addresses with and without amount.
   * Static amount of 0 is used to allow best compression.
-  * Unique entries: 1088415723
-  * Mapsize: 40976 MiB
-  * Time to create the database: ~44 hours
-  * Link (25.6 GiB zip archive): http://ladenthin.net/lmdb_full.zip
+  * Unique entries: 1317131048
+  * Mapsize: 56048 MiB
+  * Time to create the database: ~54 hours
+  * Link (37.7 GiB zip archive): http://ladenthin.net/lmdb_full.zip
 
 <details>
 <summary>Checksums</summary>
 
-* CRC32: b5f5c25e
-* MD5: 5f2af15377d1b58f93ddd83e9a0456c4
-* RIPEMD-160: 2683367e6387e274123fc932863a7f4b6330d42e
-* SHA-1: cf046e92c1077cb0306a74d2b413b3ecd91430e6
-* SHA-256: ac05a34d878ba50f87d866bad97e515fe855d4653c5d9f9acdfae9bb44b83a05
-* SHA-512: d73112eb22e5d2c9d4be3f6f8021609b01e3427625a5b93a8caa2f1d8302c893765709562ef8f856077bc9ada1395f781ebbd80c2101f43bd4a5f74f270d6ddc
-* SHA3-224: a19b7d951b1c20b1022dabaf2b47de68f6299ceeba73723e2036ed81
-* SHA3-256: e9f124a3c4130012eeb0ed29de19c8da8231974c37b91251ec4a564278f9fae6
-* SHA3-384: 58ca5fb2246e2a5ad76cf2197d37d867117fc4018e5ebeb5a144f24a1eac706fb2b56fe07e4fd1394abfb0f15a2a670d
-* SHA3-512: a10aa63918f30940e6048d0145a8c7b8a04dd0bc6586852879050c25f042137f93b196dd34e862ccb02ddd8fe3dbe74316e8fda834cecd0cf8bf48ba26d127a2
+* CRC32: 1BBAB86F
+* MD5: F3D2A7A9BBAE4AFC25D10AB3B6256FF8
+* RIPEMD-160: 293AE3D16D55DFA7EE2E9ED0A48151A786144228
+* SHA-1: 6BB264F0B14EAE533A3E659DC443902311C24083
+* SHA-256: F524E087DFE0C3883B992BA09C0CD388D2ECC8E77403468AA45E5911D26854F0
+* SHA-512: 83EA8E27F96439B5AF05E022A5DA3DCB0DA7035EFBB5CE5C99375DF073EA214B188C01F51F5AC254012620DBB0C87943B8F8E00DD77B85007B846AF38D4FF21A
+* SHA3-224: 0BBD750196486C7A54BA4084C2A92C7C2A390D2096AD0ADD7E9AC6A1
+* SHA3-256: 994CBA488664DE00DE5EBE89393C4DF07BB21F9624732D43A94899B9AD56D8C0
+* SHA3-384: 82890D4A1813F929197A80A9C35384E5FCBCEFE197CD721BFCABF5453CF0011E435A847B0D06CAF6BE883BC6142BEE2F
+* SHA3-512: 17E3287116AF342BE1677203B6773CCDDC510E2FB05526B7F13A5A2273EA978B4CB40E659807A51B5C1129B0C6780E22B47D1999428D8BB32412DBA3BB1BF0E8
 
 </details>
 
