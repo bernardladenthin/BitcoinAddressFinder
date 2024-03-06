@@ -44,7 +44,13 @@ public enum StaticUnsupportedAddress implements PublicAddress {
      */
     BitcoinP2MS("d-414f1537e051163a5a558d5e9ee37439"),
 
-    // litecoin Bech32 (P2WSH)
+    // feathercoin Bech32 (P2WSH or P2WPKH)
+    /**
+     * https://chainz.cryptoid.info/ftc/address.dws?fc1qvr9zesajsdw8aydcndd70wxj2wdgzu6zzltsph.htm
+     */
+    FeathercoinP2WSH("fc1qvr9zesajsdw8aydcndd70wxj2wdgzu6zzltsph"),
+
+    // litecoin Bech32 (P2WSH or P2WPKH)
     /**
      * https://bitcoin.stackexchange.com/questions/110995/how-can-i-find-samples-for-p2tr-transactions-on-mainnet
      */
