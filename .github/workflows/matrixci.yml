@@ -18,17 +18,13 @@ jobs:
       # https://docs.github.com/en/actions/using-jobs/using-a-matrix-for-your-jobs
       matrix:
         # https://github.com/actions/setup-java#supported-distributions
-        javaversion: [ '11', '17', '19']
+        javaversion: [ '21' ]
         javadistribution: ['adopt', 'adopt-openj9', 'corretto', 'liberica', 'microsoft', 'temurin', 'zulu'] # internally 'adopt-hotspot' is the same as 'adopt'
         # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
         os: [macos-latest, ubuntu-latest, windows-latest]
         exclude:
           - javadistribution: 'microsoft'
             os: 'macos-latest'
-          - javadistribution: 'adopt-openj9'
-            javaversion: '19'
-          - javadistribution: 'microsoft'
-            javaversion: '19'
 
     runs-on: ${{ matrix.os }}
     steps:

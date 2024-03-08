@@ -94,8 +94,7 @@ public class ByteBufferUtilityTest {
 
         // pre assert
         if (allocateDirect) {
-            long address = getAddressFromDirectBuffer((DirectBuffer)bytesAsByteBuffer);
-            assertThat(address, is(not(equalTo(0L))));
+            assertThat(isDirectBufferFreed((DirectBuffer)bytesAsByteBuffer), is(false));
         }
         
         // act
@@ -103,8 +102,7 @@ public class ByteBufferUtilityTest {
 
         // assert
         if (allocateDirect) {
-            long address = getAddressFromDirectBuffer((DirectBuffer)bytesAsByteBuffer);
-            assertThat(address, is(equalTo(0L)));
+            assertThat(isDirectBufferFreed((DirectBuffer)bytesAsByteBuffer), is(true));
         }
     }
     
@@ -233,6 +231,29 @@ public class ByteBufferUtilityTest {
         Field addressField = deallocator.getClass().getDeclaredField("address");
         addressField.setAccessible(true);
         return addressField.getLong(deallocator);
+    }
+
+    private boolean isDirectBufferFreed(DirectBuffer directBuffer) throws IllegalArgumentException, NoSuchFieldException, SecurityException, IllegalAccessException {
+        // does not work with newer JVMs (21) anymore
+        boolean testWithAddress = false;
+        boolean addressTest = true;
+        
+        Cleaner cleaner = directBuffer.cleaner();
+
+        Field nextField = cleaner.getClass().getDeclaredField("next");
+        nextField.setAccessible(true);
+        Object next = nextField.get(cleaner);
+
+        Field prevField = cleaner.getClass().getDeclaredField("prev");
+        prevField.setAccessible(true);
+        Object prev = prevField.get(cleaner);
+
+        if (testWithAddress) {
+            long address = getAddressFromDirectBuffer((DirectBuffer)directBuffer);
+            addressTest = address == 0L;
+        }
+
+        return next == prev && addressTest;
     }
 
 }

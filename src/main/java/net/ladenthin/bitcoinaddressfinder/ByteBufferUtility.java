@@ -19,9 +19,8 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.nio.ByteBuffer;
-import jdk.internal.ref.Cleaner;
+import jdk.internal.misc.Unsafe;
 import org.bouncycastle.util.encoders.Hex;
-import sun.nio.ch.DirectBuffer;
 
 public class ByteBufferUtility {
     
@@ -45,15 +44,16 @@ public class ByteBufferUtility {
         if (byteBuffer == null) {
             return;
         }
-        if (! (byteBuffer instanceof DirectBuffer)) {
+
+        if (!byteBuffer.isDirect()) {
             return;
         }
-        DirectBuffer directBuffer = (DirectBuffer) byteBuffer;
-        
-        Cleaner cleaner = directBuffer.cleaner();
-        if (cleaner != null) {
-            cleaner.clean();
-        }
+
+        Unsafe u = Unsafe.getUnsafe();
+        // https://bugs.openjdk.org/browse/JDK-8171377
+        // https://openjdk.org/jeps/8323072
+        // https://stackoverflow.com/questions/3496508/deallocating-direct-buffer-native-memory-in-java-for-jogl/26777380
+        u.invokeCleaner(byteBuffer);
     }
     
     // <editor-fold defaultstate="collapsed" desc="ByteBuffer byte array conversion">
