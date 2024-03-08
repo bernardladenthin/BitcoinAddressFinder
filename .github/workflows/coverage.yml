@@ -10,7 +10,7 @@ on:
       - '*'
 
 env:
-  javaversion: '17'
+  javaversion: '21'
   javadistribution: 'temurin'
 
 jobs:
