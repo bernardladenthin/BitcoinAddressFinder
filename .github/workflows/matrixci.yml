@@ -19,7 +19,7 @@ jobs:
       matrix:
         # https://github.com/actions/setup-java#supported-distributions
         javaversion: [ '21' ]
-        javadistribution: ['adopt', 'adopt-openj9', 'corretto', 'liberica', 'microsoft', 'temurin', 'zulu'] # internally 'adopt-hotspot' is the same as 'adopt'
+        javadistribution: ['adopt', 'adopt-openj9', 'corretto', 'dragonwell', 'liberica', 'microsoft', 'temurin', 'zulu'] # internally 'adopt-hotspot' is the same as 'adopt'
         # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
         os: [macos-latest, ubuntu-latest, windows-latest]
         exclude:
