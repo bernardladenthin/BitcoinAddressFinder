@@ -141,6 +141,7 @@ Should there be any information you find lacking or have questions about, do not
 </details>
 
 ## Pages and projects to get lists (dumps) of PubkeyHash addresses
+* https://github.com/Pymmdrza/Rich-Address-Wallet
 * https://github.com/mycroft/chainstate
 * https://github.com/graymauser/btcposbal2csv
 * https://blockchair.com/dumps
