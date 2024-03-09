@@ -25,6 +25,8 @@ jobs:
         exclude:
           - javadistribution: 'microsoft'
             os: 'macos-latest'
+          - javadistribution: 'dragonwell'
+            os: 'macos-latest'
 
     runs-on: ${{ matrix.os }}
     steps:
