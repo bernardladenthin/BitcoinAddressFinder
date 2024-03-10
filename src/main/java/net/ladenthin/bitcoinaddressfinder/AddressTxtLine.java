@@ -77,7 +77,7 @@ public class AddressTxtLine {
             // blockchair format for Bitcoin (d-) and Bitcoin Cash (m-) and (s-) (P2MS)
             return null;
         } else if (address.startsWith("bc1")) {
-            // bitcoin Bech32 (P2WPKH) or bitcoin Bech32 (P2WSH) or P2TR
+            // bitcoin Bech32 (P2WSH or P2WPKH) or P2TR
             SegwitAddress segwitAddress = SegwitAddress.fromBech32(keyUtility.networkParameters, address);
             byte[] hash = segwitAddress.getHash();
             ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash);
@@ -86,15 +86,23 @@ public class AddressTxtLine {
             // feathercoin Bech32 (P2WSH or P2WPKH)
             // https://chainz.cryptoid.info/ftc/address.dws?fc1qvr9zesajsdw8aydcndd70wxj2wdgzu6zzltsph.htm
             return null;
-        } else if (address.startsWith("ltc")) {
+        } else if (address.startsWith("ltc1")) {
             // litecoin Bech32 (P2WSH or P2WPKH)
             // https://privatekeys.pw/litecoin/address/ltc1qd5wm03t5kcdupjuyq5jffpuacnaqahvfsdu8smf8z0u0pqdqpatqsdrn8h
             return null;
-        } else if (address.startsWith("p")) {
-            // p: bitcoin cash / CashAddr (P2SH), this is a unique format and does not work
+        } else if (address.startsWith("nc1")) {
+            // namecoin Bech32 (P2WSH or P2WPKH)
+            // https://chainz.cryptoid.info/nmc/address.dws?nc1q2ml905jv7gx0d8z5f7kl23af0vtrjk4j0llmwr.htm
+            return null;
+        } else if (address.startsWith("vtc1")) {
+            // vertcoin Bech32 (P2WSH or P2WPKH)
+            // https://chainz.cryptoid.info/vtc/address.dws?vtc1qa4wejdlw9lmc7ks7l8hplc9fm394u79qjj0792.htm
             return null;
         } else if (address.startsWith("dgb1")) {
-            // dgb1: digibyte P2WPKH or P2SH
+            // digibyte Bech32 (P2WPKH or P2SH)
+            return null;
+        } else if (address.startsWith("p")) {
+            // p: bitcoin cash / CashAddr (P2SH), this is a unique format and does not work
             return null;
         } else if (address.startsWith("7") || address.startsWith("A") || address.startsWith("9") || address.startsWith("M") || address.startsWith("3") || address.startsWith("t") || address.startsWith("X") || address.startsWith("D") || address.startsWith("L") || address.startsWith("G") || address.startsWith("B") || address.startsWith("V") || address.startsWith("N") || address.startsWith("4") || address.startsWith("R")) {
             // prefix clashes for signs: 7

@@ -54,7 +54,19 @@ public enum StaticUnsupportedAddress implements PublicAddress {
     /**
      * https://bitcoin.stackexchange.com/questions/110995/how-can-i-find-samples-for-p2tr-transactions-on-mainnet
      */
-    LitecoinP2WSH("ltc1qd5wm03t5kcdupjuyq5jffpuacnaqahvfsdu8smf8z0u0pqdqpatqsdrn8h");
+    LitecoinP2WSH("ltc1qd5wm03t5kcdupjuyq5jffpuacnaqahvfsdu8smf8z0u0pqdqpatqsdrn8h"),
+
+    // namecoin Bech32 (P2WSH or P2WPKH)
+    /**
+     * https://chainz.cryptoid.info/nmc/address.dws?nc1q2ml905jv7gx0d8z5f7kl23af0vtrjk4j0llmwr.htm
+     */
+    NamecoinP2WSH("nc1q2ml905jv7gx0d8z5f7kl23af0vtrjk4j0llmwr"),
+
+    // vertcoin Bech32 (P2WSH or P2WPKH)
+    /**
+     * https://chainz.cryptoid.info/vtc/address.dws?vtc1qa4wejdlw9lmc7ks7l8hplc9fm394u79qjj0792.htm
+     */
+    VertcoinP2WSH("vtc1qa4wejdlw9lmc7ks7l8hplc9fm394u79qjj0792");
     
     private final String publicAddress;
 
