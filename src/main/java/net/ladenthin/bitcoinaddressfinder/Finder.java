@@ -30,7 +30,7 @@ import javax.annotation.Nullable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
-import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaBrainwallet;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.params.MainNetParams;
@@ -47,7 +47,7 @@ public class Finder implements Interruptable {
     
     private final List<ProducerOpenCL> openCLProducers = new ArrayList<>();
     private final List<ProducerJava> javaProducers = new ArrayList<>();
-    private final List<ProducerJavaBrainwallet> javaProducersBrainwallet = new ArrayList<>();
+    private final List<ProducerJavaSecretsFiles> javaProducersSecretsFiles = new ArrayList<>();
     
     /**
      * It is already thread local, no need for {@link java.util.concurrent.ThreadLocalRandom}.
@@ -91,11 +91,11 @@ public class Finder implements Interruptable {
             }
         }
 
-        if (finder.producerJavaBrainwallet != null) {
-            for (CProducerJavaBrainwallet cProducerJavaBrainwallet : finder.producerJavaBrainwallet) {
-                cProducerJavaBrainwallet.assertGridNumBitsCorrect();
-                ProducerJavaBrainwallet producerJavaBrainwallet = new ProducerJavaBrainwallet(cProducerJavaBrainwallet, shouldRun, consumerJava, keyUtility, random);
-                javaProducersBrainwallet.add(producerJavaBrainwallet);
+        if (finder.producerJavaSecretsFiles != null) {
+            for (CProducerJavaSecretsFiles cProducerJavaSecretsFiles : finder.producerJavaSecretsFiles) {
+                cProducerJavaSecretsFiles.assertGridNumBitsCorrect();
+                ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, shouldRun, consumerJava, keyUtility, random);
+                javaProducersSecretsFiles.add(producerJavaSecretsFiles);
             }
         }
 
@@ -137,7 +137,7 @@ public class Finder implements Interruptable {
     public List<Producer> getAllProducers() {
         List<Producer> producers = new ArrayList<>();
         producers.addAll(javaProducers);
-        producers.addAll(javaProducersBrainwallet);
+        producers.addAll(javaProducersSecretsFiles);
         producers.addAll(openCLProducers);
         return producers;
     }

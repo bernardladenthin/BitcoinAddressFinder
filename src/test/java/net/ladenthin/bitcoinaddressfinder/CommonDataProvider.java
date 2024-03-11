@@ -20,12 +20,23 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import com.tngtech.java.junit.dataprovider.DataProvider;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticP2PKHAddress;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticP2SHAddress;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticUnsupportedAddress;
 
 public class CommonDataProvider {
-    
+
+    /**
+     * For {@link #cSecretFormat()}.
+     */
+    public final static String DATA_PROVIDER_CSECRET_FORMAT = "cSecretFormat";
+
+    @DataProvider
+    public static Object[][] cSecretFormat() {
+        return transformFlatToObjectArrayArray(CSecretFormat.values());
+    }
+
     /**
      * For {@link #bytesToMib()}.
      */

@@ -1,6 +1,6 @@
 // @formatter:off
 /**
- * Copyright 2021 Bernard Ladenthin bernard.ladenthin@gmail.com
+ * Copyright 2024 Bernard Ladenthin bernard.ladenthin@gmail.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,17 @@
  *
  */
 // @formatter:on
-package net.ladenthin.bitcoinaddressfinder.configuration;
+package net.ladenthin.bitcoinaddressfinder;
 
-import java.util.ArrayList;
-import java.util.List;
+import org.bitcoinj.core.Context;
+import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.params.MainNetParams;
 
-public class CProducerJavaBrainwallet extends CProducer {
-    /**
-     * The list of strings files which should be read.
-     */
-    public List<String> brainwalletStringsFiles = new ArrayList<>();
+public class NetworkParameterFactory {
+    
+    public NetworkParameters getOrCreate() {
+        NetworkParameters networkParameters = MainNetParams.get();
+        Context.getOrCreate(networkParameters);
+        return networkParameters;
+    }
 }

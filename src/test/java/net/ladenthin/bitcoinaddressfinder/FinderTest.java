@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
-import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaBrainwallet;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 
 public class FinderTest {
@@ -64,7 +64,7 @@ public class FinderTest {
         // arrange
         CFinder cFinder = new CFinder();
         cFinder.producerJava.add(new CProducerJava());
-        cFinder.producerJavaBrainwallet.add(new CProducerJavaBrainwallet());
+        cFinder.producerJavaSecretsFiles.add(new CProducerJavaSecretsFiles());
         cFinder.producerOpenCL.add(new CProducerOpenCL());
         Finder finder = new Finder(cFinder, new AtomicBoolean(true));
         finder.configureProducer();

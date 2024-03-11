@@ -35,13 +35,13 @@ public abstract class AbstractPlaintextFile {
     @Nonnull
     protected final AtomicBoolean shouldRun;
     
-    public AbstractPlaintextFile(File file, ReadStatistic readStatistic, AtomicBoolean shouldRun) {
+    public AbstractPlaintextFile(@Nonnull File file, @Nonnull ReadStatistic readStatistic, @Nonnull AtomicBoolean shouldRun) {
         this.file = file;
         this.readStatistic = readStatistic;
         this.shouldRun = shouldRun;
     }
     
-    protected double calculateFileProgress(RandomAccessFile raf) throws IOException {
+    protected double calculateFileProgress(@Nonnull RandomAccessFile raf) throws IOException {
         return ((double)(Math.max(raf.getFilePointer(),1)) / (double)raf.length()) * 100.0d;
     }
     

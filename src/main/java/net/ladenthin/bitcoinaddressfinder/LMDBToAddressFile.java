@@ -39,8 +39,6 @@ public class LMDBToAddressFile implements Runnable, Interruptable {
     
     private final AtomicBoolean shouldRun;
 
-    private NetworkParameters networkParameters;
-
     private LMDBPersistence persistence;
 
     public LMDBToAddressFile(CLMDBToAddressFile lmdbToAddressFile, AtomicBoolean shouldRun) {
@@ -50,7 +48,8 @@ public class LMDBToAddressFile implements Runnable, Interruptable {
 
     @Override
     public void run() {
-        createNetworkParameter();
+        final NetworkParameters networkParameters = new NetworkParameterFactory().getOrCreate();
+        
         PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
         persistence = new LMDBPersistence(lmdbToAddressFile.lmdbConfigurationReadOnly, persistenceUtils);
         persistence.init();
@@ -66,11 +65,6 @@ public class LMDBToAddressFile implements Runnable, Interruptable {
         } finally {
             persistence.close();
         }
-    }
-
-    private void createNetworkParameter() {
-        networkParameters = MainNetParams.get();
-        Context.getOrCreate(networkParameters);
     }
 
     @Override

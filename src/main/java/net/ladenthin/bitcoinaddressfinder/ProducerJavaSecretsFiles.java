@@ -24,21 +24,22 @@ import java.math.BigInteger;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
-import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaBrainwallet;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
+import org.bitcoinj.core.NetworkParameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ProducerJavaBrainwallet extends AbstractProducer {
+public class ProducerJavaSecretsFiles extends AbstractProducer {
 
-    private final Logger logger = LoggerFactory.getLogger(ProducerJavaBrainwallet.class);
+    private final Logger logger = LoggerFactory.getLogger(ProducerJavaSecretsFiles.class);
     
-    private final CProducerJavaBrainwallet producerJavaBrainwallet;
+    private final CProducerJavaSecretsFiles producerJavaSecretsFiles;
 
     private final ReadStatistic readStatistic = new ReadStatistic();
 
-    public ProducerJavaBrainwallet(CProducerJavaBrainwallet producerJavaBrainwallet, AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility, Random random) {
+    public ProducerJavaSecretsFiles(CProducerJavaSecretsFiles producerJavaSecretsFiles, AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility, Random random) {
         super(shouldRun, consumer, keyUtility, random);
-        this.producerJavaBrainwallet = producerJavaBrainwallet;
+        this.producerJavaSecretsFiles = producerJavaSecretsFiles;
     }
 
     @Override
@@ -47,27 +48,31 @@ public class ProducerJavaBrainwallet extends AbstractProducer {
 
     @Override
     public void produceKeys() {
+        final NetworkParameters networkParameters = new NetworkParameterFactory().getOrCreate();
+        
         FileHelper fileHelper = new FileHelper();
-        List<File> files = fileHelper.stringsToFiles(producerJavaBrainwallet.brainwalletStringsFiles);
+        List<File> files = fileHelper.stringsToFiles(producerJavaSecretsFiles.files);
         fileHelper.assertFilesExists(files);
         
         logger.info("writeAllAmounts ...");
-        logger.info("Iterate brainwallet files ...");
+        logger.info("Iterate secrets files ...");
         try {
             for (File file : files) {
-                BrainwalletFile brainwalletFile = new BrainwalletFile(
+                SecretsFile secretsFile = new SecretsFile(
+                    networkParameters,
                     file,
+                    producerJavaSecretsFiles.secretFormat,
                     readStatistic,
                     this::processSecret,
                     this.shouldRun
                 );
 
-                logger.info("process " + file.getAbsolutePath());
-                brainwalletFile.readFile();
+                logger.info("process: " + file.getAbsolutePath());
+                secretsFile.readFile();
                 logger.info("finished: " + file.getAbsolutePath());
 
                 logProgress();
-                logger.info("... iterate brainwallet files done.");
+                logger.info("... iterate secrets files done.");
             }
         } catch (IOException e) {
             throw new RuntimeException(e);

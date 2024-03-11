@@ -40,8 +40,6 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     private final CAddressFilesToLMDB addressFilesToLMDB;
 
-    private NetworkParameters networkParameters;
-
     private LMDBPersistence persistence;
 
     private final AtomicLong addressCounter = new AtomicLong();
@@ -59,7 +57,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     @Override
     public void run() {
-        createNetworkParameter();
+        final NetworkParameters networkParameters = new NetworkParameterFactory().getOrCreate();
 
         PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
         persistence = new LMDBPersistence(addressFilesToLMDB.lmdbConfigurationWrite, persistenceUtils);
@@ -120,11 +118,6 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     private void logProgress() {
         logger.info("Progress: " + addressCounter.get() + " addresses. Unsupported: " + readStatistic.unsupported + ". Errors: " + readStatistic.errors.size() + ". Current File progress: " + String.format("%.2f", readStatistic.currentFileProgress) + "%.");
-    }
-
-    private void createNetworkParameter() {
-        networkParameters = MainNetParams.get();
-        Context.getOrCreate(networkParameters);
     }
 
     @Override
