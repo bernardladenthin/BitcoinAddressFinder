@@ -48,15 +48,14 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
 
     @Override
     public void produceKeys() {
-        final NetworkParameters networkParameters = new NetworkParameterFactory().getOrCreate();
-        
-        FileHelper fileHelper = new FileHelper();
-        List<File> files = fileHelper.stringsToFiles(producerJavaSecretsFiles.files);
-        fileHelper.assertFilesExists(files);
-        
-        logger.info("writeAllAmounts ...");
-        logger.info("Iterate secrets files ...");
         try {
+            final NetworkParameters networkParameters = new NetworkParameterFactory().getOrCreate();
+
+            FileHelper fileHelper = new FileHelper();
+            List<File> files = fileHelper.stringsToFiles(producerJavaSecretsFiles.files);
+            fileHelper.assertFilesExists(files);
+
+            logger.info("Iterate secrets files ...");
             for (File file : files) {
                 SecretsFile secretsFile = new SecretsFile(
                     networkParameters,
@@ -76,6 +75,9 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
+        } finally {
+            // try and do this produce one time only
+            this.shouldRun.set(false);
         }
     }
     

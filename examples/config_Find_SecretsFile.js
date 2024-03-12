@@ -21,7 +21,7 @@
         "producerJavaSecretsFiles" : [
             {
                 "files" : [
-                    "fileContainingSecrets_BIG_INTEGER.txt"
+                    "secrets/fileContainingSecrets_BIG_INTEGER.txt"
                 ],
                 "secretFormat" : "STRING_DO_SHA256",
                 "logSecretBase" : true,
@@ -29,7 +29,7 @@
             },
             {
                 "files" : [
-                    "fileContainingSecrets_DUMPED_RIVATE_KEY.txt"
+                    "secrets/fileContainingSecrets_DUMPED_RIVATE_KEY.txt"
                 ],
                 "secretFormat" : "STRING_DO_SHA256",
                 "logSecretBase" : true,
@@ -37,7 +37,7 @@
             },
             {
                 "files" : [
-                    "fileContainingSecrets_SHA256.txt"
+                    "secrets/fileContainingSecrets_SHA256.txt"
                 ],
                 "secretFormat" : "STRING_DO_SHA256",
                 "logSecretBase" : true,
@@ -45,7 +45,7 @@
             },
             {
                 "files" : [
-                    "fileContainingSecrets_STRING_DO_SHA256.txt"
+                    "secrets/fileContainingSecrets_STRING_DO_SHA256.txt"
                 ],
                 "secretFormat" : "STRING_DO_SHA256",
                 "logSecretBase" : true,
