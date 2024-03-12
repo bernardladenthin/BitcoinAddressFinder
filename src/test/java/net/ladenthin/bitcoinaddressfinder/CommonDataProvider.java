@@ -136,7 +136,8 @@ public class CommonDataProvider {
     @DataProvider
     public static Object[][] bitSizesLowerThan25() {
         // if the constant was changed, the dataprovider and its test must be changed also
-        if(CProducerOpenCL.MAX_GRID_NUM_BITS != 24) {
+        // this constant can not change because of the maximum size in 32-bit systems
+        if(PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY != 24) {
             throw new IllegalStateException("Adapt data provider.");
         }
         
@@ -164,7 +165,7 @@ public class CommonDataProvider {
             {21},
             {22},
             {23},
-            {CProducerOpenCL.MAX_GRID_NUM_BITS}
+            {PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY}
         };
     }
     

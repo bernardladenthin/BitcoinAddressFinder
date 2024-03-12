@@ -48,6 +48,10 @@ public class KeyUtility {
         this.networkParameters = networkParameters;
         this.byteBufferUtility = byteBufferUtility;
     }
+    
+    public BigInteger killBits(BigInteger bigInteger, BigInteger killBits) {
+        return bigInteger.andNot(killBits);
+    }
 
     /**
      * Require networkParameters.

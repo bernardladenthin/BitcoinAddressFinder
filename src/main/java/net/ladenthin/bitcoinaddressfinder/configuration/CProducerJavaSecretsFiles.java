@@ -21,7 +21,7 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CProducerJavaSecretsFiles extends CProducer {
+public class CProducerJavaSecretsFiles extends CProducerJava {
     /**
      * The list of strings files which should be read.
      */

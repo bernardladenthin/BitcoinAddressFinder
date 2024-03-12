@@ -52,6 +52,33 @@ public class PublicKeyBytes {
 
     public static final int ONE_COORDINATE_NUM_BYTES = 32;
     public static final int TWO_COORDINATES_NUM_BYTES = ONE_COORDINATE_NUM_BYTES * 2;
+    
+    /**
+     * Computes the maximum permissible length for an array intended to store pairs of coordinates within a 32-bit system.
+     * This constant represents the upper limit on array length, factoring in the memory constraint imposed by the maximum
+     * integer value addressable in Java ({@link Integer#MAX_VALUE}) and the storage requirement for two coordinates.
+     * <p>
+     * The calculation divides {@link Integer#MAX_VALUE} by the number of bytes needed to store two coordinates,
+     * as defined by {@link PublicKeyBytes#TWO_COORDINATES_NUM_BYTES}, ensuring the array's indexing does not surpass
+     * Java's maximum allowable array length.
+     * </p>
+     */
+    public static final int MAXIMUM_TWO_COORDINATES_ARRAY_LENGTH = (int)(Integer.MAX_VALUE / PublicKeyBytes.TWO_COORDINATES_NUM_BYTES);
+
+    /**
+     * Determines the minimum number of bits required to address the maximum array length for storing coordinate pairs.
+     * This value is crucial for efficiently allocating memory without exceeding the 32-bit system's limitations.
+     * <p>
+     * The calculation employs a bit manipulation strategy to find the exponent of the nearest superior power of 2
+     * capable of accommodating the maximum array length. By decrementing the maximum array length by 1 and
+     * calculating 32 minus the count of leading zeros in the decremented value, we obtain the closest superior power of 2.
+     * This technique, derived from a common bit manipulation trick (source: https://stackoverflow.com/questions/5242533/fast-way-to-find-exponent-of-nearest-superior-power-of-2),
+     * ensures the calculated bit count represents the smallest possible number that can address all potential array indices
+     * without breaching the 32-bit address space limitation.
+     * </p>
+     */
+    public static final int BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY = PublicKeyBytes.MAXIMUM_TWO_COORDINATES_ARRAY_LENGTH == 0 ? 0 : 32 - Integer.numberOfLeadingZeros(PublicKeyBytes.MAXIMUM_TWO_COORDINATES_ARRAY_LENGTH - 1) - 1;
+
     public static final int PARITY_BYTES_LENGTH = 1;
 
     public static final int LAST_Y_COORDINATE_BYTE_INDEX = PublicKeyBytes.PARITY_BYTES_LENGTH + PublicKeyBytes.TWO_COORDINATES_NUM_BYTES - 1;

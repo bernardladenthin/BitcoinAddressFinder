@@ -122,6 +122,7 @@ public class ProducerJavaSecretsFilesTest {
         List<String> secretsFilesAsStringList = secretsFiles.stream().map(file -> file.getAbsolutePath()).collect(Collectors.toList());
         cProducerJavaSecretsFiles.files = secretsFilesAsStringList;
         cProducerJavaSecretsFiles.secretFormat = cSecretFormat;
+        cProducerJavaSecretsFiles.gridNumBits = 0;
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);

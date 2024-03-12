@@ -201,4 +201,24 @@ public class KeyUtilityTest {
         assertThat(arrayWithLeadingZero, is(equalTo(maxPrivateKey)));
     }
     // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="killBits">
+    @Test
+    public void killBits_valueWithAllBitsSetGiven_bitsKilled() throws IOException {
+        // act
+        BigInteger secret = new KeyUtility(null, new ByteBufferUtility(false)).killBits(BigInteger.valueOf(63L), BigInteger.valueOf(5L));
+
+        // assert
+        assertThat(secret, is(equalTo(BigInteger.valueOf(58))));
+    }
+    
+    @Test
+    public void killBits_valueWithNotAllBitsSetGiven_bitsKilled() throws IOException {
+        // act
+        BigInteger secret = new KeyUtility(null, new ByteBufferUtility(false)).killBits(BigInteger.valueOf(62L), BigInteger.valueOf(5L));
+
+        // assert
+        assertThat(secret, is(equalTo(BigInteger.valueOf(58))));
+    }
+    // </editor-fold>
 }

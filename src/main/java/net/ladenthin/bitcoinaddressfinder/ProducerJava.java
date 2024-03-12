@@ -25,7 +25,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 
 public class ProducerJava extends AbstractProducer {
 
-    private final CProducerJava producerJava;
+    protected final CProducerJava producerJava;
 
     public ProducerJava(CProducerJava producerJava, AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility, Random random) {
         super(shouldRun, consumer, keyUtility, random);
@@ -38,30 +38,36 @@ public class ProducerJava extends AbstractProducer {
 
     @Override
     public void produceKeys() {
-        BigInteger secret = null;
+        BigInteger secret = keyUtility.createSecret(producerJava.privateKeyMaxNumBits, random);
+        processSecret(secret);
+    }
+    
+    protected void processSecret(BigInteger secret) {
         try {
-            secret = keyUtility.createSecret(producerJava.privateKeyMaxNumBits, random);
             if (PublicKeyBytes.isInvalid(secret)) {
                 return;
             }
             
             final BigInteger secretBase = createSecretBase(producerJava, secret, producerJava.logSecretBase);
-            
-            PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[producerJava.getWorkSize()];
-            for (int i = 0; i < publicKeyBytesArray.length; i++) {
-                // create uncompressed
-                BigInteger gridSecret = calculateSecretKey(secretBase, i);
-                if (PublicKeyBytes.isInvalid(gridSecret)) {
-                    publicKeyBytesArray[i] = PublicKeyBytes.INVALID_KEY_ONE;
-                    continue;
-                }
-                publicKeyBytesArray[i] = PublicKeyBytes.fromPrivate(gridSecret);
-            }
-
+            PublicKeyBytes[] publicKeyBytesArray = createGrid(secretBase);
             consumer.consumeKeys(publicKeyBytesArray);
         } catch (Exception e) {
             logErrorInProduceKeys(e, secret);
         }
+    }
+
+    protected PublicKeyBytes[] createGrid(final BigInteger secretBase) {
+        PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[producerJava.getWorkSize()];
+        for (int i = 0; i < publicKeyBytesArray.length; i++) {
+            // create uncompressed
+            BigInteger gridSecret = calculateSecretKey(secretBase, i);
+            if (PublicKeyBytes.isInvalid(gridSecret)) {
+                publicKeyBytesArray[i] = PublicKeyBytes.INVALID_KEY_ONE;
+                continue;
+            }
+            publicKeyBytesArray[i] = PublicKeyBytes.fromPrivate(gridSecret);
+        }
+        return publicKeyBytesArray;
     }
 
     @Override

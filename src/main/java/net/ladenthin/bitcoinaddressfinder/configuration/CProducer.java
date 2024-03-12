@@ -28,8 +28,6 @@ public class CProducer {
      */
     private BigInteger killBits;
     
-    public static final int MAX_GRID_NUM_BITS = 24;
-    
     /**
      * (2<sup>{@code maxNumBits}</sup> - 1) can be set to a lower value to improve a search on specific ranges (e.g. the puzzle transaction https://privatekeys.pw/puzzles/bitcoin-puzzle-tx ).
      * {@code 1} can't be tested because {@link ECKey#fromPrivate} throws an {@link IllegalArgumentException}.
@@ -38,9 +36,9 @@ public class CProducer {
     public int privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
     
     /**
-     * Range: {@code 1} (inclusive) to {@link #MAX_GRID_NUM_BITS} (inclusive).
+     * Range: {@code 0} (inclusive) to {@link PublicKeyBytes#BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY} (inclusive).
      */
-    public int gridNumBits = 8;
+    public int gridNumBits = 0;
     
     /**
      * Enable the log output for the secret address.
@@ -58,26 +56,13 @@ public class CProducer {
         return killBits;
     }
     
-    public BigInteger killBits(BigInteger bigInteger) {
-        return bigInteger.andNot(getKillBits());
-    }
-    
     public void assertGridNumBitsCorrect() {
-        {
-            // ensure the constant MAX_GRID_NUM_BITS is set correct
-            int maximumWorkSize = (int)(Integer.MAX_VALUE / PublicKeyBytes.TWO_COORDINATES_NUM_BYTES);
-            // https://stackoverflow.com/questions/5242533/fast-way-to-find-exponent-of-nearest-superior-power-of-2
-            int numBitsMaximum = maximumWorkSize == 0 ? 0 : 32 - Integer.numberOfLeadingZeros(maximumWorkSize - 1);
-
-            if (MAX_GRID_NUM_BITS > numBitsMaximum) {
-                throw new IllegalArgumentException("MAX_GRID_NUM_BITS is too high for 32 bit memory allocation.");
-            }
+        if (gridNumBits < 0) {
+            throw new IllegalArgumentException("gridNumBits must higher than 0.");
         }
-        
-        if (gridNumBits > MAX_GRID_NUM_BITS) {
-            throw new IllegalArgumentException("gridNumBits must be lower or equal than " + MAX_GRID_NUM_BITS + ".");
+        if (gridNumBits > PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY) {
+            throw new IllegalArgumentException("gridNumBits must be lower or equal than " + PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY + ".");
         }
-        
     }
     
 }

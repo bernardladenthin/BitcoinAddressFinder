@@ -29,7 +29,7 @@ import org.bitcoinj.core.NetworkParameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ProducerJavaSecretsFiles extends AbstractProducer {
+public class ProducerJavaSecretsFiles extends ProducerJava {
 
     private final Logger logger = LoggerFactory.getLogger(ProducerJavaSecretsFiles.class);
     
@@ -38,7 +38,7 @@ public class ProducerJavaSecretsFiles extends AbstractProducer {
     private final ReadStatistic readStatistic = new ReadStatistic();
 
     public ProducerJavaSecretsFiles(CProducerJavaSecretsFiles producerJavaSecretsFiles, AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility, Random random) {
-        super(shouldRun, consumer, keyUtility, random);
+        super(producerJavaSecretsFiles, shouldRun, consumer, keyUtility, random);
         this.producerJavaSecretsFiles = producerJavaSecretsFiles;
     }
 
@@ -85,18 +85,5 @@ public class ProducerJavaSecretsFiles extends AbstractProducer {
 
     @Override
     public void releaseProducers() {
-    }
-
-    private void processSecret(BigInteger secret) {
-        try {
-            if (PublicKeyBytes.isInvalid(secret)) {
-                return;
-            }
-            PublicKeyBytes publicKeyBytes = PublicKeyBytes.fromPrivate(secret);
-            PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[]{publicKeyBytes};
-            consumer.consumeKeys(publicKeyBytesArray);
-        } catch (Exception e) {
-            logErrorInProduceKeys(e, secret);
-        }
     }
 }

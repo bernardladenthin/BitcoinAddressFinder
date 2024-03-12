@@ -19,16 +19,6 @@
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
 public enum CSecretFormat {
-    /**
-     * Also known as a brainwallet. A string is hashed using SHA256 and used as the private key.
-     * e.g.: 
-     * <pre>
-     * test
-     * test with space
-     * 1337
-     * </pre>
-     */
-    STRING_DO_SHA256,
     
     /**
      * Represents a big integer.
@@ -42,6 +32,17 @@ public enum CSecretFormat {
     BIG_INTEGER,
     
     /**
+     * Also referred to as WiF (Wallet Import Format).
+     * e.g.:
+     * <pre>
+     * 5K2YUVmWfxbmvsNxCsfvArXdGXm7d5DC9pn4yD75k2UaSYgkXTh
+     * 5JVAXLpkZ21svEzwyimMHn5hAkWNqJq8uGxqUqcRrNb8F4Csp8V
+     * 5JXYuGrwSbyp8sKBmiLcvokqSnxALPjKWQMPJXZYyBWKof7c2pk
+     * </pre>
+     */
+    DUMPED_RIVATE_KEY,
+    
+    /**
      * A HEX-encoded SHA256 string. This might already be the hashed brainwallet.
      * e.g.:
      * <pre>
@@ -53,13 +54,13 @@ public enum CSecretFormat {
     SHA256,
     
     /**
-     * Also referred to as WiF (Wallet Import Format).
-     * e.g.:
+     * Also known as a brainwallet. A string is hashed using SHA256 and used as the private key.
+     * e.g.: 
      * <pre>
-     * 5K2YUVmWfxbmvsNxCsfvArXdGXm7d5DC9pn4yD75k2UaSYgkXTh
-     * 5JVAXLpkZ21svEzwyimMHn5hAkWNqJq8uGxqUqcRrNb8F4Csp8V
-     * 5JXYuGrwSbyp8sKBmiLcvokqSnxALPjKWQMPJXZYyBWKof7c2pk
+     * test
+     * test with space
+     * 1337
      * </pre>
      */
-    DUMPED_RIVATE_KEY
+    STRING_DO_SHA256
 }
