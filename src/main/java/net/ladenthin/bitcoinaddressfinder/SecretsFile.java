@@ -38,8 +38,8 @@ public class SecretsFile extends AbstractPlaintextFile {
     private final Consumer<BigInteger> secretConsumer;
     private final NetworkParameters networkParameters;
 
-    public SecretsFile(@Nonnull NetworkParameters networkParameters, @Nonnull File file, @Nonnull CSecretFormat secretFormat, @Nonnull ReadStatistic readStatistic, @Nonnull Consumer<BigInteger> secretConsumer, @Nonnull Stoppable stoppable) {
-        super(file, readStatistic, stoppable);
+    public SecretsFile(@Nonnull NetworkParameters networkParameters, @Nonnull File file, @Nonnull CSecretFormat secretFormat, @Nonnull ReadStatistic readStatistic, @Nonnull Consumer<BigInteger> secretConsumer) {
+        super(file, readStatistic);
         this.networkParameters = networkParameters;
         this.secretFormat = secretFormat;
         this.secretConsumer = secretConsumer;

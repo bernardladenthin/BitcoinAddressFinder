@@ -48,7 +48,6 @@ public class AddressFileToLMDBTest extends LMDBBase {
     @Test(expected = IllegalArgumentException.class)
     public void addressFilesToLMDB_addressFileDoesNotExists_throwsIllegalArgumentException() throws IOException {
         // arrange, act
-        final MockStoppable mockStoppable = new MockStoppable(true);
         CAddressFilesToLMDB addressFilesToLMDBConfigurationWrite = new CAddressFilesToLMDB();
         
         addressFilesToLMDBConfigurationWrite.addressesFiles.add("thisFileDoesNotExists.txt");
@@ -56,7 +55,7 @@ public class AddressFileToLMDBTest extends LMDBBase {
         File lmdbFolder = folder.newFolder("lmdb");
         String lmdbFolderPath = lmdbFolder.getAbsolutePath();
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.lmdbDirectory = lmdbFolderPath;
-        AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(addressFilesToLMDBConfigurationWrite, mockStoppable);
+        AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(addressFilesToLMDBConfigurationWrite);
         addressFilesToLMDB.run();
     }
 

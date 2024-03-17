@@ -43,7 +43,6 @@ public class Finder implements Interruptable, ProducerCompletionCallback, Secret
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
 
     private final CFinder finder;
-    private final Stoppable stoppable;
     private final Shutdown shutdown;
     
     private final List<ProducerOpenCL> openCLProducers = new ArrayList<>();
@@ -64,9 +63,8 @@ public class Finder implements Interruptable, ProducerCompletionCallback, Secret
     @Nullable
     private ConsumerJava consumerJava;
 
-    public Finder(CFinder finder, Stoppable stoppable, Shutdown shutdown) {
+    public Finder(CFinder finder, Shutdown shutdown) {
         this.finder = finder;
-        this.stoppable = stoppable;
         this.shutdown = shutdown;
         try {
             random = SecureRandom.getInstanceStrong();
@@ -77,7 +75,7 @@ public class Finder implements Interruptable, ProducerCompletionCallback, Secret
 
     public void startConsumer() {
         if (finder.consumerJava != null) {
-            consumerJava = new ConsumerJava(finder.consumerJava, stoppable, keyUtility, persistenceUtils);
+            consumerJava = new ConsumerJava(finder.consumerJava, keyUtility, persistenceUtils);
             consumerJava.initLMDB();
             consumerJava.startConsumer();
             consumerJava.startStatisticsTimer();
@@ -88,7 +86,7 @@ public class Finder implements Interruptable, ProducerCompletionCallback, Secret
         if (finder.producerJava != null) {
             for (CProducerJava cProducerJava : finder.producerJava) {
                 cProducerJava.assertGridNumBitsCorrect();
-                ProducerJava producerJava = new ProducerJava(cProducerJava, stoppable, consumerJava, keyUtility, this, this);
+                ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, this, this);
                 javaProducers.add(producerJava);
             }
         }
@@ -96,7 +94,7 @@ public class Finder implements Interruptable, ProducerCompletionCallback, Secret
         if (finder.producerJavaSecretsFiles != null) {
             for (CProducerJavaSecretsFiles cProducerJavaSecretsFiles : finder.producerJavaSecretsFiles) {
                 cProducerJavaSecretsFiles.assertGridNumBitsCorrect();
-                ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, stoppable, consumerJava, keyUtility, this, this);
+                ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, consumerJava, keyUtility, this, this);
                 javaProducersSecretsFiles.add(producerJavaSecretsFiles);
             }
         }
@@ -104,7 +102,7 @@ public class Finder implements Interruptable, ProducerCompletionCallback, Secret
         if (finder.producerOpenCL != null) {
             for (CProducerOpenCL cProducerOpenCL : finder.producerOpenCL) {
                 cProducerOpenCL.assertGridNumBitsCorrect();
-                ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, stoppable, consumerJava, keyUtility, this, this);
+                ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, consumerJava, keyUtility, this, this);
                 openCLProducers.add(producerOpenCL);
             }
         }
@@ -127,6 +125,7 @@ public class Finder implements Interruptable, ProducerCompletionCallback, Secret
         logger.info("Shut down, please wait for remaining tasks.");
         
         for (Producer producer : getAllProducers()) {
+            producer.interrupt();
             producer.waitTillProducerNotRunning();
             producer.releaseProducers();
         }

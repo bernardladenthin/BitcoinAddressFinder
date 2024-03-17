@@ -27,11 +27,16 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import lombok.NonNull;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 
 public class AddressFilesToLMDB implements Runnable, Interruptable {
+    
+    private final static long PROGRESS_LOG = 100_000;
 
     private final Logger logger = LoggerFactory.getLogger(AddressFilesToLMDB.class);
 
@@ -42,14 +47,14 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
     private final AtomicLong addressCounter = new AtomicLong();
 
     private final ReadStatistic readStatistic = new ReadStatistic();
-    
-    private final static long PROGRESS_LOG = 100_000;
-    
-    private final Stoppable stoppable;
 
-    public AddressFilesToLMDB(CAddressFilesToLMDB addressFilesToLMDB, Stoppable stoppable) {
+    @NonNull
+    AtomicReference<AddressFile> currentAddressFile = new AtomicReference<>();
+    
+    protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
+    
+    public AddressFilesToLMDB(CAddressFilesToLMDB addressFilesToLMDB) {
         this.addressFilesToLMDB = addressFilesToLMDB;
-        this.stoppable = stoppable;
     }
 
     @Override
@@ -69,17 +74,21 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
             
             logger.info("Iterate address files ...");
             for (File file : files) {
+                if (!shouldRun.get()) {
+                    break;
+                }
                 AddressFile addressFile = new AddressFile(
                     file,
                     readStatistic,
                     networkParameters,
                     this::supported,
-                    this::unsupported,
-                    stoppable
+                    this::unsupported
                 );
                 
                 logger.info("process " + file.getAbsolutePath());
+                currentAddressFile.set(addressFile);
                 addressFile.readFile();
+                currentAddressFile.set(null);
                 logger.info("finished: " + file.getAbsolutePath());
                 
                 logProgress();
@@ -119,5 +128,9 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     @Override
     public void interrupt() {
+        AddressFile addressFile = currentAddressFile.get();
+        if (addressFile != null) {
+            addressFile.interrupt();
+        }
     }
 }

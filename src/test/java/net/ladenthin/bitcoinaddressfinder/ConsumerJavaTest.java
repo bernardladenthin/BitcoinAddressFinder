@@ -83,23 +83,19 @@ public class ConsumerJavaTest {
 
     @Test(expected = org.lmdbjava.LmdbNativeException.class)
     public void initLMDB_lmdbNotExisting_noExceptionThrown() throws IOException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = folder.newFolder().getAbsolutePath();
 
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, mockStoppable, keyUtility, persistenceUtils);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
     }
 
     @Test
     public void startStatisticsTimer_noExceptionThrown() throws IOException, InterruptedException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.printStatisticsEveryNSeconds = 1;
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, mockStoppable, keyUtility, persistenceUtils);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         Logger logger = mock(Logger.class);
         consumerJava.setLogger(logger);
 
@@ -118,21 +114,17 @@ public class ConsumerJavaTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void startStatisticsTimer_invalidparameter_throwsException() throws IOException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.printStatisticsEveryNSeconds = 0;
 
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, mockStoppable, keyUtility, persistenceUtils);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.startStatisticsTimer();
     }
     
     @Test
     public void waitTillKeysQueueEmpty_noKeysAdded_resultIsTrue() throws IOException, InterruptedException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CConsumerJava cConsumerJava = new CConsumerJava();
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, mockStoppable, keyUtility, persistenceUtils);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         Logger logger = mock(Logger.class);
         consumerJava.setLogger(logger);
 
@@ -145,10 +137,8 @@ public class ConsumerJavaTest {
     
     @Test
     public void interrupt_keysAdded_waitedInternallyForTheDuration() throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CConsumerJava cConsumerJava = new CConsumerJava();
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, mockStoppable, keyUtility, persistenceUtils);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         Logger logger = mock(Logger.class);
         consumerJava.setLogger(logger);
         
@@ -171,10 +161,8 @@ public class ConsumerJavaTest {
     
     @Test
     public void waitTillKeysQueueEmpty_keysAdded_resultIsFalse() throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CConsumerJava cConsumerJava = new CConsumerJava();
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, mockStoppable, keyUtility, persistenceUtils);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         Logger logger = mock(Logger.class);
         consumerJava.setLogger(logger);
         
@@ -191,7 +179,6 @@ public class ConsumerJavaTest {
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
     public void waitTillKeysQueueEmpty_keysAddedDuringWait_resultIsTrue(boolean compressed, boolean useStaticAmount) throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
@@ -201,7 +188,7 @@ public class ConsumerJavaTest {
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, mockStoppable, keyUtility, persistenceUtils);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
         
         Logger logger = mock(Logger.class);
@@ -249,7 +236,6 @@ public class ConsumerJavaTest {
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
     public void runProber_testAddressGiven_hitExpected(boolean compressed, boolean useStaticAmount) throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
@@ -260,14 +246,14 @@ public class ConsumerJavaTest {
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         cConsumerJava.runtimePublicKeyCalculationCheck = true;
 
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, mockStoppable, keyUtility, persistenceUtils);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
 
         Random randomForProducer = new Random(TestAddresses42.RANDOM_SEED);
         
         CProducerJava cProducerJava = new CProducerJava();
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, randomForProducer);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockStoppable, consumerJava, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         Logger logger = mock(Logger.class);
         consumerJava.setLogger(logger);
@@ -309,7 +295,6 @@ public class ConsumerJavaTest {
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
     public void runProber_unknownAddressGiven_missExpected(boolean compressed, boolean useStaticAmount) throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
@@ -320,7 +305,7 @@ public class ConsumerJavaTest {
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         cConsumerJava.runtimePublicKeyCalculationCheck = true;
 
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, mockStoppable, keyUtility, persistenceUtils);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
 
         Random randomForProducer = new Random(TestAddresses1337.RANDOM_SEED);
@@ -328,7 +313,7 @@ public class ConsumerJavaTest {
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.gridNumBits = 0;
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, randomForProducer);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockStoppable, consumerJava, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
@@ -355,7 +340,6 @@ public class ConsumerJavaTest {
 
     @Test
     public void consumeKeys_invalidSecretGiven_continueExpectedAndNoExceptionThrown() throws IOException, InterruptedException, DecoderException, MnemonicException.MnemonicLengthException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
@@ -366,7 +350,7 @@ public class ConsumerJavaTest {
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         cConsumerJava.runtimePublicKeyCalculationCheck = true;
 
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, mockStoppable, keyUtility, persistenceUtils);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
 
         Logger logger = mock(Logger.class);
@@ -381,7 +365,6 @@ public class ConsumerJavaTest {
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED, location = CommonDataProvider.class)
     public void consumeKeys_invalidPublicKeyHashUncompressedGiven_ThrowException(boolean compressed) throws IOException, InterruptedException, DecoderException, MnemonicException.MnemonicLengthException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
@@ -392,7 +375,7 @@ public class ConsumerJavaTest {
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         cConsumerJava.runtimePublicKeyCalculationCheck = true;
 
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, mockStoppable, keyUtility, persistenceUtils);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
 
         Logger logger = mock(Logger.class);
@@ -436,7 +419,6 @@ public class ConsumerJavaTest {
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED, location = CommonDataProvider.class)
     public void consumeKeys_testVanityPattern_patternMatches(boolean compressed) throws IOException, InterruptedException, DecoderException, MnemonicException.MnemonicLengthException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
@@ -455,7 +437,7 @@ public class ConsumerJavaTest {
             cConsumerJava.vanityPattern = "14sN.*";
         }
 
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, mockStoppable, keyUtility, persistenceUtils);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
 
         Logger logger = mock(Logger.class);

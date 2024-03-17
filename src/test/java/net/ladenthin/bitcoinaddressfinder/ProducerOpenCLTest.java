@@ -46,14 +46,12 @@ public class ProducerOpenCLTest {
     // <editor-fold defaultstate="collapsed" desc="initProducer">
     @Test
     public void initProducer_XYZ_openCLContextSet() throws IOException, InterruptedException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         // pre-assert
         assertThat(producerOpenCL.openCLContext, nullValue());
@@ -69,14 +67,12 @@ public class ProducerOpenCLTest {
     // <editor-fold defaultstate="collapsed" desc="releaseProducers">
     @Test
     public void releaseProducers_notInitialized_noExceptionThrown() throws IOException, InterruptedException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
         
         // act
         producerOpenCL.releaseProducers();
@@ -84,14 +80,12 @@ public class ProducerOpenCLTest {
     
     @Test
     public void releaseProducers_initialized_noExceptionThrownAndOpenCLContextFreed() throws IOException, InterruptedException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
         
         producerOpenCL.initProducer();
         
@@ -109,14 +103,12 @@ public class ProducerOpenCLTest {
     // <editor-fold defaultstate="collapsed" desc="releaseProducers">
     @Test
     public void getFreeThreads_notInitialized_numberOfFreeThreadsReturned() throws IOException, InterruptedException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
         
         // act
         int freeThreads = producerOpenCL.getFreeThreads();
@@ -127,14 +119,12 @@ public class ProducerOpenCLTest {
     
     @Test
     public void getFreeThreads_initialized_numberOfFreeThreadsReturned() throws IOException, InterruptedException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
         
         producerOpenCL.initProducer();
         
@@ -149,14 +139,12 @@ public class ProducerOpenCLTest {
     // <editor-fold defaultstate="collapsed" desc="waitTillFreeThreadsInPool">
     @Test
     public void waitTillFreeThreadsInPool_notInitialized_returnImmediately() throws IOException, InterruptedException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
         
         // act
         producerOpenCL.waitTillFreeThreadsInPool();
@@ -166,14 +154,12 @@ public class ProducerOpenCLTest {
     
     @Test
     public void waitTillFreeThreadsInPool_initialized_returnImmediately() throws IOException, InterruptedException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
         
         producerOpenCL.initProducer();
         
@@ -185,14 +171,12 @@ public class ProducerOpenCLTest {
     
     @Test
     public void waitTillFreeThreadsInPool_initializedAndThreadPoolFull_doNotReturn() throws IOException, InterruptedException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
         
         producerOpenCL.initProducer();
         
@@ -222,14 +206,12 @@ public class ProducerOpenCLTest {
     // <editor-fold defaultstate="collapsed" desc="produceKeys">
     @Test(expected = IllegalStateException.class)
     public void produceKeys_notInitialized_illegalStateExceptionThrown() throws IOException, InterruptedException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
         
         // act
         producerOpenCL.produceKeys();
@@ -241,14 +223,12 @@ public class ProducerOpenCLTest {
     @OpenCLTest
     public void produceKeys_initialized_keysInConsumer() throws IOException, InterruptedException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
         
         producerOpenCL.initProducer();
         

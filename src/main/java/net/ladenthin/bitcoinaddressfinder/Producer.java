@@ -20,7 +20,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.util.Random;
 
-public interface Producer extends Runnable {
+public interface Producer extends Runnable, Interruptable {
 
     /**
      * Initialize the producer to procue keys with

@@ -19,7 +19,6 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
-import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import org.apache.commons.codec.binary.Hex;
@@ -33,15 +32,15 @@ public abstract class AbstractProducer implements Producer {
     private Logger logger = LoggerFactory.getLogger(this.getClass());
     
     protected final AtomicBoolean running = new AtomicBoolean(false);
-    protected final Stoppable stoppable;
     protected final Consumer consumer;
     protected final KeyUtility keyUtility;
     protected final SecretFactory secretFactory;
     protected final ProducerCompletionCallback producerCompletionCallback;
     protected final boolean runOnce;
+    
+    protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
-    public AbstractProducer(Stoppable stoppable, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback, boolean runOnce) {
-        this.stoppable = stoppable;
+    public AbstractProducer(Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback, boolean runOnce) {
         this.consumer = consumer;
         this.keyUtility = keyUtility;
         this.secretFactory = secretFactory;
@@ -52,7 +51,7 @@ public abstract class AbstractProducer implements Producer {
     @Override
     public void run() {
         running.set(true);
-        while (stoppable.shouldRun()) {
+        while (shouldRun.get()) {
             produceKeys();
             if (runOnce) {
                 break;
@@ -119,4 +118,8 @@ public abstract class AbstractProducer implements Producer {
         this.logger = logger;
     }
     
+    @Override
+    public void interrupt() {
+        shouldRun.set(false);
+    }
 }

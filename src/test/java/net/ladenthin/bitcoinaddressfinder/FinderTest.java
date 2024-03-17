@@ -46,9 +46,8 @@ public class FinderTest {
     @Test
     public void interrupt_noProducersSet_noExceptionThrown() throws IOException {
         // arrange
-        final MockStoppable mockStoppable = new MockStoppable(true);
         CFinder cFinder = new CFinder();
-        Finder finder = new Finder(cFinder, mockStoppable, new MockShutdown());
+        Finder finder = new Finder(cFinder, new MockShutdown());
         // act
         finder.interrupt();
         // assert
@@ -57,13 +56,12 @@ public class FinderTest {
     @Test
     public void interrupt_producersSetAndNotInitialized_noExceptionThrown() throws IOException {
         // arrange
-        final MockStoppable mockStoppable = new MockStoppable(true);
         final MockShutdown mockShutdown = new MockShutdown();
         CFinder cFinder = new CFinder();
         cFinder.producerJava.add(new CProducerJava());
         cFinder.producerJavaSecretsFiles.add(new CProducerJavaSecretsFiles());
         cFinder.producerOpenCL.add(new CProducerOpenCL());
-        Finder finder = new Finder(cFinder, mockStoppable, mockShutdown);
+        Finder finder = new Finder(cFinder, mockShutdown);
         finder.configureProducer();
         // act
         finder.interrupt();
@@ -75,10 +73,9 @@ public class FinderTest {
     @Test
     public void producerFinished_noProducersSet_shutdownCalled() throws IOException {
         // arrange
-        final MockStoppable mockStoppable = new MockStoppable(true);
         final MockShutdown mockShutdown = new MockShutdown();
         CFinder cFinder = new CFinder();
-        Finder finder = new Finder(cFinder, mockStoppable, mockShutdown);
+        Finder finder = new Finder(cFinder, mockShutdown);
         // act
         finder.producerFinished();
         // assert
@@ -88,13 +85,12 @@ public class FinderTest {
     @Test
     public void producerFinished_producersSetAndNotInitialized_shutdownCalled() throws IOException {
         // arrange
-        final MockStoppable mockStoppable = new MockStoppable(true);
         final MockShutdown mockShutdown = new MockShutdown();
         CFinder cFinder = new CFinder();
         cFinder.producerJava.add(new CProducerJava());
         cFinder.producerJavaSecretsFiles.add(new CProducerJavaSecretsFiles());
         cFinder.producerOpenCL.add(new CProducerOpenCL());
-        Finder finder = new Finder(cFinder, mockStoppable, mockShutdown);
+        Finder finder = new Finder(cFinder, mockShutdown);
         finder.configureProducer();
         // act
         finder.producerFinished();
@@ -107,10 +103,9 @@ public class FinderTest {
     @Test
     public void getAllProducers_noProducersSet_returnEmptyList() throws IOException {
         // arrange
-        final MockStoppable mockStoppable = new MockStoppable(true);
         final MockShutdown mockShutdown = new MockShutdown();
         CFinder cFinder = new CFinder();
-        Finder finder = new Finder(cFinder, mockStoppable, mockShutdown);
+        Finder finder = new Finder(cFinder, mockShutdown);
         // act
         List<Producer> allProducers = finder.getAllProducers();
         // assert
@@ -120,13 +115,12 @@ public class FinderTest {
     @Test
     public void getAllProducers_producersSetAndNotInitialized_returnList() throws IOException {
         // arrange
-        final MockStoppable mockStoppable = new MockStoppable(true);
         final MockShutdown mockShutdown = new MockShutdown();
         CFinder cFinder = new CFinder();
         cFinder.producerJava.add(new CProducerJava());
         cFinder.producerJavaSecretsFiles.add(new CProducerJavaSecretsFiles());
         cFinder.producerOpenCL.add(new CProducerOpenCL());
-        Finder finder = new Finder(cFinder, mockStoppable, mockShutdown);
+        Finder finder = new Finder(cFinder, mockShutdown);
         finder.configureProducer();
         // act
         List<Producer> allProducers = finder.getAllProducers();
@@ -142,7 +136,6 @@ public class FinderTest {
         // arrange
         boolean compressed = false;
         boolean useStaticAmount = true;
-        final MockStoppable mockStoppable = new MockStoppable(true);
         final MockShutdown mockShutdown = new MockShutdown();
         CFinder cFinder = new CFinder();
         final CProducerJava cProducerJava = new CProducerJava();
@@ -159,7 +152,7 @@ public class FinderTest {
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         
         cFinder.consumerJava = cConsumerJava;
-        Finder finder = new Finder(cFinder, mockStoppable, mockShutdown);
+        Finder finder = new Finder(cFinder, mockShutdown);
         // act
         finder.startConsumer();
         finder.configureProducer();
@@ -167,9 +160,6 @@ public class FinderTest {
         finder.startProducer();
         Thread.sleep(Duration.ofSeconds(1L));
         
-        // Attention, this is the correct order for a shutdown
-        // TODO: This cant work because shouldRun blocks
-        mockStoppable.shouldRun.set(false);
         finder.interrupt();
         
         // assert

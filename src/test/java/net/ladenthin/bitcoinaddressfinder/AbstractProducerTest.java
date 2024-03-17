@@ -59,8 +59,6 @@ public class AbstractProducerTest {
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_CREATE_SECRET_BASE_LOGGED, location = CommonDataProvider.class)
     public void createSecretBase_secretGiven_bitsKilledAndLogged(String givenSecret, int gridNumBits, String expectedSecretBase, String logInfo0, String logTrace0, String logTrace1, String logTrace2, String logTrace3, String logTrace4) throws IOException, InterruptedException, DecoderException {
         // arrange
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CProducer cProducer = new CProducer();
         cProducer.gridNumBits = gridNumBits;
         cProducer.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
@@ -68,7 +66,7 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
@@ -103,8 +101,6 @@ public class AbstractProducerTest {
     @Test
     public void createSecretBase_secretGivenAndLogSecretBaseDisabledTraceEnabled_bitsKilledAndLogged() throws IOException, InterruptedException, DecoderException {
         // arrange
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CProducer cProducer = new CProducer();
         cProducer.gridNumBits = 2;
         cProducer.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
@@ -112,7 +108,7 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
@@ -138,8 +134,6 @@ public class AbstractProducerTest {
     @Test
     public void createSecretBase_secretGivenAndLogSecretBaseEnabledTraceDisabled_bitsKilledAndLogged() throws IOException, InterruptedException, DecoderException {
         // arrange
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CProducer cProducer = new CProducer();
         cProducer.gridNumBits = 2;
         cProducer.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
@@ -147,7 +141,7 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(false);

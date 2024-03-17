@@ -20,8 +20,8 @@ package net.ladenthin.bitcoinaddressfinder;
 
 public class AbstractProducerTestImpl extends AbstractProducer {
 
-    public AbstractProducerTestImpl(Stoppable stoppable, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback) {
-        super(stoppable, consumer, keyUtility, secretFactory, producerCompletionCallback, false);
+    public AbstractProducerTestImpl(Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback) {
+        super(consumer, keyUtility, secretFactory, producerCompletionCallback, false);
     }
 
     @Override

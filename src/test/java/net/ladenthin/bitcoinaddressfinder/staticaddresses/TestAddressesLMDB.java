@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
-import net.ladenthin.bitcoinaddressfinder.MockStoppable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 import org.junit.rules.TemporaryFolder;
@@ -31,7 +30,6 @@ public class TestAddressesLMDB {
     
     
     public File createTestLMDB(TemporaryFolder folder, AddressesFiles addressesFiles, boolean useStaticAmount, boolean addInvalidAddresses) throws IOException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
         CAddressFilesToLMDB addressFilesToLMDBConfigurationWrite = new CAddressFilesToLMDB();
         
         List<String> files = addressesFiles.createAddressesFiles(folder, addInvalidAddresses);
@@ -42,7 +40,7 @@ public class TestAddressesLMDB {
         File lmdbFolder = folder.newFolder("lmdb");
         String lmdbFolderPath = lmdbFolder.getAbsolutePath();
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.lmdbDirectory = lmdbFolderPath;
-        AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(addressFilesToLMDBConfigurationWrite, mockStoppable);
+        AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(addressFilesToLMDBConfigurationWrite);
         addressFilesToLMDB.run();
         return lmdbFolder;
     }

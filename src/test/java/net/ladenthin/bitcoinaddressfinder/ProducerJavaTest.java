@@ -45,8 +45,6 @@ public class ProducerJavaTest {
 
     @Test
     public void produceKeys_GridNumBitsEqualsKeyMaxNumBits_noExceptionThrown() throws IOException, InterruptedException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.gridNumBits = 2;
         cProducerJava.privateKeyMaxNumBits = 2;
@@ -54,7 +52,7 @@ public class ProducerJavaTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         // act
         producerJava.produceKeys();
@@ -69,8 +67,6 @@ public class ProducerJavaTest {
 
     @Test
     public void produceKeys_KeyMaxNumBitsLowerThanGridNumBits_produceGridNumBitsNevertheless() throws IOException, InterruptedException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.gridNumBits = 4;
         cProducerJava.privateKeyMaxNumBits = 3;
@@ -78,7 +74,7 @@ public class ProducerJavaTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         // act
         producerJava.produceKeys();
@@ -105,8 +101,6 @@ public class ProducerJavaTest {
 
     @Test
     public void produceKeys_privateKeyMaxNumBitsIsTooLow_noKeysGenerated() throws IOException, InterruptedException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.gridNumBits = 10;
         cProducerJava.privateKeyMaxNumBits = 2;
@@ -114,7 +108,7 @@ public class ProducerJavaTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(0);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         // act
         producerJava.produceKeys();
@@ -125,8 +119,6 @@ public class ProducerJavaTest {
 
     @Test
     public void produceKeys_SomeBitRanges_consumerContainsData() throws IOException, InterruptedException {
-        final MockStoppable mockStoppable = new MockStoppable(true);
-
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.gridNumBits = 3;
         cProducerJava.privateKeyMaxNumBits = 6;
@@ -134,7 +126,7 @@ public class ProducerJavaTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(2);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         // act
         producerJava.produceKeys();

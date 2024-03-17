@@ -23,13 +23,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.Finder;
 import net.ladenthin.bitcoinaddressfinder.Interruptable;
 import net.ladenthin.bitcoinaddressfinder.LMDBToAddressFile;
 import net.ladenthin.bitcoinaddressfinder.Shutdown;
-import net.ladenthin.bitcoinaddressfinder.Stoppable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
@@ -38,13 +36,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 // VM option: -Dorg.slf4j.simpleLogger.defaultLogLevel=trace
-public class Main implements Runnable, Shutdown, Stoppable {
+public class Main implements Runnable, Shutdown {
 
     private final static Logger logger = LoggerFactory.getLogger(Main.class);
 
     private final List<Interruptable> interruptables = new ArrayList<>();
-
-    protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
     private final CConfiguration configuration;
     
@@ -83,7 +79,7 @@ public class Main implements Runnable, Shutdown, Stoppable {
         
         switch (configuration.command) {
             case Find:
-                Finder finder = new Finder(configuration.finder, this, this);
+                Finder finder = new Finder(configuration.finder, this);
                 interruptables.add(finder);
                 finder.startConsumer();
                 finder.configureProducer();
@@ -91,12 +87,12 @@ public class Main implements Runnable, Shutdown, Stoppable {
                 finder.startProducer();
                 break;
             case LMDBToAddressFile:
-                LMDBToAddressFile lmdbToAddressFile = new LMDBToAddressFile(configuration.lmdbToAddressFile, this);
+                LMDBToAddressFile lmdbToAddressFile = new LMDBToAddressFile(configuration.lmdbToAddressFile);
                 interruptables.add(lmdbToAddressFile);
                 lmdbToAddressFile.run();
                 break;
             case AddressFilesToLMDB:
-                AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(configuration.addressFilesToLMDB, this);
+                AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(configuration.addressFilesToLMDB);
                 interruptables.add(addressFilesToLMDB);
                 addressFilesToLMDB.run();
                 break;
@@ -119,14 +115,8 @@ public class Main implements Runnable, Shutdown, Stoppable {
     
     @Override
     public void shutdown() {
-        shouldRun.set(false);
         for (Interruptable interruptable : interruptables) {
             interruptable.interrupt();
         }
-    }
-
-    @Override
-    public boolean shouldRun() {
-        return shouldRun.get();
     }
 }

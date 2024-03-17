@@ -34,8 +34,8 @@ public class AddressFile extends AbstractPlaintextFile {
     @Nonnull
     private final Consumer<String> unsupportedConsumer;
 
-    public AddressFile(@Nonnull File file, ReadStatistic readStatistic, @Nonnull NetworkParameters networkParameters, @Nonnull Consumer<AddressToCoin> addressConsumer, @Nonnull Consumer<String> unsupportedConsumer, Stoppable stoppable) {
-        super(file, readStatistic, stoppable);
+    public AddressFile(@Nonnull File file, ReadStatistic readStatistic, @Nonnull NetworkParameters networkParameters, @Nonnull Consumer<AddressToCoin> addressConsumer, @Nonnull Consumer<String> unsupportedConsumer) {
+        super(file, readStatistic);
         this.networkParameters = networkParameters;
         this.addressConsumer = addressConsumer;
         this.unsupportedConsumer = unsupportedConsumer;

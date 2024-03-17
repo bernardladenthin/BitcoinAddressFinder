@@ -21,6 +21,8 @@ package net.ladenthin.bitcoinaddressfinder;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+import lombok.NonNull;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
 import org.bitcoinj.core.NetworkParameters;
 import org.slf4j.Logger;
@@ -34,15 +36,18 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
 
     private final ReadStatistic readStatistic = new ReadStatistic();
 
-    public ProducerJavaSecretsFiles(CProducerJavaSecretsFiles producerJavaSecretsFiles, Stoppable stoppable, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback) {
-        super(producerJavaSecretsFiles, stoppable, consumer, keyUtility, secretFactory, producerCompletionCallback);
+    @NonNull
+    AtomicReference<SecretsFile> currentSecretsFile = new AtomicReference<>();
+
+    public ProducerJavaSecretsFiles(CProducerJavaSecretsFiles producerJavaSecretsFiles, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback) {
+        super(producerJavaSecretsFiles, consumer, keyUtility, secretFactory, producerCompletionCallback);
         this.producerJavaSecretsFiles = producerJavaSecretsFiles;
     }
 
     @Override
     public void initProducer() {
     }
-
+    
     @Override
     public void produceKeys() {
         try {
@@ -54,17 +59,21 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
 
             logger.info("Iterate secrets files ...");
             for (File file : files) {
+                if (!shouldRun.get()) {
+                    break;
+                }
                 SecretsFile secretsFile = new SecretsFile(
                     networkParameters,
                     file,
                     producerJavaSecretsFiles.secretFormat,
                     readStatistic,
-                    this::processSecret,
-                    this.stoppable
+                    this::processSecret
                 );
 
                 logger.info("process: " + file.getAbsolutePath());
+                currentSecretsFile.set(secretsFile);
                 secretsFile.readFile();
+                currentSecretsFile.set(null);
                 logger.info("finished: " + file.getAbsolutePath());
 
                 logProgress();
@@ -82,4 +91,14 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
     @Override
     public void releaseProducers() {
     }
+
+    @Override
+    public void interrupt() {
+        super.interrupt();
+        SecretsFile secretsFile = currentSecretsFile.get();
+        if (secretsFile != null) {
+            secretsFile.interrupt();
+        }
+    }
+    
 }

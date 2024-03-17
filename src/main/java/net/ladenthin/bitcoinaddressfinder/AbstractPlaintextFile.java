@@ -22,22 +22,22 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nonnull;
 import org.lmdbjava.LmdbException;
 
-public abstract class AbstractPlaintextFile {
+public abstract class AbstractPlaintextFile implements Interruptable {
     
     @Nonnull
     protected final File file;
     @Nonnull
     protected final ReadStatistic readStatistic;
     @Nonnull
-    protected final Stoppable stoppable;
+    private final AtomicBoolean shouldRun = new AtomicBoolean(true);
     
-    public AbstractPlaintextFile(@Nonnull File file, @Nonnull ReadStatistic readStatistic, @Nonnull Stoppable stoppable) {
+    public AbstractPlaintextFile(@Nonnull File file, @Nonnull ReadStatistic readStatistic) {
         this.file = file;
         this.readStatistic = readStatistic;
-        this.stoppable = stoppable;
     }
     
     protected double calculateFileProgress(@Nonnull RandomAccessFile raf) throws IOException {
@@ -48,7 +48,7 @@ public abstract class AbstractPlaintextFile {
     
     public void readFile() throws IOException {
         try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
-            while(stoppable.shouldRun()) {
+            while(shouldRun.get()) {
                 String line = raf.readLine();
                 if (line == null) {
                     return;
@@ -68,4 +68,10 @@ public abstract class AbstractPlaintextFile {
             }
         }
     }
+
+    @Override
+    public void interrupt() {
+        shouldRun.set(false);
+    }
+    
 }

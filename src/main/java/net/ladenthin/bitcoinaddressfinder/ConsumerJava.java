@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -80,15 +81,15 @@ public class ConsumerJava implements Consumer, Interruptable {
     private final List<Future<Void>> consumers = new ArrayList<>();
     protected final LinkedBlockingQueue<PublicKeyBytes[]> keysQueue;
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
-    private final Stoppable stoppable;
     
     protected final AtomicLong vanityHits = new AtomicLong();
     private final Pattern vanityPattern;
+    
+    private final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
-    protected ConsumerJava(CConsumerJava consumerJava, Stoppable stoppable, KeyUtility keyUtility, PersistenceUtils persistenceUtils) {
+    protected ConsumerJava(CConsumerJava consumerJava, KeyUtility keyUtility, PersistenceUtils persistenceUtils) {
         this.consumerJava = consumerJava;
         this.keysQueue = new LinkedBlockingQueue<>(consumerJava.queueSize);
-        this.stoppable = stoppable;
         this.keyUtility = keyUtility;
         this.persistenceUtils = persistenceUtils;
         if (consumerJava.enableVanity) {
@@ -153,7 +154,7 @@ public class ConsumerJava implements Consumer, Interruptable {
         
         ByteBuffer threadLocalReuseableByteBuffer = ByteBuffer.allocateDirect(PublicKeyBytes.HASH160_SIZE);
         
-        while (stoppable.shouldRun()) {
+        while (shouldRun.get()) {
             if (keysQueue.size() >= consumerJava.queueSize) {
                 logger.warn("Attention, queue is full. Please increase queue size.");
             }
@@ -343,6 +344,7 @@ public class ConsumerJava implements Consumer, Interruptable {
         } catch (InterruptedException ex) {
             // do nothing, it is no problem
         }
+        shouldRun.set(false);
         timer.cancel();
     }
 }
