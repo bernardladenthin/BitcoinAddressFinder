@@ -79,7 +79,9 @@ public class ProducerOpenCLTest {
     }
     
     @Test
+    @OpenCLTest
     public void releaseProducers_initialized_noExceptionThrownAndOpenCLContextFreed() throws IOException, InterruptedException {
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
@@ -118,7 +120,9 @@ public class ProducerOpenCLTest {
     }
     
     @Test
+    @OpenCLTest
     public void getFreeThreads_initialized_numberOfFreeThreadsReturned() throws IOException, InterruptedException {
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
@@ -153,7 +157,9 @@ public class ProducerOpenCLTest {
     }
     
     @Test
+    @OpenCLTest
     public void waitTillFreeThreadsInPool_initialized_returnImmediately() throws IOException, InterruptedException {
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
@@ -170,7 +176,9 @@ public class ProducerOpenCLTest {
     }
     
     @Test
+    @OpenCLTest
     public void waitTillFreeThreadsInPool_initializedAndThreadPoolFull_doNotReturn() throws IOException, InterruptedException {
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
