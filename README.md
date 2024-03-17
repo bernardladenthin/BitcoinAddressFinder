@@ -204,6 +204,9 @@ Please find the answear for vulnerability questions somewhere else:
 * https://github.com/Noname400/Hunt-to-Mnemonic
 * https://github.com/Py-Project/Bitcoin-wallet-cracker
 
+### Deep learning private key prediction
+An export of the full database can be used to predict private keys with deep learning. A funny idea: https://github.com/DRSZL/BitcoinTensorFlowPrivateKeyPrediction
+
 ## Known issues
 If you have a laptop like HP ZBook G3/G4/G5 "hybrid graphics" mode is very slow because of the shared memory. Please select in the BIOS "discrete graphics".
 
