@@ -26,7 +26,6 @@ import org.junit.rules.TemporaryFolder;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.params.MainNetParams;
@@ -34,7 +33,6 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
 
 @RunWith(DataProviderRunner.class)
 public class ProducerJavaTest {
@@ -42,14 +40,12 @@ public class ProducerJavaTest {
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
 
-    private ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
-
     protected final NetworkParameters networkParameters = MainNetParams.get();
     protected final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
 
     @Test
     public void produceKeys_GridNumBitsEqualsKeyMaxNumBits_noExceptionThrown() throws IOException, InterruptedException {
-        final AtomicBoolean shouldRun = new AtomicBoolean(true);
+        final MockStoppable mockStoppable = new MockStoppable(true);
 
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.gridNumBits = 2;
@@ -57,7 +53,8 @@ public class ProducerJavaTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, mockConsumer, keyUtility, random);
+        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         // act
         producerJava.produceKeys();
@@ -72,7 +69,7 @@ public class ProducerJavaTest {
 
     @Test
     public void produceKeys_KeyMaxNumBitsLowerThanGridNumBits_produceGridNumBitsNevertheless() throws IOException, InterruptedException {
-        final AtomicBoolean shouldRun = new AtomicBoolean(true);
+        final MockStoppable mockStoppable = new MockStoppable(true);
 
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.gridNumBits = 4;
@@ -80,7 +77,8 @@ public class ProducerJavaTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, mockConsumer, keyUtility, random);
+        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         // act
         producerJava.produceKeys();
@@ -107,7 +105,7 @@ public class ProducerJavaTest {
 
     @Test
     public void produceKeys_privateKeyMaxNumBitsIsTooLow_noKeysGenerated() throws IOException, InterruptedException {
-        final AtomicBoolean shouldRun = new AtomicBoolean(true);
+        final MockStoppable mockStoppable = new MockStoppable(true);
 
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.gridNumBits = 10;
@@ -115,7 +113,8 @@ public class ProducerJavaTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(0);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, mockConsumer, keyUtility, random);
+        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         // act
         producerJava.produceKeys();
@@ -126,7 +125,7 @@ public class ProducerJavaTest {
 
     @Test
     public void produceKeys_SomeBitRanges_consumerContainsData() throws IOException, InterruptedException {
-        final AtomicBoolean shouldRun = new AtomicBoolean(true);
+        final MockStoppable mockStoppable = new MockStoppable(true);
 
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.gridNumBits = 3;
@@ -134,7 +133,8 @@ public class ProducerJavaTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(2);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, mockConsumer, keyUtility, random);
+        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         // act
         producerJava.produceKeys();

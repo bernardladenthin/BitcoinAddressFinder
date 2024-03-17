@@ -18,7 +18,9 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -31,7 +33,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -43,9 +44,19 @@ import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.crypto.MnemonicException;
 
-public class ConsumerJava implements Consumer {
+public class ConsumerJava implements Consumer, Interruptable {
 
-    private static final int ONE_SECOND_IN_MILLISECONDS = 1000;
+    /**
+     * We assume a queue might be empty after this amount of time.
+     * If not, some keys in the queue are not checked before shutdow.
+     */
+    static final Duration DURATION_WAIT_QUEUE_EMPTY = Duration.ofMinutes(1);
+    
+    /**
+     * The duration for a cyclic check to test the keys queue is empty.
+     */
+    private static final Duration DURATION_CYCLIC_CHECK_KEYS_QUEUE_EMPTY  = Duration.ofMillis(100L);
+    
     public static final String MISS_PREFIX = "miss: Could not find the address: ";
     public static final String HIT_PREFIX = "hit: Found the address: ";
     public static final String VANITY_HIT_PREFIX = "vanity pattern match: ";
@@ -69,15 +80,15 @@ public class ConsumerJava implements Consumer {
     private final List<Future<Void>> consumers = new ArrayList<>();
     protected final LinkedBlockingQueue<PublicKeyBytes[]> keysQueue;
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
-    private final AtomicBoolean shouldRun;
+    private final Stoppable stoppable;
     
     protected final AtomicLong vanityHits = new AtomicLong();
     private final Pattern vanityPattern;
 
-    protected ConsumerJava(CConsumerJava consumerJava, AtomicBoolean shouldRun, KeyUtility keyUtility, PersistenceUtils persistenceUtils) {
+    protected ConsumerJava(CConsumerJava consumerJava, Stoppable stoppable, KeyUtility keyUtility, PersistenceUtils persistenceUtils) {
         this.consumerJava = consumerJava;
         this.keysQueue = new LinkedBlockingQueue<>(consumerJava.queueSize);
-        this.shouldRun = shouldRun;
+        this.stoppable = stoppable;
         this.keyUtility = keyUtility;
         this.persistenceUtils = persistenceUtils;
         if (consumerJava.enableVanity) {
@@ -100,22 +111,8 @@ public class ConsumerJava implements Consumer {
         persistence.init();
     }
 
-    private String createStatisticsMessage(long uptime, long keys, long keysSumOfTimeToCheckContains, long emptyConsumer, long hits) {
-        // calculate uptime
-        long uptimeInSeconds = uptime / (long) ONE_SECOND_IN_MILLISECONDS;
-        long uptimeInMinutes = uptimeInSeconds / 60;
-        // calculate per time, prevent division by zero with Math.max
-        long keysPerSecond = keys / Math.max(uptimeInSeconds, 1);
-        long keysPerMinute = keys / Math.max(uptimeInMinutes, 1);
-        // calculate average contains time
-        long averageContainsTime = keysSumOfTimeToCheckContains / Math.max(keys, 1);
-
-        String message = "Statistics: [Checked " + (keys / 1_000_000L) + " M keys in " + uptimeInMinutes + " minutes] [" + (keysPerSecond/1_000L) + " k keys/second] [" + (keysPerMinute / 1_000_000L) + " M keys/minute] [Times an empty consumer: " + emptyConsumer + "] [Average contains time: " + averageContainsTime + " ms] [keys queue size: " + keysQueue.size() + "] [Hits: " + hits + "]";
-        return message;
-    }
-
     protected void startStatisticsTimer() {
-        long period = consumerJava.printStatisticsEveryNSeconds * ONE_SECOND_IN_MILLISECONDS;
+        long period = consumerJava.printStatisticsEveryNSeconds * Statistics.ONE_SECOND_IN_MILLISECONDS;
         if (period <= 0) {
             throw new IllegalArgumentException("period must be greater than 0.");
         }
@@ -128,7 +125,7 @@ public class ConsumerJava implements Consumer {
                 // get transient information
                 long uptime = Math.max(System.currentTimeMillis() - startTime, 1);
 
-                String message = createStatisticsMessage(uptime, checkedKeys.get(), checkedKeysSumOfTimeToCheckContains.get(), emptyConsumer.get(), hits.get());
+                String message = new Statistics().createStatisticsMessage(uptime, checkedKeys.get(), checkedKeysSumOfTimeToCheckContains.get(), emptyConsumer.get(), keysQueue.size(), hits.get());
 
                 // log the information
                 logger.info(message);
@@ -156,7 +153,7 @@ public class ConsumerJava implements Consumer {
         
         ByteBuffer threadLocalReuseableByteBuffer = ByteBuffer.allocateDirect(PublicKeyBytes.HASH160_SIZE);
         
-        while (shouldRun.get()) {
+        while (stoppable.shouldRun()) {
             if (keysQueue.size() >= consumerJava.queueSize) {
                 logger.warn("Attention, queue is full. Please increase queue size.");
             }
@@ -320,5 +317,32 @@ public class ConsumerJava implements Consumer {
     @Override
     public void consumeKeys(PublicKeyBytes[] publicKeyBytes) throws InterruptedException {
         keysQueue.put(publicKeyBytes);
+    }
+    
+    /**
+     * Returns if the consume was finished or.
+     * @return {@code true} if the keys queue is empty, otherwise {@code false}.
+     */
+    @VisibleForTesting
+    boolean waitTillKeysQueueEmpty(Duration maxWait) throws InterruptedException {
+        final long startTime = System.currentTimeMillis();
+        do {
+            if (keysQueue.isEmpty()) {
+                return true;
+            }
+            Thread.sleep(DURATION_CYCLIC_CHECK_KEYS_QUEUE_EMPTY);
+        } while (maxWait.minusMillis(System.currentTimeMillis() - startTime).isPositive());
+        return false;
+    }
+
+    @Override
+    public void interrupt() {
+        try {
+            // the result does not matter, just try to wait some seconds to empty the queue
+            waitTillKeysQueueEmpty(DURATION_WAIT_QUEUE_EMPTY);
+        } catch (InterruptedException ex) {
+            // do nothing, it is no problem
+        }
+        timer.cancel();
     }
 }

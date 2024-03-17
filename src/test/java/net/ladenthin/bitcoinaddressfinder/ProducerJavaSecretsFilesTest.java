@@ -29,7 +29,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
 import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
@@ -97,13 +96,14 @@ public class ProducerJavaSecretsFilesTest {
     
     @Test
     public void produceKeys_noFileConfigured_noKeysCreated() throws IOException, InterruptedException {
-        final AtomicBoolean shouldRun = new AtomicBoolean(true);
+        final MockStoppable mockStoppable = new MockStoppable(true);
 
         CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, shouldRun, mockConsumer, keyUtility, random);
+        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
+        ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         // act
         producerJavaSecretsFiles.produceKeys();
@@ -115,7 +115,7 @@ public class ProducerJavaSecretsFilesTest {
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_CSECRET_FORMAT, location = CommonDataProvider.class)
     public void produceKeys_filesConfigured_keysCreated(CSecretFormat cSecretFormat) throws IOException, InterruptedException {
-        final AtomicBoolean shouldRun = new AtomicBoolean(true);
+        final MockStoppable mockStoppable = new MockStoppable(true);
 
         CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
         List<File> secretsFiles = createSecretsFiles(cSecretFormat);
@@ -126,7 +126,8 @@ public class ProducerJavaSecretsFilesTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, shouldRun, mockConsumer, keyUtility, random);
+        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
+        ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         // act
         producerJavaSecretsFiles.produceKeys();

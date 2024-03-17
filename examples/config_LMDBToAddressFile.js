@@ -2,7 +2,7 @@
     "command": "LMDBToAddressFile",
     "lmdbToAddressFile" : {
         "addressesFile" : "export.txt",
-        "addressFileOutputFormat" : "DynamicWidthBase58BitcoinAddressWithAmount",
+        "addressFileOutputFormat" : "HexHash",
         "lmdbConfigurationReadOnly" : {
             "logStatsOnInit" : false,
             "logStatsOnClose" : false,

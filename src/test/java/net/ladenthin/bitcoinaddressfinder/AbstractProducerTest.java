@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
@@ -60,7 +59,7 @@ public class AbstractProducerTest {
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_CREATE_SECRET_BASE_LOGGED, location = CommonDataProvider.class)
     public void createSecretBase_secretGiven_bitsKilledAndLogged(String givenSecret, int gridNumBits, String expectedSecretBase, String logInfo0, String logTrace0, String logTrace1, String logTrace2, String logTrace3, String logTrace4) throws IOException, InterruptedException, DecoderException {
         // arrange
-        final AtomicBoolean shouldRun = new AtomicBoolean(true);
+        final MockStoppable mockStoppable = new MockStoppable(true);
 
         CProducer cProducer = new CProducer();
         cProducer.gridNumBits = gridNumBits;
@@ -68,7 +67,8 @@ public class AbstractProducerTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(shouldRun, mockConsumer, keyUtility, random);
+        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
@@ -103,7 +103,7 @@ public class AbstractProducerTest {
     @Test
     public void createSecretBase_secretGivenAndLogSecretBaseDisabledTraceEnabled_bitsKilledAndLogged() throws IOException, InterruptedException, DecoderException {
         // arrange
-        final AtomicBoolean shouldRun = new AtomicBoolean(true);
+        final MockStoppable mockStoppable = new MockStoppable(true);
 
         CProducer cProducer = new CProducer();
         cProducer.gridNumBits = 2;
@@ -111,7 +111,8 @@ public class AbstractProducerTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(shouldRun, mockConsumer, keyUtility, random);
+        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
@@ -137,7 +138,7 @@ public class AbstractProducerTest {
     @Test
     public void createSecretBase_secretGivenAndLogSecretBaseEnabledTraceDisabled_bitsKilledAndLogged() throws IOException, InterruptedException, DecoderException {
         // arrange
-        final AtomicBoolean shouldRun = new AtomicBoolean(true);
+        final MockStoppable mockStoppable = new MockStoppable(true);
 
         CProducer cProducer = new CProducer();
         cProducer.gridNumBits = 2;
@@ -145,7 +146,8 @@ public class AbstractProducerTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(shouldRun, mockConsumer, keyUtility, random);
+        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(mockStoppable, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(false);

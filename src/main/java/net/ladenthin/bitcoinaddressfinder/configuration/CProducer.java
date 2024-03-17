@@ -44,6 +44,11 @@ public class CProducer {
      * Enable the log output for the secret address.
      */
     public boolean logSecretBase;
+    
+    /**
+     * Enable to let the producer run one time only.
+     */
+    public boolean runOnce = false;
 
     public int getWorkSize() {
         return 1 << gridNumBits;

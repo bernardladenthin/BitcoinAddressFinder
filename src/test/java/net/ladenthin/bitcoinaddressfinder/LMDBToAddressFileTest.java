@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFileOutputFormat;
 import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
@@ -48,12 +47,13 @@ public class LMDBToAddressFileTest extends LMDBBase {
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
     public void writeAllAmountsToAddressFileAsDynamicWidthBase58BitcoinAddressWithAmount(boolean compressed, boolean useStaticAmount) throws IOException {
         // arrange
+        final MockStoppable mockStoppable = new MockStoppable(true);
         TestAddressesFiles testAddressesFiles = new TestAddressesFiles(compressed);
         Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false);
 
         // act
         File file = folder.newFile();
-        persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.DynamicWidthBase58BitcoinAddressWithAmount, new AtomicBoolean(true));
+        persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.DynamicWidthBase58BitcoinAddressWithAmount, mockStoppable);
 
         // assert
         try {
@@ -84,12 +84,13 @@ public class LMDBToAddressFileTest extends LMDBBase {
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
     public void writeAllAmountsToAddressFileAsFixedWidthBase58BitcoinAddress(boolean compressed, boolean useStaticAmount) throws IOException {
         // arrange
+        final MockStoppable mockStoppable = new MockStoppable(true);
         TestAddressesFiles testAddressesFiles = new TestAddressesFiles(compressed);
         Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false);
 
         // act
         File file = folder.newFile();
-        persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.FixedWidthBase58BitcoinAddress, new AtomicBoolean(true));
+        persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.FixedWidthBase58BitcoinAddress, mockStoppable);
 
         // assert
         try {
@@ -120,12 +121,13 @@ public class LMDBToAddressFileTest extends LMDBBase {
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
     public void writeAllAmountsToAddressFileAsHexHash(boolean compressed, boolean useStaticAmount) throws IOException {
         // arrange
+        final MockStoppable mockStoppable = new MockStoppable(true);
         TestAddressesFiles testAddressesFiles = new TestAddressesFiles(compressed);
         Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false);
 
         // act
         File file = folder.newFile();
-        persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.HexHash, new AtomicBoolean(true));
+        persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.HexHash, mockStoppable);
 
         // assert
         try {

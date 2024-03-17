@@ -35,11 +35,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.AddressTxtLine;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.ByteConversion;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.Stoppable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFileOutputFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
@@ -197,12 +197,12 @@ public class LMDBPersistence implements Persistence {
     }
 
     @Override
-    public void writeAllAmountsToAddressFile(File file, CAddressFileOutputFormat addressFileOutputFormat, AtomicBoolean shouldRun) throws IOException {
+    public void writeAllAmountsToAddressFile(File file, CAddressFileOutputFormat addressFileOutputFormat, Stoppable stoppable) throws IOException {
         try (Txn<ByteBuffer> txn = env.txnRead()) {
             try (CursorIterable<ByteBuffer> iterable = lmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
                 try (FileWriter writer = new FileWriter(file)) {
                     for (final CursorIterable.KeyVal<ByteBuffer> kv : iterable) {
-                        if (!shouldRun.get()) {
+                        if (!stoppable.shouldRun()) {
                             return;
                         }
                         ByteBuffer addressAsByteBuffer = kv.key();

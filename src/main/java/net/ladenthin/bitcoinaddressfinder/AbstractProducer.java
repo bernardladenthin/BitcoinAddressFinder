@@ -33,25 +33,33 @@ public abstract class AbstractProducer implements Producer {
     private Logger logger = LoggerFactory.getLogger(this.getClass());
     
     protected final AtomicBoolean running = new AtomicBoolean(false);
-    protected final AtomicBoolean shouldRun;
+    protected final Stoppable stoppable;
     protected final Consumer consumer;
     protected final KeyUtility keyUtility;
-    protected final Random random;
+    protected final SecretFactory secretFactory;
+    protected final ProducerCompletionCallback producerCompletionCallback;
+    protected final boolean runOnce;
 
-    public AbstractProducer(AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility, Random random) {
-        this.shouldRun = shouldRun;
+    public AbstractProducer(Stoppable stoppable, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback, boolean runOnce) {
+        this.stoppable = stoppable;
         this.consumer = consumer;
         this.keyUtility = keyUtility;
-        this.random = random;
+        this.secretFactory = secretFactory;
+        this.producerCompletionCallback = producerCompletionCallback;
+        this.runOnce = runOnce;
     }
 
     @Override
     public void run() {
         running.set(true);
-        while (shouldRun.get()) {
+        while (stoppable.shouldRun()) {
             produceKeys();
+            if (runOnce) {
+                break;
+            }
         }
         running.set(false);
+        producerCompletionCallback.producerFinished();
     }
     
     @Override

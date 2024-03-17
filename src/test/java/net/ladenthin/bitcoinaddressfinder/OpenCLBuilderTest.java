@@ -23,25 +23,34 @@ import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
-import org.apache.maven.artifact.versioning.ComparableVersion;
+import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
 import org.junit.Test;
 
 public class OpenCLBuilderTest {
     
+    // <editor-fold defaultstate="collapsed" desc="build">
     @Test
     @OpenCLTest
-    public void openCLBuilder() throws IOException {
+    public void build_openCLDeviceExisting_platformsAndDevicesReturned() throws IOException {
+        // arrange
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadable();
-        
         OpenCLBuilder openCLBuilder = new OpenCLBuilder();
+        
+        // act
         List<OpenCLPlatform> openCLPlatforms = openCLBuilder.build();
+        
+        // assert
+        assertThat(openCLPlatforms.size(),is(greaterThan(Integer.valueOf(0))));
+        assertThat(openCLPlatforms.getFirst().getOpenCLDevices().size(),is(greaterThan(Integer.valueOf(0))));
         System.out.println(openCLPlatforms);
         System.out.println("isOpenCLnativeLibraryLoadable: " + OpenCLBuilder.isOpenCLnativeLibraryLoadable());
         System.out.println("isOneOpenCL2DeviceAvailable: " + OpenCLBuilder.isOneOpenCL2_0OrGreaterDeviceAvailable(openCLPlatforms));
     }
+    // </editor-fold>
     
     @Test
     public void isOpenCL2_0OrGreater_OpenCLVersion1_2Given_ReturnFalse() throws IOException {

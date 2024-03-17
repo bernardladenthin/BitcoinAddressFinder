@@ -1,6 +1,6 @@
 // @formatter:off
 /**
- * Copyright 2020 Bernard Ladenthin bernard.ladenthin@gmail.com
+ * Copyright 2024 Bernard Ladenthin bernard.ladenthin@gmail.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,25 +18,24 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
-public class AbstractProducerTestImpl extends AbstractProducer {
+import java.math.BigInteger;
+import java.util.Random;
 
-    public AbstractProducerTestImpl(Stoppable stoppable, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback) {
-        super(stoppable, consumer, keyUtility, secretFactory, producerCompletionCallback, false);
+public class MockSecretFactory implements SecretFactory {
+
+    private final KeyUtility keyUtility;
+    private final Random random;
+    
+    MockSecretFactory(KeyUtility keyUtility, Random random) {
+        this.keyUtility = keyUtility;
+        this.random = random;
     }
 
     @Override
-    public void initProducer() {
-        
+    public BigInteger createSecret(int maximumBitLength) {
+        BigInteger secret = keyUtility.createSecret(maximumBitLength, random);
+        return secret;
     }
 
-    @Override
-    public void produceKeys() {
-        
-    }
-
-    @Override
-    public void releaseProducers() {
-        
-    }
     
 }

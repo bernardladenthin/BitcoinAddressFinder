@@ -25,7 +25,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
+import net.ladenthin.bitcoinaddressfinder.Stoppable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFileOutputFormat;
 
 public interface Persistence {
@@ -36,13 +36,7 @@ public interface Persistence {
     Coin getAmount(ByteBuffer hash160);
     boolean containsAddress(ByteBuffer hash160);
 
-    /**
-     * 
-     * @param file
-     * @param addressFileOutputFormat the format
-     * @throws IOException 
-     */
-    void writeAllAmountsToAddressFile(File file, CAddressFileOutputFormat addressFileOutputFormat, AtomicBoolean shouldRun) throws IOException;
+    void writeAllAmountsToAddressFile(File file, CAddressFileOutputFormat addressFileOutputFormat, Stoppable stoppable) throws IOException;
 
     /**
      * @param hash160 the hash160 to change its amount

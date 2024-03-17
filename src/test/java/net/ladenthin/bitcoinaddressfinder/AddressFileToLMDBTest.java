@@ -23,7 +23,6 @@ import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
@@ -49,6 +48,7 @@ public class AddressFileToLMDBTest extends LMDBBase {
     @Test(expected = IllegalArgumentException.class)
     public void addressFilesToLMDB_addressFileDoesNotExists_throwsIllegalArgumentException() throws IOException {
         // arrange, act
+        final MockStoppable mockStoppable = new MockStoppable(true);
         CAddressFilesToLMDB addressFilesToLMDBConfigurationWrite = new CAddressFilesToLMDB();
         
         addressFilesToLMDBConfigurationWrite.addressesFiles.add("thisFileDoesNotExists.txt");
@@ -56,7 +56,7 @@ public class AddressFileToLMDBTest extends LMDBBase {
         File lmdbFolder = folder.newFolder("lmdb");
         String lmdbFolderPath = lmdbFolder.getAbsolutePath();
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.lmdbDirectory = lmdbFolderPath;
-        AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(addressFilesToLMDBConfigurationWrite, new AtomicBoolean(true));
+        AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(addressFilesToLMDBConfigurationWrite, mockStoppable);
         addressFilesToLMDB.run();
     }
 

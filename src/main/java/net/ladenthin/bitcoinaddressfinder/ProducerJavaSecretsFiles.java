@@ -20,10 +20,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.File;
 import java.io.IOException;
-import java.math.BigInteger;
 import java.util.List;
-import java.util.Random;
-import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
 import org.bitcoinj.core.NetworkParameters;
 import org.slf4j.Logger;
@@ -37,8 +34,8 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
 
     private final ReadStatistic readStatistic = new ReadStatistic();
 
-    public ProducerJavaSecretsFiles(CProducerJavaSecretsFiles producerJavaSecretsFiles, AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility, Random random) {
-        super(producerJavaSecretsFiles, shouldRun, consumer, keyUtility, random);
+    public ProducerJavaSecretsFiles(CProducerJavaSecretsFiles producerJavaSecretsFiles, Stoppable stoppable, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback) {
+        super(producerJavaSecretsFiles, stoppable, consumer, keyUtility, secretFactory, producerCompletionCallback);
         this.producerJavaSecretsFiles = producerJavaSecretsFiles;
     }
 
@@ -63,7 +60,7 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
                     producerJavaSecretsFiles.secretFormat,
                     readStatistic,
                     this::processSecret,
-                    this.shouldRun
+                    this.stoppable
                 );
 
                 logger.info("process: " + file.getAbsolutePath());
@@ -75,9 +72,6 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
-        } finally {
-            // try and do this produce one time only
-            this.shouldRun.set(false);
         }
     }
     

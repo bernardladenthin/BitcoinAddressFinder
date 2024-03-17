@@ -18,14 +18,15 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import java.math.BigInteger;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
@@ -37,13 +38,13 @@ import org.bitcoinj.params.MainNetParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Finder implements Interruptable {
+public class Finder implements Interruptable, ProducerCompletionCallback, SecretFactory {
 
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
 
     private final CFinder finder;
-
-    private final AtomicBoolean shouldRun;
+    private final Stoppable stoppable;
+    private final Shutdown shutdown;
     
     private final List<ProducerOpenCL> openCLProducers = new ArrayList<>();
     private final List<ProducerJava> javaProducers = new ArrayList<>();
@@ -63,9 +64,10 @@ public class Finder implements Interruptable {
     @Nullable
     private ConsumerJava consumerJava;
 
-    public Finder(CFinder finder, AtomicBoolean shouldRun) {
+    public Finder(CFinder finder, Stoppable stoppable, Shutdown shutdown) {
         this.finder = finder;
-        this.shouldRun = shouldRun;
+        this.stoppable = stoppable;
+        this.shutdown = shutdown;
         try {
             random = SecureRandom.getInstanceStrong();
         } catch (NoSuchAlgorithmException e) {
@@ -75,18 +77,18 @@ public class Finder implements Interruptable {
 
     public void startConsumer() {
         if (finder.consumerJava != null) {
-            consumerJava = new ConsumerJava(finder.consumerJava, shouldRun, keyUtility, persistenceUtils);
+            consumerJava = new ConsumerJava(finder.consumerJava, stoppable, keyUtility, persistenceUtils);
             consumerJava.initLMDB();
             consumerJava.startConsumer();
             consumerJava.startStatisticsTimer();
         }
     }
-    
+
     public void configureProducer() {
         if (finder.producerJava != null) {
             for (CProducerJava cProducerJava : finder.producerJava) {
                 cProducerJava.assertGridNumBitsCorrect();
-                ProducerJava producerJava = new ProducerJava(cProducerJava, shouldRun, consumerJava, keyUtility, random);
+                ProducerJava producerJava = new ProducerJava(cProducerJava, stoppable, consumerJava, keyUtility, this, this);
                 javaProducers.add(producerJava);
             }
         }
@@ -94,7 +96,7 @@ public class Finder implements Interruptable {
         if (finder.producerJavaSecretsFiles != null) {
             for (CProducerJavaSecretsFiles cProducerJavaSecretsFiles : finder.producerJavaSecretsFiles) {
                 cProducerJavaSecretsFiles.assertGridNumBitsCorrect();
-                ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, shouldRun, consumerJava, keyUtility, random);
+                ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, stoppable, consumerJava, keyUtility, this, this);
                 javaProducersSecretsFiles.add(producerJavaSecretsFiles);
             }
         }
@@ -102,7 +104,7 @@ public class Finder implements Interruptable {
         if (finder.producerOpenCL != null) {
             for (CProducerOpenCL cProducerOpenCL : finder.producerOpenCL) {
                 cProducerOpenCL.assertGridNumBitsCorrect();
-                ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, shouldRun, consumerJava, keyUtility, random);
+                ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, stoppable, consumerJava, keyUtility, this, this);
                 openCLProducers.add(producerOpenCL);
             }
         }
@@ -120,18 +122,39 @@ public class Finder implements Interruptable {
         }
     }
     
+    @Override
     public void interrupt() {
-        if (consumerJava != null) {
-            consumerJava.timer.cancel();
-        }
         logger.info("Shut down, please wait for remaining tasks.");
         
         for (Producer producer : getAllProducers()) {
             producer.waitTillProducerNotRunning();
             producer.releaseProducers();
         }
+        
+        if (consumerJava != null) {
+            consumerJava.interrupt();
+        }
 
         logger.info("All producers released.");
+    }
+
+    @Override
+    public void producerFinished() {
+        // a signal that a producer finished its work
+        for (Producer producer : getAllProducers()) {
+            if (producer.isRunning() ){
+                break;
+            }
+        }
+        // no producers are running anymore
+        try {
+            if (consumerJava != null) {
+                consumerJava.waitTillKeysQueueEmpty(Duration.ofSeconds(30L));
+            }
+        } catch (InterruptedException ex) {
+            logger.warn("InterruptedException during waitTillKeysQueueEmpty", ex);
+        }
+        shutdown.shutdown();
     }
     
     public List<Producer> getAllProducers() {
@@ -140,6 +163,12 @@ public class Finder implements Interruptable {
         producers.addAll(javaProducersSecretsFiles);
         producers.addAll(openCLProducers);
         return producers;
+    }
+
+    @Override
+    public BigInteger createSecret(int maximumBitLength) {
+        BigInteger secret = keyUtility.createSecret(maximumBitLength, random);
+        return secret;
     }
 
 }

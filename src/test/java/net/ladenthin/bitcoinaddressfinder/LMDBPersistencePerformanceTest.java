@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
@@ -74,9 +73,9 @@ public class LMDBPersistencePerformanceTest {
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         cConsumerJava.runtimePublicKeyCalculationCheck = RUNTIME_PUBLIC_KEY_CALCULATION_CHECK;
 
-        AtomicBoolean shouldRun = new AtomicBoolean(true);
+        final MockStoppable mockStoppable = new MockStoppable(true);
         
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, shouldRun, keyUtility, persistenceUtils);
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, mockStoppable, keyUtility, persistenceUtils);
         ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) consumerJava.getLogger();
         logger.setLevel(Level.INFO);
         
@@ -85,7 +84,7 @@ public class LMDBPersistencePerformanceTest {
         // create producer
         PublicKeyBytes[] publicKeyByteses = createPublicKeyBytesArray();
         ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(PRODUCER_THREADS);
-        createProducerThreads(threadPoolExecutor, shouldRun, consumerJava, publicKeyByteses);
+        createProducerThreads(threadPoolExecutor, mockStoppable, consumerJava, publicKeyByteses);
         
         // act
         consumerJava.startConsumer();
@@ -93,14 +92,14 @@ public class LMDBPersistencePerformanceTest {
         
         Thread.sleep(TEST_TIME_IN_SECONDS * 1000);
         // shut down
-        shouldRun.set(false);
+        mockStoppable.shouldRun.set(false);
         consumerJava.timer.cancel();
     }
 
-    private void createProducerThreads(ThreadPoolExecutor threadPoolExecutor, AtomicBoolean shouldRun, ConsumerJava consumerJava, PublicKeyBytes[] publicKeyByteses) {
+    private void createProducerThreads(ThreadPoolExecutor threadPoolExecutor, Stoppable stoppable, ConsumerJava consumerJava, PublicKeyBytes[] publicKeyByteses) {
         for (int i = 0; i < PRODUCER_THREADS; i++) {
             threadPoolExecutor.submit(() ->{
-                while(shouldRun.get()) {
+                while(stoppable.shouldRun()) {
                     try {
                         consumerJava.consumeKeys(publicKeyByteses);
                     } catch (InterruptedException e) {

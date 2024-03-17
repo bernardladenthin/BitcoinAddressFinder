@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nonnull;
 import org.lmdbjava.LmdbException;
 
@@ -33,12 +32,12 @@ public abstract class AbstractPlaintextFile {
     @Nonnull
     protected final ReadStatistic readStatistic;
     @Nonnull
-    protected final AtomicBoolean shouldRun;
+    protected final Stoppable stoppable;
     
-    public AbstractPlaintextFile(@Nonnull File file, @Nonnull ReadStatistic readStatistic, @Nonnull AtomicBoolean shouldRun) {
+    public AbstractPlaintextFile(@Nonnull File file, @Nonnull ReadStatistic readStatistic, @Nonnull Stoppable stoppable) {
         this.file = file;
         this.readStatistic = readStatistic;
-        this.shouldRun = shouldRun;
+        this.stoppable = stoppable;
     }
     
     protected double calculateFileProgress(@Nonnull RandomAccessFile raf) throws IOException {
@@ -49,7 +48,7 @@ public abstract class AbstractPlaintextFile {
     
     public void readFile() throws IOException {
         try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
-            while(shouldRun.get()) {
+            while(stoppable.shouldRun()) {
                 String line = raf.readLine();
                 if (line == null) {
                     return;

@@ -18,30 +18,32 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.atomic.AtomicBoolean;
+import javax.annotation.Nullable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 
 public class ProducerOpenCL extends AbstractProducer {
 
     private final CProducerOpenCL producerOpenCL;
 
-    private ThreadPoolExecutor resultReaderThreadPoolExecutor;
-    private OpenCLContext openCLContext;
+    @VisibleForTesting
+    final ThreadPoolExecutor resultReaderThreadPoolExecutor;
+    @VisibleForTesting
+    @Nullable
+    OpenCLContext openCLContext;
 
-    public ProducerOpenCL(CProducerOpenCL producerOpenCL, AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility, Random random) {
-        super(shouldRun, consumer, keyUtility, random);
+    public ProducerOpenCL(CProducerOpenCL producerOpenCL, Stoppable stoppable, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback) {
+        super(stoppable, consumer, keyUtility, secretFactory, producerCompletionCallback, producerOpenCL.runOnce);
         this.producerOpenCL = producerOpenCL;
+        this.resultReaderThreadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads);
     }
 
     @Override
     public void initProducer() {
-        resultReaderThreadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads);
-        
         openCLContext = new OpenCLContext(producerOpenCL);
         try {
             openCLContext.init();
@@ -52,9 +54,14 @@ public class ProducerOpenCL extends AbstractProducer {
 
     @Override
     public void produceKeys() {
+        if (openCLContext == null) {
+            throw new IllegalStateException("openCLContext is null");
+        }
+        
         BigInteger secret = null;
         try {
-            secret = keyUtility.createSecret(producerOpenCL.privateKeyMaxNumBits, random);
+            secret = secretFactory.createSecret(producerOpenCL.privateKeyMaxNumBits);
+            
             if (PublicKeyBytes.isInvalid(secret)) {
                 return;
             }
@@ -80,20 +87,25 @@ public class ProducerOpenCL extends AbstractProducer {
         }
     }
     
-    private void waitTillFreeThreadsInPool() throws InterruptedException {
+    @VisibleForTesting
+    void waitTillFreeThreadsInPool() throws InterruptedException {
         while(getFreeThreads() < 1) {
             Thread.sleep(producerOpenCL.delayBlockedReader);
             getLogger().trace("No possible free threads to read OpenCL results. May increase maxResultReaderThreads.");
         }
     }
 
-    private int getFreeThreads() {
+    @VisibleForTesting
+    int getFreeThreads() {
         return resultReaderThreadPoolExecutor.getMaximumPoolSize() - resultReaderThreadPoolExecutor.getActiveCount();
     }
 
     @Override
     public void releaseProducers() {
-        openCLContext.release();
+        if (openCLContext != null) {
+            openCLContext.release();
+            openCLContext = null;
+        }
     }
 
 }

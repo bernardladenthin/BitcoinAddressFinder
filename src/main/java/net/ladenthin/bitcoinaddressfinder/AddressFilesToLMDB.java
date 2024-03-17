@@ -19,9 +19,7 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
-import org.bitcoinj.core.Context;
 import org.bitcoinj.core.NetworkParameters;
-import org.bitcoinj.params.MainNetParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +27,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
@@ -48,11 +45,11 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
     
     private final static long PROGRESS_LOG = 100_000;
     
-    private final AtomicBoolean shouldRun;
+    private final Stoppable stoppable;
 
-    public AddressFilesToLMDB(CAddressFilesToLMDB addressFilesToLMDB, AtomicBoolean shouldRun) {
+    public AddressFilesToLMDB(CAddressFilesToLMDB addressFilesToLMDB, Stoppable stoppable) {
         this.addressFilesToLMDB = addressFilesToLMDB;
-        this.shouldRun = shouldRun;
+        this.stoppable = stoppable;
     }
 
     @Override
@@ -78,7 +75,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
                     networkParameters,
                     this::supported,
                     this::unsupported,
-                    shouldRun
+                    stoppable
                 );
                 
                 logger.info("process " + file.getAbsolutePath());

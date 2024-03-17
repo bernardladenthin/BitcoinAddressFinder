@@ -19,16 +19,14 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
-import java.util.Random;
-import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 
 public class ProducerJava extends AbstractProducer {
 
     protected final CProducerJava producerJava;
 
-    public ProducerJava(CProducerJava producerJava, AtomicBoolean shouldRun, Consumer consumer, KeyUtility keyUtility, Random random) {
-        super(shouldRun, consumer, keyUtility, random);
+    public ProducerJava(CProducerJava producerJava, Stoppable stoppable, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback) {
+        super(stoppable, consumer, keyUtility, secretFactory, producerCompletionCallback, producerJava.runOnce);
         this.producerJava = producerJava;
     }
 
@@ -38,7 +36,7 @@ public class ProducerJava extends AbstractProducer {
 
     @Override
     public void produceKeys() {
-        BigInteger secret = keyUtility.createSecret(producerJava.privateKeyMaxNumBits, random);
+        BigInteger secret = secretFactory.createSecret(producerJava.privateKeyMaxNumBits);
         processSecret(secret);
     }
     

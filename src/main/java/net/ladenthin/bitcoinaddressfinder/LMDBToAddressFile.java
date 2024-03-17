@@ -20,15 +20,12 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
-import org.bitcoinj.core.Context;
 import org.bitcoinj.core.NetworkParameters;
-import org.bitcoinj.params.MainNetParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBToAddressFile;
 
 public class LMDBToAddressFile implements Runnable, Interruptable {
@@ -37,13 +34,13 @@ public class LMDBToAddressFile implements Runnable, Interruptable {
 
     private final CLMDBToAddressFile lmdbToAddressFile;
     
-    private final AtomicBoolean shouldRun;
+    private final Stoppable stoppable;
 
     private LMDBPersistence persistence;
 
-    public LMDBToAddressFile(CLMDBToAddressFile lmdbToAddressFile, AtomicBoolean shouldRun) {
+    public LMDBToAddressFile(CLMDBToAddressFile lmdbToAddressFile, Stoppable stoppable) {
         this.lmdbToAddressFile = lmdbToAddressFile;
-        this.shouldRun = shouldRun;
+        this.stoppable = stoppable;
     }
 
     @Override
@@ -58,7 +55,7 @@ public class LMDBToAddressFile implements Runnable, Interruptable {
             File addressesFile = new File(lmdbToAddressFile.addressesFile);
             // delete before write all addresses
             addressesFile.delete();
-            persistence.writeAllAmountsToAddressFile(addressesFile, lmdbToAddressFile.addressFileOutputFormat, shouldRun);
+            persistence.writeAllAmountsToAddressFile(addressesFile, lmdbToAddressFile.addressFileOutputFormat, stoppable);
             logger.info("writeAllAmounts done");
         } catch (IOException e) {
             throw new RuntimeException(e);

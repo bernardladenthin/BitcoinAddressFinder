@@ -19,7 +19,6 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.File;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import org.bitcoinj.core.NetworkParameters;
@@ -35,8 +34,8 @@ public class AddressFile extends AbstractPlaintextFile {
     @Nonnull
     private final Consumer<String> unsupportedConsumer;
 
-    public AddressFile(@Nonnull File file, ReadStatistic readStatistic, @Nonnull NetworkParameters networkParameters, @Nonnull Consumer<AddressToCoin> addressConsumer, @Nonnull Consumer<String> unsupportedConsumer, AtomicBoolean shouldRun) {
-        super(file, readStatistic, shouldRun);
+    public AddressFile(@Nonnull File file, ReadStatistic readStatistic, @Nonnull NetworkParameters networkParameters, @Nonnull Consumer<AddressToCoin> addressConsumer, @Nonnull Consumer<String> unsupportedConsumer, Stoppable stoppable) {
+        super(file, readStatistic, stoppable);
         this.networkParameters = networkParameters;
         this.addressConsumer = addressConsumer;
         this.unsupportedConsumer = unsupportedConsumer;
