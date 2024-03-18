@@ -211,6 +211,7 @@ An export of the full database can be used to predict private keys with deep lea
 If you have a laptop like HP ZBook G3/G4/G5 "hybrid graphics" mode is very slow because of the shared memory. Please select in the BIOS "discrete graphics".
 
 ## Future improvements
+- Refactor the entire key generation infrastructure to support a key provider. This provider should be configurable to supply private keys from various sources, such as Random, Secrets File, Key Range, and others. All consumers should retrieve keys from this provider.
 
 ### KeyProvider
 - Key generation within a specific key range. See #27
