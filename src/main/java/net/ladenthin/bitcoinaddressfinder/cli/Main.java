@@ -85,6 +85,7 @@ public class Main implements Runnable, Shutdown {
                 finder.configureProducer();
                 finder.initProducer();
                 finder.startProducer();
+                finder.awaitTermination();
                 break;
             case LMDBToAddressFile:
                 LMDBToAddressFile lmdbToAddressFile = new LMDBToAddressFile(configuration.lmdbToAddressFile);

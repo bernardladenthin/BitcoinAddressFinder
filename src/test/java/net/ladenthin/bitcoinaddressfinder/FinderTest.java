@@ -129,10 +129,9 @@ public class FinderTest {
     }
     // </editor-fold>
     
-    
     // <editor-fold defaultstate="collapsed" desc="testFullCycle">
     @Test
-    public void testFullCycle_producerJavaSetAndInitialized_XYT() throws IOException, InterruptedException {
+    public void testFullCycle_producerJavaSetAndInitialized_statesCorrect() throws IOException, InterruptedException {
         // arrange
         boolean compressed = false;
         boolean useStaticAmount = true;
@@ -156,15 +155,29 @@ public class FinderTest {
         // act
         finder.startConsumer();
         finder.configureProducer();
+        
+        // pre assert
+        assertThat(finder.getAllProducers(), hasSize(1));
+        assertProducerState(finder.getAllProducers(), ProducerState.UNINITIALIZED);
+        
+        // act and assert
         finder.initProducer();
+        assertProducerState(finder.getAllProducers(), ProducerState.INITIALIZED);
         finder.startProducer();
         Thread.sleep(Duration.ofSeconds(1L));
-        
+        assertProducerState(finder.getAllProducers(), ProducerState.RUNNING);
+        Thread.sleep(Duration.ofSeconds(1L));
         finder.interrupt();
+        // it is not easily possible to test the interrupted state without a thread barrier
+        assertProducerState(finder.getAllProducers(), ProducerState.NOT_RUNNING);
         
         // assert
-        //assertThat(allProducers, hasSize(3));
     }
     // </editor-fold>
 
+    private static void assertProducerState(List<Producer> producerStateProviders, ProducerState expectedProducerState) {
+        for (ProducerStateProvider producerStateProvider : producerStateProviders) {
+            assertThat(producerStateProvider.getState(), is(equalTo(expectedProducerState)));
+        }
+    }
 }

@@ -32,15 +32,20 @@ public abstract class AbstractProducer implements Producer {
     private Logger logger = LoggerFactory.getLogger(this.getClass());
     
     protected final AtomicBoolean running = new AtomicBoolean(false);
+    
+    protected final CProducer cProducer;
     protected final Consumer consumer;
     protected final KeyUtility keyUtility;
     protected final SecretFactory secretFactory;
     protected final ProducerCompletionCallback producerCompletionCallback;
     protected final boolean runOnce;
     
+    protected volatile ProducerState state = ProducerState.UNINITIALIZED;
+    
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
-    public AbstractProducer(Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback, boolean runOnce) {
+    public AbstractProducer(CProducer cProducer, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback, boolean runOnce) {
+        this.cProducer = cProducer;
         this.consumer = consumer;
         this.keyUtility = keyUtility;
         this.secretFactory = secretFactory;
@@ -49,21 +54,55 @@ public abstract class AbstractProducer implements Producer {
     }
 
     @Override
+    public void initProducer() {
+        this.state = ProducerState.INITIALIZED;
+    }
+
+    @Override
+    public void releaseProducers() {
+        this.state = ProducerState.RELEASED;
+    }
+
+    @Override
     public void run() {
-        running.set(true);
+        state = ProducerState.RUNNING;
         while (shouldRun.get()) {
             produceKeys();
             if (runOnce) {
                 break;
             }
         }
-        running.set(false);
+        state = ProducerState.NOT_RUNNING;
         producerCompletionCallback.producerFinished();
     }
     
     @Override
-    public boolean isRunning() {
-        return running.get();
+    public void produceKeys() {
+        try {
+            BigInteger secret;
+            try {
+                secret = secretFactory.createSecret(cProducer.privateKeyMaxNumBits);
+            } catch (NoMoreSecretsAvailableException ex) {
+                logNoMoreSecretsInSecretFactory();
+                interrupt();
+                return;
+            }
+            
+            if (PublicKeyBytes.isInvalid(secret)) {
+                return;
+            }
+            
+            processSecret(secret);
+         } catch (RuntimeException e) {
+            logErrorInProduceKeys(e);
+            throw e;
+        }
+    }
+    
+    @Override
+    public void processSecret(BigInteger secret) {
+        BigInteger secretBase = createSecretBase(secret, cProducer.logSecretBase);
+        processSecretBase(secretBase);
     }
     
     /**
@@ -73,10 +112,18 @@ public abstract class AbstractProducer implements Producer {
     protected void logErrorInProduceKeys(Exception e, BigInteger secret) {
         logger.error("Error in produceKey for secret " + secret + ".", e);
     }
+    
+    protected void logErrorInProduceKeys(Exception e) {
+        logger.error("Error in produceKey", e);
+    }
+    
+    protected void logNoMoreSecretsInSecretFactory() {
+        logger.error("No more keys in secret factory. Shutdown producer.");
+    }
 
     @Override
     public void waitTillProducerNotRunning() {
-        while(isRunning()) {
+        while(state == ProducerState.RUNNING) {
             try {
                 Thread.sleep(SLEEP_WAIT_TILL_RUNNING);
             } catch (InterruptedException ex) {
@@ -84,7 +131,7 @@ public abstract class AbstractProducer implements Producer {
         }
     }
 
-    public BigInteger createSecretBase(CProducer cProducer, BigInteger secret, boolean logSecretBase) {
+    public BigInteger createSecretBase(BigInteger secret, boolean logSecretBase) {
         BigInteger secretBase = keyUtility.killBits(secret, cProducer.getKillBits());
         
         if(logSecretBase) {
@@ -120,6 +167,12 @@ public abstract class AbstractProducer implements Producer {
     
     @Override
     public void interrupt() {
+        state = ProducerState.INTERRUPTED;
         shouldRun.set(false);
+    }
+    
+    @Override
+    public ProducerState getState() {
+        return state;
     }
 }

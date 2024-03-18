@@ -18,15 +18,21 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.math.BigInteger;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
@@ -40,8 +46,13 @@ import org.slf4j.LoggerFactory;
 
 public class Finder implements Interruptable, ProducerCompletionCallback, SecretFactory {
 
+    /**
+     * Wait for 100 thousand years is enough.
+     */
+    private static final long MAXIMUM_RUNTIME = 365L * 100_000L;
+    
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
-
+    
     private final CFinder finder;
     private final Shutdown shutdown;
     
@@ -55,6 +66,8 @@ public class Finder implements Interruptable, ProducerCompletionCallback, Secret
     private final Random random;
 
     private final ExecutorService producerExecutorService = Executors.newCachedThreadPool();
+    @VisibleForTesting
+    final Map<Producer, Future<?>> producerFuture = new HashMap<>();
     
     private final NetworkParameters networkParameters = MainNetParams.get();
     private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
@@ -116,7 +129,16 @@ public class Finder implements Interruptable, ProducerCompletionCallback, Secret
     
     public void startProducer() {
         for (Producer producer : getAllProducers()) {
-            producerExecutorService.submit(producer);
+            Future<?> future = producerExecutorService.submit(producer);
+            producerFuture.put(producer, future);
+        }
+    }
+    
+    public void awaitTermination() {
+        try {
+            producerExecutorService.awaitTermination(MAXIMUM_RUNTIME, TimeUnit.DAYS);
+        } catch (InterruptedException ex) {
+            throw new RuntimeException(ex);
         }
     }
     
@@ -141,7 +163,7 @@ public class Finder implements Interruptable, ProducerCompletionCallback, Secret
     public void producerFinished() {
         // a signal that a producer finished its work
         for (Producer producer : getAllProducers()) {
-            if (producer.isRunning() ){
+            if (producer.getState() == ProducerState.RUNNING ){
                 break;
             }
         }
@@ -162,6 +184,12 @@ public class Finder implements Interruptable, ProducerCompletionCallback, Secret
         producers.addAll(javaProducersSecretsFiles);
         producers.addAll(openCLProducers);
         return producers;
+    }
+    
+    public List<Consumer> getAllConsumers() {
+        List<Consumer> consumers = new ArrayList<>();
+        consumers.add(consumerJava);
+        return consumers;
     }
 
     @Override

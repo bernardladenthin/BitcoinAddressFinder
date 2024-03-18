@@ -202,7 +202,11 @@ public class ConsumerJavaTest {
         assertThat(waitBefore, is(equalTo(Boolean.FALSE)));
 
         AtomicBoolean result = new AtomicBoolean();
+        
+        AtomicBoolean waitStarted = new AtomicBoolean(false);
+        
         Thread threadWaitQueueEmpty = Thread.startVirtualThread( () -> {
+            waitStarted.set(true);
             try {
                 // act
                 result.set(consumerJava.waitTillKeysQueueEmpty(Duration.ofSeconds(2L)));
@@ -210,11 +214,14 @@ public class ConsumerJavaTest {
                 // same value as before
                 result.set(false);
             }
+            waitStarted.set(false);
         });
         
+        Thread.sleep(Duration.ofSeconds(1L));
+        
         {
-            // assert the thread is RUNNABLE now
-            assertThat(threadWaitQueueEmpty.getState(), is(equalTo(Thread.State.RUNNABLE)));
+            // assert the waitTillKeysQueueEmpty is running
+            assertThat(waitStarted.get(), is(equalTo(true)));
             // assert the result is false
             assertThat(result.get(), is(equalTo(Boolean.FALSE)));
         }
@@ -226,8 +233,8 @@ public class ConsumerJavaTest {
         threadWaitQueueEmpty.join(Duration.ofSeconds(10L));
         
         {
-            // assert the thread is TERMINATED now
-            assertThat(threadWaitQueueEmpty.getState(), is(equalTo(Thread.State.TERMINATED)));
+            // assert the waitTillKeysQueueEmpty is not running
+            assertThat(waitStarted.get(), is(equalTo(false)));
             // assert the result is true
             assertThat(result.get(), is(equalTo(Boolean.TRUE)));
         }

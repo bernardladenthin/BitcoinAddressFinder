@@ -18,8 +18,9 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.math.BigInteger;
-
-public interface SecretFactory {
-    public BigInteger createSecret(int maximumBitLength) throws NoMoreSecretsAvailableException;
+public class NoMoreSecretsAvailableException extends Exception {
+    
+    public NoMoreSecretsAvailableException() {
+        super("No more secrets available.");
+    }
 }

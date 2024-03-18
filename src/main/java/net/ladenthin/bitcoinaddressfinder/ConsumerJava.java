@@ -45,7 +45,7 @@ import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.crypto.MnemonicException;
 
-public class ConsumerJava implements Consumer, Interruptable {
+public class ConsumerJava implements Consumer {
 
     /**
      * We assume a queue might be empty after this amount of time.

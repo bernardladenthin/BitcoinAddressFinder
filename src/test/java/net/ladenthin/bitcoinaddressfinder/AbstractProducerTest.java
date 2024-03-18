@@ -66,7 +66,7 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
@@ -76,7 +76,7 @@ public class AbstractProducerTest {
         boolean logSecretBase = true;
 
         // act
-        BigInteger secretBase = abstractProducerTestImpl.createSecretBase(cProducer, secret, logSecretBase);
+        BigInteger secretBase = abstractProducerTestImpl.createSecretBase(secret, logSecretBase);
 
         // assert
         assertThat(Hex.encodeHexString(secretBase.toByteArray()), is(equalTo(expectedSecretBase)));
@@ -108,7 +108,7 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
@@ -118,7 +118,7 @@ public class AbstractProducerTest {
         boolean logSecretBase = false;
 
         // act
-        abstractProducerTestImpl.createSecretBase(cProducer, secret, logSecretBase);
+        abstractProducerTestImpl.createSecretBase(secret, logSecretBase);
 
         // assert
         // assert log secret base
@@ -141,7 +141,7 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(false);
@@ -151,7 +151,7 @@ public class AbstractProducerTest {
         boolean logSecretBase = true;
 
         // act
-        abstractProducerTestImpl.createSecretBase(cProducer, secret, logSecretBase);
+        abstractProducerTestImpl.createSecretBase(secret, logSecretBase);
 
         // assert
         // assert log secret base

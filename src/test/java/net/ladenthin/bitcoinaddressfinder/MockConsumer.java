@@ -33,5 +33,9 @@ public class MockConsumer implements Consumer {
     @Override
     public void startConsumer() {
     }
+
+    @Override
+    public void interrupt() {
+    }
     
 }

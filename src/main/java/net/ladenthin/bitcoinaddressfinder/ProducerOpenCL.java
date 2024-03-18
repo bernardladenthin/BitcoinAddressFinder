@@ -37,7 +37,7 @@ public class ProducerOpenCL extends AbstractProducer {
     OpenCLContext openCLContext;
 
     public ProducerOpenCL(CProducerOpenCL producerOpenCL, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback) {
-        super(consumer, keyUtility, secretFactory, producerCompletionCallback, producerOpenCL.runOnce);
+        super(producerOpenCL, consumer, keyUtility, secretFactory, producerCompletionCallback, producerOpenCL.runOnce);
         this.producerOpenCL = producerOpenCL;
         this.resultReaderThreadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads);
     }
@@ -47,43 +47,51 @@ public class ProducerOpenCL extends AbstractProducer {
         openCLContext = new OpenCLContext(producerOpenCL);
         try {
             openCLContext.init();
+            this.state = ProducerState.INITIALIZED;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
     @Override
-    public void produceKeys() {
+    public void processSecretBase(BigInteger secretBase) {
         if (openCLContext == null) {
-            throw new IllegalStateException("openCLContext is null");
+            throw new IllegalStateException("ProducerOpenCL not initialized");
         }
-        
-        BigInteger secret = null;
         try {
-            secret = secretFactory.createSecret(producerOpenCL.privateKeyMaxNumBits);
-            
-            if (PublicKeyBytes.isInvalid(secret)) {
-                return;
-            }
-
-            final BigInteger secretBase = createSecretBase(producerOpenCL, secret, producerOpenCL.logSecretBase);
-
             waitTillFreeThreadsInPool();
-            OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
-            
-            resultReaderThreadPoolExecutor.submit(
-                () ->{
-                    PublicKeyBytes[] publicKeyBytesArray = createKeys.getPublicKeyBytes();
-                    createKeys.freeResult();
-                    try {
-                        consumer.consumeKeys(publicKeyBytesArray);
-                    } catch (Exception e) {
-                        logErrorInProduceKeys(e, secretBase);
-                    }
-                }
-            );
+            OpenCLGridResult openCLGridResult = openCLContext.createKeys(secretBase);
+            ResultReaderRunnable resultReaderRunnable = new ResultReaderRunnable(openCLGridResult, consumer, secretBase, this);
+
+            resultReaderThreadPoolExecutor.submit(resultReaderRunnable, openCLContext);
         } catch (Exception e) {
-            logErrorInProduceKeys(e, secret);
+            logErrorInProduceKeys(e, secretBase);
+        }
+    }
+    
+    protected static class ResultReaderRunnable implements Runnable {
+        
+        private final OpenCLGridResult openCLGridResult;
+        private final Consumer consumer;
+        private final BigInteger secretBase;
+        private final AbstractProducer abstractProducer;
+        
+        ResultReaderRunnable(OpenCLGridResult openCLGridResult, Consumer consumer, BigInteger secretBase, AbstractProducer abstractProducer) {
+            this.openCLGridResult = openCLGridResult;
+            this.consumer = consumer;
+            this.secretBase = secretBase;
+            this.abstractProducer = abstractProducer;
+        }
+
+        @Override
+        public void run() {
+            try {
+                PublicKeyBytes[] publicKeyBytesArray = openCLGridResult.getPublicKeyBytes();
+                openCLGridResult.freeResult();
+                consumer.consumeKeys(publicKeyBytesArray);
+            } catch (Exception e) {
+                abstractProducer.logErrorInProduceKeys(e, secretBase);
+            }
         }
     }
     
@@ -105,6 +113,7 @@ public class ProducerOpenCL extends AbstractProducer {
         if (openCLContext != null) {
             openCLContext.release();
             openCLContext = null;
+            this.state = ProducerState.RELEASED;
         }
     }
 

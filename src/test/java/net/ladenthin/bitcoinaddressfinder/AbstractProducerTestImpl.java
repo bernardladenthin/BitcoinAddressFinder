@@ -18,15 +18,13 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import java.math.BigInteger;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
+
 public class AbstractProducerTestImpl extends AbstractProducer {
 
-    public AbstractProducerTestImpl(Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback) {
-        super(consumer, keyUtility, secretFactory, producerCompletionCallback, false);
-    }
-
-    @Override
-    public void initProducer() {
-        
+    public AbstractProducerTestImpl(CProducer cProducer, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback) {
+        super(cProducer, consumer, keyUtility, secretFactory, producerCompletionCallback, false);
     }
 
     @Override
@@ -35,8 +33,7 @@ public class AbstractProducerTestImpl extends AbstractProducer {
     }
 
     @Override
-    public void releaseProducers() {
-        
+    public void processSecretBase(BigInteger secretBase) {
     }
     
 }

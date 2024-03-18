@@ -18,10 +18,11 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import java.math.BigInteger;
 import java.util.Random;
 
-public interface Producer extends Runnable, Interruptable {
-
+public interface Producer extends Runnable, Interruptable, ProducerStateProvider {
+    
     /**
      * Initialize the producer to procue keys with
      * {@link #produceKeys(int, java.util.Random)} continuously.
@@ -37,14 +38,21 @@ public interface Producer extends Runnable, Interruptable {
     void produceKeys();
     
     /**
+     * Process the secret.
+     * @param secret
+     */
+    void processSecret(BigInteger secret);
+    
+    /**
+     * Process the secret base.
+     * @param secretBase
+     */
+    void processSecretBase(BigInteger secretBase);
+    
+    /**
      * Release the producers.
      */
     void releaseProducers();
-    
-    /**
-     * Indicate if the producer is running.
-     */
-    boolean isRunning();
     
     /**
      * Blocks till the producer is not running anymore.

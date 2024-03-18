@@ -26,31 +26,17 @@ public class ProducerJava extends AbstractProducer {
     protected final CProducerJava producerJava;
 
     public ProducerJava(CProducerJava producerJava, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback) {
-        super(consumer, keyUtility, secretFactory, producerCompletionCallback, producerJava.runOnce);
+        super(producerJava, consumer, keyUtility, secretFactory, producerCompletionCallback, producerJava.runOnce);
         this.producerJava = producerJava;
     }
 
     @Override
-    public void initProducer() {
-    }
-
-    @Override
-    public void produceKeys() {
-        BigInteger secret = secretFactory.createSecret(producerJava.privateKeyMaxNumBits);
-        processSecret(secret);
-    }
-    
-    protected void processSecret(BigInteger secret) {
+    public void processSecretBase(BigInteger secretBase) {
         try {
-            if (PublicKeyBytes.isInvalid(secret)) {
-                return;
-            }
-            
-            final BigInteger secretBase = createSecretBase(producerJava, secret, producerJava.logSecretBase);
             PublicKeyBytes[] publicKeyBytesArray = createGrid(secretBase);
             consumer.consumeKeys(publicKeyBytesArray);
         } catch (Exception e) {
-            logErrorInProduceKeys(e, secret);
+            logErrorInProduceKeys(e, secretBase);
         }
     }
 
@@ -67,9 +53,4 @@ public class ProducerJava extends AbstractProducer {
         }
         return publicKeyBytesArray;
     }
-
-    @Override
-    public void releaseProducers() {
-    }
-
 }
