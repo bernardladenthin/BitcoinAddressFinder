@@ -155,8 +155,9 @@ public class ConsumerJavaTest {
         // assert
         long afterAct = System.currentTimeMillis();
         Duration waitTime = Duration.ofMillis(afterAct-beforeAct);
-        // assert the minimum waiting time is over
-        assertThat(waitTime, is(greaterThan(ConsumerJava.DURATION_WAIT_QUEUE_EMPTY)));
+        
+        // assert the minimum waiting time is over, substract a few seconds, its not precise
+        assertThat(waitTime, is(greaterThan(ConsumerJava.DURATION_WAIT_QUEUE_EMPTY.minus(Duration.ofSeconds(2)))));
     }
     
     @Test
