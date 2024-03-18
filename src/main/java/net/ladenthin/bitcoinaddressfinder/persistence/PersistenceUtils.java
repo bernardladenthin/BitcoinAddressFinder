@@ -29,6 +29,7 @@ import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 
 public class PersistenceUtils {
 
+    @Deprecated
     private final ByteBuffer emptyByteBuffer = ByteBuffer.allocateDirect(0).asReadOnlyBuffer();
     private final ByteBuffer zeroByteBuffer = longValueToByteBufferDirectAsReadOnlyBuffer(0L);
 
@@ -49,6 +50,7 @@ public class PersistenceUtils {
         return newValue;
     }
 
+    @Deprecated
     public ByteBuffer addressListToByteBufferDirect(List<LegacyAddress> addresses) {
         ByteBuffer byteBuffer = ByteBuffer.allocateDirect(LegacyAddress.LENGTH * addresses.size());
         for (LegacyAddress address : addresses) {
@@ -58,6 +60,7 @@ public class PersistenceUtils {
         return byteBuffer;
     }
 
+    @Deprecated
     public List<LegacyAddress> byteBufferToAddressList(ByteBuffer byteBuffer) {
         List<LegacyAddress> addresses = new ArrayList<>();
         int count = byteBuffer.remaining() / LegacyAddress.LENGTH;
@@ -69,10 +72,12 @@ public class PersistenceUtils {
         return addresses;
     }
 
+    @Deprecated
     public ByteBuffer hashToByteBufferDirect(Sha256Hash hash) {
         return new ByteBufferUtility(true).byteArrayToByteBuffer(hash.getBytes());
     }
 
+    @Deprecated
     public ByteBuffer longValueToByteBufferDirectAsReadOnlyBuffer(long value) {
         ByteBuffer byteBuffer = ByteBuffer.allocateDirect(Long.BYTES);
         byteBuffer.putLong(value);
