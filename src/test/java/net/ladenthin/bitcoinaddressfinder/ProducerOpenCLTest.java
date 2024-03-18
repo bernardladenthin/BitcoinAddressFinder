@@ -44,8 +44,10 @@ public class ProducerOpenCLTest {
     protected final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
 
     // <editor-fold defaultstate="collapsed" desc="initProducer">
+    @OpenCLTest
     @Test
     public void initProducer_XYZ_openCLContextSet() throws IOException, InterruptedException {
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
