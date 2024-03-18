@@ -28,6 +28,11 @@ public interface Producer extends Runnable, Interruptable, ProducerStateProvider
      * {@link #produceKeys(int, java.util.Random)} continuously.
      */
     void initProducer();
+    
+    /**
+     * Release the producer.
+     */
+    void releaseProducer();
 
     /**
      * Create multiple keys for a specific bit length using {@link Random} and
@@ -48,11 +53,6 @@ public interface Producer extends Runnable, Interruptable, ProducerStateProvider
      * @param secretBase
      */
     void processSecretBase(BigInteger secretBase);
-    
-    /**
-     * Release the producers.
-     */
-    void releaseProducers();
     
     /**
      * Blocks till the producer is not running anymore.

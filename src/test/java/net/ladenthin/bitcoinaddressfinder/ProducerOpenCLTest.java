@@ -77,7 +77,7 @@ public class ProducerOpenCLTest {
         ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
         
         // act
-        producerOpenCL.releaseProducers();
+        producerOpenCL.releaseProducer();
     }
     
     @Test
@@ -97,7 +97,7 @@ public class ProducerOpenCLTest {
         assertThat(producerOpenCL.openCLContext, notNullValue());
         
         // act
-        producerOpenCL.releaseProducers();
+        producerOpenCL.releaseProducer();
         
         // assert
         assertThat(producerOpenCL.openCLContext, nullValue());

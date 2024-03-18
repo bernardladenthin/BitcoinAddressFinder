@@ -89,7 +89,7 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
     }
 
     @Override
-    public void releaseProducers() {
+    public void releaseProducer() {
     }
 
     @Override

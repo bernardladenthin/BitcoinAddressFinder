@@ -109,11 +109,10 @@ public class ProducerOpenCL extends AbstractProducer {
     }
 
     @Override
-    public void releaseProducers() {
+    public void releaseProducer() {
         if (openCLContext != null) {
             openCLContext.release();
             openCLContext = null;
-            this.state = ProducerState.RELEASED;
         }
     }
 

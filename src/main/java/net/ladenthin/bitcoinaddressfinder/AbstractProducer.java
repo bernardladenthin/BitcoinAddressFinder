@@ -59,8 +59,7 @@ public abstract class AbstractProducer implements Producer {
     }
 
     @Override
-    public void releaseProducers() {
-        this.state = ProducerState.RELEASED;
+    public void releaseProducer() {
     }
 
     @Override
@@ -167,7 +166,6 @@ public abstract class AbstractProducer implements Producer {
     
     @Override
     public void interrupt() {
-        state = ProducerState.INTERRUPTED;
         shouldRun.set(false);
     }
     
