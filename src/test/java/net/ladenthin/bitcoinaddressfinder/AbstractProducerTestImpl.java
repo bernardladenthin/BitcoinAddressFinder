@@ -24,7 +24,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 public class AbstractProducerTestImpl extends AbstractProducer {
 
     public AbstractProducerTestImpl(CProducer cProducer, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback) {
-        super(cProducer, consumer, keyUtility, secretFactory, producerCompletionCallback, false);
+        super(cProducer, consumer, keyUtility, secretFactory, producerCompletionCallback);
     }
 
     @Override

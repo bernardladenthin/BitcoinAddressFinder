@@ -172,6 +172,7 @@ public class FinderTest {
         assertProducerState(finder.getAllProducers(), ProducerState.NOT_RUNNING);
         
         // assert
+        finder.awaitTermination();
     }
     // </editor-fold>
 

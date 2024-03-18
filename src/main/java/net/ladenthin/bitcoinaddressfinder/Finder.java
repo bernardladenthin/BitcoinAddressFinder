@@ -174,6 +174,7 @@ public class Finder implements Interruptable, ProducerCompletionCallback, Secret
         } catch (InterruptedException ex) {
             logger.warn("InterruptedException during waitTillKeysQueueEmpty", ex);
         }
+        producerExecutorService.shutdown();
         shutdown.shutdown();
     }
     
