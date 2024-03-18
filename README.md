@@ -210,6 +210,35 @@ An export of the full database can be used to predict private keys with deep lea
 ## Known issues
 If you have a laptop like HP ZBook G3/G4/G5 "hybrid graphics" mode is very slow because of the shared memory. Please select in the BIOS "discrete graphics".
 
+## Future improvements
+
+### KeyProvider
+- Key generation within a specific key range. See #27
+Wished from themaster:
+```
+"privateKeyStartHex" : "0000000000000000000000000000000000000000000000037e26d5b1f3afe216"
+"privateKeyEndHex" : "0000000000000000000000000000000000000000000000037e26d5b1ffffffff"
+```
+Wished from Ulugbek:
+```
+// Search started from given address. Would be nice if it can save last position...
+"sequentalSearch" : true,
+"startAddress" : xxxxxxxx,
+
+// Random search with batches, here 100000. I,e. some random number is found and after 100000 sequental addresses should be checked.
+"searchAsBatches" : true,
+"searchBatchQuantity" : 100000,
+
+
+// Random search within Address Space, with batches, here 100000.
+"searchAsBatches" : true,
+"searchAddressStart" : xxxxxxx,
+"searchAddressEnd" : xxxxxxxy,
+"searchBatchQuantity" : 100000
+```
+
+- Incomplete Seed-Phrase as Private Key provider. Wished from @mirasu See #38
+
 -----
 ## Legal
 This software should not be configured and used to find (Bitcoin/Altcoin) address hash (RIPEMD-160) collisions and use (steal) credit from third-party (Bitcoin/Altcoin) addresses.
