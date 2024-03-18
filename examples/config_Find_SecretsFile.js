@@ -23,6 +23,7 @@
                 "files" : [
                     "secrets/fileContainingSecrets_BIG_INTEGER.txt"
                 ],
+                "runOnce" : true,
                 "secretFormat" : "BIG_INTEGER",
                 "logSecretBase" : true,
                 "gridNumBits" : 0
@@ -31,6 +32,7 @@
                 "files" : [
                     "secrets/fileContainingSecrets_DUMPED_RIVATE_KEY.txt"
                 ],
+                "runOnce" : true,
                 "secretFormat" : "DUMPED_RIVATE_KEY",
                 "logSecretBase" : true,
                 "gridNumBits" : 0
@@ -39,6 +41,7 @@
                 "files" : [
                     "secrets/fileContainingSecrets_SHA256.txt"
                 ],
+                "runOnce" : true,
                 "secretFormat" : "SHA256",
                 "logSecretBase" : true,
                 "gridNumBits" : 0
@@ -47,6 +50,7 @@
                 "files" : [
                     "secrets/fileContainingSecrets_STRING_DO_SHA256.txt"
                 ],
+                "runOnce" : true,
                 "secretFormat" : "STRING_DO_SHA256",
                 "logSecretBase" : true,
                 "gridNumBits" : 0
