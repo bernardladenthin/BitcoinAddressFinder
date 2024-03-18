@@ -34,7 +34,7 @@ public class OpenCLDeviceTest {
     @OpenCLTest
     public void toStringPretty_openCLDeviceExisting_stringCreated() throws IOException {
         // arrange
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadable();
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         
         OpenCLBuilder openCLBuilder = new OpenCLBuilder();
         List<OpenCLPlatform> openCLPlatforms = openCLBuilder.build();
