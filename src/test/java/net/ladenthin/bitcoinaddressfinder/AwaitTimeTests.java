@@ -1,6 +1,6 @@
 // @formatter:off
 /**
- * Copyright 2024 Bernard Ladenthin bernard.ladenthin@gmail.com
+ * Copyright 2020 Bernard Ladenthin bernard.ladenthin@gmail.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,9 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
-public class MockProducerCompletionCallback implements ProducerCompletionCallback {
+import java.time.Duration;
 
-    @Override
-    public void producerFinished() {
-    }
-    
+public class AwaitTimeTests {
+    final static Duration AWAIT_DURATION = Duration.ofSeconds(20);
+    final static Duration IMPRECISION = Duration.ofSeconds(2);
 }

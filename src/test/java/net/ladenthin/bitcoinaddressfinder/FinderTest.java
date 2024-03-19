@@ -47,7 +47,7 @@ public class FinderTest {
     public void interrupt_noProducersSet_noExceptionThrown() throws IOException {
         // arrange
         CFinder cFinder = new CFinder();
-        Finder finder = new Finder(cFinder, new MockShutdown());
+        Finder finder = new Finder(cFinder);
         // act
         finder.interrupt();
         // assert
@@ -56,46 +56,99 @@ public class FinderTest {
     @Test
     public void interrupt_producersSetAndNotInitialized_noExceptionThrown() throws IOException {
         // arrange
-        final MockShutdown mockShutdown = new MockShutdown();
         CFinder cFinder = new CFinder();
-        cFinder.producerJava.add(new CProducerJava());
+        final CProducerJava cProducerJava = new CProducerJava();
+        cFinder.producerJava.add(cProducerJava);
         cFinder.producerJavaSecretsFiles.add(new CProducerJavaSecretsFiles());
         cFinder.producerOpenCL.add(new CProducerOpenCL());
-        Finder finder = new Finder(cFinder, mockShutdown);
+        Finder finder = new Finder(cFinder);
         finder.configureProducer();
+        // act
+        finder.interrupt();
+        // assert
+    }
+    
+    @Test
+    public void interrupt_consumerStarted_consumerNotStopped() throws IOException {
+        // arrange
+        CFinder cFinder = new CFinder();
+        final CProducerJava cProducerJava = new CProducerJava();
+        cFinder.producerJava.add(cProducerJava);
+        cFinder.producerJavaSecretsFiles.add(new CProducerJavaSecretsFiles());
+        cFinder.producerOpenCL.add(new CProducerOpenCL());
+        
+        // consumer java configuration
+        configureConsumerJava(cFinder);
+        
+        Finder finder = new Finder(cFinder);
+        finder.startConsumer();
         // act
         finder.interrupt();
         // assert
     }
     // </editor-fold>
 
-    // <editor-fold defaultstate="collapsed" desc="producerFinished">
+    // <editor-fold defaultstate="collapsed" desc="shutdownAndAwaitTermination">
     @Test
-    public void producerFinished_noProducersSet_shutdownCalled() throws IOException {
+    public void shutdownAndAwaitTermination_noProducersSet_shutdownCalled() throws IOException {
         // arrange
-        final MockShutdown mockShutdown = new MockShutdown();
         CFinder cFinder = new CFinder();
-        Finder finder = new Finder(cFinder, mockShutdown);
+        Finder finder = new Finder(cFinder);
+        // pre-assert
+        assertThat(finder.producerExecutorService.isTerminated(), is(equalTo(Boolean.FALSE)));
         // act
-        finder.producerFinished();
+        finder.shutdownAndAwaitTermination();
         // assert
-        assertThat(mockShutdown.shutdownCalledCounter.get(), is(equalTo(Integer.valueOf(1))));
+        assertThat(finder.producerExecutorService.isTerminated(), is(equalTo(Boolean.TRUE)));
     }
     
     @Test
-    public void producerFinished_producersSetAndNotInitialized_shutdownCalled() throws IOException {
+    public void shutdownAndAwaitTermination_producersSetAndNotInitialized_shutdownCalled() throws IOException {
         // arrange
-        final MockShutdown mockShutdown = new MockShutdown();
         CFinder cFinder = new CFinder();
-        cFinder.producerJava.add(new CProducerJava());
+        final CProducerJava cProducerJava = new CProducerJava();
+        cFinder.producerJava.add(cProducerJava);
         cFinder.producerJavaSecretsFiles.add(new CProducerJavaSecretsFiles());
         cFinder.producerOpenCL.add(new CProducerOpenCL());
-        Finder finder = new Finder(cFinder, mockShutdown);
+        Finder finder = new Finder(cFinder);
         finder.configureProducer();
         // act
-        finder.producerFinished();
+        finder.shutdownAndAwaitTermination();
         // assert
-        assertThat(mockShutdown.shutdownCalledCounter.get(), is(equalTo(Integer.valueOf(1))));
+        assertThat(finder.producerExecutorService.isTerminated(), is(equalTo(Boolean.TRUE)));
+    }
+    
+    /**
+     * Attention, this is an await time test. This tests changes {@link Finder#AWAIT_DURATION_TERMINATE}.
+     */
+    @Test
+    public void shutdownAndAwaitTermination_producersSetAndInitialized_shutdownCalledAndAwaitTermination() throws IOException {
+        // Attention: Change the duration.
+        Finder.AWAIT_DURATION_TERMINATE = AwaitTimeTests.AWAIT_DURATION;
+        
+        // arrange
+        CFinder cFinder = new CFinder();
+        final CProducerJava cProducerJava = new CProducerJava();
+        cProducerJava.runOnce = false;
+        cFinder.producerJava.add(cProducerJava);
+        
+        configureConsumerJava(cFinder);
+        Finder finder = new Finder(cFinder);
+        finder.startConsumer();
+        finder.configureProducer();
+        finder.initProducer();
+        finder.startProducer();
+
+        // act
+        long beforeAct = System.currentTimeMillis();
+        finder.shutdownAndAwaitTermination();
+        
+        // assert
+        long afterAct = System.currentTimeMillis();
+        Duration waitTime = Duration.ofMillis(afterAct-beforeAct);
+        
+        // assert the waiting time is over, substract imprecision
+        assertThat(waitTime, is(greaterThan(Finder.AWAIT_DURATION_TERMINATE.minus(AwaitTimeTests.IMPRECISION))));
     }
     // </editor-fold>
     
@@ -103,9 +156,8 @@ public class FinderTest {
     @Test
     public void getAllProducers_noProducersSet_returnEmptyList() throws IOException {
         // arrange
-        final MockShutdown mockShutdown = new MockShutdown();
         CFinder cFinder = new CFinder();
-        Finder finder = new Finder(cFinder, mockShutdown);
+        Finder finder = new Finder(cFinder);
         // act
         List<Producer> allProducers = finder.getAllProducers();
         // assert
@@ -115,12 +167,12 @@ public class FinderTest {
     @Test
     public void getAllProducers_producersSetAndNotInitialized_returnList() throws IOException {
         // arrange
-        final MockShutdown mockShutdown = new MockShutdown();
         CFinder cFinder = new CFinder();
-        cFinder.producerJava.add(new CProducerJava());
+        final CProducerJava cProducerJava = new CProducerJava();
+        cFinder.producerJava.add(cProducerJava);
         cFinder.producerJavaSecretsFiles.add(new CProducerJavaSecretsFiles());
         cFinder.producerOpenCL.add(new CProducerOpenCL());
-        Finder finder = new Finder(cFinder, mockShutdown);
+        Finder finder = new Finder(cFinder);
         finder.configureProducer();
         // act
         List<Producer> allProducers = finder.getAllProducers();
@@ -133,16 +185,74 @@ public class FinderTest {
     @Test
     public void testFullCycle_producerJavaSetAndInitialized_statesCorrect() throws IOException, InterruptedException {
         // arrange
-        boolean compressed = false;
-        boolean useStaticAmount = true;
-        final MockShutdown mockShutdown = new MockShutdown();
         CFinder cFinder = new CFinder();
         final CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.runOnce = false;
         cFinder.producerJava.add(cProducerJava);
         
-        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+        configureConsumerJava(cFinder);
+        Finder finder = new Finder(cFinder);
+        // act and assert the full cycle
+        {
+            // pre-assert
+            assertThat(finder.getAllConsumers(), hasSize(0));
+            // act
+            finder.startConsumer();
+            // assert
+            assertThat(finder.getAllConsumers(), hasSize(1));
+        }
+        
+        {
+            // pre-assert
+            assertThat(finder.getAllProducers(), hasSize(0));
+            // act
+            finder.configureProducer();
+            // assert
+            assertThat(finder.getAllProducers(), hasSize(1));
+            assertProducerState(finder.getAllProducers(), ProducerState.UNINITIALIZED);
+        }
+        
+        {
+            // act
+            finder.initProducer();
+            // assert
+            assertProducerState(finder.getAllProducers(), ProducerState.INITIALIZED);
+        }
+        // catch the reference, it is not possible to get the reference afterwards the interrupt
+        final List<Producer> allProducers = finder.getAllProducers();
+        {
+            // act
+            finder.startProducer();
+            // wait
+            Thread.sleep(Duration.ofSeconds(1L));
+        
+            // assert
+            assertProducerState(allProducers, ProducerState.RUNNING);
+        }
+        {
+            // act
+            finder.interrupt();
+            // assert
+            assertThat(finder.getAllProducers(), hasSize(0));
+            assertProducerState(allProducers, ProducerState.NOT_RUNNING);
+        }
+        
+        {
+            // pre-assert
+            assertThat(finder.getAllConsumers(), hasSize(1));
+            // act
+            finder.shutdownAndAwaitTermination();
+            // assert
+            assertThat(finder.getAllConsumers(), hasSize(0));
+        }
+    }
+    // </editor-fold>
 
+    private void configureConsumerJava(CFinder cFinder) throws IOException {
+        boolean compressed = false;
+        boolean useStaticAmount = true;
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+        
         TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
         File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, useStaticAmount, false);
         
@@ -151,30 +261,7 @@ public class FinderTest {
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         
         cFinder.consumerJava = cConsumerJava;
-        Finder finder = new Finder(cFinder, mockShutdown);
-        // act
-        finder.startConsumer();
-        finder.configureProducer();
-        
-        // pre assert
-        assertThat(finder.getAllProducers(), hasSize(1));
-        assertProducerState(finder.getAllProducers(), ProducerState.UNINITIALIZED);
-        
-        // act and assert
-        finder.initProducer();
-        assertProducerState(finder.getAllProducers(), ProducerState.INITIALIZED);
-        finder.startProducer();
-        Thread.sleep(Duration.ofSeconds(1L));
-        assertProducerState(finder.getAllProducers(), ProducerState.RUNNING);
-        Thread.sleep(Duration.ofSeconds(1L));
-        finder.interrupt();
-        // it is not easily possible to test the interrupted state without a thread barrier
-        assertProducerState(finder.getAllProducers(), ProducerState.NOT_RUNNING);
-        
-        // assert
-        finder.awaitTermination();
     }
-    // </editor-fold>
 
     private static void assertProducerState(List<Producer> producerStateProviders, ProducerState expectedProducerState) {
         for (ProducerStateProvider producerStateProvider : producerStateProviders) {

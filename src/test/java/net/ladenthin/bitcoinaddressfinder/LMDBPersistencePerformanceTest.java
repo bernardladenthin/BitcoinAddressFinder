@@ -22,6 +22,7 @@ import ch.qos.logback.classic.Level;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.time.Duration;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -90,12 +91,11 @@ public class LMDBPersistencePerformanceTest {
         consumerJava.startConsumer();
         consumerJava.startStatisticsTimer();
         
-        Thread.sleep(TEST_TIME_IN_SECONDS * 1000);
+        Thread.sleep(TEST_TIME_IN_SECONDS * Statistics.ONE_SECOND_IN_MILLISECONDS);
         // shut down
         // interrupt the producer
         producerShouldRun.set(false);
         consumerJava.interrupt();
-        consumerJava.timer.cancel();
     }
 
     private void createProducerThreads(ThreadPoolExecutor threadPoolExecutor, ConsumerJava consumerJava, PublicKeyBytes[] publicKeyByteses, AtomicBoolean producerShouldRun) {

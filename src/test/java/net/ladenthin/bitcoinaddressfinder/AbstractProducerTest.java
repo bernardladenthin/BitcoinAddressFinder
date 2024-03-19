@@ -66,7 +66,7 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockSecretFactory);
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
@@ -108,7 +108,7 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockSecretFactory);
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
@@ -141,7 +141,7 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockSecretFactory);
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(false);

@@ -101,7 +101,7 @@ public class ProducerJavaSecretsFilesTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockSecretFactory);
 
         // act
         producerJavaSecretsFiles.produceKeys();
@@ -123,7 +123,7 @@ public class ProducerJavaSecretsFilesTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockSecretFactory);
 
         // act
         producerJavaSecretsFiles.produceKeys();

@@ -27,12 +27,12 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
@@ -51,7 +51,8 @@ public class ConsumerJava implements Consumer {
      * We assume a queue might be empty after this amount of time.
      * If not, some keys in the queue are not checked before shutdow.
      */
-    static final Duration DURATION_WAIT_QUEUE_EMPTY = Duration.ofMinutes(1);
+    @VisibleForTesting
+    static Duration AWAIT_DURATION_QUEUE_EMPTY = Duration.ofMinutes(1);
     
     /**
      * The duration for a cyclic check to test the keys queue is empty.
@@ -73,7 +74,8 @@ public class ConsumerJava implements Consumer {
     protected long startTime = 0;
 
     protected final CConsumerJava consumerJava;
-    protected final Timer timer = new Timer();
+    @VisibleForTesting
+    ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 
     protected Persistence persistence;
     private final PersistenceUtils persistenceUtils;
@@ -85,7 +87,8 @@ public class ConsumerJava implements Consumer {
     protected final AtomicLong vanityHits = new AtomicLong();
     private final Pattern vanityPattern;
     
-    private final AtomicBoolean shouldRun = new AtomicBoolean(true);
+    @VisibleForTesting
+    final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
     protected ConsumerJava(CConsumerJava consumerJava, KeyUtility keyUtility, PersistenceUtils persistenceUtils) {
         this.consumerJava = consumerJava;
@@ -113,25 +116,22 @@ public class ConsumerJava implements Consumer {
     }
 
     protected void startStatisticsTimer() {
-        long period = consumerJava.printStatisticsEveryNSeconds * Statistics.ONE_SECOND_IN_MILLISECONDS;
+        long period = consumerJava.printStatisticsEveryNSeconds;
         if (period <= 0) {
             throw new IllegalArgumentException("period must be greater than 0.");
         }
 
         startTime = System.currentTimeMillis();
 
-        timer.scheduleAtFixedRate(new TimerTask() {
-            @Override
-            public void run() {
-                // get transient information
-                long uptime = Math.max(System.currentTimeMillis() - startTime, 1);
+        scheduledExecutorService.scheduleAtFixedRate(() -> {
+            // get transient information
+            long uptime = Math.max(System.currentTimeMillis() - startTime, 1);
 
-                String message = new Statistics().createStatisticsMessage(uptime, checkedKeys.get(), checkedKeysSumOfTimeToCheckContains.get(), emptyConsumer.get(), keysQueue.size(), hits.get());
+            String message = new Statistics().createStatisticsMessage(uptime, checkedKeys.get(), checkedKeysSumOfTimeToCheckContains.get(), emptyConsumer.get(), keysQueue.size(), hits.get());
 
-                // log the information
-                logger.info(message);
-            }
-        }, period, period);
+            // log the information
+            logger.info(message);
+        }, period, period, TimeUnit.SECONDS);
     }
 
     @Override
@@ -324,8 +324,7 @@ public class ConsumerJava implements Consumer {
      * Returns if the consume was finished or.
      * @return {@code true} if the keys queue is empty, otherwise {@code false}.
      */
-    @VisibleForTesting
-    boolean waitTillKeysQueueEmpty(Duration maxWait) throws InterruptedException {
+    public boolean awaitKeysQueueEmpty(Duration maxWait) throws InterruptedException {
         final long startTime = System.currentTimeMillis();
         do {
             if (keysQueue.isEmpty()) {
@@ -340,11 +339,11 @@ public class ConsumerJava implements Consumer {
     public void interrupt() {
         try {
             // the result does not matter, just try to wait some seconds to empty the queue
-            waitTillKeysQueueEmpty(DURATION_WAIT_QUEUE_EMPTY);
+            awaitKeysQueueEmpty(AWAIT_DURATION_QUEUE_EMPTY);
         } catch (InterruptedException ex) {
             // do nothing, it is no problem
         }
         shouldRun.set(false);
-        timer.cancel();
+        scheduledExecutorService.shutdown();
     }
 }

@@ -31,6 +31,9 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.List;
 import java.util.Random;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
@@ -93,6 +96,7 @@ public class ConsumerJavaTest {
 
     @Test
     public void startStatisticsTimer_noExceptionThrown() throws IOException, InterruptedException {
+        final int runTimes = 3;
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.printStatisticsEveryNSeconds = 1;
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
@@ -102,12 +106,14 @@ public class ConsumerJavaTest {
         // act
         consumerJava.startStatisticsTimer();
 
+        // sleep close to runTimes+1 cycles to let the tasks run runTimes times
+        Thread.sleep((cConsumerJava.printStatisticsEveryNSeconds * (runTimes +1) * 1000) - 300);
+        
         // assert
-        Thread.sleep(3900);
-        consumerJava.timer.cancel();
+        consumerJava.interrupt();
 
         List<String> arguments = logCaptor.getAllValues();
-        verify(logger, atLeast(3)).info(logCaptor.capture());
+        verify(logger, atLeast(runTimes)).info(logCaptor.capture());
 
         assertThat(arguments.get(0), is(equalTo("Statistics: [Checked 0 M keys in 0 minutes] [0 k keys/second] [0 M keys/minute] [Times an empty consumer: 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
     }
@@ -129,14 +135,20 @@ public class ConsumerJavaTest {
         consumerJava.setLogger(logger);
 
         // act
-        boolean result = consumerJava.waitTillKeysQueueEmpty(Duration.ofSeconds(1L));
+        boolean result = consumerJava.awaitKeysQueueEmpty(Duration.ofSeconds(1L));
         
         // assert
         assertThat(result, is(equalTo(Boolean.TRUE)));
     }
     
+    /**
+     * Attention, this is an await time test. This tests changes  {@link ConsumerJava#AWAIT_DURATION_QUEUE_EMPTY}.
+     */
     @Test
-    public void interrupt_keysAdded_waitedInternallyForTheDuration() throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
+    public void interrupt_keysQueueNotEmpty_consumeNotRunningWaitedInternallyForTheDuration() throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
+        // Attention: Change the duration.
+        ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY = AwaitTimeTests.AWAIT_DURATION;
+        
         CConsumerJava cConsumerJava = new CConsumerJava();
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         Logger logger = mock(Logger.class);
@@ -146,18 +158,47 @@ public class ConsumerJavaTest {
         consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
 
         // pre-assert, assert the keys queue is not empty
-        assertThat(consumerJava.waitTillKeysQueueEmpty(Duration.ofMillis(1L)), is(equalTo(Boolean.FALSE)));
+        assertThat(consumerJava.awaitKeysQueueEmpty(Duration.ofMillis(1L)), is(equalTo(Boolean.FALSE)));
+        assertThat(consumerJava.shouldRun.get(), is(equalTo(Boolean.TRUE)));
         
         // act
         long beforeAct = System.currentTimeMillis();
+        // the consume is not running and the interrupt must wait and release nevertheless
         consumerJava.interrupt();
         
         // assert
+        assertThat(consumerJava.shouldRun.get(), is(equalTo(Boolean.FALSE)));
+        
         long afterAct = System.currentTimeMillis();
         Duration waitTime = Duration.ofMillis(afterAct-beforeAct);
         
-        // assert the minimum waiting time is over, substract a few seconds, its not precise
-        assertThat(waitTime, is(greaterThan(ConsumerJava.DURATION_WAIT_QUEUE_EMPTY.minus(Duration.ofSeconds(2)))));
+        // assert the waiting time is over, substract imprecision
+        assertThat(waitTime, is(greaterThan(ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY.minus(AwaitTimeTests.IMPRECISION))));
+    }
+    
+
+    @Test
+    public void interrupt_statisticsTimerStarted_executerServiceShutdown() throws IOException, InterruptedException {
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.printStatisticsEveryNSeconds = 1;
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        Logger logger = mock(Logger.class);
+        consumerJava.setLogger(logger);
+        // pre-assert
+        assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(equalTo(Boolean.FALSE)));
+        
+        consumerJava.startStatisticsTimer();
+        // wait till the scheduled TimerTask is completed
+        Thread.sleep(Duration.ofSeconds(1L));
+        
+        // pre-assert
+        assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(equalTo(Boolean.FALSE)));
+
+        // act
+        consumerJava.interrupt();
+
+        // assert
+        assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(equalTo(Boolean.TRUE)));
     }
     
     @Test
@@ -171,7 +212,7 @@ public class ConsumerJavaTest {
         consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
 
         // act
-        boolean result = consumerJava.waitTillKeysQueueEmpty(Duration.ofMillis(1L));
+        boolean result = consumerJava.awaitKeysQueueEmpty(Duration.ofMillis(1L));
         
         // assert
         assertThat(result, is(equalTo(Boolean.FALSE)));
@@ -199,7 +240,7 @@ public class ConsumerJavaTest {
         consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
         
         // key is in queue
-        boolean waitBefore = consumerJava.waitTillKeysQueueEmpty(Duration.ofMillis(1L));
+        boolean waitBefore = consumerJava.awaitKeysQueueEmpty(Duration.ofMillis(1L));
         assertThat(waitBefore, is(equalTo(Boolean.FALSE)));
 
         AtomicBoolean result = new AtomicBoolean();
@@ -210,7 +251,7 @@ public class ConsumerJavaTest {
             waitStarted.set(true);
             try {
                 // act
-                result.set(consumerJava.waitTillKeysQueueEmpty(Duration.ofSeconds(2L)));
+                result.set(consumerJava.awaitKeysQueueEmpty(Duration.ofSeconds(2L)));
             } catch (InterruptedException ex) {
                 // same value as before
                 result.set(false);
@@ -261,7 +302,7 @@ public class ConsumerJavaTest {
         
         CProducerJava cProducerJava = new CProducerJava();
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, randomForProducer);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, mockSecretFactory);
 
         Logger logger = mock(Logger.class);
         consumerJava.setLogger(logger);
@@ -321,7 +362,7 @@ public class ConsumerJavaTest {
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.gridNumBits = 0;
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, randomForProducer);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, mockSecretFactory);
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);

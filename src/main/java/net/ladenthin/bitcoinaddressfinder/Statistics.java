@@ -20,6 +20,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 public class Statistics {
     
+    @Deprecated
     public static final int ONE_SECOND_IN_MILLISECONDS = 1000;
     
     String createStatisticsMessage(long uptime, long keys, long keysSumOfTimeToCheckContains, long emptyConsumer, long keysQueueSize, long hits) {

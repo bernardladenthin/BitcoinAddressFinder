@@ -25,8 +25,8 @@ public class ProducerJava extends AbstractProducer {
 
     protected final CProducerJava producerJava;
 
-    public ProducerJava(CProducerJava producerJava, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback) {
-        super(producerJava, consumer, keyUtility, secretFactory, producerCompletionCallback);
+    public ProducerJava(CProducerJava producerJava, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory) {
+        super(producerJava, consumer, keyUtility, secretFactory);
         this.producerJava = producerJava;
     }
 

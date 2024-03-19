@@ -37,18 +37,16 @@ public abstract class AbstractProducer implements Producer {
     protected final Consumer consumer;
     protected final KeyUtility keyUtility;
     protected final SecretFactory secretFactory;
-    protected final ProducerCompletionCallback producerCompletionCallback;
     
     protected volatile ProducerState state = ProducerState.UNINITIALIZED;
     
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
-    public AbstractProducer(CProducer cProducer, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback) {
+    public AbstractProducer(CProducer cProducer, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory) {
         this.cProducer = cProducer;
         this.consumer = consumer;
         this.keyUtility = keyUtility;
         this.secretFactory = secretFactory;
-        this.producerCompletionCallback = producerCompletionCallback;
     }
 
     @Override
@@ -70,7 +68,6 @@ public abstract class AbstractProducer implements Producer {
             }
         }
         state = ProducerState.NOT_RUNNING;
-        producerCompletionCallback.producerFinished();
     }
     
     @Override

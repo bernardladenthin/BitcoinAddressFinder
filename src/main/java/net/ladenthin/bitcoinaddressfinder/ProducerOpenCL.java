@@ -36,8 +36,8 @@ public class ProducerOpenCL extends AbstractProducer {
     @Nullable
     OpenCLContext openCLContext;
 
-    public ProducerOpenCL(CProducerOpenCL producerOpenCL, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory, ProducerCompletionCallback producerCompletionCallback) {
-        super(producerOpenCL, consumer, keyUtility, secretFactory, producerCompletionCallback);
+    public ProducerOpenCL(CProducerOpenCL producerOpenCL, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory) {
+        super(producerOpenCL, consumer, keyUtility, secretFactory);
         this.producerOpenCL = producerOpenCL;
         this.resultReaderThreadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads);
     }

@@ -36,7 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 // VM option: -Dorg.slf4j.simpleLogger.defaultLogLevel=trace
-public class Main implements Runnable, Shutdown {
+public class Main implements Runnable, Interruptable {
 
     private final static Logger logger = LoggerFactory.getLogger(Main.class);
 
@@ -79,13 +79,13 @@ public class Main implements Runnable, Shutdown {
         
         switch (configuration.command) {
             case Find:
-                Finder finder = new Finder(configuration.finder, this);
+                Finder finder = new Finder(configuration.finder);
                 interruptables.add(finder);
                 finder.startConsumer();
                 finder.configureProducer();
                 finder.initProducer();
                 finder.startProducer();
-                finder.awaitTermination();
+                finder.shutdownAndAwaitTermination();
                 break;
             case LMDBToAddressFile:
                 LMDBToAddressFile lmdbToAddressFile = new LMDBToAddressFile(configuration.lmdbToAddressFile);
@@ -105,17 +105,16 @@ public class Main implements Runnable, Shutdown {
             default:
                 throw new UnsupportedOperationException("Command: " + configuration.command.name() + " currently not supported." );
         }
-        
     }
     
     private void addSchutdownHook() {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            shutdown();
+            interrupt();
         }));
     }
     
     @Override
-    public void shutdown() {
+    public void interrupt() {
         for (Interruptable interruptable : interruptables) {
             interruptable.interrupt();
         }

@@ -52,7 +52,7 @@ public class ProducerJavaTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory);
 
         // act
         producerJava.produceKeys();
@@ -74,7 +74,7 @@ public class ProducerJavaTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory);
 
         // act
         producerJava.produceKeys();
@@ -108,7 +108,7 @@ public class ProducerJavaTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(0);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory);
 
         // act
         producerJava.produceKeys();
@@ -126,7 +126,7 @@ public class ProducerJavaTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(2);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory, new MockProducerCompletionCallback());
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory);
 
         // act
         producerJava.produceKeys();
