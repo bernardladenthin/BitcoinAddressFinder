@@ -21,17 +21,19 @@ package net.ladenthin.bitcoinaddressfinder.cli;
 import com.google.gson.Gson;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.Finder;
 import net.ladenthin.bitcoinaddressfinder.Interruptable;
 import net.ladenthin.bitcoinaddressfinder.LMDBToAddressFile;
-import net.ladenthin.bitcoinaddressfinder.Shutdown;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
-import net.ladenthin.javacommons.StreamHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,9 +50,10 @@ public class Main implements Runnable, Interruptable {
         this.configuration = configuration;
     }
     
-    public static Main createFromConfigurationFile(File configFile) {
+    public static Main createFromConfigurationFile(Path path) {
         try {
-            return createFromConfigurationString(new StreamHelper().readFullyAsUTF8String(configFile));
+            String content = Files.readString(path, Charset.defaultCharset());
+            return createFromConfigurationString(content);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -67,7 +70,7 @@ public class Main implements Runnable, Interruptable {
             logger.error("Invalid arguments. Pass path to configuration as first argument.");
             return;
         }
-        Main main = createFromConfigurationFile(new File(args[0]));
+        Main main = createFromConfigurationFile(Path.of(args[0]));
         main.run();
     }
 
@@ -105,6 +108,7 @@ public class Main implements Runnable, Interruptable {
             default:
                 throw new UnsupportedOperationException("Command: " + configuration.command.name() + " currently not supported." );
         }
+        logger.info("Main#run end.");
     }
     
     private void addSchutdownHook() {

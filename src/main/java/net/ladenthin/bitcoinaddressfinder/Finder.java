@@ -151,6 +151,7 @@ public class Finder implements Interruptable, SecretFactory {
         for (Producer producer : getAllProducers()) {
             logger.info("Interrupt: " + producer);
             producer.interrupt();
+            logger.info("waitTillProducerNotRunning ...");
             producer.waitTillProducerNotRunning();
             producer.releaseProducer();
         }
