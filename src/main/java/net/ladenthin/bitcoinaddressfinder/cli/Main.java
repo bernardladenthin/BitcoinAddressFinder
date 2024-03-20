@@ -18,15 +18,15 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.cli;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.gson.Gson;
-import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.Finder;
 import net.ladenthin.bitcoinaddressfinder.Interruptable;
@@ -40,7 +40,8 @@ import org.slf4j.LoggerFactory;
 // VM option: -Dorg.slf4j.simpleLogger.defaultLogLevel=trace
 public class Main implements Runnable, Interruptable {
 
-    private final static Logger logger = LoggerFactory.getLogger(Main.class);
+    @VisibleForTesting
+    public static Logger logger = LoggerFactory.getLogger(Main.class);
 
     private final List<Interruptable> interruptables = new ArrayList<>();
 
@@ -109,6 +110,23 @@ public class Main implements Runnable, Interruptable {
                 throw new UnsupportedOperationException("Command: " + configuration.command.name() + " currently not supported." );
         }
         logger.info("Main#run end.");
+        
+        if(false) {
+            try {
+                Thread.sleep(2000L);
+            } catch (InterruptedException ex) {
+
+            }
+            Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
+            for (Thread thread : threadSet) {
+                System.out.println("##################################################");
+                System.out.println("#thread: " + thread);
+                StackTraceElement[] stackTrace = thread.getStackTrace();
+                for (StackTraceElement stackTraceElement : stackTrace) {
+                    System.out.println(stackTraceElement);
+                }
+            }
+        }
     }
     
     private void addSchutdownHook() {

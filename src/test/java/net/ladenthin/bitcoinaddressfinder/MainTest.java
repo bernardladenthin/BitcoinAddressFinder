@@ -24,7 +24,17 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.cli.Main;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
+import org.mockito.ArgumentCaptor;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import org.slf4j.Logger;
 
 public class MainTest {
 
@@ -62,6 +72,25 @@ public class MainTest {
         // arrange
         Main mainFind_SecretsFile = Main.createFromConfigurationFile(config_OpenCLInfo_js);
         mainFind_SecretsFile.run();
+    }
+    // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="invalidArgument">
+    @Test
+    public void main_noArgumentGiven_errorLogged() throws IOException, InterruptedException {
+        // arrange
+        Logger logger = mock(Logger.class);
+        when(logger.isTraceEnabled()).thenReturn(true);
+        Main.logger = logger;
+        
+        // act
+        Main.main(new String[0]);
+        
+        // assert
+        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
+        List<String> arguments = logCaptor.getAllValues();
+        verify(logger, times(1)).error(logCaptor.capture());
+        assertThat(arguments.get(0), is(equalTo("Invalid arguments. Pass path to configuration as first argument.")));
     }
     // </editor-fold>
 }
