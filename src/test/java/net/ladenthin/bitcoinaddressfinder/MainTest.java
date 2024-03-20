@@ -68,7 +68,9 @@ public class MainTest {
     
     // <editor-fold defaultstate="collapsed" desc="testRoundtrip">
     @Test
+    @OpenCLTest
     public void testOpenCLInfo_configurationGiven_noExceptionThrown() throws IOException, InterruptedException {
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // arrange
         Main mainFind_SecretsFile = Main.createFromConfigurationFile(config_OpenCLInfo_js);
         mainFind_SecretsFile.run();
