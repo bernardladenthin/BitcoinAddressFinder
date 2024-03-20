@@ -42,14 +42,44 @@ public class ProducerOpenCLTest {
 
     protected final NetworkParameters networkParameters = MainNetParams.get();
     protected final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
+    
 
     // <editor-fold defaultstate="collapsed" desc="initProducer">
     @OpenCLTest
     @Test
-    public void initProducer_XYZ_openCLContextSet() throws IOException, InterruptedException {
+    public void initProducer_configurationGiven_stateInitializedAndLogged() throws IOException, InterruptedException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        MockConsumer mockConsumer = new MockConsumer();
+        Random random = new Random(1);
+        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory);
 
+        AbstractProducerTest.verifyInitProducer(producerOpenCL);
+    }
+    // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="releaseProducer">
+    @OpenCLTest
+    @Test
+    public void releaseProducer_configurationGiven_stateInitializedAndLogged() throws IOException, InterruptedException {
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        MockConsumer mockConsumer = new MockConsumer();
+        Random random = new Random(1);
+        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory);
+
+        AbstractProducerTest.verifyReleaseProducer(producerOpenCL);
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="initProducer">
+    @OpenCLTest
+    @Test
+    public void initProducer_configurationGiven_stateInitializedAndOpenCLContextSet() throws IOException, InterruptedException {
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
@@ -57,12 +87,14 @@ public class ProducerOpenCLTest {
 
         // pre-assert
         assertThat(producerOpenCL.openCLContext, nullValue());
+        assertThat(producerOpenCL.state, is(equalTo(ProducerState.UNINITIALIZED)));
         
         // act
         producerOpenCL.initProducer();
 
         // assert
         assertThat(producerOpenCL.openCLContext, notNullValue());
+        assertThat(producerOpenCL.state, is(equalTo(ProducerState.INITIALIZED)));
     }
     // </editor-fold>
 
@@ -104,7 +136,7 @@ public class ProducerOpenCLTest {
     }
     // </editor-fold>
     
-    // <editor-fold defaultstate="collapsed" desc="releaseProducers">
+    // <editor-fold defaultstate="collapsed" desc="getFreeThreads">
     @Test
     public void getFreeThreads_notInitialized_numberOfFreeThreadsReturned() throws IOException, InterruptedException {
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();

@@ -93,7 +93,34 @@ public class ProducerJavaSecretsFilesTest {
             return ECKey.fromPrivate(getBigInteger(), false).getPrivateKeyAsHex();
         }
     }
+
+    // <editor-fold defaultstate="collapsed" desc="initProducer">
+    @Test
+    public void initProducer_configurationGiven_stateInitializedAndLogged() throws IOException, InterruptedException {
+        CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
+        MockConsumer mockConsumer = new MockConsumer();
+        Random random = new Random(1);
+        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
+        ProducerJava producerJava = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockSecretFactory);
+
+        AbstractProducerTest.verifyInitProducer(producerJava);
+    }
+    // </editor-fold>
     
+    // <editor-fold defaultstate="collapsed" desc="releaseProducer">
+    @Test
+    public void releaseProducer_configurationGiven_stateInitializedAndLogged() throws IOException, InterruptedException {
+        CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
+        MockConsumer mockConsumer = new MockConsumer();
+        Random random = new Random(1);
+        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
+        ProducerJava producerJava = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockSecretFactory);
+
+        AbstractProducerTest.verifyReleaseProducer(producerJava);
+    }
+    // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="produceKeys">
     @Test
     public void produceKeys_noFileConfigured_noKeysCreated() throws IOException, InterruptedException {
         CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
@@ -145,6 +172,7 @@ public class ProducerJavaSecretsFilesTest {
         assertThat(mockConsumer.publicKeyBytesArrayList.get(4)[0], is(equalTo(PrivateKey.WITH_COMMENT.getPublicKeyBytes())));
         assertThat(mockConsumer.publicKeyBytesArrayList.get(5)[0], is(equalTo(PrivateKey.WITH_SPECIAL_CHARACTER.getPublicKeyBytes())));
     }
+    // </editor-fold>
     
     private List<File> createSecretsFiles(CSecretFormat secretFormat) throws IOException {
         List<File> fileList = new ArrayList<>();

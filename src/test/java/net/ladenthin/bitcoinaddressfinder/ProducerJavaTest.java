@@ -43,6 +43,33 @@ public class ProducerJavaTest {
     protected final NetworkParameters networkParameters = MainNetParams.get();
     protected final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
 
+    // <editor-fold defaultstate="collapsed" desc="initProducer">
+    @Test
+    public void initProducer_configurationGiven_stateInitializedAndLogged() throws IOException, InterruptedException {
+        CProducerJava cProducerJava = new CProducerJava();
+        MockConsumer mockConsumer = new MockConsumer();
+        Random random = new Random(1);
+        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory);
+
+        AbstractProducerTest.verifyInitProducer(producerJava);
+    }
+    // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="releaseProducer">
+    @Test
+    public void releaseProducer_configurationGiven_stateInitializedAndLogged() throws IOException, InterruptedException {
+        CProducerJava cProducerJava = new CProducerJava();
+        MockConsumer mockConsumer = new MockConsumer();
+        Random random = new Random(1);
+        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory);
+
+        AbstractProducerTest.verifyReleaseProducer(producerJava);
+    }
+    // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="produceKeys">
     @Test
     public void produceKeys_GridNumBitsEqualsKeyMaxNumBits_noExceptionThrown() throws IOException, InterruptedException {
         CProducerJava cProducerJava = new CProducerJava();
@@ -142,5 +169,6 @@ public class ProducerJavaTest {
         assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[6], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(62)))));
         assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[7], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(63)))));
     }
+    // </editor-fold>
 
 }

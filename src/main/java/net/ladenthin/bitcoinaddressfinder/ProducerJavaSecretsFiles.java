@@ -43,10 +43,6 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
         super(producerJavaSecretsFiles, consumer, keyUtility, secretFactory);
         this.producerJavaSecretsFiles = producerJavaSecretsFiles;
     }
-
-    @Override
-    public void initProducer() {
-    }
     
     @Override
     public void produceKeys() {
@@ -86,10 +82,6 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
     
     private void logProgress() {
         logger.info("Progress: Unsupported: " + readStatistic.unsupported + ". Errors: " + readStatistic.errors.size() + ". Current File progress: " + String.format("%.2f", readStatistic.currentFileProgress) + "%.");
-    }
-
-    @Override
-    public void releaseProducer() {
     }
 
     @Override

@@ -160,6 +160,7 @@ public class ConsumerJava implements Consumer {
             }
             try {
                 consumeKeys(threadLocalReuseableByteBuffer);
+                // the consumeKeys method is looped inside, if the method returns it means the queue is empty
                 emptyConsumer.incrementAndGet();
                 Thread.sleep(consumerJava.delayEmptyConsumer);
             } catch (InterruptedException e) {

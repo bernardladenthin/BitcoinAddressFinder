@@ -44,10 +44,10 @@ public class ProducerOpenCL extends AbstractProducer {
 
     @Override
     public void initProducer() {
+        super.initProducer();
         openCLContext = new OpenCLContext(producerOpenCL);
         try {
             openCLContext.init();
-            this.state = ProducerState.INITIALIZED;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -110,6 +110,7 @@ public class ProducerOpenCL extends AbstractProducer {
 
     @Override
     public void releaseProducer() {
+        super.releaseProducer();
         if (openCLContext != null) {
             openCLContext.release();
             openCLContext = null;

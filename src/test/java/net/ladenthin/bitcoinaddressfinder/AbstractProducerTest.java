@@ -50,11 +50,36 @@ public class AbstractProducerTest {
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
 
-    private ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
-
     protected final NetworkParameters networkParameters = MainNetParams.get();
     protected final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
 
+    // <editor-fold defaultstate="collapsed" desc="initProducer">
+    @Test
+    public void initProducer_configurationGiven_stateInitializedAndLogged() throws IOException, InterruptedException {
+        CProducer cProducer = new CProducer();
+        MockConsumer mockConsumer = new MockConsumer();
+        Random random = new Random(1);
+        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockSecretFactory);
+
+        verifyInitProducer(abstractProducerTestImpl);
+    }
+    // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="initProducer">
+    @Test
+    public void releaseProducer_configurationGiven_stateInitializedAndLogged() throws IOException, InterruptedException {
+        CProducer cProducer = new CProducer();
+        MockConsumer mockConsumer = new MockConsumer();
+        Random random = new Random(1);
+        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockSecretFactory);
+
+        verifyReleaseProducer(abstractProducerTestImpl);
+    }
+    // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="createSecretBase">
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_CREATE_SECRET_BASE_LOGGED, location = CommonDataProvider.class)
     public void createSecretBase_secretGiven_bitsKilledAndLogged(String givenSecret, int gridNumBits, String expectedSecretBase, String logInfo0, String logTrace0, String logTrace1, String logTrace2, String logTrace3, String logTrace4) throws IOException, InterruptedException, DecoderException {
@@ -81,6 +106,7 @@ public class AbstractProducerTest {
         // assert
         assertThat(Hex.encodeHexString(secretBase.toByteArray()), is(equalTo(expectedSecretBase)));
 
+        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
         List<String> arguments = logCaptor.getAllValues();
         // assert log secret base
         {
@@ -120,6 +146,7 @@ public class AbstractProducerTest {
         // act
         abstractProducerTestImpl.createSecretBase(secret, logSecretBase);
 
+        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
         // assert
         // assert log secret base
         {
@@ -153,6 +180,7 @@ public class AbstractProducerTest {
         // act
         abstractProducerTestImpl.createSecretBase(secret, logSecretBase);
 
+        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
         // assert
         // assert log secret base
         {
@@ -163,5 +191,50 @@ public class AbstractProducerTest {
             verify(logger, times(0)).trace(logCaptor.capture());
         }
     }
+    // </editor-fold>
 
+    public static void verifyReleaseProducer(AbstractProducer abstractProducer) {
+        Logger logger = mock(Logger.class);
+        when(logger.isTraceEnabled()).thenReturn(true);
+        abstractProducer.setLogger(logger);
+        
+        abstractProducer.initProducer();
+        
+        // act
+        abstractProducer.releaseProducer();
+
+        // assert
+        assertThat(abstractProducer.state, is(equalTo(ProducerState.INITIALIZED)));
+        
+        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
+        List<String> arguments = logCaptor.getAllValues();
+        // assert log initProducer
+        {
+            verify(logger, times(2)).info(logCaptor.capture());
+            assertThat(arguments.get(1), is(equalTo("Release producer.")));
+        }
+    }
+
+    public static void verifyInitProducer(AbstractProducer abstractProducer) {
+        Logger logger = mock(Logger.class);
+        when(logger.isTraceEnabled()).thenReturn(true);
+        abstractProducer.setLogger(logger);
+        
+        // pre-assert
+        assertThat(abstractProducer.state, is(equalTo(ProducerState.UNINITIALIZED)));
+        
+        // act
+        abstractProducer.initProducer();
+
+        // assert
+        assertThat(abstractProducer.state, is(equalTo(ProducerState.INITIALIZED)));
+        
+        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
+        List<String> arguments = logCaptor.getAllValues();
+        // assert log initProducer
+        {
+            verify(logger, times(1)).info(logCaptor.capture());
+            assertThat(arguments.get(0), is(equalTo("Init producer.")));
+        }
+    }
 }

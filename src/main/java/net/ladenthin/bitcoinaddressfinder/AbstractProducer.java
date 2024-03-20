@@ -51,11 +51,13 @@ public abstract class AbstractProducer implements Producer {
 
     @Override
     public void initProducer() {
+        logger.info("Init producer.");
         this.state = ProducerState.INITIALIZED;
     }
 
     @Override
     public void releaseProducer() {
+        logger.info("Release producer.");
     }
 
     @Override
