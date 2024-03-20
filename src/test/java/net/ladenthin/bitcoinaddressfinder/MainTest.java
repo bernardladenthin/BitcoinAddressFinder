@@ -30,18 +30,21 @@ public class MainTest {
 
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
+    
+    private final Path resourceDirectory = Path.of("src","test","resources");
+    private final Path testRoundtripDirectory = resourceDirectory.resolve("testRoundtrip");
+    private final Path testOpenCLInfoDirectory = resourceDirectory.resolve("testOpenCLInfo");
+    
+    private final Path config_AddressFilesToLMDB_js = testRoundtripDirectory.resolve("config_AddressFilesToLMDB.js");
+    private final Path config_LMDBToAddressFile_js = testRoundtripDirectory.resolve("config_LMDBToAddressFile.js");
+    private final Path config_Find_SecretsFile_js = testRoundtripDirectory.resolve("config_Find_SecretsFile.js");
+    
+    private final Path config_OpenCLInfo_js = testOpenCLInfoDirectory.resolve("config_OpenCLInfo.js");
 
     // <editor-fold defaultstate="collapsed" desc="testRoundtrip">
     @Test
     public void testRoundtrip_configurationsGiven_lmdbCreatedExportedAndRunFindSecretsFile() throws IOException, InterruptedException {
         // arrange
-        Path resourceDirectory = Path.of("src","test","resources");
-        Path testRoundtripDirectory = resourceDirectory.resolve("testRoundtrip");
-        
-        Path config_AddressFilesToLMDB_js = testRoundtripDirectory.resolve("config_AddressFilesToLMDB.js");
-        Path config_LMDBToAddressFile_js = testRoundtripDirectory.resolve("config_LMDBToAddressFile.js");
-        Path config_Find_SecretsFile_js = testRoundtripDirectory.resolve("config_Find_SecretsFile.js");
-        
         Main mainAddressFilesToLMDB = Main.createFromConfigurationFile(config_AddressFilesToLMDB_js);
         mainAddressFilesToLMDB.run();
         
@@ -50,6 +53,15 @@ public class MainTest {
         
         Main mainFind_SecretsFile = Main.createFromConfigurationFile(config_Find_SecretsFile_js);
         mainFind_SecretsFile.run();
-    // </editor-fold>
     }
+    // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="testRoundtrip">
+    @Test
+    public void testOpenCLInfo_configurationGiven_noExceptionThrown() throws IOException, InterruptedException {
+        // arrange
+        Main mainFind_SecretsFile = Main.createFromConfigurationFile(config_OpenCLInfo_js);
+        mainFind_SecretsFile.run();
+    }
+    // </editor-fold>
 }
