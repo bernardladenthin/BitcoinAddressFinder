@@ -34,6 +34,9 @@ public class AddressToCoin {
     private final Coin coin;
 
     public AddressToCoin(@Nonnull ByteBuffer hash160, @Nonnull Coin coin) {
+        if (hash160.limit() != PublicKeyBytes.HASH160_SIZE) {
+            throw new IllegalArgumentException("Given hash160 has not the correct size: " + hash160.limit());
+        }
         this.hash160 = hash160;
         this.coin = coin;
     }

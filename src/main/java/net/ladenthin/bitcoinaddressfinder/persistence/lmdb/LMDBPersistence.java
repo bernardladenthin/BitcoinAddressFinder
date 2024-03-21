@@ -206,6 +206,10 @@ public class LMDBPersistence implements Persistence {
                             return;
                         }
                         ByteBuffer addressAsByteBuffer = kv.key();
+                        if(logger.isTraceEnabled()) {
+                            String hexFromByteBuffer = new ByteBufferUtility(false).getHexFromByteBuffer(addressAsByteBuffer);
+                            logger.trace("Process address: " + hexFromByteBuffer);
+                        }
                         LegacyAddress address = keyUtility.byteBufferToAddress(addressAsByteBuffer);
                         final String line;
                         switch(addressFileOutputFormat) {

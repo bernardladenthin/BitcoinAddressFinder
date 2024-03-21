@@ -21,6 +21,7 @@ package net.ladenthin.bitcoinaddressfinder;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.ECKey;
@@ -53,6 +54,15 @@ public class AddressToCoinTest {
 
         assertThat(addressToCoinUncompressed.toString(), is(equalTo("AddressToCoin{hash160=73d6a3b07f488e12f9175716f95c5e18c265693f, coin=100000000}")));
         assertThat(addressToCoinCompressed.toString(), is(equalTo("AddressToCoin{hash160=6970dea35c48e1c78e931117fab833354cddf9b4, coin=100000000}")));
+    }
+    
+    @Test(expected = IllegalArgumentException.class)
+    public void createAddressToCoin_invalidAddressSizeGiven_ToStringAndEqualsAndHashCode() throws IOException, InterruptedException {
+        // arrange
+        ByteBuffer byteBuffer32bytes = keyUtility.byteBufferUtility.getByteBufferFromHex("0000000000000000000000000000000000000000000000000000000000000000");
+        // act
+        new AddressToCoin(byteBuffer32bytes, Coin.COIN);
+        // assert
     }
     
 }
