@@ -72,6 +72,10 @@ public enum StaticP2PKHAddress implements PublicAddress {
      */
     Litecoin("LQTpS3VaYTjCr4s9Y1t5zbeY26zevf7Fb3", "3977ea726e43b1db5c1f3ddd634d56ade26eb0a2"),
     /**
+     * https://chainz.cryptoid.info/lcc/address.dws?CdEK8wqqzg5ekA6hT9uwiv1TfPad9Wjx1z.htm
+     */
+    LitecoinCash("CdEK8wqqzg5ekA6hT9uwiv1TfPad9Wjx1z", "e3c953658a0c16ec171553fc923d7c2e11163d32"),
+    /**
      * https://bitinfocharts.com/de/namecoin/address/NAxZHe6yUCADnGAeCs4xrkgEKHjSFVrK5m
      */
     Namecoin("NAxZHe6yUCADnGAeCs4xrkgEKHjSFVrK5m", "9dc42a94d1852c6b42f93e8130d4a589bc3ffa1f"),

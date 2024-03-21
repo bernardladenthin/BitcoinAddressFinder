@@ -66,6 +66,7 @@ The importer read multiple txt/text files containing the following addresses in 
   * dogecoin
   * feathercoin
   * litecoin
+  * litecoin cash
   * namecoin
   * novacoin
   * reddcoin

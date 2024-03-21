@@ -26,7 +26,6 @@ import org.bitcoinj.core.AddressFormatException;
 import org.bitcoinj.core.Base58;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.SegwitAddress;
-import org.bitcoinj.script.Script;
 
 /**
  * Most txt files have a common format which uses Base58 address and separated
@@ -85,6 +84,10 @@ public class AddressTxtLine {
         } else if (address.startsWith("fc1")) {
             // feathercoin Bech32 (P2WSH or P2WPKH)
             // https://chainz.cryptoid.info/ftc/address.dws?fc1qvr9zesajsdw8aydcndd70wxj2wdgzu6zzltsph.htm
+            return null;
+        } else if (address.startsWith("lcc1")) {
+            // litecoin cash Bech32 (P2WSH or P2WPKH)
+            // https://chainz.cryptoid.info/lcc/address.dws?lcc1qrzlsxpjl0tynu3t2fkrw2ff2dgm0pv53ern0s5.htm
             return null;
         } else if (address.startsWith("ltc1")) {
             // litecoin Bech32 (P2WSH or P2WPKH)

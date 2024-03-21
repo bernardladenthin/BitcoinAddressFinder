@@ -56,6 +56,12 @@ public enum StaticUnsupportedAddress implements PublicAddress {
      */
     LitecoinP2WSH("ltc1qd5wm03t5kcdupjuyq5jffpuacnaqahvfsdu8smf8z0u0pqdqpatqsdrn8h"),
 
+    // litecoin Bech32 (P2WSH or P2WPKH)
+    /**
+     * https://chainz.cryptoid.info/lcc/address.dws?lcc1qrzlsxpjl0tynu3t2fkrw2ff2dgm0pv53ern0s5.htm
+     */
+    LitecoinCashP2WSH("lcc1qrzlsxpjl0tynu3t2fkrw2ff2dgm0pv53ern0s5"),
+
     // namecoin Bech32 (P2WSH or P2WPKH)
     /**
      * https://chainz.cryptoid.info/nmc/address.dws?nc1q2ml905jv7gx0d8z5f7kl23af0vtrjk4j0llmwr.htm
