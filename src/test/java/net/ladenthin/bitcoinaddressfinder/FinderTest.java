@@ -126,6 +126,9 @@ public class FinderTest {
         // Attention: Change the duration.
         Finder.AWAIT_DURATION_TERMINATE = AwaitTimeTests.AWAIT_DURATION;
         
+        // Attention: During the long duration, this test produce a lot of debug and warn output, prevent it by set the log details
+        new LogLevelChange().turnOff();
+        
         // arrange
         CFinder cFinder = new CFinder();
         final CProducerJava cProducerJava = new CProducerJava();
