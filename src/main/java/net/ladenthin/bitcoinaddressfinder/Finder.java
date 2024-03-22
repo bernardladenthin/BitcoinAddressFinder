@@ -82,6 +82,7 @@ public class Finder implements Interruptable, SecretFactory {
     }
 
     public void startConsumer() {
+        logger.info("startConsumer");
         if (finder.consumerJava != null) {
             consumerJava = new ConsumerJava(finder.consumerJava, keyUtility, persistenceUtils);
             consumerJava.initLMDB();
@@ -91,6 +92,7 @@ public class Finder implements Interruptable, SecretFactory {
     }
 
     public void configureProducer() {
+        logger.info("configureProducer");
         if (finder.producerJava != null) {
             for (CProducerJava cProducerJava : finder.producerJava) {
                 cProducerJava.assertGridNumBitsCorrect();
@@ -117,18 +119,21 @@ public class Finder implements Interruptable, SecretFactory {
     }
     
     public void initProducer() {
+        logger.info("initProducer");
         for (Producer producer : getAllProducers()) {
             producer.initProducer();
         }
     }
     
     public void startProducer() {
+        logger.info("startProducer");
         for (Producer producer : getAllProducers()) {
             producerExecutorService.submit(producer);
         }
     }
     
     public void shutdownAndAwaitTermination() {
+        logger.info("shutdownAndAwaitTermination");
         try {
             producerExecutorService.shutdown();
             producerExecutorService.awaitTermination(AWAIT_DURATION_TERMINATE.get(ChronoUnit.SECONDS), TimeUnit.SECONDS);
