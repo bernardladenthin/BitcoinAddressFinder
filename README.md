@@ -182,6 +182,7 @@ Nvidia GTX 1050 Ti Mobile | 256 | 16 | 550 k keys /s
 It's impossible to find collisions, isn't it? 
 Please find the answear for vulnerability questions somewhere else:
 * https://crypto.stackexchange.com/questions/33821/how-to-deal-with-collisions-in-bitcoin-addresses
+* https://crypto.stackexchange.com/questions/47809/why-havent-any-sha-256-collisions-been-found-yet
 * https://github.com/treyyoder/bitcoin-wallet-finder#results
 * https://github.com/Frankenmint/PKGenerator_Checker#instructions
 * https://github.com/Xefrok/BitBruteForce-Wallet#requeriments
@@ -240,6 +241,8 @@ Wished from Ulugbek:
 ```
 
 - Incomplete Seed-Phrase as Private Key provider. Wished from @mirasu See #38
+- Socket key provider for independend key provider via byte protocol
+  - Ideas might be a screen recorder and use the visible screen downscaled as 256 bit input
 
 -----
 ## Legal
