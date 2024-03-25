@@ -79,7 +79,7 @@ public class MainTest {
         Main mainAddressFilesToLMDB = Main.createFromConfigurationFile(config_AddressFilesToLMDB_js);
         mainAddressFilesToLMDB.run();
         
-        new LogLevelChange().setLevel(Level.INFO);
+        new LogLevelChange().setLevel(Level.DEBUG);
         
         Main mainFind_1OpenCLDevice = Main.createFromConfigurationFile(config_Find_1OpenCLDevice_js);
         mainFind_1OpenCLDevice.run();

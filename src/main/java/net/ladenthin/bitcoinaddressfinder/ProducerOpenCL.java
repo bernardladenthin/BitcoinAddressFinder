@@ -60,6 +60,9 @@ public class ProducerOpenCL extends AbstractProducer {
         }
         try {
             waitTillFreeThreadsInPool();
+            if(getLogger().isDebugEnabled()) {
+                getLogger().debug("openCLContext.createKeys for secretBase: " + secretBase);
+            }
             OpenCLGridResult openCLGridResult = openCLContext.createKeys(secretBase);
             ResultReaderRunnable resultReaderRunnable = new ResultReaderRunnable(openCLGridResult, consumer, secretBase, this);
 

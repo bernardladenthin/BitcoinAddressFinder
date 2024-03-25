@@ -301,17 +301,17 @@ public class ConsumerJava implements Consumer {
 
     private boolean containsAddress(ByteBuffer hash160AsByteBuffer) {
         long timeBefore = System.currentTimeMillis();
-        if (logger.isDebugEnabled()) {
-            logger.debug("Time before persistence.containsAddress: " + timeBefore);
+        if (logger.isTraceEnabled()) {
+            logger.trace("Time before persistence.containsAddress: " + timeBefore);
         }
         boolean containsAddress = persistence.containsAddress(hash160AsByteBuffer);
         long timeAfter = System.currentTimeMillis();
         long timeDelta = timeAfter - timeBefore;
         checkedKeys.incrementAndGet();
         checkedKeysSumOfTimeToCheckContains.addAndGet(timeDelta);
-        if (logger.isDebugEnabled()) {
-            logger.debug("Time after persistence.containsAddress: " + timeAfter);
-            logger.debug("Time delta: " + timeDelta);
+        if (logger.isTraceEnabled()) {
+            logger.trace("Time after persistence.containsAddress: " + timeAfter);
+            logger.trace("Time delta: " + timeDelta);
         }
         return containsAddress;
     }
