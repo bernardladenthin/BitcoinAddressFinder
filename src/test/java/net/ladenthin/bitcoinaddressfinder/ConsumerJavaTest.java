@@ -191,12 +191,14 @@ public class ConsumerJavaTest {
         
         // pre-assert
         assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(equalTo(Boolean.FALSE)));
+        assertThat(consumerJava.consumeKeysExecutorService.isShutdown(), is(equalTo(Boolean.FALSE)));
 
         // act
         consumerJava.interrupt();
 
         // assert
         assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(equalTo(Boolean.TRUE)));
+        assertThat(consumerJava.consumeKeysExecutorService.isShutdown(), is(equalTo(Boolean.TRUE)));
     }
     
     @Test

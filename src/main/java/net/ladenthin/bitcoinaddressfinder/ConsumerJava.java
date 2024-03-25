@@ -89,6 +89,9 @@ public class ConsumerJava implements Consumer {
     
     @VisibleForTesting
     final AtomicBoolean shouldRun = new AtomicBoolean(true);
+    
+    @VisibleForTesting
+    final ExecutorService consumeKeysExecutorService;
 
     protected ConsumerJava(CConsumerJava consumerJava, KeyUtility keyUtility, PersistenceUtils persistenceUtils) {
         this.consumerJava = consumerJava;
@@ -100,6 +103,7 @@ public class ConsumerJava implements Consumer {
         } else {
             vanityPattern = null;
         }
+        consumeKeysExecutorService = Executors.newFixedThreadPool(consumerJava.threads);
     }
 
     Logger getLogger() {
@@ -136,9 +140,8 @@ public class ConsumerJava implements Consumer {
 
     @Override
     public void startConsumer() {
-        ExecutorService executor = Executors.newFixedThreadPool(consumerJava.threads);
         for (int i = 0; i < consumerJava.threads; i++) {
-            consumers.add(executor.submit(
+            consumers.add(consumeKeysExecutorService.submit(
                     () -> {
                         consumeKeysRunner();
                         return null;
@@ -325,6 +328,7 @@ public class ConsumerJava implements Consumer {
      * Returns if the consume was finished or.
      * @return {@code true} if the keys queue is empty, otherwise {@code false}.
      */
+    @Deprecated
     public boolean awaitKeysQueueEmpty(Duration maxWait) throws InterruptedException {
         final long startTime = System.currentTimeMillis();
         do {
@@ -346,5 +350,6 @@ public class ConsumerJava implements Consumer {
         }
         shouldRun.set(false);
         scheduledExecutorService.shutdown();
+        consumeKeysExecutorService.shutdown();
     }
 }
