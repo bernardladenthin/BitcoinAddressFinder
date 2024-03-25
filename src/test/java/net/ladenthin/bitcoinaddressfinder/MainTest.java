@@ -18,6 +18,7 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import ch.qos.logback.classic.Level;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -49,6 +50,8 @@ public class MainTest {
     private final Path config_LMDBToAddressFile_js = testRoundtripDirectory.resolve("config_LMDBToAddressFile.js");
     private final Path config_Find_SecretsFile_js = testRoundtripDirectory.resolve("config_Find_SecretsFile.js");
     
+    private final Path config_Find_1OpenCLDevice_js = testRoundtripDirectory.resolve("config_Find_1OpenCLDevice.js");
+    
     private final Path config_OpenCLInfo_js = testOpenCLInfoDirectory.resolve("config_OpenCLInfo.js");
 
     // <editor-fold defaultstate="collapsed" desc="testRoundtrip">
@@ -63,6 +66,23 @@ public class MainTest {
         
         Main mainFind_SecretsFile = Main.createFromConfigurationFile(config_Find_SecretsFile_js);
         mainFind_SecretsFile.run();
+    }
+    // </editor-fold>
+    
+    
+    // <editor-fold defaultstate="collapsed" desc="testRoundtrip OpenCL producer">
+    @Test
+    @OpenCLTest
+    public void testRoundtripOpenCLProducer_configurationsGiven_lmdbCreatedAndRunFindOpenCLDevice() throws IOException, InterruptedException {
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        // arrange
+        Main mainAddressFilesToLMDB = Main.createFromConfigurationFile(config_AddressFilesToLMDB_js);
+        mainAddressFilesToLMDB.run();
+        
+        new LogLevelChange().setLevel(Level.INFO);
+        
+        Main mainFind_1OpenCLDevice = Main.createFromConfigurationFile(config_Find_1OpenCLDevice_js);
+        mainFind_1OpenCLDevice.run();
     }
     // </editor-fold>
     

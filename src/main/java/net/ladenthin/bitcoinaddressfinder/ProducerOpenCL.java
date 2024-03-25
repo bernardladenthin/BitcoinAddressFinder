@@ -111,6 +111,7 @@ public class ProducerOpenCL extends AbstractProducer {
     @Override
     public void releaseProducer() {
         super.releaseProducer();
+        resultReaderThreadPoolExecutor.shutdown();
         if (openCLContext != null) {
             openCLContext.release();
             openCLContext = null;

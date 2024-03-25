@@ -62,7 +62,7 @@ public class ProducerOpenCLTest {
     // <editor-fold defaultstate="collapsed" desc="releaseProducer">
     @OpenCLTest
     @Test
-    public void releaseProducer_configurationGiven_stateInitializedAndLogged() throws IOException, InterruptedException {
+    public void releaseProducer_configurationGiven_stateInitializedAndLoggedAndExecuterServiceShutdown() throws IOException, InterruptedException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         MockConsumer mockConsumer = new MockConsumer();
@@ -71,6 +71,7 @@ public class ProducerOpenCLTest {
         ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory);
 
         AbstractProducerTest.verifyReleaseProducer(producerOpenCL);
+        assertThat(producerOpenCL.resultReaderThreadPoolExecutor.isShutdown(), is(equalTo(Boolean.TRUE)));
     }
     // </editor-fold>
 

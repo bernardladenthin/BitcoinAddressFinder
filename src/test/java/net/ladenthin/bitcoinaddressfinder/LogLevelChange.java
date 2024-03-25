@@ -27,4 +27,8 @@ public class LogLevelChange {
         final Logger logger = (Logger)LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
         logger.setLevel(Level.OFF);
     }
+    public void setLevel(Level newLevel) {
+        final Logger logger = (Logger)LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+        logger.setLevel(newLevel);
+    }
 }
