@@ -31,9 +31,6 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.List;
 import java.util.Random;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
@@ -60,6 +57,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.mockito.internal.matchers.StartsWith;
 import org.slf4j.Logger;
 
 @RunWith(DataProviderRunner.class)
@@ -374,7 +372,7 @@ public class ConsumerJavaTest {
         // assert
         assertThat(consumerJava.hits.get(), is(equalTo(0L)));
         assertThat(consumerJava.vanityHits.get(), is(equalTo(0L)));
-        verify(logger, times(2)).trace(logCaptor.capture());
+        verify(logger, times(8)).trace(logCaptor.capture());
 
         List<String> arguments = logCaptor.getAllValues();
 
@@ -383,8 +381,14 @@ public class ConsumerJavaTest {
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), new ByteBufferUtility(false));
         String missMessageUncompressed = ConsumerJava.MISS_PREFIX + keyUtility.createKeyDetails(unknownKeyUncompressed);
         String missMessageCompressed = ConsumerJava.MISS_PREFIX + keyUtility.createKeyDetails(unknownKeyCompressed);
-        assertThat(arguments.get(0), is(equalTo(missMessageUncompressed)));
-        assertThat(arguments.get(1), is(equalTo(missMessageCompressed)));
+        assertThat(arguments.get(0).startsWith("Time before persistence.containsAddress: "), is(equalTo(Boolean.TRUE)));
+        assertThat(arguments.get(1).startsWith("Time after persistence.containsAddress: "), is(equalTo(Boolean.TRUE)));
+        assertThat(arguments.get(2).startsWith("Time delta: "), is(equalTo(Boolean.TRUE)));
+        assertThat(arguments.get(3).startsWith("Time before persistence.containsAddress: "), is(equalTo(Boolean.TRUE)));
+        assertThat(arguments.get(4).startsWith("Time after persistence.containsAddress: "), is(equalTo(Boolean.TRUE)));
+        assertThat(arguments.get(5).startsWith("Time delta: "), is(equalTo(Boolean.TRUE)));
+        assertThat(arguments.get(6), is(equalTo(missMessageUncompressed)));
+        assertThat(arguments.get(7), is(equalTo(missMessageCompressed)));
     }
 
     @Test

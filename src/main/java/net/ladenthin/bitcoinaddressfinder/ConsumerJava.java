@@ -150,7 +150,7 @@ public class ConsumerJava implements Consumer {
      * This method runs in multiple threads.
      */
     private void consumeKeysRunner() {
-        logger.trace("Start consumeKeysRunner.");
+        logger.debug("Start consumeKeysRunner.");
         
         ByteBuffer threadLocalReuseableByteBuffer = ByteBuffer.allocateDirect(PublicKeyBytes.HASH160_SIZE);
         
