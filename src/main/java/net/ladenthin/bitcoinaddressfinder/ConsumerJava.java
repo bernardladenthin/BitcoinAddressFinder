@@ -21,6 +21,7 @@ package net.ladenthin.bitcoinaddressfinder;
 import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -324,32 +325,20 @@ public class ConsumerJava implements Consumer {
         keysQueue.put(publicKeyBytes);
     }
     
-    /**
-     * Returns if the consume was finished or.
-     * @return {@code true} if the keys queue is empty, otherwise {@code false}.
-     */
-    @Deprecated
-    public boolean awaitKeysQueueEmpty(Duration maxWait) throws InterruptedException {
-        final long startTime = System.currentTimeMillis();
-        do {
-            if (keysQueue.isEmpty()) {
-                return true;
-            }
-            Thread.sleep(DURATION_CYCLIC_CHECK_KEYS_QUEUE_EMPTY);
-        } while (maxWait.minusMillis(System.currentTimeMillis() - startTime).isPositive());
-        return false;
-    }
-
     @Override
     public void interrupt() {
-        try {
-            // the result does not matter, just try to wait some seconds to empty the queue
-            awaitKeysQueueEmpty(AWAIT_DURATION_QUEUE_EMPTY);
-        } catch (InterruptedException ex) {
-            // do nothing, it is no problem
-        }
         shouldRun.set(false);
         scheduledExecutorService.shutdown();
         consumeKeysExecutorService.shutdown();
+        try {
+            consumeKeysExecutorService.awaitTermination(AWAIT_DURATION_QUEUE_EMPTY.get(ChronoUnit.SECONDS), TimeUnit.SECONDS);
+        } catch (InterruptedException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+    
+    @VisibleForTesting
+    int keysQueueSize() {
+        return keysQueue.size();
     }
 }

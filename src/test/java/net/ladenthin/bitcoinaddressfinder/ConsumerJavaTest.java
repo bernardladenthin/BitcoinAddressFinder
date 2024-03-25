@@ -31,7 +31,6 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
@@ -57,7 +56,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import org.mockito.internal.matchers.StartsWith;
 import org.slf4j.Logger;
 
 @RunWith(DataProviderRunner.class)
@@ -125,25 +123,11 @@ public class ConsumerJavaTest {
         consumerJava.startStatisticsTimer();
     }
     
-    @Test
-    public void waitTillKeysQueueEmpty_noKeysAdded_resultIsTrue() throws IOException, InterruptedException {
-        CConsumerJava cConsumerJava = new CConsumerJava();
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
-        Logger logger = mock(Logger.class);
-        consumerJava.setLogger(logger);
-
-        // act
-        boolean result = consumerJava.awaitKeysQueueEmpty(Duration.ofSeconds(1L));
-        
-        // assert
-        assertThat(result, is(equalTo(Boolean.TRUE)));
-    }
-    
     /**
      * Attention, this is an await time test. This tests changes  {@link ConsumerJava#AWAIT_DURATION_QUEUE_EMPTY}.
      */
     @Test
-    public void interrupt_keysQueueNotEmpty_consumeNotRunningWaitedInternallyForTheDuration() throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
+    public void interrupt_keysQueueNotEmpty_consumerNotRunningWaitedInternallyForTheDuration() throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
         // Attention: Change the duration.
         ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY = AwaitTimeTests.AWAIT_DURATION;
         
@@ -156,9 +140,17 @@ public class ConsumerJavaTest {
         consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
 
         // pre-assert, assert the keys queue is not empty
-        assertThat(consumerJava.awaitKeysQueueEmpty(Duration.ofMillis(1L)), is(equalTo(Boolean.FALSE)));
+        assertThat(consumerJava.keysQueueSize(), is(equalTo(1)));
         assertThat(consumerJava.shouldRun.get(), is(equalTo(Boolean.TRUE)));
         
+        // add a pseudo thread to the executor to test its eecution duration
+        consumerJava.consumeKeysExecutorService.submit(() -> {
+            try {
+                Thread.sleep(ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY);
+            } catch (InterruptedException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
         // act
         long beforeAct = System.currentTimeMillis();
         // the consume is not running and the interrupt must wait and release nevertheless
@@ -201,87 +193,6 @@ public class ConsumerJavaTest {
         assertThat(consumerJava.consumeKeysExecutorService.isShutdown(), is(equalTo(Boolean.TRUE)));
     }
     
-    @Test
-    public void waitTillKeysQueueEmpty_keysAdded_resultIsFalse() throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
-        CConsumerJava cConsumerJava = new CConsumerJava();
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
-        Logger logger = mock(Logger.class);
-        consumerJava.setLogger(logger);
-        
-        // add keys
-        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
-
-        // act
-        boolean result = consumerJava.awaitKeysQueueEmpty(Duration.ofMillis(1L));
-        
-        // assert
-        assertThat(result, is(equalTo(Boolean.FALSE)));
-    }
-    
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
-    public void waitTillKeysQueueEmpty_keysAddedDuringWait_resultIsTrue(boolean compressed, boolean useStaticAmount) throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
-        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
-
-        TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
-        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, useStaticAmount, false);
-        
-        CConsumerJava cConsumerJava = new CConsumerJava();
-        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
-        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
-        
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
-        consumerJava.initLMDB();
-        
-        Logger logger = mock(Logger.class);
-        consumerJava.setLogger(logger);
-        
-        // add keys
-        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
-        
-        // key is in queue
-        boolean waitBefore = consumerJava.awaitKeysQueueEmpty(Duration.ofMillis(1L));
-        assertThat(waitBefore, is(equalTo(Boolean.FALSE)));
-
-        AtomicBoolean result = new AtomicBoolean();
-        
-        AtomicBoolean waitStarted = new AtomicBoolean(false);
-        
-        Thread threadWaitQueueEmpty = Thread.startVirtualThread( () -> {
-            waitStarted.set(true);
-            try {
-                // act
-                result.set(consumerJava.awaitKeysQueueEmpty(Duration.ofSeconds(2L)));
-            } catch (InterruptedException ex) {
-                // same value as before
-                result.set(false);
-            }
-            waitStarted.set(false);
-        });
-        
-        Thread.sleep(Duration.ofSeconds(1L));
-        
-        {
-            // assert the waitTillKeysQueueEmpty is running
-            assertThat(waitStarted.get(), is(equalTo(true)));
-            // assert the result is false
-            assertThat(result.get(), is(equalTo(Boolean.FALSE)));
-        }
-        
-        // consume the keys now to empty the queue, the result must change to true
-        consumerJava.consumeKeys(createHash160ByteBuffer());
-        
-        // wait for terminate
-        threadWaitQueueEmpty.join(Duration.ofSeconds(10L));
-        
-        {
-            // assert the waitTillKeysQueueEmpty is not running
-            assertThat(waitStarted.get(), is(equalTo(false)));
-            // assert the result is true
-            assertThat(result.get(), is(equalTo(Boolean.TRUE)));
-        }
-    }
-
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
     public void runProber_testAddressGiven_hitExpected(boolean compressed, boolean useStaticAmount) throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
