@@ -102,10 +102,11 @@ public abstract class AbstractProducer implements Producer {
     }
     
     /**
-     * fromPrivate can throw an {@link IllegalArgumentException}.
+     * The method fromPrivate can throw an {@link IllegalArgumentException}.
+     * The method {@link ByteBufferUtility#freeByteBuffer} can throw an {@link java.lang.IllegalAccessError}.
      * @param secret the secret to be able to recover the issue
      */
-    protected void logErrorInProduceKeys(Exception e, BigInteger secret) {
+    protected void logErrorInProduceKeys(Throwable e, BigInteger secret) {
         logger.error("Error in produceKey for secret " + secret + ".", e);
     }
     

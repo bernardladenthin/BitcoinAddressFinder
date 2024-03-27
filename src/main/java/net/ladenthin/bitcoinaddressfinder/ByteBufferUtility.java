@@ -34,6 +34,7 @@ public class ByteBufferUtility {
     }
     
     /**
+     * ATTENTION: The {@link Unsafe#getUnsafe} can throw an {@link java.lang.IllegalAccessError}.
      * https://stackoverflow.com/questions/8462200/examples-of-forcing-freeing-of-native-memory-direct-bytebuffer-has-allocated-us
      * https://stackoverflow.com/questions/13003871/how-do-i-get-the-instance-of-sun-misc-unsafe
      * https://stackoverflow.com/questions/29301755/got-securityexception-in-java

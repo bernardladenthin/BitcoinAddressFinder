@@ -101,19 +101,15 @@ public class ProducerOpenCL extends AbstractProducer {
 
         @Override
         public void run() {
-            if(logger.isDebugEnabled()) {
-                logger.debug("ResultReaderRunnable started");
-            }
+            logger.trace("ResultReaderRunnable started");
             try {
                 PublicKeyBytes[] publicKeyBytesArray = openCLGridResult.getPublicKeyBytes();
                 openCLGridResult.freeResult();
                 consumer.consumeKeys(publicKeyBytesArray);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 abstractProducer.logErrorInProduceKeys(e, secretBase);
             }
-            if(logger.isDebugEnabled()) {
-                logger.debug("ResultReaderRunnable finished");
-            }
+            logger.trace("ResultReaderRunnable finished");
         }
     }
     
