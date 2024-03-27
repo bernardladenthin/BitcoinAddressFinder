@@ -27,6 +27,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
 import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.Finder;
 import net.ladenthin.bitcoinaddressfinder.Interruptable;
@@ -46,6 +50,8 @@ public class Main implements Runnable, Interruptable {
     private final List<Interruptable> interruptables = new ArrayList<>();
 
     private final CConfiguration configuration;
+    
+    CountDownLatch runLatch = new CountDownLatch(1);
     
     public Main(CConfiguration configuration) {
         this.configuration = configuration;
@@ -110,6 +116,7 @@ public class Main implements Runnable, Interruptable {
                 throw new UnsupportedOperationException("Command: " + configuration.command.name() + " currently not supported." );
         }
         logger.info("Main#run end.");
+        runLatch.countDown();
         
         if(false) {
             try {
@@ -131,7 +138,15 @@ public class Main implements Runnable, Interruptable {
     
     private void addSchutdownHook() {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            logger.info("Shutdown received via hook.");
             interrupt();
+            try {
+                logger.info("runLatch await");
+                runLatch.await(30, TimeUnit.SECONDS);
+            } catch (InterruptedException ex) {
+                throw new RuntimeException(ex);
+            }
+            logger.info("Finish shutdown hook.");
         }));
     }
     

@@ -163,6 +163,12 @@ public class LMDBPersistence implements Persistence {
     public void close() {
         logStatsOnCloseByConfig();
         lmdb_h160ToAmount.close();
+        env.close();
+    }
+    
+    @Override
+    public boolean isClosed() {
+        return env.isClosed();
     }
 
     @Override

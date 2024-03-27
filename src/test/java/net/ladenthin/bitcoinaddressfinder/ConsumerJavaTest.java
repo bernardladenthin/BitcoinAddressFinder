@@ -47,6 +47,7 @@ import org.bitcoinj.crypto.MnemonicException;
 import org.bitcoinj.params.MainNetParams;
 import static org.hamcrest.core.StringStartsWith.startsWith;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
@@ -164,7 +165,6 @@ public class ConsumerJavaTest {
         assertThat(waitTime, is(greaterThan(ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY.minus(AwaitTimeTests.IMPRECISION))));
     }
     
-
     @Test
     public void interrupt_statisticsTimerStarted_executerServiceShutdown() throws IOException, InterruptedException {
         CConsumerJava cConsumerJava = new CConsumerJava();
@@ -189,6 +189,55 @@ public class ConsumerJavaTest {
         // assert
         assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(equalTo(Boolean.TRUE)));
         assertThat(consumerJava.consumeKeysExecutorService.isShutdown(), is(equalTo(Boolean.TRUE)));
+    }
+
+    @Test
+    public void initLMDB_initialize_databaseOpened() throws IOException, InterruptedException, DecoderException, MnemonicException.MnemonicLengthException {
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+
+        TestAddressesFiles testAddresses = new TestAddressesFiles(false);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
+
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        cConsumerJava.runtimePublicKeyCalculationCheck = true;
+
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        
+        // pre-assert
+        assertThat(consumerJava.persistence, is(nullValue()));
+        
+        // act
+        consumerJava.initLMDB();
+        
+        // assert
+        assertThat(consumerJava.persistence.isClosed(), is(equalTo(Boolean.FALSE)));
+    }
+    
+    @Test
+    public void interrupt_consumerInitialized_databaseClosed() throws IOException, InterruptedException, DecoderException, MnemonicException.MnemonicLengthException {
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+
+        TestAddressesFiles testAddresses = new TestAddressesFiles(false);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
+
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        cConsumerJava.runtimePublicKeyCalculationCheck = true;
+
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        consumerJava.initLMDB();
+        
+        // pre-assert
+        assertThat(consumerJava.persistence.isClosed(), is(equalTo(Boolean.FALSE)));
+        
+        // act
+        consumerJava.interrupt();
+        
+        // assert
+        assertThat(consumerJava.persistence.isClosed(), is(equalTo(Boolean.TRUE)));
     }
     
     @Test

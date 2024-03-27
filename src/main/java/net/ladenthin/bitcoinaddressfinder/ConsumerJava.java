@@ -340,6 +340,7 @@ public class ConsumerJava implements Consumer {
         } catch (InterruptedException ex) {
             throw new RuntimeException(ex);
         }
+        persistence.close();
         logger.debug("finish interrupt");
     }
     
