@@ -45,6 +45,7 @@ import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.crypto.MnemonicException;
 import org.bitcoinj.params.MainNetParams;
+import static org.hamcrest.core.StringStartsWith.startsWith;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
@@ -252,7 +253,7 @@ public class ConsumerJavaTest {
 
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
-    public void runProber_unknownAddressGiven_missExpected(boolean compressed, boolean useStaticAmount) throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
+    public void runProber_unknownAddressGiven_missExpectedAndLogMessagesInTrace(boolean compressed, boolean useStaticAmount) throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
@@ -283,7 +284,7 @@ public class ConsumerJavaTest {
         // assert
         assertThat(consumerJava.hits.get(), is(equalTo(0L)));
         assertThat(consumerJava.vanityHits.get(), is(equalTo(0L)));
-        verify(logger, times(8)).trace(logCaptor.capture());
+        verify(logger, times(9)).trace(logCaptor.capture());
 
         List<String> arguments = logCaptor.getAllValues();
 
@@ -292,14 +293,17 @@ public class ConsumerJavaTest {
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), new ByteBufferUtility(false));
         String missMessageUncompressed = ConsumerJava.MISS_PREFIX + keyUtility.createKeyDetails(unknownKeyUncompressed);
         String missMessageCompressed = ConsumerJava.MISS_PREFIX + keyUtility.createKeyDetails(unknownKeyCompressed);
-        assertThat(arguments.get(0).startsWith("Time before persistence.containsAddress: "), is(equalTo(Boolean.TRUE)));
-        assertThat(arguments.get(1).startsWith("Time after persistence.containsAddress: "), is(equalTo(Boolean.TRUE)));
-        assertThat(arguments.get(2).startsWith("Time delta: "), is(equalTo(Boolean.TRUE)));
-        assertThat(arguments.get(3).startsWith("Time before persistence.containsAddress: "), is(equalTo(Boolean.TRUE)));
-        assertThat(arguments.get(4).startsWith("Time after persistence.containsAddress: "), is(equalTo(Boolean.TRUE)));
-        assertThat(arguments.get(5).startsWith("Time delta: "), is(equalTo(Boolean.TRUE)));
-        assertThat(arguments.get(6), is(equalTo(missMessageUncompressed)));
-        assertThat(arguments.get(7), is(equalTo(missMessageCompressed)));
+        assertThat(arguments.get(0), startsWith("consumeKeys"));
+        assertThat(arguments.get(1), startsWith("Time before persistence.containsAddress: "));
+        assertThat(arguments.get(2), startsWith("Time after persistence.containsAddress: "));
+        assertThat(arguments.get(3), startsWith("Time delta: "));
+        assertThat(arguments.get(4), startsWith("Time before persistence.containsAddress: "));
+        assertThat(arguments.get(5), startsWith("Time after persistence.containsAddress: "));
+        assertThat(arguments.get(6), startsWith("Time delta: "));
+        
+        // assert for expected miss messages
+        assertThat(arguments.get(7), is(equalTo(missMessageUncompressed)));
+        assertThat(arguments.get(8), is(equalTo(missMessageCompressed)));
     }
 
     @Test

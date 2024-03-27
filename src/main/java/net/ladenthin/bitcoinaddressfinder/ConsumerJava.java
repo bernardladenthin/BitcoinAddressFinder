@@ -139,9 +139,7 @@ public class ConsumerJava implements Consumer {
         for (int i = 0; i < consumerJava.threads; i++) {
             consumers.add(consumeKeysExecutorService.submit(
                     () -> {
-                        logger.info("start consumeKeysRunner");
                         consumeKeysRunner();
-                        logger.info("end consumeKeysRunner");
                         return null;
                     }));
         }
@@ -151,8 +149,7 @@ public class ConsumerJava implements Consumer {
      * This method runs in multiple threads.
      */
     private void consumeKeysRunner() {
-        logger.debug("Start consumeKeysRunner.");
-        
+        logger.info("start consumeKeysRunner");
         ByteBuffer threadLocalReuseableByteBuffer = ByteBuffer.allocateDirect(PublicKeyBytes.HASH160_SIZE);
         
         while (shouldRun.get()) {
@@ -177,6 +174,7 @@ public class ConsumerJava implements Consumer {
         if (threadLocalReuseableByteBuffer != null) {
             byteBufferUtility.freeByteBuffer(threadLocalReuseableByteBuffer);
         }
+        logger.info("end consumeKeysRunner");
     }
     
     void consumeKeys(ByteBuffer threadLocalReuseableByteBuffer) throws MnemonicException.MnemonicLengthException {
