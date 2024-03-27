@@ -26,6 +26,9 @@ import org.junit.rules.TemporaryFolder;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.cli.Main;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -69,7 +72,6 @@ public class MainTest {
     }
     // </editor-fold>
     
-    
     // <editor-fold defaultstate="collapsed" desc="testRoundtrip OpenCL producer">
     @Test
     @OpenCLTest
@@ -82,6 +84,16 @@ public class MainTest {
         new LogLevelChange().setLevel(Level.DEBUG);
         
         Main mainFind_1OpenCLDevice = Main.createFromConfigurationFile(config_Find_1OpenCLDevice_js);
+        
+        
+        ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+        
+        // interrupt the act after 10 seconds
+        scheduledExecutorService.schedule(() -> {
+            mainFind_1OpenCLDevice.interrupt();
+        }, 10, TimeUnit.SECONDS);
+        
+        // act
         mainFind_1OpenCLDevice.run();
     }
     // </editor-fold>

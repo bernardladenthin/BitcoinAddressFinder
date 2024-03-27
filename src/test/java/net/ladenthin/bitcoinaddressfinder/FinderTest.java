@@ -118,12 +118,10 @@ public class FinderTest {
         assertThat(finder.producerExecutorService.isTerminated(), is(equalTo(Boolean.TRUE)));
     }
     
-    /**
-     * Attention, this is an await time test. This tests changes {@link Finder#AWAIT_DURATION_TERMINATE}.
-     */
+    @AwaitTimeTest
     @Test
     public void shutdownAndAwaitTermination_producersSetAndInitialized_shutdownCalledAndAwaitTermination() throws IOException {
-        // Attention: Change the duration.
+        // Change await duration
         Finder.AWAIT_DURATION_TERMINATE = AwaitTimeTests.AWAIT_DURATION;
         
         // Attention: During the long duration, this test produce a lot of debug and warn output, prevent it by set the log details

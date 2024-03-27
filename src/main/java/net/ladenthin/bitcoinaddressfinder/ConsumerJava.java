@@ -55,11 +55,6 @@ public class ConsumerJava implements Consumer {
     @VisibleForTesting
     static Duration AWAIT_DURATION_QUEUE_EMPTY = Duration.ofMinutes(1);
     
-    /**
-     * The duration for a cyclic check to test the keys queue is empty.
-     */
-    private static final Duration DURATION_CYCLIC_CHECK_KEYS_QUEUE_EMPTY  = Duration.ofMillis(100L);
-    
     public static final String MISS_PREFIX = "miss: Could not find the address: ";
     public static final String HIT_PREFIX = "hit: Found the address: ";
     public static final String VANITY_HIT_PREFIX = "vanity pattern match: ";

@@ -123,12 +123,10 @@ public class ConsumerJavaTest {
         consumerJava.startStatisticsTimer();
     }
     
-    /**
-     * Attention, this is an await time test. This tests changes  {@link ConsumerJava#AWAIT_DURATION_QUEUE_EMPTY}.
-     */
+    @AwaitTimeTest
     @Test
     public void interrupt_keysQueueNotEmpty_consumerNotRunningWaitedInternallyForTheDuration() throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
-        // Attention: Change the duration.
+        // Change await duration
         ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY = AwaitTimeTests.AWAIT_DURATION;
         
         CConsumerJava cConsumerJava = new CConsumerJava();
