@@ -145,7 +145,7 @@ Should there be any information you find lacking or have questions about, do not
   * Link extracted addresses as txt (21.2 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Full_HexHash.zip
 
 <details>
-<summary>Checksums</summary>
+<summary>Checksums lmdb_full.zip</summary>
 
 * CRC32: AC705AEA
 * MD5: DFCE421B8C7E720DC216175598B20975
