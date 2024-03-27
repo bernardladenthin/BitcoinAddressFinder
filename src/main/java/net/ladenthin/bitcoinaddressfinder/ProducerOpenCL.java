@@ -25,6 +25,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import javax.annotation.Nullable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ProducerOpenCL extends AbstractProducer {
 
@@ -40,6 +42,12 @@ public class ProducerOpenCL extends AbstractProducer {
         super(producerOpenCL, consumer, keyUtility, secretFactory);
         this.producerOpenCL = producerOpenCL;
         this.resultReaderThreadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads);
+        if (false) {
+            int prestartedThreads = resultReaderThreadPoolExecutor.prestartAllCoreThreads();
+            if (prestartedThreads != producerOpenCL.maxResultReaderThreads) {
+                throw new RuntimeException("Unable to prestart core threads.");
+            }
+        }
     }
 
     @Override
@@ -66,6 +74,9 @@ public class ProducerOpenCL extends AbstractProducer {
             OpenCLGridResult openCLGridResult = openCLContext.createKeys(secretBase);
             ResultReaderRunnable resultReaderRunnable = new ResultReaderRunnable(openCLGridResult, consumer, secretBase, this);
 
+            if(getLogger().isDebugEnabled()) {
+                getLogger().debug("submit resultReaderRunnable for secretBase: " + secretBase);
+            }
             resultReaderThreadPoolExecutor.submit(resultReaderRunnable, openCLContext);
         } catch (Exception e) {
             logErrorInProduceKeys(e, secretBase);
@@ -73,6 +84,8 @@ public class ProducerOpenCL extends AbstractProducer {
     }
     
     protected static class ResultReaderRunnable implements Runnable {
+        
+        private Logger logger = LoggerFactory.getLogger(this.getClass());
         
         private final OpenCLGridResult openCLGridResult;
         private final Consumer consumer;
@@ -88,12 +101,18 @@ public class ProducerOpenCL extends AbstractProducer {
 
         @Override
         public void run() {
+            if(logger.isDebugEnabled()) {
+                logger.debug("ResultReaderRunnable started");
+            }
             try {
                 PublicKeyBytes[] publicKeyBytesArray = openCLGridResult.getPublicKeyBytes();
                 openCLGridResult.freeResult();
                 consumer.consumeKeys(publicKeyBytesArray);
             } catch (Exception e) {
                 abstractProducer.logErrorInProduceKeys(e, secretBase);
+            }
+            if(logger.isDebugEnabled()) {
+                logger.debug("ResultReaderRunnable finished");
             }
         }
     }
