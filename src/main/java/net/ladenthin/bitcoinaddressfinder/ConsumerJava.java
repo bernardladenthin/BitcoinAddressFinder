@@ -139,7 +139,9 @@ public class ConsumerJava implements Consumer {
         for (int i = 0; i < consumerJava.threads; i++) {
             consumers.add(consumeKeysExecutorService.submit(
                     () -> {
+                        logger.info("start consumeKeysRunner");
                         consumeKeysRunner();
+                        logger.info("end consumeKeysRunner");
                         return null;
                     }));
         }
@@ -178,6 +180,7 @@ public class ConsumerJava implements Consumer {
     }
     
     void consumeKeys(ByteBuffer threadLocalReuseableByteBuffer) throws MnemonicException.MnemonicLengthException {
+        logger.trace("consumeKeys");
         PublicKeyBytes[] publicKeyBytesArray = keysQueue.poll();
         while (publicKeyBytesArray != null) {
             for (PublicKeyBytes publicKeyBytes : publicKeyBytesArray) {
@@ -322,6 +325,7 @@ public class ConsumerJava implements Consumer {
     
     @Override
     public void interrupt() {
+        logger.debug("start interrupt");
         shouldRun.set(false);
         scheduledExecutorService.shutdown();
         consumeKeysExecutorService.shutdown();
@@ -330,6 +334,7 @@ public class ConsumerJava implements Consumer {
         } catch (InterruptedException ex) {
             throw new RuntimeException(ex);
         }
+        logger.debug("finish interrupt");
     }
     
     @VisibleForTesting
