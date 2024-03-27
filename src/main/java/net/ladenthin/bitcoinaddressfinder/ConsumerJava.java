@@ -318,7 +318,15 @@ public class ConsumerJava implements Consumer {
 
     @Override
     public void consumeKeys(PublicKeyBytes[] publicKeyBytes) throws InterruptedException {
+        if(logger.isDebugEnabled()){
+            logger.debug("keysQueue.put(publicKeyBytes) with length: " + publicKeyBytes.length);
+        }
+        
         keysQueue.put(publicKeyBytes);
+        
+        if(logger.isDebugEnabled()){
+            logger.debug("keysQueue.size(): " + keysQueue.size());
+        }
     }
     
     @Override

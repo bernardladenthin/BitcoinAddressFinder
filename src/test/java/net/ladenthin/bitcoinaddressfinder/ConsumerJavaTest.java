@@ -68,8 +68,6 @@ public class ConsumerJavaTest {
     private final NetworkParameters networkParameters = MainNetParams.get();
     private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
     private final PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
-
-    private ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
     
     /**
      * Returns an example key. {@link https://privatekeys.pw/key/0000000000000000000000000000000000000000000000000000000000000049}
@@ -109,8 +107,9 @@ public class ConsumerJavaTest {
         // assert
         consumerJava.interrupt();
 
-        List<String> arguments = logCaptor.getAllValues();
-        verify(logger, atLeast(runTimes)).info(logCaptor.capture());
+        ArgumentCaptor<String> logCaptorInfo = ArgumentCaptor.forClass(String.class);
+        List<String> arguments = logCaptorInfo.getAllValues();
+        verify(logger, atLeast(runTimes)).info(logCaptorInfo.capture());
 
         assertThat(arguments.get(0), is(equalTo("Statistics: [Checked 0 M keys in 0 minutes] [0 k keys/second] [0 M keys/minute] [Times an empty consumer: 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
     }
@@ -222,9 +221,10 @@ public class ConsumerJavaTest {
         // assert
         assertThat(consumerJava.hits.get(), is(equalTo(1L)));
         assertThat(consumerJava.vanityHits.get(), is(equalTo(0L)));
-        verify(logger, times(6)).info(logCaptor.capture());
+        ArgumentCaptor<String> logCaptorInfo = ArgumentCaptor.forClass(String.class);
+        verify(logger, times(6)).info(logCaptorInfo.capture());
 
-        List<String> arguments = logCaptor.getAllValues();
+        List<String> arguments = logCaptorInfo.getAllValues();
 
         ECKey key = new TestAddresses42(1, compressed).getECKeys().get(0);
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), new ByteBufferUtility(false));
@@ -253,7 +253,7 @@ public class ConsumerJavaTest {
 
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
-    public void runProber_unknownAddressGiven_missExpectedAndLogMessagesInTrace(boolean compressed, boolean useStaticAmount) throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
+    public void runProber_unknownAddressGiven_missExpectedAndLogMessagesInDebugAndTrace(boolean compressed, boolean useStaticAmount) throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
@@ -275,6 +275,7 @@ public class ConsumerJavaTest {
         ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, mockSecretFactory);
 
         Logger logger = mock(Logger.class);
+        when(logger.isDebugEnabled()).thenReturn(true);
         when(logger.isTraceEnabled()).thenReturn(true);
         consumerJava.setLogger(logger);
         producerJava.produceKeys();
@@ -284,26 +285,34 @@ public class ConsumerJavaTest {
         // assert
         assertThat(consumerJava.hits.get(), is(equalTo(0L)));
         assertThat(consumerJava.vanityHits.get(), is(equalTo(0L)));
-        verify(logger, times(9)).trace(logCaptor.capture());
+        ArgumentCaptor<String> logCaptorDebug = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> logCaptorTrace = ArgumentCaptor.forClass(String.class);
+        verify(logger, times(2)).debug(logCaptorDebug.capture());
+        verify(logger, times(9)).trace(logCaptorTrace.capture());
 
-        List<String> arguments = logCaptor.getAllValues();
+        List<String> argumentsDebug = logCaptorDebug.getAllValues();
+        List<String> argumentsTrace = logCaptorTrace.getAllValues();
 
         ECKey unknownKeyUncompressed = new TestAddresses1337(1, false).getECKeys().get(0);
         ECKey unknownKeyCompressed = new TestAddresses1337(1, true).getECKeys().get(0);
         KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), new ByteBufferUtility(false));
         String missMessageUncompressed = ConsumerJava.MISS_PREFIX + keyUtility.createKeyDetails(unknownKeyUncompressed);
         String missMessageCompressed = ConsumerJava.MISS_PREFIX + keyUtility.createKeyDetails(unknownKeyCompressed);
-        assertThat(arguments.get(0), startsWith("consumeKeys"));
-        assertThat(arguments.get(1), startsWith("Time before persistence.containsAddress: "));
-        assertThat(arguments.get(2), startsWith("Time after persistence.containsAddress: "));
-        assertThat(arguments.get(3), startsWith("Time delta: "));
-        assertThat(arguments.get(4), startsWith("Time before persistence.containsAddress: "));
-        assertThat(arguments.get(5), startsWith("Time after persistence.containsAddress: "));
-        assertThat(arguments.get(6), startsWith("Time delta: "));
+        
+        assertThat(argumentsDebug.get(0), startsWith("keysQueue.put(publicKeyBytes) with length: 1"));
+        assertThat(argumentsDebug.get(1), startsWith("keysQueue.size(): 1"));
+        
+        assertThat(argumentsTrace.get(0), startsWith("consumeKeys"));
+        assertThat(argumentsTrace.get(1), startsWith("Time before persistence.containsAddress: "));
+        assertThat(argumentsTrace.get(2), startsWith("Time after persistence.containsAddress: "));
+        assertThat(argumentsTrace.get(3), startsWith("Time delta: "));
+        assertThat(argumentsTrace.get(4), startsWith("Time before persistence.containsAddress: "));
+        assertThat(argumentsTrace.get(5), startsWith("Time after persistence.containsAddress: "));
+        assertThat(argumentsTrace.get(6), startsWith("Time delta: "));
         
         // assert for expected miss messages
-        assertThat(arguments.get(7), is(equalTo(missMessageUncompressed)));
-        assertThat(arguments.get(8), is(equalTo(missMessageCompressed)));
+        assertThat(argumentsTrace.get(7), is(equalTo(missMessageUncompressed)));
+        assertThat(argumentsTrace.get(8), is(equalTo(missMessageCompressed)));
     }
 
     @Test
@@ -363,9 +372,10 @@ public class ConsumerJavaTest {
         // assert
         assertThat(consumerJava.hits.get(), is(equalTo(0L)));
         assertThat(consumerJava.vanityHits.get(), is(equalTo(0L)));
-        verify(logger, times(6)).error(logCaptor.capture());
+        ArgumentCaptor<String> logCaptorError = ArgumentCaptor.forClass(String.class);
+        verify(logger, times(6)).error(logCaptorError.capture());
         
-        List<String> arguments = logCaptor.getAllValues();
+        List<String> arguments = logCaptorError.getAllValues();
         
         if (compressed) {
             assertThat(arguments.get(0), is(equalTo("fromPrivateCompressed.getPubKeyHash() != hash160Compressed")));
@@ -417,9 +427,10 @@ public class ConsumerJavaTest {
         // assert
         assertThat(consumerJava.hits.get(), is(equalTo(0L)));
         assertThat(consumerJava.vanityHits.get(), is(equalTo(1L)));
-        verify(logger, times(6)).info(logCaptor.capture());
+        ArgumentCaptor<String> logCaptorInfo = ArgumentCaptor.forClass(String.class);
+        verify(logger, times(6)).info(logCaptorInfo.capture());
         
-        List<String> arguments = logCaptor.getAllValues();
+        List<String> arguments = logCaptorInfo.getAllValues();
         
         if (compressed) {
             assertThat(arguments.get(0), is(equalTo("hit: safe log: publicKeyBytes.getSecretKey(): 73")));
