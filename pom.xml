@@ -6,7 +6,7 @@
     <artifactId>bitcoinaddressfinder</artifactId>
     <version>1.1.0-SNAPSHOT</version>
     <prerequisites>
-        <maven>3.3.9</maven>
+        <maven>3.6.3</maven>
     </prerequisites>
     <packaging>jar</packaging>
 
@@ -149,7 +149,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-assembly-plugin</artifactId>
-                    <version>3.6.0</version>
+                    <version>3.7.1</version>
                 </plugin>
                   <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -159,7 +159,7 @@
                 <plugin>
                   <groupId>org.apache.maven.plugins</groupId>
                   <artifactId>maven-compiler-plugin</artifactId>
-                  <version>3.12.1</version>
+                  <version>3.13.0</version>
                 </plugin>
                 <plugin>
                   <groupId>org.jacoco</groupId>
@@ -190,7 +190,7 @@
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>33.0.0-jre</version>
+            <version>33.1.0-jre</version>
         </dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>
@@ -210,7 +210,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.30</version>
+            <version>1.18.32</version>
             <scope>provided</scope>
         </dependency>
 
