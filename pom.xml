@@ -84,13 +84,19 @@
                     <target>21</target>
                     <compilerArgs>
                         <arg>--add-exports</arg>
+                        <arg>java.base/java.lang=ALL-UNNAMED</arg>
+                        <arg>--add-exports</arg>
+                        <arg>java.base/java.io=ALL-UNNAMED</arg>
+                        <arg>--add-exports</arg>
                         <arg>java.base/java.nio=ALL-UNNAMED</arg>
                         <arg>--add-exports</arg>
-                        <arg>java.base/sun.nio.ch=ALL-UNNAMED</arg>
+                        <arg>java.base/jdk.internal.ref=ALL-UNNAMED</arg>
                         <arg>--add-exports</arg>
                         <arg>java.base/jdk.internal.misc=ALL-UNNAMED</arg>
                         <arg>--add-exports</arg>
-                        <arg>java.base/jdk.internal.ref=ALL-UNNAMED</arg>
+                        <arg>java.base/sun.nio.ch=ALL-UNNAMED</arg>
+                        <arg>--add-exports</arg>
+                        <arg>jdk.management/com.sun.management.internal=ALL-UNNAMED</arg>
                     </compilerArgs>
                 </configuration>
             </plugin>
