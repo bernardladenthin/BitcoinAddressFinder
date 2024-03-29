@@ -279,8 +279,8 @@ public class ConsumerJavaTest {
         Random randomForProducer = new Random(TestAddresses42.RANDOM_SEED);
         
         CProducerJava cProducerJava = new CProducerJava();
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, randomForProducer);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, randomForProducer);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, mockKeyProducer);
 
         Logger logger = mock(Logger.class);
         consumerJava.setLogger(logger);
@@ -339,8 +339,8 @@ public class ConsumerJavaTest {
         
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.gridNumBits = 0;
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, randomForProducer);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, randomForProducer);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, mockKeyProducer);
 
         Logger logger = mock(Logger.class);
         when(logger.isDebugEnabled()).thenReturn(true);

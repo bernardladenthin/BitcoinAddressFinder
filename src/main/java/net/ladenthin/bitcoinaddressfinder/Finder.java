@@ -19,14 +19,13 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.math.BigInteger;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
+import com.google.common.collect.ImmutableMap;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Random;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -34,6 +33,8 @@ import javax.annotation.Nullable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import org.bitcoinj.core.NetworkParameters;
@@ -41,7 +42,7 @@ import org.bitcoinj.params.MainNetParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Finder implements Interruptable, SecretFactory {
+public class Finder implements Interruptable {
 
     /**
      * We must define a maximum time to wait for terminate. Wait for 100 thousand years is enough.
@@ -53,15 +54,15 @@ public class Finder implements Interruptable, SecretFactory {
     
     private final CFinder finder;
     
+    private final Map<String, KeyProducer> keyProducers = new HashMap<>();
+    
+    @Nullable
+    private ConsumerJava consumerJava;
+    
     private final List<ProducerOpenCL> openCLProducers = new ArrayList<>();
     private final List<ProducerJava> javaProducers = new ArrayList<>();
     private final List<ProducerJavaSecretsFiles> javaProducersSecretsFiles = new ArrayList<>();
     
-    /**
-     * It is already thread local, no need for {@link java.util.concurrent.ThreadLocalRandom}.
-     */
-    private final Random random;
-
     @VisibleForTesting
     final ExecutorService producerExecutorService = Executors.newCachedThreadPool();
     
@@ -69,15 +70,25 @@ public class Finder implements Interruptable, SecretFactory {
     private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
     private final PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
     
-    @Nullable
-    private ConsumerJava consumerJava;
-
     public Finder(CFinder finder) {
         this.finder = finder;
-        try {
-            random = SecureRandom.getInstanceStrong();
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
+
+    }
+    
+    public void startKeyProducer() {
+        logger.info("startKeyProducer");
+        if (finder.keyProducerJavaRandom != null) {
+            for (CKeyProducerJavaRandom cKeyProducerJavaRandom : finder.keyProducerJavaRandom) {
+                KeyProducerJavaRandom keyProducerJavaRandom = new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility);
+                if (cKeyProducerJavaRandom.keyProducerId == null) {
+                    throw new KeyProducerIdNullException();
+                }
+                boolean containsKey = keyProducers.containsKey(cKeyProducerJavaRandom.keyProducerId);
+                if (containsKey) {
+                    throw new KeyProducerIdIsNotUniqueException(cKeyProducerJavaRandom.keyProducerId);
+                }
+                keyProducers.put(cKeyProducerJavaRandom.keyProducerId, keyProducerJavaRandom);
+            }
         }
     }
 
@@ -96,7 +107,8 @@ public class Finder implements Interruptable, SecretFactory {
         if (finder.producerJava != null) {
             for (CProducerJava cProducerJava : finder.producerJava) {
                 cProducerJava.assertGridNumBitsCorrect();
-                ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, this);
+                KeyProducer keyProducer = getKeyProducerJava(cProducerJava);
+                ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, keyProducer);
                 javaProducers.add(producerJava);
             }
         }
@@ -104,7 +116,8 @@ public class Finder implements Interruptable, SecretFactory {
         if (finder.producerJavaSecretsFiles != null) {
             for (CProducerJavaSecretsFiles cProducerJavaSecretsFiles : finder.producerJavaSecretsFiles) {
                 cProducerJavaSecretsFiles.assertGridNumBitsCorrect();
-                ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, consumerJava, keyUtility, this);
+                KeyProducer keyProducer = getKeyProducerJava(cProducerJavaSecretsFiles);
+                ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, consumerJava, keyUtility, keyProducer);
                 javaProducersSecretsFiles.add(producerJavaSecretsFiles);
             }
         }
@@ -112,10 +125,19 @@ public class Finder implements Interruptable, SecretFactory {
         if (finder.producerOpenCL != null) {
             for (CProducerOpenCL cProducerOpenCL : finder.producerOpenCL) {
                 cProducerOpenCL.assertGridNumBitsCorrect();
-                ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, consumerJava, keyUtility, this);
+                KeyProducer keyProducer = getKeyProducerJava(cProducerOpenCL);
+                ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, consumerJava, keyUtility, keyProducer);
                 openCLProducers.add(producerOpenCL);
             }
         }
+    }
+
+    public KeyProducer getKeyProducerJava(CProducer cProducer) throws RuntimeException {
+        KeyProducer keyProducer = keyProducers.get(cProducer.keyProducerId);
+        if(keyProducer == null) {
+            throw new KeyProducerIdUnknownException(cProducer.keyProducerId);
+        }
+        return keyProducer;
     }
     
     public void initProducer() {
@@ -164,6 +186,10 @@ public class Finder implements Interruptable, SecretFactory {
         logger.info("All producers released and freed.");
     }
     
+    public Map<String, KeyProducer> getKeyProducers() {
+        return ImmutableMap.copyOf(keyProducers);
+    }
+    
     public List<Producer> getAllProducers() {
         List<Producer> producers = new ArrayList<>();
         producers.addAll(javaProducers);
@@ -185,11 +211,4 @@ public class Finder implements Interruptable, SecretFactory {
         }
         return consumers;
     }
-
-    @Override
-    public BigInteger createSecret(int maximumBitLength) {
-        BigInteger secret = keyUtility.createSecret(maximumBitLength, random);
-        return secret;
-    }
-
 }

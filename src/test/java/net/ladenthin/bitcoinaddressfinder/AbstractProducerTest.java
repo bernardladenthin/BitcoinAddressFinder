@@ -59,8 +59,8 @@ public class AbstractProducerTest {
         CProducer cProducer = new CProducer();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer);
 
         verifyInitProducer(abstractProducerTestImpl);
     }
@@ -72,8 +72,8 @@ public class AbstractProducerTest {
         CProducer cProducer = new CProducer();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer);
 
         verifyReleaseProducer(abstractProducerTestImpl);
     }
@@ -90,8 +90,8 @@ public class AbstractProducerTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer);
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
@@ -133,8 +133,8 @@ public class AbstractProducerTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer);
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
@@ -167,8 +167,8 @@ public class AbstractProducerTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer);
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(false);

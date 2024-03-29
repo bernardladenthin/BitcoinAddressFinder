@@ -1,6 +1,12 @@
 {
     "command": "Find",
     "finder" : {
+        "keyProducerJavaRandom" : [
+            {
+                "keyProducerId" : "exampleKeyProducerSecureRandomId",
+                "keyProducerJavaRandomInstance" : "SECURE_RANDOM"
+            }
+        ],
         "consumerJava" : {
             "lmdbConfigurationReadOnly" : {
                 "lmdbDirectory" : "src/test/resources/testRoundtrip/lmdb",
@@ -18,6 +24,7 @@
         },
         "producerOpenCL" : [
             {
+                "keyProducerId" : "exampleKeyProducerSecureRandomId",
                 "privateKeyMaxNumBits" : 256,
                 "platformIndex" : 0,
                 "deviceType" : -1,

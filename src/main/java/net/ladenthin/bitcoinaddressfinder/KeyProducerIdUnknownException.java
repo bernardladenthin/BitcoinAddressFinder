@@ -18,24 +18,9 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.math.BigInteger;
-import java.util.Random;
-
-public class MockSecretFactory implements SecretFactory {
-
-    private final KeyUtility keyUtility;
-    private final Random random;
+public class KeyProducerIdUnknownException extends RuntimeException {
     
-    MockSecretFactory(KeyUtility keyUtility, Random random) {
-        this.keyUtility = keyUtility;
-        this.random = random;
+    public KeyProducerIdUnknownException(String id) {
+        super("Key producer id is unknown: " + id);
     }
-
-    @Override
-    public BigInteger createSecret(int maximumBitLength) {
-        BigInteger secret = keyUtility.createSecret(maximumBitLength, random);
-        return secret;
-    }
-
-    
 }

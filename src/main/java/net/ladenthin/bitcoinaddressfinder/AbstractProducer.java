@@ -36,17 +36,17 @@ public abstract class AbstractProducer implements Producer {
     protected final CProducer cProducer;
     protected final Consumer consumer;
     protected final KeyUtility keyUtility;
-    protected final SecretFactory secretFactory;
+    protected final KeyProducer keyProducer;
     
     protected volatile ProducerState state = ProducerState.UNINITIALIZED;
     
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
-    public AbstractProducer(CProducer cProducer, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory) {
+    public AbstractProducer(CProducer cProducer, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer) {
         this.cProducer = cProducer;
         this.consumer = consumer;
         this.keyUtility = keyUtility;
-        this.secretFactory = secretFactory;
+        this.keyProducer = keyProducer;
     }
 
     @Override
@@ -77,7 +77,7 @@ public abstract class AbstractProducer implements Producer {
         try {
             BigInteger secret;
             try {
-                secret = secretFactory.createSecret(cProducer.privateKeyMaxNumBits);
+                secret = keyProducer.createSecret(cProducer.privateKeyMaxNumBits);
             } catch (NoMoreSecretsAvailableException ex) {
                 logNoMoreSecretsInSecretFactory();
                 interrupt();

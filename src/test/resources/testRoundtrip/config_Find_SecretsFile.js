@@ -1,6 +1,12 @@
 {
     "command": "Find",
     "finder" : {
+        "keyProducerJavaRandom" : [
+            {
+                "keyProducerId" : "exampleKeyProducerSecureRandomId",
+                "keyProducerJavaRandomInstance" : "SECURE_RANDOM"
+            }
+        ],
         "consumerJava" : {
             "lmdbConfigurationReadOnly" : {
                 "lmdbDirectory" : "src/test/resources/testRoundtrip/lmdb",
@@ -20,6 +26,7 @@
         ],
         "producerJavaSecretsFiles" : [
             {
+                "keyProducerId" : "exampleKeyProducerSecureRandomId",
                 "files" : [
                     "src/test/resources/secrets/fileContainingSecrets_BIG_INTEGER.txt"
                 ],
@@ -29,6 +36,7 @@
                 "gridNumBits" : 0
             },
             {
+                "keyProducerId" : "exampleKeyProducerSecureRandomId",
                 "files" : [
                     "src/test/resources/secrets/fileContainingSecrets_DUMPED_RIVATE_KEY.txt"
                 ],
@@ -38,6 +46,7 @@
                 "gridNumBits" : 0
             },
             {
+                "keyProducerId" : "exampleKeyProducerSecureRandomId",
                 "files" : [
                     "src/test/resources/secrets/fileContainingSecrets_SHA256.txt"
                 ],
@@ -47,6 +56,7 @@
                 "gridNumBits" : 0
             },
             {
+                "keyProducerId" : "exampleKeyProducerSecureRandomId",
                 "files" : [
                     "src/test/resources/secrets/fileContainingSecrets_STRING_DO_SHA256.txt"
                 ],

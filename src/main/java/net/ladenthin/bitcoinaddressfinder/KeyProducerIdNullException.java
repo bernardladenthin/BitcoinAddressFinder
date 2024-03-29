@@ -1,6 +1,6 @@
 // @formatter:off
 /**
- * Copyright 2020 Bernard Ladenthin bernard.ladenthin@gmail.com
+ * Copyright 2024 Bernard Ladenthin bernard.ladenthin@gmail.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,19 +16,11 @@
  *
  */
 // @formatter:on
-package net.ladenthin.bitcoinaddressfinder.configuration;
+package net.ladenthin.bitcoinaddressfinder;
 
-import java.util.ArrayList;
-import java.util.List;
-
-public class CFinder {
+public class KeyProducerIdNullException extends RuntimeException {
     
-    public List<CKeyProducerJavaRandom> keyProducerJavaRandom = new ArrayList<>();
-    
-    public CConsumerJava consumerJava;
-    
-    public List<CProducerJava> producerJava = new ArrayList<>();
-    public List<CProducerJavaSecretsFiles> producerJavaSecretsFiles = new ArrayList<>();
-    public List<CProducerOpenCL> producerOpenCL = new ArrayList<>();
-    
+    public KeyProducerIdNullException() {
+        super("Key producer id must not be null.");
+    }
 }

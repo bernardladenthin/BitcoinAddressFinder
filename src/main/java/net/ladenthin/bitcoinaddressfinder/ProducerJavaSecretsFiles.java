@@ -39,8 +39,8 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
     @NonNull
     AtomicReference<SecretsFile> currentSecretsFile = new AtomicReference<>();
 
-    public ProducerJavaSecretsFiles(CProducerJavaSecretsFiles producerJavaSecretsFiles, Consumer consumer, KeyUtility keyUtility, SecretFactory secretFactory) {
-        super(producerJavaSecretsFiles, consumer, keyUtility, secretFactory);
+    public ProducerJavaSecretsFiles(CProducerJavaSecretsFiles producerJavaSecretsFiles, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer) {
+        super(producerJavaSecretsFiles, consumer, keyUtility, keyProducer);
         this.producerJavaSecretsFiles = producerJavaSecretsFiles;
     }
     

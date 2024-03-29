@@ -49,8 +49,8 @@ public class ProducerJavaTest {
         CProducerJava cProducerJava = new CProducerJava();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer);
 
         AbstractProducerTest.verifyInitProducer(producerJava);
     }
@@ -62,8 +62,8 @@ public class ProducerJavaTest {
         CProducerJava cProducerJava = new CProducerJava();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer);
 
         AbstractProducerTest.verifyReleaseProducer(producerJava);
     }
@@ -78,8 +78,8 @@ public class ProducerJavaTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer);
 
         // act
         producerJava.produceKeys();
@@ -100,8 +100,8 @@ public class ProducerJavaTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer);
 
         // act
         producerJava.produceKeys();
@@ -134,8 +134,8 @@ public class ProducerJavaTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(0);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer);
 
         // act
         producerJava.produceKeys();
@@ -152,8 +152,8 @@ public class ProducerJavaTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(2);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer);
 
         // act
         producerJava.produceKeys();

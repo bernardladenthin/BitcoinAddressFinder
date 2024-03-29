@@ -29,8 +29,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
 import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.Finder;
 import net.ladenthin.bitcoinaddressfinder.Interruptable;
@@ -91,7 +89,13 @@ public class Main implements Runnable, Interruptable {
             case Find:
                 Finder finder = new Finder(configuration.finder);
                 interruptables.add(finder);
+                // key producer first
+                finder.startKeyProducer();
+                
+                // consumer second
                 finder.startConsumer();
+                
+                // producer last
                 finder.configureProducer();
                 finder.initProducer();
                 finder.startProducer();

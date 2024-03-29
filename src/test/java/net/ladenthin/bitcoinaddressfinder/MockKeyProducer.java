@@ -19,7 +19,23 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
+import java.util.Random;
 
-public interface SecretFactory {
-    public BigInteger createSecret(int maximumBitLength) throws NoMoreSecretsAvailableException;
+public class MockKeyProducer implements KeyProducer {
+
+    private final KeyUtility keyUtility;
+    private final Random random;
+    
+    MockKeyProducer(KeyUtility keyUtility, Random random) {
+        this.keyUtility = keyUtility;
+        this.random = random;
+    }
+
+    @Override
+    public BigInteger createSecret(int maximumBitLength) {
+        BigInteger secret = keyUtility.createSecret(maximumBitLength, random);
+        return secret;
+    }
+
+    
 }

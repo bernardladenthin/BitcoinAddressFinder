@@ -30,6 +30,8 @@ import java.time.Duration;
 import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomInstance;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
@@ -57,11 +59,9 @@ public class FinderTest {
     public void interrupt_producersSetAndNotInitialized_noExceptionThrown() throws IOException {
         // arrange
         CFinder cFinder = new CFinder();
-        final CProducerJava cProducerJava = new CProducerJava();
-        cFinder.producerJava.add(cProducerJava);
-        cFinder.producerJavaSecretsFiles.add(new CProducerJavaSecretsFiles());
-        cFinder.producerOpenCL.add(new CProducerOpenCL());
+        configureProducerWithExamples(cFinder);
         Finder finder = new Finder(cFinder);
+        finder.startKeyProducer();
         finder.configureProducer();
         // act
         finder.interrupt();
@@ -72,10 +72,7 @@ public class FinderTest {
     public void interrupt_consumerStarted_consumerNotStopped() throws IOException {
         // arrange
         CFinder cFinder = new CFinder();
-        final CProducerJava cProducerJava = new CProducerJava();
-        cFinder.producerJava.add(cProducerJava);
-        cFinder.producerJavaSecretsFiles.add(new CProducerJavaSecretsFiles());
-        cFinder.producerOpenCL.add(new CProducerOpenCL());
+        configureProducerWithExamples(cFinder);
         
         // consumer java configuration
         configureConsumerJava(cFinder);
@@ -106,11 +103,9 @@ public class FinderTest {
     public void shutdownAndAwaitTermination_producersSetAndNotInitialized_shutdownCalled() throws IOException {
         // arrange
         CFinder cFinder = new CFinder();
-        final CProducerJava cProducerJava = new CProducerJava();
-        cFinder.producerJava.add(cProducerJava);
-        cFinder.producerJavaSecretsFiles.add(new CProducerJavaSecretsFiles());
-        cFinder.producerOpenCL.add(new CProducerOpenCL());
+        configureProducerWithExamples(cFinder);
         Finder finder = new Finder(cFinder);
+        finder.startKeyProducer();
         finder.configureProducer();
         // act
         finder.shutdownAndAwaitTermination();
@@ -129,12 +124,16 @@ public class FinderTest {
         
         // arrange
         CFinder cFinder = new CFinder();
+        String keyProducerId = "exampleId";
         final CProducerJava cProducerJava = new CProducerJava();
+        cProducerJava.keyProducerId = keyProducerId;
         cProducerJava.runOnce = false;
         cFinder.producerJava.add(cProducerJava);
+        configureKeyProducerJavaRandom(keyProducerId, cFinder);
         
         configureConsumerJava(cFinder);
         Finder finder = new Finder(cFinder);
+        finder.startKeyProducer();
         finder.startConsumer();
         finder.configureProducer();
         finder.initProducer();
@@ -169,11 +168,9 @@ public class FinderTest {
     public void getAllProducers_producersSetAndNotInitialized_returnList() throws IOException {
         // arrange
         CFinder cFinder = new CFinder();
-        final CProducerJava cProducerJava = new CProducerJava();
-        cFinder.producerJava.add(cProducerJava);
-        cFinder.producerJavaSecretsFiles.add(new CProducerJavaSecretsFiles());
-        cFinder.producerOpenCL.add(new CProducerOpenCL());
+        configureProducerWithExamples(cFinder);
         Finder finder = new Finder(cFinder);
+        finder.startKeyProducer();
         finder.configureProducer();
         // act
         List<Producer> allProducers = finder.getAllProducers();
@@ -182,18 +179,79 @@ public class FinderTest {
     }
     // </editor-fold>
     
+    // <editor-fold defaultstate="collapsed" desc="startKeyProducer">
+    @Test(expected = KeyProducerIdNullException.class)
+    public void startKeyProducer_keyProducerIdIsNull_ExceptionThrown() throws IOException, InterruptedException {
+        // arrange
+        CFinder cFinder = new CFinder();
+        configureKeyProducerJavaRandom(null, cFinder);
+        
+        configureConsumerJava(cFinder);
+        Finder finder = new Finder(cFinder);
+        // act
+        finder.startKeyProducer();
+    }
+    
+    @Test(expected = KeyProducerIdIsNotUniqueException.class)
+    public void startKeyProducer_keyProducerIdIsNotUnique_ExceptionThrown() throws IOException, InterruptedException {
+        // arrange
+        CFinder cFinder = new CFinder();
+        String sameIdTwice = "123";
+        configureKeyProducerJavaRandom(sameIdTwice, cFinder);
+        configureKeyProducerJavaRandom(sameIdTwice, cFinder);
+        
+        configureConsumerJava(cFinder);
+        Finder finder = new Finder(cFinder);
+        // act
+        finder.startKeyProducer();
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="configureProducer">
+    @Test(expected = KeyProducerIdUnknownException.class)
+    public void configureProducer_keyProducerIdIsUnknown_ExceptionThrown() throws IOException, InterruptedException {
+        // arrange
+        CFinder cFinder = new CFinder();
+        final CProducerJava cProducerJava = new CProducerJava();
+        cProducerJava.runOnce = false;
+        // null is not valid or will find any other id
+        cProducerJava.keyProducerId = null;
+        cFinder.producerJava.add(cProducerJava);
+        configureKeyProducerJavaRandom("unknownId", cFinder);
+        
+        configureConsumerJava(cFinder);
+        Finder finder = new Finder(cFinder);
+        
+        finder.startKeyProducer();
+        
+        // act
+        finder.configureProducer();
+    }
+    // </editor-fold>
+    
     // <editor-fold defaultstate="collapsed" desc="testFullCycle">
     @Test
     public void testFullCycle_producerJavaSetAndInitialized_statesCorrect() throws IOException, InterruptedException {
         // arrange
         CFinder cFinder = new CFinder();
+        String keyProducerId = "exampleId";
         final CProducerJava cProducerJava = new CProducerJava();
+        cProducerJava.keyProducerId = keyProducerId;
         cProducerJava.runOnce = false;
         cFinder.producerJava.add(cProducerJava);
+        configureKeyProducerJavaRandom(keyProducerId, cFinder);
         
         configureConsumerJava(cFinder);
         Finder finder = new Finder(cFinder);
         // act and assert the full cycle
+        {
+            // pre-assert
+            assertThat(finder.getKeyProducers().keySet(), hasSize(0));
+            // act
+            finder.startKeyProducer();
+            // assert
+            assertThat(finder.getKeyProducers().keySet(), hasSize(1));
+        }
         {
             // pre-assert
             assertThat(finder.getAllConsumers(), hasSize(0));
@@ -248,7 +306,33 @@ public class FinderTest {
         }
     }
     // </editor-fold>
-
+    
+    private void configureProducerWithExamples(CFinder cFinder) {
+        String keyProducerId_producerJava = "exampleId_producerJava";
+        String keyProducerId_producerJavaSecretsFiles = "exampleId_producerJavaSecretsFiles";
+        String keyProducerId_producerOpenCL = "exampleId_producerOpenCL";
+        CProducerJava cProducerJava = new CProducerJava();
+        cProducerJava.keyProducerId = keyProducerId_producerJava;
+        cFinder.producerJava.add(cProducerJava);
+        CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
+        cProducerJavaSecretsFiles.keyProducerId = keyProducerId_producerJavaSecretsFiles;
+        cFinder.producerJavaSecretsFiles.add(cProducerJavaSecretsFiles);
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.keyProducerId = keyProducerId_producerOpenCL;
+        cFinder.producerOpenCL.add(cProducerOpenCL);
+        configureKeyProducerJavaRandom(keyProducerId_producerJava, cFinder);
+        configureKeyProducerJavaRandom(keyProducerId_producerJavaSecretsFiles, cFinder);
+        configureKeyProducerJavaRandom(keyProducerId_producerOpenCL, cFinder);
+    }
+    
+    private void configureKeyProducerJavaRandom(String keyProducerId, CFinder cFinder) {
+        CKeyProducerJavaRandom cKeyProducerJavaRandom = new CKeyProducerJavaRandom();
+        cKeyProducerJavaRandom.keyProducerId = keyProducerId;
+        cKeyProducerJavaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
+        cKeyProducerJavaRandom.customSeed = 0L;
+        cFinder.keyProducerJavaRandom.add(cKeyProducerJavaRandom);
+    }
+    
     private void configureConsumerJava(CFinder cFinder) throws IOException {
         boolean compressed = false;
         boolean useStaticAmount = true;

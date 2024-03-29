@@ -52,8 +52,8 @@ public class ProducerOpenCLTest {
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer);
 
         AbstractProducerTest.verifyInitProducer(producerOpenCL);
     }
@@ -67,8 +67,8 @@ public class ProducerOpenCLTest {
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer);
 
         AbstractProducerTest.verifyReleaseProducer(producerOpenCL);
         assertThat(producerOpenCL.resultReaderThreadPoolExecutor.isShutdown(), is(equalTo(Boolean.TRUE)));
@@ -83,8 +83,8 @@ public class ProducerOpenCLTest {
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer);
 
         // pre-assert
         assertThat(producerOpenCL.openCLContext, nullValue());
@@ -106,8 +106,8 @@ public class ProducerOpenCLTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer);
         
         // act
         producerOpenCL.releaseProducer();
@@ -121,8 +121,8 @@ public class ProducerOpenCLTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer);
         
         producerOpenCL.initProducer();
         
@@ -144,8 +144,8 @@ public class ProducerOpenCLTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer);
         
         // act
         int freeThreads = producerOpenCL.getFreeThreads();
@@ -162,8 +162,8 @@ public class ProducerOpenCLTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer);
         
         producerOpenCL.initProducer();
         
@@ -182,8 +182,8 @@ public class ProducerOpenCLTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer);
         
         // act
         producerOpenCL.waitTillFreeThreadsInPool();
@@ -199,8 +199,8 @@ public class ProducerOpenCLTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer);
         
         producerOpenCL.initProducer();
         
@@ -218,8 +218,8 @@ public class ProducerOpenCLTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer);
         
         producerOpenCL.initProducer();
         
@@ -253,8 +253,8 @@ public class ProducerOpenCLTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer);
         
         // act
         producerOpenCL.produceKeys();
@@ -270,8 +270,8 @@ public class ProducerOpenCLTest {
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
-        MockSecretFactory mockSecretFactory = new MockSecretFactory(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockSecretFactory);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer);
         
         producerOpenCL.initProducer();
         
