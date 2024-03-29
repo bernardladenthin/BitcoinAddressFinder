@@ -275,9 +275,11 @@ Wished from Ulugbek:
 "searchBatchQuantity" : 100000
 ```
 
-- Incomplete Seed-Phrase as Private Key provider. Wished from @mirasu See #38
-- Socket key provider for independend key provider via byte protocol
+- Incomplete Seed-Phrase as Private KeyProvider. Wished from @mirasu See #38
+- Socket KeyProvider for independend KeyProvider via byte protocol
   - Ideas might be a screen recorder and use the visible screen downscaled as 256 bit input
+- KeyProvider must get the grid size to increment properly on incremental based Producer
+- ExecutableKeyProvider gets data from stdout
 
 -----
 ## Legal
