@@ -38,7 +38,6 @@ import static org.jocl.CL.*;
 
 import java.util.Arrays;
 import java.util.Random;
-import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
 import org.bitcoinj.core.ECKey;
@@ -414,7 +413,8 @@ public class ProbeAddressesOpenCLTest {
         
         Random sr = new SecureRandom();
         BigInteger secret = keyUtility.createSecret(bitSize, sr);
-        BigInteger secretBase = keyUtility.killBits(secret, producerOpenCL.getKillBits());
+        BitHelper bitHelper = new BitHelper();
+        BigInteger secretBase = keyUtility.killBits(secret, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
         
         openCLContext.createKeys(secretBase);
         openCLContext.release();
@@ -435,7 +435,8 @@ public class ProbeAddressesOpenCLTest {
         
         Random sr = new SecureRandom();
         BigInteger secret = keyUtility.createSecret(BITS_FOR_BATCH-1, sr);
-        BigInteger secretBase = keyUtility.killBits(secret, producerOpenCL.getKillBits());
+        BitHelper bitHelper = new BitHelper();
+        BigInteger secretBase = keyUtility.killBits(secret, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
         
         openCLContext.createKeys(secretBase);
         openCLContext.release();
@@ -477,7 +478,8 @@ public class ProbeAddressesOpenCLTest {
         Random sr = new SecureRandom();
         BigInteger secretKeyBase = keyUtility.createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, sr);
         
-        BigInteger secretBase = keyUtility.killBits(secretKeyBase, producerOpenCL.getKillBits());
+        BitHelper bitHelper = new BitHelper();
+        BigInteger secretBase = keyUtility.killBits(secretKeyBase, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
         
         OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
         PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();

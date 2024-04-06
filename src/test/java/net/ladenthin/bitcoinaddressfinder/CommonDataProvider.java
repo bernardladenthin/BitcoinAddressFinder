@@ -19,6 +19,7 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import com.tngtech.java.junit.dataprovider.DataProvider;
+import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticP2PKHAddress;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticP2SHAddress;
@@ -34,6 +35,38 @@ public class CommonDataProvider {
     @DataProvider
     public static Object[][] cSecretFormat() {
         return transformFlatToObjectArrayArray(CSecretFormat.values());
+    }
+
+    /**
+     * For {@link #bitsToSize()}.
+     */
+    public final static String DATA_PROVIDER_BITS_TO_SIZE = "bitsToSize";
+
+    @DataProvider
+    public static Object[][] bitsToSize() {
+        return new Object[][]{
+            {0, 1},
+            {1, 2},
+            {2, 4},
+            {3, 8},
+            {8, 256},
+        };
+    }
+
+    /**
+     * For {@link #killBits()}.
+     */
+    public final static String DATA_PROVIDER_KILL_BITS = "killBits";
+
+    @DataProvider
+    public static Object[][] killBits() {
+        return new Object[][]{
+            {0, BigInteger.valueOf(0L)},
+            {1, BigInteger.valueOf(1L)},
+            {2, BigInteger.valueOf(3L)},
+            {3, BigInteger.valueOf(7L)},
+            {8, BigInteger.valueOf(255L)},
+        };
     }
 
     /**

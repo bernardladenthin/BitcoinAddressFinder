@@ -18,16 +18,9 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
-import java.math.BigInteger;
-import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 
 public class CProducer {
-    
-    /**
-     * Lazy initialization. The configuration is changed on demand.
-     */
-    private transient BigInteger killBits;
     
     public String keyProducerId;
     
@@ -50,12 +43,4 @@ public class CProducer {
      * Enable to let the producer run one time only.
      */
     public boolean runOnce = false;
-    
-    public BigInteger getKillBits() {
-        if (killBits == null) {
-            killBits = new BitHelper().getKillBits(batchSizeInBits);
-        }
-        return killBits;
-    }
-    
 }
