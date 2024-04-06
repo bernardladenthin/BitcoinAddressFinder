@@ -33,11 +33,13 @@ public class KeyProducerJavaRandom extends KeyProducerJava {
      * It is already thread local, no need for {@link java.util.concurrent.ThreadLocalRandom}.
      */
     private final Random random;
+    private final BitHelper bitHelper;
     
-    public KeyProducerJavaRandom(CKeyProducerJavaRandom cKeyProducerJavaRandom, KeyUtility keyUtility) {
+    public KeyProducerJavaRandom(CKeyProducerJavaRandom cKeyProducerJavaRandom, KeyUtility keyUtility, BitHelper bitHelper) {
         super(cKeyProducerJavaRandom);
         this.cKeyProducerJavaRandom = cKeyProducerJavaRandom;
         this.keyUtility = keyUtility;
+        this.bitHelper = bitHelper;
         
         switch (cKeyProducerJavaRandom.keyProducerJavaRandomInstance) {
             case SECURE_RANDOM:
@@ -59,8 +61,12 @@ public class KeyProducerJavaRandom extends KeyProducerJava {
     }
     
     @Override
-    public BigInteger createSecret(int maximumBitLength) {
-        BigInteger secret = keyUtility.createSecret(maximumBitLength, random);
-        return secret;
+    public BigInteger[] createSecrets(int batchSizeInBits, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
+        int length = returnStartSecretOnly ? 1 : bitHelper.convertBitsToSize(batchSizeInBits);
+        BigInteger[] secrets = new BigInteger[length];
+        for (int i = 0; i < secrets.length; i++) {
+            secrets[i] = keyUtility.createSecret(cKeyProducerJavaRandom.privateKeyMaxNumBits, random);
+        }
+        return secrets;
     }
 }

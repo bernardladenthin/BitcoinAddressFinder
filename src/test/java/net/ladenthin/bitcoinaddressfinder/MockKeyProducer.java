@@ -25,16 +25,27 @@ public class MockKeyProducer implements KeyProducer {
 
     private final KeyUtility keyUtility;
     private final Random random;
+    private final int maximumBitLength;
+    private final BitHelper bitHelper = new BitHelper();
     
-    MockKeyProducer(KeyUtility keyUtility, Random random) {
+    MockKeyProducer(KeyUtility keyUtility, Random random, int maximumBitLength) {
         this.keyUtility = keyUtility;
         this.random = random;
+        this.maximumBitLength = maximumBitLength;
+    }
+    
+    MockKeyProducer(KeyUtility keyUtility, Random random) {
+        this(keyUtility, random, PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS);
     }
 
     @Override
-    public BigInteger createSecret(int maximumBitLength) {
-        BigInteger secret = keyUtility.createSecret(maximumBitLength, random);
-        return secret;
+    public BigInteger[] createSecrets(int batchSizeInBits, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
+        int length = returnStartSecretOnly ? 1 : bitHelper.convertBitsToSize(batchSizeInBits);
+        BigInteger[] secrets = new BigInteger[length];
+        for (int i = 0; i < secrets.length; i++) {
+            secrets[i] = keyUtility.createSecret(maximumBitLength, random);
+        }
+        return secrets;
     }
 
     

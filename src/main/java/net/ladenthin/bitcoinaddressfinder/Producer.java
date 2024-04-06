@@ -43,16 +43,16 @@ public interface Producer extends Runnable, Interruptable, ProducerStateProvider
     void produceKeys();
     
     /**
-     * Process the secret.
-     * @param secret
-     */
-    void processSecret(BigInteger secret);
-    
-    /**
      * Process the secret base.
      * @param secretBase
      */
     void processSecretBase(BigInteger secretBase);
+    
+    /**
+     * Process the secret.
+     * @param secret
+     */
+    void processSecrets(BigInteger[] secrets);
     
     /**
      * Blocks till the producer is not running anymore.

@@ -49,6 +49,7 @@ public class LMDBPersistencePerformanceTest {
     private final static BigInteger PRIVATE_KEY = BigInteger.valueOf(1337);
     private final static int CONSUMER_THREADS = 32;
     private final static int TEST_TIME_IN_SECONDS = 4;
+    
     /**
      * Deactivate to get proper performance results for the LMDB (round about 10506 k keys / second).
      * Set to active to test all OpenCL results if they are correct (round about 200 k keys / second).

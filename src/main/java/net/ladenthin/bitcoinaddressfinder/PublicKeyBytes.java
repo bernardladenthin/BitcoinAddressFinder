@@ -40,11 +40,18 @@ public class PublicKeyBytes {
 
     public static final BigInteger MAX_TECHNICALLY_PRIVATE_KEY = BigInteger.valueOf(2).pow(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS).subtract(BigInteger.ONE);
 
+    public static final BigInteger MIN_PRIVATE_KEY = BigInteger.ONE;
+    
     /**
      * Specifically, any 256-bit number between {@code 0x1} and {@code 0xFFFF FFFF FFFF FFFF FFFF FFFF FFFF FFFE BAAE DCE6 AF48 A03B BFD2 5E8C D036 4141} is a valid
      * private key.
      */
     public static final BigInteger MAX_PRIVATE_KEY = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16);
+    
+    /**
+     * I choose a random value for a replacement.
+     */
+    public static final BigInteger INVALID_PRIVATE_KEY_REPLACEMENT = BigInteger.valueOf(2);
 
     public static final int PRIVATE_KEY_MAX_NUM_BITS = 256;
     public static final int BITS_PER_BYTE = 8;
@@ -143,11 +150,25 @@ public class PublicKeyBytes {
     }
     
     public static boolean isInvalid(BigInteger secret) {
-        if (BigInteger.ZERO.equals(secret) || BigInteger.ONE.equals(secret)) {
+        if (secret.compareTo(MIN_PRIVATE_KEY) < 1 || secret.compareTo(MAX_PRIVATE_KEY) > 1) {
             // prevent an IllegalArgumentException
             return true;
         }
+        
         return false;
+    }
+    
+    public static BigInteger returnValidPrivateKey(BigInteger secret) {
+        if (isInvalid(secret)) {
+            return INVALID_PRIVATE_KEY_REPLACEMENT;
+        }
+        return secret;
+    }
+    
+    public static void replaceInvalidPrivateKeys(BigInteger[] secrets) {
+        for (int i = 0; i < secrets.length; i++) {
+            secrets[i] = returnValidPrivateKey(secrets[i]);
+        }
     }
     
     public PublicKeyBytes(BigInteger secretKey, byte[] uncompressed) {

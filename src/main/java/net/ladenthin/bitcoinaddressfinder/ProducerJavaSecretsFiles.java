@@ -20,6 +20,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.NonNull;
@@ -39,8 +40,8 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
     @NonNull
     AtomicReference<SecretsFile> currentSecretsFile = new AtomicReference<>();
 
-    public ProducerJavaSecretsFiles(CProducerJavaSecretsFiles producerJavaSecretsFiles, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer) {
-        super(producerJavaSecretsFiles, consumer, keyUtility, keyProducer);
+    public ProducerJavaSecretsFiles(CProducerJavaSecretsFiles producerJavaSecretsFiles, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer, BitHelper bitHelper) {
+        super(producerJavaSecretsFiles, consumer, keyUtility, keyProducer, bitHelper);
         this.producerJavaSecretsFiles = producerJavaSecretsFiles;
     }
     
@@ -63,7 +64,7 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
                     file,
                     producerJavaSecretsFiles.secretFormat,
                     readStatistic,
-                    this::processSecret
+                    this::consumeSecrets
                 );
 
                 logger.info("process: " + file.getAbsolutePath());
@@ -78,6 +79,11 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public void processSecrets(BigInteger[] secrets) {
+        throw new UnsupportedOperationException("Not supported yet.");
     }
     
     private void logProgress() {

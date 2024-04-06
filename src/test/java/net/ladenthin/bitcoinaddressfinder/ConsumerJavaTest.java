@@ -69,6 +69,7 @@ public class ConsumerJavaTest {
     private final NetworkParameters networkParameters = MainNetParams.get();
     private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
     private final PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
+    private final BitHelper bitHelper = new BitHelper();
     
     /**
      * Returns an example key. {@link https://privatekeys.pw/key/0000000000000000000000000000000000000000000000000000000000000049}
@@ -280,7 +281,7 @@ public class ConsumerJavaTest {
         
         CProducerJava cProducerJava = new CProducerJava();
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, randomForProducer);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, mockKeyProducer);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, mockKeyProducer, bitHelper);
 
         Logger logger = mock(Logger.class);
         consumerJava.setLogger(logger);
@@ -338,9 +339,9 @@ public class ConsumerJavaTest {
         Random randomForProducer = new Random(TestAddresses1337.RANDOM_SEED);
         
         CProducerJava cProducerJava = new CProducerJava();
-        cProducerJava.gridNumBits = 0;
+        cProducerJava.batchSizeInBits = 0;
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, randomForProducer);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, mockKeyProducer);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, mockKeyProducer, bitHelper);
 
         Logger logger = mock(Logger.class);
         when(logger.isDebugEnabled()).thenReturn(true);

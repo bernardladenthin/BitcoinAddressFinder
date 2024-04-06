@@ -12,5 +12,5 @@ java ^
 -Dlogback.configurationFile=logbackConfiguration.xml ^
 -jar ^
 bitcoinaddressfinder-1.2.0-SNAPSHOT-jar-with-dependencies.jar ^
-config_Find_1OpenCLDevice.js
+config_Find_1OpenCLDevice.json
 rem >> log_Find_1OpenCLDevice.txt 2>&1

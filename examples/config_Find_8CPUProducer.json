@@ -1,0 +1,130 @@
+{
+  "command": "Find",
+  "finder": {
+    "keyProducerJavaRandom": [
+      {
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
+        "keyProducerId": "exampleKeyProducerSecureRandomId_1",
+        "privateKeyMaxNumBits": 256
+      },
+      {
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
+        "keyProducerId": "exampleKeyProducerSecureRandomId_2",
+        "privateKeyMaxNumBits": 256
+      },
+      {
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
+        "keyProducerId": "exampleKeyProducerSecureRandomId_3",
+        "privateKeyMaxNumBits": 256
+      },
+      {
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
+        "keyProducerId": "exampleKeyProducerSecureRandomId_4",
+        "privateKeyMaxNumBits": 256
+      },
+      {
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
+        "keyProducerId": "exampleKeyProducerSecureRandomId_5",
+        "privateKeyMaxNumBits": 256
+      },
+      {
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
+        "keyProducerId": "exampleKeyProducerSecureRandomId_6",
+        "privateKeyMaxNumBits": 256
+      },
+      {
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
+        "keyProducerId": "exampleKeyProducerSecureRandomId_7",
+        "privateKeyMaxNumBits": 256
+      },
+      {
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
+        "keyProducerId": "exampleKeyProducerSecureRandomId_8",
+        "privateKeyMaxNumBits": 256
+      }
+    ],
+    "consumerJava": {
+      "lmdbConfigurationReadOnly": {
+        "lmdbDirectory": "lmdb",
+        "useProxyOptimal": true,
+        "logStatsOnInit": true,
+        "logStatsOnClose": false
+      },
+      "printStatisticsEveryNSeconds": 10,
+      "threads": 4,
+      "delayEmptyConsumer": 50,
+      "queueSize": 4,
+      "runtimePublicKeyCalculationCheck": false,
+      "enableVanity": false,
+      "vanityPattern": "1[Ee][Mm][Ii][Ll].*"
+    },
+    "producerJava": [
+      {
+        "keyProducerId": "exampleKeyProducerSecureRandomId_1",
+        "batchSizeInBits": 14,
+        "batchUsePrivateKeyIncrement": true,
+        "logSecretBase": false,
+        "runOnce": false
+      },
+      {
+        "keyProducerId": "exampleKeyProducerSecureRandomId_2",
+        "batchSizeInBits": 14,
+        "batchUsePrivateKeyIncrement": true,
+        "logSecretBase": false,
+        "runOnce": false
+      },
+      {
+        "keyProducerId": "exampleKeyProducerSecureRandomId_3",
+        "batchSizeInBits": 14,
+        "batchUsePrivateKeyIncrement": true,
+        "logSecretBase": false,
+        "runOnce": false
+      },
+      {
+        "keyProducerId": "exampleKeyProducerSecureRandomId_4",
+        "batchSizeInBits": 14,
+        "batchUsePrivateKeyIncrement": true,
+        "logSecretBase": false,
+        "runOnce": false
+      },
+      {
+        "keyProducerId": "exampleKeyProducerSecureRandomId_5",
+        "batchSizeInBits": 14,
+        "batchUsePrivateKeyIncrement": true,
+        "logSecretBase": false,
+        "runOnce": false
+      },
+      {
+        "keyProducerId": "exampleKeyProducerSecureRandomId_6",
+        "batchSizeInBits": 14,
+        "batchUsePrivateKeyIncrement": true,
+        "logSecretBase": false,
+        "runOnce": false
+      },
+      {
+        "keyProducerId": "exampleKeyProducerSecureRandomId_7",
+        "batchSizeInBits": 14,
+        "batchUsePrivateKeyIncrement": true,
+        "logSecretBase": false,
+        "runOnce": false
+      },
+      {
+        "keyProducerId": "exampleKeyProducerSecureRandomId_8",
+        "batchSizeInBits": 14,
+        "batchUsePrivateKeyIncrement": true,
+        "logSecretBase": false,
+        "runOnce": false
+      }
+    ],
+    "producerJavaSecretsFiles": [],
+    "producerOpenCL": []
+  }
+}

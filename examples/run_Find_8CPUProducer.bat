@@ -12,5 +12,5 @@ java ^
 -Dlogback.configurationFile=logbackConfiguration.xml ^
 -jar ^
 bitcoinaddressfinder-1.2.0-SNAPSHOT-jar-with-dependencies.jar ^
-config_Find_8CPUProducer.js
+config_Find_8CPUProducer.json
 rem >> log_Find_8CPUProducer.txt 2>&1

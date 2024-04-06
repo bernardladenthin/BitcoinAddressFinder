@@ -20,6 +20,7 @@ package net.ladenthin.bitcoinaddressfinder.cli;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -55,19 +56,25 @@ public class Main implements Runnable, Interruptable {
         this.configuration = configuration;
     }
     
-    public static Main createFromConfigurationFile(Path path) {
+    public static String readString(Path path) {
         try {
             String content = Files.readString(path, Charset.defaultCharset());
-            return createFromConfigurationString(content);
+            return content;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
     
-    public static Main createFromConfigurationString(String configurationString) {
+    public static CConfiguration fromJson(String configurationString) {
         Gson gson = new Gson();
         CConfiguration configuration = gson.fromJson(configurationString, CConfiguration.class);
-        return new Main(configuration);
+        return configuration;
+    }
+    
+    public static String configurationToJson(CConfiguration configuration) {
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        String json = gson.toJson(configuration);
+        return json;
     }
 
     public static void main(String[] args) {
@@ -75,8 +82,21 @@ public class Main implements Runnable, Interruptable {
             logger.error("Invalid arguments. Pass path to configuration as first argument.");
             return;
         }
-        Main main = createFromConfigurationFile(Path.of(args[0]));
+        String configurationAsString = readString(Path.of(args[0]));
+        CConfiguration configuration = fromJson(configurationAsString);
+        Main main = new Main(configuration);
+        main.logConfigurationTransformation();
         main.run();
+    }
+
+    public void logConfigurationTransformation() {
+        String json = configurationToJson(configuration);
+        logger.info(
+                "Please review the transformed configuration to ensure it aligns with your expectations and requirements before proceeding.:\n" +
+                        "########## BEGIN transformed configuration ##########\n" +
+                        json + "\n" +
+                        "########## END   transformed configuration ##########\n"
+        );
     }
 
     @Override

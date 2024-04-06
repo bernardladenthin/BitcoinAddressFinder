@@ -69,6 +69,7 @@ public class Finder implements Interruptable {
     private final NetworkParameters networkParameters = MainNetParams.get();
     private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
     private final PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
+    private final BitHelper bitHelper = new BitHelper();
     
     public Finder(CFinder finder) {
         this.finder = finder;
@@ -79,7 +80,7 @@ public class Finder implements Interruptable {
         logger.info("startKeyProducer");
         if (finder.keyProducerJavaRandom != null) {
             for (CKeyProducerJavaRandom cKeyProducerJavaRandom : finder.keyProducerJavaRandom) {
-                KeyProducerJavaRandom keyProducerJavaRandom = new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility);
+                KeyProducerJavaRandom keyProducerJavaRandom = new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility, bitHelper);
                 if (cKeyProducerJavaRandom.keyProducerId == null) {
                     throw new KeyProducerIdNullException();
                 }
@@ -106,27 +107,27 @@ public class Finder implements Interruptable {
         logger.info("configureProducer");
         if (finder.producerJava != null) {
             for (CProducerJava cProducerJava : finder.producerJava) {
-                cProducerJava.assertGridNumBitsCorrect();
+                bitHelper.assertBatchSizeInBitsIsInRange(cProducerJava.batchSizeInBits);
                 KeyProducer keyProducer = getKeyProducerJava(cProducerJava);
-                ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, keyProducer);
+                ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, keyProducer, bitHelper);
                 javaProducers.add(producerJava);
             }
         }
 
         if (finder.producerJavaSecretsFiles != null) {
             for (CProducerJavaSecretsFiles cProducerJavaSecretsFiles : finder.producerJavaSecretsFiles) {
-                cProducerJavaSecretsFiles.assertGridNumBitsCorrect();
+                bitHelper.assertBatchSizeInBitsIsInRange(cProducerJavaSecretsFiles.batchSizeInBits);
                 KeyProducer keyProducer = getKeyProducerJava(cProducerJavaSecretsFiles);
-                ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, consumerJava, keyUtility, keyProducer);
+                ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, consumerJava, keyUtility, keyProducer, bitHelper);
                 javaProducersSecretsFiles.add(producerJavaSecretsFiles);
             }
         }
 
         if (finder.producerOpenCL != null) {
             for (CProducerOpenCL cProducerOpenCL : finder.producerOpenCL) {
-                cProducerOpenCL.assertGridNumBitsCorrect();
+                bitHelper.assertBatchSizeInBitsIsInRange(cProducerOpenCL.batchSizeInBits);
                 KeyProducer keyProducer = getKeyProducerJava(cProducerOpenCL);
-                ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, consumerJava, keyUtility, keyProducer);
+                ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, consumerJava, keyUtility, keyProducer, bitHelper);
                 openCLProducers.add(producerOpenCL);
             }
         }

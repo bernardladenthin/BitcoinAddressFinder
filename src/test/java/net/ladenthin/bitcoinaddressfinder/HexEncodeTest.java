@@ -18,25 +18,20 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.math.BigInteger;
-import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
+import static org.junit.Assert.assertEquals;
 
-public class AbstractProducerTestImpl extends AbstractProducer {
+import org.junit.Test;
 
-    public AbstractProducerTestImpl(CProducer cProducer, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer, BitHelper bitHelper) {
-        super(cProducer, consumer, keyUtility, keyProducer, bitHelper);
+public class HexEncodeTest {
+
+    @Test
+    public void testEncodeHexString() {
+        byte[] data = { (byte) 0x8f, (byte) 0xc2, (byte) 0xab, (byte) 0xde };
+
+        String resultBouncyCastle = org.bouncycastle.util.encoders.Hex.toHexString(data);
+
+        String resultApache = org.apache.commons.codec.binary.Hex.encodeHexString(data);
+
+        assertEquals("Die Hex-Strings sollten gleich sein", resultBouncyCastle, resultApache);
     }
-
-    @Override
-    public void produceKeys() {
-    }
-
-    @Override
-    public void processSecretBase(BigInteger secretBase) {
-    }
-
-    @Override
-    public void processSecrets(BigInteger[] secret) {
-    }
-    
 }

@@ -38,8 +38,8 @@ public class ProducerOpenCL extends AbstractProducer {
     @Nullable
     OpenCLContext openCLContext;
 
-    public ProducerOpenCL(CProducerOpenCL producerOpenCL, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer) {
-        super(producerOpenCL, consumer, keyUtility, keyProducer);
+    public ProducerOpenCL(CProducerOpenCL producerOpenCL, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer, BitHelper bitHelper) {
+        super(producerOpenCL, consumer, keyUtility, keyProducer, bitHelper);
         this.producerOpenCL = producerOpenCL;
         this.resultReaderThreadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads);
         if (false) {
@@ -53,7 +53,7 @@ public class ProducerOpenCL extends AbstractProducer {
     @Override
     public void initProducer() {
         super.initProducer();
-        openCLContext = new OpenCLContext(producerOpenCL);
+        openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
         try {
             openCLContext.init();
         } catch (IOException e) {
@@ -81,6 +81,11 @@ public class ProducerOpenCL extends AbstractProducer {
         } catch (Exception e) {
             logErrorInProduceKeys(e, secretBase);
         }
+    }
+
+    @Override
+    public void processSecrets(BigInteger[] secrets) {
+        throw new UnsupportedOperationException("Not supported yet.");
     }
     
     protected static class ResultReaderRunnable implements Runnable {

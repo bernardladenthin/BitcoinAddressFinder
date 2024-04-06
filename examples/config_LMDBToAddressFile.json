@@ -1,0 +1,13 @@
+{
+  "command": "LMDBToAddressFile",
+  "lmdbToAddressFile": {
+    "lmdbConfigurationReadOnly": {
+      "lmdbDirectory": "lmdb",
+      "useProxyOptimal": true,
+      "logStatsOnInit": false,
+      "logStatsOnClose": false
+    },
+    "addressesFile": "export.txt",
+    "addressFileOutputFormat": "HexHash"
+  }
+}

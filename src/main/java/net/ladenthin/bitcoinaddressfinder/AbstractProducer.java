@@ -37,16 +37,18 @@ public abstract class AbstractProducer implements Producer {
     protected final Consumer consumer;
     protected final KeyUtility keyUtility;
     protected final KeyProducer keyProducer;
+    protected final BitHelper bitHelper;
     
     protected volatile ProducerState state = ProducerState.UNINITIALIZED;
     
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
-    public AbstractProducer(CProducer cProducer, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer) {
+    public AbstractProducer(CProducer cProducer, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer, BitHelper bitHelper) {
         this.cProducer = cProducer;
         this.consumer = consumer;
         this.keyUtility = keyUtility;
         this.keyProducer = keyProducer;
+        this.bitHelper = bitHelper;
     }
 
     @Override
@@ -75,30 +77,42 @@ public abstract class AbstractProducer implements Producer {
     @Override
     public void produceKeys() {
         try {
-            BigInteger secret;
+            BigInteger[] secrets;
             try {
-                secret = keyProducer.createSecret(cProducer.privateKeyMaxNumBits);
+                secrets = keyProducer.createSecrets(cProducer.batchSizeInBits, cProducer.batchUsePrivateKeyIncrement);
             } catch (NoMoreSecretsAvailableException ex) {
                 logNoMoreSecretsInSecretFactory();
                 interrupt();
                 return;
             }
             
-            if (PublicKeyBytes.isInvalid(secret)) {
-                return;
+            // assert the requested secrets array fulfill its request parameter
+            if (cProducer.batchUsePrivateKeyIncrement) {
+                if(secrets.length != 1) {
+                    throw new RuntimeException("secrets.length != 1");
+                }
+            } else {
+                if(secrets.length != bitHelper.convertBitsToSize(cProducer.batchSizeInBits)) {
+                    throw new RuntimeException("secrets.length != bitHelper.convertBitsToSize(cProducer.batchSizeInBits)");
+                }
             }
+            PublicKeyBytes.replaceInvalidPrivateKeys(secrets);
             
-            processSecret(secret);
+            consumeSecrets(secrets);
          } catch (RuntimeException e) {
             logErrorInProduceKeys(e);
             throw e;
         }
     }
     
-    @Override
-    public void processSecret(BigInteger secret) {
-        BigInteger secretBase = createSecretBase(secret, cProducer.logSecretBase);
-        processSecretBase(secretBase);
+    void consumeSecrets(BigInteger[] secrets) {
+        if (cProducer.batchUsePrivateKeyIncrement) {
+            BigInteger secret = secrets[0];
+            BigInteger secretBase = createSecretBase(secret, cProducer.logSecretBase);
+            processSecretBase(secretBase);
+        } else {
+            processSecrets(secrets);
+        }
     }
     
     /**
@@ -132,7 +146,7 @@ public abstract class AbstractProducer implements Producer {
         BigInteger secretBase = keyUtility.killBits(secret, cProducer.getKillBits());
         
         if(logSecretBase) {
-            logger.info("secretBase: " + org.bouncycastle.util.encoders.Hex.toHexString(secretBase.toByteArray()) + "/" + cProducer.gridNumBits);
+            logger.info("secretBase: " + org.bouncycastle.util.encoders.Hex.toHexString(secretBase.toByteArray()) + "/" + cProducer.batchSizeInBits);
         }
             
         if (logger.isTraceEnabled()) {

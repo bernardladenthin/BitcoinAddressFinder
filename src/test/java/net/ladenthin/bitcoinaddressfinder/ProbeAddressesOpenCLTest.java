@@ -62,7 +62,9 @@ public class ProbeAddressesOpenCLTest {
      * 23:  512Mb: executed in: 2346ms, read in: 148ms
      * 24: 1024Mb: executed in: 4622ms, read in: 302ms
     */
-    private final static int BITS_FOR_GRID = 8;
+    private final static int BITS_FOR_BATCH = 8;
+    
+    private final BitHelper bitHelper = new BitHelper();
 
     @Rule
     public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -406,8 +408,8 @@ public class ProbeAddressesOpenCLTest {
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
-        producerOpenCL.gridNumBits = bitSize;
-        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL);
+        producerOpenCL.batchSizeInBits = bitSize;
+        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
         openCLContext.init();
         
         Random sr = new SecureRandom();
@@ -427,12 +429,12 @@ public class ProbeAddressesOpenCLTest {
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
-        producerOpenCL.gridNumBits = BITS_FOR_GRID;
-        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL);
+        producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
+        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
         openCLContext.init();
         
         Random sr = new SecureRandom();
-        BigInteger secret = keyUtility.createSecret(BITS_FOR_GRID-1, sr);
+        BigInteger secret = keyUtility.createSecret(BITS_FOR_BATCH-1, sr);
         BigInteger secretBase = keyUtility.killBits(secret, producerOpenCL.getKillBits());
         
         openCLContext.createKeys(secretBase);
@@ -446,21 +448,14 @@ public class ProbeAddressesOpenCLTest {
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
-        producerOpenCL.gridNumBits = 20;
-        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL);
+        producerOpenCL.batchSizeInBits = 20;
+        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
         openCLContext.init();
         
         OpenClTask openClTask = openCLContext.getOpenClTask();
         openClTask.setSrcPrivateKeyChunk(PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY);
         
         openCLContext.release();
-    }
-    
-    
-    @Test
-    public void assertGridNumBitsCorrect_configurationConstantsSet_noExceptionThrown() throws IOException {
-        CProducer cProducer = new CProducer();
-        cProducer.assertGridNumBitsCorrect();
     }
     
     @Test
@@ -475,8 +470,8 @@ public class ProbeAddressesOpenCLTest {
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
-        producerOpenCL.gridNumBits = BITS_FOR_GRID;
-        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL);
+        producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
+        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
         openCLContext.init();
         
         Random sr = new SecureRandom();

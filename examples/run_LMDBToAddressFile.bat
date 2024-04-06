@@ -12,5 +12,5 @@ java ^
 -Dlogback.configurationFile=logbackConfiguration.xml ^
 -jar ^
 bitcoinaddressfinder-1.2.0-SNAPSHOT-jar-with-dependencies.jar ^
-config_LMDBToAddressFile.js
+config_LMDBToAddressFile.json
 rem >> log_LMDBToAddressFile.txt 2>&1

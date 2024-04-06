@@ -25,8 +25,8 @@ public class ProducerJava extends AbstractProducer {
 
     protected final CProducerJava producerJava;
 
-    public ProducerJava(CProducerJava producerJava, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer) {
-        super(producerJava, consumer, keyUtility, keyProducer);
+    public ProducerJava(CProducerJava producerJava, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer, BitHelper bitHelper) {
+        super(producerJava, consumer, keyUtility, keyProducer, bitHelper);
         this.producerJava = producerJava;
     }
 
@@ -40,8 +40,21 @@ public class ProducerJava extends AbstractProducer {
         }
     }
 
+    @Override
+    public void processSecrets(BigInteger[] secrets) {
+        try {
+            PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[secrets.length];
+            for (int i = 0; i < secrets.length; i++) {
+                publicKeyBytesArray[i] = PublicKeyBytes.fromPrivate(secrets[i]);
+            }
+            consumer.consumeKeys(publicKeyBytesArray);
+        } catch (Exception e) {
+            logErrorInProduceKeys(e);
+        }
+    }
+
     protected PublicKeyBytes[] createGrid(final BigInteger secretBase) {
-        PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[producerJava.getWorkSize()];
+        PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[bitHelper.convertBitsToSize(producerJava.batchSizeInBits)];
         for (int i = 0; i < publicKeyBytesArray.length; i++) {
             // create uncompressed
             BigInteger gridSecret = calculateSecretKey(secretBase, i);

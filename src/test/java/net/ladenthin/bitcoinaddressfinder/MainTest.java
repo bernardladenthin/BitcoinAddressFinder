@@ -30,6 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.cli.Main;
+import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -49,26 +50,23 @@ public class MainTest {
     private final Path testRoundtripDirectory = resourceDirectory.resolve("testRoundtrip");
     private final Path testOpenCLInfoDirectory = resourceDirectory.resolve("testOpenCLInfo");
     
-    private final Path config_AddressFilesToLMDB_js = testRoundtripDirectory.resolve("config_AddressFilesToLMDB.js");
-    private final Path config_LMDBToAddressFile_js = testRoundtripDirectory.resolve("config_LMDBToAddressFile.js");
-    private final Path config_Find_SecretsFile_js = testRoundtripDirectory.resolve("config_Find_SecretsFile.js");
+    private final Path config_AddressFilesToLMDB_json = testRoundtripDirectory.resolve("config_AddressFilesToLMDB.json");
+    private final Path config_LMDBToAddressFile_json = testRoundtripDirectory.resolve("config_LMDBToAddressFile.json");
+    private final Path config_Find_SecretsFile_json = testRoundtripDirectory.resolve("config_Find_SecretsFile.json");
     
-    private final Path config_Find_1OpenCLDevice_js = testRoundtripDirectory.resolve("config_Find_1OpenCLDevice.js");
+    private final Path config_Find_1OpenCLDevice_json = testRoundtripDirectory.resolve("config_Find_1OpenCLDevice.json");
     
-    private final Path config_OpenCLInfo_js = testOpenCLInfoDirectory.resolve("config_OpenCLInfo.js");
+    private final Path config_OpenCLInfo_json = testOpenCLInfoDirectory.resolve("config_OpenCLInfo.json");
 
     // <editor-fold defaultstate="collapsed" desc="testRoundtrip">
     @Test
     public void testRoundtrip_configurationsGiven_lmdbCreatedExportedAndRunFindSecretsFile() throws IOException, InterruptedException {
-        // arrange
-        Main mainAddressFilesToLMDB = Main.createFromConfigurationFile(config_AddressFilesToLMDB_js);
-        mainAddressFilesToLMDB.run();
+        // arrange, act, assert
+        Main.main(new String[]{config_AddressFilesToLMDB_json.toAbsolutePath().toString()});
         
-        Main mainLMDBToAddressFile = Main.createFromConfigurationFile(config_LMDBToAddressFile_js);
-        mainLMDBToAddressFile.run();
+        Main.main(new String[]{config_LMDBToAddressFile_json.toAbsolutePath().toString()});
         
-        Main mainFind_SecretsFile = Main.createFromConfigurationFile(config_Find_SecretsFile_js);
-        mainFind_SecretsFile.run();
+        Main.main(new String[]{config_Find_SecretsFile_json.toAbsolutePath().toString()});
     }
     // </editor-fold>
     
@@ -78,12 +76,13 @@ public class MainTest {
     public void testRoundtripOpenCLProducer_configurationsGiven_lmdbCreatedAndRunFindOpenCLDevice() throws IOException, InterruptedException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // arrange
-        Main mainAddressFilesToLMDB = Main.createFromConfigurationFile(config_AddressFilesToLMDB_js);
+        Main mainAddressFilesToLMDB = new Main(Main.fromJson(Main.readString(config_AddressFilesToLMDB_json)));
+        mainAddressFilesToLMDB.logConfigurationTransformation();
         mainAddressFilesToLMDB.run();
         
         new LogLevelChange().setLevel(Level.DEBUG);
         
-        Main mainFind_1OpenCLDevice = Main.createFromConfigurationFile(config_Find_1OpenCLDevice_js);
+        Main mainFind_1OpenCLDevice = new Main(Main.fromJson(Main.readString(config_Find_1OpenCLDevice_json)));
         
         
         ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
@@ -94,6 +93,7 @@ public class MainTest {
         }, 10, TimeUnit.SECONDS);
         
         // act
+        mainFind_1OpenCLDevice.logConfigurationTransformation();
         mainFind_1OpenCLDevice.run();
     }
     // </editor-fold>
@@ -104,7 +104,8 @@ public class MainTest {
     public void testOpenCLInfo_configurationGiven_noExceptionThrown() throws IOException, InterruptedException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // arrange
-        Main mainFind_SecretsFile = Main.createFromConfigurationFile(config_OpenCLInfo_js);
+        Main mainFind_SecretsFile = new Main(Main.fromJson(Main.readString(config_OpenCLInfo_json)));
+        mainFind_SecretsFile.logConfigurationTransformation();
         mainFind_SecretsFile.run();
     }
     // </editor-fold>

@@ -19,24 +19,23 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
-import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 
-public class AbstractProducerTestImpl extends AbstractProducer {
-
-    public AbstractProducerTestImpl(CProducer cProducer, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer, BitHelper bitHelper) {
-        super(cProducer, consumer, keyUtility, keyProducer, bitHelper);
-    }
-
-    @Override
-    public void produceKeys() {
-    }
-
-    @Override
-    public void processSecretBase(BigInteger secretBase) {
-    }
-
-    @Override
-    public void processSecrets(BigInteger[] secret) {
+public class BitHelper {
+    
+    public int convertBitsToSize(int bits) {
+        return 1 << bits;
     }
     
+    public BigInteger getKillBits(int bits) {
+        return BigInteger.valueOf(2).pow(bits).subtract(BigInteger.ONE);
+    }
+    
+    public void assertBatchSizeInBitsIsInRange(int batchSizeInBits) {
+        if (batchSizeInBits < 0) {
+            throw new IllegalArgumentException("batchSizeInBits must higher or equal to 0.");
+        }
+        if (batchSizeInBits > PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY) {
+            throw new IllegalArgumentException("batchSizeInBits must be lower or equal than " + PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY + ".");
+        }
+    }
 }

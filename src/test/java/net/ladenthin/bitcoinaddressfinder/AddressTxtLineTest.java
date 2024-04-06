@@ -40,9 +40,8 @@ public class AddressTxtLineTest {
 
     private static final TestAddresses42 testAddresses = new TestAddresses42(0, false);
 
-    StaticKey staticKey = new StaticKey();
-
-    KeyUtility keyUtility = new KeyUtility(testAddresses.networkParameters, new ByteBufferUtility(false));
+    private final StaticKey staticKey = new StaticKey();
+    private final KeyUtility keyUtility = new KeyUtility(testAddresses.networkParameters, new ByteBufferUtility(false));
 
     @Before
     public void init() throws IOException {

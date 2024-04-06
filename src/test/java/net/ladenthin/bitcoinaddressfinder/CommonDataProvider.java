@@ -141,6 +141,7 @@ public class CommonDataProvider {
         }
         
         return new Object[][]{
+            {0},
             {1},
             {2},
             {3},
@@ -365,15 +366,15 @@ public class CommonDataProvider {
     @DataProvider
     public static Object[][] createSecretBaseLogged() {
         return new Object[][]{
-            // small key, 2 bit num grid
+            // small key, batchSizeInBits: 2
             {"ABCDEF", 2, "abcdec", "secretBase: abcdec/2", "secret BigInteger: -5517841", "secret as byte array: abcdef", "killBits: 03", "secretBase: -5517844", "secretBase as byte array: abcdec"},
             {"FEDCBA", 2, "fedcb8", "secretBase: fedcb8/2", "secret BigInteger: -74566", "secret as byte array: fedcba", "killBits: 03", "secretBase: -74568", "secretBase as byte array: fedcb8"},
-            // small key, 21 bit num grid
+            // small key, batchSizeInBits: 21
             {"ABCDEF", 21, "a00000", "secretBase: a00000/21", "secret BigInteger: -5517841", "secret as byte array: abcdef", "killBits: 1fffff", "secretBase: -6291456", "secretBase as byte array: a00000"},
             {"FEDCBA", 21, "e00000", "secretBase: e00000/21", "secret BigInteger: -74566", "secret as byte array: fedcba", "killBits: 1fffff", "secretBase: -2097152", "secretBase as byte array: e00000"},
-            // large key, 21 bit num grid
+            // large key, batchSizeInBits: 21
             {"123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff", 21, "123456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000", "secretBase: 123456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000/21", "secret BigInteger: 8234104123542484900769178205574010627627573691361805720124810878238590820095", "secret as byte array: 123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff", "killBits: 1fffff", "secretBase: 8234104123542484900769178205574010627627573691361805720124810878238588928000", "secretBase as byte array: 123456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000"},
-            // large key with odd number, 21 bit num grid
+            // large key with odd number, batchSizeInBits: 21
             {"00d456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff", 21, "00d456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000", "secretBase: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000/21", "secret BigInteger: 375168379408231402782670922269509069226925318059052594399906494889018056447", "secret as byte array: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff", "killBits: 1fffff", "secretBase: 375168379408231402782670922269509069226925318059052594399906494889016164352", "secretBase as byte array: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000"},
         };
     }

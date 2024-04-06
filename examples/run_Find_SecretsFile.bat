@@ -12,5 +12,5 @@ java ^
 -Dlogback.configurationFile=logbackConfiguration.xml ^
 -jar ^
 bitcoinaddressfinder-1.2.0-SNAPSHOT-jar-with-dependencies.jar ^
-config_Find_SecretsFile.js
+config_Find_SecretsFile.json
 rem >> log_Find_SecretsFile.txt 2>&1

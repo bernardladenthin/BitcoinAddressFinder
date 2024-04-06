@@ -88,6 +88,7 @@ public class OpenCLContext {
     private final static boolean EXCEPTIONS_ENABLED = true;
     
     private final CProducerOpenCL producerOpenCL;
+    private final BitHelper bitHelper;
 
     private cl_context_properties contextProperties;
     private cl_device_id device;
@@ -97,8 +98,9 @@ public class OpenCLContext {
     private cl_kernel kernel;
     private OpenClTask openClTask;
     
-    public OpenCLContext(CProducerOpenCL producerOpenCL) {
+    public OpenCLContext(CProducerOpenCL producerOpenCL, BitHelper bitHelper) {
         this.producerOpenCL = producerOpenCL;
+        this.bitHelper = bitHelper;
     }
     
     public void init() throws IOException {
@@ -152,7 +154,7 @@ public class OpenCLContext {
         // Create the kernel
         kernel = clCreateKernel(program, KERNEL_NAME, null);
         
-        openClTask = new OpenClTask(context, producerOpenCL);
+        openClTask = new OpenClTask(context, producerOpenCL, bitHelper);
     }
 
     OpenClTask getOpenClTask() {
@@ -171,7 +173,7 @@ public class OpenCLContext {
         openClTask.setSrcPrivateKeyChunk(privateKeyBase);
         ByteBuffer dstByteBuffer = openClTask.executeKernel(kernel, commandQueue);
 
-        OpenCLGridResult openCLGridResult = new OpenCLGridResult(privateKeyBase, producerOpenCL.getWorkSize(), dstByteBuffer);
+        OpenCLGridResult openCLGridResult = new OpenCLGridResult(privateKeyBase, bitHelper.convertBitsToSize(producerOpenCL.batchSizeInBits), dstByteBuffer);
         return openCLGridResult;
     }
 

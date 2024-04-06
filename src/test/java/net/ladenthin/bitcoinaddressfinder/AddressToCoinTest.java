@@ -33,8 +33,8 @@ import static org.hamcrest.Matchers.is;
 
 public class AddressToCoinTest {
 
-    protected final NetworkParameters networkParameters = MainNetParams.get();
-    protected final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(true));
+    private final NetworkParameters networkParameters = MainNetParams.get();
+    private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(true));
     
     @Test
     public void createAddressToCoin_publicKeyGiven_ToStringAndEqualsAndHashCode() throws IOException, InterruptedException {

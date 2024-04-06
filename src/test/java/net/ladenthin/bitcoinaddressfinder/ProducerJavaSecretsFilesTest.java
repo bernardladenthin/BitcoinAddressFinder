@@ -55,8 +55,9 @@ public class ProducerJavaSecretsFilesTest {
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
     
-    protected static final NetworkParameters networkParameters = MainNetParams.get();
-    protected final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
+    private static final NetworkParameters networkParameters = MainNetParams.get();
+    private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
+    private final BitHelper bitHelper = new BitHelper();
     
     enum PrivateKey {
         TEST("test"),
@@ -101,7 +102,7 @@ public class ProducerJavaSecretsFilesTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerJava producerJava = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockKeyProducer);
+        ProducerJava producerJava = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         AbstractProducerTest.verifyInitProducer(producerJava);
     }
@@ -114,7 +115,7 @@ public class ProducerJavaSecretsFilesTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerJava producerJava = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockKeyProducer);
+        ProducerJava producerJava = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         AbstractProducerTest.verifyReleaseProducer(producerJava);
     }
@@ -128,7 +129,7 @@ public class ProducerJavaSecretsFilesTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockKeyProducer);
+        ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         // act
         producerJavaSecretsFiles.produceKeys();
@@ -145,12 +146,12 @@ public class ProducerJavaSecretsFilesTest {
         List<String> secretsFilesAsStringList = secretsFiles.stream().map(file -> file.getAbsolutePath()).collect(Collectors.toList());
         cProducerJavaSecretsFiles.files = secretsFilesAsStringList;
         cProducerJavaSecretsFiles.secretFormat = cSecretFormat;
-        cProducerJavaSecretsFiles.gridNumBits = 0;
+        cProducerJavaSecretsFiles.batchSizeInBits = 0;
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockKeyProducer);
+        ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         // act
         producerJavaSecretsFiles.produceKeys();

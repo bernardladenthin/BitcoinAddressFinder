@@ -59,11 +59,13 @@ public class OpenClTask {
     private final Pointer srcPointer;
 
     private final cl_mem srcMem;
+    private final BitHelper bitHelper;
 
     // Only available after init
-    public OpenClTask(cl_context context, CProducer cProducer) {
+    public OpenClTask(cl_context context, CProducer cProducer, BitHelper bitHelper) {
         this.context = context;
         this.cProducer = cProducer;
+        this.bitHelper = bitHelper;
 
         int srcSizeInBytes = getSrcSizeInBytes();
         srcByteBuffer = ByteBuffer.allocateDirect(srcSizeInBytes);
@@ -82,7 +84,7 @@ public class OpenClTask {
     }
 
     public int getDstSizeInBytes() {
-        return PublicKeyBytes.TWO_COORDINATES_NUM_BYTES * cProducer.getWorkSize();
+        return PublicKeyBytes.TWO_COORDINATES_NUM_BYTES * bitHelper.convertBitsToSize(cProducer.batchSizeInBits);
     }
 
     public void setSrcPrivateKeyChunk(BigInteger privateKeyBase) {
@@ -123,7 +125,7 @@ public class OpenClTask {
         clSetKernelArg(kernel, 1, Sizeof.cl_mem, Pointer.to(srcMem));
 
         // Set the work-item dimensions
-        long global_work_size[] = new long[]{cProducer.getWorkSize()};
+        long global_work_size[] = new long[]{bitHelper.convertBitsToSize(cProducer.batchSizeInBits)};
         long localWorkSize[] = null; // new long[]{1}; // enabling the system to choose the work-group size.
         int workDim = 1;
 

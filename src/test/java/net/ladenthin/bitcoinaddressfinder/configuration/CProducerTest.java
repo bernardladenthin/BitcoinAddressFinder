@@ -20,9 +20,8 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
+import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
-import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
 import org.junit.Before;
 import org.junit.Test;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -30,77 +29,77 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
 
 public class CProducerTest {
-
-    private final StaticKey staticKey = new StaticKey();
+    
+    private final BitHelper bitHelper = new BitHelper();
     
     @Before
     public void init() throws IOException {
     }
 
-    // <editor-fold defaultstate="collapsed" desc="assertGridNumBitsCorrect">
+    // <editor-fold defaultstate="collapsed" desc="assertBatchSizeInBitsCorrect">
     @Test(expected = IllegalArgumentException.class)
-    public void assertGridNumBitsCorrect_gridNumBitsSetNegative_exceptionThrown() throws IOException {
+    public void assertBatchSizeInBitsCorrect_batchSizeInBitsSetNegative_exceptionThrown() throws IOException {
         // arrange
         CProducer cProducer = new CProducer();
-        cProducer.gridNumBits = -1;
+        cProducer.batchSizeInBits = -1;
 
         // act, assert
-        cProducer.assertGridNumBitsCorrect();
+        bitHelper.assertBatchSizeInBitsIsInRange(cProducer.batchSizeInBits);
     }
     
     @Test(expected = IllegalArgumentException.class)
-    public void assertGridNumBitsCorrect_gridNumBitsSetOverMaximum_exceptionThrown() throws IOException {
+    public void assertBatchSizeInBitsCorrect_batchSizeInBitsSetOverMaximum_exceptionThrown() throws IOException {
         // arrange
         CProducer cProducer = new CProducer();
-        cProducer.gridNumBits = PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY + 1;
+        cProducer.batchSizeInBits = PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY + 1;
 
         // act, assert
-        cProducer.assertGridNumBitsCorrect();
+        bitHelper.assertBatchSizeInBitsIsInRange(cProducer.batchSizeInBits);
     }
     
     @Test
-    public void assertGridNumBitsCorrect_gridNumBitsNotSet_noExceptionThrown() throws IOException {
+    public void assertBatchSizeInBitsCorrect_batchSizeInBitsNotSet_noExceptionThrown() throws IOException {
         // arrange
         CProducer cProducer = new CProducer();
 
         // act, assert
-        cProducer.assertGridNumBitsCorrect();
+        bitHelper.assertBatchSizeInBitsIsInRange(cProducer.batchSizeInBits);
     }
 
     @Test
-    public void assertGridNumBitsCorrect_gridNumBitsSetToZero_noExceptionThrown() throws IOException {
+    public void assertBatchSizeInBitsCorrect_batchSizeInBitsSetToZero_noExceptionThrown() throws IOException {
         // arrange
         CProducer cProducer = new CProducer();
-        cProducer.gridNumBits = 0;
+        cProducer.batchSizeInBits = 0;
 
         // act, assert
-        cProducer.assertGridNumBitsCorrect();
+        bitHelper.assertBatchSizeInBitsIsInRange(cProducer.batchSizeInBits);
     }
 
     @Test
-    public void assertGridNumBitsCorrect_gridNumBitsSetToOne_noExceptionThrown() throws IOException {
+    public void assertBatchSizeInBitsCorrect_batchSizeInBitsSetToOne_noExceptionThrown() throws IOException {
         // arrange
         CProducer cProducer = new CProducer();
-        cProducer.gridNumBits = 1;
+        cProducer.batchSizeInBits = 1;
 
         // act, assert
-        cProducer.assertGridNumBitsCorrect();
+        bitHelper.assertBatchSizeInBitsIsInRange(cProducer.batchSizeInBits);
     }
 
     @Test
-    public void assertGridNumBitsCorrect_gridNumBitsSetToTwo_noExceptionThrown() throws IOException {
+    public void assertBatchSizeInBitsCorrect_batchSizeInBitsSetToTwo_noExceptionThrown() throws IOException {
         // arrange
         CProducer cProducer = new CProducer();
-        cProducer.gridNumBits = 2;
+        cProducer.batchSizeInBits = 2;
 
         // act, assert
-        cProducer.assertGridNumBitsCorrect();
+        bitHelper.assertBatchSizeInBitsIsInRange(cProducer.batchSizeInBits);
     }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="getKillBits">
     @Test
-    public void getKillBits_gridNumBitsNotSet_killBitsEqualsExpectation() throws IOException {
+    public void getKillBits_batchSizeInBitsNotSet_killBitsEqualsExpectation() throws IOException {
         // arrange
         CProducer cProducer = new CProducer();
 
@@ -109,96 +108,102 @@ public class CProducerTest {
     }
 
     @Test
-    public void getKillBits_gridNumBitsSetToZero_killBitsEqualsExpectation() throws IOException {
+    public void getKillBits_batchSizeInBitsSetToZero_killBitsEqualsExpectation() throws IOException {
         // arrange
         CProducer cProducer = new CProducer();
-        cProducer.gridNumBits = 0;
+        cProducer.batchSizeInBits = 0;
 
         // act, assert
         assertThat(cProducer.getKillBits(), is(equalTo(BigInteger.valueOf(0L))));
     }
 
     @Test
-    public void getKillBits_gridNumBitsSetToOne_killBitsEqualsExpectation() throws IOException {
+    public void getKillBits_batchSizeInBitsSetToOne_killBitsEqualsExpectation() throws IOException {
         // arrange
         CProducer cProducer = new CProducer();
-        cProducer.gridNumBits = 1;
+        cProducer.batchSizeInBits = 1;
 
         // act, assert
         assertThat(cProducer.getKillBits(), is(equalTo(BigInteger.valueOf(1L))));
     }
 
     @Test
-    public void getKillBits_gridNumBitsSetToTwo_killBitsEqualsExpectation() throws IOException {
+    public void getKillBits_batchSizeInBitsSetToTwo_killBitsEqualsExpectation() throws IOException {
         // arrange
         CProducer cProducer = new CProducer();
-        cProducer.gridNumBits = 2;
+        cProducer.batchSizeInBits = 2;
 
         // act, assert
         assertThat(cProducer.getKillBits(), is(equalTo(BigInteger.valueOf(3L))));
     }
 
     @Test
-    public void getKillBits_gridNumBitsSetToThree_killBitsEqualsExpectation() throws IOException {
+    public void getKillBits_batchSizeInBitsSetToThree_killBitsEqualsExpectation() throws IOException {
         // arrange
         CProducer cProducer = new CProducer();
-        cProducer.gridNumBits = 3;
+        cProducer.batchSizeInBits = 3;
 
         // act, assert
         assertThat(cProducer.getKillBits(), is(equalTo(BigInteger.valueOf(7L))));
     }
 
     @Test
-    public void getKillBits_gridNumBitsSetToEight_killBitsEqualsExpectation() throws IOException {
+    public void getKillBits_batchSizeInBitsSetToEight_killBitsEqualsExpectation() throws IOException {
         // arrange
         CProducer cProducer = new CProducer();
-        cProducer.gridNumBits = 8;
+        cProducer.batchSizeInBits = 8;
 
         // act, assert
         assertThat(cProducer.getKillBits(), is(equalTo(BigInteger.valueOf(255L))));
     }
     // </editor-fold>
 
-    // <editor-fold defaultstate="collapsed" desc="getWorkSize">
+    // <editor-fold defaultstate="collapsed" desc="getBatchSize">
     @Test
-    public void getWorkSize_gridNumBitsNotSet_workSizeEqualsExpectation() throws IOException {
+    public void getBatchSize_batchSizeInBitsNotSet_batchSizeEqualsExpectation() throws IOException {
         // arrange
         CProducer cProducer = new CProducer();
 
         // act, assert
-        assertThat(cProducer.getWorkSize(), is(equalTo(1)));
+        assertThat(bitHelper.convertBitsToSize(cProducer.batchSizeInBits), is(equalTo(1)));
     }
 
     @Test
-    public void getWorkSize_gridNumBitsSetToZero_workSizeEqualsExpectation() throws IOException {
+    public void getBatchSize_batchSizeInBitsSetToZero_batchSizeEqualsExpectation() throws IOException {
         // arrange
         CProducer cProducer = new CProducer();
-        cProducer.gridNumBits = 0;
+        cProducer.batchSizeInBits = 0;
 
         // act, assert
-        assertThat(cProducer.getWorkSize(), is(equalTo(1)));
+        assertThat(bitHelper.convertBitsToSize(cProducer.batchSizeInBits), is(equalTo(1)));
     }
 
     @Test
-    public void getWorkSize_gridNumBitsSetToOne_workSizeEqualsExpectation() throws IOException {
+    public void getBatchSize_batchSizeInBitsSetToOne_batchSizeEqualsExpectation() throws IOException {
         // arrange
         CProducer cProducer = new CProducer();
-        cProducer.gridNumBits = 1;
+        cProducer.batchSizeInBits = 1;
 
         // act, assert
-        assertThat(cProducer.getWorkSize(), is(equalTo(2)));
+        assertThat(bitHelper.convertBitsToSize(cProducer.batchSizeInBits), is(equalTo(2)));
     }
 
     @Test
-    public void getWorkSize_gridNumBitsSetToTwo_workSizeEqualsExpectation() throws IOException {
+    public void getBatchSize_batchSizeInBitsSetToTwo_batchSizeEqualsExpectation() throws IOException {
         // arrange
         CProducer cProducer = new CProducer();
-        cProducer.gridNumBits = 2;
+        cProducer.batchSizeInBits = 2;
 
         // act, assert
-        assertThat(cProducer.getWorkSize(), is(equalTo(4)));
+        assertThat(bitHelper.convertBitsToSize(cProducer.batchSizeInBits), is(equalTo(4)));
     }
     // </editor-fold>
-
-
+    
+    // <editor-fold defaultstate="collapsed" desc="default parameter for batchSizeInBits">
+    @Test
+    public void batchSizeInBits_configurationConstantsSet_isValidDefaultValue() throws IOException {
+        CProducer cProducer = new CProducer();
+        bitHelper.assertBatchSizeInBitsIsInRange(cProducer.batchSizeInBits);
+    }
+    // </editor-fold>
 }

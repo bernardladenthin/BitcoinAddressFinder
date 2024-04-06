@@ -7,10 +7,10 @@ java ^
 --add-opens java.base/jdk.internal.misc=ALL-UNNAMED ^
 --add-opens java.base/sun.nio.ch=ALL-UNNAMED ^
 --add-opens jdk.management/com.sun.management.internal=ALL-UNNAMED ^
--Xms512M ^
--Xmx16G ^
+-Xms512m ^
+-Xmx512m ^
 -Dlogback.configurationFile=logbackConfiguration.xml ^
 -jar ^
 bitcoinaddressfinder-1.2.0-SNAPSHOT-jar-with-dependencies.jar ^
-config_OpenCLInfo.js
+config_OpenCLInfo.json
 rem >> log_OpenCLInfo.txt 2>&1

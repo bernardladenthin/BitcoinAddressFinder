@@ -1,0 +1,71 @@
+{
+  "command": "Find",
+  "finder": {
+    "keyProducerJavaRandom": [
+      {
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
+        "keyProducerId": "exampleKeyProducerSecureRandomId_1",
+        "privateKeyMaxNumBits": 256
+      },
+      {
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
+        "keyProducerId": "exampleKeyProducerSecureRandomId_2",
+        "privateKeyMaxNumBits": 256
+      },
+      {
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
+        "keyProducerId": "exampleKeyProducerSecureRandomId_3",
+        "privateKeyMaxNumBits": 256
+      }
+    ],
+    "consumerJava": {
+      "lmdbConfigurationReadOnly": {
+        "lmdbDirectory": "lmdb",
+        "useProxyOptimal": true,
+        "logStatsOnInit": true,
+        "logStatsOnClose": false
+      },
+      "printStatisticsEveryNSeconds": 10,
+      "threads": 8,
+      "delayEmptyConsumer": 50,
+      "queueSize": 4,
+      "runtimePublicKeyCalculationCheck": false,
+      "enableVanity": false,
+      "vanityPattern": "1[Ee][Mm][Ii][Ll].*"
+    },
+    "producerJava": [
+      {
+        "keyProducerId": "exampleKeyProducerSecureRandomId_2",
+        "batchSizeInBits": 14,
+        "batchUsePrivateKeyIncrement": true,
+        "logSecretBase": false,
+        "runOnce": false
+      },
+      {
+        "keyProducerId": "exampleKeyProducerSecureRandomId_3",
+        "batchSizeInBits": 14,
+        "batchUsePrivateKeyIncrement": true,
+        "logSecretBase": false,
+        "runOnce": false
+      }
+    ],
+    "producerJavaSecretsFiles": [],
+    "producerOpenCL": [
+      {
+        "platformIndex": 0,
+        "deviceType": -1,
+        "deviceIndex": 0,
+        "maxResultReaderThreads": 4,
+        "delayBlockedReader": 50,
+        "keyProducerId": "exampleKeyProducerSecureRandomId_1",
+        "batchSizeInBits": 18,
+        "batchUsePrivateKeyIncrement": true,
+        "logSecretBase": false,
+        "runOnce": false
+      }
+    ]
+  }
+}

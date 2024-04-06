@@ -35,10 +35,10 @@ import org.bitcoinj.core.NetworkParameters;
 public class SecretsFile extends AbstractPlaintextFile {
 
     private final CSecretFormat secretFormat;
-    private final Consumer<BigInteger> secretConsumer;
+    private final Consumer<BigInteger[]> secretConsumer;
     private final NetworkParameters networkParameters;
 
-    public SecretsFile(@Nonnull NetworkParameters networkParameters, @Nonnull File file, @Nonnull CSecretFormat secretFormat, @Nonnull ReadStatistic readStatistic, @Nonnull Consumer<BigInteger> secretConsumer) {
+    public SecretsFile(@Nonnull NetworkParameters networkParameters, @Nonnull File file, @Nonnull CSecretFormat secretFormat, @Nonnull ReadStatistic readStatistic, @Nonnull Consumer<BigInteger[]> secretConsumer) {
         super(file, readStatistic);
         this.networkParameters = networkParameters;
         this.secretFormat = secretFormat;
@@ -67,6 +67,8 @@ public class SecretsFile extends AbstractPlaintextFile {
             default:
                 throw new UnknownSecretFormatException(secretFormat);
         }
-        secretConsumer.accept(secret);
+        final BigInteger secrets[] = new BigInteger[1];
+        secrets[0] = secret;
+        secretConsumer.accept(secrets);
     }
 }

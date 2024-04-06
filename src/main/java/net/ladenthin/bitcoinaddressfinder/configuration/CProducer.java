@@ -19,6 +19,7 @@
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import java.math.BigInteger;
+import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 
 public class CProducer {
@@ -26,21 +27,19 @@ public class CProducer {
     /**
      * Lazy initialization. The configuration is changed on demand.
      */
-    private BigInteger killBits;
+    private transient BigInteger killBits;
     
     public String keyProducerId;
     
     /**
-     * (2<sup>{@code maxNumBits}</sup> - 1) can be set to a lower value to improve a search on specific ranges (e.g. the puzzle transaction https://privatekeys.pw/puzzles/bitcoin-puzzle-tx ).
-     * {@code 1} can't be tested because {@link ECKey#fromPrivate} throws an {@link IllegalArgumentException}.
-     * Range: {@code 2} (inclusive) to {@link PublicKeyBytes#PRIVATE_KEY_MAX_NUM_BITS} (inclusive).
-     */
-    public int privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
-    
-    /**
      * Range: {@code 0} (inclusive) to {@link PublicKeyBytes#BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY} (inclusive).
      */
-    public int gridNumBits = 0;
+    public int batchSizeInBits = 0;
+    
+    /**
+     * The batch mode will use a private key increment internal to increase the performance.
+     */
+    public boolean batchUsePrivateKeyIncrement = true;
     
     /**
      * Enable the log output for the secret address.
@@ -51,25 +50,12 @@ public class CProducer {
      * Enable to let the producer run one time only.
      */
     public boolean runOnce = false;
-
-    public int getWorkSize() {
-        return 1 << gridNumBits;
-    }
     
     public BigInteger getKillBits() {
         if (killBits == null) {
-            killBits = BigInteger.valueOf(2).pow(gridNumBits).subtract(BigInteger.ONE);
+            killBits = new BitHelper().getKillBits(batchSizeInBits);
         }
         return killBits;
-    }
-    
-    public void assertGridNumBitsCorrect() {
-        if (gridNumBits < 0) {
-            throw new IllegalArgumentException("gridNumBits must higher than 0.");
-        }
-        if (gridNumBits > PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY) {
-            throw new IllegalArgumentException("gridNumBits must be lower or equal than " + PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY + ".");
-        }
     }
     
 }
