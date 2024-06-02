@@ -39,6 +39,8 @@ import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
 
 // VM option: -Dorg.slf4j.simpleLogger.defaultLogLevel=trace
 public class Main implements Runnable, Interruptable {
@@ -71,10 +73,25 @@ public class Main implements Runnable, Interruptable {
         return configuration;
     }
     
+    public static CConfiguration fromYaml(String configurationString) {
+        Yaml yaml = new Yaml();
+        CConfiguration configuration = yaml.loadAs(configurationString, CConfiguration.class);
+        return configuration;
+    }
+    
     public static String configurationToJson(CConfiguration configuration) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         String json = gson.toJson(configuration);
         return json;
+    }
+    
+    public static String configurationToYAML(CConfiguration configuration) {
+        final DumperOptions options = new DumperOptions();
+        options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+        options.setPrettyFlow(true);
+        final Yaml yaml = new Yaml(options);
+        String yamlDump = yaml.dump(configuration);
+        return yamlDump;
     }
 
     public static void main(String[] args) {
@@ -82,8 +99,16 @@ public class Main implements Runnable, Interruptable {
             logger.error("Invalid arguments. Pass path to configuration as first argument.");
             return;
         }
-        String configurationAsString = readString(Path.of(args[0]));
-        CConfiguration configuration = fromJson(configurationAsString);
+        final Path configurationPath = Path.of(args[0]);
+        String configurationAsString = readString(configurationPath);
+        final CConfiguration configuration;
+        if (configurationPath.toString().toLowerCase().endsWith(".js") || configurationPath.toString().toLowerCase().endsWith(".json")) {
+            configuration = fromJson(configurationAsString);
+        } else if(configurationPath.toString().toLowerCase().endsWith(".yaml")) {
+            configuration = fromYaml(configurationAsString);
+        } else {
+            throw new IllegalArgumentException("Unknown file ending for: " + configurationPath);
+        }
         Main main = new Main(configuration);
         main.logConfigurationTransformation();
         main.run();
@@ -91,11 +116,16 @@ public class Main implements Runnable, Interruptable {
 
     public void logConfigurationTransformation() {
         String json = configurationToJson(configuration);
+        String yaml = configurationToYAML(configuration);
         logger.info(
                 "Please review the transformed configuration to ensure it aligns with your expectations and requirements before proceeding.:\n" +
-                        "########## BEGIN transformed configuration ##########\n" +
+                        "########## BEGIN transformed JSON configuration ##########\n" +
                         json + "\n" +
-                        "########## END   transformed configuration ##########\n"
+                        "########## END   transformed JSON configuration ##########\n" +
+                        "\n" + 
+                        "########## BEGIN transformed YAML configuration ##########\n" +
+                        yaml + "\n" +
+                        "########## END   transformed YAML configuration ##########\n"
         );
     }
 
