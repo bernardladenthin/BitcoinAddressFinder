@@ -25,9 +25,9 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.rules.TemporaryFolder;
 
-import static net.ladenthin.bitcoinaddressfinder.AddressTxtLine.COMMA;
-import static net.ladenthin.bitcoinaddressfinder.AddressTxtLine.SEMICOLON;
-import static net.ladenthin.bitcoinaddressfinder.AddressTxtLine.TAB_SPLIT;
+import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.COMMA;
+import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.SEMICOLON;
+import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.TAB_SPLIT;
 
 public class AddressesFileSpecialUsecases implements AddressesFiles {
 
@@ -56,9 +56,9 @@ public class AddressesFileSpecialUsecases implements AddressesFiles {
      */
     public List<String> getAllAddresses() {
         List<String> addresses = new ArrayList<>();
-        addresses.add(testAddresses.getIndexAsBase58String(0) + COMMA + "0");
-        addresses.add(testAddresses.getIndexAsBase58String(1) + TAB_SPLIT + "0");
-        addresses.add(testAddresses.getIndexAsBase58String(2) + SEMICOLON + "0");
+        addresses.add(testAddresses.getIndexAsBase58String(0) + COMMA.getSymbol() + "0");
+        addresses.add(testAddresses.getIndexAsBase58String(1) + TAB_SPLIT.getSymbol() + "0");
+        addresses.add(testAddresses.getIndexAsBase58String(2) + SEMICOLON.getSymbol() + "0");
         return addresses;
     }
 

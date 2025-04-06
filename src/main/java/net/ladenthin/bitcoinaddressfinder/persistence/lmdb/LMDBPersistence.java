@@ -40,6 +40,7 @@ import net.ladenthin.bitcoinaddressfinder.AddressTxtLine;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.ByteConversion;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.SeparatorFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFileOutputFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
@@ -228,7 +229,7 @@ public class LMDBPersistence implements Persistence {
                             case DynamicWidthBase58BitcoinAddressWithAmount:
                                 ByteBuffer value = kv.val();
                                 Coin coin = getCoinFromByteBuffer(value);
-                                line = address.toBase58() + AddressTxtLine.COMMA + coin.getValue() + System.lineSeparator();
+                                line = address.toBase58() + SeparatorFormat.COMMA.getSymbol() + coin.getValue() + System.lineSeparator();
                                 break;
                             default:
                                 throw new IllegalArgumentException("Unknown addressFileOutputFormat: " + addressFileOutputFormat);

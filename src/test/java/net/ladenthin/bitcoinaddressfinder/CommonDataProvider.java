@@ -20,6 +20,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import com.tngtech.java.junit.dataprovider.DataProvider;
 import java.math.BigInteger;
+import java.util.Arrays;
 import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticP2PKHAddress;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticP2SHAddress;
@@ -250,11 +251,9 @@ public class CommonDataProvider {
 
     @DataProvider
     public static Object[][] addressSeperator() {
-        return new Object[][]{
-            {AddressTxtLine.COMMA},
-            {AddressTxtLine.SEMICOLON},
-            {AddressTxtLine.TAB_SPLIT}
-        };
+            return Arrays.stream(SeparatorFormat.values())
+                 .map(format -> new Object[]{format.getSymbol()})
+                 .toArray(Object[][]::new);
     }
     
     /**
