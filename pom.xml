@@ -204,7 +204,7 @@
               <!-- CI Surefire plugin config (forking disabled) -->
               <configuration>
                       <!-- Fork just one JVM for test isolation -->
-                      <forkCount>0</forkCount>
+                      <forkCount>1</forkCount>
                       <reuseForks>false</reuseForks>
                       <!-- Properly include JaCoCo agent and any other injected argLine -->
                       <argLine>@{argLine}</argLine>
@@ -212,7 +212,6 @@
                       <redirectTestOutputToFile>true</redirectTestOutputToFile>
                       <!-- Increase timeout to ensure long-running tests don't break -->
                       <forkedProcessTimeoutInSeconds>180</forkedProcessTimeoutInSeconds>
-                      <useSystemClassLoader>false</useSystemClassLoader>
               </configuration>
             </plugin>
           </plugins>
