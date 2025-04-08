@@ -29,7 +29,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.*;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;

@@ -18,6 +18,7 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.opencl;
 
+import com.google.errorprone.annotations.Immutable;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.Serializable;
@@ -25,7 +26,6 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import javax.annotation.concurrent.Immutable;
 import lombok.EqualsAndHashCode;
 import lombok.NonNull;
 import lombok.ToString;

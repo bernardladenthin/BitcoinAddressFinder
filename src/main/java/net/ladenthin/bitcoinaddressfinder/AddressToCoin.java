@@ -18,9 +18,9 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import com.google.errorprone.annotations.Immutable;
 import java.nio.ByteBuffer;
-import javax.annotation.Nonnull;
-import javax.annotation.concurrent.Immutable;
+import org.jspecify.annotations.*;
 import lombok.EqualsAndHashCode;
 import org.bitcoinj.core.Coin;
 
@@ -28,12 +28,12 @@ import org.bitcoinj.core.Coin;
 @EqualsAndHashCode
 public class AddressToCoin {
 
-    @Nonnull
+    @NonNull
     private final ByteBuffer hash160;
-    @Nonnull
+    @NonNull
     private final Coin coin;
 
-    public AddressToCoin(@Nonnull ByteBuffer hash160, @Nonnull Coin coin) {
+    public AddressToCoin(@NonNull ByteBuffer hash160, @NonNull Coin coin) {
         if (hash160.limit() != PublicKeyBytes.HASH160_SIZE) {
             throw new IllegalArgumentException("Given hash160 has not the correct size: " + hash160.limit());
         }
@@ -41,12 +41,12 @@ public class AddressToCoin {
         this.coin = coin;
     }
 
-    @Nonnull
+    @NonNull
     public Coin getCoin() {
         return coin;
     }
 
-    @Nonnull
+    @NonNull
     public ByteBuffer getHash160() {
         return hash160;
     }

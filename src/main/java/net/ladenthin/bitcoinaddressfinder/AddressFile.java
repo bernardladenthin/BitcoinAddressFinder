@@ -20,21 +20,21 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.File;
 import java.util.function.Consumer;
-import javax.annotation.Nonnull;
 import org.bitcoinj.core.NetworkParameters;
+import org.jspecify.annotations.NonNull;
 
 public class AddressFile extends AbstractPlaintextFile {
 
-    @Nonnull
+    @NonNull
     private final NetworkParameters networkParameters;
-    @Nonnull
+    @NonNull
     private final KeyUtility keyUtility;
-    @Nonnull
+    @NonNull
     private final Consumer<AddressToCoin> addressConsumer;
-    @Nonnull
+    @NonNull
     private final Consumer<String> unsupportedConsumer;
 
-    public AddressFile(@Nonnull File file, ReadStatistic readStatistic, @Nonnull NetworkParameters networkParameters, @Nonnull Consumer<AddressToCoin> addressConsumer, @Nonnull Consumer<String> unsupportedConsumer) {
+    public AddressFile(@NonNull File file, ReadStatistic readStatistic, @NonNull NetworkParameters networkParameters, @NonNull Consumer<AddressToCoin> addressConsumer, @NonNull Consumer<String> unsupportedConsumer) {
         super(file, readStatistic);
         this.networkParameters = networkParameters;
         this.addressConsumer = addressConsumer;

@@ -23,24 +23,24 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javax.annotation.Nonnull;
+import org.jspecify.annotations.*;
 import org.lmdbjava.LmdbException;
 
 public abstract class AbstractPlaintextFile implements Interruptable {
     
-    @Nonnull
+    @NonNull
     protected final File file;
-    @Nonnull
+    @NonNull
     protected final ReadStatistic readStatistic;
-    @Nonnull
+    @NonNull
     private final AtomicBoolean shouldRun = new AtomicBoolean(true);
     
-    public AbstractPlaintextFile(@Nonnull File file, @Nonnull ReadStatistic readStatistic) {
+    public AbstractPlaintextFile(@NonNull File file, @NonNull ReadStatistic readStatistic) {
         this.file = file;
         this.readStatistic = readStatistic;
     }
     
-    protected double calculateFileProgress(@Nonnull RandomAccessFile raf) throws IOException {
+    protected double calculateFileProgress(@NonNull RandomAccessFile raf) throws IOException {
         return ((double)(Math.max(raf.getFilePointer(),1)) / (double)raf.length()) * 100.0d;
     }
     

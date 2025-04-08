@@ -20,7 +20,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import com.github.kiulian.converter.AddressConverter;
 import java.nio.ByteBuffer;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.*;
 import org.bitcoinj.core.AddressFormatException;
 import org.bitcoinj.core.Base58;
 import org.bitcoinj.core.Coin;

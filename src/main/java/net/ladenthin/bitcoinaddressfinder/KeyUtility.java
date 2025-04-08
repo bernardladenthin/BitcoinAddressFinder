@@ -23,13 +23,14 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
-import javax.annotation.Nullable;
+
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.crypto.MnemonicCode;
 import org.bitcoinj.crypto.MnemonicException;
 import org.bouncycastle.util.encoders.Hex;
+import org.jspecify.annotations.*;
 
 /**
  * https://stackoverflow.com/questions/5399798/byte-array-and-int-conversion-in-java/11419863
