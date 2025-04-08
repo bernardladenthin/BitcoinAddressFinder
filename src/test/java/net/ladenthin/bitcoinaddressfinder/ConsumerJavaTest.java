@@ -41,10 +41,9 @@ import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
-import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.MnemonicException;
-import org.bitcoinj.params.MainNetParams;
 import static org.hamcrest.core.StringStartsWith.startsWith;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.nullValue;
@@ -66,9 +65,9 @@ public class ConsumerJavaTest {
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
     
-    private final NetworkParameters networkParameters = MainNetParams.get();
-    private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
-    private final PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
+    private final Network network = new NetworkParameterFactory().getNetwork();
+    private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+    private final PersistenceUtils persistenceUtils = new PersistenceUtils(network);
     private final BitHelper bitHelper = new BitHelper();
     
     /**
@@ -297,7 +296,6 @@ public class ConsumerJavaTest {
         List<String> arguments = logCaptorInfo.getAllValues();
 
         ECKey key = new TestAddresses42(1, compressed).getECKeys().get(0);
-        KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), new ByteBufferUtility(false));
         
         PublicKeyBytes publicKeyBytes = PublicKeyBytes.fromPrivate(key.getPrivKey());
         
@@ -364,7 +362,6 @@ public class ConsumerJavaTest {
 
         ECKey unknownKeyUncompressed = new TestAddresses1337(1, false).getECKeys().get(0);
         ECKey unknownKeyCompressed = new TestAddresses1337(1, true).getECKeys().get(0);
-        KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), new ByteBufferUtility(false));
         String missMessageUncompressed = ConsumerJava.MISS_PREFIX + keyUtility.createKeyDetails(unknownKeyUncompressed);
         String missMessageCompressed = ConsumerJava.MISS_PREFIX + keyUtility.createKeyDetails(unknownKeyCompressed);
         

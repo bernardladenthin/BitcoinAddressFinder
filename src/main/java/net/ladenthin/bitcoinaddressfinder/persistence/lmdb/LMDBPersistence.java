@@ -73,14 +73,14 @@ public class LMDBPersistence implements Persistence {
         this.lmdbConfigurationReadOnly = null;
         this.lmdbConfigurationWrite = lmdbConfigurationWrite;
         this.persistenceUtils = persistenceUtils;
-        this.keyUtility = new KeyUtility(persistenceUtils.networkParameters, new ByteBufferUtility(true));
+        this.keyUtility = new KeyUtility(persistenceUtils.network, new ByteBufferUtility(true));
     }
 
     public LMDBPersistence(CLMDBConfigurationReadOnly lmdbConfigurationReadOnly, PersistenceUtils persistenceUtils) {
         this.lmdbConfigurationReadOnly = lmdbConfigurationReadOnly;
         lmdbConfigurationWrite = null;
         this.persistenceUtils = persistenceUtils;
-        this.keyUtility = new KeyUtility(persistenceUtils.networkParameters, new ByteBufferUtility(true));
+        this.keyUtility = new KeyUtility(persistenceUtils.network, new ByteBufferUtility(true));
     }
     
     @Override

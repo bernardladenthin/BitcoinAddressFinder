@@ -21,8 +21,8 @@ package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 import java.nio.ByteBuffer;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import org.bitcoinj.core.NetworkParameters;
-import org.bitcoinj.params.MainNetParams;
+import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
+import org.bitcoinj.base.Network;
 import org.bouncycastle.util.encoders.Hex;
 
 public enum StaticP2PKHAddress implements PublicAddress {
@@ -122,8 +122,8 @@ public enum StaticP2PKHAddress implements PublicAddress {
     }
     
     public String getPublicKeyHashAsBase58() {
-        final NetworkParameters networkParameters = MainNetParams.get();
-        KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(true));
+        final Network network = new NetworkParameterFactory().getNetwork();
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(true));
         return keyUtility.toBase58(getPublicKeyHash());
     }
 }

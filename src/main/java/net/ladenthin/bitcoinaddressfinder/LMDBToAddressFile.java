@@ -20,7 +20,6 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
-import org.bitcoinj.core.NetworkParameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,10 +27,13 @@ import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBToAddressFile;
+import org.bitcoinj.base.Network;
 
 public class LMDBToAddressFile implements Runnable, Interruptable {
 
     private final Logger logger = LoggerFactory.getLogger(LMDBToAddressFile.class);
+    
+    private final Network network = new NetworkParameterFactory().getNetwork();
 
     private final CLMDBToAddressFile lmdbToAddressFile;
 
@@ -45,9 +47,7 @@ public class LMDBToAddressFile implements Runnable, Interruptable {
 
     @Override
     public void run() {
-        final NetworkParameters networkParameters = new NetworkParameterFactory().getOrCreate();
-        
-        PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
+        PersistenceUtils persistenceUtils = new PersistenceUtils(network);
         persistence = new LMDBPersistence(lmdbToAddressFile.lmdbConfigurationReadOnly, persistenceUtils);
         persistence.init();
         try {

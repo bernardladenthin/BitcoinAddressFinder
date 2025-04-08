@@ -24,12 +24,12 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
+import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
 import org.junit.Before;
 import org.junit.Test;
 import org.bitcoinj.crypto.MnemonicCode;
 import org.bitcoinj.crypto.MnemonicException;
-import org.bitcoinj.params.MainNetParams;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
@@ -37,6 +37,7 @@ import static org.hamcrest.Matchers.*;
 public class KeyUtilityTest {
 
     private final StaticKey staticKey = new StaticKey();
+    private final Network network = new NetworkParameterFactory().getNetwork();
     
     @Before
     public void init() throws IOException {
@@ -49,7 +50,7 @@ public class KeyUtilityTest {
         BigInteger bigIntegerFromHex = new BigInteger(staticKey.privateKeyHex, 16);
 
         // act
-        ECKey key = new KeyUtility(null, new ByteBufferUtility(false)).createECKey(bigIntegerFromHex, false);
+        ECKey key = new KeyUtility(network, new ByteBufferUtility(false)).createECKey(bigIntegerFromHex, false);
 
         // assert
         byte[] hash160 = key.getPubKeyHash();
@@ -64,7 +65,7 @@ public class KeyUtilityTest {
         BigInteger bigIntegerFromHex = new BigInteger(staticKey.privateKeyHex, 16);
 
         // act
-        ECKey key = new KeyUtility(null, new ByteBufferUtility(false)).createECKey(bigIntegerFromHex, true);
+        ECKey key = new KeyUtility(network, new ByteBufferUtility(false)).createECKey(bigIntegerFromHex, true);
 
         // assert
         byte[] hash160 = key.getPubKeyHash();
@@ -78,7 +79,7 @@ public class KeyUtilityTest {
     @Test
     public void getHash160ByteBufferFromBase58String_TestUncompressed() throws IOException {
         // act
-        ByteBuffer byteBufferPublicKeyUncompressed = new KeyUtility(MainNetParams.get(), new ByteBufferUtility(false)).getHash160ByteBufferFromBase58String(staticKey.publicKeyUncompressed);
+        ByteBuffer byteBufferPublicKeyUncompressed = new KeyUtility(network, new ByteBufferUtility(false)).getHash160ByteBufferFromBase58String(staticKey.publicKeyUncompressed);
 
         // assert
         assertThat(byteBufferPublicKeyUncompressed, is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
@@ -87,7 +88,7 @@ public class KeyUtilityTest {
     @Test
     public void getHash160ByteBufferFromBase58String_TestCompressed() throws IOException {
         // act
-        ByteBuffer byteBufferPublicKeyCompressed = new KeyUtility(MainNetParams.get(), new ByteBufferUtility(false)).getHash160ByteBufferFromBase58String(staticKey.publicKeyCompressed);
+        ByteBuffer byteBufferPublicKeyCompressed = new KeyUtility(network, new ByteBufferUtility(false)).getHash160ByteBufferFromBase58String(staticKey.publicKeyCompressed);
 
         // assert
         assertThat(byteBufferPublicKeyCompressed, is(equalTo(staticKey.byteBufferPublicKeyCompressed)));
@@ -138,7 +139,7 @@ public class KeyUtilityTest {
     @Test
     public void createSecret() throws IOException {
         // act
-        BigInteger secret = new KeyUtility(null, new ByteBufferUtility(false)).createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, new Random(42));
+        BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false)).createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, new Random(42));
 
         // assert
         assertThat(secret.toString(), is(not(equalTo(""))));
@@ -150,7 +151,7 @@ public class KeyUtilityTest {
     public void createKeyDetails_Uncompressed() throws IOException, MnemonicException.MnemonicLengthException {
         // arrange
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
-        KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
+        KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
 
         BigInteger secret = new BigInteger(staticKey.privateKeyHex, 16);
         ECKey ecKey = keyUtility.createECKey(secret, false);
@@ -166,7 +167,7 @@ public class KeyUtilityTest {
     public void createKeyDetails_Compressed() throws IOException, MnemonicException.MnemonicLengthException {
         // arrange
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
-        KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
+        KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
 
         BigInteger secret = new BigInteger(staticKey.privateKeyHex, 16);
         ECKey ecKey = keyUtility.createECKey(secret, true);
@@ -206,7 +207,7 @@ public class KeyUtilityTest {
     @Test
     public void killBits_valueWithAllBitsSetGiven_bitsKilled() throws IOException {
         // act
-        BigInteger secret = new KeyUtility(null, new ByteBufferUtility(false)).killBits(BigInteger.valueOf(63L), BigInteger.valueOf(5L));
+        BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false)).killBits(BigInteger.valueOf(63L), BigInteger.valueOf(5L));
 
         // assert
         assertThat(secret, is(equalTo(BigInteger.valueOf(58))));
@@ -215,7 +216,7 @@ public class KeyUtilityTest {
     @Test
     public void killBits_valueWithNotAllBitsSetGiven_bitsKilled() throws IOException {
         // act
-        BigInteger secret = new KeyUtility(null, new ByteBufferUtility(false)).killBits(BigInteger.valueOf(62L), BigInteger.valueOf(5L));
+        BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false)).killBits(BigInteger.valueOf(62L), BigInteger.valueOf(5L));
 
         // assert
         assertThat(secret, is(equalTo(BigInteger.valueOf(58))));

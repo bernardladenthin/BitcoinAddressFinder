@@ -31,8 +31,7 @@ import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
-import org.bitcoinj.core.NetworkParameters;
-import org.bitcoinj.params.MainNetParams;
+import org.bitcoinj.base.Network;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -50,8 +49,8 @@ public class AbstractProducerTest {
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
 
-    private final NetworkParameters networkParameters = MainNetParams.get();
-    private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
+    private final Network network = new NetworkParameterFactory().getNetwork();
+    private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
 
     // <editor-fold defaultstate="collapsed" desc="initProducer">

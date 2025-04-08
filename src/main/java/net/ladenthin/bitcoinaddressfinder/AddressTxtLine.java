@@ -74,7 +74,7 @@ public class AddressTxtLine {
         } else if (address.startsWith("bc1")) {
             // bitcoin Bech32 (P2WSH or P2WPKH) or P2TR
             // supported (20 bytes): https://privatekeys.pw/address/bitcoin/bc1qazcm763858nkj2dj986etajv6wquslv8uxwczt
-            SegwitAddress segwitAddress = SegwitAddress.fromBech32(keyUtility.networkParameters, address);
+            SegwitAddress segwitAddress = SegwitAddress.fromBech32(address, keyUtility.network);
             byte[] hash = segwitAddress.getHash();
             ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash);
             if (hash160.limit() != PublicKeyBytes.HASH160_SIZE) {

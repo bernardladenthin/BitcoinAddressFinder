@@ -40,8 +40,8 @@ import java.util.Arrays;
 import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
+import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
-import org.bitcoinj.params.MainNetParams;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -53,6 +53,8 @@ import org.junit.runner.RunWith;
 @RunWith(DataProviderRunner.class)
 public class ProbeAddressesOpenCLTest {
 
+    private final Network network = new NetworkParameterFactory().getNetwork();
+    
     private static final TestAddresses42 testAddresses = new TestAddresses42(1024, false);
     
     public final static int BYTES_FOR_INT = 4;
@@ -403,7 +405,7 @@ public class ProbeAddressesOpenCLTest {
     public void createKeys_bitsLowerThan25_use32BitNevertheless(int bitSize) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
-        KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
+        KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
@@ -425,7 +427,7 @@ public class ProbeAddressesOpenCLTest {
     public void createKeys_bitsLowerThanGridSize_useMoreNevertheless() throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
-        KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
+        KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
@@ -467,7 +469,7 @@ public class ProbeAddressesOpenCLTest {
         final boolean souts = false;
         
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
-        KeyUtility keyUtility = new KeyUtility(MainNetParams.get(), byteBufferUtility);
+        KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();

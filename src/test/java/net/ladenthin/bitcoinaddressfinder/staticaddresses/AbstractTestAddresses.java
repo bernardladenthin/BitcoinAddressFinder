@@ -25,16 +25,17 @@ import java.util.List;
 import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.base.LegacyAddress;
-import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.base.Network;
+import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.crypto.ECKey;
-import org.bitcoinj.params.MainNetParams;
 
 public abstract class AbstractTestAddresses implements TestAddresses {
     
-    public final NetworkParameters networkParameters = MainNetParams.get();
+    public final Network network = new NetworkParameterFactory().getNetwork();
 
     private final List<ECKey> ecKeys = new ArrayList<>();
     
@@ -56,20 +57,32 @@ public abstract class AbstractTestAddresses implements TestAddresses {
     public List<ECKey> getECKeys() {
         return ecKeys;
     }
-
-    @Override
-    public String getIndexAsBase58String(int index) {
-        return LegacyAddress.fromKey(networkParameters, getECKeys().get(index)).toBase58();
+    
+    private LegacyAddress toLegacyAddress(ECKey ecKey) {
+        return (LegacyAddress) ecKey.toAddress(ScriptType.P2PKH, network);
+    }
+    
+    private LegacyAddress getLegacyAddressAtIndex(int index) {
+        ECKey ecKey = getECKeys().get(index);
+        return toLegacyAddress(ecKey);
     }
 
     @Override
-    public String getIndexAsHash160HexEncoded(int index) {
-        return Hex.encodeHexString(LegacyAddress.fromKey(networkParameters, getECKeys().get(index)).getHash());
+    public String getIndexAsBase58String(int index) {
+        LegacyAddress legacyAddress = getLegacyAddressAtIndex(index);
+        return legacyAddress.toBase58();
     }
     
     @Override
     public byte[] getIndexAsHash160(int index) {
-        return LegacyAddress.fromKey(networkParameters, getECKeys().get(index)).getHash();
+        LegacyAddress legacyAddress = getLegacyAddressAtIndex(index);
+        return legacyAddress.getHash();
+    }
+
+    @Override
+    public String getIndexAsHash160HexEncoded(int index) {
+        byte[] hash = getIndexAsHash160(index);
+        return Hex.encodeHexString(hash);
     }
     
     @Override
@@ -96,7 +109,7 @@ public abstract class AbstractTestAddresses implements TestAddresses {
         List<String> base58Strings = new ArrayList<>();
         List<ECKey> ecKeys = getECKeys();
         for (ECKey ecKey : ecKeys) {
-            LegacyAddress address = LegacyAddress.fromKey(networkParameters, ecKey);
+            LegacyAddress address = toLegacyAddress(ecKey);
             String base58 = address.toBase58();
             base58Strings.add(base58);
         }

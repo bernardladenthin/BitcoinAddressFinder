@@ -24,7 +24,7 @@ import java.math.BigInteger;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
-import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.base.Network;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +32,8 @@ import org.slf4j.LoggerFactory;
 public class ProducerJavaSecretsFiles extends ProducerJava {
 
     private final Logger logger = LoggerFactory.getLogger(ProducerJavaSecretsFiles.class);
+    
+    private final Network network = new NetworkParameterFactory().getNetwork();
     
     private final CProducerJavaSecretsFiles producerJavaSecretsFiles;
 
@@ -48,8 +50,6 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
     @Override
     public void produceKeys() {
         try {
-            final NetworkParameters networkParameters = new NetworkParameterFactory().getOrCreate();
-
             FileHelper fileHelper = new FileHelper();
             List<File> files = fileHelper.stringsToFiles(producerJavaSecretsFiles.files);
             fileHelper.assertFilesExists(files);
@@ -60,7 +60,7 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
                     break;
                 }
                 SecretsFile secretsFile = new SecretsFile(
-                    networkParameters,
+                    network,
                     file,
                     producerJavaSecretsFiles.secretFormat,
                     readStatistic,

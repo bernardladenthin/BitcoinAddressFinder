@@ -23,8 +23,7 @@ import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.Random;
-import org.bitcoinj.core.NetworkParameters;
-import org.bitcoinj.params.MainNetParams;
+import org.bitcoinj.base.Network;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -34,8 +33,8 @@ import org.junit.runner.RunWith;
 @RunWith(DataProviderRunner.class)
 public class MockKeyProducerTest {
     
-    private final NetworkParameters networkParameters = MainNetParams.get();
-    private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
+    private final Network network = new NetworkParameterFactory().getNetwork();
+    private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
     /**
      * This random is fine to produce with lower private key bits: 1; 0; 1; 0

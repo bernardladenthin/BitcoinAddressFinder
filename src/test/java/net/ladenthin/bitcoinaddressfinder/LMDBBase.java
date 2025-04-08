@@ -26,8 +26,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.AddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
-import org.bitcoinj.core.NetworkParameters;
-import org.bitcoinj.params.MainNetParams;
+import org.bitcoinj.base.Network;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
 
@@ -36,8 +35,8 @@ public class LMDBBase {
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
     
-    protected final NetworkParameters networkParameters = MainNetParams.get();
-    protected final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(true));
+    protected final Network network = new NetworkParameterFactory().getNetwork();
+    protected final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(true));
     
     protected Persistence createAndFillAndOpenLMDB(boolean useStaticAmount, AddressesFiles addressesFiles, boolean addInvalidAddresses) throws IOException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
@@ -46,7 +45,7 @@ public class LMDBBase {
 
         CLMDBConfigurationReadOnly lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
-        PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
+        PersistenceUtils persistenceUtils = new PersistenceUtils(network);
         Persistence persistence = new LMDBPersistence(lmdbConfigurationReadOnly, persistenceUtils);
         persistence.init();
         return persistence;

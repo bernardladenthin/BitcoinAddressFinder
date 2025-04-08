@@ -38,9 +38,8 @@ import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.SHA
 import net.ladenthin.bitcoinaddressfinder.configuration.UnknownSecretFormatException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.FileUtils;
-import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
-import org.bitcoinj.params.MainNetParams;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -55,8 +54,8 @@ public class ProducerJavaSecretsFilesTest {
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
     
-    private static final NetworkParameters networkParameters = MainNetParams.get();
-    private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
+    private static final Network network = new NetworkParameterFactory().getNetwork();
+    private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
     
     enum PrivateKey {
@@ -87,7 +86,7 @@ public class ProducerJavaSecretsFilesTest {
         }
         
         public String getWiF() {
-            return ECKey.fromPrivate(getBigInteger(), false).getPrivateKeyAsWiF(networkParameters);
+            return ECKey.fromPrivate(getBigInteger(), false).getPrivateKeyAsWiF(network);
         }
 
         public String getHex() {

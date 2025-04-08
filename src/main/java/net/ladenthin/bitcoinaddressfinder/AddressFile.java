@@ -20,13 +20,13 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.File;
 import java.util.function.Consumer;
-import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.base.Network;
 import org.jspecify.annotations.NonNull;
 
 public class AddressFile extends AbstractPlaintextFile {
 
     @NonNull
-    private final NetworkParameters networkParameters;
+    private final Network network;
     @NonNull
     private final KeyUtility keyUtility;
     @NonNull
@@ -34,12 +34,12 @@ public class AddressFile extends AbstractPlaintextFile {
     @NonNull
     private final Consumer<String> unsupportedConsumer;
 
-    public AddressFile(@NonNull File file, ReadStatistic readStatistic, @NonNull NetworkParameters networkParameters, @NonNull Consumer<AddressToCoin> addressConsumer, @NonNull Consumer<String> unsupportedConsumer) {
+    public AddressFile(@NonNull File file, ReadStatistic readStatistic, @NonNull Network network, @NonNull Consumer<AddressToCoin> addressConsumer, @NonNull Consumer<String> unsupportedConsumer) {
         super(file, readStatistic);
-        this.networkParameters = networkParameters;
+        this.network = network;
         this.addressConsumer = addressConsumer;
         this.unsupportedConsumer = unsupportedConsumer;
-        keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(true));
+        keyUtility = new KeyUtility(network, new ByteBufferUtility(true));
     }
 
     @Override

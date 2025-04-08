@@ -29,9 +29,8 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import org.bitcoinj.base.Coin;
-import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
-import org.bitcoinj.params.MainNetParams;
 import org.junit.Rule;
 import org.junit.Test;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -48,10 +47,10 @@ public class LMDBPersistenceTest {
     
     private Random random = new Random(1337);
     
-    private final NetworkParameters networkParameters = MainNetParams.get();
+    private final Network network = new NetworkParameterFactory().getNetwork();
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
-    private final KeyUtility keyUtility = new KeyUtility(networkParameters, byteBufferUtility);
-    private final PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
+    private final KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
+    private final PersistenceUtils persistenceUtils = new PersistenceUtils(network);
     
     /**
      * The increase should happen a few times. See {@link #TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES}.

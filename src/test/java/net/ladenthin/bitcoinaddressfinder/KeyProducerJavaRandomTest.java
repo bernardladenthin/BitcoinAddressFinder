@@ -23,8 +23,7 @@ import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomInstance;
-import org.bitcoinj.core.NetworkParameters;
-import org.bitcoinj.params.MainNetParams;
+import org.bitcoinj.base.Network;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -34,8 +33,8 @@ import org.junit.runner.RunWith;
 @RunWith(DataProviderRunner.class)
 public class KeyProducerJavaRandomTest {
     
-    private final NetworkParameters networkParameters = MainNetParams.get();
-    private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
+    private final Network network = new NetworkParameterFactory().getNetwork();
+    private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
     
     String keyProducerId = "exampleId";

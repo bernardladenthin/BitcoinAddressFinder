@@ -18,12 +18,12 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.persistence;
 
-import org.bitcoinj.core.NetworkParameters;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import org.bitcoinj.base.LegacyAddress;
+import org.bitcoinj.base.Network;
 import org.bitcoinj.base.Sha256Hash;
 
 public class PersistenceUtils {
@@ -32,10 +32,10 @@ public class PersistenceUtils {
     private final ByteBuffer emptyByteBuffer = ByteBuffer.allocateDirect(0).asReadOnlyBuffer();
     private final ByteBuffer zeroByteBuffer = longValueToByteBufferDirectAsReadOnlyBuffer(0L);
 
-    public final NetworkParameters networkParameters;
+    public final Network network;
 
-    public PersistenceUtils(NetworkParameters networkParameters) {
-        this.networkParameters = networkParameters;
+    public PersistenceUtils(Network network) {
+        this.network = network;
     }
 
     public ByteBuffer longToByteBufferDirect(long longValue) {
@@ -50,7 +50,7 @@ public class PersistenceUtils {
     }
 
     @Deprecated
-    public ByteBuffer addressListToByteBufferDirect(List<LegacyAddress> addresses) {
+    private ByteBuffer addressListToByteBufferDirect(List<LegacyAddress> addresses) {
         ByteBuffer byteBuffer = ByteBuffer.allocateDirect(LegacyAddress.LENGTH * addresses.size());
         for (LegacyAddress address : addresses) {
             byteBuffer.put(address.getHash());
@@ -60,24 +60,23 @@ public class PersistenceUtils {
     }
 
     @Deprecated
-    public List<LegacyAddress> byteBufferToAddressList(ByteBuffer byteBuffer) {
+    private List<LegacyAddress> byteBufferToAddressList(ByteBuffer byteBuffer) {
         List<LegacyAddress> addresses = new ArrayList<>();
         int count = byteBuffer.remaining() / LegacyAddress.LENGTH;
         for (int i = 0; i < count; i++) {
             byte[] hash160 = new byte[LegacyAddress.LENGTH];
             byteBuffer.get(hash160);
-            addresses.add(LegacyAddress.fromPubKeyHash(networkParameters, hash160));
+            addresses.add(LegacyAddress.fromPubKeyHash(network, hash160));
         }
         return addresses;
     }
 
     @Deprecated
-    public ByteBuffer hashToByteBufferDirect(Sha256Hash hash) {
+    private ByteBuffer hashToByteBufferDirect(Sha256Hash hash) {
         return new ByteBufferUtility(true).byteArrayToByteBuffer(hash.getBytes());
     }
 
-    @Deprecated
-    public ByteBuffer longValueToByteBufferDirectAsReadOnlyBuffer(long value) {
+    private ByteBuffer longValueToByteBufferDirectAsReadOnlyBuffer(long value) {
         ByteBuffer byteBuffer = ByteBuffer.allocateDirect(Long.BYTES);
         byteBuffer.putLong(value);
         return byteBuffer.asReadOnlyBuffer();

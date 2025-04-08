@@ -36,8 +36,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
-import org.bitcoinj.core.NetworkParameters;
-import org.bitcoinj.params.MainNetParams;
+import org.bitcoinj.base.Network;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,9 +65,9 @@ public class Finder implements Interruptable {
     @VisibleForTesting
     final ExecutorService producerExecutorService = Executors.newCachedThreadPool();
     
-    private final NetworkParameters networkParameters = MainNetParams.get();
-    private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
-    private final PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
+    private final Network network = new NetworkParameterFactory().getNetwork();
+    private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+    private final PersistenceUtils persistenceUtils = new PersistenceUtils(network);
     private final BitHelper bitHelper = new BitHelper();
     
     public Finder(CFinder finder) {

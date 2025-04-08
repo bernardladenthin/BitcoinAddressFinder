@@ -75,7 +75,7 @@ public class AddressFileToLMDBTest extends LMDBBase {
             
             for (int i = 0; i < amounts.length; i++) {
                 String base58Adresse = base58Adresses[i];
-                LegacyAddress fromBase58 = LegacyAddress.fromBase58(networkParameters, base58Adresse);
+                LegacyAddress fromBase58 = LegacyAddress.fromBase58(base58Adresse, network);
                 ByteBuffer hash160 = keyUtility.addressToByteBuffer(fromBase58);
                 amounts[i] = persistence.getAmount(hash160);
                 if (useStaticAmount) {

@@ -26,8 +26,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
-import org.bitcoinj.core.NetworkParameters;
-import org.bitcoinj.params.MainNetParams;
+import org.bitcoinj.base.Network;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -40,8 +39,8 @@ public class ProducerOpenCLTest {
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
 
-    private final NetworkParameters networkParameters = MainNetParams.get();
-    private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
+    private final Network network = new NetworkParameterFactory().getNetwork();
+    private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
     
 

@@ -30,8 +30,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOn
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
-import org.bitcoinj.core.NetworkParameters;
-import org.bitcoinj.params.MainNetParams;
+import org.bitcoinj.base.Network;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -41,9 +40,9 @@ public class LMDBPersistencePerformanceTest {
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
     
-    private final NetworkParameters networkParameters = MainNetParams.get();
-    private final KeyUtility keyUtility = new KeyUtility(networkParameters, new ByteBufferUtility(false));
-    private final PersistenceUtils persistenceUtils = new PersistenceUtils(networkParameters);
+    private final Network network = new NetworkParameterFactory().getNetwork();
+    private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+    private final PersistenceUtils persistenceUtils = new PersistenceUtils(network);
     
     private final static int ARRAY_SIZE = 1024*8;
     private final static BigInteger PRIVATE_KEY = BigInteger.valueOf(1337);

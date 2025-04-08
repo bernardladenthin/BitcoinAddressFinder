@@ -24,13 +24,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import org.bitcoinj.base.LegacyAddress;
+import org.bitcoinj.base.Network;
 
-import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.MnemonicCode;
 import org.bitcoinj.crypto.MnemonicException;
 import org.bouncycastle.util.encoders.Hex;
-import org.jspecify.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 /**
  * https://stackoverflow.com/questions/5399798/byte-array-and-int-conversion-in-java/11419863
@@ -39,14 +39,14 @@ import org.jspecify.annotations.Nullable;
  */
 public class KeyUtility {
 
-    @Nullable
-    public final NetworkParameters networkParameters;
+    @NonNull
+    public final Network network;
     public final ByteBufferUtility byteBufferUtility;
     
     private final MnemonicCode mnemonicCode = MnemonicCode.INSTANCE;
 
-    public KeyUtility(NetworkParameters networkParameters, ByteBufferUtility byteBufferUtility) {
-        this.networkParameters = networkParameters;
+    public KeyUtility(Network network, ByteBufferUtility byteBufferUtility) {
+        this.network = network;
         this.byteBufferUtility = byteBufferUtility;
     }
     
@@ -58,13 +58,13 @@ public class KeyUtility {
      * Require networkParameters.
      */
     public ByteBuffer getHash160ByteBufferFromBase58String(String base58) {
-        LegacyAddress address = LegacyAddress.fromBase58(networkParameters, base58);
+        LegacyAddress address = LegacyAddress.fromBase58(base58, network);
         byte[] hash160 = address.getHash();
         return byteBufferUtility.byteArrayToByteBuffer(hash160);
     }
 
     public String toBase58(byte[] hash160) {
-        LegacyAddress address = LegacyAddress.fromPubKeyHash(networkParameters, hash160);
+        LegacyAddress address = LegacyAddress.fromPubKeyHash(network, hash160);
         return address.toBase58();
     }
 
@@ -78,16 +78,14 @@ public class KeyUtility {
     }
 
     public String createKeyDetails(ECKey key) throws MnemonicException.MnemonicLengthException {
-        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
-
         BigInteger privateKeyBigInteger = key.getPrivKey();
         byte[] privateKeyBytes = key.getPrivKeyBytes();
         String privateKeyHex = key.getPrivateKeyAsHex();
-        String privateKeyAsWiF = key.getPrivateKeyAsWiF(networkParameters);
+        String privateKeyAsWiF = key.getPrivateKeyAsWiF(network);
 
         byte[] hash160 = key.getPubKeyHash();
         String publicKeyHash160Hex = Hex.toHexString(hash160);
-        String publicKeyHash160Base58 = new KeyUtility(networkParameters, byteBufferUtility).toBase58(hash160);
+        String publicKeyHash160Base58 = toBase58(hash160);
 
         String logprivateKeyBigInteger = "privateKeyBigInteger: [" + privateKeyBigInteger + "]";
         String logprivateKeyBytes = "privateKeyBytes: [" + Arrays.toString(privateKeyBytes) + "]";
@@ -114,7 +112,7 @@ public class KeyUtility {
      * Require networkParameters.
      */
     public LegacyAddress byteBufferToAddress(ByteBuffer byteBuffer) {
-        return LegacyAddress.fromPubKeyHash(networkParameters, byteBufferUtility.byteBufferToBytes(byteBuffer));
+        return LegacyAddress.fromPubKeyHash(network, byteBufferUtility.byteBufferToBytes(byteBuffer));
     }
     // </editor-fold>
 

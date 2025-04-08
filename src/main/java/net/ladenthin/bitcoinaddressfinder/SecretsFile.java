@@ -28,6 +28,7 @@ import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.BIG
 import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.SHA256;
 import net.ladenthin.bitcoinaddressfinder.configuration.UnknownSecretFormatException;
 import org.apache.commons.codec.binary.Hex;
+import org.bitcoinj.base.Network;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.crypto.DumpedPrivateKey;
 import org.jspecify.annotations.NonNull;
@@ -36,11 +37,11 @@ public class SecretsFile extends AbstractPlaintextFile {
 
     private final CSecretFormat secretFormat;
     private final Consumer<BigInteger[]> secretConsumer;
-    private final NetworkParameters networkParameters;
+    private final Network network;
 
-    public SecretsFile(@NonNull NetworkParameters networkParameters, @NonNull File file, @NonNull CSecretFormat secretFormat, @NonNull ReadStatistic readStatistic, @NonNull Consumer<BigInteger[]> secretConsumer) {
+    public SecretsFile(@NonNull Network network, @NonNull File file, @NonNull CSecretFormat secretFormat, @NonNull ReadStatistic readStatistic, @NonNull Consumer<BigInteger[]> secretConsumer) {
         super(file, readStatistic);
-        this.networkParameters = networkParameters;
+        this.network = network;
         this.secretFormat = secretFormat;
         this.secretConsumer = secretConsumer;
     }
@@ -61,7 +62,7 @@ public class SecretsFile extends AbstractPlaintextFile {
                 secret = new BigInteger(line, 16);
                 break;
             case DUMPED_RIVATE_KEY:
-                DumpedPrivateKey dpk = DumpedPrivateKey.fromBase58(networkParameters, line);
+                DumpedPrivateKey dpk = DumpedPrivateKey.fromBase58(network, line);
                 secret = dpk.getKey().getPrivKey();
                 break;
             default:
