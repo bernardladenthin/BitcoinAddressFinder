@@ -175,8 +175,6 @@ public class LMDBPersistence implements Persistence {
     public Coin getAmount(ByteBuffer hash160) {
         try (Txn<ByteBuffer> txn = env.txnRead()) {
             ByteBuffer byteBuffer = lmdb_h160ToAmount.get(txn, hash160);
-            txn.close();
-
             return getCoinFromByteBuffer(byteBuffer);
         }
     }
@@ -197,7 +195,6 @@ public class LMDBPersistence implements Persistence {
     public boolean containsAddress(ByteBuffer hash160) {
         try (Txn<ByteBuffer> txn = env.txnRead()) {
             ByteBuffer byteBuffer = lmdb_h160ToAmount.get(txn, hash160);
-            txn.close();
             return byteBuffer != null;
         }
     }
@@ -294,7 +291,6 @@ public class LMDBPersistence implements Persistence {
                 lmdb_h160ToAmount.put(txn, hash160, persistenceUtils.longToByteBufferDirect(amountAsLong));
             }
             txn.commit();
-            txn.close();
         }
     }
 
