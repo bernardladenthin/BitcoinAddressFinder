@@ -70,7 +70,7 @@ public class MainTest {
     // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc="testRoundtrip OpenCL producer">
-    @Test
+    @Test(timeout = 60000) // 60 seconds
     @OpenCLTest
     public void testRoundtripOpenCLProducer_configurationsGiven_lmdbCreatedAndRunFindOpenCLDevice() throws IOException, InterruptedException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
