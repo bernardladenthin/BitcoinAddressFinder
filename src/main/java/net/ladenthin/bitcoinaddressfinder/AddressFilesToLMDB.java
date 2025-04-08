@@ -30,9 +30,9 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import lombok.NonNull;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
+import org.jspecify.annotations.NonNull;
 
 public class AddressFilesToLMDB implements Runnable, Interruptable {
     

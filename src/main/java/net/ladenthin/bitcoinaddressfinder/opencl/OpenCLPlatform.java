@@ -23,9 +23,9 @@ import java.io.Serializable;
 import java.util.Collections;
 import java.util.List;
 import lombok.EqualsAndHashCode;
-import lombok.NonNull;
 import lombok.ToString;
 import org.jocl.cl_platform_id;
+import org.jspecify.annotations.NonNull;
 
 @Immutable
 @ToString

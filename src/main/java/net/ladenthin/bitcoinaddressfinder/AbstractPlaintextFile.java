@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.jspecify.annotations.*;
+import org.jspecify.annotations.NonNull;
 import org.lmdbjava.LmdbException;
 
 public abstract class AbstractPlaintextFile implements Interruptable {

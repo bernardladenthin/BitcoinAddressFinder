@@ -20,11 +20,12 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import com.github.kiulian.converter.AddressConverter;
 import java.nio.ByteBuffer;
-import org.jspecify.annotations.*;
 import org.bitcoinj.core.AddressFormatException;
 import org.bitcoinj.core.Base58;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.SegwitAddress;
+import org.jspecify.annotations.Nullable;
+
 
 /**
  * Most txt files have a common format which uses Base58 address and separated

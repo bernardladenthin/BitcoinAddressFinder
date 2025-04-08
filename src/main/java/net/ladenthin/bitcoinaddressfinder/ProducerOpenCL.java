@@ -23,8 +23,8 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
-import org.jspecify.annotations.*;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

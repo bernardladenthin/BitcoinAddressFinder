@@ -23,7 +23,6 @@ import java.io.File;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.function.Consumer;
-import org.jspecify.annotations.*;
 import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
 import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.BIG_INTEGER;
 import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.SHA256;
@@ -31,6 +30,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.UnknownSecretFormatExcep
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.core.DumpedPrivateKey;
 import org.bitcoinj.core.NetworkParameters;
+import org.jspecify.annotations.NonNull;
 
 public class SecretsFile extends AbstractPlaintextFile {
 

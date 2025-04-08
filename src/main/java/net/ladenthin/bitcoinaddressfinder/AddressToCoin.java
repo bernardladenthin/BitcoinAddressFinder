@@ -20,9 +20,9 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import com.google.errorprone.annotations.Immutable;
 import java.nio.ByteBuffer;
-import org.jspecify.annotations.*;
 import lombok.EqualsAndHashCode;
 import org.bitcoinj.core.Coin;
+import lombok.NonNull;
 
 @Immutable
 @EqualsAndHashCode

@@ -27,11 +27,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import lombok.EqualsAndHashCode;
-import lombok.NonNull;
 import lombok.ToString;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.jocl.CL;
 import org.jocl.cl_device_id;
+import org.jspecify.annotations.NonNull;
 
 @Immutable
 @ToString
@@ -44,211 +44,176 @@ public class OpenCLDevice implements Serializable {
     /**
      * See {@link org.jocl.CL#CL_DEVICE_NAME}.
      */
-    @NonNull
     private final String deviceName;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_VENDOR}.
      */
-    @NonNull
     private final String deviceVendor;
     
     /**
      * See {@link org.jocl.CL#CL_DRIVER_VERSION}.
      */
-    @NonNull
     private final String driverVersion;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_PROFILE}.
      */
-    @NonNull
     private final String deviceProfile;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_VERSION}.
      */
-    @NonNull
     private final String deviceVersion;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_EXTENSIONS}.
      */
-    @NonNull
     private final String deviceExtensions;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_TYPE}.
      */
-    @NonNull
     private final long deviceType;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_MAX_COMPUTE_UNITS}.
      */
-    @NonNull
     private final int maxComputeUnits;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS}.
      */
-    @NonNull
     private final long maxWorkItemDimensions;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_MAX_WORK_ITEM_SIZES}.
      */
-    @NonNull
     private final long maxWorkItemSizes[];
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_MAX_WORK_GROUP_SIZE}.
      */
-    @NonNull
     private final long maxWorkGroupSize;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_MAX_CLOCK_FREQUENCY}.
      */
-    @NonNull
     private final long maxClockFrequency;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_ADDRESS_BITS}.
      */
-    @NonNull
     private final int addressBits;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_MAX_MEM_ALLOC_SIZE}.
      */
-    @NonNull
     private final long maxMemAllocSize;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_GLOBAL_MEM_SIZE}.
      */
-    @NonNull
     private final long globalMemSize;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_ERROR_CORRECTION_SUPPORT}.
      */
-    @NonNull
     private final long errorCorrectionSupport;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_LOCAL_MEM_TYPE}.
      */
-    @NonNull
     private final int localMemType;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_LOCAL_MEM_SIZE}.
      */
-    @NonNull
     private final long localMemSize;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE}.
      */
-    @NonNull
     private final long maxConstantBufferSize;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_QUEUE_PROPERTIES}.
      */
-    @NonNull
     private final long queueProperties;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_IMAGE_SUPPORT}.
      */
-    @NonNull
     private final int imageSupport;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_MAX_READ_IMAGE_ARGS}.
      */
-    @NonNull
     private final int maxReadImageArgs;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_MAX_WRITE_IMAGE_ARGS}.
      */
-    @NonNull
     private final int maxWriteImageArgs;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_SINGLE_FP_CONFIG}.
      */
-    @NonNull
     private final long singleFpConfig;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_IMAGE2D_MAX_WIDTH}.
      */
-    @NonNull
     private final long image2dMaxWidth;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_IMAGE2D_MAX_HEIGHT}.
      */
-    @NonNull
     private final long image2dMaxHeight;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_IMAGE3D_MAX_WIDTH}.
      */
-    @NonNull
     private final long image3dMaxWidth;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_IMAGE3D_MAX_HEIGHT}.
      */
-    @NonNull
     private final long image3dMaxHeight;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_IMAGE3D_MAX_DEPTH}.
      */
-    @NonNull
     private final long image3dMaxDepth;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_CHAR}.
      */
-    @NonNull
     private final int preferredVectorWidthChar;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_SHORT}.
      */
-    @NonNull
     private final int preferredVectorWidthShort;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_INT}.
      */
-    @NonNull
     private final int preferredVectorWidthInt;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_LONG}.
      */
-    @NonNull
     private final int preferredVectorWidthLong;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT}.
      */
-    @NonNull
     private final int preferredVectorWidthFloat;
     
     /**
      * See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE}.
      */
-    @NonNull
     private final int preferredVectorWidthDouble;
     
     public OpenCLDevice(
