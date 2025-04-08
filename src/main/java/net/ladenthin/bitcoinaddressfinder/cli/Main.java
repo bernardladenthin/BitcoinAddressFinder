@@ -172,20 +172,24 @@ public class Main implements Runnable, Interruptable {
         logger.info("Main#run end.");
         runLatch.countDown();
         
-        if(false) {
-            try {
-                Thread.sleep(2000L);
-            } catch (InterruptedException ex) {
+        if (false) {
+            printAllStackTracesWithDelay(2_000L);
+        }
+    }
+    
+    public static void printAllStackTracesWithDelay(long delayMillis) {
+        try {
+            Thread.sleep(delayMillis);
+        } catch (InterruptedException ignored) {
+            // Intentionally ignored
+        }
 
-            }
-            Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
-            for (Thread thread : threadSet) {
-                System.out.println("##################################################");
-                System.out.println("#thread: " + thread);
-                StackTraceElement[] stackTrace = thread.getStackTrace();
-                for (StackTraceElement stackTraceElement : stackTrace) {
-                    System.out.println(stackTraceElement);
-                }
+        Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
+        for (Thread thread : threadSet) {
+            System.out.println("##################################################");
+            System.out.println("# Thread: " + thread);
+            for (StackTraceElement element : thread.getStackTrace()) {
+                System.out.println(element);
             }
         }
     }

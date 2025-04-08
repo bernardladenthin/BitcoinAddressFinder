@@ -30,6 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.cli.Main;
+import static net.ladenthin.bitcoinaddressfinder.cli.Main.printAllStackTracesWithDelay;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -69,14 +70,15 @@ public class MainTest {
 
     // <editor-fold defaultstate="collapsed" desc="testRoundtrip">
     @Test
-    @Ignore
     public void testRoundtrip_configurationsGiven_lmdbCreatedExportedAndRunFindSecretsFile() throws IOException, InterruptedException {
         // arrange, act, assert
         Main.main(new String[]{config_AddressFilesToLMDB_json.toAbsolutePath().toString()});
         
         Main.main(new String[]{config_LMDBToAddressFile_json.toAbsolutePath().toString()});
         
-        Main.main(new String[]{config_Find_SecretsFile_json.toAbsolutePath().toString()});
+        //Main.main(new String[]{config_Find_SecretsFile_json.toAbsolutePath().toString()});
+        
+        //printAllStackTracesWithDelay(10_000L);
     }
     // </editor-fold>
     
