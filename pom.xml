@@ -105,6 +105,7 @@
                         <redirectTestOutputToFile>true</redirectTestOutputToFile>
                         <!-- Increase timeout to ensure long-running tests don't break -->
                         <forkedProcessTimeoutInSeconds>180</forkedProcessTimeoutInSeconds>
+                        <useSystemClassLoader>false</useSystemClassLoader>
                 </configuration>
             </plugin>
             <plugin>
