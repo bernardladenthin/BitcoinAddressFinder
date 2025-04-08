@@ -33,3 +33,11 @@ jobs:
       with:
         name: jar binaries
         path: target/*.jar
+    - name: Upload Surefire Reports and JVM Crash Logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: surefire-and-crash-logs
+        path: |
+          target/surefire-reports/**
+          hs_err_pid*.log

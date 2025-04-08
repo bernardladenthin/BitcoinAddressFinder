@@ -39,9 +39,11 @@ jobs:
         cache: maven
     - name: Build with Maven
       run: mvn -B --update-snapshots test --file pom.xml
-    - name: Upload Surefire Reports
-      if: always() # upload even if tests fail
+    - name: Upload Surefire Reports and JVM Crash Logs
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: surefire-reports-${{ matrix.os }}-${{ matrix.javadistribution }}-java${{ matrix.javaversion }}
-        path: target/surefire-reports/
+        path: |
+            target/surefire-reports/**
+            hs_err_pid*.log

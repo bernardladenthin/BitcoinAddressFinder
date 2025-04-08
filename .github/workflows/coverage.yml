@@ -27,7 +27,14 @@ jobs:
         cache: maven
     - name: Build with Maven
       run: mvn -B --update-snapshots test package jacoco:report --file pom.xml
-
+    - name: Upload Surefire Reports and JVM Crash Logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: surefire-and-crash-logs
+        path: |
+          target/surefire-reports/**
+          hs_err_pid*.log
     # Optional: Uploads the full dependency graph to GitHub to improve the quality of Dependabot alerts this repository can receive
     - name: Update dependency graph
       uses: advanced-security/maven-dependency-submission-action@0b9cd8f382c5d2016fa77ebf8a0f2804452fefef
@@ -47,4 +54,3 @@ jobs:
       uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-
