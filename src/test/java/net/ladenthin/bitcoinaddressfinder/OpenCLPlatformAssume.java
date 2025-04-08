@@ -25,7 +25,7 @@ import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import org.junit.Assume;
 import static org.hamcrest.Matchers.is;
 
-public class OpenCLPlatformAssume {
+public class OpenCLPlatformAssume implements PlatformAssume {
     
     public void assumeOpenCLLibraryLoadable() {
         Assume.assumeThat("OpenCL library loadable", OpenCLBuilder.isOpenCLnativeLibraryLoadable(), is(TRUE));

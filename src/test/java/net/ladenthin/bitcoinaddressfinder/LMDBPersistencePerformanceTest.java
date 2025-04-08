@@ -60,6 +60,7 @@ public class LMDBPersistencePerformanceTest {
     
     @Test(timeout = 180_000) // 180 seconds, also in maven-surefire-plugin: forkedProcessTimeoutInSeconds
     public void runProber_performanceTest() throws IOException, InterruptedException, IllegalArgumentException, NoSuchFieldException, IllegalAccessException {
+        new LMDBPlatformAssume().assumeLMDBExecution();
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
