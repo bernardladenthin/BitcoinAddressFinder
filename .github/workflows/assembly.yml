@@ -18,9 +18,9 @@ jobs:
 
     runs-on: 'ubuntu-latest'
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up JDK ${{ env.javaversion }} ${{ env.javadistribution }}
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         java-version: ${{ env.javaversion }}
         distribution: ${{ env.javadistribution }}
@@ -29,7 +29,7 @@ jobs:
       run: mvn -B --update-snapshots test package assembly:single --file pom.xml
 
     - name: Archive binary
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: jar binaries
         path: target/*.jar
