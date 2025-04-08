@@ -26,7 +26,7 @@ jobs:
         distribution: ${{ env.javadistribution }}
         cache: maven
     - name: Build with Maven
-      run: mvn "-Djacoco.skip=true" -B --update-snapshots test package assembly:single --file pom.xml
+      run: mvn "-Djacoco.skip=true" "-DforkCount=0" "-DreuseForks=false" -B --update-snapshots test package assembly:single --file pom.xml
 
     - name: Archive binary
       uses: actions/upload-artifact@v4
