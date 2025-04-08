@@ -18,8 +18,6 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.persistence;
 
-import org.bitcoinj.core.Coin;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -27,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFileOutputFormat;
+import org.bitcoinj.base.Coin;
 
 public interface Persistence {
 

@@ -28,8 +28,8 @@ import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.BIG
 import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.SHA256;
 import net.ladenthin.bitcoinaddressfinder.configuration.UnknownSecretFormatException;
 import org.apache.commons.codec.binary.Hex;
-import org.bitcoinj.core.DumpedPrivateKey;
 import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.crypto.DumpedPrivateKey;
 import org.jspecify.annotations.NonNull;
 
 public class SecretsFile extends AbstractPlaintextFile {

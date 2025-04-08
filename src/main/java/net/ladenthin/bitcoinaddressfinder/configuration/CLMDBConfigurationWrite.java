@@ -18,7 +18,7 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
-import org.bitcoinj.core.Coin;
+import org.bitcoinj.base.Coin;
 
 public class CLMDBConfigurationWrite extends CLMDBConfigurationReadOnly {
 

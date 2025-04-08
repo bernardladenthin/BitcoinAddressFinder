@@ -20,10 +20,10 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import com.github.kiulian.converter.AddressConverter;
 import java.nio.ByteBuffer;
-import org.bitcoinj.core.AddressFormatException;
-import org.bitcoinj.core.Base58;
-import org.bitcoinj.core.Coin;
-import org.bitcoinj.core.SegwitAddress;
+import org.bitcoinj.base.Base58;
+import org.bitcoinj.base.Coin;
+import org.bitcoinj.base.SegwitAddress;
+import org.bitcoinj.base.exceptions.AddressFormatException;
 import org.jspecify.annotations.Nullable;
 
 

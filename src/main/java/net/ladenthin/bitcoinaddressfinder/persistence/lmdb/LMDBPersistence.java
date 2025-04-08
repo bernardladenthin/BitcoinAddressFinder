@@ -20,8 +20,6 @@ package net.ladenthin.bitcoinaddressfinder.persistence.lmdb;
 
 import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
-import org.bitcoinj.core.LegacyAddress;
-import org.bitcoinj.core.Coin;
 import org.lmdbjava.CursorIterable;
 import org.lmdbjava.Dbi;
 import org.lmdbjava.Env;
@@ -36,7 +34,6 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import net.ladenthin.bitcoinaddressfinder.AddressTxtLine;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.ByteConversion;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
@@ -45,6 +42,8 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFileOutputFormat
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 import org.apache.commons.codec.binary.Hex;
+import org.bitcoinj.base.Coin;
+import org.bitcoinj.base.LegacyAddress;
 import org.lmdbjava.BufferProxy;
 import org.lmdbjava.ByteBufferProxy;
 

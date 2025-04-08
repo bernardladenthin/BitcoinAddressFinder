@@ -38,8 +38,8 @@ import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.SHA
 import net.ladenthin.bitcoinaddressfinder.configuration.UnknownSecretFormatException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.FileUtils;
-import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.params.MainNetParams;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;

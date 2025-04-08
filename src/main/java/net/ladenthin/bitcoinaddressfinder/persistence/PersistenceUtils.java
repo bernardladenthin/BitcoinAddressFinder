@@ -18,14 +18,13 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.persistence;
 
-import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.NetworkParameters;
-import org.bitcoinj.core.Sha256Hash;
-
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
+import org.bitcoinj.base.LegacyAddress;
+import org.bitcoinj.base.Sha256Hash;
 
 public class PersistenceUtils {
 

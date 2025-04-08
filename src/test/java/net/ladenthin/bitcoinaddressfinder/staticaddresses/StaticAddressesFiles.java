@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
-import org.bitcoinj.core.Coin;
+import org.bitcoinj.base.Coin;
 import org.junit.rules.TemporaryFolder;
 
 public class StaticAddressesFiles implements AddressesFiles {

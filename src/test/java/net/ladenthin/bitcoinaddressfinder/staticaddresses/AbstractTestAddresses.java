@@ -27,9 +27,9 @@ import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import org.apache.commons.codec.binary.Hex;
-import org.bitcoinj.core.ECKey;
-import org.bitcoinj.core.LegacyAddress;
+import org.bitcoinj.base.LegacyAddress;
 import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.params.MainNetParams;
 
 public abstract class AbstractTestAddresses implements TestAddresses {

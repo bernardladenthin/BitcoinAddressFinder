@@ -11,7 +11,7 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import static net.ladenthin.bitcoinaddressfinder.eckey.Secp256k1.getPublicKey;
 import static net.ladenthin.bitcoinaddressfinder.eckey.Secp256k1.byteArrayToHexString;
 import static net.ladenthin.bitcoinaddressfinder.eckey.Secp256k1.hexStringToByteArray;
-import org.bitcoinj.core.ECKey;
+import org.bitcoinj.crypto.ECKey;
 import org.bouncycastle.jce.ECNamedCurveTable;
 import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec;
 

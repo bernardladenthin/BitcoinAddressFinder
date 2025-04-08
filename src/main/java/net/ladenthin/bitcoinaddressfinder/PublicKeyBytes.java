@@ -23,8 +23,9 @@ import java.math.BigInteger;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Utils;
+import org.bitcoinj.crypto.ECKey;
+import org.bitcoinj.crypto.internal.CryptoUtils;
 import org.bouncycastle.crypto.digests.RIPEMD160Digest;
 
 @ToString
@@ -208,7 +209,7 @@ public class PublicKeyBytes {
             if (USE_SHA256_RIPEMD160_FAST) {
                 uncompressedKeyHash = sha256hash160Fast(uncompressed);
             } else {
-                uncompressedKeyHash = Utils.sha256hash160(uncompressed);
+                uncompressedKeyHash = CryptoUtils.sha256hash160(uncompressed);
             }
         }
         return uncompressedKeyHash;
@@ -217,7 +218,7 @@ public class PublicKeyBytes {
     public byte[] getCompressedKeyHash() {
         if (compressedKeyHash == null) {
             if (USE_SHA256_RIPEMD160_FAST) {
-                compressedKeyHash = Utils.sha256hash160(compressed);
+                compressedKeyHash = CryptoUtils.sha256hash160(compressed);
             } else {
                 compressedKeyHash = sha256hash160Fast(compressed);
             }

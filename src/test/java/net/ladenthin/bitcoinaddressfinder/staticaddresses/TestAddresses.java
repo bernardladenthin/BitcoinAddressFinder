@@ -20,7 +20,7 @@ package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 
 import java.nio.ByteBuffer;
 import java.util.List;
-import org.bitcoinj.core.ECKey;
+import org.bitcoinj.crypto.ECKey;
 
 public interface TestAddresses {
     

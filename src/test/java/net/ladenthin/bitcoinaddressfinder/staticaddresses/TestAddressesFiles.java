@@ -32,7 +32,7 @@ import net.ladenthin.bitcoinaddressfinder.SeparatorFormat;
 import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.COMMA;
 import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.SEMICOLON;
 import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.TAB_SPLIT;
-import org.bitcoinj.core.Coin;
+import org.bitcoinj.base.Coin;
 import org.junit.rules.TemporaryFolder;
 
 public class TestAddressesFiles implements AddressesFiles {
