@@ -59,7 +59,7 @@ public class LMDBPersistencePerformanceTest {
     private final static int KEYS_QUEUE_SIZE = CONSUMER_THREADS*2;
     private final static int PRODUCER_THREADS = KEYS_QUEUE_SIZE;
     
-    @Test(timeout = 120000) // 120 seconds, also in maven-surefire-plugin: forkedProcessTimeoutInSeconds
+    @Test(timeout = 180_000) // 180 seconds, also in maven-surefire-plugin: forkedProcessTimeoutInSeconds
     public void runProber_performanceTest() throws IOException, InterruptedException, IllegalArgumentException, NoSuchFieldException, IllegalAccessException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 

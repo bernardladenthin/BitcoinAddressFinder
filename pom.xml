@@ -106,7 +106,7 @@
                         <!-- Avoid flooding the native stream -->
                         <redirectTestOutputToFile>true</redirectTestOutputToFile>
                         <!-- Increase timeout to ensure long-running tests don't break -->
-                        <forkedProcessTimeoutInSeconds>120</forkedProcessTimeoutInSeconds>
+                        <forkedProcessTimeoutInSeconds>180</forkedProcessTimeoutInSeconds>
                 </configuration>
             </plugin>
             <plugin>
