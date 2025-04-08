@@ -96,7 +96,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                         <!-- Fork just one JVM for test isolation -->
-                        <forkCount>0</forkCount>
+                        <forkCount>1</forkCount>
                         <reuseForks>false</reuseForks>
                         <!-- Properly include JaCoCo agent and any other injected argLine -->
                         <!-- https://bugs.openjdk.org/browse/JDK-6776659 https://stackoverflow.com/questions/55272870/surefire-maven-plugin-corrupted-stdout-by-directly-writing-to-native-stream-in -->
