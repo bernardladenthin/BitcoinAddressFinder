@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.ByteConversion;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.SeparatorFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFileOutputFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
@@ -194,8 +195,11 @@ public class LMDBPersistence implements Persistence {
     @Override
     public boolean containsAddress(ByteBuffer hash160) {
         try (Txn<ByteBuffer> txn = env.txnRead()) {
-            ByteBuffer safeCopy = hash160.duplicate(); // fast, cheap
-            safeCopy.rewind();
+
+            ByteBuffer safeCopy = ByteBuffer.allocateDirect(PublicKeyBytes.HASH160_SIZE);
+            safeCopy.put(hash160);
+            safeCopy.flip();
+
             ByteBuffer byteBuffer = lmdb_h160ToAmount.get(txn, safeCopy);
             return byteBuffer != null;
         }
