@@ -197,10 +197,10 @@ public class LMDBPersistence implements Persistence {
         Txn<ByteBuffer> txn;
         synchronized (env) {
             txn = env.txnRead();
-        }
-        try (txn) {
-            ByteBuffer byteBuffer = lmdb_h160ToAmount.get(txn, hash160);
-            return byteBuffer != null;
+            try (txn) {
+                ByteBuffer byteBuffer = lmdb_h160ToAmount.get(txn, hash160);
+                return byteBuffer != null;
+            }
         }
     }
 
