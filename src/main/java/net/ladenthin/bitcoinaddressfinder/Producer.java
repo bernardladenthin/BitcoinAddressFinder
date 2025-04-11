@@ -50,7 +50,7 @@ public interface Producer extends Runnable, Interruptable, ProducerStateProvider
     
     /**
      * Process the secret.
-     * @param secret
+     * @param secrets
      */
     void processSecrets(BigInteger[] secrets);
     
