@@ -415,7 +415,6 @@ public class ProbeAddressesOpenCLTest {
         
         Random sr = new SecureRandom();
         BigInteger secret = keyUtility.createSecret(bitSize, sr);
-        BitHelper bitHelper = new BitHelper();
         BigInteger secretBase = keyUtility.killBits(secret, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
         
         openCLContext.createKeys(secretBase);
@@ -437,7 +436,6 @@ public class ProbeAddressesOpenCLTest {
         
         Random sr = new SecureRandom();
         BigInteger secret = keyUtility.createSecret(BITS_FOR_BATCH-1, sr);
-        BitHelper bitHelper = new BitHelper();
         BigInteger secretBase = keyUtility.killBits(secret, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
         
         openCLContext.createKeys(secretBase);
@@ -480,7 +478,6 @@ public class ProbeAddressesOpenCLTest {
         Random sr = new SecureRandom();
         BigInteger secretKeyBase = keyUtility.createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, sr);
         
-        BitHelper bitHelper = new BitHelper();
         BigInteger secretBase = keyUtility.killBits(secretKeyBase, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
         
         OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
