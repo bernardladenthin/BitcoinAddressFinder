@@ -37,13 +37,13 @@ public class FileHelper {
     }
 
     public void assertFilesExists(List<File> files) throws IllegalArgumentException {
-        logger.info("check if all files exists ...");
+        logger.info("Validating that all input files exist...");
         for (File file : files) {
             if (!file.exists()) {
-                throw new IllegalArgumentException("The file does not exists: " + file.getAbsolutePath());
+                throw new IllegalArgumentException("Missing file: " + file);
             }
-            logger.info("file exists: " + file.getAbsolutePath());
+            logger.debug("Found file: {}", file);
         }
-        logger.info("... all files exists.");
+        logger.info("All input files verified successfully.");
     }
 }

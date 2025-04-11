@@ -54,9 +54,10 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
             List<File> files = fileHelper.stringsToFiles(producerJavaSecretsFiles.files);
             fileHelper.assertFilesExists(files);
 
-            logger.info("Iterate secrets files ...");
+            logger.info("Starting secrets file processing...");
             for (File file : files) {
                 if (!shouldRun.get()) {
+                    logger.info("Key production stopped by flag.");
                     break;
                 }
                 SecretsFile secretsFile = new SecretsFile(
@@ -67,15 +68,15 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
                     this::consumeSecrets
                 );
 
-                logger.info("process: " + file.getAbsolutePath());
+                logger.info("Processing secrets file: {}", file);
                 currentSecretsFile.set(secretsFile);
                 secretsFile.readFile();
                 currentSecretsFile.set(null);
-                logger.info("finished: " + file.getAbsolutePath());
+                logger.info("Finished processing: {}", file);
 
                 logProgress();
-                logger.info("... iterate secrets files done.");
             }
+            logger.info("All secrets files processed.");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
