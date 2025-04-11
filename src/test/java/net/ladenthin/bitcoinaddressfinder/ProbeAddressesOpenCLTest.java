@@ -162,13 +162,13 @@ public class ProbeAddressesOpenCLTest {
         // Allocate the memory objects for the input- and output data
         cl_mem srcMemA = clCreateBuffer(context,
                 CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                Sizeof.cl_float * n, srcA, null);
+                (long)Sizeof.cl_float * n, srcA, null);
         cl_mem srcMemB = clCreateBuffer(context,
                 CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                Sizeof.cl_float * n, srcB, null);
+                (long)Sizeof.cl_float * n, srcB, null);
         cl_mem dstMem = clCreateBuffer(context,
                 CL_MEM_READ_WRITE,
-                Sizeof.cl_float * n, null, null);
+                (long)Sizeof.cl_float * n, null, null);
 
         // Create the program from the source code
         cl_program program = clCreateProgramWithSource(context,

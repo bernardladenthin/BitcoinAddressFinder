@@ -250,7 +250,7 @@ public class OpenCLBuilder {
     private static int[] getInts(cl_device_id device, int paramName, int numValues)
     {
         int values[] = new int[numValues];
-        clGetDeviceInfo(device, paramName, Sizeof.cl_int * numValues, Pointer.to(values), null);
+        clGetDeviceInfo(device, paramName, (long)Sizeof.cl_int * numValues, Pointer.to(values), null);
         return values;
     }
 
@@ -277,7 +277,7 @@ public class OpenCLBuilder {
     private static long[] getLongs(cl_device_id device, int paramName, int numValues)
     {
         long values[] = new long[numValues];
-        clGetDeviceInfo(device, paramName, Sizeof.cl_long * numValues, Pointer.to(values), null);
+        clGetDeviceInfo(device, paramName, (long)Sizeof.cl_long * numValues, Pointer.to(values), null);
         return values;
     }
 
@@ -350,7 +350,7 @@ public class OpenCLBuilder {
         long size = (long)numValues * Sizeof.size_t;
         ByteBuffer buffer = ByteBuffer.allocate(
             ByteBufferUtility.ensureByteBufferCapacityFitsInt(size)).order(ByteOrder.nativeOrder());
-        clGetDeviceInfo(device, paramName, Sizeof.size_t * numValues, 
+        clGetDeviceInfo(device, paramName, size, 
             Pointer.to(buffer), null);
         long values[] = new long[numValues];
         if (Sizeof.size_t == 4)
