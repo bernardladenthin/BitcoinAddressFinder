@@ -256,4 +256,63 @@ public class ByteBufferUtilityTest {
         return next == prev && addressTest;
     }
 
+    // <editor-fold defaultstate="collapsed" desc="ensureByteBufferCapacityFitsInt">
+    @Test
+    public void ensureByteBufferCapacityFitsInt_zeroGiven_returnZero() {
+        // arrange
+        long capacity = 0L;
+
+        // act
+        int result = ByteBufferUtility.ensureByteBufferCapacityFitsInt(capacity);
+
+        // assert
+        assertThat(result, is(equalTo(0)));
+    }
+
+    @Test
+    public void ensureByteBufferCapacityFitsInt_smallValueGiven_returnAsInt() {
+        // arrange
+        long capacity = 1234L;
+
+        // act
+        int result = ByteBufferUtility.ensureByteBufferCapacityFitsInt(capacity);
+
+        // assert
+        assertThat(result, is(equalTo(1234)));
+    }
+
+    @Test
+    public void ensureByteBufferCapacityFitsInt_maxIntGiven_returnAsInt() {
+        // arrange
+        long capacity = Integer.MAX_VALUE;
+
+        // act
+        int result = ByteBufferUtility.ensureByteBufferCapacityFitsInt(capacity);
+
+        // assert
+        assertThat(result, is(equalTo(Integer.MAX_VALUE)));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void ensureByteBufferCapacityFitsInt_valueTooLarge_throwsException() {
+        // arrange
+        long capacity = (long) Integer.MAX_VALUE + 1L;
+
+        // act
+        ByteBufferUtility.ensureByteBufferCapacityFitsInt(capacity);
+
+        // assert is handled by exception rule
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void ensureByteBufferCapacityFitsInt_negativeValueGiven_throwsException() {
+        // arrange
+        long capacity = -1L;
+
+        // act
+        ByteBufferUtility.ensureByteBufferCapacityFitsInt(capacity);
+
+        // assert is handled by exception rule
+    }
+    // </editor-fold>
 }

@@ -194,8 +194,9 @@ public class ProbeAddressesOpenCLTest {
                 global_work_size, null, 0, null, null);
 
         // Read the output data
+        long cb = (long) n * Sizeof.cl_float;
         clEnqueueReadBuffer(commandQueue, dstMem, CL_TRUE, 0,
-                n * Sizeof.cl_float, dst, 0, null, null);
+                cb, dst, 0, null, null);
 
         // Release kernel, program, and memory objects
         clReleaseMemObject(srcMemA);

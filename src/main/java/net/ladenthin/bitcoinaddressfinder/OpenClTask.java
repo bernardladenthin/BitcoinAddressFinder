@@ -83,8 +83,8 @@ public class OpenClTask {
         return PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES;
     }
 
-    public int getDstSizeInBytes() {
-        return PublicKeyBytes.TWO_COORDINATES_NUM_BYTES * bitHelper.convertBitsToSize(cProducer.batchSizeInBits);
+    public long getDstSizeInBytes() {
+        return (long) PublicKeyBytes.TWO_COORDINATES_NUM_BYTES * bitHelper.convertBitsToSize(cProducer.batchSizeInBits);
     }
 
     public void setSrcPrivateKeyChunk(BigInteger privateKeyBase) {
@@ -98,23 +98,20 @@ public class OpenClTask {
 
     
     public ByteBuffer executeKernel(cl_kernel kernel, cl_command_queue commandQueue) {
+        final long dstSizeInBytes = getDstSizeInBytes();
         // allocate a new dst buffer that a clone afterwards is not necessary
-        final ByteBuffer dstByteBuffer = ByteBuffer.allocateDirect(getDstSizeInBytes());
+        final ByteBuffer dstByteBuffer = ByteBuffer.allocateDirect(ByteBufferUtility.ensureByteBufferCapacityFitsInt(dstSizeInBytes));
         final Pointer dstPointer = Pointer.to(dstByteBuffer);
         final cl_mem dstMem;
         if (USE_HOST_PTR) {
-            dstMem = clCreateBuffer(
-                    context,
-                    CL_MEM_USE_HOST_PTR,
-                    getDstSizeInBytes(),
+            dstMem = clCreateBuffer(context,
+                    CL_MEM_USE_HOST_PTR, dstSizeInBytes,
                     dstPointer,
                     null
             );
         } else {
-            dstMem = clCreateBuffer(
-                    context,
-                    CL_MEM_WRITE_ONLY,
-                    getDstSizeInBytes(),
+            dstMem = clCreateBuffer(context,
+                    CL_MEM_WRITE_ONLY, dstSizeInBytes,
                     null,
                     null
             );
@@ -170,12 +167,11 @@ public class OpenClTask {
             // read the dst buffer
             long beforeRead = System.currentTimeMillis();
 
-            clEnqueueReadBuffer(
-                    commandQueue,
+            clEnqueueReadBuffer(commandQueue,
                     dstMem,
                     CL_TRUE,
                     0,
-                    getDstSizeInBytes(),
+                    dstSizeInBytes,
                     dstPointer,
                     0,
                     null,
@@ -186,7 +182,7 @@ public class OpenClTask {
 
             long afterRead = System.currentTimeMillis();
             if (logger.isTraceEnabled()) {
-                logger.trace("Read OpenCL data "+((getDstSizeInBytes() / 1024) / 1024) + "Mb in " + (afterRead - beforeRead) + "ms");
+                logger.trace("Read OpenCL data "+((dstSizeInBytes / 1024) / 1024) + "Mb in " + (afterRead - beforeRead) + "ms");
             }
         }
         return dstByteBuffer;

@@ -101,4 +101,22 @@ public class ByteBufferUtility {
     }
     // </editor-fold>
     
+    // <editor-fold defaultstate="collapsed" desc="ensureByteBufferCapacityFitsInt">
+    /**
+    * Validates that the given capacity fits within Java's ByteBuffer limit.
+    * 
+    * @param capacity the desired buffer capacity in bytes
+    * @return the same value as an int, if within bounds
+    * @throws IllegalArgumentException if capacity exceeds Integer.MAX_VALUE or is negative
+    */
+   public static int ensureByteBufferCapacityFitsInt(long capacity) {
+       if (capacity < 0) {
+           throw new IllegalArgumentException("Capacity must not be negative: " + capacity);
+       }
+       if (capacity > Integer.MAX_VALUE) {
+           throw new IllegalArgumentException("Capacity exceeds maximum ByteBuffer limit: " + capacity);
+       }
+       return (int) capacity;
+   }
+    // </editor-fold>
 }
