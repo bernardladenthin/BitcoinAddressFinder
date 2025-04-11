@@ -218,10 +218,6 @@ public class ProbeAddressesOpenCLTest {
                 break;
             }
         }
-        System.out.println("Test " + (passed ? "PASSED" : "FAILED"));
-        if (n <= 10) {
-            System.out.println("Result: " + Arrays.toString(dstArray));
-        }
 
         assertThat(passed, is(equalTo(Boolean.TRUE)));
     }
