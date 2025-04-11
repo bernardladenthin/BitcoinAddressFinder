@@ -93,13 +93,13 @@ public class AddressTxtLineTest {
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ADDRESS_SEPARATOR, location = CommonDataProvider.class)
     public void fromLine_uncompressedBitcoinAddressGivenWithValidAmount_ReturnHash160AndDefaultCoin(String addressSeparator) throws IOException {
         // arrange
-        String coin = "123987";
+        long coin = 123987L;
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticKey.publicKeyUncompressed + addressSeparator + coin, keyUtility);
 
         // assert
         assertThat(addressToCoin.getHash160(), is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
-        assertThat(addressToCoin.getCoin(), is(equalTo(Coin.valueOf(Long.valueOf(coin)))));
+        assertThat(addressToCoin.getCoin(), is(equalTo(Coin.valueOf(coin))));
     }
 
     @Test
