@@ -135,6 +135,7 @@ public class ConsumerJava implements Consumer {
 
     @Override
     public void startConsumer() {
+        logger.debug("Starting {} consumer threads...", consumerJava.threads);
         for (int i = 0; i < consumerJava.threads; i++) {
             consumers.add(consumeKeysExecutorService.submit(
                     () -> {
@@ -142,6 +143,7 @@ public class ConsumerJava implements Consumer {
                         return null;
                     }));
         }
+        logger.debug("Successfully started {} consumer threads.", consumers.size());
     }
     
     /**
@@ -330,17 +332,22 @@ public class ConsumerJava implements Consumer {
     
     @Override
     public void interrupt() {
-        logger.debug("start interrupt");
+        logger.debug("Interrupt initiated: stopping consumer execution...");
         shouldRun.set(false);
         scheduledExecutorService.shutdown();
         consumeKeysExecutorService.shutdown();
+        logger.debug("Waiting for termination of {} consumer threads (timeout: {} seconds)...", consumers.size(), AWAIT_DURATION_QUEUE_EMPTY.getSeconds());
         try {
-            consumeKeysExecutorService.awaitTermination(AWAIT_DURATION_QUEUE_EMPTY.get(ChronoUnit.SECONDS), TimeUnit.SECONDS);
+            boolean terminated = consumeKeysExecutorService.awaitTermination(AWAIT_DURATION_QUEUE_EMPTY.get(ChronoUnit.SECONDS), TimeUnit.SECONDS);
+            if (!terminated) {
+                logger.warn("Timeout reached. Some consumer threads may not have terminated cleanly.");
+            }
         } catch (InterruptedException ex) {
+            logger.error("Interrupted while awaiting consumer termination.", ex);
             throw new RuntimeException(ex);
         }
         persistence.close();
-        logger.debug("finish interrupt");
+        logger.debug("Interrupt complete: resources released and persistence closed.");
     }
     
     @VisibleForTesting
