@@ -19,7 +19,6 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import org.bitcoinj.base.Network;
-import org.bitcoinj.core.Context;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.params.MainNetParams;
 
@@ -31,7 +30,6 @@ public class NetworkParameterFactory {
     
     private NetworkParameters getNetworkParameters() {
         NetworkParameters networkParameters = MainNetParams.get();
-        Context.getOrCreate(networkParameters);
         return networkParameters;
     }
 }

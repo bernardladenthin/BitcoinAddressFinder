@@ -25,9 +25,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -45,6 +42,8 @@ import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.MnemonicException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ConsumerJava implements Consumer {
 
@@ -347,5 +346,10 @@ public class ConsumerJava implements Consumer {
     @VisibleForTesting
     int keysQueueSize() {
         return keysQueue.size();
+    }
+    
+    @Override
+    public String toString() {
+        return "ConsumerJava@" + Integer.toHexString(System.identityHashCode(this));
     }
 }

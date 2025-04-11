@@ -29,12 +29,12 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
-import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.Nullable;
@@ -165,7 +165,7 @@ public class Finder implements Interruptable {
         
         // no producers are running anymore, the consumer can be interrupted
         if (consumerJava != null) {
-            logger.info("Interrupt: " + consumerJava);
+            logger.info("Interrupt: " + consumerJava.toString());
             consumerJava.interrupt();
             consumerJava = null;
         }
@@ -176,7 +176,7 @@ public class Finder implements Interruptable {
     public void interrupt() {
         logger.info("interrupt called: delegate interrupt to all producer");
         for (Producer producer : getAllProducers()) {
-            logger.info("Interrupt: " + producer);
+            logger.info("Interrupt: " + producer.toString());
             producer.interrupt();
             logger.info("waitTillProducerNotRunning ...");
             producer.waitTillProducerNotRunning();

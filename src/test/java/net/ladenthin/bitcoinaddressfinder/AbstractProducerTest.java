@@ -106,15 +106,15 @@ public class AbstractProducerTest {
         assertThat(Hex.encodeHexString(secretBase.toByteArray()), is(equalTo(expectedSecretBase)));
 
         ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
+        verify(logger, times(1)).info(logCaptor.capture());
+        verify(logger, times(5)).trace(logCaptor.capture());
         List<String> arguments = logCaptor.getAllValues();
         // assert log secret base
         {
-            verify(logger, times(1)).info(logCaptor.capture());
             assertThat(arguments.get(0), is(equalTo(logInfo0)));
         }
         // assert log trace
         {
-            verify(logger, times(5)).trace(logCaptor.capture());
             assertThat(arguments.get(1), is(equalTo(logTrace0)));
             assertThat(arguments.get(2), is(equalTo(logTrace1)));
             assertThat(arguments.get(3), is(equalTo(logTrace2)));
@@ -204,10 +204,10 @@ public class AbstractProducerTest {
         assertThat(abstractProducer.state, is(equalTo(ProducerState.INITIALIZED)));
         
         ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
+        verify(logger, times(2)).info(logCaptor.capture());
         List<String> arguments = logCaptor.getAllValues();
         // assert log initProducer
         {
-            verify(logger, times(2)).info(logCaptor.capture());
             assertThat(arguments.get(1), is(equalTo("Release producer.")));
         }
     }
@@ -227,10 +227,10 @@ public class AbstractProducerTest {
         assertThat(abstractProducer.state, is(equalTo(ProducerState.INITIALIZED)));
         
         ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
+        verify(logger, times(1)).info(logCaptor.capture());
         List<String> arguments = logCaptor.getAllValues();
         // assert log initProducer
         {
-            verify(logger, times(1)).info(logCaptor.capture());
             assertThat(arguments.get(0), is(equalTo("Init producer.")));
         }
     }

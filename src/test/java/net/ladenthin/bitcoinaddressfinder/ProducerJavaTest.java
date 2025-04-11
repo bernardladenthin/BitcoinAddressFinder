@@ -19,10 +19,6 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.Random;
@@ -30,8 +26,11 @@ import static net.ladenthin.bitcoinaddressfinder.PublicKeyBytes.INVALID_PRIVATE_
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import org.bitcoinj.base.Network;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.*;
+import static org.hamcrest.text.MatchesPattern.matchesPattern;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 
 @RunWith(DataProviderRunner.class)
@@ -54,6 +53,24 @@ public class ProducerJavaTest {
         ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         AbstractProducerTest.verifyInitProducer(producerJava);
+    }
+    // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="toString">
+    @ToStringTest
+    @Test
+    public void toString_whenCalled_containsClassNameAndIdentityHash() {
+        CProducerJava cProducerJava = new CProducerJava();
+        MockConsumer mockConsumer = new MockConsumer();
+        Random random = new Random(1);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+
+        String toStringOutput = producerJava.toString();
+
+        assertThat(toStringOutput, is(notNullValue()));
+        assertThat(toStringOutput, not(emptyString()));
+        assertThat(toStringOutput, matchesPattern("ProducerJava@\\p{XDigit}+"));
     }
     // </editor-fold>
     

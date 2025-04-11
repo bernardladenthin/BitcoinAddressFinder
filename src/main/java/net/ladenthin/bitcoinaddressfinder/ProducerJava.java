@@ -66,4 +66,9 @@ public class ProducerJava extends AbstractProducer {
         }
         return publicKeyBytesArray;
     }
+    
+    @Override
+    public String toString() {
+        return "ProducerJava@" + Integer.toHexString(System.identityHashCode(this));
+    }
 }

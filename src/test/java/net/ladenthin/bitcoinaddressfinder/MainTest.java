@@ -19,10 +19,6 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import ch.qos.logback.classic.Level;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -30,11 +26,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.cli.Main;
-import static net.ladenthin.bitcoinaddressfinder.cli.Main.printAllStackTracesWithDelay;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import org.junit.Ignore;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.mockito.ArgumentCaptor;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -130,8 +127,8 @@ public class MainTest {
         
         // assert
         ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
-        List<String> arguments = logCaptor.getAllValues();
         verify(logger, times(1)).error(logCaptor.capture());
+        List<String> arguments = logCaptor.getAllValues();
         assertThat(arguments.get(0), is(equalTo("Invalid arguments. Pass path to configuration as first argument.")));
     }
     // </editor-fold>

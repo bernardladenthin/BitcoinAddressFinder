@@ -21,10 +21,6 @@ package net.ladenthin.bitcoinaddressfinder;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -44,12 +40,12 @@ import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.MnemonicException;
-import static org.hamcrest.core.StringStartsWith.startsWith;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.nullValue;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.greaterThan;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.*;
+import static org.hamcrest.core.StringStartsWith.startsWith;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import static org.mockito.Mockito.atLeast;
@@ -89,6 +85,25 @@ public class ConsumerJavaTest {
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
     }
+    
+    
+    // <editor-fold defaultstate="collapsed" desc="toString">
+    @ToStringTest
+    @Test
+    public void toString_whenCalled_containsClassNameAndIdentityHash() throws IOException {
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = folder.newFolder().getAbsolutePath();
+
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+
+        String toStringOutput = consumerJava.toString();
+
+        assertThat(toStringOutput, is(notNullValue()));
+        assertThat(toStringOutput, not(emptyString()));
+        assertThat(toStringOutput, matchesPattern("ConsumerJava@\\p{XDigit}+"));
+    }
+    // </editor-fold>
 
     @Test
     public void startStatisticsTimer_noExceptionThrown() throws IOException, InterruptedException {
@@ -117,8 +132,8 @@ public class ConsumerJavaTest {
         consumerJava.interrupt();
 
         ArgumentCaptor<String> logCaptorInfo = ArgumentCaptor.forClass(String.class);
-        List<String> arguments = logCaptorInfo.getAllValues();
         verify(logger, atLeast(runTimes)).info(logCaptorInfo.capture());
+        List<String> arguments = logCaptorInfo.getAllValues();
 
         assertThat(arguments.get(0), is(equalTo("Statistics: [Checked 0 M keys in 0 minutes] [0 k keys/second] [0 M keys/minute] [Times an empty consumer: 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
     }
