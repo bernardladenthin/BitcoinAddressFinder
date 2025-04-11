@@ -193,14 +193,10 @@ public class LMDBPersistence implements Persistence {
     }
 
     @Override
-    public boolean containsAddress(ByteBuffer hash160) {
-        Txn<ByteBuffer> txn;
-        synchronized (env) {
-            txn = env.txnRead();
-            try (txn) {
-                ByteBuffer byteBuffer = lmdb_h160ToAmount.get(txn, hash160);
-                return byteBuffer != null;
-            }
+    public synchronized boolean containsAddress(ByteBuffer hash160) {
+        try (Txn<ByteBuffer> txn = env.txnRead()) {
+            ByteBuffer byteBuffer = lmdb_h160ToAmount.get(txn, hash160);
+            return byteBuffer != null;
         }
     }
 
