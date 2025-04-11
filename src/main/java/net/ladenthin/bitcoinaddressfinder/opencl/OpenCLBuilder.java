@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
+import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 import static org.jocl.CL.CL_DEVICE_ADDRESS_BITS;
 import static org.jocl.CL.CL_DEVICE_ERROR_CORRECTION_SUPPORT;
@@ -346,8 +347,9 @@ public class OpenCLBuilder {
     {
         // The size of the returned data has to depend on 
         // the size of a size_t, which is handled here
+        long size = (long)numValues * Sizeof.size_t;
         ByteBuffer buffer = ByteBuffer.allocate(
-            numValues * Sizeof.size_t).order(ByteOrder.nativeOrder());
+            ByteBufferUtility.ensureByteBufferCapacityFitsInt(size)).order(ByteOrder.nativeOrder());
         clGetDeviceInfo(device, paramName, Sizeof.size_t * numValues, 
             Pointer.to(buffer), null);
         long values[] = new long[numValues];
