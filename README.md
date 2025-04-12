@@ -1,4 +1,5 @@
 # BitcoinAddressFinder
+> 🚀 Fast address finder for Bitcoin and altcoins using OpenCL & Java – includes vanity address generation, balance checking, and offline support.
 <!-- =========================== Build & Environment =========================== -->
 [![OpenJDK](https://img.shields.io/badge/OpenJDK-21-blue)]()
 [![JUnit](https://img.shields.io/badge/tested%20with-JUnit4-yellow)]()
@@ -30,21 +31,26 @@ TODO:
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1234/badge)](https://bestpractices.coreinfrastructure.org/projects/1234)
 -->
 
-Free high performance tool for fast scanning random Bitcoin, Bitcoin Cash, Bitcoin SV, Litecoin, Dogecoin, Dash, Zcash (and many more) private keys and finding addresses with balance.
-The main goal is to generate as fast as possible (Bitcoin/Altcoin) addresses using the JVM combined with OpenCL and check if the address (RIPEMD160 hash) was used/not used before. This includes possible hash collisions.
+---
 
-Copyright (c) 2017-2024 Bernard Ladenthin.
+## About BitcoinAddressFinder
+A free, high-performance tool for rapidly scanning random private keys of Bitcoin, Bitcoin Cash, Bitcoin SV, Litecoin, Dogecoin, Dash, Zcash, and many other cryptocurrencies to find addresses with a balance.
 
-## Requirments
+The main goal is to generate addresses (Bitcoin/Altcoin) as fast as possible using the JVM combined with OpenCL, and to check whether the address (RIPEMD160 hash) has ever been used. This also includes the detection of possible hash collisions.
+
+**Made with ❤️ in Germany**
+Copyright (c) 2017-2025 Bernard Ladenthin.
+
+## Requirements
 * Java 21 or newer. Java 8, 11, 17 is not supported anymore.
 
 ## Quickstart
 1. Download the binary (jar) from https://github.com/bernardladenthin/BitcoinAddressFinder/releases
 2. Download and extract the light database from https://github.com/bernardladenthin/BitcoinAddressFinder#use-my-prepared-database
-3. Download a configuration set like
-  1. https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/logbackConfiguration.xml
-  2. https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/config_Find_1OpenCLDevice.js
-  3. https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/run_Find_1OpenCLDevice.bat
+3. Download a configuration set like:
+- [`logbackConfiguration.xml`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/logbackConfiguration.xml)
+- [`config_Find_1OpenCLDevice.js`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/config_Find_1OpenCLDevice.js)
+- [`run_Find_1OpenCLDevice.bat`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/run_Find_1OpenCLDevice.bat)
 4. Put all in one directory like the following structure
   * Downloads
     * lmdb
@@ -57,24 +63,24 @@ Copyright (c) 2017-2024 Bernard Ladenthin.
 5. Run the file run_Find_1OpenCLDevice.bat
 
 ## Features
-* Support blockchain addresses which are based on [secp256k1](https://en.bitcoin.it/wiki/Secp256k1).
-* Unit tested (trusted) open source which can be compiled easily from yourself.
-* Vanitygen of bitcoin addresses using regex pattern.
-* Runs completely offline. No internet required or used. You can run it in a bunker with an electric generator somewhere in nowhere and nobody knows it.
-* No synchronisation necessary to run multiple instances. Random numbers are used and a search organization is not necessary. Just start on multiple computers.
-* Check with a high performance database containing addresses if generated address are already in use.
-* Portable, plattform independend, runs on JVM.
-* Generate uncompressed and compressed keys at once.
-* EC-Key generation via
-  * Multiple CPU Threads
+* Supports blockchain addresses based on [secp256k1](https://en.bitcoin.it/wiki/Secp256k1).
+* Unit-tested, trusted open source that can be compiled easily by yourself.
+* Vanity generation of Bitcoin addresses using regex patterns.
+* Runs completely offline — no internet required or used. You can run it in a bunker with a generator in the middle of nowhere, and no one will know.
+* No synchronization required to run multiple instances. Random numbers are used, so no coordinated search strategy is needed — just run it on multiple machines.
+* Checks a high-performance database of known addresses to detect already used ones.
+* Portable, platform-independent, runs on the JVM.
+* Generates both uncompressed and compressed keys simultaneously.
+* EC key generation via:
+  * Multiple CPU threads
   * Multiple OpenCL devices (optional)
 
-## Address database
-The addresses will be inserted in a high performance database [LMDB](https://github.com/LMDB).
-The database can be used to check if a generated addresses is ever used.
+## Address Database
+The addresses are stored in a high-performance database: [LMDB](https://github.com/LMDB).
+The database can be used to check whether a generated address has ever been used.
 
 ### Import
-The importer read multiple txt/text files containing the following addresses in arbitrary order. Each line can contain a different format.
+The importer reads multiple `.txt` or `.text` files containing addresses in arbitrary order. Each line can contain a different format.
 * P2PKH
   * bitcoin
   * bitcoin cash
