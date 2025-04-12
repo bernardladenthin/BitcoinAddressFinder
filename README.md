@@ -39,6 +39,7 @@ A free, high-performance tool for rapidly scanning random private keys of Bitcoi
 The main goal is to generate addresses (Bitcoin/Altcoin) as fast as possible using the JVM combined with OpenCL, and to check whether the address (RIPEMD160 hash) has ever been used. This also includes the detection of possible hash collisions.
 
 **Made with ❤️ in Germany**
+
 Copyright (c) 2017-2025 Bernard Ladenthin.
 
 ## Requirements
@@ -105,16 +106,30 @@ Useful txt/text file provider:
 * http://blockdata.loyce.club/alladdresses/
 * https://blockchair.com/dumps
 
-### Export
-The exporter writes all addresses in different formats:
-* HexHash: The hash160 will be written encoded in hex without the amount. Optimal viewing with a viewer with a fixed width (e.g. HxD).
-* FixedWidthBase58BitcoinAddress: The addresses will be written with a fixed width and without the amount. Optimal viewing with a viewer with a fixed width (e.g. HxD).
-* DynamicWidthBase58BitcoinAddressWithAmount: The addresses will be written with amount.
 
-### Use my prepared database
-I am in the process of preparing databases filled with numerous Bitcoin and altcoin addresses (refer to the Import Support section for more information).
-The sources of this information are confidential; however, you have the permission to extract any and all addresses.
-Should there be any information you find lacking or have questions about, do not hesitate to ask.
+### Export
+The exporter provides various output formats for Bitcoin and altcoin address data:
+
+* **HexHash**  
+  Exports addresses as raw `hash160` (RIPEMD-160 of the SHA-256 of the public key), encoded in hexadecimal. No version byte or checksum is included. Ideal for advanced usage and low-level comparison. Best viewed in fixed-width hex viewers (e.g., HxD).
+
+* **FixedWidthBase58BitcoinAddress**  
+  Exports Base58Check-encoded addresses (e.g., legacy `P2PKH`) in a fixed-width format for consistent alignment. No amount is included. Suitable for hex/byte-aligned visual inspection and batch comparison.
+
+* **DynamicWidthBase58BitcoinAddressWithAmount**  
+  Exports Base58Check-encoded addresses along with their associated amounts (e.g., balance or UTXO value), using a dynamic-width format. Suitable for human-readable CSV-like formats and analytics.
+
+---
+
+### Use My Prepared Database
+I am in the process of building and publishing databases containing large sets of Bitcoin and altcoin addresses.  
+(Refer to the **Import** section above for details on supported address formats.)
+
+> The sources of these addresses are confidential, but you are fully permitted to extract, inspect, and use them.
+
+You are also welcome to **extend this database** by importing your own address data. This allows you to build upon the existing dataset, tailoring it to your specific needs (e.g., adding additional coins, formats, or private address collections).
+
+If you're missing any information or have questions about usage or content, feel free to ask or open an issue.
 
 #### Light database
 * Light (5.12 GiB), Last update: April 5, 2025
@@ -201,6 +216,8 @@ Should there be any information you find lacking or have questions about, do not
 
 </details>
 
+---
+
 ## Pages and projects to get lists (dumps) of PubkeyHash addresses
 * https://github.com/Pymmdrza/Rich-Address-Wallet
 * https://github.com/mycroft/chainstate
@@ -208,23 +225,45 @@ Should there be any information you find lacking or have questions about, do not
 * https://blockchair.com/dumps
 * https://balances.crypto-nerdz.org/
 
-## Find addresses
-**Attention**: Do not use this software in a productive, non safe environment. A safe environment might be a dedicated computer with an air gap / disconnected network. A side-channel attack is possible and the software is optimized for performance and not constant-time. You may use a [paper wallet](https://en.bitcoin.it/wiki/Paper_wallet) for created vanity keys.
+## Find Addresses
+> ⚠️ **Security Warning**: This software is intended for research and educational purposes. Do **not** use it in production or on systems connected to the internet.
 
-### Mixed modes
-Find personal vanity addresses and check if addresses already exists in the lmdb can be used together.
+A secure environment should be fully isolated — ideally an air-gapped computer (physically disconnected from all networks).  
+The software is highly optimized for performance and **not designed to run in constant time**, which means it may be vulnerable to **side-channel attacks** on shared or exposed systems.
 
-### Key range
-A key range can be defined (e.g. 64-bit) whereas the first (e.g. 192-bit (256-bit - 64-bit)) are zeroed. This can be used to creaty keys in a specific range to find keys in a known range (e.g. [Bitcoin Puzzle Transaction](https://privatekeys.pw/puzzles/bitcoin-puzzle-tx)).
-This can be also used to proof that the software works.
+For generated vanity addresses or private keys, consider storing them safely using a [paper wallet](https://en.bitcoin.it/wiki/Paper_wallet).
 
-### OpenCL
-To increase the performance of the EC-key generation OpenCL can be used.
-A common secret is transfered to the OpenCL device with a fixed grid size. Each OpenCL thread creates a different EC-Key because it add its thread-id to the secret. Therefore a range of EC-keys for a fixed grid size is created at once and will be transfered back to the main memory.
-The CPU is now able to hash the x,y coordinate of the EC-key to create (Bitcoin/Altcoin) addresses.
-The CPU doesn't spend most of its time for EC-key generation and can be used more efficient for hashing and database lookups.
+### Mixed Modes
+You can combine **vanity address generation** with **database lookups** to enhance functionality and efficiency.
 
-The OpenCL mode has a Built-in self-test (BIST) to compare the OpenCL results with CPU based EC-Key generation. This allows an end user to verify it's OpenCL device is working properly.
+For example:
+- Search for personalized (vanity) addresses using custom patterns **and**
+- Simultaneously check if the generated addresses already **exist in the LMDB** database
+
+This hybrid mode allows you to find rare or meaningful addresses while ensuring they haven’t been used before.
+
+### Key Range
+
+You can define a custom key range for private key generation—for example, limiting the search space to 64-bit keys.  
+In this setup, the first 192 bits (256-bit - 64-bit) of the key are zeroed, effectively restricting the generation to a specific portion of the keyspace.
+
+This feature can be used for:
+
+- **Targeted key recovery**, such as searching for private keys from known ranges like the [Bitcoin Puzzle Transaction](https://privatekeys.pw/puzzles/bitcoin-puzzle-tx)
+- **Verification and testing**, to prove that the software functions correctly within a predictable key range
+
+### OpenCL Acceleration
+
+To significantly boost the performance of EC key generation, the software supports OpenCL-based parallelization.
+
+A shared secret (base key) is transferred to the OpenCL device along with a predefined grid size. Each OpenCL thread independently derives a unique EC key by incrementing the base key with its thread ID. This allows the generation of a batch of EC keys in a single execution cycle. Once generated, the keys are transferred back to the host (CPU) memory for further processing.
+
+The CPU then hashes the X and Y coordinates of the public keys to derive the corresponding (Bitcoin/Altcoin) addresses. This division of labor offloads the computationally expensive elliptic curve operations to the GPU, allowing the CPU to focus on faster address hashing and database lookup operations—resulting in improved overall throughput.
+
+#### Built-in Self-Test (BIST)
+
+The OpenCL backend includes a built-in self-test mechanism that cross-verifies results from the GPU against a CPU-generated reference. This ensures that the OpenCL device is functioning correctly and producing valid EC keys—giving end users confidence in the reliability of their hardware-accelerated address search.
+
 
 #### Performance
 The effective keys / s using uncompressed and compressed keys. OpenCL creates uncompressed keys only. A compressed key can be deduced easily from the uncompressed key.
