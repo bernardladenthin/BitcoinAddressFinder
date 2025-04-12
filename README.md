@@ -47,7 +47,14 @@ Whether you're searching for vanity addresses, verifying address usage, or exper
 Copyright (c) 2017-2025 Bernard Ladenthin.
 
 ## Requirements
-* Java 21 or newer. Java 8, 11, 17 is not supported anymore.
+- **Java 21 or newer** is required to run BitcoinAddressFinder.  
+  Older versions such as Java 8, 11, or 17 are not supported.
+
+- **OpenCL (optional)**:  
+  You can choose between CPU-only and GPU-accelerated configurations.  
+  When OpenCL is enabled, elliptic curve key generation can be offloaded to one or multiple OpenCL-capable devices (e.g., GPUs), greatly increasing performance.
+
+  Multi-GPU setups are fully supported — each GPU can be configured individually to parallelize the workload and scan more keys per second.
 
 ## Quickstart
 1. Download the binary (jar) from https://github.com/bernardladenthin/BitcoinAddressFinder/releases
