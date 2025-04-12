@@ -34,9 +34,13 @@ TODO:
 ---
 
 ## About BitcoinAddressFinder
-A free, high-performance tool for rapidly scanning random private keys of Bitcoin, Bitcoin Cash, Bitcoin SV, Litecoin, Dogecoin, Dash, Zcash, and many other cryptocurrencies to find addresses with a balance.
+**BitcoinAddressFinder** is a free, high-performance tool designed to rapidly scan random private keys for a wide range of cryptocurrencies — including Bitcoin, Bitcoin Cash, Bitcoin SV, Litecoin, Dogecoin, Dash, Zcash, and many more.
 
-The main goal is to generate addresses (Bitcoin/Altcoin) as fast as possible using the JVM combined with OpenCL, and to check whether the address (RIPEMD160 hash) has ever been used. This also includes the detection of possible hash collisions.
+Its primary goal is to generate addresses (compressed and uncompressed) as efficiently as possible by combining the power of the Java Virtual Machine (JVM) with OpenCL for hardware acceleration.
+
+Once generated, each address is checked against a high-performance database (**LMDB**) to determine whether it has ever been used — effectively identifying addresses that might hold a balance. This includes detecting potential RIPEMD160 hash collisions and exploring known or partially known keyspaces.
+
+Whether you're searching for vanity addresses, verifying address usage, or experimenting with cryptographic edge cases, BitcoinAddressFinder is built for speed, flexibility, and offline use.
 
 **Made with ❤️ in Germany**
 
