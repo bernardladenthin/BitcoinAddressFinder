@@ -18,7 +18,7 @@
 [![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=bernardladenthin_BitcoinAddressFinder&metric=code_smells)](https://sonarcloud.io/dashboard?id=bernardladenthin_BitcoinAddressFinder)
 [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=bernardladenthin_BitcoinAddressFinder&metric=security_rating)](https://sonarcloud.io/dashboard?id=bernardladenthin_BitcoinAddressFinder)
 <!-- =========================== Security & Compliance =========================== -->
-[![Known Vulnerabilities](https://snyk.io/test/github/bernardladenthin/BitcoinAddressFinder/badge.svg?targetFile=pom.xml)](https://snyk.io/test/github/bernardladenthin/BitcoinAddressFinder?targetFile=targetFile=pom.xml)
+[![Known Vulnerabilities](https://snyk.io/test/github/bernardladenthin/BitcoinAddressFinder/badge.svg?targetFile=pom.xml)](https://snyk.io/test/github/bernardladenthin/BitcoinAddressFinder?targetFile=pom.xml)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder?ref=badge_shield)
 [![Dependencies](https://img.shields.io/librariesio/github/bernardladenthin/BitcoinAddressFinder)](https://libraries.io/github/bernardladenthin/BitcoinAddressFinder)
 <!-- =========================== License & Contribution =========================== -->
@@ -30,6 +30,29 @@
 TODO:
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1234/badge)](https://bestpractices.coreinfrastructure.org/projects/1234)
 -->
+
+---
+
+## Table of Contents
+- [About BitcoinAddressFinder](#about-bitcoinaddressfinder)
+- [Requirements](#requirements)
+- [Quickstart](#quickstart)
+- [Features](#features)
+- [Address Database](#address-database)
+  - [Import](#import)
+  - [Create the Database by Yourself](#create-the-database-by-yourself)
+  - [Export](#export)
+  - [Use My Prepared Database](#use-my-prepared-database)
+- [Find Addresses](#find-addresses)
+  - [Mixed Modes](#mixed-modes)
+  - [Key Range](#key-range)
+  - [OpenCL Acceleration](#opencl-acceleration)
+- [Collision Probability and Security Concerns](#collision-probability-and-security-concerns)
+- [Similar Projects](#similar-projects)
+- [Known Issues](#known-issues)
+- [Future Improvements](#future-improvements)
+- [Legal](#legal)
+- [License](#license)
 
 ---
 
