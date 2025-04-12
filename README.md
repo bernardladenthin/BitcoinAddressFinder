@@ -43,15 +43,26 @@ TODO:
   - [Create the Database by Yourself](#create-the-database-by-yourself)
   - [Export](#export)
   - [Use My Prepared Database](#use-my-prepared-database)
+    - [Light Database](#light-database)
+    - [Full Database](#full-database)
+- [Pages and Projects for Address Lists](#pages-and-projects-to-get-lists-dumps-of-pubkeyhash-addresses)
 - [Find Addresses](#find-addresses)
   - [Mixed Modes](#mixed-modes)
   - [Key Range](#key-range)
   - [OpenCL Acceleration](#opencl-acceleration)
-- [Collision Probability and Security Concerns](#collision-probability-and-security-concerns)
+    - [Built-in Self-Test (BIST)](#built-in-self-test-bist)
+    - [Performance Benchmarks](#performance-benchmarks)
+- [Collision Probability and Security Considerations](#collision-probability-and-security-considerations)
 - [Similar Projects](#similar-projects)
+  - [Deep Learning Private Key Prediction](#deep-learning-private-key-prediction)
 - [Known Issues](#known-issues)
+  - [Hybrid Graphics Performance (Low Throughput)](#hybrid-graphics-performance-low-throughput)
 - [Future Improvements](#future-improvements)
+  - [KeyProvider](#keyprovider)
 - [Legal](#legal)
+  - [Permitted Use Cases](#️-permitted-use-cases)
+  - [Prohibited Use Cases](#-prohibited-use-cases)
+  - [Legal References by Jurisdiction](#legal-references-by-jurisdiction)
 - [License](#license)
 
 ---
@@ -298,27 +309,36 @@ The CPU then hashes the X and Y coordinates of the public keys to derive the cor
 
 The OpenCL backend includes a built-in self-test mechanism that cross-verifies results from the GPU against a CPU-generated reference. This ensures that the OpenCL device is functioning correctly and producing valid EC keys—giving end users confidence in the reliability of their hardware-accelerated address search.
 
+#### Performance Benchmarks
 
-#### Performance
-The effective keys / s using uncompressed and compressed keys. OpenCL creates uncompressed keys only. A compressed key can be deduced easily from the uncompressed key.
+> **Note:** OpenCL generates uncompressed keys. Compressed keys can be derived from uncompressed ones with minimal overhead.
 
-GPU | privateKeyMaxNumBits | gridNumBits | effective keys / s
------------- | ------------- | ------------- | -------------
-Nvidia RTX 2060 | 256 | 18 | 2160 k keys / s
-Nvidia Quadro P2000 | 256 | 18 | 505 k keys /s
-Nvidia Quadro P2000 | 64 | 18 | more than 1000 k keys /s (CPU was at its limit)
-Nvidia Quadro M2000M | 256 | 16 | 205 k keys /s
-Nvidia GTX 1050 Ti Mobile | 64 | 16 | more than 1000 k keys /s (CPU was at its limit)
-Nvidia GTX 1050 Ti Mobile | 256 | 16 | 550 k keys /s
+| GPU Model                   | Key Range (Bits) | Grid Size (Bits) | Effective Keys/s       | Notes                            |
+|-----------------------------|------------------|------------------|------------------------|----------------------------------|
+| Nvidia RTX 2060             | 256              | 18               | 2,160,000 keys/s       |                                  |
+| Nvidia Quadro P2000         | 256              | 18               | 505,000 keys/s         |                                  |
+| Nvidia Quadro P2000         | 64               | 18               | >1,000,000 keys/s      | CPU bottleneck observed          |
+| Nvidia Quadro M2000M        | 256              | 16               | 205,000 keys/s         |                                  |
+| Nvidia GTX 1050 Ti Mobile   | 64               | 16               | >1,000,000 keys/s      | CPU bottleneck observed          |
+| Nvidia GTX 1050 Ti Mobile   | 256              | 16               | 550,000 keys/s         |                                  |
 
-## Collision probability and security concerns
-It's impossible to find collisions, isn't it? 
-Please find the answear for vulnerability questions somewhere else:
-* https://crypto.stackexchange.com/questions/33821/how-to-deal-with-collisions-in-bitcoin-addresses
-* https://crypto.stackexchange.com/questions/47809/why-havent-any-sha-256-collisions-been-found-yet
-* https://github.com/treyyoder/bitcoin-wallet-finder#results
-* https://github.com/Frankenmint/PKGenerator_Checker#instructions
-* https://github.com/Xefrok/BitBruteForce-Wallet#requeriments
+
+## Collision Probability and Security Considerations
+
+> Isn't it impossible to find collisions?
+
+The likelihood of discovering a collision—two different inputs that produce the same output hash—is **astronomically low** when using secure cryptographic functions like **SHA-256** and **RIPEMD-160**, which are employed in Bitcoin address generation.
+
+However, discussions around potential vulnerabilities, theoretical attacks, or edge cases exist in the cryptography and Bitcoin communities.
+
+For more in-depth information on collision resistance, address reuse risks, and cryptographic hash functions, refer to the following resources:
+
+- [How to deal with collisions in Bitcoin addresses – Crypto StackExchange](https://crypto.stackexchange.com/questions/33821/how-to-deal-with-collisions-in-bitcoin-addresses)
+- [Why haven't any SHA-256 collisions been found yet? – Crypto StackExchange](https://crypto.stackexchange.com/questions/47809/why-havent-any-sha-256-collisions-been-found-yet)
+- [bitcoin-wallet-finder – Results and discussion](https://github.com/treyyoder/bitcoin-wallet-finder#results)
+- [PKGenerator_Checker – Instructions](https://github.com/Frankenmint/PKGenerator_Checker#instructions)
+- [BitBruteForce-Wallet – Requirements and usage](https://github.com/Xefrok/BitBruteForce-Wallet#requeriments)
+
 
 ## Similar projects
 * The [LBC](https://lbc.cryptoguru.org/) is optimized to find keys for the [Bitcoin Puzzle Transaction](https://privatekeys.pw/puzzles/bitcoin-puzzle-tx). It require communication to a server, doesn't support altcoin and pattern matching.
@@ -343,8 +363,29 @@ Please find the answear for vulnerability questions somewhere else:
 ### Deep learning private key prediction
 An export of the full database can be used to predict private keys with deep learning. A funny idea: https://github.com/DRSZL/BitcoinTensorFlowPrivateKeyPrediction
 
-## Known issues
-If you have a laptop like HP ZBook G3/G4/G5 "hybrid graphics" mode is very slow because of the shared memory. Please select in the BIOS "discrete graphics".
+## Known Issues
+
+### Hybrid Graphics Performance (Low Throughput)
+
+Laptops with hybrid graphics—using both integrated (iGPU) and discrete (dGPU) GPUs—may suffer from significantly reduced performance when running compute-intensive OpenCL workloads like BitcoinAddressFinder. This is often due to:
+
+- Shared memory between CPU and GPU
+- Bandwidth limitations
+- Automatic GPU switching (e.g., NVIDIA Optimus, AMD Enduro)
+- Suboptimal GPU selection by drivers
+
+#### Affected Devices and Recommendations
+
+| Manufacturer       | Affected Series/Models                          | Recommendation                           |
+|--------------------|--------------------------------------------------|------------------------------------------|
+| **HP**             | ZBook G3, G4, G5, G7                             | Enter BIOS → set **Graphics** to *Discrete Only* |
+| **Lenovo**         | ThinkPad X, T, and P Series (hybrid configs)     | Use **Lenovo Vantage** → Disable Hybrid Graphics |
+| **Dell**           | Inspiron, XPS, Precision (with Optimus)          | BIOS → Disable Hybrid Mode (if available) |
+| **MSI**            | Gaming laptops with switchable graphics          | Use **Dragon Center** to select dGPU     |
+| **Razer**          | Blade models with NVIDIA Optimus                 | Use **Razer Synapse** to enforce dGPU use |
+| **Apple (Intel)**  | MacBook Pro (pre-2021 with dual GPUs)            | macOS → Disable *Automatic Graphics Switching* in Energy Preferences |
+
+> If your laptop uses hybrid graphics, always ensure that the **discrete GPU** is explicitly selected for OpenCL workloads to avoid severe performance bottlenecks.
 
 ## Future improvements
 - Refactor the entire key generation infrastructure to support a key provider. This provider should be configurable to supply private keys from various sources, such as Random, Secrets File, Key Range, and others. All consumers should retrieve keys from this provider.
@@ -381,15 +422,76 @@ Wished from Ulugbek:
 - ExecutableKeyProvider gets data from stdout
 
 -----
+
+
 ## Legal
-This software should not be configured and used to find (Bitcoin/Altcoin) address hash (RIPEMD-160) collisions and use (steal) credit from third-party (Bitcoin/Altcoin) addresses.
-This mode might be allowed to recover lost private keys of your own public addresses only.
 
-Another mostly legal use case is a check if the (Bitcoin/Altcoin) addresses hash (RIPEMD-160) is already in use to prevent yourself from a known hash (RIPEMD-160) collision and double use.
+**BitcoinAddressFinder is not intended for malicious use**, and **you are solely responsible** for complying with your local laws, international regulations, and ethical standards.
 
-Some configurations are not allowed in some countries (definitely not complete):
-* Germany: § 202c Vorbereiten des Ausspähens und Abfangens von Daten
-* United States of America (USA): Computer Fraud and Abuse Act (CFAA)
+This software must **not** be configured or used to attempt unauthorized access to cryptocurrency assets (e.g., scanning for RIPEMD-160 address collisions to gain access to third-party funds).  
+Such activities are likely illegal in most jurisdictions and may carry serious penalties.
+
+---
+
+### ✅ Permitted Use Cases
+
+You may use BitcoinAddressFinder for legitimate and research-focused purposes, such as:
+
+- **Recovering lost private keys** associated with your own known public addresses
+- Verifying whether generated addresses have ever been used to **prevent collisions**
+- Running **performance benchmarks** and OpenCL testing
+- Generating **vanity addresses** for personal or demonstrative use
+- Conducting **offline cryptographic research** and educational exploration
+
+---
+
+### 🚫 Prohibited Use Cases
+
+You must not use this tool for:
+
+- **Gaining unauthorized access to cryptocurrency or wallet funds**
+- Circumventing access controls or exploiting systems
+- Engaging in unethical behavior or violating terms of service
+
+---
+
+### Legal References by Jurisdiction
+
+Below are some non-exhaustive legal frameworks that may apply depending on your region:
+
+#### Germany
+
+- **§ 202c StGB** – *Vorbereiten des Ausspähens und Abfangens von Daten*  
+  (Preparation of spying or intercepting data)
+
+#### United States
+
+- **Computer Fraud and Abuse Act (CFAA)**  
+  Prohibits unauthorized access to protected computers, including use of tools for circumvention
+
+- **Digital Millennium Copyright Act (DMCA)**  
+  Sections on anti-circumvention tools and reverse engineering may apply in specific contexts
+
+#### European Union
+
+- **General Data Protection Regulation (GDPR)**  
+  While not directly related, use of personally identifiable data or address targeting must comply
+
+- **Directive 2013/40/EU** on Attacks Against Information Systems  
+  Criminalizes the creation or possession of tools designed for unauthorized access
+
+#### Other Notable References
+
+- **UK**: Computer Misuse Act 1990  
+- **Canada**: Criminal Code Sections 342.1 & 430  
+- **Australia**: Criminal Code Act 1995 – Part 10.7 – Computer Offences
+
+---
+
+> ⚠️ The authors and maintainers of BitcoinAddressFinder assume **no responsibility** for how the tool is used.  
+> It is your duty to ensure compliance with all relevant legal and ethical standards in your country and jurisdiction.
+
+If in doubt, consult with a legal professional before using this software for anything beyond educational or personal purposes.
 
 ## License
 
