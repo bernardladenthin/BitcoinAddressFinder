@@ -60,6 +60,7 @@ public class OpenCLDeviceTest {
     @OpenCLTest
     @ToStringTest
     public void toStringPretty_staticDeviceData_stringCreated() {
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadable();
         // arrange
         OpenCLDevice device = new OpenCLDevice(
             "NVIDIA GeForce RTX 3070 Laptop GPU",
