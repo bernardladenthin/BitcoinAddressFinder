@@ -104,7 +104,7 @@ public class OpenCLBuilder {
                 openCLDevices.add(openCLDevice);
             }
             
-            OpenCLPlatform openCLPlatform = new OpenCLPlatform(platformId, platformName, openCLDevices);
+            OpenCLPlatform openCLPlatform = new OpenCLPlatform(platformName, openCLDevices);
             openCLPlatforms.add(openCLPlatform);
         }
         
@@ -149,7 +149,6 @@ public class OpenCLBuilder {
         int preferredVectorWidthDouble = getInt(device, CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE);
         
         OpenCLDevice openCLDevice = new OpenCLDevice(
-                device,
                 deviceName,
                 deviceVendor,
                 driverVersion,
@@ -209,7 +208,7 @@ public class OpenCLBuilder {
     
     public static boolean isOneOpenCL2_0OrGreaterDeviceAvailable(List<OpenCLPlatform> openCLPlatforms) {
         for (OpenCLPlatform openCLPlatform : openCLPlatforms) {
-            List<OpenCLDevice> openCLDevices = openCLPlatform.getOpenCLDevices();
+            List<OpenCLDevice> openCLDevices = openCLPlatform.openCLDevices();
             for (OpenCLDevice openCLDevice : openCLDevices) {
                 if (isOpenCL2_0OrGreater(openCLDevice.getDeviceVersionAsComparableVersion())) {
                     return true;

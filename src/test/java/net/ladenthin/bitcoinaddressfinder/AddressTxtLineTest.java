@@ -48,7 +48,7 @@ public class AddressTxtLineTest {
     }
 
     private void assertThatDefaultCoinIsSet(AddressToCoin addressToCoin) {
-        assertThat(addressToCoin.getCoin(), is(equalTo(AddressTxtLine.DEFAULT_COIN)));
+        assertThat(addressToCoin.coin(), is(equalTo(AddressTxtLine.DEFAULT_COIN)));
     }
 
     @Test
@@ -75,7 +75,7 @@ public class AddressTxtLineTest {
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticKey.publicKeyUncompressed, keyUtility);
 
         // assert
-        assertThat(addressToCoin.getHash160(), is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
+        assertThat(addressToCoin.hash160(), is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
         assertThatDefaultCoinIsSet(addressToCoin);
     }
 
@@ -85,7 +85,7 @@ public class AddressTxtLineTest {
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticKey.publicKeyCompressed, keyUtility);
 
         // assert
-        assertThat(addressToCoin.getHash160(), is(equalTo(staticKey.byteBufferPublicKeyCompressed)));
+        assertThat(addressToCoin.hash160(), is(equalTo(staticKey.byteBufferPublicKeyCompressed)));
         assertThatDefaultCoinIsSet(addressToCoin);
     }
 
@@ -98,8 +98,8 @@ public class AddressTxtLineTest {
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticKey.publicKeyUncompressed + addressSeparator + coin, keyUtility);
 
         // assert
-        assertThat(addressToCoin.getHash160(), is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
-        assertThat(addressToCoin.getCoin(), is(equalTo(Coin.valueOf(coin))));
+        assertThat(addressToCoin.hash160(), is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
+        assertThat(addressToCoin.coin(), is(equalTo(Coin.valueOf(coin))));
     }
 
     @Test
@@ -109,7 +109,7 @@ public class AddressTxtLineTest {
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticKey.publicKeyUncompressed + addressSeparator + "XYZ", keyUtility);
 
         // assert
-        assertThat(addressToCoin.getHash160(), is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
+        assertThat(addressToCoin.hash160(), is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
         assertThatDefaultCoinIsSet(addressToCoin);
     }
 
@@ -139,8 +139,8 @@ public class AddressTxtLineTest {
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(address.getPublicAddress(), keyUtility);
 
         // assert
-        assertThat(new ByteBufferUtility(true).getHexFromByteBuffer(addressToCoin.getHash160()), is(equalTo(address.getPublicKeyHashAsHex())));
-        assertThat(addressToCoin.getHash160(), is(equalTo(address.getPublicKeyHashAsByteBuffer())));
+        assertThat(new ByteBufferUtility(true).getHexFromByteBuffer(addressToCoin.hash160()), is(equalTo(address.getPublicKeyHashAsHex())));
+        assertThat(addressToCoin.hash160(), is(equalTo(address.getPublicKeyHashAsByteBuffer())));
         assertThatDefaultCoinIsSet(addressToCoin);
     }
 
@@ -151,8 +151,8 @@ public class AddressTxtLineTest {
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(address.getPublicAddress(), keyUtility);
 
         // assert
-        assertThat(new ByteBufferUtility(true).getHexFromByteBuffer(addressToCoin.getHash160()), is(equalTo(address.getScriptHashAsHex())));
-        assertThat(addressToCoin.getHash160(), is(equalTo(address.getScriptHashAsByteBuffer())));
+        assertThat(new ByteBufferUtility(true).getHexFromByteBuffer(addressToCoin.hash160()), is(equalTo(address.getScriptHashAsHex())));
+        assertThat(addressToCoin.hash160(), is(equalTo(address.getScriptHashAsByteBuffer())));
         assertThatDefaultCoinIsSet(addressToCoin);
     }
 
@@ -170,7 +170,7 @@ public class AddressTxtLineTest {
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
 
         // assert
-        String hash160AsHex = keyUtility.byteBufferUtility.getHexFromByteBuffer(addressToCoin.getHash160());
+        String hash160AsHex = keyUtility.byteBufferUtility.getHexFromByteBuffer(addressToCoin.hash160());
         assertThat(hash160AsHex, is(equalTo(expectedHash160)));
     }
 
@@ -191,7 +191,7 @@ public class AddressTxtLineTest {
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
 
         // assert
-        String hash160AsHex = keyUtility.byteBufferUtility.getHexFromByteBuffer(addressToCoin.getHash160());
+        String hash160AsHex = keyUtility.byteBufferUtility.getHexFromByteBuffer(addressToCoin.hash160());
         assertThat(hash160AsHex, is(equalTo(expectedHash160)));
     }
 
@@ -209,7 +209,7 @@ public class AddressTxtLineTest {
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
 
         // assert
-        String hash160AsHex = keyUtility.byteBufferUtility.getHexFromByteBuffer(addressToCoin.getHash160());
+        String hash160AsHex = keyUtility.byteBufferUtility.getHexFromByteBuffer(addressToCoin.hash160());
         assertThat(hash160AsHex, is(equalTo(expectedHash160)));
     }
 

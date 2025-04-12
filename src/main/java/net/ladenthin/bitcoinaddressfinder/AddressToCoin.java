@@ -18,44 +18,28 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.google.errorprone.annotations.Immutable;
 import java.nio.ByteBuffer;
-import lombok.EqualsAndHashCode;
 import org.bitcoinj.base.Coin;
-import lombok.NonNull;
+import org.jspecify.annotations.NonNull;
 
-@Immutable
-@EqualsAndHashCode
-public class AddressToCoin {
+/**
+ * Represents an immutable mapping from a hash160 to a Coin amount.
+ *
+ * <p>Note: hash160 is expected to be exactly {@code PublicKeyBytes.HASH160_SIZE} bytes long.</p>
+ */
+public record AddressToCoin(@NonNull ByteBuffer hash160, @NonNull Coin coin) {
 
-    @NonNull
-    private final ByteBuffer hash160;
-    @NonNull
-    private final Coin coin;
-
-    public AddressToCoin(@NonNull ByteBuffer hash160, @NonNull Coin coin) {
+    public AddressToCoin {
         if (hash160.limit() != PublicKeyBytes.HASH160_SIZE) {
             throw new IllegalArgumentException("Given hash160 has not the correct size: " + hash160.limit());
         }
-        this.hash160 = hash160;
-        this.coin = coin;
     }
 
-    @NonNull
-    public Coin getCoin() {
-        return coin;
-    }
-
-    @NonNull
-    public ByteBuffer getHash160() {
-        return hash160;
-    }
-
-    // handcraftet to print the ByteBuffer pretty
     @Override
     public String toString() {
-        return "AddressToCoin{" + "hash160=" + new ByteBufferUtility(false).getHexFromByteBuffer(hash160) + ", coin=" + coin + '}';
+        return "AddressToCoin{" +
+                "hash160=" + new ByteBufferUtility(false).getHexFromByteBuffer(hash160) +
+                ", coin=" + coin +
+                '}';
     }
-    
-
 }

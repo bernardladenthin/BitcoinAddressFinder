@@ -25,6 +25,7 @@ import java.util.Random;
 import static net.ladenthin.bitcoinaddressfinder.PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import org.bitcoinj.base.Network;
+import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.hamcrest.text.MatchesPattern.matchesPattern;
@@ -68,8 +69,7 @@ public class ProducerJavaTest {
 
         String toStringOutput = producerJava.toString();
 
-        assertThat(toStringOutput, is(notNullValue()));
-        assertThat(toStringOutput, not(emptyString()));
+        assertThat(toStringOutput, not(emptyOrNullString()));
         assertThat(toStringOutput, matchesPattern("ProducerJava@\\p{XDigit}+"));
     }
     // </editor-fold>

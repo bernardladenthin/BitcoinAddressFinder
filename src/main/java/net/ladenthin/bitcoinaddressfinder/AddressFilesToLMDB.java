@@ -107,8 +107,8 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
     }
     
     private void supported(AddressToCoin addressToCoin) {
-        ByteBuffer hash160 = addressToCoin.getHash160();
-        persistence.putNewAmount(hash160, addressToCoin.getCoin());
+        ByteBuffer hash160 = addressToCoin.hash160();
+        persistence.putNewAmount(hash160, addressToCoin.coin());
         addressCounter.incrementAndGet();
 
         if (addressCounter.get() % PROGRESS_LOG == 0) {

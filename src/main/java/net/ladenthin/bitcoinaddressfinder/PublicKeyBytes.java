@@ -20,16 +20,13 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import com.google.common.hash.Hashing;
 import java.math.BigInteger;
-import lombok.EqualsAndHashCode;
-import lombok.ToString;
+import java.util.Objects;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.bitcoinj.core.Utils;
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.internal.CryptoUtils;
 import org.bouncycastle.crypto.digests.RIPEMD160Digest;
 
-@ToString
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class PublicKeyBytes {
     
     /**
@@ -127,7 +124,6 @@ public class PublicKeyBytes {
      */
     private String compressedKeyHashBase58;
     
-    @EqualsAndHashCode.Include
     private final BigInteger secretKey;
     
     // [4, 121, -66, 102, 126, -7, -36, -69, -84, 85, -96, 98, -107, -50, -121, 11, 7, 2, -101, -4, -37, 45, -50, 40, -39, 89, -14, -127, 91, 22, -8, 23, -104, 72, 58, -38, 119, 38, -93, -60, 101, 93, -92, -5, -4, 14, 17, 8, -88, -3, 23, -76, 72, -90, -123, 84, 25, -100, 71, -48, -113, -5, 16, -44, -72]
@@ -253,4 +249,51 @@ public class PublicKeyBytes {
         }
         return compressedKeyHashBase58;
     }
+
+    // <editor-fold defaultstate="collapsed" desc="Overrides: hashCode, equals, toString">
+    /*
+     * Overrides for {@code hashCode()}, {@code equals(Object)}, and {@code toString()}.
+     * <p>
+     * These methods are implemented based **only** on the {@code secretKey} field, 
+     * which uniquely identifies the {@code PublicKeyBytes} instance.
+     * <ul>
+     *     <li>{@code hashCode()} – Generated using a prime multiplier and {@code secretKey} hash.</li>
+     *     <li>{@code equals(Object)} – Considers two instances equal if their {@code secretKey} values are equal.</li>
+     *     <li>{@code toString()} – Returns a string including the {@code secretKey} for debugging/logging.</li>
+     * </ul>
+     * <p>
+     * This design ensures that objects with the same {@code secretKey} are treated as equal,
+     * regardless of other internal state (e.g., precomputed hash representations or compressed keys).
+     */
+    
+    // generated, based on secretKey only!
+    @Override
+    public int hashCode() {
+        int hash = 3;
+        hash = 73 * hash + Objects.hashCode(this.secretKey);
+        return hash;
+    }
+
+    // generated, based on secretKey only!
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final PublicKeyBytes other = (PublicKeyBytes) obj;
+        return Objects.equals(this.secretKey, other.secretKey);
+    }
+
+    // generated, based on secretKey only!
+    @Override
+    public String toString() {
+        return "PublicKeyBytes{" + "secretKey=" + secretKey + '}';
+    }
+    // </editor-fold>
 }

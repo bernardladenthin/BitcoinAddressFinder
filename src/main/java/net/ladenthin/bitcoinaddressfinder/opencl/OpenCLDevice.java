@@ -18,479 +18,152 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.opencl;
 
-import com.google.errorprone.annotations.Immutable;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.Serializable;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import lombok.EqualsAndHashCode;
-import lombok.ToString;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.jocl.CL;
-import org.jocl.cl_device_id;
-import org.jspecify.annotations.NonNull;
 
-@Immutable
-@ToString
-@EqualsAndHashCode
-public class OpenCLDevice implements Serializable {
-    
-    @NonNull
-    private final transient cl_device_id id;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_NAME}.
-     */
-    private final String deviceName;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_VENDOR}.
-     */
-    private final String deviceVendor;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DRIVER_VERSION}.
-     */
-    private final String driverVersion;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_PROFILE}.
-     */
-    private final String deviceProfile;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_VERSION}.
-     */
-    private final String deviceVersion;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_EXTENSIONS}.
-     */
-    private final String deviceExtensions;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_TYPE}.
-     */
-    private final long deviceType;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_MAX_COMPUTE_UNITS}.
-     */
-    private final int maxComputeUnits;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS}.
-     */
-    private final long maxWorkItemDimensions;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_MAX_WORK_ITEM_SIZES}.
-     */
-    private final long maxWorkItemSizes[];
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_MAX_WORK_GROUP_SIZE}.
-     */
-    private final long maxWorkGroupSize;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_MAX_CLOCK_FREQUENCY}.
-     */
-    private final long maxClockFrequency;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_ADDRESS_BITS}.
-     */
-    private final int addressBits;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_MAX_MEM_ALLOC_SIZE}.
-     */
-    private final long maxMemAllocSize;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_GLOBAL_MEM_SIZE}.
-     */
-    private final long globalMemSize;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_ERROR_CORRECTION_SUPPORT}.
-     */
-    private final long errorCorrectionSupport;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_LOCAL_MEM_TYPE}.
-     */
-    private final int localMemType;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_LOCAL_MEM_SIZE}.
-     */
-    private final long localMemSize;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE}.
-     */
-    private final long maxConstantBufferSize;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_QUEUE_PROPERTIES}.
-     */
-    private final long queueProperties;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_IMAGE_SUPPORT}.
-     */
-    private final int imageSupport;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_MAX_READ_IMAGE_ARGS}.
-     */
-    private final int maxReadImageArgs;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_MAX_WRITE_IMAGE_ARGS}.
-     */
-    private final int maxWriteImageArgs;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_SINGLE_FP_CONFIG}.
-     */
-    private final long singleFpConfig;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_IMAGE2D_MAX_WIDTH}.
-     */
-    private final long image2dMaxWidth;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_IMAGE2D_MAX_HEIGHT}.
-     */
-    private final long image2dMaxHeight;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_IMAGE3D_MAX_WIDTH}.
-     */
-    private final long image3dMaxWidth;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_IMAGE3D_MAX_HEIGHT}.
-     */
-    private final long image3dMaxHeight;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_IMAGE3D_MAX_DEPTH}.
-     */
-    private final long image3dMaxDepth;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_CHAR}.
-     */
-    private final int preferredVectorWidthChar;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_SHORT}.
-     */
-    private final int preferredVectorWidthShort;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_INT}.
-     */
-    private final int preferredVectorWidthInt;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_LONG}.
-     */
-    private final int preferredVectorWidthLong;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT}.
-     */
-    private final int preferredVectorWidthFloat;
-    
-    /**
-     * See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE}.
-     */
-    private final int preferredVectorWidthDouble;
-    
-    public OpenCLDevice(
-            cl_device_id id,
-            String deviceName,
-            String deviceVendor,
-            String driverVersion,
-            String deviceProfile,
-            String deviceVersion,
-            String deviceExtensions,
-            long deviceType,
-            int maxComputeUnits,
-            long maxWorkItemDimensions,
-            long maxWorkItemSizes[],
-            long maxWorkGroupSize,
-            long maxClockFrequency,
-            int addressBits,
-            long maxMemAllocSize,
-            long globalMemSize,
-            long errorCorrectionSupport,
-            int localMemType,
-            long localMemSize,
-            long maxConstantBufferSize,
-            long queueProperties,
-            int imageSupport,
-            int maxReadImageArgs,
-            int maxWriteImageArgs,
-            long singleFpConfig,
-            long image2dMaxWidth,
-            long image2dMaxHeight,
-            long image3dMaxWidth,
-            long image3dMaxHeight,
-            long image3dMaxDepth,
-            int preferredVectorWidthChar,
-            int preferredVectorWidthShort,
-            int preferredVectorWidthInt,
-            int preferredVectorWidthLong,
-            int preferredVectorWidthFloat,
-            int preferredVectorWidthDouble
-    ) {
-        this.id = id;
-        this.deviceName = deviceName;
-        this.deviceVendor = deviceVendor;
-        this.driverVersion = driverVersion;
-        this.deviceProfile = deviceProfile;
-        this.deviceVersion = deviceVersion;
-        this.deviceExtensions = deviceExtensions;
-        this.deviceType = deviceType;
-        this.maxComputeUnits = maxComputeUnits;
-        this.maxWorkItemDimensions = maxWorkItemDimensions;
-        this.maxWorkItemSizes = maxWorkItemSizes;
-        this.maxWorkGroupSize = maxWorkGroupSize;
-        this.maxClockFrequency = maxClockFrequency;
-        this.addressBits = addressBits;
-        this.maxMemAllocSize = maxMemAllocSize;
-        this.globalMemSize = globalMemSize;
-        this.errorCorrectionSupport = errorCorrectionSupport;
-        this.localMemType = localMemType;
-        this.localMemSize = localMemSize;
-        this.maxConstantBufferSize = maxConstantBufferSize;
-        this.queueProperties = queueProperties;
-        this.imageSupport = imageSupport;
-        this.maxReadImageArgs = maxReadImageArgs;
-        this.maxWriteImageArgs = maxWriteImageArgs;
-        this.singleFpConfig = singleFpConfig;
-        this.image2dMaxWidth = image2dMaxWidth;
-        this.image2dMaxHeight = image2dMaxHeight;
-        this.image3dMaxWidth = image3dMaxWidth;
-        this.image3dMaxHeight = image3dMaxHeight;
-        this.image3dMaxDepth = image3dMaxDepth;
-        this.preferredVectorWidthChar = preferredVectorWidthChar;
-        this.preferredVectorWidthShort = preferredVectorWidthShort;
-        this.preferredVectorWidthInt = preferredVectorWidthInt;
-        this.preferredVectorWidthLong = preferredVectorWidthLong;
-        this.preferredVectorWidthFloat = preferredVectorWidthFloat;
-        this.preferredVectorWidthDouble = preferredVectorWidthDouble;
-    }
-
-    public cl_device_id getId() {
-        return id;
-    }
-
-    public String getDeviceName() {
-        return deviceName;
-    }
-
-    public String getDeviceVendor() {
-        return deviceVendor;
-    }
-
-    public String getDriverVersion() {
-        return driverVersion;
-    }
-
-    public String getDeviceProfile() {
-        return deviceProfile;
-    }
-
-    public String getDeviceVersion() {
-        return deviceVersion;
-    }
-
-    public String getDeviceExtensions() {
-        return deviceExtensions;
-    }
-
-    public long getDeviceType() {
-        return deviceType;
-    }
-
-    public int getMaxComputeUnits() {
-        return maxComputeUnits;
-    }
-
-    public long getMaxWorkItemDimensions() {
-        return maxWorkItemDimensions;
-    }
-
-    public long[] getMaxWorkItemSizes() {
-        return maxWorkItemSizes;
-    }
-
-    public long getMaxWorkGroupSize() {
-        return maxWorkGroupSize;
-    }
-
-    public long getMaxClockFrequency() {
-        return maxClockFrequency;
-    }
-
-    public int getAddressBits() {
-        return addressBits;
-    }
-
-    public long getMaxMemAllocSize() {
-        return maxMemAllocSize;
-    }
-
-    public long getGlobalMemSize() {
-        return globalMemSize;
-    }
-
-    public long getErrorCorrectionSupport() {
-        return errorCorrectionSupport;
-    }
-
-    public int getLocalMemType() {
-        return localMemType;
-    }
-
-    public long getLocalMemSize() {
-        return localMemSize;
-    }
-
-    public long getMaxConstantBufferSize() {
-        return maxConstantBufferSize;
-    }
-
-    public long getQueueProperties() {
-        return queueProperties;
-    }
-
-    public int getImageSupport() {
-        return imageSupport;
-    }
-
-    public int getMaxReadImageArgs() {
-        return maxReadImageArgs;
-    }
-
-    public int getMaxWriteImageArgs() {
-        return maxWriteImageArgs;
-    }
-
-    public long getSingleFpConfig() {
-        return singleFpConfig;
-    }
-
-    public long getImage2dMaxWidth() {
-        return image2dMaxWidth;
-    }
-
-    public long getImage2dMaxHeight() {
-        return image2dMaxHeight;
-    }
-
-    public long getImage3dMaxWidth() {
-        return image3dMaxWidth;
-    }
-
-    public long getImage3dMaxHeight() {
-        return image3dMaxHeight;
-    }
-
-    public long getImage3dMaxDepth() {
-        return image3dMaxDepth;
-    }
-
-    public int getPreferredVectorWidthChar() {
-        return preferredVectorWidthChar;
-    }
-
-    public int getPreferredVectorWidthShort() {
-        return preferredVectorWidthShort;
-    }
-
-    public int getPreferredVectorWidthInt() {
-        return preferredVectorWidthInt;
-    }
-
-    public int getPreferredVectorWidthLong() {
-        return preferredVectorWidthLong;
-    }
-
-    public int getPreferredVectorWidthFloat() {
-        return preferredVectorWidthFloat;
-    }
-
-    public int getPreferredVectorWidthDouble() {
-        return preferredVectorWidthDouble;
-    }
+/**
+ * Represents an OpenCL device and its properties.
+ *
+ * @param deviceName                 See {@link org.jocl.CL#CL_DEVICE_NAME}
+ * @param deviceVendor               See {@link org.jocl.CL#CL_DEVICE_VENDOR}
+ * @param driverVersion              See {@link org.jocl.CL#CL_DRIVER_VERSION}
+ * @param deviceProfile              See {@link org.jocl.CL#CL_DEVICE_PROFILE}
+ * @param deviceVersion              See {@link org.jocl.CL#CL_DEVICE_VERSION}
+ * @param deviceExtensions           See {@link org.jocl.CL#CL_DEVICE_EXTENSIONS}
+ * @param deviceType                 See {@link org.jocl.CL#CL_DEVICE_TYPE}
+ * @param maxComputeUnits            See {@link org.jocl.CL#CL_DEVICE_MAX_COMPUTE_UNITS}
+ * @param maxWorkItemDimensions      See {@link org.jocl.CL#CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS}
+ * @param maxWorkItemSizes           See {@link org.jocl.CL#CL_DEVICE_MAX_WORK_ITEM_SIZES}
+ * @param maxWorkGroupSize           See {@link org.jocl.CL#CL_DEVICE_MAX_WORK_GROUP_SIZE}
+ * @param maxClockFrequency          See {@link org.jocl.CL#CL_DEVICE_MAX_CLOCK_FREQUENCY}
+ * @param addressBits                See {@link org.jocl.CL#CL_DEVICE_ADDRESS_BITS}
+ * @param maxMemAllocSize            See {@link org.jocl.CL#CL_DEVICE_MAX_MEM_ALLOC_SIZE}
+ * @param globalMemSize              See {@link org.jocl.CL#CL_DEVICE_GLOBAL_MEM_SIZE}
+ * @param errorCorrectionSupport     See {@link org.jocl.CL#CL_DEVICE_ERROR_CORRECTION_SUPPORT}
+ * @param localMemType               See {@link org.jocl.CL#CL_DEVICE_LOCAL_MEM_TYPE}
+ * @param localMemSize               See {@link org.jocl.CL#CL_DEVICE_LOCAL_MEM_SIZE}
+ * @param maxConstantBufferSize      See {@link org.jocl.CL#CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE}
+ * @param queueProperties            See {@link org.jocl.CL#CL_DEVICE_QUEUE_PROPERTIES}
+ * @param imageSupport               See {@link org.jocl.CL#CL_DEVICE_IMAGE_SUPPORT}
+ * @param maxReadImageArgs           See {@link org.jocl.CL#CL_DEVICE_MAX_READ_IMAGE_ARGS}
+ * @param maxWriteImageArgs          See {@link org.jocl.CL#CL_DEVICE_MAX_WRITE_IMAGE_ARGS}
+ * @param singleFpConfig             See {@link org.jocl.CL#CL_DEVICE_SINGLE_FP_CONFIG}
+ * @param image2dMaxWidth            See {@link org.jocl.CL#CL_DEVICE_IMAGE2D_MAX_WIDTH}
+ * @param image2dMaxHeight           See {@link org.jocl.CL#CL_DEVICE_IMAGE2D_MAX_HEIGHT}
+ * @param image3dMaxWidth            See {@link org.jocl.CL#CL_DEVICE_IMAGE3D_MAX_WIDTH}
+ * @param image3dMaxHeight           See {@link org.jocl.CL#CL_DEVICE_IMAGE3D_MAX_HEIGHT}
+ * @param image3dMaxDepth            See {@link org.jocl.CL#CL_DEVICE_IMAGE3D_MAX_DEPTH}
+ * @param preferredVectorWidthChar   See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_CHAR}
+ * @param preferredVectorWidthShort  See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_SHORT}
+ * @param preferredVectorWidthInt    See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_INT}
+ * @param preferredVectorWidthLong   See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_LONG}
+ * @param preferredVectorWidthFloat  See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT}
+ * @param preferredVectorWidthDouble See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE}
+ */
+public record OpenCLDevice(
+    String deviceName,
+    String deviceVendor,
+    String driverVersion,
+    String deviceProfile,
+    String deviceVersion,
+    String deviceExtensions,
+    long deviceType,
+    int maxComputeUnits,
+    long maxWorkItemDimensions,
+    long[] maxWorkItemSizes,
+    long maxWorkGroupSize,
+    long maxClockFrequency,
+    int addressBits,
+    long maxMemAllocSize,
+    long globalMemSize,
+    long errorCorrectionSupport,
+    int localMemType,
+    long localMemSize,
+    long maxConstantBufferSize,
+    long queueProperties,
+    int imageSupport,
+    int maxReadImageArgs,
+    int maxWriteImageArgs,
+    long singleFpConfig,
+    long image2dMaxWidth,
+    long image2dMaxHeight,
+    long image3dMaxWidth,
+    long image3dMaxHeight,
+    long image3dMaxDepth,
+    int preferredVectorWidthChar,
+    int preferredVectorWidthShort,
+    int preferredVectorWidthInt,
+    int preferredVectorWidthLong,
+    int preferredVectorWidthFloat,
+    int preferredVectorWidthDouble
+) implements Serializable {
     
     public String toStringPretty() {
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         final Charset charset = java.nio.charset.StandardCharsets.UTF_8;
-        
+
         try (PrintStream ps = new PrintStream(baos, true, charset)) {
-            ps.println("--- Info for device "+deviceName+": ---");
-            ps.printf("CL_DEVICE_NAME: \t\t\t%s\n", deviceName);
-            ps.printf("CL_DEVICE_VENDOR: \t\t\t%s\n", deviceVendor);
-            ps.printf("CL_DRIVER_VERSION: \t\t\t%s\n", driverVersion);
-            ps.printf("CL_DEVICE_PROFILE: \t\t\t%s\n", deviceProfile);
-            ps.printf("CL_DEVICE_VERSION: \t\t\t%s\n", deviceVersion);
-            ps.printf("CL_DEVICE_EXTENSIONS: \t\t\t%s\n", deviceExtensions);
-            ps.printf("CL_DEVICE_TYPE:\t\t\t\t%s\n", CL.stringFor_cl_device_type(deviceType));
-            ps.printf("CL_DEVICE_MAX_COMPUTE_UNITS:\t\t%d\n", maxComputeUnits);
-            ps.printf("CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS:\t%d\n", maxWorkItemDimensions);
-            ps.printf("CL_DEVICE_MAX_WORK_ITEM_SIZES:\t\t%d / %d / %d \n",
-                maxWorkItemSizes[0], maxWorkItemSizes[1], maxWorkItemSizes[2]);
-            ps.printf("CL_DEVICE_MAX_WORK_GROUP_SIZE:\t\t%d\n", maxWorkGroupSize);
-            ps.printf("CL_DEVICE_MAX_CLOCK_FREQUENCY:\t\t%d MHz\n", maxClockFrequency);
-            ps.printf("CL_DEVICE_ADDRESS_BITS:\t\t\t%d\n", addressBits);
-            ps.printf("CL_DEVICE_MAX_MEM_ALLOC_SIZE:\t\t%d MByte\n", (int)(maxMemAllocSize / (1024 * 1024)));
-            ps.printf("CL_DEVICE_GLOBAL_MEM_SIZE:\t\t%d MByte\n", (int)(globalMemSize / (1024 * 1024)));
-            ps.printf("CL_DEVICE_ERROR_CORRECTION_SUPPORT:\t%s\n", errorCorrectionSupport != 0 ? "yes" : "no");
-            ps.printf("CL_DEVICE_LOCAL_MEM_TYPE:\t\t%s\n", CL.stringFor_cl_device_local_mem_type(localMemType));
-            ps.printf("CL_DEVICE_LOCAL_MEM_SIZE:\t\t%d KByte\n", (int)(localMemSize / 1024));
-            ps.printf("CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE:\t%d KByte\n", (int)(maxConstantBufferSize / 1024));
-            ps.printf("CL_DEVICE_QUEUE_PROPERTIES:\t\t%s\n", CL.stringFor_cl_command_queue_properties(queueProperties));
-            ps.printf("CL_DEVICE_IMAGE_SUPPORT:\t\t%d\n", imageSupport);
-            ps.printf("CL_DEVICE_MAX_READ_IMAGE_ARGS:\t\t%d\n", maxReadImageArgs);
-            ps.printf("CL_DEVICE_MAX_WRITE_IMAGE_ARGS:\t\t%d\n", maxWriteImageArgs);
-            ps.printf("CL_DEVICE_SINGLE_FP_CONFIG:\t\t%s\n", CL.stringFor_cl_device_fp_config(singleFpConfig));
-            ps.printf("CL_DEVICE_2D_MAX_WIDTH\t\t\t%d\n", image2dMaxWidth);
-            ps.printf("CL_DEVICE_2D_MAX_HEIGHT\t\t\t%d\n", image2dMaxHeight);
-            ps.printf("CL_DEVICE_3D_MAX_WIDTH\t\t\t%d\n", image3dMaxWidth);
-            ps.printf("CL_DEVICE_3D_MAX_HEIGHT\t\t\t%d\n", image3dMaxHeight);
-            ps.printf("CL_DEVICE_3D_MAX_DEPTH\t\t\t%d\n", image3dMaxDepth);
-            ps.printf("CL_DEVICE_PREFERRED_VECTOR_WIDTH_<t>\t");
-            ps.printf("CHAR %d, SHORT %d, INT %d, LONG %d, FLOAT %d, DOUBLE %d\n\n\n",
-               preferredVectorWidthChar, preferredVectorWidthShort,
-               preferredVectorWidthInt, preferredVectorWidthLong,
-               preferredVectorWidthFloat, preferredVectorWidthDouble);
+            ps.println("--- Info for OpenCL device: " + deviceName + " ---");
+            ps.printf("CL_DEVICE_NAME:                        %s%n", deviceName);
+            ps.printf("CL_DEVICE_VENDOR:                      %s%n", deviceVendor);
+            ps.printf("CL_DRIVER_VERSION:                     %s%n", driverVersion);
+            ps.printf("CL_DEVICE_PROFILE:                     %s%n", deviceProfile);
+            ps.printf("CL_DEVICE_VERSION:                     %s%n", deviceVersion);
+            ps.printf("CL_DEVICE_EXTENSIONS:                  %s%n", deviceExtensions);
+            ps.printf("CL_DEVICE_TYPE:                        %s%n", CL.stringFor_cl_device_type(deviceType));
+            ps.printf("CL_DEVICE_MAX_COMPUTE_UNITS:           %d%n", maxComputeUnits);
+            ps.printf("CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS:    %d%n", maxWorkItemDimensions);
+            ps.printf("CL_DEVICE_MAX_WORK_ITEM_SIZES:         %s%n", formatWorkItemSizes(maxWorkItemSizes));
+            ps.printf("CL_DEVICE_MAX_WORK_GROUP_SIZE:         %d%n", maxWorkGroupSize);
+            ps.printf("CL_DEVICE_MAX_CLOCK_FREQUENCY:         %d MHz%n", maxClockFrequency);
+            ps.printf("CL_DEVICE_ADDRESS_BITS:                %d%n", addressBits);
+            ps.printf("CL_DEVICE_MAX_MEM_ALLOC_SIZE:          %d MByte%n", maxMemAllocSize / (1024 * 1024));
+            ps.printf("CL_DEVICE_GLOBAL_MEM_SIZE:             %d MByte%n", globalMemSize / (1024 * 1024));
+            ps.printf("CL_DEVICE_ERROR_CORRECTION_SUPPORT:    %s%n", errorCorrectionSupport != 0 ? "yes" : "no");
+            ps.printf("CL_DEVICE_LOCAL_MEM_TYPE:              %s%n", CL.stringFor_cl_device_local_mem_type(localMemType));
+            ps.printf("CL_DEVICE_LOCAL_MEM_SIZE:              %d KByte%n", localMemSize / 1024);
+            ps.printf("CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE:    %d KByte%n", maxConstantBufferSize / 1024);
+            ps.printf("CL_DEVICE_QUEUE_PROPERTIES:            %s%n", CL.stringFor_cl_command_queue_properties(queueProperties));
+            ps.printf("CL_DEVICE_IMAGE_SUPPORT:               %d%n", imageSupport);
+            ps.printf("CL_DEVICE_MAX_READ_IMAGE_ARGS:         %d%n", maxReadImageArgs);
+            ps.printf("CL_DEVICE_MAX_WRITE_IMAGE_ARGS:        %d%n", maxWriteImageArgs);
+            ps.printf("CL_DEVICE_SINGLE_FP_CONFIG:            %s%n", CL.stringFor_cl_device_fp_config(singleFpConfig));
+            ps.printf("CL_DEVICE_IMAGE2D_MAX_WIDTH:           %d%n", image2dMaxWidth);
+            ps.printf("CL_DEVICE_IMAGE2D_MAX_HEIGHT:          %d%n", image2dMaxHeight);
+            ps.printf("CL_DEVICE_IMAGE3D_MAX_WIDTH:           %d%n", image3dMaxWidth);
+            ps.printf("CL_DEVICE_IMAGE3D_MAX_HEIGHT:          %d%n", image3dMaxHeight);
+            ps.printf("CL_DEVICE_IMAGE3D_MAX_DEPTH:           %d%n", image3dMaxDepth);
+            ps.printf("CL_DEVICE_PREFERRED_VECTOR_WIDTHS:     CHAR %d, SHORT %d, INT %d, LONG %d, FLOAT %d, DOUBLE %d%n",
+                preferredVectorWidthChar, preferredVectorWidthShort,
+                preferredVectorWidthInt, preferredVectorWidthLong,
+                preferredVectorWidthFloat, preferredVectorWidthDouble);
         }
-        
-        String string = new String(baos.toByteArray(), charset);
-        return string;
+
+        return baos.toString(charset);
+    }
+    
+    public static String formatWorkItemSizes(long[] sizes) {
+        if (sizes == null || sizes.length == 0) return "(none)";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < sizes.length; i++) {
+            sb.append(sizes[i]);
+            if (i < sizes.length - 1) sb.append(" / ");
+        }
+        return sb.toString();
     }
     
     public ComparableVersion getDeviceVersionAsComparableVersion() {
-        return getComparableVersionFromDeviceVersion(getDeviceVersion());
+        return getComparableVersionFromDeviceVersion(deviceVersion());
     }
     
     public static ComparableVersion getComparableVersionFromDeviceVersion(String deviceVersion) {
         String s = deviceVersion;
         s = s.replace("OpenCL ", "");
         s = s.replace("CUDA", "");
-        return new ComparableVersion(s);
+        return new ComparableVersion(s.trim());
     }
 }

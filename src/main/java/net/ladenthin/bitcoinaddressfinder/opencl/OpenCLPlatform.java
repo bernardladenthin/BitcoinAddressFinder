@@ -22,43 +22,22 @@ import com.google.errorprone.annotations.Immutable;
 import java.io.Serializable;
 import java.util.Collections;
 import java.util.List;
-import lombok.EqualsAndHashCode;
-import lombok.ToString;
-import org.jocl.cl_platform_id;
 import org.jspecify.annotations.NonNull;
 
+/**
+ * Represents an OpenCL platform and its associated devices.
+ *
+ * @param platformName    the name of the OpenCL platform
+ * @param openCLDevices   a list of associated OpenCL devices
+ */
 @Immutable
-@ToString
-@EqualsAndHashCode
-public class OpenCLPlatform implements Serializable  {
-    @NonNull
-    private final transient cl_platform_id id;
-    
-    /**
-     * See {@link org.jocl.CL#CL_PLATFORM_NAME}.
-     */
-    @NonNull
-    private final String platformName;
-    
-    @NonNull
-    private final List<OpenCLDevice> openCLDevices;
-    
-    public OpenCLPlatform(cl_platform_id id, String platformName, List<OpenCLDevice> openCLDevices) {
-        this.id = id;
+public record OpenCLPlatform(
+    @NonNull String platformName,
+    @NonNull List<OpenCLDevice> openCLDevices
+) implements Serializable {
+
+    public OpenCLPlatform(String platformName, List<OpenCLDevice> openCLDevices) {
         this.platformName = platformName;
         this.openCLDevices = Collections.unmodifiableList(openCLDevices);
     }
-
-    public cl_platform_id getId() {
-        return id;
-    }
-
-    public String getPlatformName() {
-        return platformName;
-    }
-
-    public List<OpenCLDevice> getOpenCLDevices() {
-        return openCLDevices;
-    }
-    
 }

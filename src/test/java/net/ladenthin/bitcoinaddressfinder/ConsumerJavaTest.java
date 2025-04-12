@@ -40,6 +40,7 @@ import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.MnemonicException;
+import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.hamcrest.core.StringStartsWith.startsWith;
@@ -99,8 +100,7 @@ public class ConsumerJavaTest {
 
         String toStringOutput = consumerJava.toString();
 
-        assertThat(toStringOutput, is(notNullValue()));
-        assertThat(toStringOutput, not(emptyString()));
+        assertThat(toStringOutput, not(emptyOrNullString()));
         assertThat(toStringOutput, matchesPattern("ConsumerJava@\\p{XDigit}+"));
     }
     // </editor-fold>
