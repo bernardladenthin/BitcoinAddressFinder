@@ -57,6 +57,7 @@ public class OpenCLDeviceTest {
     
     // <editor-fold defaultstate="collapsed" desc="toStringPretty (static sample)">
     @Test
+    @OpenCLTest
     @ToStringTest
     public void toStringPretty_staticDeviceData_stringCreated() {
         // arrange
