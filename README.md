@@ -1,16 +1,35 @@
 # BitcoinAddressFinder
-[![CI Status](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/assembly.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/assembly.yml)
-[![CI Status](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/coverage.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/coverage.yml)
-[![CI Status](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/matrixci.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/matrixci.yml)
+<!-- =========================== Build & Environment =========================== -->
+[![OpenJDK](https://img.shields.io/badge/OpenJDK-21-blue)]()
+[![JUnit](https://img.shields.io/badge/tested%20with-JUnit4-yellow)]()
+[![Assembly](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/assembly.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/assembly.yml)
+[![Coverage](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/coverage.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/coverage.yml)
+[![Matrix CI](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/matrixci.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/matrixci.yml)
+<!-- =========================== Test Coverage =========================== -->
 [![Coverage Status](https://coveralls.io/repos/github/bernardladenthin/BitcoinAddressFinder/badge.svg?branch=main)](https://coveralls.io/github/bernardladenthin/BitcoinAddressFinder?branch=main)
 [![codecov](https://codecov.io/gh/bernardladenthin/BitcoinAddressFinder/graph/badge.svg?token=RRCR4ZC28T)](https://codecov.io/gh/bernardladenthin/BitcoinAddressFinder)
+<!-- =========================== Package & Release =========================== -->
+[![Maven Central](https://img.shields.io/maven-central/v/net.ladenthin/bitcoinaddressfinder.svg)](https://search.maven.org/artifact/net.ladenthin/bitcoinaddressfinder)
+[![Release Date](https://img.shields.io/github/release-date/bernardladenthin/BitcoinAddressFinder)]()
+[![Last Commit](https://img.shields.io/github/last-commit/bernardladenthin/BitcoinAddressFinder)]()
+<!-- =========================== Quality & Analysis =========================== -->
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=bernardladenthin_BitcoinAddressFinder&metric=alert_status)](https://sonarcloud.io/dashboard?id=bernardladenthin_BitcoinAddressFinder)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=bernardladenthin_BitcoinAddressFinder&metric=code_smells)]()
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=bernardladenthin_BitcoinAddressFinder&metric=security_rating)]()
+<!-- =========================== Security & Compliance =========================== -->
+[![Known Vulnerabilities](https://snyk.io/test/github/bernardladenthin/BitcoinAddressFinder/badge.svg?targetFile=pom.xml)](https://snyk.io/test/github/bernardladenthin/BitcoinAddressFinder?targetFile=targetFile=pom.xml)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder?ref=badge_shield)
-
+[![Dependencies](https://img.shields.io/librariesio/github/bernardladenthin/BitcoinAddressFinder)](https://libraries.io/github/bernardladenthin/BitcoinAddressFinder)
+<!-- =========================== License & Contribution =========================== -->
+[![Apache 2.0 License](https://img.shields.io/badge/License-Apache%202.0-orange)](./LICENSE)
+[![Contribute with Gitpod](https://img.shields.io/badge/Contribute%20with-Gitpod-908a85?logo=gitpod)](https://gitpod.io/#https://github.com/bernardladenthin/BitcoinAddressFinder)
+<!-- =========================== Sustainability =========================== -->
+[![Treeware](https://img.shields.io/badge/dynamic/json?color=brightgreen&label=Treeware&query=%24.total&url=https%3A%2F%2Fpublic.offset.earth%2Fusers%2Ftreeware%2Ftrees)](https://treeware.earth)
 <!--
-[![Security Score](https://snyk-widget.herokuapp.com/badge/mvn/net.ladenthin/bitcoinaddressfinder/badge.svg)](https://snyk.io/test/github/bernardladenthin/BitcoinAddressFinder)
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/net.ladenthin/bitcoinaddressfinder/badge.svg#)](https://maven-badges.herokuapp.com/maven-central/net.ladenthin/bitcoinaddressfinder)
+TODO:
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1234/badge)](https://bestpractices.coreinfrastructure.org/projects/1234)
 -->
+
 Free high performance tool for fast scanning random Bitcoin, Bitcoin Cash, Bitcoin SV, Litecoin, Dogecoin, Dash, Zcash (and many more) private keys and finding addresses with balance.
 The main goal is to generate as fast as possible (Bitcoin/Altcoin) addresses using the JVM combined with OpenCL and check if the address (RIPEMD160 hash) was used/not used before. This includes possible hash collisions.
 
@@ -92,87 +111,87 @@ The sources of this information are confidential; however, you have the permissi
 Should there be any information you find lacking or have questions about, do not hesitate to ask.
 
 #### Light database
-* Light (5.25 GiB), Last update: March 22, 2024
+* Light (5.12 GiB), Last update: April 5, 2025
   * Contains Bitcoin addresses whith amount and many altcoin addresses with amount.
   * Static amount of 0 is used to allow best compression.
-  * Unique entries: 119509048
-  * Mapsize: 5376 MiB
+  * Unique entries: 124362254
+  * Mapsize: 5248 MiB
   * Time to create the database: ~9 hours
-  * Link (3.3 GiB zip archive): http://ladenthin.net/lmdb_light.zip
-  * Link extracted addresses as txt (2.1 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Light_HexHash.zip
+  * Link (3.47 GiB zip archive): http://ladenthin.net/lmdb_light.zip
+  * Link extracted addresses as txt (2.51 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Light_HexHash.zip
 
 <details>
 <summary>Checksums lmdb_light.zip</summary>
 
-* CRC32: 3F1FDC9A
-* MD5: 1F9776BD28ED26C1DA8D7B00DC387A2B
-* RipeMD160: 8D1993B1CF022B940DB5AAA5C22CDDF816DE6CD1
-* SHA-1: 95D907CED30F473428B37A59E6C9C8EDADCDD633
-* SHA-256: A25A19966645C8D2F22CCA3478980AFBEE1964409C3744684241EFE5ED2DABC1
-* SHA-512: 1F63C07CFB6287D87CEBE175BA1710041D133EA3B4A4A445F4BF155A00E1289A09B7EFC4A40F215C032A0D25EE357AE15E9DD3FB0C649C02149372877A9E9202
-* SHA3-224: E23E6DA501C84B09C050A4EBEE255427EAAF2D2D0A9773355B055FEC
-* SHA3-256: B575839DE86CEC95ACD370636CCAE35D463873F2A3A7D30296BBB9363E9AC659
-* SHA3-384: B50DC230430187AC612AECFC64952129C2D54B6DE1BDBFCD239754F66D9CC2CB86A4C9DEBC196886C7B9B309A6F0439D
-* SHA3-512: 75AA1D6B9379F4AAA6F01B11BE9F94B59173604EA89BAA9D4F15E3DAFAB87B9ACDDA76BB102EB83C20BA4FED85172B6D7D843EE93678C232395B1E586D23AE55
+* CRC32: 713075CD
+* MD5: 171D41E23E8EC59980BA28465A8764BC
+* RipeMD160: AE052E3000C3B9557A97FFAA2A9515FDE9F2B9D1
+* SHA-1: D9C5EA07178A4094CFB823CDE537332548B5DCA2
+* SHA-256: A35FCEDD4F2C2B1F08B27FC72E40217D8375E7B32810678D1D11598BE70D56B2
+* SHA-512: F63C1A430BB572F48AE34D15B80CC61F146A9D1F7BEA88E2BE23A30BDC12CC621CCC952CAB83F951CFD430909DF6D7B12BF5FAA1ED325493C296892A37A4E695
+* SHA3-224: 6E7F35BD938A668660AB5E8133FB46F22DBC5C97C90ADC324E6D8DD7
+* SHA3-256: ACEFFF02E78C2AD12482A621F367FB3C9FC6EAE5F833947CBA67F386CC83105B
+* SHA3-384: 5E8636133192C6151E405F0B43CEE41E4A8CC823982DABC58290083FC2917C822DADC75CF2442A24666B516CE19FED9C
+* SHA3-512: B69BE8B2C6C37C5443B0760FC293A96DAB087F856DB6CE865A1855F324121A86F404231732FDEFC94EEAE600B64221D3D7541D362312F2674B932AFCB39A12A3
 
 </details>
 
 <details>
 <summary>Checksums LMDBToAddressFile_Light_HexHash.zip</summary>
 
-* CRC32: CDF4DEAA
-* MD5: A3C18E19D12B661A52EABE3D9C3C98A5
-* RipeMD160: 86351035F7DF951E3BBFED6F0A1DD6E393E1A503
-* SHA-1: DAC3028774CA60EA34EA6C698DF18AEB1E3736FB
-* SHA-256: A47C074CEEDEE88C3DB4660B0A6668431195602248E11843ADC1170DB115EBE1
-* SHA-512: 5B135919C96782927170CC6675DA2B28130435B896B985D4406BDC7BBD64FE402362F9AD8CDE70F2DAE39D4A4500956BA76A9E40D19FAB8225FB6D9F919D006A
-* SHA3-224: F01CCFEED3775888569A9D36A0F456F3EF2251852771202D353081E7
-* SHA3-256: 8430D6F48E2D5BFD1544587AA423EC41764EE14FD619804DC6C89CE1A3D328F4
-* SHA3-384: F8A4A5AE2577B83F56E363C9C82D58EB782E8BCCDDEB8B92416F0A9C44438B268333D2B7B0BBE4A4ABFC35CDC1222FA7
-* SHA3-512: B7D69667D5AC44F5A5F7354E9C4AA34D662D837119B10C394C04A93B6F8C117F82F2F8BE576617FE7B4F940E71001949DEF1B59EC79FC920FF011050B3943B75
+* CRC32: A463351D
+* MD5: C5472DFCAB0C0AAA737B50E21B16FFD3
+* RipeMD160: A02DF582D37F9060C008F4D30DA89FF2C92E9736
+* SHA-1: 80BA38C2891BD96F6E8FA6831C39A53D8EACA693
+* SHA-256: BC60657ED5D362ABD4B827E30901B5C09217CF747FCE237ACAF74A23DF75756E
+* SHA-512: 34E763A56C8A4469C7FCB91288E428C13794B24C190D01B48C95EACB3DC0921CB9CAB7677D5AC29A6593CC8C7D688B5D56643E0F247F1E6B77F0D897FEA3A7FC
+* SHA3-224: 7F0B47FDD1E3B8BF31143F10FE325034A4B81F5FFF646E37E18566AB
+* SHA3-256: B4C1D2DDB554E6DE2705973D7CF8E828EE6C6D0FE156F67B85F4D81CF6A00023
+* SHA3-384: A5D1DF7B613706C6424A85EE4344B30D51DF3CABFEDD539746440054E7E50329C6B3EB845A0A7F56E4412ABC978AFAA8
+* SHA3-512: 72807FB367EC0B330C79A01AABFA732F5AA4C5E83949C1B195D9286F0E5B2222D2E9439FAA2E0B86879490C0DA872E7E34D0E625BFDB53C55D56B3CD1BC81ECA
 
 </details>
 
 
 #### Full database
-* Full (55.0 GiB), Last update: March 22, 2024
+* Full (57.0 GiB), Last update: April 5, 2025
   * Contains all Bitcoin addresses which are ever used and many altcoin addresses with and without amount.
   * Static amount of 0 is used to allow best compression.
-  * Unique entries: 1251129601
-  * Mapsize: 56048 MiB
+  * Unique entries: 1349299900
+  * Mapsize: 58368 MiB
   * Time to create the database: ~54 hours
-  * Link (29.7 GiB zip archive): http://ladenthin.net/lmdb_full.zip
-  * Link extracted addresses as txt (21.2 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Full_HexHash.zip
+  * Link (33.8 GiB zip archive): http://ladenthin.net/lmdb_full.zip
+  * Link extracted addresses as txt (26.7 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Full_HexHash.zip
 
 <details>
 <summary>Checksums lmdb_full.zip</summary>
 
-* CRC32: AC705AEA
-* MD5: DFCE421B8C7E720DC216175598B20975
-* RipeMD160: 7ABF5F9B6F432B0E6628A764CE58EDE8096692B6
-* SHA-1: D6EDF234989DE68E241EB3ACE717FBD2E8EABC07
-* SHA-256: 5932172C515CB632B92DD0C91FDA518D3A5BD2DE6375DE4C5BF480731663FEF7
-* SHA-512: 1944F4F41BDCD3B6117A77F584EF76B784CD9931A476668163C8AD0C77422B014DFBF5C1DBD1EF79D73397BF58AD654CB12DD5011762D78F18C5D7A1A3D4271A
-* SHA3-224: B41A7FF86488577476F65CBF3C0223003210D2FF50E71BC0C8CF5AAD
-* SHA3-256: C39C4E926502BB19737E07C803F9DDC0A0BE7AAB9AA5E98BE1659F17ECA2AEF0
-* SHA3-384: 6B37F3E1C4F9BD265B1B622EB8BD8270E6F66F08A0F56D1F20DC2863A57ED93F99F15ACDF2A77CC1DAB748DD9334081B
-* SHA3-512: A2453833006494923343A961AD23483D8CA9E7F3065A525A89CC05B6B541C195E09C3EBF1F1F5EB5513FE1AC1B025D57FE577C9D434807A2A89F166A2902072E
+* CRC32: A7D4658A
+* MD5: B17BA5DACB27FE5FE71373210FEA2D41
+* RipeMD160: 186DE9B56E15214D8CFAD38BECC0A4A4E83671A1
+* SHA-1: 0E9E8DE60714CDA4E4FDA6E7A6F295792180DDB2
+* SHA-256: FDA76402364E4C4E6BDCD644C674EB76DD898C0B6337F6B8DB267B421E5BE0BC
+* SHA-512: 06A30D28AD5C40035FFC7BE72B4FE41400A599AB15FA073D3642B8595AC292AD8FAACB1242DDC6DBD4070AB3CC842EE94F291E0A5E59AEE24EA41636622A9EFF
+* SHA3-224: C2592F5588F4C33259632E9757845C683EAE2091CEA579E257218240
+* SHA3-256: B02169C2F1AD7ECF21C0A4F5512AD824AC488E69F01878A386F55E82DD8BA5D3
+* SHA3-384: 299FEF1C4CAC02BE19A66F5B32501042167D88F7A5BB6BB04A15D9F8B9D47476BF8127ABE05302A93A80244EC5852E57
+* SHA3-512: 8DF569677C493978E2B44DEF6A37A91E1427FF368AE781CAA7E34D90D2ABF5B882B40026AC49B99267109E612EC5056B9F96EB5E4461A091A1A972F59D226877
 
 </details>
 
 <details>
 <summary>Checksums LMDBToAddressFile_Full_HexHash.zip</summary>
 
-* CRC32: F213E215
-* MD5: 27167D44969DCB86E20F466E4FAF1066
-* RipeMD160: B92B61E1C2B3C0344A6622C59FEDD3C1A699611E
-* SHA-1: DE9FB5637650601CB669359F14D6F4C8EA8050AC
-* SHA-256: E2485F2833740EFE3C4687E6B7A5921B02CD7D83AD7EEBFB600C6F4286A279F0
-* SHA-512: 44D70EA70BAFF60880E625679A4AD0B5D38C82DF332D21BD58B93D87F487946DD197F095AEC619FAE005224D382E5E1C21344441C8995A09291A1BF2C60B3820
-* SHA3-224: 7D4E4F40CE6EB8C5449DEC1317826228C788B92ABA31FA6E4AC76F27
-* SHA3-256: E1B31B8E408FF6BD128FBFFFE2C6C9186E251EB084752F97FAA80A462EF8651C
-* SHA3-384: DA0CA34D845F8B508287FD5E3B2B9CA6398F866727B67F8E353ECFC7A8B5747B74AFC0343EA0E912BECB212AA084701D
-* SHA3-512: 121F37DB04ECEB1496BB09C219E1B1B9069B5AE490D9D8B04695BAF4C61377ABB4AE648F0037B3061F2942916FF74198C0854F7950892B7D9D119C6144384CE8
+* CRC32: C9B08F08
+* MD5: B0823B1B02663356DE3B2EC5C800DE7A
+* RipeMD160: 56FE29F2799F867969F7EF66A6577448A865C880
+* SHA-1: 06E6C0177C2315528C589EE8B15CFEE81BEA5F4F
+* SHA-256: BE58229A7523A6248ED013E1AE0CBD65925A3F02DBF5E416B5DC3F9E2A6446F9
+* SHA-512: 381C035C84AC015C748A38FD78D61A9EDEB18F5B3269EB726C118D5F2C3F5767E2FE0C1934CAF649949F688806A3CF705F3A4C47FD70B7EAD5EFB9F70AE695CB
+* SHA3-224: 5FFF77FA7F26AFCABF407337A87398A2222560D36CCE27E646BDF98C
+* SHA3-256: 6BB7EB61CD90285633C1C9794E71A9D24D30DE6EEAEADB18E5D2E01AA0DAE69C
+* SHA3-384: C834F256438F6E9C58D01B0A106A14D6EBFD9D97D0135B7CD609FFC938AE4AB32C0728998CE79EA4006BC5FB674FF99C
+* SHA3-512: 5F0F9B8AA071F7875D68C206D7A908DCD79E193E549C84BE329BCEBF017A3EF444C4FD28A1F6DF30D500DFDD009D2C791B2DF97CD9BB56758557BAD292B08668
 
 </details>
 
@@ -240,6 +259,7 @@ Please find the answear for vulnerability questions somewhere else:
 * https://github.com/Isaacdelly/Plutus
 * https://github.com/Noname400/Hunt-to-Mnemonic
 * https://github.com/Py-Project/Bitcoin-wallet-cracker
+* https://github.com/johncantrell97/bip39-solver-gpu
 
 ### Deep learning private key prediction
 An export of the full database can be used to predict private keys with deep learning. A funny idea: https://github.com/DRSZL/BitcoinTensorFlowPrivateKeyPrediction
@@ -297,6 +317,6 @@ Some configurations are not allowed in some countries (definitely not complete):
 It is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full license text.
 Some subprojects have a different license.
 
-
+This package is [Treeware](https://treeware.earth). If you use it in production, then we ask that you [**buy the world a tree**](https://plant.treeware.earth/bernardladenthin/BitcoinAddressFinder) to thank us for our work. By contributing to the Treeware forest you’ll be creating employment for local families and restoring wildlife habitats.
 
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder?ref=badge_large)
