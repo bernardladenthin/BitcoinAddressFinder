@@ -87,37 +87,45 @@ public class LMDBPersistence implements Persistence {
     @Override
     public void init() {
         if (lmdbConfigurationWrite != null) {
-            // -Xmx10G -XX:MaxDirectMemorySize=5G
-            // We always need an Env. An Env owns a physical on-disk storage file. One
-            // Env can store many different databases (ie sorted maps).
-            File lmdbDirectory = new File(lmdbConfigurationWrite.lmdbDirectory);
-            lmdbDirectory.mkdirs();
-
-            BufferProxy<ByteBuffer> bufferProxy = getBufferProxyByUseProxyOptimal(lmdbConfigurationWrite.useProxyOptimal);
-
-            env = create(bufferProxy)
-                    // LMDB also needs to know how large our DB might be. Over-estimating is OK.
-                    .setMapSize(new ByteConversion().mibToBytes(lmdbConfigurationWrite.initialMapSizeInMiB))
-                    // LMDB also needs to know how many DBs (Dbi) we want to store in this Env.
-                    .setMaxDbs(DB_COUNT)
-                    // Now let's open the Env. The same path can be concurrently opened and
-                    // used in different processes, but do not open the same path twice in
-                    // the same process at the same time.
-
-                    //https://github.com/kentnl/CHI-Driver-LMDB
-                    .open(lmdbDirectory, EnvFlags.MDB_NOSYNC, EnvFlags.MDB_NOMETASYNC, EnvFlags.MDB_WRITEMAP, EnvFlags.MDB_MAPASYNC);
-            // We need a Dbi for each DB. A Dbi roughly equates to a sorted map. The
-            // MDB_CREATE flag causes the DB to be created if it doesn't already exist.
-            lmdb_h160ToAmount = env.openDbi(DB_NAME_HASH160_TO_COINT, MDB_CREATE);
+            initWritable();
         } else if (lmdbConfigurationReadOnly != null) {
-            BufferProxy<ByteBuffer> bufferProxy = getBufferProxyByUseProxyOptimal(lmdbConfigurationReadOnly.useProxyOptimal);
-            env = create(bufferProxy).setMaxDbs(DB_COUNT).open(new File(lmdbConfigurationReadOnly.lmdbDirectory), EnvFlags.MDB_RDONLY_ENV, EnvFlags.MDB_NOLOCK);
-            lmdb_h160ToAmount = env.openDbi(DB_NAME_HASH160_TO_COINT);
+            initReadOnly();
         } else {
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("Neither write nor read-only configuration provided.");
         }
         
-        logStatsOnInitByConfig();
+        logStatsIfConfigured(true);
+    }
+
+    private void initReadOnly() {
+        BufferProxy<ByteBuffer> bufferProxy = getBufferProxyByUseProxyOptimal(lmdbConfigurationReadOnly.useProxyOptimal);
+        env = create(bufferProxy).setMaxDbs(DB_COUNT).open(new File(lmdbConfigurationReadOnly.lmdbDirectory), EnvFlags.MDB_RDONLY_ENV, EnvFlags.MDB_NOLOCK);
+        lmdb_h160ToAmount = env.openDbi(DB_NAME_HASH160_TO_COINT);
+    }
+
+    private void initWritable() {
+        // -Xmx10G -XX:MaxDirectMemorySize=5G
+        // We always need an Env. An Env owns a physical on-disk storage file. One
+        // Env can store many different databases (ie sorted maps).
+        File lmdbDirectory = new File(lmdbConfigurationWrite.lmdbDirectory);
+        lmdbDirectory.mkdirs();
+        
+        BufferProxy<ByteBuffer> bufferProxy = getBufferProxyByUseProxyOptimal(lmdbConfigurationWrite.useProxyOptimal);
+        
+        env = create(bufferProxy)
+                // LMDB also needs to know how large our DB might be. Over-estimating is OK.
+                .setMapSize(new ByteConversion().mibToBytes(lmdbConfigurationWrite.initialMapSizeInMiB))
+                // LMDB also needs to know how many DBs (Dbi) we want to store in this Env.
+                .setMaxDbs(DB_COUNT)
+                // Now let's open the Env. The same path can be concurrently opened and
+                // used in different processes, but do not open the same path twice in
+                // the same process at the same time.
+                
+                //https://github.com/kentnl/CHI-Driver-LMDB
+                .open(lmdbDirectory, EnvFlags.MDB_NOSYNC, EnvFlags.MDB_NOMETASYNC, EnvFlags.MDB_WRITEMAP, EnvFlags.MDB_MAPASYNC);
+        // We need a Dbi for each DB. A Dbi roughly equates to a sorted map. The
+        // MDB_CREATE flag causes the DB to be created if it doesn't already exist.
+        lmdb_h160ToAmount = env.openDbi(DB_NAME_HASH160_TO_COINT, MDB_CREATE);
     }
 
     /**
@@ -134,35 +142,19 @@ public class LMDBPersistence implements Persistence {
         }
     }
     
-    private void logStatsOnInitByConfig() {
-        if (lmdbConfigurationWrite != null) {
-            if (lmdbConfigurationWrite.logStatsOnInit) {
-                logStats();
-            }
-        }
-        if (lmdbConfigurationReadOnly != null) {
-            if (lmdbConfigurationReadOnly.logStatsOnInit) {
-                logStats();
-            }
+    private void logStatsIfConfigured(boolean onInit) {
+        if (isLoggingEnabled(lmdbConfigurationWrite, onInit) || isLoggingEnabled(lmdbConfigurationReadOnly, onInit)) {
+            logStats();
         }
     }
-    
-    private void logStatsOnCloseByConfig() {
-        if (lmdbConfigurationWrite != null) {
-            if (lmdbConfigurationWrite.logStatsOnClose) {
-                logStats();
-            }
-        }
-        if (lmdbConfigurationReadOnly != null) {
-            if (lmdbConfigurationReadOnly.logStatsOnClose) {
-                logStats();
-            }
-        }
+
+    private boolean isLoggingEnabled(CLMDBConfigurationReadOnly config, boolean onInit) {
+        return config != null && (onInit ? config.logStatsOnInit : config.logStatsOnClose);
     }
 
     @Override
     public void close() {
-        logStatsOnCloseByConfig();
+        logStatsIfConfigured(false);
         lmdb_h160ToAmount.close();
         env.close();
     }
@@ -181,15 +173,10 @@ public class LMDBPersistence implements Persistence {
     }
     
     private Coin getCoinFromByteBuffer(ByteBuffer byteBuffer) {
-        if (byteBuffer != null) {
-            if (byteBuffer.capacity() == 0) {
-                return Coin.ZERO;
-            } else {
-                return Coin.valueOf(byteBuffer.getLong());
-            }
-        } else {
+        if (byteBuffer == null || byteBuffer.capacity() == 0) {
             return Coin.ZERO;
         }
+        return Coin.valueOf(byteBuffer.getLong());
     }
 
     @Override
