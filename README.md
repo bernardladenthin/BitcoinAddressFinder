@@ -129,6 +129,7 @@ To accelerate `k·G` (private key × base point), the OpenCL kernel uses:
   The scalar `k` is converted to a signed digit representation using a **window size of 4**.  
   This results in digits from the set `{±1, ±3, ±5, ±7}`, with at least one zero between non-zero digits.  
   This reduces the number of costly additions during multiplication.
+  [Further explanation of wNAF on crypto.stackexchange.com](https://crypto.stackexchange.com/questions/82013/simple-explanation-of-sliding-window-and-wnaf-methods-of-elliptic-curve-point-mu)
 
 - **Precomputed Table**:
   The kernel precomputes and stores the following multiples of the base point `G`:
