@@ -122,6 +122,45 @@ Copyright (c) 2017-2025 Bernard Ladenthin.
   * Multiple CPU threads
   * Multiple OpenCL devices (optional)
 
+### ⚡ ECC Scalar Multiplication Optimizations
+To accelerate `k·G` (private key × base point), the OpenCL kernel uses:
+
+- **Windowed Non-Adjacent Form (wNAF)**:
+  The scalar `k` is converted to a signed digit representation using a **window size of 4**.  
+  This results in digits from the set `{±1, ±3, ±5, ±7}`, with at least one zero between non-zero digits.  
+  This reduces the number of costly additions during multiplication.
+
+- **Precomputed Table**:
+  The kernel precomputes and stores the following multiples of the base point `G`:
+  - `±1·G`, `±3·G`, `±5·G`, `±7·G`  
+  These are stored in the `secp256k1_t` structure and used during scalar multiplication.
+
+- **Left-to-Right Scalar Multiplication**:
+  The multiplication loop scans the wNAF digits from most to least significant:
+  - Each iteration **always doubles** the current point.
+  - If the current digit is non-zero, it **adds the matching precomputed point**.
+
+- **Optimized for GPGPU (not constant-time)**:
+  To prioritize speed on OpenCL/CUDA devices, this implementation is **not constant-time** and may be vulnerable to side-channel attacks in adversarial environments.
+
+- **Use of Constant Memory**:
+  Precomputed points are stored in **constant GPU memory** (`__constant` via `CONSTANT_AS`), allowing fast access by all threads in a workgroup.
+
+### 🔄 Planned Kernel Enhancements (Preview)
+The current kernel computes `k·G` for each thread by applying the thread ID (`global_id`) to the least significant bits of the private key. The resulting point is stored as affine `(x, y)` coordinates.
+
+As a next step, I plan to:
+- Add an internal loop (e.g. 16,384 iterations) within the kernel
+- Each iteration performs an additional `point_add`
+- This turns the kernel into a **sequential scalar walker**, enabling:
+  - Grid scanning of private key ranges per thread
+  - Optimized batch key generation with fewer kernel dispatches
+
+#### 🔐 Public Key Hashing (Next Step)
+I also plan to integrate **SHA-256 + RIPEMD-160** hashing directly after point multiplication to compute the public key hash:
+- Apply `sha256(x || y)` followed by `ripemd160`
+- Enables direct GPU-side creation of Bitcoin addresses
+
 ## Address Database
 The addresses are stored in a high-performance database: [LMDB](https://github.com/LMDB).
 The database can be used to check whether a generated address has ever been used.
