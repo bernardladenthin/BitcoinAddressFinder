@@ -162,6 +162,23 @@ I also plan to integrate **SHA-256 + RIPEMD-160** hashing directly after point m
 - Apply `sha256(x || y)` followed by `ripemd160`
 - Enables direct GPU-side creation of Bitcoin addresses
 
+#### 🚀 MSB-Zero Scalar Walk Strategy
+
+To further accelerate brute-force key scanning, I plan to combine two advanced optimizations:
+
+- **Zeroing the 96 most significant bits (MSB) of the private key**:  
+  Since `RIPEMD160(SHA256(pubkey))` produces only a 160-bit hash, I can safely fix the upper 96 bits of the 256-bit private key to zero.  
+  This reduces the effective entropy to 160 bits and significantly shortens the scalar used for ECC multiplication, improving performance.
+
+- **Sequential Scalar Walker inside the kernel**:  
+  Each GPU thread computes a single `k₀·G` using full scalar multiplication (wNAF), where `k₀` has 96 MSB set to zero and variable 160-bit LSB.  
+  Then, a `for` loop performs multiple `point_add` operations:
+  - This effectively walks linearly through the scalar space: `k₀`, `k₀+1`, `k₀+2`, ...
+  - Avoids full scalar multiplication per iteration
+  - Enables high-throughput sequential key space traversal with minimal kernel invocations
+
+This approach massively improves GPU efficiency for address collision hunting or vanity key generation.
+
 ## Address Database
 The addresses are stored in a high-performance database: [LMDB](https://github.com/LMDB).
 The database can be used to check whether a generated address has ever been used.
