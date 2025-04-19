@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import static net.ladenthin.bitcoinaddressfinder.PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT;
 import org.bitcoinj.base.LegacyAddress;
 import org.bitcoinj.base.Network;
 
@@ -53,7 +54,59 @@ public class KeyUtility {
     public BigInteger killBits(BigInteger bigInteger, BigInteger killBits) {
         return bigInteger.andNot(killBits);
     }
+    
+    /**
+     * Calculates the maximum allowed private key value that can safely be used as a base
+     * for grid-based key generation without exceeding the secp256k1 private key limit.
+     *
+     * This is necessary for chunked or grid-based generation where the base key is incremented
+     * by up to 2^batchSizeInBits - 1.
+     *
+     * @param batchSizeInBits The number of bits used for batch size (i.e., the number of keys generated in one grid chunk).
+     *                        Must be in the range [0, {@link PublicKeyBytes#PRIVATE_KEY_MAX_NUM_BITS}].
+     * @return The maximum base private key that will not overflow when incremented by the grid.
+     */
+    public static BigInteger getMaxPrivateKeyForBatchSize(int batchSizeInBits) {
+        if (batchSizeInBits < 0 || batchSizeInBits > PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS) {
+            throw new IllegalArgumentException("batchSizeInBits must be between 0 and " + PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS);
+        }
 
+        // 2^batchSizeInBits represents the maximum offset (grid size)
+        BigInteger maxOffset = BigInteger.ONE.shiftLeft(batchSizeInBits);
+
+        // Subtract maxOffset - 1 to ensure that baseKey + (2^bits - 1) ≤ MAX_PRIVATE_KEY
+        BigInteger maxSafeKey = PublicKeyBytes.MAX_PRIVATE_KEY.subtract(maxOffset).add(BigInteger.ONE);
+
+        if (maxSafeKey.signum() < 0) {
+            throw new IllegalStateException("batchSizeInBits too large; no valid private keys remain.");
+        }
+
+        return maxSafeKey;
+    }
+    
+    public static  boolean isInvalidWithBatchSize(BigInteger privateKeyBase, BigInteger maxPrivateKeyForBatchSize) {
+        return privateKeyBase.compareTo(maxPrivateKeyForBatchSize) > 0;
+    }
+    
+    public static boolean isOutsidePrivateKeyRange(BigInteger secret) {
+        return secret.compareTo(PublicKeyBytes.MIN_VALID_PRIVATE_KEY) < 0 
+            || secret.compareTo(PublicKeyBytes.MAX_PRIVATE_KEY) > 0;
+
+    }
+    
+    public static BigInteger returnValidPrivateKey(BigInteger secret) {
+        if (isOutsidePrivateKeyRange(secret)) {
+            return INVALID_PRIVATE_KEY_REPLACEMENT;
+        }
+        return secret;
+    }
+    
+    public static void replaceInvalidPrivateKeys(BigInteger[] secrets) {
+        for (int i = 0; i < secrets.length; i++) {
+            secrets[i] = returnValidPrivateKey(secrets[i]);
+        }
+    }
+    
     /**
      * Require networkParameters.
      */
@@ -215,23 +268,5 @@ public class KeyUtility {
             bytes[i + 1] = bytes[i + 2];
             bytes[i + 2] = tmp2;
         }
-    }
-
-    /**
-     * https://bitbucket.org/connect2id/nimbus-srp/pull-requests/6/remove-leading-zero-byte-when-converting/diff
-     * Converts a BigInteger into a byte array ignoring the sign of the
-     * BigInteger, according to SRP specification
-     *
-     * @param bigInteger BigInteger, must not be null
-     *
-     * @return byte array (leading byte is always != 0), empty array if
-     * BigInteger is zero.
-     */
-    public static byte[] bigIntegerToBytes(final BigInteger bigInteger) {
-        byte[] bytes = bigInteger.toByteArray();
-        if (bytes[0] == 0) {
-            return Arrays.copyOfRange(bytes, 1, bytes.length);
-        }
-        return bytes;
     }
 }

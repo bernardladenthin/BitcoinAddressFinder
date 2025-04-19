@@ -18,6 +18,7 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
@@ -49,8 +50,6 @@ public class OpenClTask {
      * I din't know which is better.
      */
     private static final boolean USE_HOST_PTR = false;
-
-    private final static boolean USE_XOR_SWAP = false;
     
     private final CProducer cProducer;
 
@@ -60,14 +59,18 @@ public class OpenClTask {
 
     private final cl_mem srcMem;
     private final BitHelper bitHelper;
+    private final ByteBufferUtility byteBufferUtility;
+    private final BigInteger maxPrivateKeyForBatchSize;
 
     // Only available after init
-    public OpenClTask(cl_context context, CProducer cProducer, BitHelper bitHelper) {
+    public OpenClTask(cl_context context, CProducer cProducer, BitHelper bitHelper, ByteBufferUtility byteBufferUtility) {
         this.context = context;
         this.cProducer = cProducer;
         this.bitHelper = bitHelper;
+        this.byteBufferUtility = byteBufferUtility;
 
         int srcSizeInBytes = getSrcSizeInBytes();
+        maxPrivateKeyForBatchSize = KeyUtility.getMaxPrivateKeyForBatchSize(cProducer.batchSizeInBits);
         srcByteBuffer = ByteBuffer.allocateDirect(srcSizeInBytes);
         srcPointer = Pointer.to(srcByteBuffer);
         srcMem = clCreateBuffer(
@@ -88,15 +91,19 @@ public class OpenClTask {
     }
 
     public void setSrcPrivateKeyChunk(BigInteger privateKeyBase) {
-        byte[] privateKeyChunkAsByteArray = KeyUtility.bigIntegerToBytes(privateKeyBase);
+        if (KeyUtility.isInvalidWithBatchSize(privateKeyBase, maxPrivateKeyForBatchSize)) {
+            throw new PrivateKeyTooLargeException(privateKeyBase, maxPrivateKeyForBatchSize, cProducer.batchSizeInBits);
+        }
 
-        // put key in reverse order because the ByteBuffer put writes in reverse order, a flip has no effect
-        reverse(privateKeyChunkAsByteArray);
-        srcByteBuffer.clear();
-        srcByteBuffer.put(privateKeyChunkAsByteArray, 0, privateKeyChunkAsByteArray.length);
+        byte[] byteArray = byteBufferUtility.bigIntegerToBytes(privateKeyBase);
+        byteBufferUtility.putToByteBufferAsMSBtoLSB(srcByteBuffer, byteArray);
+    }
+    
+    @VisibleForTesting
+    public ByteBuffer getSrcByteBuffer() {
+        return srcByteBuffer;
     }
 
-    
     public ByteBuffer executeKernel(cl_kernel kernel, cl_command_queue commandQueue) {
         final long dstSizeInBytes = getDstSizeInBytes();
         // allocate a new dst buffer that a clone afterwards is not necessary
@@ -212,31 +219,4 @@ public class OpenClTask {
         return clone;
     }
 
-    /**
-     * https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java
-     */
-    public static void reverse(byte[] array) {
-        if (array == null) {
-            return;
-        }
-        if (USE_XOR_SWAP) {
-            int len = array.length;
-            for (int i = 0; i < len / 2; i++) {
-                array[i] ^= array[len - i - 1];
-                array[len - i - 1] ^= array[i];
-                array[i] ^= array[len - i - 1];
-            }
-        } else {
-            int i = 0;
-            int j = array.length - 1;
-            byte tmp;
-            while (j > i) {
-                tmp = array[j];
-                array[j] = array[i];
-                array[i] = tmp;
-                j--;
-                i++;
-            }
-        }
-    }
 }

@@ -18,7 +18,9 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import jdk.internal.misc.Unsafe;
 import org.bouncycastle.util.encoders.Hex;
 
@@ -119,4 +121,88 @@ public class ByteBufferUtility {
        return (int) capacity;
    }
     // </editor-fold>
+   
+    // <editor-fold defaultstate="collapsed" desc="allocateByteBufferDirectStrict (enforce direct allocation)">
+    /**
+     * Allocates a {@link ByteBuffer} strictly using {@link ByteBuffer#allocateDirect(int)}.
+     * <p>
+     * This method enforces that {@code allocateDirect == true}.
+     * It throws an {@link IllegalStateException} if heap allocation is enabled.
+     * Useful when native memory access is required, e.g. for OpenCL interop.
+     *
+     * @param capacity the number of bytes to allocate
+     * @return a direct {@link ByteBuffer}
+     * @throws IllegalStateException if not configured for direct allocation
+     */
+    public ByteBuffer allocateByteBufferDirectStrict(int capacity) {
+        if (!allocateDirect) {
+            throw new IllegalStateException("Direct allocation requested, but allocateDirect is false.");
+        }
+        return ByteBuffer.allocateDirect(capacity);
+    }
+    // </editor-fold>
+    
+    /**
+     * https://bitbucket.org/connect2id/nimbus-srp/pull-requests/6/remove-leading-zero-byte-when-converting/diff
+     * Converts a BigInteger into a byte array ignoring the sign of the
+     * BigInteger, according to SRP specification
+     *
+     * @param bigInteger BigInteger, must not be null
+     *
+     * @return byte array (leading byte is always != 0), empty array if
+     * BigInteger is zero.
+     */
+    public static byte[] bigIntegerToBytes(final BigInteger bigInteger) {
+        byte[] bytes = bigInteger.toByteArray();
+        if (bytes[0] == 0) {
+            return Arrays.copyOfRange(bytes, 1, bytes.length);
+        }
+        return bytes;
+    }
+    
+    /**
+    * Writes a BigInteger into a ByteBuffer in Most-Significant-Byte to Least-Significant-Byte order.
+    * The input BigInteger is converted to a 32-byte array. Leading zeros are stripped or added to ensure exactly 32 bytes.
+    * This is important for OpenCL, which expects keys in LSB order, written as raw bytes.
+    *
+    * @param buffer The ByteBuffer to write to. Must have at least 32 bytes capacity.
+    * @param byteArray The byte array to write.
+    */
+   public static void putToByteBufferAsMSBtoLSB(ByteBuffer buffer, byte[] byteArray) {
+       reverse(byteArray);
+       buffer.clear();
+       buffer.put(byteArray, 0, byteArray.length);
+       buffer.rewind();
+   }
+   
+    private final static boolean USE_XOR_SWAP = false;
+    
+    /**
+     * https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java
+     */
+    public static void reverse(byte[] array) {
+        if (array == null) {
+            return;
+        }
+        if (USE_XOR_SWAP) {
+            int len = array.length;
+            for (int i = 0; i < len / 2; i++) {
+                array[i] ^= array[len - i - 1];
+                array[len - i - 1] ^= array[i];
+                array[i] ^= array[len - i - 1];
+            }
+        } else {
+            int i = 0;
+            int j = array.length - 1;
+            byte tmp;
+            while (j > i) {
+                tmp = array[j];
+                array[j] = array[i];
+                array[i] = tmp;
+                j--;
+                i++;
+            }
+        }
+    }
+
 }

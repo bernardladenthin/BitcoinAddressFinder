@@ -23,6 +23,8 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Random;
+import com.tngtech.java.junit.dataprovider.DataProviderRunner;
+import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
@@ -33,7 +35,10 @@ import org.bitcoinj.crypto.MnemonicException;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
+import org.junit.Ignore;
+import org.junit.runner.RunWith;
 
+@RunWith(DataProviderRunner.class)
 public class KeyUtilityTest {
 
     private final StaticKey staticKey = new StaticKey();
@@ -93,6 +98,20 @@ public class KeyUtilityTest {
         // assert
         assertThat(byteBufferPublicKeyCompressed, is(equalTo(staticKey.byteBufferPublicKeyCompressed)));
     }
+    
+    @Test
+    public void byteBufferToAddress_isInverseOf_getHash160ByteBufferFromBase58String() {
+        // arrange
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+        String originalBase58 = staticKey.publicKeyUncompressed;
+
+        // act
+        ByteBuffer hash160Buffer = keyUtility.getHash160ByteBufferFromBase58String(originalBase58);
+        String backToBase58 = keyUtility.byteBufferToAddress(hash160Buffer).toBase58();
+
+        // assert
+        assertThat(backToBase58, is(equalTo(originalBase58)));
+    }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="getHexFromByteBuffer">
@@ -144,6 +163,12 @@ public class KeyUtilityTest {
         // assert
         assertThat(secret.toString(), is(not(equalTo(""))));
     }
+    
+    @Test
+    public void createSecret_zeroBits_returnsZero() {
+        BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false)).createSecret(0, new Random(123));
+        assertThat(secret, is(equalTo(BigInteger.ZERO)));
+    }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="createKeyDetails">
@@ -179,29 +204,6 @@ public class KeyUtilityTest {
         assertThat(keyDetails, is(equalTo("privateKeyBigInteger: [" + staticKey.privateKeyBigInteger + "] privateKeyBytes: [" + Arrays.toString(staticKey.privateKeyBytes) + "] privateKeyHex: [" + staticKey.privateKeyHex + "] WiF: [" + staticKey.privateKeyWiFCompressed + "] publicKeyAsHex: [" + staticKey.publicKeyCompressedHex + "] publicKeyHash160Hex: [" + staticKey.publicKeyCompressedHash160Hex + "] publicKeyHash160Base58: [" + staticKey.publicKeyCompressed + "] Compressed: [true] Mnemonic: " + MnemonicCode.INSTANCE.toMnemonic(ecKey.getPrivKeyBytes()))));
     }
     // </editor-fold>
-        
-    // <editor-fold defaultstate="collapsed" desc="bigIntegerToBytes">
-    @Test
-    public void bigIntegerToBytes_maxPrivateKeyGiven_returnWithoutLeadingZeros() throws IOException {
-        // arrange
-        BigInteger key = PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY;
-        byte[] maxPrivateKey = key.toByteArray();
-        assertThat(maxPrivateKey.length, is(equalTo(33)));
-
-        // act
-        byte[] keyWithoutLeadingZeros = KeyUtility.bigIntegerToBytes(key);
-
-        // assert
-        assertThat(keyWithoutLeadingZeros.length, is(equalTo(32)));
-        
-        // copy back
-        byte[] arrayWithLeadingZero = new byte[33];
-        System.arraycopy(keyWithoutLeadingZeros, 0, arrayWithLeadingZero, 1, 32);
-        
-        // assert content equals
-        assertThat(arrayWithLeadingZero, is(equalTo(maxPrivateKey)));
-    }
-    // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc="killBits">
     @Test
@@ -222,4 +224,236 @@ public class KeyUtilityTest {
         assertThat(secret, is(equalTo(BigInteger.valueOf(58))));
     }
     // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="getMaxPrivateKeyForBatchSize">
+    @Test
+    public void getMaxPrivateKeyForBatchSize_batchSize0_returnsMaxPrivateKey() {
+        // arrange
+        int batchSizeInBits = 0;
+
+        // act
+        BigInteger result = KeyUtility.getMaxPrivateKeyForBatchSize(batchSizeInBits);
+
+        // assert
+        assertThat(result, is(equalTo(PublicKeyBytes.MAX_PRIVATE_KEY)));
+    }
+
+    @Test
+    public void getMaxPrivateKeyForBatchSize_batchSize1_returnsMaxMinus1() {
+        // arrange
+        int batchSizeInBits = 1;
+
+        // act
+        BigInteger result = KeyUtility.getMaxPrivateKeyForBatchSize(batchSizeInBits);
+
+        // assert
+        assertThat(result.add(BigInteger.ONE), is(equalTo(PublicKeyBytes.MAX_PRIVATE_KEY)));
+    }
+
+    @Test
+    public void getMaxPrivateKeyForBatchSize_maxAllowedBitSize_returnsMinimumSafeKey() {
+        // arrange
+        int batchSizeInBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS - 1;
+
+        // act
+        BigInteger result = KeyUtility.getMaxPrivateKeyForBatchSize(batchSizeInBits);
+
+        // assert
+        BigInteger offset = BigInteger.ONE.shiftLeft(batchSizeInBits);
+        BigInteger expected = PublicKeyBytes.MAX_PRIVATE_KEY.subtract(offset).add(BigInteger.ONE);
+        assertThat(result, is(equalTo(expected)));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void getMaxPrivateKeyForBatchSize_bitSizeNegative_throwsException() {
+        // act
+        KeyUtility.getMaxPrivateKeyForBatchSize(-1);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void getMaxPrivateKeyForBatchSize_bitSizeTooLarge_throwsException() {
+        // act
+        KeyUtility.getMaxPrivateKeyForBatchSize(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS + 1);
+    }
+    
+    @Test(expected = IllegalStateException.class)
+    public void getMaxPrivateKeyForBatchSize_tooLarge_throwsException() {
+        // arrange
+        int batchSizeInBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
+
+        // act
+        KeyUtility.getMaxPrivateKeyForBatchSize(batchSizeInBits);
+    }
+    // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="isInvalidWithBatchSize">
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE, location = CommonDataProvider.class)
+    public void isInvalidWithBatchSize_keyTooLarge_returnsTrue(BigInteger privateKey, int batchSizeInBits) {
+        // arrange
+        BigInteger maxAllowed = KeyUtility.getMaxPrivateKeyForBatchSize(batchSizeInBits);
+
+        // act
+        boolean isInvalid = KeyUtility.isInvalidWithBatchSize(privateKey, maxAllowed);
+
+        // assert
+        assertThat(isInvalid, is(true));
+    }
+
+    @Test
+    public void isInvalidWithBatchSize_keyWithinLimit_returnsFalse() {
+        // arrange
+        int batchSizeInBits = 2;
+        BigInteger maxAllowed = KeyUtility.getMaxPrivateKeyForBatchSize(batchSizeInBits);
+        BigInteger validKey = maxAllowed.subtract(BigInteger.ONE);
+
+        // act
+        boolean isInvalid = KeyUtility.isInvalidWithBatchSize(validKey, maxAllowed);
+
+        // assert
+        assertThat(isInvalid, is(false));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="ECKey.fromPrivate: boundaries">
+    @Test
+    public void ecKey_fromPrivate_randomValidInRange_succeeds() {
+        BigInteger randomValidKey = PublicKeyBytes.MIN_VALID_PRIVATE_KEY.add(BigInteger.valueOf(123456));
+        ECKey ecKey = ECKey.fromPrivate(randomValidKey, false);
+        assertThat(ecKey.getPrivKey(), is(equalTo(randomValidKey)));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void ecKey_fromPrivate_minPrivateKey_throwsException() {
+        // act
+        ECKey.fromPrivate(PublicKeyBytes.MIN_PRIVATE_KEY, false);
+    }
+    
+    @Ignore("bitcoinj.ECKey.fromPrivate(...) accepts values > MAX_PRIVATE_KEY without throwing an exception. " +
+       "Test ignored because the library does not enforce the upper bound.")
+    @Test(expected = IllegalArgumentException.class)
+    public void ecKey_fromPrivate_maxPrivateKeyPlusOne_throwsException() {
+        // act
+        ECKey.fromPrivate(PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE), false);
+    }
+
+    @Test
+    public void ecKey_fromPrivate_minValidPrivateKey_noExceptionThrown() {
+        // act
+        ECKey ecKey = ECKey.fromPrivate(PublicKeyBytes.MIN_VALID_PRIVATE_KEY, false);
+
+        // assert
+        assertThat(ecKey.getPrivKey(), is(equalTo(PublicKeyBytes.MIN_VALID_PRIVATE_KEY)));
+    }
+
+    @Test
+    public void ecKey_fromPrivate_maxPrivateKey_noExceptionThrown() {
+        // act
+        ECKey ecKey = ECKey.fromPrivate(PublicKeyBytes.MAX_PRIVATE_KEY, false);
+
+        // assert
+        assertThat(ecKey.getPrivKey(), is(equalTo(PublicKeyBytes.MAX_PRIVATE_KEY)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="isOutsidePrivateKeyRange">
+    @Test
+    public void isOutsidePrivateKeyRange_minPrivateKey_returnsFalse() {
+        // act
+        boolean result = KeyUtility.isOutsidePrivateKeyRange(PublicKeyBytes.MIN_PRIVATE_KEY);
+
+        // assert
+        assertThat(result, is(true));
+    }
+    
+    @Test
+    public void isOutsidePrivateKeyRange_minValidPrivateKey_returnsFalse() {
+        // act
+        boolean result = KeyUtility.isOutsidePrivateKeyRange(PublicKeyBytes.MIN_VALID_PRIVATE_KEY);
+
+        // assert
+        assertThat(result, is(false));
+    }
+
+    @Test
+    public void isOutsidePrivateKeyRange_maxPrivateKey_returnsFalse() {
+        // act
+        boolean result = KeyUtility.isOutsidePrivateKeyRange(PublicKeyBytes.MAX_PRIVATE_KEY);
+
+        // assert
+        assertThat(result, is(false));
+    }
+
+    @Test
+    public void isOutsidePrivateKeyRange_zero_returnsTrue() {
+        // act
+        boolean result = KeyUtility.isOutsidePrivateKeyRange(BigInteger.ZERO);
+
+        // assert
+        assertThat(result, is(true));
+    }
+
+    @Test
+    public void isOutsidePrivateKeyRange_belowMin_returnsTrue() {
+        // arrange
+        BigInteger invalidKey = PublicKeyBytes.MIN_PRIVATE_KEY.subtract(BigInteger.ONE);
+
+        // act
+        boolean result = KeyUtility.isOutsidePrivateKeyRange(invalidKey);
+
+        // assert
+        assertThat(result, is(true));
+    }
+
+    @Test
+    public void isOutsidePrivateKeyRange_aboveMax_returnsTrue() {
+        // arrange
+        BigInteger invalidKey = PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE);
+
+        // act
+        boolean result = KeyUtility.isOutsidePrivateKeyRange(invalidKey);
+
+        // assert
+        assertThat(result, is(true));
+    }
+    // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="returnValidPrivateKey">
+    @Test
+    public void returnValidPrivateKey_validKey_returnsSameKey() {
+        BigInteger valid = PublicKeyBytes.MIN_PRIVATE_KEY.add(BigInteger.ONE);
+        assertThat(KeyUtility.returnValidPrivateKey(valid), is(equalTo(valid)));
+    }
+
+    @Test
+    public void returnValidPrivateKey_tooSmall_returnsReplacement() {
+        BigInteger tooSmall = PublicKeyBytes.MIN_PRIVATE_KEY.subtract(BigInteger.ONE);
+        assertThat(KeyUtility.returnValidPrivateKey(tooSmall), is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
+    }
+
+    @Test
+    public void returnValidPrivateKey_tooLarge_returnsReplacement() {
+        BigInteger tooLarge = PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE);
+        assertThat(KeyUtility.returnValidPrivateKey(tooLarge), is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
+    }
+    // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="replaceInvalidPrivateKeys">
+    @Test
+    public void replaceInvalidPrivateKeys_mixedArray_replacesInvalids() {
+        BigInteger[] secrets = new BigInteger[]{
+            PublicKeyBytes.MIN_VALID_PRIVATE_KEY,                      // valid
+            PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE),        // invalid
+            BigInteger.ZERO                                            // valid
+        };
+
+        KeyUtility.replaceInvalidPrivateKeys(secrets);
+
+        assertThat(secrets[0], is(equalTo(PublicKeyBytes.MIN_VALID_PRIVATE_KEY)));
+        assertThat(secrets[1], is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
+        assertThat(secrets[2], is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
+    }
+
+    // </editor-fold>
+
 }

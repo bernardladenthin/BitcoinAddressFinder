@@ -183,7 +183,7 @@ public class ConsumerJava implements Consumer {
         PublicKeyBytes[] publicKeyBytesArray = keysQueue.poll();
         while (publicKeyBytesArray != null) {
             for (PublicKeyBytes publicKeyBytes : publicKeyBytesArray) {
-                if (publicKeyBytes.isInvalid()) {
+                if (publicKeyBytes.isOutsidePrivateKeyRange()) {
                     continue;
                 }
                 byte[] hash160Uncompressed = publicKeyBytes.getUncompressedKeyHash();

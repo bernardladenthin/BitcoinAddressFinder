@@ -462,4 +462,84 @@ public class CommonDataProvider {
             {false},
         };
     }
+    
+    /**
+     * For {@link #largePrivateKeys()}.
+     */
+    public final static String DATA_PROVIDER_LARGE_PRIVATE_KEYS = "largePrivateKeys";
+
+    @DataProvider
+    public static Object[][] largePrivateKeys() {
+        return new Object[][]{
+            // ⚠️ Important: Do not include keys that are near or equal to the maximum valid private key (e.g., MAX_PRIVATE_KEY + offset).
+            // Since we use grid-based key derivation (e.g., k + i), these values can overflow the valid secp256k1 range and cause failures.
+            // {PublicKeyBytes.MAX_PRIVATE_KEY},
+            //
+            // Custom crafted BigIntegers with MSB set (highest bit in first byte = 1)
+            // These will be encoded with a leading zero byte (i.e., total of 33 bytes)
+            {new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8C00000000", 16)},
+            {new BigInteger("F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0", 16)},
+            {new BigInteger("F000000000000000000000000000000000000000000000000000000000000000", 16)},
+
+            // Additional examples that force 33-byte encoding due to high bit in first byte
+            {new BigInteger("F000000000000000000000000000000000000000000000000000000000000000", 16)},
+            {new BigInteger("8000000000000000000000000000000000000000000000000000000000000000", 16)}, // Only MSB set
+            {new BigInteger("C000000000000000000000000000000000000000000000000000000000000000", 16)}, // First 2 bits set
+
+            // Variants with slight length differences, still 256-bit aligned or close
+            {new BigInteger("F000000000000000000000000000000000000000000000000000000000000000", 16)},
+            {new BigInteger( "F00000000000000000000000000000000000000000000000000000000000000", 16)},
+            {new BigInteger(  "F0000000000000000000000000000000000000000000000000000000000000", 16)},
+        };
+    }
+    
+    /**
+     * For {@link #privateKeysTooLargeWithChunkSize()}.
+     */
+    public final static String DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE = "privateKeysTooLargeWithChunkSize";
+
+    @DataProvider
+    public static Object[][] privateKeysTooLargeWithChunkSize() {
+        return new Object[][]{
+            {PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY, PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY},
+            {PublicKeyBytes.MAX_PRIVATE_KEY, PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY},
+        };
+    }
+    
+    /**
+     * For {@link #largePrivate32ByteKeys()}.
+     */
+    public final static String DATA_PROVIDER_PRIVATE_KEYS_32_BYTE_REQUIRING_STRIP = "privateKeys32ByteRequiringStrip";
+
+    @DataProvider
+    public static Object[][] privateKeys32ByteRequiringStrip() {
+        return new Object[][]{
+            // Custom crafted BigIntegers with MSB set (highest bit in first byte = 1)
+            // These will be encoded with a leading zero byte (i.e., total of 33 bytes)
+            {new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8C00000000", 16)},
+            {new BigInteger("F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0", 16)},
+            {new BigInteger("F000000000000000000000000000000000000000000000000000000000000000", 16)},
+        };
+    }
+    
+    /**
+     * For {@link bigIntegerVariants}.
+     */
+    public final static String DATA_PROVIDER_BIG_INTEGER_VARIANTS = "bigIntegerVariants";
+    
+    @DataProvider
+    public static Object[][] bigIntegerVariants() {
+        return new Object[][] {
+            { new BigInteger("00", 16), 0, (byte) 0x00 }, // 0-value, empty result
+            { new BigInteger("01", 16), 1, (byte) 0x01 },
+            { new BigInteger("7F", 16), 1, (byte) 0x7F },
+            { new BigInteger("FF", 16), 1, (byte) 0xFF }, // highest byte without sign extension
+            { new BigInteger(1, new byte[]{0x00, 0x01}), 1, (byte) 0x01 }, // explicit leading zero
+            { new BigInteger(1, new byte[]{0x00, (byte)0x80}), 1, (byte) 0x80 }, // zero removed, keep sign
+            { new BigInteger(1, new byte[]{(byte) 0x00, (byte) 0xFF}), 1, (byte) 0xFF }, // zero removed
+            { new BigInteger("FFFFFFFF", 16), 4, (byte) 0xFF },
+            // Max technically private key (leading 0x00 byte expected)
+            { PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY, 32, (byte) 0xFF }
+        };
+    }
 }

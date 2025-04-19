@@ -36,7 +36,9 @@ import org.junit.rules.TemporaryFolder;
 import static org.jocl.CL.*;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
+import java.util.stream.Collectors;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
 import org.bitcoinj.base.Network;
@@ -44,6 +46,8 @@ import org.bitcoinj.crypto.ECKey;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.everyItem;
 
 import org.jocl.*;
 import org.junit.Ignore;
@@ -438,29 +442,132 @@ public class ProbeAddressesOpenCLTest {
         openCLContext.release();
     }
     
+    /**
+    * Verifies that at least one test input triggers BigInteger encoding with a leading zero byte (sign bit = 1).
+    * This is a prerequisite for testing OpenCL buffer serialization of such keys.
+    */
     @Test
+    public void dataProvider_largePrivateKeys_containsAtLeastOneEncodingWithLeadingZeroByte() {
+        List<Integer> lengths = Arrays.stream(CommonDataProvider.largePrivateKeys())
+            .map(data -> ((BigInteger) data[0]).toByteArray().length)
+            .collect(Collectors.toList());
+
+        assertThat(
+            "Expected at least one BigInteger with 33-byte encoding (sign-preserving leading zero)",
+            lengths,
+            hasItem(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES + 1)
+        );
+    }
+    
+    /**
+    * Verifies that all test inputs in largePrivate32ByteKeys() produce a 33-byte encoding
+    * due to the high bit being set (i.e., sign-preserving leading zero is required).
+    */
+   @Test
+   public void dataProvider_largePrivateKeys_allHaveLeadingZeroEncoding() {
+       List<Integer> lengths = Arrays.stream(CommonDataProvider.privateKeys32ByteRequiringStrip())
+           .map(data -> ((BigInteger) data[0]).toByteArray().length)
+           .collect(Collectors.toList());
+
+       assertThat(
+           "Expected all BigIntegers to be encoded with 33 bytes (sign bit set → leading zero required)",
+           lengths,
+           everyItem(is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES + 1))
+       );
+   }
+   
     @OpenCLTest
-    public void setSrcPrivateKeyChunk_aBigIntegerHaveLeadingZeros_Copy32BytesOnlyAndNoExceptionThrown() throws IOException {
+    @Test(expected = PrivateKeyTooLargeException.class)
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE, location = CommonDataProvider.class)
+    public void setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException(BigInteger privateKey, int chunkSize) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         
-        // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
-        producerOpenCL.batchSizeInBits = 20;
+        producerOpenCL.batchSizeInBits = chunkSize;
         OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
         openCLContext.init();
         
         OpenClTask openClTask = openCLContext.getOpenClTask();
-        openClTask.setSrcPrivateKeyChunk(PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY);
-        
+
+        // Force a key that exceeds the limit
+        openClTask.setSrcPrivateKeyChunk(privateKey);
+    }
+
+    @Test
+    @OpenCLTest
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_32_BYTE_REQUIRING_STRIP, location = CommonDataProvider.class)
+    public void setSrcPrivateKeyChunk_handlesLeadingZero_correctlySerializesTo32Bytes(BigInteger privateKey) throws IOException {
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
+        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
+        openCLContext.init();
+
+        byte[] encoded = privateKey.toByteArray();
+        assertThat("Encoded must hold exactly 33 bytes", encoded.length, is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES + 1));
+        byte[] expectedStripped = Arrays.copyOfRange(encoded, 1, encoded.length);
+        assertThat("ExpectedStripped must hold exactly 32 bytes", expectedStripped.length, is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES));
+
+        // Perform the actual OpenCL buffer population
+        OpenClTask openClTask = openCLContext.getOpenClTask();
+        openClTask.setSrcPrivateKeyChunk(privateKey);
+
+        ByteBuffer buffer = openClTask.getSrcByteBuffer();
+        assertThat("Buffer must hold exactly 32 bytes", buffer.capacity(), is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES));
+
+        byte[] actualBytes = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
+        buffer.rewind();
+        buffer.get(actualBytes);
+        buffer.rewind();
+
+        // Convert buffer back to BigInteger for equality test
+        byte[] reversed = actualBytes.clone();
+        ByteBufferUtility.reverse(reversed);
+
+        BigInteger result = new BigInteger(1, reversed);
+
+        assertThat("Buffer reversed content must match stripped BigInteger encoding", reversed, is(equalTo(expectedStripped)));
+        assertThat("Deserialized BigInteger must match original", result, is(equalTo(privateKey)));
+
         openCLContext.release();
     }
     
     @Test
     @OpenCLTest
-    public void hashcatOpenClGrid() throws IOException {
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_LARGE_PRIVATE_KEYS, location = CommonDataProvider.class)
+    public void createKeys_fromLargePrivateKey_generatesValidPublicKeys(BigInteger privateKey) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         
+        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
+        KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
+        
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
+        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
+        openCLContext.init();
+
+        // Perform the actual OpenCL buffer population
+        OpenClTask openClTask = openCLContext.getOpenClTask();
+        
+        openClTask.setSrcPrivateKeyChunk(privateKey);
+        
+        BigInteger secretBase = keyUtility.killBits(privateKey, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
+        
+        OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
+        PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
+        createKeys.freeResult();
+        
+        openCLContext.release();
+        
         final boolean souts = false;
+        assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
+    }
+    
+    @Test
+    @OpenCLTest
+    public void createKeys_fromRandomPrivateKey_correctlyHashesAndVerifiesResults() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
@@ -471,8 +578,8 @@ public class ProbeAddressesOpenCLTest {
         OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
         openCLContext.init();
         
-        Random sr = new Random(1337);
-        BigInteger secretKeyBase = keyUtility.createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, sr);
+        Random random = new Random(1337);
+        BigInteger secretKeyBase = keyUtility.createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, random);
         
         BigInteger secretBase = keyUtility.killBits(secretKeyBase, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
         
@@ -482,15 +589,9 @@ public class ProbeAddressesOpenCLTest {
         
         openCLContext.release();
         
-        {
-            // do a warmup for the jvm, afterwards we can compare the speed of hash / hash fast
-            System.out.println("WARMUP ... ");
-            hashPublicKeys(publicKeys, souts);
-            hashPublicKeysFast(publicKeys, souts);
-            System.out.println("... WARMUP done.");
-        }
-        hashPublicKeys(publicKeys, souts);
-        hashPublicKeysFast(publicKeys, souts);
+        final boolean souts = false;
+        hashPublicKeys(publicKeys, souts); // just for performance tests
+        hashPublicKeysFast(publicKeys, souts); // just for performance tests
         
         assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
     }
@@ -498,14 +599,12 @@ public class ProbeAddressesOpenCLTest {
     private static void assertPublicKeyBytesCalculatedCorrect(PublicKeyBytes[] publicKeys, BigInteger secretBase, final boolean souts, KeyUtility keyUtility) {
         for (int i = 0; i < publicKeys.length; i++) {
             if (i%10_000 == 0) {
-                System.out.println("progress: " + i);
+                if(souts) System.out.println("progress: " + i);
             }
             BigInteger privateKey = AbstractProducer.calculateSecretKey(secretBase, i);
             byte[] privateKeyAsByteArray = privateKey.toByteArray();
             
-            if(souts) {
-                System.out.println("privateKey: " + Arrays.toString(privateKeyAsByteArray));
-            }
+            if(souts) System.out.println("privateKey: " + Arrays.toString(privateKeyAsByteArray));
             
             PublicKeyBytes publicKeyBytes = publicKeys[i];
             
@@ -564,7 +663,7 @@ public class ProbeAddressesOpenCLTest {
     }
 
     private static void hashPublicKeysFast(PublicKeyBytes[] publicKeys, final boolean souts) {
-        System.out.println("execute hash fast ...");
+        if (souts) System.out.println("execute hash fast ...");
         long beforeHash = System.currentTimeMillis();
         for (int i = 0; i < publicKeys.length; i++) {
             byte[] compressedKeyHashFast = publicKeys[i].getCompressedKeyHash();
@@ -573,17 +672,15 @@ public class ProbeAddressesOpenCLTest {
             //assertThat(compressedKeyHash, is(equalTo(compressedKeyHashFast)));
             //assertThat(uncompressedKeyHash, is(equalTo(uncompressedKeyHashFast)));
             
-            if (souts) {
-                System.out.println("publicKeys["+i+"].compressedKeyHashFast: " + Arrays.toString(compressedKeyHashFast));
-                System.out.println("publicKeys["+i+"].uncompressedKeyHashFast: " + Arrays.toString(uncompressedKeyHashFast));
-            }
+            if (souts) System.out.println("publicKeys["+i+"].compressedKeyHashFast: " + Arrays.toString(compressedKeyHashFast));
+            if (souts) System.out.println("publicKeys["+i+"].uncompressedKeyHashFast: " + Arrays.toString(uncompressedKeyHashFast));
         }
         long afterHash = System.currentTimeMillis();
-        System.out.println("... hashed fast in: " + (afterHash - beforeHash) + "ms");
+        if (souts) System.out.println("... hashed fast in: " + (afterHash - beforeHash) + "ms");
     }
 
     private static void hashPublicKeys(PublicKeyBytes[] publicKeys, final boolean souts) {
-        System.out.println("execute hash ...");
+        if (souts) System.out.println("execute hash ...");
         long beforeHash = System.currentTimeMillis();
         for (int i = 0; i < publicKeys.length; i++) {
             byte[] compressedKeyHash = publicKeys[i].getCompressedKeyHash();
@@ -592,13 +689,11 @@ public class ProbeAddressesOpenCLTest {
             //assertThat(compressedKeyHash, is(equalTo(compressedKeyHashFast)));
             //assertThat(uncompressedKeyHash, is(equalTo(uncompressedKeyHashFast)));
             
-            if (souts) {
-                System.out.println("publicKeys["+i+"].compressedKeyHash: " + Arrays.toString(compressedKeyHash));
-                System.out.println("publicKeys["+i+"].uncompressedKeyHash: " + Arrays.toString(uncompressedKeyHash));
-            }
+            if (souts) System.out.println("publicKeys["+i+"].compressedKeyHash: " + Arrays.toString(compressedKeyHash));
+            if (souts) System.out.println("publicKeys["+i+"].uncompressedKeyHash: " + Arrays.toString(uncompressedKeyHash));
         }
         long afterHash = System.currentTimeMillis();
-        System.out.println("... hashed in: " + (afterHash - beforeHash) + "ms");
+        if (souts) System.out.println("... hashed in: " + (afterHash - beforeHash) + "ms");
     }
     
     /**

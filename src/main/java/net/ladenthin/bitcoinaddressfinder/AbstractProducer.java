@@ -96,7 +96,7 @@ public abstract class AbstractProducer implements Producer {
                     throw new RuntimeException("secrets.length != bitHelper.convertBitsToSize(cProducer.batchSizeInBits)");
                 }
             }
-            PublicKeyBytes.replaceInvalidPrivateKeys(secrets);
+            KeyUtility.replaceInvalidPrivateKeys(secrets);
             
             consumeSecrets(secrets);
          } catch (RuntimeException e) {

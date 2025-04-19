@@ -96,10 +96,12 @@ public class OpenCLContext {
     private cl_program program;
     private cl_kernel kernel;
     private OpenClTask openClTask;
+    private ByteBufferUtility byteBufferUtility;
     
     public OpenCLContext(CProducerOpenCL producerOpenCL, BitHelper bitHelper) {
         this.producerOpenCL = producerOpenCL;
         this.bitHelper = bitHelper;
+        this.byteBufferUtility = new ByteBufferUtility(true);
     }
     
     public void init() throws IOException {
@@ -153,7 +155,7 @@ public class OpenCLContext {
         // Create the kernel
         kernel = clCreateKernel(program, KERNEL_NAME, null);
         
-        openClTask = new OpenClTask(context, producerOpenCL, bitHelper);
+        openClTask = new OpenClTask(context, producerOpenCL, bitHelper, byteBufferUtility);
     }
 
     OpenClTask getOpenClTask() {

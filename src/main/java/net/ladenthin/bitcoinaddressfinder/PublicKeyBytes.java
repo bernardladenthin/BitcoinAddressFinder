@@ -41,11 +41,42 @@ public class PublicKeyBytes {
     public static final BigInteger MIN_PRIVATE_KEY = BigInteger.ONE;
     
     /**
-     * Specifically, any 256-bit number between {@code 0x1} and {@code 0xFFFF FFFF FFFF FFFF FFFF FFFF FFFF FFFE BAAE DCE6 AF48 A03B BFD2 5E8C D036 4141} is a valid
-     * private key.
+     * The minimum valid private key that can be safely used in this implementation.
+     * <p>
+     * While the secp256k1 specification allows private keys in the range
+     * {@code [0x1, MAX_PRIVATE_KEY]} (i.e., including {@code 1}), this implementation
+     * deliberately excludes {@code 1} for practical safety and compatibility reasons.
+     * The constant {@code MIN_VALID_PRIVATE_KEY} is therefore defined as {@code 2}.
+     * </p>
+     * <p>
+     * This avoids edge cases or known issues in downstream libraries or certain 
+     * ECKey handling implementations (e.g., {@link org.bitcoinj.crypto.ECKey#fromPrivate(BigInteger, boolean)})
+     * that may throw exceptions or produce inconsistent results for {@code 1}.
+     * </p>
+     *
+     * @see #MAX_PRIVATE_KEY
+     * @see org.bitcoinj.crypto.ECKey#fromPrivate(BigInteger, boolean)
+     */
+    public static final BigInteger MIN_VALID_PRIVATE_KEY = BigInteger.valueOf(2);
+
+    /**
+     * The maximum valid private key according to the secp256k1 specification.
+     * <p>
+     * The valid range for secp256k1 private keys is technically defined as 
+     * {@code 0x1} to {@code 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141} (inclusive).
+     * This value represents the order of the secp256k1 curve (also called the group order).
+     * </p>
+     * <p>
+     * However, this implementation deliberately defines {@link PublicKeyBytes#MIN_VALID_PRIVATE_KEY} as {@code 0x2},
+     * excluding {@code 0x1} due to its potential to cause inconsistencies or exceptions in certain cryptographic
+     * libraries such as {@link org.bitcoinj.crypto.ECKey#fromPrivate(BigInteger, boolean)}.
+     * </p>
+     *
+     * @see #MIN_VALID_PRIVATE_KEY
+     * @see org.bitcoinj.crypto.ECKey
      */
     public static final BigInteger MAX_PRIVATE_KEY = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16);
-    
+
     /**
      * I choose a random value for a replacement.
      */
@@ -142,30 +173,8 @@ public class PublicKeyBytes {
         return uncompressed;
     }
     
-    public boolean isInvalid() {
-        return isInvalid(secretKey);
-    }
-    
-    public static boolean isInvalid(BigInteger secret) {
-        if (secret.compareTo(MIN_PRIVATE_KEY) < 1 || secret.compareTo(MAX_PRIVATE_KEY) > 1) {
-            // prevent an IllegalArgumentException
-            return true;
-        }
-        
-        return false;
-    }
-    
-    public static BigInteger returnValidPrivateKey(BigInteger secret) {
-        if (isInvalid(secret)) {
-            return INVALID_PRIVATE_KEY_REPLACEMENT;
-        }
-        return secret;
-    }
-    
-    public static void replaceInvalidPrivateKeys(BigInteger[] secrets) {
-        for (int i = 0; i < secrets.length; i++) {
-            secrets[i] = returnValidPrivateKey(secrets[i]);
-        }
+    public boolean isOutsidePrivateKeyRange() {
+        return KeyUtility.isOutsidePrivateKeyRange(secretKey);
     }
     
     public PublicKeyBytes(BigInteger secretKey, byte[] uncompressed) {

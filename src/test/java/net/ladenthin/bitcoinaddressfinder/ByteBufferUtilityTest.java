@@ -18,10 +18,12 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import com.tngtech.java.junit.dataprovider.DataProvider;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import org.junit.Before;
@@ -315,4 +317,157 @@ public class ByteBufferUtilityTest {
         // assert is handled by exception rule
     }
     // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="allocateByteBufferDirectStrict">
+    /**
+     * Ensures that a direct ByteBuffer is successfully allocated when configured to allow direct allocation.
+     */
+    @Test
+    public void allocateByteBufferDirectStrict_directAllocationEnabled_returnsDirectBuffer() {
+        // arrange
+        final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
+
+        // act
+        ByteBuffer directBuffer = byteBufferUtility.allocateByteBufferDirectStrict(16);
+
+        // assert
+        assertThat(directBuffer.isDirect(), is(true));
+        assertThat(directBuffer.capacity(), is(equalTo(16)));
+    }
+
+    /**
+     * Ensures that an exception is thrown when trying to allocate a direct ByteBuffer while direct allocation is disabled.
+     */
+    @Test(expected = IllegalStateException.class)
+    public void allocateByteBufferDirectStrict_directAllocationDisabled_throwsException() {
+        // arrange
+        final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
+
+        // act
+        byteBufferUtility.allocateByteBufferDirectStrict(16);
+
+        // assert handled by exception
+    }
+
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="bigIntegerToBytes">
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIG_INTEGER_VARIANTS, location = CommonDataProvider.class)
+    public void bigIntegerToBytes_leadingZeroStripped(BigInteger input, int expectedLength, byte expectedFirstByte) {
+        // act
+        byte[] actualBytes = ByteBufferUtility.bigIntegerToBytes(input);
+
+        // assert
+        assertThat(actualBytes.length, is(equalTo(expectedLength)));
+        if (actualBytes.length > 0) {
+            assertThat(actualBytes[0], is(equalTo(expectedFirstByte)));
+        }
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="bigIntegerToBytes">
+    @Test
+    public void bigIntegerToBytes_maxPrivateKeyGiven_returnWithoutLeadingZeros() throws IOException {
+        // arrange
+        BigInteger key = PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY;
+        byte[] maxPrivateKey = key.toByteArray();
+        assertThat(maxPrivateKey.length, is(equalTo(33)));
+        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
+
+        // act
+        byte[] keyWithoutLeadingZeros = byteBufferUtility.bigIntegerToBytes(key);
+
+        // assert
+        assertThat(keyWithoutLeadingZeros.length, is(equalTo(32)));
+        
+        // copy back
+        byte[] arrayWithLeadingZero = new byte[33];
+        System.arraycopy(keyWithoutLeadingZeros, 0, arrayWithLeadingZero, 1, 32);
+        
+        // assert content equals
+        assertThat(arrayWithLeadingZero, is(equalTo(maxPrivateKey)));
+    }
+    // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="putToByteBufferAsMSBtoLSB">
+    @Test
+    public void putToByteBufferAsMSBtoLSB_singleByte_writtenAsLSBAtStart() {
+        // arrange
+        ByteBuffer buffer = ByteBuffer.allocate(32);
+        byte[] input = new byte[] { 0x01 };
+        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
+
+        // act
+        byteBufferUtility.putToByteBufferAsMSBtoLSB(buffer, input);
+
+        // assert
+        buffer.rewind();
+        assertThat(buffer.get(0), is((byte) 0x01));
+        for (int i = 1; i < 32; i++) {
+            assertThat("buffer[" + i + "]", buffer.get(i), is((byte) 0x00));
+        }
+    }
+
+    @Test
+    public void putToByteBufferAsMSBtoLSB_bytesInCorrectReverseOrder() {
+        // arrange
+        ByteBuffer buffer = ByteBuffer.allocate(32);
+        byte[] input = new byte[] { 0x01, 0x02, 0x03, 0x04 };
+        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
+
+        // act
+        byteBufferUtility.putToByteBufferAsMSBtoLSB(buffer, input);
+
+        // assert
+        buffer.rewind();
+        assertThat(buffer.get(0), is((byte) 0x04));
+        assertThat(buffer.get(1), is((byte) 0x03));
+        assertThat(buffer.get(2), is((byte) 0x02));
+        assertThat(buffer.get(3), is((byte) 0x01));
+        for (int i = 4; i < 32; i++) {
+            assertThat("buffer[" + i + "]", buffer.get(i), is((byte) 0x00));
+        }
+    }
+
+    @Test
+    public void putToByteBufferAsMSBtoLSB_fullLengthInput_writtenWithoutPadding() {
+        // arrange
+        byte[] input = new byte[32];
+        for (int i = 0; i < 32; i++) {
+            input[i] = (byte) i;
+        }
+        ByteBuffer buffer = ByteBuffer.allocate(32);
+        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
+
+        // act
+        byteBufferUtility.putToByteBufferAsMSBtoLSB(buffer, input);
+
+        // assert
+        buffer.rewind();
+        for (int i = 0; i < 32; i++) {
+            assertThat("buffer[" + i + "]", buffer.get(i), is((byte) (31 - i)));
+        }
+    }
+    
+    @Test
+    public void putToByteBufferAsMSBtoLSB_shortArray_shouldWriteReversedAtBeginning() {
+        // arrange
+        ByteBuffer buffer = ByteBuffer.allocate(32);
+        byte[] input = new byte[] { 0x01, 0x02 };
+        byte[] expected = new byte[32];
+        expected[0] = 0x02; // reversed input
+        expected[1] = 0x01;
+
+        // act
+        ByteBufferUtility.putToByteBufferAsMSBtoLSB(buffer, input);
+        byte[] actual = new byte[32];
+        buffer.rewind();
+        buffer.get(actual);
+
+        // assert
+        assertThat(actual, is(equalTo(expected)));
+    }
+    // </editor-fold>
+
 }

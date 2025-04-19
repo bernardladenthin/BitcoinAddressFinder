@@ -37,7 +37,8 @@ import static org.hamcrest.Matchers.not;
 public class PublicKeyBytesTest {
 
     private final Network network = new NetworkParameterFactory().getNetwork();
-    protected final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(true));
+    private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
+    protected final KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
     
     @Test
     public void createPublicKeyBytes_publicKeyGiven_PublicKeyAndHashesEquals() throws IOException, InterruptedException {
@@ -89,7 +90,7 @@ public class PublicKeyBytesTest {
     @Test
     public void maxPrivateKeyAsHexString_isEqualToConstant() throws IOException, InterruptedException {
         // arrange
-        String maxPrivateKeyAsHexString = Hex.encodeHexString(KeyUtility.bigIntegerToBytes(PublicKeyBytes.MAX_PRIVATE_KEY));
+        String maxPrivateKeyAsHexString = Hex.encodeHexString(byteBufferUtility.bigIntegerToBytes(PublicKeyBytes.MAX_PRIVATE_KEY));
         // act
         
         // assert
