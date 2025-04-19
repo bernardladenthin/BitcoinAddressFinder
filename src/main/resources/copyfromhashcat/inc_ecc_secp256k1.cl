@@ -103,7 +103,7 @@
 
 #include "inc_ecc_secp256k1.h"
 
-DECLSPEC u32 sub (u32 *r, const u32 *a, const u32 *b)
+DECLSPEC u32 sub (PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a, PRIVATE_AS const u32 *b)
 {
   u32 c = 0; // carry/borrow
 
@@ -124,7 +124,9 @@ DECLSPEC u32 sub (u32 *r, const u32 *a, const u32 *b)
     :  "r"(a[0]),  "r"(a[1]),  "r"(a[2]),  "r"(a[3]),  "r"(a[4]),  "r"(a[5]),  "r"(a[6]),  "r"(a[7]),
        "r"(b[0]),  "r"(b[1]),  "r"(b[2]),  "r"(b[3]),  "r"(b[4]),  "r"(b[5]),  "r"(b[6]),  "r"(b[7])
   );
-  #elif defined IS_AMD && HAS_VSUB == 1 && HAS_VSUBB == 1
+  // HIP doesnt support these so we stick to OpenCL (aka IS_AMD) - is also faster without asm
+  //#elif (defined IS_AMD || defined IS_HIP) && HAS_VSUB == 1 && HAS_VSUBB == 1
+  #elif 0
   __asm__ __volatile__
   (
     "V_SUB_U32   %0,  %9, %17;"
@@ -155,7 +157,7 @@ DECLSPEC u32 sub (u32 *r, const u32 *a, const u32 *b)
   return c;
 }
 
-DECLSPEC u32 add (u32 *r, const u32 *a, const u32 *b)
+DECLSPEC u32 add (PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a, PRIVATE_AS const u32 *b)
 {
   u32 c = 0; // carry/borrow
 
@@ -176,7 +178,9 @@ DECLSPEC u32 add (u32 *r, const u32 *a, const u32 *b)
     :  "r"(a[0]),  "r"(a[1]),  "r"(a[2]),  "r"(a[3]),  "r"(a[4]),  "r"(a[5]),  "r"(a[6]),  "r"(a[7]),
        "r"(b[0]),  "r"(b[1]),  "r"(b[2]),  "r"(b[3]),  "r"(b[4]),  "r"(b[5]),  "r"(b[6]),  "r"(b[7])
   );
-  #elif defined IS_AMD && HAS_VADD == 1 && HAS_VADDC == 1
+  // HIP doesnt support these so we stick to OpenCL (aka IS_AMD) - is also faster without asm
+  //#elif (defined IS_AMD || defined IS_HIP) && HAS_VSUB == 1 && HAS_VSUBB == 1
+  #elif 0
   __asm__ __volatile__
   (
     "V_ADD_U32   %0,  %9, %17;"
@@ -207,7 +211,7 @@ DECLSPEC u32 add (u32 *r, const u32 *a, const u32 *b)
   return c;
 }
 
-DECLSPEC void sub_mod (u32 *r, const u32 *a, const u32 *b)
+DECLSPEC void sub_mod (PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a, PRIVATE_AS const u32 *b)
 {
   const u32 c = sub (r, a, b); // carry
 
@@ -228,7 +232,7 @@ DECLSPEC void sub_mod (u32 *r, const u32 *a, const u32 *b)
   }
 }
 
-DECLSPEC void add_mod (u32 *r, const u32 *a, const u32 *b)
+DECLSPEC void add_mod (PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a, PRIVATE_AS const u32 *b)
 {
   const u32 c = add (r, a, b); // carry
 
@@ -274,7 +278,7 @@ DECLSPEC void add_mod (u32 *r, const u32 *a, const u32 *b)
   }
 }
 
-DECLSPEC void mod_512 (u32 *n)
+DECLSPEC void mod_512 (PRIVATE_AS u32 *n)
 {
   // we need to perform a modulo operation with 512-bit % 256-bit (bignum modulo):
   // the modulus is the secp256k1 group order
@@ -586,7 +590,7 @@ DECLSPEC void mod_512 (u32 *n)
   n[15] = a[15];
 }
 
-DECLSPEC void mul_mod (u32 *r, const u32 *a, const u32 *b) // TODO get rid of u64 ?
+DECLSPEC void mul_mod (PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a, PRIVATE_AS const u32 *b) // TODO get rid of u64 ?
 {
   u32 t[16] = { 0 }; // we need up to double the space (2 * 8)
 
@@ -739,7 +743,7 @@ DECLSPEC void mul_mod (u32 *r, const u32 *a, const u32 *b) // TODO get rid of u6
   }
 }
 
-DECLSPEC void sqrt_mod (u32 *r)
+DECLSPEC void sqrt_mod (PRIVATE_AS u32 *r)
 {
   // Fermat's Little Theorem
   // secp256k1: y^2 = x^3 + 7 % p
@@ -791,7 +795,7 @@ DECLSPEC void sqrt_mod (u32 *r)
 
 // (inverse (a, p) * a) % p == 1 (or think of a * a^-1 = a / a = 1)
 
-DECLSPEC void inv_mod (u32 *a)
+DECLSPEC void inv_mod (PRIVATE_AS u32 *a)
 {
   // How often does this really happen? it should "almost" never happen (but would be safer)
   // if ((a[0] | a[1] | a[2] | a[3] | a[4] | a[5] | a[6] | a[7]) == 0) return;
@@ -1040,7 +1044,7 @@ DECLSPEC void inv_mod (u32 *a)
   Z =  2 * y * z
 */
 
-DECLSPEC void point_double (u32 *x, u32 *y, u32 *z)
+DECLSPEC void point_double (PRIVATE_AS u32 *x, PRIVATE_AS u32 *y, PRIVATE_AS u32 *z)
 {
   // How often does this really happen? it should "almost" never happen (but would be safer)
 
@@ -1227,7 +1231,7 @@ DECLSPEC void point_double (u32 *x, u32 *y, u32 *z)
  * y3 = t3-t4
  */
 
-DECLSPEC void point_add (u32 *x1, u32 *y1, u32 *z1, u32 *x2, u32 *y2) // z2 = 1
+DECLSPEC void point_add (PRIVATE_AS u32 *x1, PRIVATE_AS u32 *y1, PRIVATE_AS u32 *z1, PRIVATE_AS const u32 *x2, PRIVATE_AS const u32 *y2) // z2 = 1
 {
   // How often does this really happen? it should "almost" never happen (but would be safer)
 
@@ -1411,7 +1415,7 @@ DECLSPEC void point_add (u32 *x1, u32 *y1, u32 *z1, u32 *x2, u32 *y2) // z2 = 1
   z1[7] = t8[7];
 }
 
-DECLSPEC void point_get_coords (secp256k1_t *r, const u32 *x, const u32 *y)
+DECLSPEC void point_get_coords (PRIVATE_AS secp256k1_t *r, PRIVATE_AS const u32 *x, PRIVATE_AS const u32 *y)
 {
   /*
     pre-compute 1/-1, 3/-3, 5/-5, 7/-7 times P (x, y)
@@ -1736,10 +1740,12 @@ DECLSPEC void point_get_coords (secp256k1_t *r, const u32 *x, const u32 *y)
  * @param k in: tweak/scalar which should be converted, a pointer to an u32 array with a size of 8.
  * @return Returns the loop start index.
  */
-DECLSPEC int convert_to_window_naf (u32 *naf, const u32 *k)
+DECLSPEC int convert_to_window_naf (PRIVATE_AS u32 *naf, PRIVATE_AS const u32 *k)
 {
   int loop_start = 0;
+
   u32 n[9];
+
   n[0] =    0; // we need this extra slot sometimes for the subtraction to work
   n[1] = k[7];
   n[2] = k[6];
@@ -1833,6 +1839,7 @@ DECLSPEC int convert_to_window_naf (u32 *naf, const u32 *k)
     n[1] = n[1] >> 1 | n[0] << 31;
     n[0] = n[0] >> 1;
   }
+
   return loop_start;
 }
 
@@ -1843,10 +1850,11 @@ DECLSPEC int convert_to_window_naf (u32 *naf, const u32 *k)
  * @param tmps in: a basepoint for the multiplication.
  * @return Returns the x coordinate with a leading parity/sign (for odd/even y), it is named a compressed coordinate.
  */
-DECLSPEC void point_mul_xy (u32 *x1, u32 *y1, const u32 *k, GLOBAL_AS const secp256k1_t *tmps)
+DECLSPEC void point_mul_xy (PRIVATE_AS u32 *x1, PRIVATE_AS u32 *y1, PRIVATE_AS const u32 *k, SECP256K1_TMPS_TYPE const secp256k1_t *tmps)
 {
   u32 naf[SECP256K1_NAF_SIZE] = { 0 };
-  int loop_start = convert_to_window_naf(naf, k);
+
+  int loop_start = convert_to_window_naf (naf, k);
 
   // first set:
 
@@ -1983,11 +1991,12 @@ DECLSPEC void point_mul_xy (u32 *x1, u32 *y1, const u32 *k, GLOBAL_AS const secp
  * @param tmps in: a basepoint for the multiplication.
  * @return Returns the x coordinate with a leading parity/sign (for odd/even y), it is named a compressed coordinate.
  */
-DECLSPEC void point_mul (u32 *r, const u32 *k, GLOBAL_AS const secp256k1_t *tmps)
+DECLSPEC void point_mul (PRIVATE_AS u32 *r, PRIVATE_AS const u32 *k, SECP256K1_TMPS_TYPE const secp256k1_t *tmps)
 {
   u32 x[8];
   u32 y[8];
-  point_mul_xy(x, y, k, tmps);
+
+  point_mul_xy (x, y, k, tmps);
 
   /*
    * output:
@@ -2015,9 +2024,9 @@ DECLSPEC void point_mul (u32 *r, const u32 *k, GLOBAL_AS const secp256k1_t *tmps
  * @param r out: x and y coordinates.
  * @param x in: x coordinate which should be converted, a pointer to an u32 array with a size of 8.
  * @param first_byte in: The parity of the y coordinate, a u32.
- * @return Returns 0 if successfull, returns 1 if x is greater than the basepoint.
+ * @return Returns 0 if successful, returns 1 if x is greater than the basepoint.
  */
-DECLSPEC u32 transform_public (secp256k1_t *r, const u32 *x, const u32 first_byte)
+DECLSPEC u32 transform_public (PRIVATE_AS secp256k1_t *r, PRIVATE_AS const u32 *x, const u32 first_byte)
 {
   u32 p[8];
 
@@ -2075,9 +2084,9 @@ DECLSPEC u32 transform_public (secp256k1_t *r, const u32 *x, const u32 first_byt
  * Parse a x coordinate with leading parity to secp256k1_t.
  * @param r out: x and y coordinates.
  * @param k in: x coordinate which should be converted with leading parity, a pointer to an u32 array with a size of 9.
- * @return Returns 0 if successfull, returns 1 if x is greater than the basepoint or the parity has an unexpected value.
+ * @return Returns 0 if successful, returns 1 if x is greater than the basepoint or the parity has an unexpected value.
  */
-DECLSPEC u32 parse_public (secp256k1_t *r, const u32 *k)
+DECLSPEC u32 parse_public (PRIVATE_AS secp256k1_t *r, PRIVATE_AS const u32 *k)
 {
   // verify:
 
@@ -2101,7 +2110,7 @@ DECLSPEC u32 parse_public (secp256k1_t *r, const u32 *k)
   x[6] = (k[1] & 0xff00) << 16 | (k[1] & 0xff0000) | (k[1] & 0xff000000) >> 16 | (k[2] & 0xff);
   x[7] = (k[0] & 0xff00) << 16 | (k[0] & 0xff0000) | (k[0] & 0xff000000) >> 16 | (k[1] & 0xff);
 
-  return transform_public(r, x, first_byte);
+  return transform_public (r, x, first_byte);
 }
 
 
@@ -2109,124 +2118,125 @@ DECLSPEC u32 parse_public (secp256k1_t *r, const u32 *k)
  * Set precomputed values of the basepoint g to a secp256k1 structure.
  * @param r out: x and y coordinates. pre-computed points: (x1,y1,-y1),(x3,y3,-y3),(x5,y5,-y5),(x7,y7,-y7)
  */
-DECLSPEC void set_precomputed_basepoint_g (secp256k1_t *r) {
-    // x1
-    r->xy[ 0] = SECP256K1_G_PRE_COMPUTED_00;
-    r->xy[ 1] = SECP256K1_G_PRE_COMPUTED_01;
-    r->xy[ 2] = SECP256K1_G_PRE_COMPUTED_02;
-    r->xy[ 3] = SECP256K1_G_PRE_COMPUTED_03;
-    r->xy[ 4] = SECP256K1_G_PRE_COMPUTED_04;
-    r->xy[ 5] = SECP256K1_G_PRE_COMPUTED_05;
-    r->xy[ 6] = SECP256K1_G_PRE_COMPUTED_06;
-    r->xy[ 7] = SECP256K1_G_PRE_COMPUTED_07;
+DECLSPEC void set_precomputed_basepoint_g (PRIVATE_AS secp256k1_t *r)
+{
+  // x1
+  r->xy[ 0] = SECP256K1_G_PRE_COMPUTED_00;
+  r->xy[ 1] = SECP256K1_G_PRE_COMPUTED_01;
+  r->xy[ 2] = SECP256K1_G_PRE_COMPUTED_02;
+  r->xy[ 3] = SECP256K1_G_PRE_COMPUTED_03;
+  r->xy[ 4] = SECP256K1_G_PRE_COMPUTED_04;
+  r->xy[ 5] = SECP256K1_G_PRE_COMPUTED_05;
+  r->xy[ 6] = SECP256K1_G_PRE_COMPUTED_06;
+  r->xy[ 7] = SECP256K1_G_PRE_COMPUTED_07;
 
-    // y1
-    r->xy[ 8] = SECP256K1_G_PRE_COMPUTED_08;
-    r->xy[ 9] = SECP256K1_G_PRE_COMPUTED_09;
-    r->xy[10] = SECP256K1_G_PRE_COMPUTED_10;
-    r->xy[11] = SECP256K1_G_PRE_COMPUTED_11;
-    r->xy[12] = SECP256K1_G_PRE_COMPUTED_12;
-    r->xy[13] = SECP256K1_G_PRE_COMPUTED_13;
-    r->xy[14] = SECP256K1_G_PRE_COMPUTED_14;
-    r->xy[15] = SECP256K1_G_PRE_COMPUTED_15;
+  // y1
+  r->xy[ 8] = SECP256K1_G_PRE_COMPUTED_08;
+  r->xy[ 9] = SECP256K1_G_PRE_COMPUTED_09;
+  r->xy[10] = SECP256K1_G_PRE_COMPUTED_10;
+  r->xy[11] = SECP256K1_G_PRE_COMPUTED_11;
+  r->xy[12] = SECP256K1_G_PRE_COMPUTED_12;
+  r->xy[13] = SECP256K1_G_PRE_COMPUTED_13;
+  r->xy[14] = SECP256K1_G_PRE_COMPUTED_14;
+  r->xy[15] = SECP256K1_G_PRE_COMPUTED_15;
 
-    // -y1
-    r->xy[16] = SECP256K1_G_PRE_COMPUTED_16;
-    r->xy[17] = SECP256K1_G_PRE_COMPUTED_17;
-    r->xy[18] = SECP256K1_G_PRE_COMPUTED_18;
-    r->xy[19] = SECP256K1_G_PRE_COMPUTED_19;
-    r->xy[20] = SECP256K1_G_PRE_COMPUTED_20;
-    r->xy[21] = SECP256K1_G_PRE_COMPUTED_21;
-    r->xy[22] = SECP256K1_G_PRE_COMPUTED_22;
-    r->xy[23] = SECP256K1_G_PRE_COMPUTED_23;
+  // -y1
+  r->xy[16] = SECP256K1_G_PRE_COMPUTED_16;
+  r->xy[17] = SECP256K1_G_PRE_COMPUTED_17;
+  r->xy[18] = SECP256K1_G_PRE_COMPUTED_18;
+  r->xy[19] = SECP256K1_G_PRE_COMPUTED_19;
+  r->xy[20] = SECP256K1_G_PRE_COMPUTED_20;
+  r->xy[21] = SECP256K1_G_PRE_COMPUTED_21;
+  r->xy[22] = SECP256K1_G_PRE_COMPUTED_22;
+  r->xy[23] = SECP256K1_G_PRE_COMPUTED_23;
 
-    // x3
-    r->xy[24] = SECP256K1_G_PRE_COMPUTED_24;
-    r->xy[25] = SECP256K1_G_PRE_COMPUTED_25;
-    r->xy[26] = SECP256K1_G_PRE_COMPUTED_26;
-    r->xy[27] = SECP256K1_G_PRE_COMPUTED_27;
-    r->xy[28] = SECP256K1_G_PRE_COMPUTED_28;
-    r->xy[29] = SECP256K1_G_PRE_COMPUTED_29;
-    r->xy[30] = SECP256K1_G_PRE_COMPUTED_30;
-    r->xy[31] = SECP256K1_G_PRE_COMPUTED_31;
+  // x3
+  r->xy[24] = SECP256K1_G_PRE_COMPUTED_24;
+  r->xy[25] = SECP256K1_G_PRE_COMPUTED_25;
+  r->xy[26] = SECP256K1_G_PRE_COMPUTED_26;
+  r->xy[27] = SECP256K1_G_PRE_COMPUTED_27;
+  r->xy[28] = SECP256K1_G_PRE_COMPUTED_28;
+  r->xy[29] = SECP256K1_G_PRE_COMPUTED_29;
+  r->xy[30] = SECP256K1_G_PRE_COMPUTED_30;
+  r->xy[31] = SECP256K1_G_PRE_COMPUTED_31;
 
-    // y3
-    r->xy[32] = SECP256K1_G_PRE_COMPUTED_32;
-    r->xy[33] = SECP256K1_G_PRE_COMPUTED_33;
-    r->xy[34] = SECP256K1_G_PRE_COMPUTED_34;
-    r->xy[35] = SECP256K1_G_PRE_COMPUTED_35;
-    r->xy[36] = SECP256K1_G_PRE_COMPUTED_36;
-    r->xy[37] = SECP256K1_G_PRE_COMPUTED_37;
-    r->xy[38] = SECP256K1_G_PRE_COMPUTED_38;
-    r->xy[39] = SECP256K1_G_PRE_COMPUTED_39;
+  // y3
+  r->xy[32] = SECP256K1_G_PRE_COMPUTED_32;
+  r->xy[33] = SECP256K1_G_PRE_COMPUTED_33;
+  r->xy[34] = SECP256K1_G_PRE_COMPUTED_34;
+  r->xy[35] = SECP256K1_G_PRE_COMPUTED_35;
+  r->xy[36] = SECP256K1_G_PRE_COMPUTED_36;
+  r->xy[37] = SECP256K1_G_PRE_COMPUTED_37;
+  r->xy[38] = SECP256K1_G_PRE_COMPUTED_38;
+  r->xy[39] = SECP256K1_G_PRE_COMPUTED_39;
 
-    // -y3
-    r->xy[40] = SECP256K1_G_PRE_COMPUTED_40;
-    r->xy[41] = SECP256K1_G_PRE_COMPUTED_41;
-    r->xy[42] = SECP256K1_G_PRE_COMPUTED_42;
-    r->xy[43] = SECP256K1_G_PRE_COMPUTED_43;
-    r->xy[44] = SECP256K1_G_PRE_COMPUTED_44;
-    r->xy[45] = SECP256K1_G_PRE_COMPUTED_45;
-    r->xy[46] = SECP256K1_G_PRE_COMPUTED_46;
-    r->xy[47] = SECP256K1_G_PRE_COMPUTED_47;
+  // -y3
+  r->xy[40] = SECP256K1_G_PRE_COMPUTED_40;
+  r->xy[41] = SECP256K1_G_PRE_COMPUTED_41;
+  r->xy[42] = SECP256K1_G_PRE_COMPUTED_42;
+  r->xy[43] = SECP256K1_G_PRE_COMPUTED_43;
+  r->xy[44] = SECP256K1_G_PRE_COMPUTED_44;
+  r->xy[45] = SECP256K1_G_PRE_COMPUTED_45;
+  r->xy[46] = SECP256K1_G_PRE_COMPUTED_46;
+  r->xy[47] = SECP256K1_G_PRE_COMPUTED_47;
 
-    // x5
-    r->xy[48] = SECP256K1_G_PRE_COMPUTED_48;
-    r->xy[49] = SECP256K1_G_PRE_COMPUTED_49;
-    r->xy[50] = SECP256K1_G_PRE_COMPUTED_50;
-    r->xy[51] = SECP256K1_G_PRE_COMPUTED_51;
-    r->xy[52] = SECP256K1_G_PRE_COMPUTED_52;
-    r->xy[53] = SECP256K1_G_PRE_COMPUTED_53;
-    r->xy[54] = SECP256K1_G_PRE_COMPUTED_54;
-    r->xy[55] = SECP256K1_G_PRE_COMPUTED_55;
+  // x5
+  r->xy[48] = SECP256K1_G_PRE_COMPUTED_48;
+  r->xy[49] = SECP256K1_G_PRE_COMPUTED_49;
+  r->xy[50] = SECP256K1_G_PRE_COMPUTED_50;
+  r->xy[51] = SECP256K1_G_PRE_COMPUTED_51;
+  r->xy[52] = SECP256K1_G_PRE_COMPUTED_52;
+  r->xy[53] = SECP256K1_G_PRE_COMPUTED_53;
+  r->xy[54] = SECP256K1_G_PRE_COMPUTED_54;
+  r->xy[55] = SECP256K1_G_PRE_COMPUTED_55;
 
-    // y5
-    r->xy[56] = SECP256K1_G_PRE_COMPUTED_56;
-    r->xy[57] = SECP256K1_G_PRE_COMPUTED_57;
-    r->xy[58] = SECP256K1_G_PRE_COMPUTED_58;
-    r->xy[59] = SECP256K1_G_PRE_COMPUTED_59;
-    r->xy[60] = SECP256K1_G_PRE_COMPUTED_60;
-    r->xy[61] = SECP256K1_G_PRE_COMPUTED_61;
-    r->xy[62] = SECP256K1_G_PRE_COMPUTED_62;
-    r->xy[63] = SECP256K1_G_PRE_COMPUTED_63;
+  // y5
+  r->xy[56] = SECP256K1_G_PRE_COMPUTED_56;
+  r->xy[57] = SECP256K1_G_PRE_COMPUTED_57;
+  r->xy[58] = SECP256K1_G_PRE_COMPUTED_58;
+  r->xy[59] = SECP256K1_G_PRE_COMPUTED_59;
+  r->xy[60] = SECP256K1_G_PRE_COMPUTED_60;
+  r->xy[61] = SECP256K1_G_PRE_COMPUTED_61;
+  r->xy[62] = SECP256K1_G_PRE_COMPUTED_62;
+  r->xy[63] = SECP256K1_G_PRE_COMPUTED_63;
 
-    // -y5
-    r->xy[64] = SECP256K1_G_PRE_COMPUTED_64;
-    r->xy[65] = SECP256K1_G_PRE_COMPUTED_65;
-    r->xy[66] = SECP256K1_G_PRE_COMPUTED_66;
-    r->xy[67] = SECP256K1_G_PRE_COMPUTED_67;
-    r->xy[68] = SECP256K1_G_PRE_COMPUTED_68;
-    r->xy[69] = SECP256K1_G_PRE_COMPUTED_69;
-    r->xy[70] = SECP256K1_G_PRE_COMPUTED_70;
-    r->xy[71] = SECP256K1_G_PRE_COMPUTED_71;
+  // -y5
+  r->xy[64] = SECP256K1_G_PRE_COMPUTED_64;
+  r->xy[65] = SECP256K1_G_PRE_COMPUTED_65;
+  r->xy[66] = SECP256K1_G_PRE_COMPUTED_66;
+  r->xy[67] = SECP256K1_G_PRE_COMPUTED_67;
+  r->xy[68] = SECP256K1_G_PRE_COMPUTED_68;
+  r->xy[69] = SECP256K1_G_PRE_COMPUTED_69;
+  r->xy[70] = SECP256K1_G_PRE_COMPUTED_70;
+  r->xy[71] = SECP256K1_G_PRE_COMPUTED_71;
 
-    // x7
-    r->xy[72] = SECP256K1_G_PRE_COMPUTED_72;
-    r->xy[73] = SECP256K1_G_PRE_COMPUTED_73;
-    r->xy[74] = SECP256K1_G_PRE_COMPUTED_74;
-    r->xy[75] = SECP256K1_G_PRE_COMPUTED_75;
-    r->xy[76] = SECP256K1_G_PRE_COMPUTED_76;
-    r->xy[77] = SECP256K1_G_PRE_COMPUTED_77;
-    r->xy[78] = SECP256K1_G_PRE_COMPUTED_78;
-    r->xy[79] = SECP256K1_G_PRE_COMPUTED_79;
+  // x7
+  r->xy[72] = SECP256K1_G_PRE_COMPUTED_72;
+  r->xy[73] = SECP256K1_G_PRE_COMPUTED_73;
+  r->xy[74] = SECP256K1_G_PRE_COMPUTED_74;
+  r->xy[75] = SECP256K1_G_PRE_COMPUTED_75;
+  r->xy[76] = SECP256K1_G_PRE_COMPUTED_76;
+  r->xy[77] = SECP256K1_G_PRE_COMPUTED_77;
+  r->xy[78] = SECP256K1_G_PRE_COMPUTED_78;
+  r->xy[79] = SECP256K1_G_PRE_COMPUTED_79;
 
-    // y7
-    r->xy[80] = SECP256K1_G_PRE_COMPUTED_80;
-    r->xy[81] = SECP256K1_G_PRE_COMPUTED_81;
-    r->xy[82] = SECP256K1_G_PRE_COMPUTED_82;
-    r->xy[83] = SECP256K1_G_PRE_COMPUTED_83;
-    r->xy[84] = SECP256K1_G_PRE_COMPUTED_84;
-    r->xy[85] = SECP256K1_G_PRE_COMPUTED_85;
-    r->xy[86] = SECP256K1_G_PRE_COMPUTED_86;
-    r->xy[87] = SECP256K1_G_PRE_COMPUTED_87;
+  // y7
+  r->xy[80] = SECP256K1_G_PRE_COMPUTED_80;
+  r->xy[81] = SECP256K1_G_PRE_COMPUTED_81;
+  r->xy[82] = SECP256K1_G_PRE_COMPUTED_82;
+  r->xy[83] = SECP256K1_G_PRE_COMPUTED_83;
+  r->xy[84] = SECP256K1_G_PRE_COMPUTED_84;
+  r->xy[85] = SECP256K1_G_PRE_COMPUTED_85;
+  r->xy[86] = SECP256K1_G_PRE_COMPUTED_86;
+  r->xy[87] = SECP256K1_G_PRE_COMPUTED_87;
 
-    // -y7
-    r->xy[88] = SECP256K1_G_PRE_COMPUTED_88;
-    r->xy[89] = SECP256K1_G_PRE_COMPUTED_89;
-    r->xy[90] = SECP256K1_G_PRE_COMPUTED_90;
-    r->xy[91] = SECP256K1_G_PRE_COMPUTED_91;
-    r->xy[92] = SECP256K1_G_PRE_COMPUTED_92;
-    r->xy[93] = SECP256K1_G_PRE_COMPUTED_93;
-    r->xy[94] = SECP256K1_G_PRE_COMPUTED_94;
-    r->xy[95] = SECP256K1_G_PRE_COMPUTED_95;
+  // -y7
+  r->xy[88] = SECP256K1_G_PRE_COMPUTED_88;
+  r->xy[89] = SECP256K1_G_PRE_COMPUTED_89;
+  r->xy[90] = SECP256K1_G_PRE_COMPUTED_90;
+  r->xy[91] = SECP256K1_G_PRE_COMPUTED_91;
+  r->xy[92] = SECP256K1_G_PRE_COMPUTED_92;
+  r->xy[93] = SECP256K1_G_PRE_COMPUTED_93;
+  r->xy[94] = SECP256K1_G_PRE_COMPUTED_94;
+  r->xy[95] = SECP256K1_G_PRE_COMPUTED_95;
 }

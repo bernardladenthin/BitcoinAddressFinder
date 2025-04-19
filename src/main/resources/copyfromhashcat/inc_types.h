@@ -3,32 +3,73 @@
  * License.....: MIT
  */
 
-#ifndef _INC_TYPES_H
-#define _INC_TYPES_H
+#ifndef INC_TYPES_H
+#define INC_TYPES_H
 
 #if ATTACK_MODE == 9
-#define SALT_POS       (pws_pos + gid)
-#define DIGESTS_CNT    1
-#define DIGESTS_OFFSET (pws_pos + gid)
+#define BITMAP_MASK         kernel_param->bitmap_mask
+#define BITMAP_SHIFT1       kernel_param->bitmap_shift1
+#define BITMAP_SHIFT2       kernel_param->bitmap_shift2
+#define SALT_POS_HOST       (kernel_param->pws_pos + gid)
+#define LOOP_POS            kernel_param->loop_pos
+#define LOOP_CNT            kernel_param->loop_cnt
+#define IL_CNT              kernel_param->il_cnt
+#define DIGESTS_CNT         1
+#define DIGESTS_OFFSET_HOST (kernel_param->pws_pos + gid)
+#define COMBS_MODE          kernel_param->combs_mode
+#define SALT_REPEAT         kernel_param->salt_repeat
+#define PWS_POS             kernel_param->pws_pos
+#define GID_CNT             kernel_param->gid_max
 #else
-#define SALT_POS       salt_pos_host
-#define DIGESTS_CNT    digests_cnt_host
-#define DIGESTS_OFFSET digests_offset_host
+#define BITMAP_MASK         kernel_param->bitmap_mask
+#define BITMAP_SHIFT1       kernel_param->bitmap_shift1
+#define BITMAP_SHIFT2       kernel_param->bitmap_shift2
+#define SALT_POS_HOST       kernel_param->salt_pos_host
+#define LOOP_POS            kernel_param->loop_pos
+#define LOOP_CNT            kernel_param->loop_cnt
+#define IL_CNT              kernel_param->il_cnt
+#define DIGESTS_CNT         kernel_param->digests_cnt
+#define DIGESTS_OFFSET_HOST kernel_param->digests_offset_host
+#define COMBS_MODE          kernel_param->combs_mode
+#define SALT_REPEAT         kernel_param->salt_repeat
+#define PWS_POS             kernel_param->pws_pos
+#define GID_CNT             kernel_param->gid_max
 #endif
 
 #ifdef IS_CUDA
-//https://docs.nvidia.com/cuda/nvrtc/index.html#integer-size
-typedef unsigned char      uchar;
-typedef unsigned short     ushort;
-typedef unsigned int       uint;
-typedef unsigned long long ulong;
+// https://docs.nvidia.com/cuda/nvrtc/index.html#integer-size
+typedef unsigned char       uchar;
+typedef unsigned short      ushort;
+typedef unsigned int        uint;
+typedef unsigned long       ulong;
+typedef unsigned long long  ullong;
+#endif
+
+#ifdef IS_METAL
+typedef unsigned char  uchar;
+typedef unsigned short ushort;
+typedef unsigned int   uint;
+typedef unsigned long  ulong;
+#define ullong ulong
+#endif
+
+#ifdef IS_OPENCL
+typedef ulong   ullong;
+typedef ulong2  ullong2;
+typedef ulong4  ullong4;
+typedef ulong8  ullong8;
+typedef ulong16 ullong16;
 #endif
 
 #ifdef KERNEL_STATIC
 typedef uchar  u8;
 typedef ushort u16;
 typedef uint   u32;
+#ifdef IS_METAL
 typedef ulong  u64;
+#else
+typedef ullong u64;
+#endif
 #else
 typedef uint8_t  u8;
 typedef uint16_t u16;
@@ -68,7 +109,17 @@ typedef u64  u64x;
 #define make_u64x (u64)
 
 #else
-#ifdef IS_CUDA
+
+#if defined IS_CUDA || defined IS_HIP
+
+#ifndef __device_builtin__
+#define __device_builtin__
+#endif
+
+#ifndef __builtin_align__
+#define __builtin_align__(x)
+#endif
+
 
 #if VECT_SIZE == 2
 
@@ -825,15 +876,22 @@ typedef __device_builtin__ struct u64x u64x;
 #define make_u64x u64x
 
 #else
-typedef VTYPE(uchar,  VECT_SIZE)  u8x;
+typedef VTYPE(uchar,  VECT_SIZE) u8x;
 typedef VTYPE(ushort, VECT_SIZE) u16x;
 typedef VTYPE(uint,   VECT_SIZE) u32x;
-typedef VTYPE(ulong,  VECT_SIZE) u64x;
+typedef VTYPE(ullong, VECT_SIZE) u64x;
 
+#ifndef IS_METAL
 #define make_u8x  (u8x)
 #define make_u16x (u16x)
 #define make_u32x (u32x)
 #define make_u64x (u64x)
+#else
+#define make_u8x  u8x
+#define make_u16x u16x
+#define make_u32x u32x
+#define make_u64x u64x
+#endif
 
 #endif
 #endif
@@ -1617,6 +1675,99 @@ typedef enum blake2b_constants
 
 } blake2b_constants_t;
 
+typedef enum blake2s_constants
+{
+  BLAKE2S_IV_00=0x6a09e667,
+  BLAKE2S_IV_01=0xbb67ae85,
+  BLAKE2S_IV_02=0x3c6ef372,
+  BLAKE2S_IV_03=0xa54ff53a,
+  BLAKE2S_IV_04=0x510e527f,
+  BLAKE2S_IV_05=0x9b05688c,
+  BLAKE2S_IV_06=0x1f83d9ab,
+  BLAKE2S_IV_07=0x5be0cd19
+
+} blake2s_constants_t;
+
+typedef enum sm3_constants
+{
+  // SM3 Initial Hash Values
+  SM3_IV_A=0x7380166fUL,
+  SM3_IV_B=0x4914b2b9UL,
+  SM3_IV_C=0x172442d7UL,
+  SM3_IV_D=0xda8a0600UL,
+  SM3_IV_E=0xa96f30bcUL,
+  SM3_IV_F=0x163138aaUL,
+  SM3_IV_G=0xe38dee4dUL,
+  SM3_IV_H=0xb0fb0e4eUL,
+
+  // SM3 Tj round constants
+  SM3_T00=0x79CC4519UL,
+  SM3_T01=0xF3988A32UL,
+  SM3_T02=0xE7311465UL,
+  SM3_T03=0xCE6228CBUL,
+  SM3_T04=0x9CC45197UL,
+  SM3_T05=0x3988A32FUL,
+  SM3_T06=0x7311465EUL,
+  SM3_T07=0xE6228CBCUL,
+  SM3_T08=0xCC451979UL,
+  SM3_T09=0x988A32F3UL,
+  SM3_T10=0x311465E7UL,
+  SM3_T11=0x6228CBCEUL,
+  SM3_T12=0xC451979CUL,
+  SM3_T13=0x88A32F39UL,
+  SM3_T14=0x11465E73UL,
+  SM3_T15=0x228CBCE6UL,
+  SM3_T16=0x9D8A7A87UL,
+  SM3_T17=0x3B14F50FUL,
+  SM3_T18=0x7629EA1EUL,
+  SM3_T19=0xEC53D43CUL,
+  SM3_T20=0xD8A7A879UL,
+  SM3_T21=0xB14F50F3UL,
+  SM3_T22=0x629EA1E7UL,
+  SM3_T23=0xC53D43CEUL,
+  SM3_T24=0x8A7A879DUL,
+  SM3_T25=0x14F50F3BUL,
+  SM3_T26=0x29EA1E76UL,
+  SM3_T27=0x53D43CECUL,
+  SM3_T28=0xA7A879D8UL,
+  SM3_T29=0x4F50F3B1UL,
+  SM3_T30=0x9EA1E762UL,
+  SM3_T31=0x3D43CEC5UL,
+  SM3_T32=0x7A879D8AUL,
+  SM3_T33=0xF50F3B14UL,
+  SM3_T34=0xEA1E7629UL,
+  SM3_T35=0xD43CEC53UL,
+  SM3_T36=0xA879D8A7UL,
+  SM3_T37=0x50F3B14FUL,
+  SM3_T38=0xA1E7629EUL,
+  SM3_T39=0x43CEC53DUL,
+  SM3_T40=0x879D8A7AUL,
+  SM3_T41=0x0F3B14F5UL,
+  SM3_T42=0x1E7629EAUL,
+  SM3_T43=0x3CEC53D4UL,
+  SM3_T44=0x79D8A7A8UL,
+  SM3_T45=0xF3B14F50UL,
+  SM3_T46=0xE7629EA1UL,
+  SM3_T47=0xCEC53D43UL,
+  SM3_T48=0x9D8A7A87UL,
+  SM3_T49=0x3B14F50FUL,
+  SM3_T50=0x7629EA1EUL,
+  SM3_T51=0xEC53D43CUL,
+  SM3_T52=0xD8A7A879UL,
+  SM3_T53=0xB14F50F3UL,
+  SM3_T54=0x629EA1E7UL,
+  SM3_T55=0xC53D43CEUL,
+  SM3_T56=0x8A7A879DUL,
+  SM3_T57=0x14F50F3BUL,
+  SM3_T58=0x29EA1E76UL,
+  SM3_T59=0x53D43CECUL,
+  SM3_T60=0xA7A879D8UL,
+  SM3_T61=0x4F50F3B1UL,
+  SM3_T62=0x9EA1E762UL,
+  SM3_T63=0x3D43CEC5UL
+
+} sm3_constants_t;
+
 typedef enum combinator_mode
 {
   COMBINATOR_MODE_BASE_LEFT  = 10001,
@@ -1631,6 +1782,26 @@ typedef struct digest
 
 } digest_t;
 #endif
+
+typedef struct kernel_param
+{
+  // We can only move attributes into this struct which do not use special declarations like __global
+
+  u32 bitmap_mask;          // 24
+  u32 bitmap_shift1;        // 25
+  u32 bitmap_shift2;        // 26
+  u32 salt_pos_host;        // 27
+  u32 loop_pos;             // 28
+  u32 loop_cnt;             // 29
+  u32 il_cnt;               // 30
+  u32 digests_cnt;          // 31
+  u32 digests_offset_host;  // 32
+  u32 combs_mode;           // 33
+  u32 salt_repeat;          // 34
+  u64 pws_pos;              // 35
+  u64 gid_max;              // 36
+
+} kernel_param_t;
 
 typedef struct salt
 {

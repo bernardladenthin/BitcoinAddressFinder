@@ -21,38 +21,157 @@ k_local[0] = 0x929f72dc;
 */
 
 /**
- * Loads the base point G in standard big-endian format (X coordinate only).
+ * @brief
+ * Precomputed multiples of the base point G used in wNAF-based scalar multiplication.
  *
- * @param g A pointer to an array of 8 u32 elements where the X coordinate of the base point G will be stored.
+ * This table includes:
+ * - ±1·G, ±3·G, ±5·G, ±7·G (total: 8 point pairs)
+ * - Each point consists of (x, y) coordinates, 256 bits each
+ * - For each y, the negative value is precomputed as well
+ *
+ * Memory layout:
+ * - 4 window values (±1, ±3, ±5, ±7)
+ * - 8 points × 2 coordinates (x, y) = 16 × 32 bytes = 512 bytes
+ * - Each coordinate consists of 8 × u32 = 256 bits
+ * - 8 (x) + 8 (y) + 8 (–y) = 24 coordinates per point (for sign flipping)
+ * - Total: 96 × 4 bytes = **384 bytes** for each coordinate
+ * - Overall memory usage: 96 × 4 = **384 bytes**
+ *
+ * This constant fits well into the GPU’s __constant memory space (64 KB on RTX 3090)
+ * and benefits from fast broadcast access across all threads in a workgroup.
+ *
+ * Note:
+ * Using __constant ensures:
+ * - Reduced register pressure
+ * - No redundant memory transfers per thread
+ * - Better caching performance vs. global memory
+ *
+ * This allows thousands of threads to reuse the same precomputed data efficiently,
+ * which is crucial in large scalar multiplication kernels on GPGPU.
  */
-inline void load_basepoint_x_only(u32 *g) {
-    g[0] = SECP256K1_G0;
-    g[1] = SECP256K1_G1;
-    g[2] = SECP256K1_G2;
-    g[3] = SECP256K1_G3;
-    g[4] = SECP256K1_G4;
-    g[5] = SECP256K1_G5;
-    g[6] = SECP256K1_G6;
-    g[7] = SECP256K1_G7;
-}
+__constant secp256k1_t g_precomputed = {
+    .xy = {
+        // x1
+        SECP256K1_G_PRE_COMPUTED_00,
+        SECP256K1_G_PRE_COMPUTED_01,
+        SECP256K1_G_PRE_COMPUTED_02,
+        SECP256K1_G_PRE_COMPUTED_03,
+        SECP256K1_G_PRE_COMPUTED_04,
+        SECP256K1_G_PRE_COMPUTED_05,
+        SECP256K1_G_PRE_COMPUTED_06,
+        SECP256K1_G_PRE_COMPUTED_07,
 
-/**
- * Loads the base point G with byte-reversed X coordinate and appended parity byte.
- * This format is used for compressed public key parsing.
- *
- * @param g A pointer to an array of 9 u32 elements where the byte-reversed X coordinate and parity of G will be stored.
- */
-inline void load_basepoint_x_byte_reversed_with_parity(u32 *g) {
-    g[0] = SECP256K1_G_STRING0;
-    g[1] = SECP256K1_G_STRING1;
-    g[2] = SECP256K1_G_STRING2;
-    g[3] = SECP256K1_G_STRING3;
-    g[4] = SECP256K1_G_STRING4;
-    g[5] = SECP256K1_G_STRING5;
-    g[6] = SECP256K1_G_STRING6;
-    g[7] = SECP256K1_G_STRING7;
-    g[8] = SECP256K1_G_STRING8;
-}
+        // y1
+        SECP256K1_G_PRE_COMPUTED_08,
+        SECP256K1_G_PRE_COMPUTED_09,
+        SECP256K1_G_PRE_COMPUTED_10,
+        SECP256K1_G_PRE_COMPUTED_11,
+        SECP256K1_G_PRE_COMPUTED_12,
+        SECP256K1_G_PRE_COMPUTED_13,
+        SECP256K1_G_PRE_COMPUTED_14,
+        SECP256K1_G_PRE_COMPUTED_15,
+
+        // -y1
+        SECP256K1_G_PRE_COMPUTED_16,
+        SECP256K1_G_PRE_COMPUTED_17,
+        SECP256K1_G_PRE_COMPUTED_18,
+        SECP256K1_G_PRE_COMPUTED_19,
+        SECP256K1_G_PRE_COMPUTED_20,
+        SECP256K1_G_PRE_COMPUTED_21,
+        SECP256K1_G_PRE_COMPUTED_22,
+        SECP256K1_G_PRE_COMPUTED_23,
+
+        // x3
+        SECP256K1_G_PRE_COMPUTED_24,
+        SECP256K1_G_PRE_COMPUTED_25,
+        SECP256K1_G_PRE_COMPUTED_26,
+        SECP256K1_G_PRE_COMPUTED_27,
+        SECP256K1_G_PRE_COMPUTED_28,
+        SECP256K1_G_PRE_COMPUTED_29,
+        SECP256K1_G_PRE_COMPUTED_30,
+        SECP256K1_G_PRE_COMPUTED_31,
+
+        // y3
+        SECP256K1_G_PRE_COMPUTED_32,
+        SECP256K1_G_PRE_COMPUTED_33,
+        SECP256K1_G_PRE_COMPUTED_34,
+        SECP256K1_G_PRE_COMPUTED_35,
+        SECP256K1_G_PRE_COMPUTED_36,
+        SECP256K1_G_PRE_COMPUTED_37,
+        SECP256K1_G_PRE_COMPUTED_38,
+        SECP256K1_G_PRE_COMPUTED_39,
+
+        // -y3
+        SECP256K1_G_PRE_COMPUTED_40,
+        SECP256K1_G_PRE_COMPUTED_41,
+        SECP256K1_G_PRE_COMPUTED_42,
+        SECP256K1_G_PRE_COMPUTED_43,
+        SECP256K1_G_PRE_COMPUTED_44,
+        SECP256K1_G_PRE_COMPUTED_45,
+        SECP256K1_G_PRE_COMPUTED_46,
+        SECP256K1_G_PRE_COMPUTED_47,
+
+        // x5
+        SECP256K1_G_PRE_COMPUTED_48,
+        SECP256K1_G_PRE_COMPUTED_49,
+        SECP256K1_G_PRE_COMPUTED_50,
+        SECP256K1_G_PRE_COMPUTED_51,
+        SECP256K1_G_PRE_COMPUTED_52,
+        SECP256K1_G_PRE_COMPUTED_53,
+        SECP256K1_G_PRE_COMPUTED_54,
+        SECP256K1_G_PRE_COMPUTED_55,
+
+        // y5
+        SECP256K1_G_PRE_COMPUTED_56,
+        SECP256K1_G_PRE_COMPUTED_57,
+        SECP256K1_G_PRE_COMPUTED_58,
+        SECP256K1_G_PRE_COMPUTED_59,
+        SECP256K1_G_PRE_COMPUTED_60,
+        SECP256K1_G_PRE_COMPUTED_61,
+        SECP256K1_G_PRE_COMPUTED_62,
+        SECP256K1_G_PRE_COMPUTED_63,
+
+        // -y5
+        SECP256K1_G_PRE_COMPUTED_64,
+        SECP256K1_G_PRE_COMPUTED_65,
+        SECP256K1_G_PRE_COMPUTED_66,
+        SECP256K1_G_PRE_COMPUTED_67,
+        SECP256K1_G_PRE_COMPUTED_68,
+        SECP256K1_G_PRE_COMPUTED_69,
+        SECP256K1_G_PRE_COMPUTED_70,
+        SECP256K1_G_PRE_COMPUTED_71,
+
+        // x7
+        SECP256K1_G_PRE_COMPUTED_72,
+        SECP256K1_G_PRE_COMPUTED_73,
+        SECP256K1_G_PRE_COMPUTED_74,
+        SECP256K1_G_PRE_COMPUTED_75,
+        SECP256K1_G_PRE_COMPUTED_76,
+        SECP256K1_G_PRE_COMPUTED_77,
+        SECP256K1_G_PRE_COMPUTED_78,
+        SECP256K1_G_PRE_COMPUTED_79,
+
+        // y7
+        SECP256K1_G_PRE_COMPUTED_80,
+        SECP256K1_G_PRE_COMPUTED_81,
+        SECP256K1_G_PRE_COMPUTED_82,
+        SECP256K1_G_PRE_COMPUTED_83,
+        SECP256K1_G_PRE_COMPUTED_84,
+        SECP256K1_G_PRE_COMPUTED_85,
+        SECP256K1_G_PRE_COMPUTED_86,
+        SECP256K1_G_PRE_COMPUTED_87,
+
+        // -y7
+        SECP256K1_G_PRE_COMPUTED_88,
+        SECP256K1_G_PRE_COMPUTED_89,
+        SECP256K1_G_PRE_COMPUTED_90,
+        SECP256K1_G_PRE_COMPUTED_91,
+        SECP256K1_G_PRE_COMPUTED_92,
+        SECP256K1_G_PRE_COMPUTED_93,
+        SECP256K1_G_PRE_COMPUTED_94,
+        SECP256K1_G_PRE_COMPUTED_95
+    }
+};
 
 /**
  * Copies 8 u32 values from source to destination.
@@ -125,89 +244,6 @@ inline void copy_xy_to_r(u32 *r, int offset, u32 *x, u32 *y) {
 }
 
 /*
- * Generate a public key from a private key.
- * @param r out: x coordinate with leading parity, a pointer to an u32 array with a size of 9.
- * @param k in: scalar to multiply the basepoint, a pointer to an u32 array with a size of 8.
- */
-__kernel void generateKeysKernel_parse_public(__global u32 *r, __global const u32 *k)
-{
-    u32 g_local[PUBLIC_KEY_LENGTH_WITH_PARITY];
-    u32 r_local[PUBLIC_KEY_LENGTH_WITH_PARITY];
-    u32 k_local[PRIVATE_KEY_LENGTH];
-    secp256k1_t g_xy_local;
-    u32 return_value;
-
-    load_basepoint_x_byte_reversed_with_parity(g_local);
-
-    // global to local
-    copy_u32_array_8(k_local, k);
-    
-    return_value = parse_public(&g_xy_local, g_local);
-    if (return_value != 0) {
-        return;
-    }
-    
-    point_mul(r_local, k_local, &g_xy_local);
-
-    // local to global
-    copy_u32_array_9(r, r_local);
-}
-
-/*
- * Generate a secp256k1_t struct for the public point. pre-computed points: (x1,y1,-y1),(x3,y3,-y3),(x5,y5,-y5),(x7,y7,-y7).
- * @param r out: secp256k1_t structure, a pointer to an u32 array with a size of 96 (SECP256K1_PRE_COMPUTED_XY_SIZE).
- */
-__kernel void get_precalculated_g(__global u32 *r)
-{
-    u32 g_local[PUBLIC_KEY_LENGTH_WITHOUT_PARITY];
-    secp256k1_t g_xy_local;
-    const u32 g_parity = SECP256K1_G_PARITY;
-    u32 return_value;
-
-    load_basepoint_x_only(g_local);
-    
-    return_value = transform_public(&g_xy_local, g_local, g_parity);
-    
-    if (return_value != 0) {
-        return;
-    }
-    
-    for(int i=0; i<SECP256K1_PRE_COMPUTED_XY_SIZE; i++) {
-        r[i] = g_xy_local.xy[i];
-    }
-}
-
-/*
- * Compute public key by multiplying private key with base point G.
- * Uses uncompressed G (X + parity) and stores compressed public key (X + parity).
- */
-__kernel void generateKeysKernel_transform_public(__global u32 *r, __global const u32 *k)
-{
-    u32 g_local[PUBLIC_KEY_LENGTH_WITHOUT_PARITY];
-    u32 r_local[PUBLIC_KEY_LENGTH_WITH_PARITY];
-    u32 k_local[PRIVATE_KEY_LENGTH];
-    secp256k1_t g_xy_local;
-    const u32 g_parity = SECP256K1_G_PARITY;
-    u32 return_value;
-
-    load_basepoint_x_only(g_local);
-
-    // global to local
-    copy_u32_array_8(k_local, k);
-    
-    return_value = transform_public(&g_xy_local, g_local, g_parity);
-    
-    if (return_value != 0) {
-        return;
-    }
-    
-    point_mul(r_local, k_local, &g_xy_local);
-
-    // local to global
-    copy_u32_array_9(r, r_local);
-}
-
-/*
  * Compute public key grid by varying private key's LSB using global_id.
  * Uses precomputed G and stores (X, Y) coordinates for each result.
  */
@@ -216,7 +252,6 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
     u32 x_local[PUBLIC_KEY_LENGTH_WITHOUT_PARITY];
     u32 y_local[PUBLIC_KEY_LENGTH_WITHOUT_PARITY];
     u32 k_local[PRIVATE_KEY_LENGTH];
-    secp256k1_t g_xy_local;
 
     // get_global_id(dim) where dim is the dimension index (0 for first, 1 for second dimension etc.)
     // The above call is equivalent to get_local_size(dim)*get_group_id(dim) + get_local_id(dim)
@@ -232,16 +267,10 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
     // Apply variation (global_id) to LSB part of key (k[0])
     k_local[0] |= global_id;
 
-    set_precomputed_basepoint_g(&g_xy_local);
-
-    point_mul_xy(x_local, y_local, k_local, &g_xy_local);
+    point_mul_xy(x_local, y_local, k_local, &g_precomputed);
 
     // local to global
     int r_offset = PUBLIC_KEY_LENGTH_X_Y_WITHOUT_PARITY * global_id;
 
     copy_xy_to_r(r, r_offset, x_local, y_local);
-}
-
-__kernel void test_kernel_do_nothing(__global u32 *r, __global const u32 *k)
-{
 }

@@ -61,7 +61,6 @@ public class OpenCLContext {
         for (String content : resourceNamesContent) {
             String contentWithReplacements = content;
             contentWithReplacements = contentWithReplacements.replaceAll("#include.*", "");
-            contentWithReplacements = contentWithReplacements.replaceAll("GLOBAL_AS const secp256k1_t \\*tmps", "const secp256k1_t \\*tmps");
             resourceNamesContentWithReplacements.add(contentWithReplacements);
         }
         String[] openClPrograms = resourceNamesContentWithReplacements.toArray(new String[0]);
