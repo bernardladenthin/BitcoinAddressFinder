@@ -27,7 +27,6 @@ import java.math.BigInteger;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import org.apache.commons.io.FileUtils;
 import org.junit.Before;
 import org.junit.Rule;
@@ -410,7 +409,7 @@ public class ProbeAddressesOpenCLTest {
         OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
         openCLContext.init();
         
-        Random sr = new SecureRandom();
+        Random sr = new Random(1337);
         BigInteger secret = keyUtility.createSecret(bitSize, sr);
         BigInteger secretBase = keyUtility.killBits(secret, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
         
@@ -431,7 +430,7 @@ public class ProbeAddressesOpenCLTest {
         OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
         openCLContext.init();
         
-        Random sr = new SecureRandom();
+        Random sr = new Random(1337);
         BigInteger secret = keyUtility.createSecret(BITS_FOR_BATCH-1, sr);
         BigInteger secretBase = keyUtility.killBits(secret, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
         
@@ -472,7 +471,7 @@ public class ProbeAddressesOpenCLTest {
         OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
         openCLContext.init();
         
-        Random sr = new SecureRandom();
+        Random sr = new Random(1337);
         BigInteger secretKeyBase = keyUtility.createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, sr);
         
         BigInteger secretBase = keyUtility.killBits(secretKeyBase, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
