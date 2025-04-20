@@ -32,11 +32,12 @@ import org.junit.Before;
 import org.junit.Test;
 import org.bitcoinj.crypto.MnemonicCode;
 import org.bitcoinj.crypto.MnemonicException;
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
 import org.junit.Ignore;
 import org.junit.runner.RunWith;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
 
 @RunWith(DataProviderRunner.class)
 public class KeyUtilityTest {
@@ -455,5 +456,5 @@ public class KeyUtilityTest {
     }
 
     // </editor-fold>
-
+    
 }

@@ -23,7 +23,6 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -186,51 +185,17 @@ public class ConsumerJava implements Consumer {
                 if (publicKeyBytes.isOutsidePrivateKeyRange()) {
                     continue;
                 }
+                
                 byte[] hash160Uncompressed = publicKeyBytes.getUncompressedKeyHash();
-
-                threadLocalReuseableByteBuffer.rewind();
-                threadLocalReuseableByteBuffer.put(hash160Uncompressed);
-                threadLocalReuseableByteBuffer.flip();
-
-                boolean containsAddressUncompressed = containsAddress(threadLocalReuseableByteBuffer);
-
+                boolean containsAddressUncompressed = containsAddress(threadLocalReuseableByteBuffer, hash160Uncompressed);
+                
                 byte[] hash160Compressed = publicKeyBytes.getCompressedKeyHash();
-                threadLocalReuseableByteBuffer.rewind();
-                threadLocalReuseableByteBuffer.put(hash160Compressed);
-                threadLocalReuseableByteBuffer.flip();
-
-                boolean containsAddressCompressed = containsAddress(threadLocalReuseableByteBuffer);
-
+                boolean containsAddressCompressed = containsAddress(threadLocalReuseableByteBuffer, hash160Compressed);
+                
                 if (consumerJava.runtimePublicKeyCalculationCheck) {
-                    
-                    ECKey fromPrivateUncompressed = ECKey.fromPrivate(publicKeyBytes.getSecretKey(), false);
-                    ECKey fromPrivateCompressed = ECKey.fromPrivate(publicKeyBytes.getSecretKey(), true);
-                    
-                    final byte[] pubKeyUncompressedFromEcKey = fromPrivateUncompressed.getPubKey();
-                    final byte[] pubKeyCompressedFromEcKey = fromPrivateCompressed.getPubKey();
-                    
-                    final byte[] hash160UncompressedFromEcKey = fromPrivateUncompressed.getPubKeyHash();
-                    final byte[] hash160CompressedFromEcKey = fromPrivateCompressed.getPubKeyHash();
-                    
-                    if (!Arrays.equals(hash160UncompressedFromEcKey, hash160Uncompressed)) {
-                        logger.error("fromPrivateUncompressed.getPubKeyHash() != hash160Uncompressed");
-                        logger.error("getSecretKey: " + publicKeyBytes.getSecretKey());
-                        logger.error("pubKeyUncompressed: " + Hex.encodeHexString(publicKeyBytes.getUncompressed()));
-                        logger.error("pubKeyUncompressedFromEcKey: " + Hex.encodeHexString(pubKeyUncompressedFromEcKey));
-                        logger.error("hash160Uncompressed: " + Hex.encodeHexString(hash160Uncompressed));
-                        logger.error("hash160UncompressedFromEcKey: " + Hex.encodeHexString(hash160UncompressedFromEcKey));
-                    }
-                    
-                    if (!Arrays.equals(hash160CompressedFromEcKey, hash160Compressed)) {
-                        logger.error("fromPrivateCompressed.getPubKeyHash() != hash160Compressed");
-                        logger.error("getSecretKey: " + publicKeyBytes.getSecretKey());
-                        logger.error("pubKeyCompressed: " + Hex.encodeHexString(publicKeyBytes.getCompressed()));
-                        logger.error("pubKeyCompressedFromEcKey: " + Hex.encodeHexString(pubKeyCompressedFromEcKey));
-                        logger.error("hash160Compressed: " + Hex.encodeHexString(hash160Compressed));
-                        logger.error("hash160CompressedFromEcKey: " + Hex.encodeHexString(hash160CompressedFromEcKey));
-                    }
+                    publicKeyBytes.runtimePublicKeyCalculationCheck(logger);
                 }
-
+                
                 if (containsAddressUncompressed) {
                     // immediately log the secret
                     safeLog(publicKeyBytes, hash160Uncompressed, hash160Compressed);
@@ -287,6 +252,13 @@ public class ConsumerJava implements Consumer {
             }
             publicKeyBytesArray = keysQueue.poll();
         }
+    }
+
+    public boolean containsAddress(ByteBuffer threadLocalReuseableByteBuffer, byte[] hash160) {
+        threadLocalReuseableByteBuffer.rewind();
+        threadLocalReuseableByteBuffer.put(hash160);
+        threadLocalReuseableByteBuffer.flip();
+        return containsAddress(threadLocalReuseableByteBuffer);
     }
     
     /**

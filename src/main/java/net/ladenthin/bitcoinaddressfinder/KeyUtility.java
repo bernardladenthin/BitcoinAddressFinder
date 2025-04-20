@@ -32,6 +32,7 @@ import org.bitcoinj.crypto.MnemonicCode;
 import org.bitcoinj.crypto.MnemonicException;
 import org.bouncycastle.util.encoders.Hex;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
 
 /**
  * https://stackoverflow.com/questions/5399798/byte-array-and-int-conversion-in-java/11419863

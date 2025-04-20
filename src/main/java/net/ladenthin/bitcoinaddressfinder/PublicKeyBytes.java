@@ -20,12 +20,14 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import com.google.common.hash.Hashing;
 import java.math.BigInteger;
+import java.util.Arrays;
 import java.util.Objects;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.bitcoinj.core.Utils;
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.internal.CryptoUtils;
 import org.bouncycastle.crypto.digests.RIPEMD160Digest;
+import org.slf4j.Logger;
 
 public class PublicKeyBytes {
     
@@ -257,6 +259,41 @@ public class PublicKeyBytes {
             compressedKeyHashBase58 = keyUtility.toBase58(getUncompressedKeyHash());
         }
         return compressedKeyHashBase58;
+    }
+    
+    public boolean runtimePublicKeyCalculationCheck(Logger logger) {
+        byte[] hash160Uncompressed = getUncompressedKeyHash();
+        byte[] hash160Compressed = getCompressedKeyHash();
+        ECKey fromPrivateUncompressed = ECKey.fromPrivate(getSecretKey(), false);
+        ECKey fromPrivateCompressed = ECKey.fromPrivate(getSecretKey(), true);
+        
+        final byte[] pubKeyUncompressedFromEcKey = fromPrivateUncompressed.getPubKey();
+        final byte[] pubKeyCompressedFromEcKey = fromPrivateCompressed.getPubKey();
+        
+        final byte[] hash160UncompressedFromEcKey = fromPrivateUncompressed.getPubKeyHash();
+        final byte[] hash160CompressedFromEcKey = fromPrivateCompressed.getPubKeyHash();
+        
+        boolean isValid = true;
+        if (!Arrays.equals(hash160UncompressedFromEcKey, hash160Uncompressed)) {
+            logger.error("fromPrivateUncompressed.getPubKeyHash() != hash160Uncompressed");
+            logger.error("getSecretKey: " + getSecretKey());
+            logger.error("pubKeyUncompressed: " + org.apache.commons.codec.binary.Hex.encodeHexString(getUncompressed()));
+            logger.error("pubKeyUncompressedFromEcKey: " + org.apache.commons.codec.binary.Hex.encodeHexString(pubKeyUncompressedFromEcKey));
+            logger.error("hash160Uncompressed: " + org.apache.commons.codec.binary.Hex.encodeHexString(hash160Uncompressed));
+            logger.error("hash160UncompressedFromEcKey: " + org.apache.commons.codec.binary.Hex.encodeHexString(hash160UncompressedFromEcKey));
+            isValid = false;
+        }
+        
+        if (!Arrays.equals(hash160CompressedFromEcKey, hash160Compressed)) {
+            logger.error("fromPrivateCompressed.getPubKeyHash() != hash160Compressed");
+            logger.error("getSecretKey: " + getSecretKey());
+            logger.error("pubKeyCompressed: " + org.apache.commons.codec.binary.Hex.encodeHexString(getCompressed()));
+            logger.error("pubKeyCompressedFromEcKey: " + org.apache.commons.codec.binary.Hex.encodeHexString(pubKeyCompressedFromEcKey));
+            logger.error("hash160Compressed: " + org.apache.commons.codec.binary.Hex.encodeHexString(hash160Compressed));
+            logger.error("hash160CompressedFromEcKey: " + org.apache.commons.codec.binary.Hex.encodeHexString(hash160CompressedFromEcKey));
+            isValid = false;
+        }
+        return isValid;
     }
 
     // <editor-fold defaultstate="collapsed" desc="Overrides: hashCode, equals, toString">

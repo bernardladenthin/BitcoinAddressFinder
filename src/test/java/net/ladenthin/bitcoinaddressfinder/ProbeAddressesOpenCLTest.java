@@ -48,10 +48,12 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.everyItem;
+import static org.mockito.Mockito.mock;
 
 import org.jocl.*;
 import org.junit.Ignore;
 import org.junit.runner.RunWith;
+import org.slf4j.Logger;
 
 @RunWith(DataProviderRunner.class)
 public class ProbeAddressesOpenCLTest {
@@ -596,7 +598,21 @@ public class ProbeAddressesOpenCLTest {
         assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
     }
 
+    private static void assertAllRuntimePublicKeyCalculationsValid(PublicKeyBytes[] publicKeys, Logger logger) {
+        for (int i = 0; i < publicKeys.length; i++) {
+            assertRuntimePublicKeyCalculationValid(publicKeys[i], logger);
+        }
+    }
+
+    private static void assertRuntimePublicKeyCalculationValid(PublicKeyBytes publicKeyBytes, Logger logger) {
+        boolean valid = publicKeyBytes.runtimePublicKeyCalculationCheck(logger);
+        assertThat("runtimePublicKeyCalculationCheck failed for secretKey: " + publicKeyBytes.getSecretKey(), valid, is(true));
+    }
+
     private static void assertPublicKeyBytesCalculatedCorrect(PublicKeyBytes[] publicKeys, BigInteger secretBase, final boolean souts, KeyUtility keyUtility) {
+        Logger logger = mock(Logger.class);
+        assertAllRuntimePublicKeyCalculationsValid(publicKeys, logger);
+        
         for (int i = 0; i < publicKeys.length; i++) {
             if (i%10_000 == 0) {
                 if(souts) System.out.println("progress: " + i);
