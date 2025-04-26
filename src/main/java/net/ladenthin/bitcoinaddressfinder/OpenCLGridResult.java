@@ -20,8 +20,22 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 
 public class OpenCLGridResult {
+    
+    /**
+     * Enable additional validation to check if generated uncompressed keys are not all zero.
+     * <p>
+     * This should remain <b>disabled in production</b> to avoid unnecessary performance overhead.
+     * Useful only during debugging or when validating OpenCL/GPU kernel correctness.
+     * </p>
+     * <p>
+     * Superseded by {@link PublicKeyBytes#runtimePublicKeyCalculationCheck(org.slf4j.Logger)}
+     * and its activation via {@link CConsumerJava#runtimePublicKeyCalculationCheck}.
+     * </p>
+     */
+    private static final boolean ENABLE_UNCOMPRESSED_KEY_VALIDATION = false;
 
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
     
@@ -74,40 +88,35 @@ public class OpenCLGridResult {
             // the calculated key is invalid, return a fallback
             return PublicKeyBytes.INVALID_KEY_ONE;
         }
-        byte[] uncompressed = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
-        uncompressed[0] = PublicKeyBytes.PARITY_UNCOMPRESSED;
+        final int resultBlockSize = PublicKeyBytes.TWO_COORDINATES_NUM_BYTES;
+        final int keyOffsetInByteBuffer = resultBlockSize*keyNumber;
         
-        int keyOffsetInByteBuffer = PublicKeyBytes.TWO_COORDINATES_NUM_BYTES*keyNumber;
+        // Read XY block
+        byte[] kernelResultBlock = new byte[resultBlockSize];
+        b.get(keyOffsetInByteBuffer, kernelResultBlock, 0, resultBlockSize);
         
-        // read ByteBuffer
-        byte[] yx = new byte[PublicKeyBytes.TWO_COORDINATES_NUM_BYTES];
-        for (int i = 0; i < PublicKeyBytes.TWO_COORDINATES_NUM_BYTES; i++) {
-            yx[yx.length-1-i] = b.get(keyOffsetInByteBuffer+i);
-        }
+        // Extract and reverse X
+        byte[] x = new byte[PublicKeyBytes.ONE_COORDINATE_NUM_BYTES];
+        System.arraycopy(kernelResultBlock, 0, x, 0, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        // LSB to MSB: From Java to OpenCL
+        ByteBufferUtility.reverse(x);
         
-        // copy x
-        System.arraycopy(yx, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
-        // copy y
-        System.arraycopy(yx, 0, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH+PublicKeyBytes.ONE_COORDINATE_NUM_BYTES, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        // Extract and reverse Y
+        byte[] y = new byte[PublicKeyBytes.ONE_COORDINATE_NUM_BYTES];
+        System.arraycopy(kernelResultBlock, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES, y, 0, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        // LSB to MSB: From Java to OpenCL
+        ByteBufferUtility.reverse(y);
         
-        if (false) {
-            assertValidResult(uncompressed);
+        // Assemble uncompressed key
+        byte[] uncompressed = PublicKeyBytes.assembleUncompressedPublicKey(x,y);
+        
+        if (ENABLE_UNCOMPRESSED_KEY_VALIDATION) {
+            boolean allZero = PublicKeyBytes.isAllCoordinateBytesZero(uncompressed);
+            if (allZero) {
+                throw new RuntimeException("Invalid GPU result: all coordinate bytes are zero in uncompressed public key.");
+            }
         }
         PublicKeyBytes publicKeyBytes = new PublicKeyBytes(secret, uncompressed);
         return publicKeyBytes;
     }
-    
-    private static void assertValidResult(byte[] uncompressed) {
-        boolean invalid = true;
-        for (int i = 1; i < uncompressed.length; i++) {
-            if (uncompressed[i] != 0) {
-                invalid = false;
-                break;
-            }
-        }
-        if (invalid) {
-            throw new RuntimeException("Invalid result from GPU, all uncompressed key bytes are 0.");
-        }
-    }
-    
 }

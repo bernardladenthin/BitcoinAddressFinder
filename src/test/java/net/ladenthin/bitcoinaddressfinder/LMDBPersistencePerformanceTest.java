@@ -49,16 +49,10 @@ public class LMDBPersistencePerformanceTest {
     private final static int CONSUMER_THREADS = 32;
     private final static int TEST_TIME_IN_SECONDS = 4;
     
-    /**
-     * Deactivate to get proper performance results for the LMDB (round about 10506 k keys / second).
-     * Set to active to test all OpenCL results if they are correct (round about 200 k keys / second).
-     */
-    private final static boolean RUNTIME_PUBLIC_KEY_CALCULATION_CHECK = true;
-    
     private final static int KEYS_QUEUE_SIZE = CONSUMER_THREADS*2;
     private final static int PRODUCER_THREADS = KEYS_QUEUE_SIZE;
     
-    @Test(timeout = 180_000) // 180 seconds, also in maven-surefire-plugin: forkedProcessTimeoutInSeconds
+    @Test
     public void runProber_performanceTest() throws IOException, InterruptedException, IllegalArgumentException, NoSuchFieldException, IllegalAccessException {
         new LMDBPlatformAssume().assumeLMDBExecution();
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
@@ -73,7 +67,6 @@ public class LMDBPersistencePerformanceTest {
         cConsumerJava.delayEmptyConsumer = 1;
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
-        cConsumerJava.runtimePublicKeyCalculationCheck = RUNTIME_PUBLIC_KEY_CALCULATION_CHECK;
         
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) consumerJava.getLogger();
@@ -92,9 +85,10 @@ public class LMDBPersistencePerformanceTest {
         consumerJava.startStatisticsTimer();
         
         Thread.sleep(TEST_TIME_IN_SECONDS * Statistics.ONE_SECOND_IN_MILLISECONDS);
-        // shut down
-        // interrupt the producer
+        // Signal all producer threads to stop by setting the shared flag to false.
+        // Each producer thread will check this flag in its loop and exit cleanly.
         producerShouldRun.set(false);
+        // Gracefully stop consumer threads and release all resources
         consumerJava.interrupt();
     }
 

@@ -29,7 +29,25 @@ public class CConsumerJava {
     public int queueSize = 10;
     
     /**
-     * Test during runtime if the key calculation is correct. Decreases massive the performance. Usefull if an OpenCL producer is used.
+     * Enables runtime verification of public key calculation.
+     * 
+     * This performs a full consistency check for each generated key by comparing it
+     * against a known-correct Java-based calculation. Use this option only in very specific
+     * debugging or validation scenarios, such as:
+     * 
+     * <ul>
+     *   <li>Suspected errors in the OpenCL implementation</li>
+     *   <li>Hardware defects causing incorrect calculations</li>
+     *   <li>Regression testing during development</li>
+     * </ul>
+     * 
+     * <b>Warning:</b> This has a significant performance impact.
+     * <ul>
+     *   <li>Enabled: ~20k keys/second</li>
+     *   <li>Disabled (default): ~10 million keys/second (LMDB benchmark)</li>
+     * </ul>
+     * 
+     * <p>Do not enable in production or performance benchmarking environments.</p>
      */
     public boolean runtimePublicKeyCalculationCheck;
     

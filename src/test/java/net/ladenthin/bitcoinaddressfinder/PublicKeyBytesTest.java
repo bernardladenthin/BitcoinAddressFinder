@@ -22,6 +22,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.util.Arrays;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.base.LegacyAddress;
@@ -48,7 +49,7 @@ public class PublicKeyBytesTest {
     protected final KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
     
     @Test
-    public void createPublicKeyBytes_publicKeyGiven_PublicKeyAndHashesEquals() throws IOException, InterruptedException {
+    public void publicKeyBytes_fromPublicKey_matchesExpectedHashes() {
         // arrange
         ECKey keyUncompressed = new TestAddresses42(1, false).getECKeys().get(0);
         ECKey keyCompressed = new TestAddresses42(1, true).getECKeys().get(0);
@@ -74,7 +75,7 @@ public class PublicKeyBytesTest {
     }
     
     @Test
-    public void createPublicKeyBytes_publicKeyGiven_ToStringAndEqualsAndHashCode() throws IOException, InterruptedException {
+    public void publicKeyBytes_toStringEqualsAndHashCode_consistent() {
         // arrange
         ECKey keyUncompressed = new TestAddresses42(1, false).getECKeys().get(0);
         ECKey keyCompressed = new TestAddresses42(1, true).getECKeys().get(0);
@@ -95,7 +96,7 @@ public class PublicKeyBytesTest {
     }
     
     @Test
-    public void maxPrivateKeyAsHexString_isEqualToConstant() throws IOException, InterruptedException {
+    public void maxPrivateKeyAsHexString_isEqualToConstant() {
         // arrange
         String maxPrivateKeyAsHexString = Hex.encodeHexString(byteBufferUtility.bigIntegerToBytes(PublicKeyBytes.MAX_PRIVATE_KEY));
         // act
@@ -166,10 +167,9 @@ public class PublicKeyBytesTest {
     }
     
     @Test
-    public void runtimePublicKeyCalculationCheck_invalidCompressedAndUncompressedHash_returnsFalse() {
+    public void runtimePublicKeyCalculationCheck_invalidCompressedAndUncompressed_returnsFalse() {
         // arrange
         BigInteger secretKey = new BigInteger("1337");
-        ECKey ecKey = ECKey.fromPrivate(secretKey, false);
         byte[] uncompressedWrong = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES]; // all-zero hash (invalid)
         byte[] compressedWrong = new byte[PublicKeyBytes.PUBLIC_KEY_COMPRESSED_BYTES]; // all-zero hash (invalid)
 
@@ -187,6 +187,83 @@ public class PublicKeyBytesTest {
     }
     // </editor-fold>
     
+    // <editor-fold defaultstate="collapsed" desc="Tests for assembleUncompressedPublicKey">
+    @Test
+    public void assembleUncompressedPublicKey_validXY_correctlyAssembles() {
+        // arrange
+        byte[] x = new byte[PublicKeyBytes.ONE_COORDINATE_NUM_BYTES];
+        byte[] y = new byte[PublicKeyBytes.ONE_COORDINATE_NUM_BYTES];
+        for (int i = 0; i < PublicKeyBytes.ONE_COORDINATE_NUM_BYTES; i++) {
+            x[i] = (byte) i;
+            y[i] = (byte) (i + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        }
+
+        // act
+        byte[] result = PublicKeyBytes.assembleUncompressedPublicKey(x, y);
+
+        // assert
+        assertThat(result[0], is((byte) PublicKeyBytes.PARITY_UNCOMPRESSED));
+        for (int i = 0; i < PublicKeyBytes.ONE_COORDINATE_NUM_BYTES; i++) {
+            assertThat("X coordinate mismatch at index " + i, result[i + PublicKeyBytes.PARITY_BYTES_LENGTH], is(x[i]));
+            assertThat("Y coordinate mismatch at index " + i, result[i + PublicKeyBytes.PARITY_BYTES_LENGTH + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES], is(y[i]));
+        }
+    }
+
+    @Test
+    public void assembleUncompressedPublicKey_allZeros_createsValidKey() {
+        // arrange
+        byte[] x = new byte[PublicKeyBytes.ONE_COORDINATE_NUM_BYTES];
+        byte[] y = new byte[PublicKeyBytes.ONE_COORDINATE_NUM_BYTES];
+
+        // act
+        byte[] result = PublicKeyBytes.assembleUncompressedPublicKey(x, y);
+
+        // assert
+        assertThat(result[0], is((byte) PublicKeyBytes.PARITY_UNCOMPRESSED));
+        for (int i = PublicKeyBytes.PARITY_BYTES_LENGTH; i < result.length; i++) {
+            assertThat("Expected zero at index " + i, result[i], is((byte) 0x00));
+        }
+    }
+
+    @Test(expected = NullPointerException.class)
+    public void assembleUncompressedPublicKey_nullInput_throwsException() {
+        // arrange
+        byte[] x = null;
+        byte[] y = new byte[PublicKeyBytes.ONE_COORDINATE_NUM_BYTES];
+
+        // act
+        PublicKeyBytes.assembleUncompressedPublicKey(x, y);
+    }
+    
+    @Test(expected = NullPointerException.class)
+    public void assembleUncompressedPublicKey_yIsNull_throwsNullPointerException() {
+        // arrange
+        byte[] x = new byte[PublicKeyBytes.ONE_COORDINATE_NUM_BYTES];
+        byte[] y = null; // deliberately null to trigger NPE
+
+        // act
+        PublicKeyBytes.assembleUncompressedPublicKey(x, y);
+    }
+    
+    @Test
+    public void assembleUncompressedPublicKey_validXAndY_assemblesCorrectly() {
+        // arrange
+        BigInteger secretKey = new BigInteger("1337");
+        ECKey ecKey = ECKey.fromPrivate(secretKey, false);
+        byte[] pubKey = ecKey.getPubKey(); // full uncompressed pubkey (parity + X + Y)
+
+        // extract X and Y from real ECKey
+        byte[] x = Arrays.copyOfRange(pubKey, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.PARITY_BYTES_LENGTH + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        byte[] y = Arrays.copyOfRange(pubKey, PublicKeyBytes.PARITY_BYTES_LENGTH + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES, PublicKeyBytes.PARITY_BYTES_LENGTH + PublicKeyBytes.TWO_COORDINATES_NUM_BYTES);
+
+        // act
+        byte[] assembledUncompressed = PublicKeyBytes.assembleUncompressedPublicKey(x, y);
+
+        // assert
+        assertThat(assembledUncompressed, is(equalTo(pubKey)));
+    }
+    // </editor-fold>
+
     // <editor-fold defaultstate="collapsed" desc="toString">
     @ToStringTest
     @Test
@@ -200,6 +277,49 @@ public class PublicKeyBytesTest {
 
         assertThat(toStringOutput, not(emptyOrNullString()));
         assertThat(toStringOutput, matchesPattern("PublicKeyBytes\\{secretKey=\\d+}"));
+    }
+    // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="isAllCoordinateBytesZero">
+    @Test
+    public void isAllCoordinateBytesZero_validKey_returnsFalse() {
+        // arrange
+        byte[] validUncompressedKey = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
+        validUncompressedKey[0] = PublicKeyBytes.PARITY_UNCOMPRESSED;
+        validUncompressedKey[1] = 0x01; // at least one non-zero coordinate byte
+
+        // act
+        boolean result = PublicKeyBytes.isAllCoordinateBytesZero(validUncompressedKey);
+
+        // assert
+        assertThat(result, is(false));
+    }
+
+    @Test
+    public void isAllCoordinateBytesZero_allCoordinateBytesZero_returnsTrue() {
+        // arrange
+        byte[] invalidUncompressedKey = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
+        invalidUncompressedKey[0] = PublicKeyBytes.PARITY_UNCOMPRESSED; // parity byte set
+
+        // act
+        boolean result = PublicKeyBytes.isAllCoordinateBytesZero(invalidUncompressedKey);
+
+        // assert
+        assertThat(result, is(true));
+    }
+
+    @Test
+    public void isAllCoordinateBytesZero_validKeyOnlyLastByteNonZero_returnsFalse() {
+        // arrange
+        byte[] validUncompressedKey = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
+        validUncompressedKey[0] = PublicKeyBytes.PARITY_UNCOMPRESSED;
+        validUncompressedKey[validUncompressedKey.length - 1] = 0x01; // last coordinate byte non-zero
+
+        // act
+        boolean result = PublicKeyBytes.isAllCoordinateBytesZero(validUncompressedKey);
+
+        // assert
+        assertThat(result, is(false));
     }
     // </editor-fold>
 }

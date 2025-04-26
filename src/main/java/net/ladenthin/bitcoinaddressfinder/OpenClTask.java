@@ -96,7 +96,9 @@ public class OpenClTask {
         }
 
         byte[] byteArray = byteBufferUtility.bigIntegerToBytes(privateKeyBase);
-        byteBufferUtility.putToByteBufferAsMSBtoLSB(srcByteBuffer, byteArray);
+        // MSB to LSB: From Java to OpenCL
+        byteBufferUtility.reverse(byteArray);
+        byteBufferUtility.putToByteBuffer(srcByteBuffer, byteArray);
     }
     
     @VisibleForTesting

@@ -210,6 +210,39 @@ public class PublicKeyBytes {
         }
         return compressed;
     }
+    
+    /**
+    * Assembles an uncompressed public key from reversed X and Y coordinates.
+    *
+    * @param x the X coordinate, reversed (MSB-first)
+    * @param y the Y coordinate, reversed (MSB-first)
+    * @return the uncompressed public key byte array
+    */
+   public static byte[] assembleUncompressedPublicKey(byte[] x, byte[] y) {
+       byte[] uncompressed = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
+       uncompressed[0] = PublicKeyBytes.PARITY_UNCOMPRESSED;
+       System.arraycopy(x, 0, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+       System.arraycopy(y, 0, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+       return uncompressed;
+   }
+
+   /**
+    * Checks whether all coordinate bytes (excluding the parity byte) are zero.
+    * <p>
+    * This is used to detect critical failures such as a broken OpenCL kernel execution or invalid GPU output.
+    * </p>
+    * 
+    * @param uncompressed the full uncompressed public key byte array (parity + X + Y)
+    * @return true if all coordinate bytes are zero, false otherwise
+    */
+   public static boolean isAllCoordinateBytesZero(byte[] uncompressed) {
+       for (int i = PublicKeyBytes.PARITY_BYTES_LENGTH; i < uncompressed.length; i++) {
+           if (uncompressed[i] != 0) {
+               return false;
+           }
+       }
+       return true;
+   }
 
     public byte[] getUncompressedKeyHash() {
         if (uncompressedKeyHash == null) {

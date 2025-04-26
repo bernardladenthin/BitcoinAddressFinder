@@ -21,7 +21,6 @@ package net.ladenthin.bitcoinaddressfinder;
 import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -302,15 +301,27 @@ public class ConsumerJava implements Consumer {
         }
     }
     
+    /**
+    * Initiates a graceful shutdown of the consumer:
+    * <ul>
+    *   <li>Stops internal execution by setting the control flag</li>
+    *   <li>Shuts down scheduled tasks and consumer thread pool</li>
+    *   <li>Waits for all consumer threads to finish within a defined timeout</li>
+    *   <li>Logs any unclean terminations</li>
+    *   <li>Closes LMDB persistence and releases resources</li>
+    * </ul>
+    *
+    * This method ensures a clean and deterministic shutdown without relying on thread interruption signals.
+    */
     @Override
     public void interrupt() {
-        logger.debug("Interrupt initiated: stopping consumer execution...");
+        logger.info("Interrupt initiated: stopping consumer execution...");
         shouldRun.set(false);
         scheduledExecutorService.shutdown();
         consumeKeysExecutorService.shutdown();
-        logger.debug("Waiting for termination of {} consumer threads (timeout: {} seconds)...", consumers.size(), AWAIT_DURATION_QUEUE_EMPTY.getSeconds());
+        logger.info("Waiting for termination of {} consumer threads (timeout: {} seconds)...", consumers.size(), AWAIT_DURATION_QUEUE_EMPTY.getSeconds());
         try {
-            boolean terminated = consumeKeysExecutorService.awaitTermination(AWAIT_DURATION_QUEUE_EMPTY.get(ChronoUnit.SECONDS), TimeUnit.SECONDS);
+            boolean terminated = consumeKeysExecutorService.awaitTermination(AWAIT_DURATION_QUEUE_EMPTY.getSeconds(), TimeUnit.SECONDS);
             if (!terminated) {
                 logger.warn("Timeout reached. Some consumer threads may not have terminated cleanly.");
             }

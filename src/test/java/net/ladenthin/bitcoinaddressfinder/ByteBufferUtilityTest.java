@@ -24,6 +24,7 @@ import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.math.BigInteger;
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import org.junit.Before;
@@ -390,84 +391,78 @@ public class ByteBufferUtilityTest {
     }
     // </editor-fold>
     
-    // <editor-fold defaultstate="collapsed" desc="putToByteBufferAsMSBtoLSB">
+    // <editor-fold defaultstate="collapsed" desc="reverse">
     @Test
-    public void putToByteBufferAsMSBtoLSB_singleByte_writtenAsLSBAtStart() {
-        // arrange
-        ByteBuffer buffer = ByteBuffer.allocate(32);
-        byte[] input = new byte[] { 0x01 };
-        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
-
+    public void reverse_nullArray_doesNothing() {
         // act
-        byteBufferUtility.putToByteBufferAsMSBtoLSB(buffer, input);
+        ByteBufferUtility.reverse(null);
 
         // assert
-        buffer.rewind();
-        assertThat(buffer.get(0), is((byte) 0x01));
-        for (int i = 1; i < 32; i++) {
-            assertThat("buffer[" + i + "]", buffer.get(i), is((byte) 0x00));
-        }
+        // No exception expected, nothing to assert
     }
 
     @Test
-    public void putToByteBufferAsMSBtoLSB_bytesInCorrectReverseOrder() {
-        // arrange
-        ByteBuffer buffer = ByteBuffer.allocate(32);
-        byte[] input = new byte[] { 0x01, 0x02, 0x03, 0x04 };
-        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
+    public void reverse_singleElement_noChange() {
+        byte[] input = { 0x42 };
+        byte[] expected = { 0x42 };
 
-        // act
-        byteBufferUtility.putToByteBufferAsMSBtoLSB(buffer, input);
+        ByteBufferUtility.reverse(input);
 
-        // assert
-        buffer.rewind();
-        assertThat(buffer.get(0), is((byte) 0x04));
-        assertThat(buffer.get(1), is((byte) 0x03));
-        assertThat(buffer.get(2), is((byte) 0x02));
-        assertThat(buffer.get(3), is((byte) 0x01));
-        for (int i = 4; i < 32; i++) {
-            assertThat("buffer[" + i + "]", buffer.get(i), is((byte) 0x00));
-        }
+        assertThat(input, is(equalTo(expected)));
     }
 
     @Test
-    public void putToByteBufferAsMSBtoLSB_fullLengthInput_writtenWithoutPadding() {
-        // arrange
-        byte[] input = new byte[32];
-        for (int i = 0; i < 32; i++) {
-            input[i] = (byte) i;
-        }
-        ByteBuffer buffer = ByteBuffer.allocate(32);
-        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
+    public void reverse_evenLengthArray_correctlyReversed() {
+        byte[] input = { 0x01, 0x02, 0x03, 0x04 };
+        byte[] expected = { 0x04, 0x03, 0x02, 0x01 };
 
-        // act
-        byteBufferUtility.putToByteBufferAsMSBtoLSB(buffer, input);
+        ByteBufferUtility.reverse(input);
 
-        // assert
-        buffer.rewind();
-        for (int i = 0; i < 32; i++) {
-            assertThat("buffer[" + i + "]", buffer.get(i), is((byte) (31 - i)));
-        }
+        assertThat(input, is(equalTo(expected)));
     }
-    
+
     @Test
-    public void putToByteBufferAsMSBtoLSB_shortArray_shouldWriteReversedAtBeginning() {
-        // arrange
-        ByteBuffer buffer = ByteBuffer.allocate(32);
-        byte[] input = new byte[] { 0x01, 0x02 };
-        byte[] expected = new byte[32];
-        expected[0] = 0x02; // reversed input
-        expected[1] = 0x01;
+    public void reverse_oddLengthArray_correctlyReversed() {
+        byte[] input = { 0x01, 0x02, 0x03 };
+        byte[] expected = { 0x03, 0x02, 0x01 };
 
-        // act
-        ByteBufferUtility.putToByteBufferAsMSBtoLSB(buffer, input);
-        byte[] actual = new byte[32];
-        buffer.rewind();
-        buffer.get(actual);
+        ByteBufferUtility.reverse(input);
 
-        // assert
-        assertThat(actual, is(equalTo(expected)));
+        assertThat(input, is(equalTo(expected)));
     }
     // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="putToByteBuffer">
+    @Test
+    public void putToByteBuffer_arraySmallerThanBuffer_writtenCorrectly() {
+        ByteBuffer buffer = ByteBuffer.allocate(4);
+        byte[] input = { 0x11, 0x22 };
 
+        ByteBufferUtility.putToByteBuffer(buffer, input);
+
+        buffer.rewind();
+        assertThat(buffer.get(), is((byte) 0x11));
+        assertThat(buffer.get(), is((byte) 0x22));
+    }
+
+    @Test
+    public void putToByteBuffer_arraySameSizeAsBuffer_writtenCompletely() {
+        ByteBuffer buffer = ByteBuffer.allocate(2);
+        byte[] input = { 0x11, 0x22 };
+
+        ByteBufferUtility.putToByteBuffer(buffer, input);
+
+        buffer.rewind();
+        assertThat(buffer.get(), is((byte) 0x11));
+        assertThat(buffer.get(), is((byte) 0x22));
+    }
+
+    @Test(expected = BufferOverflowException.class)
+    public void putToByteBuffer_arrayLargerThanBuffer_throwsBufferOverflowException() {
+       ByteBuffer buffer = ByteBuffer.allocate(1);
+       byte[] input = { 0x11, 0x22 };
+
+       ByteBufferUtility.putToByteBuffer(buffer, input);
+    }
+    // </editor-fold>
 }

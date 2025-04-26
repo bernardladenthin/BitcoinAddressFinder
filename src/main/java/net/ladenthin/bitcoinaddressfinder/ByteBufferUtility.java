@@ -86,6 +86,18 @@ public class ByteBufferUtility {
         key.put(bytes).flip();
         return key;
     }
+    
+    /**
+    * Writes a BigInteger into a ByteBuffer.
+    *
+    * @param buffer The ByteBuffer to write to.
+    * @param byteArray The byte array to write.
+    */
+   public static void putToByteBuffer(ByteBuffer buffer, byte[] byteArray) {
+       buffer.clear();
+       buffer.put(byteArray, 0, byteArray.length);
+       buffer.rewind();
+   }
     // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc="ByteBuffer Hex conversion">
@@ -160,21 +172,6 @@ public class ByteBufferUtility {
         return bytes;
     }
     
-    /**
-    * Writes a BigInteger into a ByteBuffer in Most-Significant-Byte to Least-Significant-Byte order.
-    * The input BigInteger is converted to a 32-byte array. Leading zeros are stripped or added to ensure exactly 32 bytes.
-    * This is important for OpenCL, which expects keys in LSB order, written as raw bytes.
-    *
-    * @param buffer The ByteBuffer to write to. Must have at least 32 bytes capacity.
-    * @param byteArray The byte array to write.
-    */
-   public static void putToByteBufferAsMSBtoLSB(ByteBuffer buffer, byte[] byteArray) {
-       reverse(byteArray);
-       buffer.clear();
-       buffer.put(byteArray, 0, byteArray.length);
-       buffer.rewind();
-   }
-   
     private final static boolean USE_XOR_SWAP = false;
     
     /**

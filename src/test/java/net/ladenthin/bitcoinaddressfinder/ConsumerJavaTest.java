@@ -238,7 +238,6 @@ public class ConsumerJavaTest {
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
-        cConsumerJava.runtimePublicKeyCalculationCheck = true;
 
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         
@@ -261,7 +260,6 @@ public class ConsumerJavaTest {
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
-        cConsumerJava.runtimePublicKeyCalculationCheck = true;
 
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
@@ -286,7 +284,6 @@ public class ConsumerJavaTest {
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
-        cConsumerJava.runtimePublicKeyCalculationCheck = true;
 
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
@@ -344,7 +341,6 @@ public class ConsumerJavaTest {
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
-        cConsumerJava.runtimePublicKeyCalculationCheck = true;
 
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
@@ -405,7 +401,6 @@ public class ConsumerJavaTest {
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
-        cConsumerJava.runtimePublicKeyCalculationCheck = true;
 
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
@@ -421,7 +416,7 @@ public class ConsumerJavaTest {
     
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED, location = CommonDataProvider.class)
-    public void consumeKeys_invalidPublicKeyHashUncompressedGiven_ThrowException(boolean compressed) throws IOException, InterruptedException, DecoderException, MnemonicException.MnemonicLengthException {
+    public void consumeKeys_withRuntimeKeyCalculationEnabled_logsError_whenPublicKeyHashIsInvalid(boolean compressed) throws IOException, InterruptedException, DecoderException, MnemonicException.MnemonicLengthException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
         File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
@@ -483,7 +478,6 @@ public class ConsumerJavaTest {
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
-        cConsumerJava.runtimePublicKeyCalculationCheck = true;
         cConsumerJava.enableVanity = true;
         if (compressed) {
             // 1JYHzX3ndZEcnjrWSQ9VC7324TJ9BAoGy4

@@ -102,7 +102,7 @@
                         <!-- Properly include JaCoCo agent and any other injected argLine -->
                         <argLine>@{argLine}</argLine>
                         <!-- Increase timeout to ensure long-running tests don't break -->
-                        <forkedProcessTimeoutInSeconds>180</forkedProcessTimeoutInSeconds>
+                        <forkedProcessTimeoutInSeconds>60</forkedProcessTimeoutInSeconds>
                 </configuration>
             </plugin>
             <plugin>
