@@ -22,22 +22,26 @@ import com.google.errorprone.annotations.Immutable;
 import java.io.Serializable;
 import java.util.Collections;
 import java.util.List;
+import org.jocl.cl_context_properties;
 import org.jspecify.annotations.NonNull;
 
 /**
  * Represents an OpenCL platform and its associated devices.
  *
- * @param platformName    the name of the OpenCL platform
- * @param openCLDevices   a list of associated OpenCL devices
+ * @param platformName      the name of the OpenCL platform
+ * @param contextProperties the context properties of the OpenCL platform
+ * @param openCLDevices     a list of associated OpenCL devices
  */
 @Immutable
 public record OpenCLPlatform(
     @NonNull String platformName,
+    @NonNull cl_context_properties contextProperties,
     @NonNull List<OpenCLDevice> openCLDevices
 ) implements Serializable {
 
-    public OpenCLPlatform(String platformName, List<OpenCLDevice> openCLDevices) {
+    public OpenCLPlatform(String platformName, cl_context_properties contextProperties, List<OpenCLDevice> openCLDevices) {
         this.platformName = platformName;
+        this.contextProperties = contextProperties;
         this.openCLDevices = Collections.unmodifiableList(openCLDevices);
     }
 }

@@ -21,13 +21,16 @@ package net.ladenthin.bitcoinaddressfinder.opencl;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.Serializable;
+import java.nio.ByteOrder;
 import java.nio.charset.Charset;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.jocl.CL;
+import org.jocl.cl_device_id;
 
 /**
  * Represents an OpenCL device and its properties.
  *
+ * @param device                     See {@link org.jocl.cl_device_id}
  * @param deviceName                 See {@link org.jocl.CL#CL_DEVICE_NAME}
  * @param deviceVendor               See {@link org.jocl.CL#CL_DEVICE_VENDOR}
  * @param driverVersion              See {@link org.jocl.CL#CL_DRIVER_VERSION}
@@ -35,6 +38,7 @@ import org.jocl.CL;
  * @param deviceVersion              See {@link org.jocl.CL#CL_DEVICE_VERSION}
  * @param deviceExtensions           See {@link org.jocl.CL#CL_DEVICE_EXTENSIONS}
  * @param deviceType                 See {@link org.jocl.CL#CL_DEVICE_TYPE}
+ * @param endianLittle               See {@link org.jocl.CL#CL_DEVICE_ENDIAN_LITTLE}
  * @param maxComputeUnits            See {@link org.jocl.CL#CL_DEVICE_MAX_COMPUTE_UNITS}
  * @param maxWorkItemDimensions      See {@link org.jocl.CL#CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS}
  * @param maxWorkItemSizes           See {@link org.jocl.CL#CL_DEVICE_MAX_WORK_ITEM_SIZES}
@@ -65,6 +69,7 @@ import org.jocl.CL;
  * @param preferredVectorWidthDouble See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE}
  */
 public record OpenCLDevice(
+    cl_device_id device,
     String deviceName,
     String deviceVendor,
     String driverVersion,
@@ -72,6 +77,7 @@ public record OpenCLDevice(
     String deviceVersion,
     String deviceExtensions,
     long deviceType,
+    boolean endianLittle,
     int maxComputeUnits,
     long maxWorkItemDimensions,
     long[] maxWorkItemSizes,
@@ -102,12 +108,20 @@ public record OpenCLDevice(
     int preferredVectorWidthDouble
 ) implements Serializable {
     
+    public ByteOrder getByteOrder() {
+        if(endianLittle) {
+            return ByteOrder.LITTLE_ENDIAN;
+        }
+        return ByteOrder.BIG_ENDIAN;
+    }
+    
     public String toStringPretty() {
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         final Charset charset = java.nio.charset.StandardCharsets.UTF_8;
 
         try (PrintStream ps = new PrintStream(baos, true, charset)) {
             ps.println("--- Info for OpenCL device: " + deviceName + " ---");
+            ps.printf("cl_device_id:                          %s%n", device);
             ps.printf("CL_DEVICE_NAME:                        %s%n", deviceName);
             ps.printf("CL_DEVICE_VENDOR:                      %s%n", deviceVendor);
             ps.printf("CL_DRIVER_VERSION:                     %s%n", driverVersion);
@@ -115,6 +129,7 @@ public record OpenCLDevice(
             ps.printf("CL_DEVICE_VERSION:                     %s%n", deviceVersion);
             ps.printf("CL_DEVICE_EXTENSIONS:                  %s%n", deviceExtensions);
             ps.printf("CL_DEVICE_TYPE:                        %s%n", CL.stringFor_cl_device_type(deviceType));
+            ps.printf("CL_DEVICE_ENDIAN_LITTLE:               %b%n", endianLittle);
             ps.printf("CL_DEVICE_MAX_COMPUTE_UNITS:           %d%n", maxComputeUnits);
             ps.printf("CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS:    %d%n", maxWorkItemDimensions);
             ps.printf("CL_DEVICE_MAX_WORK_ITEM_SIZES:         %s%n", formatWorkItemSizes(maxWorkItemSizes));

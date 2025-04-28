@@ -194,37 +194,70 @@ public class PublicKeyBytes {
         return new PublicKeyBytes(ecKey.getPrivKey(), ecKey.getPubKey());
     }
     
+    /**
+     * Creates a compressed public key from an uncompressed public key byte array in SEC format.
+     * <p>
+     * The method extracts the X coordinate and calculates the appropriate compression prefix
+     * based on the parity (evenness) of the Y coordinate.
+     * <p>
+     * The resulting compressed key is structured as:
+     * <ul>
+     *   <li>1 byte prefix: {@code 0x02} if Y is even, {@code 0x03} if Y is odd</li>
+     *   <li>32 bytes: X coordinate (Big-Endian) (MSB-first)</li>
+     * </ul>
+     * <p>
+     * This format follows the Bitcoin and general ECC compressed public key convention,
+     * where the full Y coordinate is not transmitted, but can later be recovered.
+     *
+     * @param uncompressed the full uncompressed public key byte array in SEC format ({@code 04 || X || Y})
+     * @return the compressed public key byte array in SEC format
+     */
     public static byte[] createCompressedBytes(byte[] uncompressed) {
         // add one byte for format sign
         byte[] compressed = new byte[PUBLIC_KEY_COMPRESSED_BYTES];
-        
-        // copy x
-        System.arraycopy(uncompressed, PARITY_BYTES_LENGTH, compressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
-        
+        // parity
         boolean even = uncompressed[LAST_Y_COORDINATE_BYTE_INDEX] % 2 == 0;
-        
         if (even) {
             compressed[0] = PARITY_COMPRESSED_EVEN;
         } else {
             compressed[0] = PARITY_COMPRESSED_ODD;
         }
+        // x
+        System.arraycopy(uncompressed, PARITY_BYTES_LENGTH, compressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
         return compressed;
     }
     
     /**
-    * Assembles an uncompressed public key from reversed X and Y coordinates.
-    *
-    * @param x the X coordinate, reversed (MSB-first)
-    * @param y the Y coordinate, reversed (MSB-first)
-    * @return the uncompressed public key byte array
-    */
-   public static byte[] assembleUncompressedPublicKey(byte[] x, byte[] y) {
-       byte[] uncompressed = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
-       uncompressed[0] = PublicKeyBytes.PARITY_UNCOMPRESSED;
-       System.arraycopy(x, 0, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
-       System.arraycopy(y, 0, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
-       return uncompressed;
-   }
+     * Assembles an uncompressed public key in SEC (Standards for Efficient Cryptography) format
+     * from the X and Y coordinate byte arrays.
+     * <p>
+     * The method expects both the X and Y coordinates to be in Big-Endian (MSB-first) order,
+     * which is the standard byte ordering for Bitcoin public keys.
+     * <p>
+     * The resulting byte array is structured as:
+     * <ul>
+     *   <li>1 byte prefix: {@code 0x04} indicating an uncompressed public key</li>
+     *   <li>32 bytes: X coordinate (Big-Endian) (MSB-first)</li>
+     *   <li>32 bytes: Y coordinate (Big-Endian) (MSB-first)</li>
+     * </ul>
+     * <p>
+     * This format complies with Bitcoin, Ethereum, and general ECC usage where
+     * uncompressed public keys are transmitted as {@code 04 || X || Y}.
+     *
+     * @param x the X coordinate in Big-Endian (MSB-first) order
+     * @param y the Y coordinate in Big-Endian (MSB-first) order
+     * @return the assembled uncompressed public key byte array in SEC format
+     */
+    public static byte[] assembleUncompressedPublicKey(byte[] x, byte[] y) {
+        byte[] uncompressed = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
+        // parity
+        uncompressed[0] = PublicKeyBytes.PARITY_UNCOMPRESSED;
+        // x
+        System.arraycopy(x, 0, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        // y
+        System.arraycopy(y, 0, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        return uncompressed;
+    }
 
    /**
     * Checks whether all coordinate bytes (excluding the parity byte) are zero.
@@ -243,25 +276,25 @@ public class PublicKeyBytes {
        }
        return true;
    }
+   
+   private static byte[] calculateHash160(byte[] input) {
+        if (USE_SHA256_RIPEMD160_FAST) {
+            return sha256hash160Fast(input);
+        } else {
+            return CryptoUtils.sha256hash160(input);
+        }
+    }
 
     public byte[] getUncompressedKeyHash() {
         if (uncompressedKeyHash == null) {
-            if (USE_SHA256_RIPEMD160_FAST) {
-                uncompressedKeyHash = sha256hash160Fast(uncompressed);
-            } else {
-                uncompressedKeyHash = CryptoUtils.sha256hash160(uncompressed);
-            }
+            uncompressedKeyHash = calculateHash160(uncompressed);
         }
         return uncompressedKeyHash;
     }
 
     public byte[] getCompressedKeyHash() {
         if (compressedKeyHash == null) {
-            if (USE_SHA256_RIPEMD160_FAST) {
-                compressedKeyHash = CryptoUtils.sha256hash160(compressed);
-            } else {
-                compressedKeyHash = sha256hash160Fast(compressed);
-            }
+            compressedKeyHash = calculateHash160(compressed);
         }
         return compressedKeyHash;
     }

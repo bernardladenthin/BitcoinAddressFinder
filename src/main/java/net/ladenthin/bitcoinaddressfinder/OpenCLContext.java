@@ -23,18 +23,21 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
-import static org.jocl.CL.CL_CONTEXT_PLATFORM;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDeviceSelection;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatformSelector;
 import static org.jocl.CL.clBuildProgram;
 import static org.jocl.CL.clCreateCommandQueueWithProperties;
 import static org.jocl.CL.clCreateContext;
 import static org.jocl.CL.clCreateKernel;
 import static org.jocl.CL.clCreateProgramWithSource;
-import static org.jocl.CL.clGetDeviceIDs;
-import static org.jocl.CL.clGetPlatformIDs;
 import static org.jocl.CL.clReleaseCommandQueue;
 import static org.jocl.CL.clReleaseContext;
 import org.jocl.cl_command_queue;
@@ -42,7 +45,6 @@ import org.jocl.cl_context;
 import org.jocl.cl_context_properties;
 import org.jocl.cl_device_id;
 import org.jocl.cl_kernel;
-import org.jocl.cl_platform_id;
 import org.jocl.cl_program;
 import org.jocl.cl_queue_properties;
 import org.jocl.CL;
@@ -89,8 +91,7 @@ public class OpenCLContext {
     private final CProducerOpenCL producerOpenCL;
     private final BitHelper bitHelper;
 
-    private cl_context_properties contextProperties;
-    private cl_device_id device;
+    private OpenCLDevice device;
     private cl_context context;
     private cl_command_queue commandQueue;
     private cl_program program;
@@ -111,37 +112,25 @@ public class OpenCLContext {
         // Enable exceptions and subsequently omit error checks in this sample
         CL.setExceptionsEnabled(EXCEPTIONS_ENABLED);
         
-        // Obtain the number of platforms
-        int numPlatformsArray[] = new int[1];
-        clGetPlatformIDs(0, null, numPlatformsArray);
-        int numPlatforms = numPlatformsArray[0];
+        List<OpenCLPlatform> platforms = new OpenCLBuilder().build();
+
+        OpenCLDeviceSelection selection = OpenCLPlatformSelector.select(
+            platforms,
+            producerOpenCL.platformIndex,
+            producerOpenCL.deviceType,
+            producerOpenCL.deviceIndex
+        );
         
-        // Obtain a platform ID
-        cl_platform_id platforms[] = new cl_platform_id[numPlatforms];
-        clGetPlatformIDs(platforms.length, platforms, null);
-        cl_platform_id platform = platforms[producerOpenCL.platformIndex];
-        
-        // Initialize the context properties
-        contextProperties = new cl_context_properties();
-        contextProperties.addProperty(CL_CONTEXT_PLATFORM, platform);
-        
-        // Obtain the number of devices for the platform
-        int numDevicesArray[] = new int[1];
-        clGetDeviceIDs(platform, producerOpenCL.deviceType, 0, null, numDevicesArray);
-        int numDevices = numDevicesArray[0];
-        
-        // Obtain a device ID 
-        cl_device_id devices[] = new cl_device_id[numDevices];
-        clGetDeviceIDs(platform, producerOpenCL.deviceType, numDevices, devices, null);
-        device = devices[producerOpenCL.deviceIndex];
-        cl_device_id[] cl_device_ids = new cl_device_id[]{device};
+        device = selection.getDevice();
+        cl_context_properties contextProperties = selection.getContextProperties();
+        cl_device_id[] cl_device_ids = new cl_device_id[]{device.device()};
         
         // Create a context for the selected device
         context = clCreateContext(contextProperties, 1, cl_device_ids, null, null, null);
         
         // Create a command-queue for the selected device
         cl_queue_properties properties = new cl_queue_properties();
-        commandQueue = clCreateCommandQueueWithProperties(context, device, properties, null);
+        commandQueue = clCreateCommandQueueWithProperties(context, device.device(), properties, null);
         
         // #################### kernel specifix ####################
         
@@ -155,7 +144,7 @@ public class OpenCLContext {
         // Create the kernel
         kernel = clCreateKernel(program, KERNEL_NAME, null);
         
-        openClTask = new OpenClTask(context, producerOpenCL, bitHelper, byteBufferUtility);
+        openClTask = new OpenClTask(context, device.getByteOrder(), producerOpenCL, bitHelper, byteBufferUtility);
     }
 
     OpenClTask getOpenClTask() {
@@ -174,7 +163,7 @@ public class OpenCLContext {
         openClTask.setSrcPrivateKeyChunk(privateKeyBase);
         ByteBuffer dstByteBuffer = openClTask.executeKernel(kernel, commandQueue);
 
-        OpenCLGridResult openCLGridResult = new OpenCLGridResult(privateKeyBase, bitHelper.convertBitsToSize(producerOpenCL.batchSizeInBits), dstByteBuffer);
+        OpenCLGridResult openCLGridResult = new OpenCLGridResult(privateKeyBase, device.getByteOrder(), bitHelper.convertBitsToSize(producerOpenCL.batchSizeInBits), dstByteBuffer);
         return openCLGridResult;
     }
 

@@ -21,6 +21,7 @@ package net.ladenthin.bitcoinaddressfinder;
 import com.google.common.annotations.VisibleForTesting;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import static org.jocl.CL.CL_MEM_READ_ONLY;
 import static org.jocl.CL.CL_MEM_USE_HOST_PTR;
@@ -54,6 +55,7 @@ public class OpenClTask {
     private final CProducer cProducer;
 
     private final cl_context context;
+    private final ByteOrder clByteOrder;
     private final ByteBuffer srcByteBuffer;
     private final Pointer srcPointer;
 
@@ -63,11 +65,12 @@ public class OpenClTask {
     private final BigInteger maxPrivateKeyForBatchSize;
 
     // Only available after init
-    public OpenClTask(cl_context context, CProducer cProducer, BitHelper bitHelper, ByteBufferUtility byteBufferUtility) {
+    public OpenClTask(cl_context context, ByteOrder clByteOrder, CProducer cProducer, BitHelper bitHelper, ByteBufferUtility byteBufferUtility) {
         this.context = context;
         this.cProducer = cProducer;
         this.bitHelper = bitHelper;
         this.byteBufferUtility = byteBufferUtility;
+        this.clByteOrder = clByteOrder;
 
         int srcSizeInBytes = getSrcSizeInBytes();
         maxPrivateKeyForBatchSize = KeyUtility.getMaxPrivateKeyForBatchSize(cProducer.batchSizeInBits);
@@ -95,15 +98,23 @@ public class OpenClTask {
             throw new PrivateKeyTooLargeException(privateKeyBase, maxPrivateKeyForBatchSize, cProducer.batchSizeInBits);
         }
 
+        // BigInteger.toByteArray() always returns a big-endian (MSB-first) representation, 
+        // meaning the most significant byte (MSB) comes first.
+        // Therefore, the source format is always Big Endian.
         byte[] byteArray = byteBufferUtility.bigIntegerToBytes(privateKeyBase);
-        // MSB to LSB: From Java to OpenCL
-        byteBufferUtility.reverse(byteArray);
+        EndiannessConverter endiannessConverter = new EndiannessConverter(ByteOrder.BIG_ENDIAN, clByteOrder, byteBufferUtility);
+        endiannessConverter.convertEndian(byteArray);
         byteBufferUtility.putToByteBuffer(srcByteBuffer, byteArray);
     }
     
     @VisibleForTesting
     public ByteBuffer getSrcByteBuffer() {
         return srcByteBuffer;
+    }
+    
+    @VisibleForTesting
+    public ByteOrder getClByteOrder() {
+        return clByteOrder;
     }
 
     public ByteBuffer executeKernel(cl_kernel kernel, cl_command_queue commandQueue) {

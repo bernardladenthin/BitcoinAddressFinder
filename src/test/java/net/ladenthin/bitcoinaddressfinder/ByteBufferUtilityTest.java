@@ -18,7 +18,6 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.tngtech.java.junit.dataprovider.DataProvider;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
@@ -394,8 +393,11 @@ public class ByteBufferUtilityTest {
     // <editor-fold defaultstate="collapsed" desc="reverse">
     @Test
     public void reverse_nullArray_doesNothing() {
+        // arrange
+        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
+        
         // act
-        ByteBufferUtility.reverse(null);
+        byteBufferUtility.reverse(null);
 
         // assert
         // No exception expected, nothing to assert
@@ -403,31 +405,44 @@ public class ByteBufferUtilityTest {
 
     @Test
     public void reverse_singleElement_noChange() {
+        // arrange
+        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
+        
         byte[] input = { 0x42 };
         byte[] expected = { 0x42 };
 
-        ByteBufferUtility.reverse(input);
+        // act
+        byteBufferUtility.reverse(input);
 
+        // assert
         assertThat(input, is(equalTo(expected)));
     }
 
     @Test
     public void reverse_evenLengthArray_correctlyReversed() {
+        // arrange
+        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
         byte[] input = { 0x01, 0x02, 0x03, 0x04 };
         byte[] expected = { 0x04, 0x03, 0x02, 0x01 };
 
-        ByteBufferUtility.reverse(input);
+        // act
+        byteBufferUtility.reverse(input);
 
+        // assert
         assertThat(input, is(equalTo(expected)));
     }
 
     @Test
     public void reverse_oddLengthArray_correctlyReversed() {
+        // arrange
+        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
         byte[] input = { 0x01, 0x02, 0x03 };
         byte[] expected = { 0x03, 0x02, 0x01 };
 
-        ByteBufferUtility.reverse(input);
+        // act
+        byteBufferUtility.reverse(input);
 
+        // assert
         assertThat(input, is(equalTo(expected)));
     }
     // </editor-fold>

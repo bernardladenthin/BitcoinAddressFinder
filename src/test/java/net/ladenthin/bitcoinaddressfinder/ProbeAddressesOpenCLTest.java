@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.FileUtils;
 import org.junit.Before;
@@ -59,6 +60,7 @@ import org.slf4j.Logger;
 public class ProbeAddressesOpenCLTest {
 
     private final Network network = new NetworkParameterFactory().getNetwork();
+    private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
     
     private static final TestAddresses42 testAddresses = new TestAddresses42(1024, false);
     
@@ -406,28 +408,29 @@ public class ProbeAddressesOpenCLTest {
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_LOWER_THAN_25, location = CommonDataProvider.class)
     public void createKeys_bitsLowerThan25_use32BitNevertheless(int bitSize) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
-        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
+
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
-        
+
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = bitSize;
         OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
         openCLContext.init();
-        
-        Random sr = new Random(1337);
-        BigInteger secret = keyUtility.createSecret(bitSize, sr);
-        BigInteger secretBase = keyUtility.killBits(secret, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
-        
-        openCLContext.createKeys(secretBase);
-        openCLContext.release();
+        try {
+            Random sr = new Random(1337);
+            BigInteger secret = keyUtility.createSecret(bitSize, sr);
+            BigInteger secretBase = keyUtility.killBits(secret, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
+
+            openCLContext.createKeys(secretBase);
+        } finally {
+            openCLContext.release();
+        }
     }
     
     @Test
     @OpenCLTest
     public void createKeys_bitsLowerThanGridSize_useMoreNevertheless() throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
-        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -435,13 +438,15 @@ public class ProbeAddressesOpenCLTest {
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
         OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
         openCLContext.init();
-        
-        Random sr = new Random(1337);
-        BigInteger secret = keyUtility.createSecret(BITS_FOR_BATCH-1, sr);
-        BigInteger secretBase = keyUtility.killBits(secret, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
-        
-        openCLContext.createKeys(secretBase);
-        openCLContext.release();
+        try {
+            Random sr = new Random(1337);
+            BigInteger secret = keyUtility.createSecret(BITS_FOR_BATCH-1, sr);
+            BigInteger secretBase = keyUtility.killBits(secret, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
+
+            openCLContext.createKeys(secretBase);
+       } finally {
+            openCLContext.release();
+       }
     }
     
     /**
@@ -488,11 +493,14 @@ public class ProbeAddressesOpenCLTest {
         producerOpenCL.batchSizeInBits = chunkSize;
         OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
         openCLContext.init();
-        
-        OpenClTask openClTask = openCLContext.getOpenClTask();
+        try {
+            OpenClTask openClTask = openCLContext.getOpenClTask();
 
-        // Force a key that exceeds the limit
-        openClTask.setSrcPrivateKeyChunk(privateKey);
+            // Force a key that exceeds the limit
+            openClTask.setSrcPrivateKeyChunk(privateKey);
+       } finally {
+            openCLContext.release();
+       }
     }
 
     @Test
@@ -505,34 +513,41 @@ public class ProbeAddressesOpenCLTest {
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
         OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
         openCLContext.init();
+        try {
+            byte[] encoded = privateKey.toByteArray();
+            assertThat("Encoded must hold exactly 33 bytes", encoded.length, is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES + 1));
+            byte[] expectedStripped = Arrays.copyOfRange(encoded, 1, encoded.length);
+            assertThat("ExpectedStripped must hold exactly 32 bytes", expectedStripped.length, is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES));
 
-        byte[] encoded = privateKey.toByteArray();
-        assertThat("Encoded must hold exactly 33 bytes", encoded.length, is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES + 1));
-        byte[] expectedStripped = Arrays.copyOfRange(encoded, 1, encoded.length);
-        assertThat("ExpectedStripped must hold exactly 32 bytes", expectedStripped.length, is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES));
+            // Perform the actual OpenCL buffer population
+            OpenClTask openClTask = openCLContext.getOpenClTask();
+            openClTask.setSrcPrivateKeyChunk(privateKey);
 
-        // Perform the actual OpenCL buffer population
-        OpenClTask openClTask = openCLContext.getOpenClTask();
-        openClTask.setSrcPrivateKeyChunk(privateKey);
+            ByteBuffer buffer = openClTask.getSrcByteBuffer();
+            assertThat("Buffer must hold exactly 32 bytes", buffer.capacity(), is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES));
 
-        ByteBuffer buffer = openClTask.getSrcByteBuffer();
-        assertThat("Buffer must hold exactly 32 bytes", buffer.capacity(), is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES));
+            byte[] openClEndianBytes = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
+            buffer.rewind();
+            buffer.get(openClEndianBytes);
 
-        byte[] actualBytes = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
-        buffer.rewind();
-        buffer.get(actualBytes);
-        buffer.rewind();
+            // Reconstruct BigInteger from OpenCL buffer for validation
+            byte[] bigEndianBytes = openClEndianBytes.clone();
 
-        // Convert buffer back to BigInteger for equality test
-        byte[] reversed = actualBytes.clone();
-        ByteBufferUtility.reverse(reversed);
+            // OpenCL provides the bytes in device-specific endianness (could be little-endian or big-endian).
+            // BigInteger(byte[]) always expects a Big-Endian (MSB-first) format.
+            // Therefore, we convert the device-endian buffer to Big-Endian before creating the BigInteger.
+            EndiannessConverter endiannessConverter = new EndiannessConverter(openClTask.getClByteOrder(), ByteOrder.BIG_ENDIAN, byteBufferUtility);
+            endiannessConverter.convertEndian(bigEndianBytes);
 
-        BigInteger result = new BigInteger(1, reversed);
+            BigInteger result = new BigInteger(1, bigEndianBytes);
 
-        assertThat("Buffer reversed content must match stripped BigInteger encoding", reversed, is(equalTo(expectedStripped)));
-        assertThat("Deserialized BigInteger must match original", result, is(equalTo(privateKey)));
+            // Validate that the OpenCL buffer correctly represents the original private key
+            assertThat("bigEndianBytes content must match stripped BigInteger encoding", bigEndianBytes, is(equalTo(expectedStripped)));
+            assertThat("Reconstructed BigInteger must match original private key", result, is(equalTo(privateKey)));
 
-        openCLContext.release();
+       } finally {
+           openCLContext.release();
+       }
     }
     
     @Test
@@ -541,29 +556,29 @@ public class ProbeAddressesOpenCLTest {
     public void createKeys_fromLargePrivateKey_generatesValidPublicKeys(BigInteger privateKey) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         
-        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
         
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
         OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
         openCLContext.init();
+        try {
+            // Perform the actual OpenCL buffer population
+            OpenClTask openClTask = openCLContext.getOpenClTask();
 
-        // Perform the actual OpenCL buffer population
-        OpenClTask openClTask = openCLContext.getOpenClTask();
-        
-        openClTask.setSrcPrivateKeyChunk(privateKey);
-        
-        BigInteger secretBase = keyUtility.killBits(privateKey, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
-        
-        OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
-        PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
-        createKeys.freeResult();
-        
-        openCLContext.release();
-        
-        final boolean souts = false;
-        assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
+            openClTask.setSrcPrivateKeyChunk(privateKey);
+
+            BigInteger secretBase = keyUtility.killBits(privateKey, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
+
+            OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
+            PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
+            createKeys.freeResult();
+
+            final boolean souts = false;
+            assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
+       } finally {
+           openCLContext.release();
+       }
     }
     
     @Test
@@ -571,7 +586,6 @@ public class ProbeAddressesOpenCLTest {
     public void createKeys_fromRandomPrivateKey_correctlyHashesAndVerifiesResults() throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         
-        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
         
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -579,23 +593,24 @@ public class ProbeAddressesOpenCLTest {
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
         OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
         openCLContext.init();
-        
-        Random random = new Random(1337);
-        BigInteger secretKeyBase = keyUtility.createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, random);
-        
-        BigInteger secretBase = keyUtility.killBits(secretKeyBase, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
-        
-        OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
-        PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
-        createKeys.freeResult();
-        
-        openCLContext.release();
-        
-        final boolean souts = false;
-        hashPublicKeys(publicKeys, souts); // just for performance tests
-        hashPublicKeysFast(publicKeys, souts); // just for performance tests
-        
-        assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
+        try {
+            Random random = new Random(1337);
+            BigInteger secretKeyBase = keyUtility.createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, random);
+
+            BigInteger secretBase = keyUtility.killBits(secretKeyBase, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
+
+            OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
+            PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
+            createKeys.freeResult();
+
+            final boolean souts = false;
+            hashPublicKeys(publicKeys, souts); // just for performance tests
+            hashPublicKeysFast(publicKeys, souts); // just for performance tests
+
+            assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
+       } finally {
+           openCLContext.release();
+       }
     }
 
     private static void assertAllRuntimePublicKeyCalculationsValid(PublicKeyBytes[] publicKeys, Logger logger) {

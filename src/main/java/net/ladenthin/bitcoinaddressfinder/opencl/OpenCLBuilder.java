@@ -25,7 +25,9 @@ import java.util.ArrayList;
 import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import org.apache.maven.artifact.versioning.ComparableVersion;
+import static org.jocl.CL.CL_CONTEXT_PLATFORM;
 import static org.jocl.CL.CL_DEVICE_ADDRESS_BITS;
+import static org.jocl.CL.CL_DEVICE_ENDIAN_LITTLE;
 import static org.jocl.CL.CL_DEVICE_ERROR_CORRECTION_SUPPORT;
 import static org.jocl.CL.CL_DEVICE_EXTENSIONS;
 import static org.jocl.CL.CL_DEVICE_GLOBAL_MEM_SIZE;
@@ -68,6 +70,7 @@ import static org.jocl.CL.clGetPlatformIDs;
 import static org.jocl.CL.clGetPlatformInfo;
 import org.jocl.Pointer;
 import org.jocl.Sizeof;
+import org.jocl.cl_context_properties;
 import org.jocl.cl_device_id;
 import org.jocl.cl_platform_id;
 
@@ -88,15 +91,20 @@ public class OpenCLBuilder {
         for (int i=0; i<platforms.length; i++) {
             // Collect all devices of all platforms
             final cl_platform_id platformId = platforms[i];
+            
+            // Initialize the context properties
+            cl_context_properties contextProperties = new cl_context_properties();
+            contextProperties.addProperty(CL_CONTEXT_PLATFORM, platformId);
 
             String platformName = getString(platformId, CL_PLATFORM_NAME);
             
             // Obtain the number of devices for the current platform
-            int numDevices[] = new int[1];
-            clGetDeviceIDs(platformId, CL_DEVICE_TYPE_ALL, 0, null, numDevices);
+            int numDevicesArray[] = new int[1];
+            clGetDeviceIDs(platformId, CL_DEVICE_TYPE_ALL, 0, null, numDevicesArray);
+            int numDevices = numDevicesArray[0];
             
-            cl_device_id devicesArray[] = new cl_device_id[numDevices[0]];
-            clGetDeviceIDs(platformId, CL_DEVICE_TYPE_ALL, numDevices[0], devicesArray, null);
+            cl_device_id devicesArray[] = new cl_device_id[numDevices];
+            clGetDeviceIDs(platformId, CL_DEVICE_TYPE_ALL, numDevices, devicesArray, null);
 
             List<OpenCLDevice> openCLDevices = new ArrayList<>();
             for (cl_device_id device : devicesArray) {
@@ -104,7 +112,7 @@ public class OpenCLBuilder {
                 openCLDevices.add(openCLDevice);
             }
             
-            OpenCLPlatform openCLPlatform = new OpenCLPlatform(platformName, openCLDevices);
+            OpenCLPlatform openCLPlatform = new OpenCLPlatform(platformName, contextProperties, openCLDevices);
             openCLPlatforms.add(openCLPlatform);
         }
         
@@ -118,6 +126,7 @@ public class OpenCLBuilder {
         String deviceProfile = getString(device, CL_DEVICE_PROFILE);
         String deviceVersion = getString(device, CL_DEVICE_VERSION);
         String deviceExtensions = getString(device, CL_DEVICE_EXTENSIONS);
+        boolean endianLittle = getInt(device, CL_DEVICE_ENDIAN_LITTLE) == 1;
         long deviceType = getLong(device, CL_DEVICE_TYPE);
         int maxComputeUnits = getInt(device, CL_DEVICE_MAX_COMPUTE_UNITS);
         long maxWorkItemDimensions = getLong(device, CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS);
@@ -149,6 +158,7 @@ public class OpenCLBuilder {
         int preferredVectorWidthDouble = getInt(device, CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE);
         
         OpenCLDevice openCLDevice = new OpenCLDevice(
+                device,
                 deviceName,
                 deviceVendor,
                 driverVersion,
@@ -156,6 +166,7 @@ public class OpenCLBuilder {
                 deviceVersion,
                 deviceExtensions,
                 deviceType,
+                endianLittle,
                 maxComputeUnits,
                 maxWorkItemDimensions,
                 maxWorkItemSizes,

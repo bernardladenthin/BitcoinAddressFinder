@@ -21,6 +21,8 @@ package net.ladenthin.bitcoinaddressfinder;
 import com.tngtech.java.junit.dataprovider.DataProvider;
 import java.math.BigInteger;
 import java.util.Arrays;
+import java.nio.ByteOrder;
+
 import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticP2PKHAddress;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticP2SHAddress;
@@ -36,6 +38,21 @@ public class CommonDataProvider {
     @DataProvider
     public static Object[][] cSecretFormat() {
         return transformFlatToObjectArrayArray(CSecretFormat.values());
+    }
+    
+    /**
+     * For {@link EndiannessConverterTest}.
+     */
+    public static final String DATA_PROVIDER_ENDIANNESS = "endiannessScenarios";
+
+    @DataProvider
+    public static Object[][] endiannessScenarios() {
+        return new Object[][] {
+            {ByteOrder.LITTLE_ENDIAN, ByteOrder.LITTLE_ENDIAN, false},
+            {ByteOrder.BIG_ENDIAN, ByteOrder.BIG_ENDIAN, false},
+            {ByteOrder.LITTLE_ENDIAN, ByteOrder.BIG_ENDIAN, true},
+            {ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN, true},
+        };
     }
 
     /**

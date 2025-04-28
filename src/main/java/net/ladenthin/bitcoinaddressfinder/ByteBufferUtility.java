@@ -177,7 +177,7 @@ public class ByteBufferUtility {
     /**
      * https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java
      */
-    public static void reverse(byte[] array) {
+    public void reverse(byte[] array) {
         if (array == null) {
             return;
         }

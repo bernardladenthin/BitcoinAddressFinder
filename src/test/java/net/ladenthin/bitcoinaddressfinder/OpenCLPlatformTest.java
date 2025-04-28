@@ -29,6 +29,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
 import static org.hamcrest.Matchers.not;
+import org.jocl.cl_context_properties;
 
 public class OpenCLPlatformTest {
 
@@ -40,7 +41,7 @@ public class OpenCLPlatformTest {
         List<OpenCLDevice> devices = Collections.emptyList();
 
         // act
-        OpenCLPlatform platform = new OpenCLPlatform(platformName, devices);
+        OpenCLPlatform platform = new OpenCLPlatform(platformName, new cl_context_properties(), devices);
 
         // assert
         assertThat(platform, is(notNullValue()));
@@ -54,7 +55,7 @@ public class OpenCLPlatformTest {
         List<OpenCLDevice> mutableList = new java.util.ArrayList<>();
 
         // act
-        OpenCLPlatform platform = new OpenCLPlatform("Immutable Test", mutableList);
+        OpenCLPlatform platform = new OpenCLPlatform("Immutable Test", new cl_context_properties(), mutableList);
 
         // try to modify list (should throw)
         platform.openCLDevices().add(null);
@@ -67,7 +68,7 @@ public class OpenCLPlatformTest {
     public void toString_containsPlatformName() {
         // arrange
         String platformName = "Platform A";
-        OpenCLPlatform platform = new OpenCLPlatform(platformName, Collections.emptyList());
+        OpenCLPlatform platform = new OpenCLPlatform(platformName, new cl_context_properties(), Collections.emptyList());
 
         // act
         String result = platform.toString();
