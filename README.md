@@ -190,6 +190,7 @@ The importer reads multiple `.txt` or `.text` files containing addresses in arbi
   * bitcoin cash
   * bitcoin gold
   * blackcoin
+  * curecoin
   * dash
   * digibyte
   * dogecoin
@@ -198,6 +199,7 @@ The importer reads multiple `.txt` or `.text` files containing addresses in arbi
   * litecoin cash
   * namecoin
   * novacoin
+  * peercoin
   * reddcoin
   * vertcoin
   * ZCash
@@ -396,6 +398,7 @@ For more in-depth information on collision resistance, address reuse risks, and 
 - [bitcoin-wallet-finder – Results and discussion](https://github.com/treyyoder/bitcoin-wallet-finder#results)
 - [PKGenerator_Checker – Instructions](https://github.com/Frankenmint/PKGenerator_Checker#instructions)
 - [BitBruteForce-Wallet – Requirements and usage](https://github.com/Xefrok/BitBruteForce-Wallet#requeriments)
+- [New Records in Collision Attacks on RIPEMD-160 and SHA-256 (ePrint 2023/285)](https://eprint.iacr.org/2023/285) – Li et al. present new records in collision attacks: 40-step RIPEMD-160 and 39-step semi-free-start SHA-256. Both hash functions are fundamental to Bitcoin address generation.
 
 
 ## Similar projects
@@ -420,6 +423,9 @@ For more in-depth information on collision resistance, address reuse risks, and 
 
 ### Deep learning private key prediction
 An export of the full database can be used to predict private keys with deep learning. A funny idea: https://github.com/DRSZL/BitcoinTensorFlowPrivateKeyPrediction
+
+## Learn more
+* https://learnmeabitcoin.com/technical/keys/public-key/
 
 ## Known Issues
 

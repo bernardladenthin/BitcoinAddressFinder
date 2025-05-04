@@ -84,27 +84,127 @@ public class PublicKeyBytes {
      */
     public static final BigInteger INVALID_PRIVATE_KEY_REPLACEMENT = BigInteger.valueOf(2);
 
-    public static final int PRIVATE_KEY_MAX_NUM_BITS = 256;
-    public static final int BITS_PER_BYTE = 8;
-    public static final int PRIVATE_KEY_MAX_NUM_BYTES = PRIVATE_KEY_MAX_NUM_BITS / BITS_PER_BYTE;
+    // ==== BEGIN: SYNCHRONIZED WITH OpenCL CONSTANTS (Do not modify without updating OpenCL) ====
+    public static final int BITS_PER_BYTE                                          = 8;
+    public static final int U32_PER_WORD                                           = 1;
+    public static final int U32_NUM_BYTES                                          = 4;
+    public static final int BYTE_SHIFT_TO_U32_MSB                                  = 24;
+    
+    // === private key ===
+    public static final int PRIVATE_KEY_MAX_NUM_BITS                               = 256;
+    public static final int PRIVATE_KEY_MAX_NUM_BYTES                              = PRIVATE_KEY_MAX_NUM_BITS / BITS_PER_BYTE; // 32
+    public static final int PRIVATE_KEY_MAX_NUM_WORDS                              = PRIVATE_KEY_MAX_NUM_BYTES / U32_NUM_BYTES; // 8
+    
+    // === SEC format prefixes ===
+    public static final int SEC_PREFIX_NUM_BITS                                    = BITS_PER_BYTE;
+    public static final int SEC_PREFIX_NUM_BYTES                                   = 1;
+    public static final int SEC_PREFIX_WORDS                                       = U32_PER_WORD;
+    public static final int SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT                    = 0x04;
+    public static final int SEC_PREFIX_COMPRESSED_ECDSA_POINT_EVEN_Y               = 0x02;
+    public static final int SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y                = 0x03;
+    
+    // ==== SEC format prefixes shifted versions (for use in u32[0] with MSB-first layout) ====
+    public static final int SEC_PREFIX_SHIFTED_NUM_BYTES                           = U32_NUM_BYTES;
+    public static final int SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT_SHIFTED            = (SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT           << BYTE_SHIFT_TO_U32_MSB);
+    public static final int SEC_PREFIX_COMPRESSED_ECDSA_POINT_EVEN_Y_SHIFTED       = (SEC_PREFIX_COMPRESSED_ECDSA_POINT_EVEN_Y << BYTE_SHIFT_TO_U32_MSB);
+    public static final int SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y_SHIFTED        = (SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y   << BYTE_SHIFT_TO_U32_MSB);
+    
+    // ==== x, y coordinate length ====
+    public static final int ONE_COORDINATE_NUM_BITS                                = 256;
+    public static final int ONE_COORDINATE_NUM_BYTES                               = ONE_COORDINATE_NUM_BITS / BITS_PER_BYTE; // 32
+    public static final int TWO_COORDINATES_NUM_BITS                               = ONE_COORDINATE_NUM_BITS * 2; // 512
+    public static final int TWO_COORDINATES_NUM_BYTES                              = ONE_COORDINATE_NUM_BYTES * 2; // 64
+    public static final int ONE_COORDINATE_U32                                     = ONE_COORDINATE_NUM_BYTES / U32_NUM_BYTES; // 8
+    public static final int TWO_COORDINATE_U32                                     = ONE_COORDINATE_U32 * 2; // 16
+    
+    // ==== public key length ====
+    public static final int SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BITS                   = SEC_PREFIX_NUM_BITS  + TWO_COORDINATES_NUM_BITS;  // 520
+    public static final int SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BYTES                  = SEC_PREFIX_NUM_BYTES + TWO_COORDINATES_NUM_BYTES; // 65
+    public static final int SEC_PUBLIC_KEY_UNCOMPRESSED_WORDS                      = SEC_PREFIX_WORDS     + TWO_COORDINATE_U32;        // 17
+    public static final int SEC_PUBLIC_KEY_COMPRESSED_NUM_BITS                     = SEC_PREFIX_NUM_BITS  + ONE_COORDINATE_NUM_BITS;   // 264
+    public static final int SEC_PUBLIC_KEY_COMPRESSED_NUM_BYTES                    = SEC_PREFIX_NUM_BYTES + ONE_COORDINATE_NUM_BYTES;  // 33
+    public static final int SEC_PUBLIC_KEY_COMPRESSED_WORDS                        = SEC_PREFIX_WORDS     + ONE_COORDINATE_U32;        // 9
+    
+    // === Hash sizes in bytes ===
+    public static final int SHA256_INPUT_BLOCK_SIZE_BITS                           = 512;
+    public static final int SHA256_INPUT_BLOCK_SIZE_BYTES                          = SHA256_INPUT_BLOCK_SIZE_BITS /  BITS_PER_BYTE; // 64
+    public static final int SHA256_INPUT_BLOCK_SIZE_WORDS                          = SHA256_INPUT_BLOCK_SIZE_BYTES / U32_NUM_BYTES; // 16
+    public static final int RIPEMD160_INPUT_BLOCK_SIZE_BITS                        = 512;
+    public static final int RIPEMD160_INPUT_BLOCK_SIZE_BYTES                       = RIPEMD160_INPUT_BLOCK_SIZE_BITS /  BITS_PER_BYTE; // 64
+    public static final int RIPEMD160_INPUT_BLOCK_SIZE_WORDS                       = RIPEMD160_INPUT_BLOCK_SIZE_BYTES / U32_NUM_BYTES; // 16
+    public static final int SHA256_HASH_NUM_BITS                                   = 256;
+    public static final int SHA256_HASH_NUM_BYTES                                  = SHA256_HASH_NUM_BITS /  BITS_PER_BYTE; // 32
+    public static final int SHA256_HASH_NUM_WORDS                                  = SHA256_HASH_NUM_BYTES / U32_NUM_BYTES; // 8
+    public static final int RIPEMD160_HASH_NUM_BITS                                = 160;
+    public static final int RIPEMD160_HASH_NUM_BYTES                               = RIPEMD160_HASH_NUM_BITS /  BITS_PER_BYTE; // 20
+    public static final int RIPEMD160_HASH_NUM_WORDS                               = RIPEMD160_HASH_NUM_BYTES / U32_NUM_BYTES; // 5
+    
+    public static final int SHA256_INPUT_BLOCKS_FOR_UNCOMPRESSED_SEC               = 2;
+    public static final int SHA256_INPUT_TOTAL_BITS_UNCOMPRESSED                   = SHA256_INPUT_BLOCKS_FOR_UNCOMPRESSED_SEC * SHA256_INPUT_BLOCK_SIZE_BITS;  // 1024
+    public static final int SHA256_INPUT_TOTAL_BYTES_UNCOMPRESSED                  = SHA256_INPUT_BLOCKS_FOR_UNCOMPRESSED_SEC * SHA256_INPUT_BLOCK_SIZE_BYTES; // 128
+    public static final int SHA256_INPUT_TOTAL_WORDS_UNCOMPRESSED                  = SHA256_INPUT_BLOCKS_FOR_UNCOMPRESSED_SEC * SHA256_INPUT_BLOCK_SIZE_WORDS; // 32
+    
+    public static final int SHA256_INPUT_BLOCKS_FOR_COMPRESSED_SEC                 = 1;
+    public static final int SHA256_INPUT_TOTAL_BITS_COMPRESSED                     = SHA256_INPUT_BLOCKS_FOR_COMPRESSED_SEC * SHA256_INPUT_BLOCK_SIZE_BITS;  // 512
+    public static final int SHA256_INPUT_TOTAL_BYTES_COMPRESSED                    = SHA256_INPUT_BLOCKS_FOR_COMPRESSED_SEC * SHA256_INPUT_BLOCK_SIZE_BYTES; // 64
+    public static final int SHA256_INPUT_TOTAL_WORDS_COMPRESSED                    = SHA256_INPUT_BLOCKS_FOR_COMPRESSED_SEC * SHA256_INPUT_BLOCK_SIZE_WORDS; // 16
+    
+    // ==== Individual Chunk Sizes (Bytes in Java) ====
+    public static final int CHUNK_SIZE_0_BIG_ENDIAN_X                              = ONE_COORDINATE_NUM_BYTES;
+    public static final int CHUNK_SIZE_1_BIG_ENDIAN_Y                              = ONE_COORDINATE_NUM_BYTES;
+    public static final int CHUNK_SIZE_2_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX         = U32_NUM_BYTES;
+    public static final int CHUNK_SIZE_3_LITTLE_ENDIAN_UNCOMPRESSED_X              = ONE_COORDINATE_NUM_BYTES;
+    public static final int CHUNK_SIZE_4_LITTLE_ENDIAN_UNCOMPRESSED_Y              = ONE_COORDINATE_NUM_BYTES;
+    public static final int CHUNK_SIZE_5_LITTLE_ENDIAN_COMPRESSED_PREFIX           = U32_NUM_BYTES;
+    public static final int CHUNK_SIZE_6_LITTLE_ENDIAN_COMPRESSED_X                = ONE_COORDINATE_NUM_BYTES;
+    public static final int CHUNK_SIZE_7_SHA256_UNCOMPRESSED                       = SHA256_HASH_NUM_BYTES;
+    public static final int CHUNK_SIZE_8_SHA256_COMPRESSED                         = SHA256_HASH_NUM_BYTES;
+    public static final int CHUNK_SIZE_9_RIPEMD160_UNCOMPRESSED                    = RIPEMD160_HASH_NUM_BYTES;
+    public static final int CHUNK_SIZE_A_RIPEMD160_COMPRESSED                      = RIPEMD160_HASH_NUM_BYTES;
+    
+    // ==== Combined Chunk Sizes ====
+    public static final int CHUNK_SIZE_01_BIG_ENDIAN_XY                            = CHUNK_SIZE_0_BIG_ENDIAN_X + CHUNK_SIZE_1_BIG_ENDIAN_Y;
+    public static final int CHUNK_SIZE_234_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX_X_Y   = CHUNK_SIZE_2_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX + CHUNK_SIZE_3_LITTLE_ENDIAN_UNCOMPRESSED_X + CHUNK_SIZE_4_LITTLE_ENDIAN_UNCOMPRESSED_Y;
+    public static final int CHUNK_SIZE_56_LITTLE_ENDIAN_COMPRESSED_PREFIX_X        = CHUNK_SIZE_5_LITTLE_ENDIAN_COMPRESSED_PREFIX + CHUNK_SIZE_6_LITTLE_ENDIAN_COMPRESSED_X;
+    
+    // ==== Offsets Within a Chunk ====
+    public static final int CHUNK_OFFSET_0_BIG_ENDIAN_X                            = 0;
+    public static final int CHUNK_OFFSET_1_BIG_ENDIAN_Y                            = CHUNK_OFFSET_0_BIG_ENDIAN_X                      + CHUNK_SIZE_0_BIG_ENDIAN_X;
+    public static final int CHUNK_OFFSET_2_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX       = CHUNK_OFFSET_1_BIG_ENDIAN_Y                      + CHUNK_SIZE_1_BIG_ENDIAN_Y;
+    public static final int CHUNK_OFFSET_3_LITTLE_ENDIAN_UNCOMPRESSED_X            = CHUNK_OFFSET_2_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX + CHUNK_SIZE_2_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX;
+    public static final int CHUNK_OFFSET_4_LITTLE_ENDIAN_UNCOMPRESSED_Y            = CHUNK_OFFSET_3_LITTLE_ENDIAN_UNCOMPRESSED_X      + CHUNK_SIZE_3_LITTLE_ENDIAN_UNCOMPRESSED_X;
+    public static final int CHUNK_OFFSET_5_LITTLE_ENDIAN_COMPRESSED_PREFIX         = CHUNK_OFFSET_4_LITTLE_ENDIAN_UNCOMPRESSED_Y      + CHUNK_SIZE_4_LITTLE_ENDIAN_UNCOMPRESSED_Y;
+    public static final int CHUNK_OFFSET_6_LITTLE_ENDIAN_COMPRESSED_X              = CHUNK_OFFSET_5_LITTLE_ENDIAN_COMPRESSED_PREFIX   + CHUNK_SIZE_5_LITTLE_ENDIAN_COMPRESSED_PREFIX;
+    public static final int CHUNK_OFFSET_7_SHA256_UNCOMPRESSED                     = CHUNK_OFFSET_6_LITTLE_ENDIAN_COMPRESSED_X        + CHUNK_SIZE_6_LITTLE_ENDIAN_COMPRESSED_X;
+    public static final int CHUNK_OFFSET_8_SHA256_COMPRESSED                       = CHUNK_OFFSET_7_SHA256_UNCOMPRESSED               + CHUNK_SIZE_7_SHA256_UNCOMPRESSED;
+    public static final int CHUNK_OFFSET_9_RIPEMD160_UNCOMPRESSED                  = CHUNK_OFFSET_8_SHA256_COMPRESSED                 + CHUNK_SIZE_8_SHA256_COMPRESSED;
+    public static final int CHUNK_OFFSET_A_RIPEMD160_COMPRESSED                    = CHUNK_OFFSET_9_RIPEMD160_UNCOMPRESSED            + CHUNK_SIZE_9_RIPEMD160_UNCOMPRESSED;
+    public static final int CHUNK_OFFSET_B_END_OF_CHUNK                            = CHUNK_OFFSET_A_RIPEMD160_COMPRESSED              + CHUNK_SIZE_A_RIPEMD160_COMPRESSED;
 
-    public static final int ONE_COORDINATE_NUM_BYTES = 32;
-    public static final int TWO_COORDINATES_NUM_BYTES = ONE_COORDINATE_NUM_BYTES * 2;
+    // ==== Combined Offsets ====
+    public static final int CHUNK_OFFSET_01_BIG_ENDIAN_XY                          = CHUNK_OFFSET_0_BIG_ENDIAN_X;
+    public static final int CHUNK_OFFSET_234_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX_X_Y = CHUNK_OFFSET_2_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX;
+    public static final int CHUNK_OFFSET_56_LITTLE_ENDIAN_COMPRESSED_PREFIX_X      = CHUNK_OFFSET_5_LITTLE_ENDIAN_COMPRESSED_PREFIX;
+    
+    // ==== Total Chunk Size ====
+    public static final int CHUNK_SIZE                                             = CHUNK_OFFSET_B_END_OF_CHUNK;
+    
+    // ==== END: SYNCHRONIZED WITH OpenCL CONSTANTS ====
     
     /**
      * Computes the maximum permissible length for an array intended to store pairs of coordinates within a 32-bit system.
      * This constant represents the upper limit on array length, factoring in the memory constraint imposed by the maximum
      * integer value addressable in Java ({@link Integer#MAX_VALUE}) and the storage requirement for two coordinates.
      * <p>
-     * The calculation divides {@link Integer#MAX_VALUE} by the number of bytes needed to store two coordinates,
-     * as defined by {@link PublicKeyBytes#TWO_COORDINATES_NUM_BYTES}, ensuring the array's indexing does not surpass
+     * The calculation divides {@link Integer#MAX_VALUE} by the number of bytes needed to store a OpenCL chunk,
+     * as defined by {@link PublicKeyBytes#CHUNK_SIZE}, ensuring the array's indexing does not surpass
      * Java's maximum allowable array length.
      * </p>
      */
-    public static final int MAXIMUM_TWO_COORDINATES_ARRAY_LENGTH = (int)(Integer.MAX_VALUE / PublicKeyBytes.TWO_COORDINATES_NUM_BYTES);
+    public static final int MAXIMUM_CHUNK_ELEMENTS = (int)(Integer.MAX_VALUE / CHUNK_SIZE);
 
     /**
-     * Determines the minimum number of bits required to address the maximum array length for storing coordinate pairs.
+     * Determines the minimum number of bits required to address the maximum array length for storing chunks.
      * This value is crucial for efficiently allocating memory without exceeding the 32-bit system's limitations.
      * <p>
      * The calculation employs a bit manipulation strategy to find the exponent of the nearest superior power of 2
@@ -115,24 +215,12 @@ public class PublicKeyBytes {
      * without breaching the 32-bit address space limitation.
      * </p>
      */
-    public static final int BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY = PublicKeyBytes.MAXIMUM_TWO_COORDINATES_ARRAY_LENGTH == 0 ? 0 : 32 - Integer.numberOfLeadingZeros(PublicKeyBytes.MAXIMUM_TWO_COORDINATES_ARRAY_LENGTH - 1) - 1;
+    public static final int BIT_COUNT_FOR_MAX_CHUNKS_ARRAY = MAXIMUM_CHUNK_ELEMENTS == 0 ? 0 : 32 - Integer.numberOfLeadingZeros(MAXIMUM_CHUNK_ELEMENTS - 1) - 1;
 
-    public static final int PARITY_BYTES_LENGTH = 1;
-
-    public static final int LAST_Y_COORDINATE_BYTE_INDEX = PublicKeyBytes.PARITY_BYTES_LENGTH + PublicKeyBytes.TWO_COORDINATES_NUM_BYTES - 1;
-
-    /**
-     * The first byte (parity) is 4 to indicate a public key with x and y
-     * coordinate (uncompressed).
-     */
-    public static final int PARITY_UNCOMPRESSED = 4;
-    public static final int PARITY_COMPRESSED_EVEN = 2;
-    public static final int PARITY_COMPRESSED_ODD = 3;
-
-    public static final int HASH160_SIZE = 20;
+    public static final int LAST_Y_COORDINATE_BYTE_INDEX = SEC_PREFIX_NUM_BYTES + TWO_COORDINATES_NUM_BYTES - 1;
     
-    public final static int PUBLIC_KEY_UNCOMPRESSED_BYTES = PARITY_BYTES_LENGTH + TWO_COORDINATES_NUM_BYTES;
-    public final static int PUBLIC_KEY_COMPRESSED_BYTES = PARITY_BYTES_LENGTH + ONE_COORDINATE_NUM_BYTES;
+    public final static int PUBLIC_KEY_UNCOMPRESSED_BYTES = SEC_PREFIX_NUM_BYTES + TWO_COORDINATES_NUM_BYTES;
+    public final static int PUBLIC_KEY_COMPRESSED_BYTES   = SEC_PREFIX_NUM_BYTES + ONE_COORDINATE_NUM_BYTES;
 
     private final byte[] uncompressed;
     private final byte[] compressed;
@@ -183,10 +271,22 @@ public class PublicKeyBytes {
         this(secretKey, uncompressed, createCompressedBytes(uncompressed));
     }
     
+    public PublicKeyBytes(BigInteger secretKey, byte[] uncompressed, byte[] uncompressedKeyHash, byte[] compressedKeyHash) {
+        this(secretKey, uncompressed, createCompressedBytes(uncompressed), uncompressedKeyHash, compressedKeyHash);
+    }
+    
     public PublicKeyBytes(BigInteger secretKey, byte[] uncompressed, byte[] compressed) {
         this.secretKey = secretKey;
         this.uncompressed = uncompressed;
         this.compressed = compressed;
+    }
+    
+    public PublicKeyBytes(BigInteger secretKey, byte[] uncompressed, byte[] compressed, byte[] uncompressedKeyHash, byte[] compressedKeyHash) {
+        this.secretKey = secretKey;
+        this.uncompressed = uncompressed;
+        this.compressed = compressed;
+        this.uncompressedKeyHash = uncompressedKeyHash;
+        this.compressedKeyHash = compressedKeyHash;
     }
     
     public static PublicKeyBytes fromPrivate(BigInteger secretKey) {
@@ -218,12 +318,12 @@ public class PublicKeyBytes {
         // parity
         boolean even = uncompressed[LAST_Y_COORDINATE_BYTE_INDEX] % 2 == 0;
         if (even) {
-            compressed[0] = PARITY_COMPRESSED_EVEN;
+            compressed[0] = SEC_PREFIX_COMPRESSED_ECDSA_POINT_EVEN_Y;
         } else {
-            compressed[0] = PARITY_COMPRESSED_ODD;
+            compressed[0] = SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y;
         }
         // x
-        System.arraycopy(uncompressed, PARITY_BYTES_LENGTH, compressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        System.arraycopy(uncompressed, SEC_PREFIX_NUM_BYTES, compressed, SEC_PREFIX_NUM_BYTES, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
         return compressed;
     }
     
@@ -250,26 +350,26 @@ public class PublicKeyBytes {
      */
     public static byte[] assembleUncompressedPublicKey(byte[] x, byte[] y) {
         byte[] uncompressed = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
-        // parity
-        uncompressed[0] = PublicKeyBytes.PARITY_UNCOMPRESSED;
+        // prefix
+        uncompressed[0] = SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT;
         // x
-        System.arraycopy(x, 0, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        System.arraycopy(x, 0, uncompressed, SEC_PREFIX_NUM_BYTES, ONE_COORDINATE_NUM_BYTES);
         // y
-        System.arraycopy(y, 0, uncompressed, PublicKeyBytes.PARITY_BYTES_LENGTH + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        System.arraycopy(y, 0, uncompressed, SEC_PREFIX_NUM_BYTES + ONE_COORDINATE_NUM_BYTES, ONE_COORDINATE_NUM_BYTES);
         return uncompressed;
     }
 
    /**
-    * Checks whether all coordinate bytes (excluding the parity byte) are zero.
+    * Checks whether all coordinate bytes (excluding the prefix byte) are zero.
     * <p>
     * This is used to detect critical failures such as a broken OpenCL kernel execution or invalid GPU output.
     * </p>
     * 
-    * @param uncompressed the full uncompressed public key byte array (parity + X + Y)
+    * @param uncompressed the full uncompressed public key byte array (prefix + X + Y)
     * @return true if all coordinate bytes are zero, false otherwise
     */
    public static boolean isAllCoordinateBytesZero(byte[] uncompressed) {
-       for (int i = PublicKeyBytes.PARITY_BYTES_LENGTH; i < uncompressed.length; i++) {
+       for (int i = SEC_PREFIX_NUM_BYTES; i < uncompressed.length; i++) {
            if (uncompressed[i] != 0) {
                return false;
            }
@@ -308,7 +408,7 @@ public class PublicKeyBytes {
         byte[] sha256 = Hashing.sha256().hashBytes(input).asBytes();
         RIPEMD160Digest digest = new RIPEMD160Digest();
         digest.update(sha256, 0, sha256.length);
-        byte[] out = new byte[HASH160_SIZE];
+        byte[] out = new byte[RIPEMD160_HASH_NUM_BYTES];
         digest.doFinal(out, 0);
         return out;
     }

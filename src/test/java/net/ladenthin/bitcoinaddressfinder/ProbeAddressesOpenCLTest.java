@@ -405,7 +405,7 @@ public class ProbeAddressesOpenCLTest {
     
     @Test
     @OpenCLTest
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_LOWER_THAN_25, location = CommonDataProvider.class)
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_LOWER_THAN_23, location = CommonDataProvider.class)
     public void createKeys_bitsLowerThan25_use32BitNevertheless(int bitSize) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 

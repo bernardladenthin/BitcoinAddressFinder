@@ -179,16 +179,16 @@ public class CommonDataProvider {
     }
 
     /**
-     * For {@link #bitSizesLowerThan25()}.
+     * For {@link #bitSizesLowerThan24()}.
      */
-    public final static String DATA_PROVIDER_BIT_SIZES_LOWER_THAN_25 = "bitSizesLowerThan25";
+    public final static String DATA_PROVIDER_BIT_SIZES_LOWER_THAN_23 = "bitSizesLowerThan23";
 
     @DataProvider
-    public static Object[][] bitSizesLowerThan25() {
+    public static Object[][] bitSizesLowerThan23() {
         // if the constant was changed, the dataprovider and its test must be changed also
         // this constant can not change because of the maximum size in 32-bit systems
-        if(PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY != 24) {
-            throw new IllegalStateException("Adapt data provider.");
+        if(PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY != 22) {
+            throw new IllegalStateException("Adapt data provider for max chunks: " + PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY);
         }
         
         return new Object[][]{
@@ -214,9 +214,7 @@ public class CommonDataProvider {
             {19},
             {20},
             {21},
-            {22},
-            {23},
-            {PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY}
+            {PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY}
         };
     }
     
@@ -584,8 +582,8 @@ public class CommonDataProvider {
     @DataProvider
     public static Object[][] privateKeysTooLargeWithChunkSize() {
         return new Object[][]{
-            {PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY, PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY},
-            {PublicKeyBytes.MAX_PRIVATE_KEY, PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY},
+            {PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY, PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
+            {PublicKeyBytes.MAX_PRIVATE_KEY, PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
         };
     }
     

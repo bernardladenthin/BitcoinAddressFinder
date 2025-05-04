@@ -77,7 +77,7 @@ public class AddressTxtLine {
             SegwitAddress segwitAddress = SegwitAddress.fromBech32(address, keyUtility.network);
             byte[] hash = segwitAddress.getHash();
             ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash);
-            if (hash160.limit() != PublicKeyBytes.HASH160_SIZE) {
+            if (hash160.limit() != PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES) {
                 // unsupported (32 bytes): https://privatekeys.pw/bitcoin/address/bc1qp762gmkychywl4elnuyuwph68hqw0uc2jkzu3ax48zfjkskslpsq8p66gf
                 return null;
             }
@@ -107,8 +107,14 @@ public class AddressTxtLine {
             return null;
         } else if (address.startsWith("p")) {
             // p: bitcoin cash / CashAddr (P2SH), this is a unique format and does not work
-            return null;
-        } else if (address.startsWith("7") || address.startsWith("A") || address.startsWith("9") || address.startsWith("M") || address.startsWith("3") || address.startsWith("t") || address.startsWith("X") || address.startsWith("D") || address.startsWith("L") || address.startsWith("G") || address.startsWith("B") || address.startsWith("V") || address.startsWith("N") || address.startsWith("4") || address.startsWith("R")) {
+            // p: peercoin possible
+            try {
+                ByteBuffer hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_ZCASH);
+                return new AddressToCoin(hash160, amount);
+            } catch (RuntimeException e) {
+                return null;
+            }
+        } else if (address.startsWith("7") || address.startsWith("A") || address.startsWith("9") || address.startsWith("M") || address.startsWith("3") || address.startsWith("t") || address.startsWith("X") || address.startsWith("D") || address.startsWith("L") || address.startsWith("G") || address.startsWith("B") || address.startsWith("V") || address.startsWith("N") || address.startsWith("4") || address.startsWith("P") || address.startsWith("R")) {
             // prefix clashes for signs: 7
             //
             // Base58 P2SH
@@ -120,6 +126,7 @@ public class AddressTxtLine {
             // t: Zcash
             //
             // Base58 P2PKH
+            // B: curecoin
             // X: dash
             // D: dogecoin / digibyte
             // L: litecoin
@@ -129,6 +136,7 @@ public class AddressTxtLine {
             // V: vertcoin
             // N: namecoin
             // 4: novacoin
+            // P: Peercoin
             // R: reddcoin
             // t: Zcash
 

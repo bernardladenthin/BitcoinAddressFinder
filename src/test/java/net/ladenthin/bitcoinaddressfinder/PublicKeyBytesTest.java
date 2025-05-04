@@ -131,7 +131,7 @@ public class PublicKeyBytesTest {
         ECKey ecKey = ECKey.fromPrivate(secretKey, false);
         byte[] uncompressed = ecKey.getPubKey();
         byte[] compressed = ECKey.fromPrivate(secretKey, true).getPubKey();
-        byte[] wrongCompressedHash = new byte[PublicKeyBytes.HASH160_SIZE]; // all-zero hash (invalid)
+        byte[] wrongCompressedHash = new byte[PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES]; // all-zero hash (invalid)
 
         PublicKeyBytes publicKeyBytes = new PublicKeyBytes(secretKey, uncompressed, wrongCompressedHash);
 
@@ -152,7 +152,7 @@ public class PublicKeyBytesTest {
         ECKey ecKey = ECKey.fromPrivate(secretKey, false);
         byte[] uncompressed = ecKey.getPubKey();
         byte[] compressed = ECKey.fromPrivate(secretKey, true).getPubKey();
-        byte[] wrongUncompressedHash = new byte[PublicKeyBytes.HASH160_SIZE]; // all-zero hash (invalid)
+        byte[] wrongUncompressedHash = new byte[PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES]; // all-zero hash (invalid)
 
         PublicKeyBytes publicKeyBytes = new PublicKeyBytes(secretKey, wrongUncompressedHash, compressed);
 
@@ -202,10 +202,10 @@ public class PublicKeyBytesTest {
         byte[] result = PublicKeyBytes.assembleUncompressedPublicKey(x, y);
 
         // assert
-        assertThat(result[0], is((byte) PublicKeyBytes.PARITY_UNCOMPRESSED));
+        assertThat(result[0], is((byte) PublicKeyBytes.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT));
         for (int i = 0; i < PublicKeyBytes.ONE_COORDINATE_NUM_BYTES; i++) {
-            assertThat("X coordinate mismatch at index " + i, result[i + PublicKeyBytes.PARITY_BYTES_LENGTH], is(x[i]));
-            assertThat("Y coordinate mismatch at index " + i, result[i + PublicKeyBytes.PARITY_BYTES_LENGTH + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES], is(y[i]));
+            assertThat("X coordinate mismatch at index " + i, result[i + PublicKeyBytes.SEC_PREFIX_NUM_BYTES], is(x[i]));
+            assertThat("Y coordinate mismatch at index " + i, result[i + PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES], is(y[i]));
         }
     }
 
@@ -219,8 +219,8 @@ public class PublicKeyBytesTest {
         byte[] result = PublicKeyBytes.assembleUncompressedPublicKey(x, y);
 
         // assert
-        assertThat(result[0], is((byte) PublicKeyBytes.PARITY_UNCOMPRESSED));
-        for (int i = PublicKeyBytes.PARITY_BYTES_LENGTH; i < result.length; i++) {
+        assertThat(result[0], is((byte) PublicKeyBytes.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT));
+        for (int i = PublicKeyBytes.SEC_PREFIX_NUM_BYTES; i < result.length; i++) {
             assertThat("Expected zero at index " + i, result[i], is((byte) 0x00));
         }
     }
@@ -253,8 +253,8 @@ public class PublicKeyBytesTest {
         byte[] pubKey = ecKey.getPubKey(); // full uncompressed pubkey (parity + X + Y)
 
         // extract X and Y from real ECKey
-        byte[] x = Arrays.copyOfRange(pubKey, PublicKeyBytes.PARITY_BYTES_LENGTH, PublicKeyBytes.PARITY_BYTES_LENGTH + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
-        byte[] y = Arrays.copyOfRange(pubKey, PublicKeyBytes.PARITY_BYTES_LENGTH + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES, PublicKeyBytes.PARITY_BYTES_LENGTH + PublicKeyBytes.TWO_COORDINATES_NUM_BYTES);
+        byte[] x = Arrays.copyOfRange(pubKey, PublicKeyBytes.SEC_PREFIX_NUM_BYTES, PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        byte[] y = Arrays.copyOfRange(pubKey, PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES, PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.TWO_COORDINATES_NUM_BYTES);
 
         // act
         byte[] assembledUncompressed = PublicKeyBytes.assembleUncompressedPublicKey(x, y);
@@ -285,7 +285,7 @@ public class PublicKeyBytesTest {
     public void isAllCoordinateBytesZero_validKey_returnsFalse() {
         // arrange
         byte[] validUncompressedKey = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
-        validUncompressedKey[0] = PublicKeyBytes.PARITY_UNCOMPRESSED;
+        validUncompressedKey[0] = PublicKeyBytes.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT;
         validUncompressedKey[1] = 0x01; // at least one non-zero coordinate byte
 
         // act
@@ -299,7 +299,7 @@ public class PublicKeyBytesTest {
     public void isAllCoordinateBytesZero_allCoordinateBytesZero_returnsTrue() {
         // arrange
         byte[] invalidUncompressedKey = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
-        invalidUncompressedKey[0] = PublicKeyBytes.PARITY_UNCOMPRESSED; // parity byte set
+        invalidUncompressedKey[0] = PublicKeyBytes.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT; // prefix byte set
 
         // act
         boolean result = PublicKeyBytes.isAllCoordinateBytesZero(invalidUncompressedKey);
@@ -312,7 +312,7 @@ public class PublicKeyBytesTest {
     public void isAllCoordinateBytesZero_validKeyOnlyLastByteNonZero_returnsFalse() {
         // arrange
         byte[] validUncompressedKey = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
-        validUncompressedKey[0] = PublicKeyBytes.PARITY_UNCOMPRESSED;
+        validUncompressedKey[0] = PublicKeyBytes.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT;
         validUncompressedKey[validUncompressedKey.length - 1] = 0x01; // last coordinate byte non-zero
 
         // act

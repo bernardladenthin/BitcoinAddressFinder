@@ -52,6 +52,10 @@ public enum StaticP2PKHAddress implements PublicAddress {
      */
     Blackcoin("BF58Wm7hXSPXxfXm6HwrkWAr45qrZhNHJu", "7482a6aabd8e0bdb6d56a507a6f1352f7cc872fa"),
     /**
+     * https://chainz.cryptoid.info/cure/address.dws?12256.htm
+     */
+    Curecoin("B4dbDb5Qt7DifAd26LqJZi756fNB9YS2JB", "01fcde97ab8306f16ea73417c5e474c42b647ffb"),
+    /**
      * https://privatekeys.pw/dash/address/XdAUmwtig27HBG6WfYyHAzP8n6XC9jESEw
      */
     Dash("XdAUmwtig27HBG6WfYyHAzP8n6XC9jESEw", "1b2a522cc8d42b0be7ceb8db711416794d50c846"),
@@ -83,6 +87,14 @@ public enum StaticP2PKHAddress implements PublicAddress {
      * https://bitinfocharts.com/de/novacoin/address/4aLpet1cqwr6TuEb8grfAnpvD1eJbTqyvN
      */
     Novacoin("4aLpet1cqwr6TuEb8grfAnpvD1eJbTqyvN", "e261b8251b26231b0e2d62d7f6698d7acee1dbae"),
+    /**
+     * https://chainz.cryptoid.info/ppc/address.dws?932101.htm
+     */
+    Peercoin("PN9ZrKwPttJxM8VMsfBFtAWzbycpG2cosD", "94b9e4350dd548e23642a903b79ec90d65ede272"),
+    /**
+     * https://chainz.cryptoid.info/ppc/address.dws?1288727.htm
+     */
+    Peercoin_SmallPrefix("p77CZFn9jvg9waCzKBzkQfSvBBzPH1nRre", "23c89acd257e796c209f6f1914ed999f45076d10"),
     /**
      * https://bitinfocharts.com/de/reddcoin/address/RdLmuVt2ByWxXhiqhKSk4aV9UPLj6Lu3HL
      */

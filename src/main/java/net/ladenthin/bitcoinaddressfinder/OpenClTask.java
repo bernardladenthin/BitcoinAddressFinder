@@ -90,7 +90,7 @@ public class OpenClTask {
     }
 
     public long getDstSizeInBytes() {
-        return (long) PublicKeyBytes.TWO_COORDINATES_NUM_BYTES * bitHelper.convertBitsToSize(cProducer.batchSizeInBits);
+        return (long) PublicKeyBytes.CHUNK_SIZE * bitHelper.convertBitsToSize(cProducer.batchSizeInBits);
     }
 
     public void setSrcPrivateKeyChunk(BigInteger privateKeyBase) {

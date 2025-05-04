@@ -149,7 +149,7 @@ public class ConsumerJava implements Consumer {
      */
     private void consumeKeysRunner() {
         logger.info("start consumeKeysRunner");
-        ByteBuffer threadLocalReuseableByteBuffer = ByteBuffer.allocateDirect(PublicKeyBytes.HASH160_SIZE);
+        ByteBuffer threadLocalReuseableByteBuffer = ByteBuffer.allocateDirect(PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES);
         
         while (shouldRun.get()) {
             if (keysQueue.size() >= consumerJava.queueSize) {

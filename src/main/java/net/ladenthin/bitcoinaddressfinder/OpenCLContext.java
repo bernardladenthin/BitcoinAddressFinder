@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URL;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -78,6 +77,10 @@ public class OpenCLContext {
         resourceNames.add("copyfromhashcat/inc_platform.cl");
         resourceNames.add("copyfromhashcat/inc_common.h");
         resourceNames.add("copyfromhashcat/inc_common.cl");
+        resourceNames.add("copyfromhashcat/inc_hash_sha256.h");
+        resourceNames.add("copyfromhashcat/inc_hash_sha256.cl");
+        resourceNames.add("copyfromhashcat/inc_hash_ripemd160.h");
+        resourceNames.add("copyfromhashcat/inc_hash_ripemd160.cl");
 
         resourceNames.add("copyfromhashcat/inc_ecc_secp256k1.h");
         resourceNames.add("copyfromhashcat/inc_ecc_secp256k1.cl");
@@ -163,7 +166,7 @@ public class OpenCLContext {
         openClTask.setSrcPrivateKeyChunk(privateKeyBase);
         ByteBuffer dstByteBuffer = openClTask.executeKernel(kernel, commandQueue);
 
-        OpenCLGridResult openCLGridResult = new OpenCLGridResult(privateKeyBase, device.getByteOrder(), bitHelper.convertBitsToSize(producerOpenCL.batchSizeInBits), dstByteBuffer);
+        OpenCLGridResult openCLGridResult = new OpenCLGridResult(privateKeyBase, bitHelper.convertBitsToSize(producerOpenCL.batchSizeInBits), dstByteBuffer);
         return openCLGridResult;
     }
 

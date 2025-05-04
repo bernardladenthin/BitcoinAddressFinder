@@ -18,6 +18,7 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import java.util.Arrays;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -41,13 +42,11 @@ public class OpenCLGridResult {
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
     
     private final BigInteger secretKeyBase;
-    private final ByteOrder clByteOrder;
     private final int workSize;
     private ByteBuffer result;
     
-    OpenCLGridResult(BigInteger secretKeyBase, ByteOrder clByteOrder, int workSize, ByteBuffer result) {
+    OpenCLGridResult(BigInteger secretKeyBase, int workSize, ByteBuffer result) {
         this.secretKeyBase = secretKeyBase;
-        this.clByteOrder = clByteOrder;
         this.workSize = workSize;
         this.result = result;
     }
@@ -93,10 +92,15 @@ public class OpenCLGridResult {
     public PublicKeyBytes[] getPublicKeyBytes() {
         PublicKeyBytes[] publicKeys = new PublicKeyBytes[workSize];
         for (int i = 0; i < workSize; i++) {
-            PublicKeyBytes publicKeyBytes = getPublicKeyFromByteBufferXY(clByteOrder, byteBufferUtility, result, i, secretKeyBase);
+            PublicKeyBytes publicKeyBytes = getPublicKeyFromByteBufferXY(byteBufferUtility, result, i, secretKeyBase);
             publicKeys[i] = publicKeyBytes;
         }
         return publicKeys;
+    }
+    
+    public static byte[] trimU32PrefixBytes(byte[] fullArray) {
+        final int PREFIX_BYTES_TO_SKIP = 3;
+        return Arrays.copyOfRange(fullArray, PREFIX_BYTES_TO_SKIP, fullArray.length);
     }
 
     /**
@@ -118,7 +122,6 @@ public class OpenCLGridResult {
      *   <li>32 bytes: Y coordinate</li>
      * </ul>
      *
-     * @param clByteOrder the {@link ByteOrder} used by the OpenCL device (e.g., Little-Endian)
      * @param byteBufferUtility the {@link ByteBufferUtility} instance for array operations
      * @param resultBuffer the {@link ByteBuffer} containing the OpenCL kernel output
      * @param keyNumber the index of the key to extract (based on work-item ID)
@@ -126,43 +129,82 @@ public class OpenCLGridResult {
      * @return a {@link PublicKeyBytes} object representing the reconstructed public key
      * @throws RuntimeException if all coordinate bytes are zero (invalid GPU output)
      */
-    private static final PublicKeyBytes getPublicKeyFromByteBufferXY(ByteOrder clByteOrder, ByteBufferUtility byteBufferUtility, ByteBuffer resultBuffer, int keyNumber, BigInteger secretKeyBase) {
+    private static final PublicKeyBytes getPublicKeyFromByteBufferXY(ByteBufferUtility byteBufferUtility, ByteBuffer resultBuffer, int keyNumber, BigInteger secretKeyBase) {
         BigInteger secret = AbstractProducer.calculateSecretKey(secretKeyBase, keyNumber);
         if(BigInteger.ZERO.equals(secret)) {
             // the calculated key is invalid, return a fallback
             return PublicKeyBytes.INVALID_KEY_ONE;
         }
-        final int resultBlockSize = PublicKeyBytes.TWO_COORDINATES_NUM_BYTES;
-        final int keyOffsetInByteBuffer = resultBlockSize*keyNumber;
+        final int keyOffsetInByteBuffer = PublicKeyBytes.CHUNK_SIZE*keyNumber;
         
-        // Read XY block
-        byte[] kernelResultBlock = new byte[resultBlockSize];
-        resultBuffer.get(keyOffsetInByteBuffer, kernelResultBlock, 0, resultBlockSize);
+        // Read a chunk completely
+        byte[] kernelResultChunk = new byte[PublicKeyBytes.CHUNK_SIZE];
+        resultBuffer.get(keyOffsetInByteBuffer, kernelResultChunk, 0, PublicKeyBytes.CHUNK_SIZE);
         
-        EndiannessConverter endiannessConverter = new EndiannessConverter(clByteOrder, ByteOrder.BIG_ENDIAN, byteBufferUtility);
-        
-        // Extract x
-        byte[] x = new byte[PublicKeyBytes.ONE_COORDINATE_NUM_BYTES];
-        System.arraycopy(kernelResultBlock, 0, x, 0, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        EndiannessConverter endiannessConverter = new EndiannessConverter(ByteOrder.LITTLE_ENDIAN, ByteOrder.BIG_ENDIAN, byteBufferUtility);
+        // Extract X from BigEndian
+        byte[] xFromBigEndian = Arrays.copyOfRange(
+            kernelResultChunk,
+            PublicKeyBytes.CHUNK_OFFSET_0_BIG_ENDIAN_X,
+            PublicKeyBytes.CHUNK_OFFSET_0_BIG_ENDIAN_X + PublicKeyBytes.CHUNK_SIZE_0_BIG_ENDIAN_X
+        );
         // To SEC format (Big-Endian) (MSB-first)
-        endiannessConverter.convertEndian(x);
+        endiannessConverter.convertEndian(xFromBigEndian);
         
-        // Extract Y
-        byte[] y = new byte[PublicKeyBytes.ONE_COORDINATE_NUM_BYTES];
-        System.arraycopy(kernelResultBlock, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES, y, 0, PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        // Extract Y from BigEndian
+        byte[] yFromBigEndian = Arrays.copyOfRange(
+            kernelResultChunk,
+            PublicKeyBytes.CHUNK_OFFSET_1_BIG_ENDIAN_Y,
+            PublicKeyBytes.CHUNK_OFFSET_1_BIG_ENDIAN_Y + PublicKeyBytes.CHUNK_SIZE_1_BIG_ENDIAN_Y
+        );
         // To SEC format (Big-Endian) (MSB-first)
-        endiannessConverter.convertEndian(y);
+        endiannessConverter.convertEndian(yFromBigEndian);
+        
+        // Extract U32 Parity, X, Y from LittleEndian
+        byte[] u32parity_xy_FromLittleEndian = Arrays.copyOfRange(
+            kernelResultChunk,
+            PublicKeyBytes.CHUNK_OFFSET_234_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX_X_Y,
+            PublicKeyBytes.CHUNK_OFFSET_234_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX_X_Y + PublicKeyBytes.CHUNK_SIZE_234_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX_X_Y
+        );
+        byte[] prefix_xy_FromLittleEndian = trimU32PrefixBytes(u32parity_xy_FromLittleEndian);
+ 
+        // Extract U32 Parity, X from LittleEndian
+        byte[] u32parity_x_FromLittleEndian = Arrays.copyOfRange(
+            kernelResultChunk,
+            PublicKeyBytes.CHUNK_OFFSET_56_LITTLE_ENDIAN_COMPRESSED_PREFIX_X,
+            PublicKeyBytes.CHUNK_OFFSET_56_LITTLE_ENDIAN_COMPRESSED_PREFIX_X + PublicKeyBytes.CHUNK_SIZE_56_LITTLE_ENDIAN_COMPRESSED_PREFIX_X
+        );
+        byte[] prefix_x_FromLittleEndian = trimU32PrefixBytes(u32parity_x_FromLittleEndian);
+        
+        // Extract RIPEMD160 for uncompressed key
+        byte[] ripemd160Uncompressed = Arrays.copyOfRange(
+            kernelResultChunk,
+            PublicKeyBytes.CHUNK_OFFSET_9_RIPEMD160_UNCOMPRESSED,
+            PublicKeyBytes.CHUNK_OFFSET_9_RIPEMD160_UNCOMPRESSED + PublicKeyBytes.CHUNK_SIZE_9_RIPEMD160_UNCOMPRESSED
+        );
+        
+        // Extract RIPEMD160 for uncompressed key
+        byte[] ripemd160Compressed = Arrays.copyOfRange(
+            kernelResultChunk,
+            PublicKeyBytes.CHUNK_OFFSET_A_RIPEMD160_COMPRESSED,
+            PublicKeyBytes.CHUNK_OFFSET_A_RIPEMD160_COMPRESSED + PublicKeyBytes.CHUNK_SIZE_A_RIPEMD160_COMPRESSED
+        );
         
         // Assemble uncompressed key
-        byte[] uncompressed = PublicKeyBytes.assembleUncompressedPublicKey(x, y);
+        byte[] uncompressedFromBigEndian = PublicKeyBytes.assembleUncompressedPublicKey(xFromBigEndian, yFromBigEndian);
         
         if (ENABLE_UNCOMPRESSED_KEY_VALIDATION) {
-            boolean allZero = PublicKeyBytes.isAllCoordinateBytesZero(uncompressed);
+            boolean allZero = PublicKeyBytes.isAllCoordinateBytesZero(uncompressedFromBigEndian);
             if (allZero) {
                 throw new RuntimeException("Invalid GPU result: all coordinate bytes are zero in uncompressed public key.");
             }
         }
-        PublicKeyBytes publicKeyBytes = new PublicKeyBytes(secret, uncompressed);
-        return publicKeyBytes;
+        
+        PublicKeyBytes publicKeyBytesFromBig = new PublicKeyBytes(secret, uncompressedFromBigEndian, ripemd160Uncompressed, ripemd160Compressed);
+        PublicKeyBytes publicKeyBytesFromLittle = new PublicKeyBytes(secret, prefix_xy_FromLittleEndian, prefix_x_FromLittleEndian, ripemd160Uncompressed, ripemd160Compressed);
+        
+        final PublicKeyBytes publicKeyBytesUsed = publicKeyBytesFromLittle;
+        
+        return publicKeyBytesUsed;
     }
 }

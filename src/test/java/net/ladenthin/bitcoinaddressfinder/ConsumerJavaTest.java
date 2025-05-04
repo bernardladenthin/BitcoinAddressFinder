@@ -522,7 +522,7 @@ public class ConsumerJavaTest {
     }
 
     private ByteBuffer createHash160ByteBuffer() {
-        ByteBuffer threadLocalReuseableByteBuffer = ByteBuffer.allocateDirect(PublicKeyBytes.HASH160_SIZE);
+        ByteBuffer threadLocalReuseableByteBuffer = ByteBuffer.allocateDirect(PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES);
         return threadLocalReuseableByteBuffer;
     }
 }

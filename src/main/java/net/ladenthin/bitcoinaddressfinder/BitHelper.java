@@ -34,8 +34,8 @@ public class BitHelper {
         if (batchSizeInBits < 0) {
             throw new IllegalArgumentException("batchSizeInBits must higher or equal to 0.");
         }
-        if (batchSizeInBits > PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY) {
-            throw new IllegalArgumentException("batchSizeInBits must be lower or equal than " + PublicKeyBytes.BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY + ".");
+        if (batchSizeInBits > PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY) {
+            throw new IllegalArgumentException("batchSizeInBits must be lower or equal than " + PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY + ".");
         }
     }
 }

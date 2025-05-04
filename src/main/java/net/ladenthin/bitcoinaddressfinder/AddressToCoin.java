@@ -30,7 +30,7 @@ import org.jspecify.annotations.NonNull;
 public record AddressToCoin(@NonNull ByteBuffer hash160, @NonNull Coin coin) {
 
     public AddressToCoin {
-        if (hash160.limit() != PublicKeyBytes.HASH160_SIZE) {
+        if (hash160.limit() != PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES) {
             throw new IllegalArgumentException("Given hash160 has not the correct size: " + hash160.limit());
         }
     }
