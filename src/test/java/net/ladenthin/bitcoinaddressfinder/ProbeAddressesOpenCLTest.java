@@ -64,7 +64,6 @@ public class ProbeAddressesOpenCLTest {
     
     private static final TestAddresses42 testAddresses = new TestAddresses42(1024, false);
     
-    public final static int BYTES_FOR_INT = 4;
     /**
      * 22:  256Mb: executed in: 1253ms, read in:  74ms
      * 23:  512Mb: executed in: 2346ms, read in: 148ms
@@ -396,16 +395,9 @@ public class ProbeAddressesOpenCLTest {
                 global_work_size, null, 0, null, null);
     }
 
-    
-    public final static int PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array = 9;
-    public final static int PRIVATE_KEY_LENGTH_U32Array = 8;
-    public final static int PUBLIC_KEY_LENGTH_X_Y_WITHOUT_PARITY = 16;
-    public final static int SECP256K1_PRE_COMPUTED_XY_SIZE = 12*8;
-
-    
     @Test
     @OpenCLTest
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_LOWER_THAN_23, location = CommonDataProvider.class)
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_24, location = CommonDataProvider.class)
     public void createKeys_bitsLowerThan25_use32BitNevertheless(int bitSize) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
@@ -536,7 +528,7 @@ public class ProbeAddressesOpenCLTest {
             // OpenCL provides the bytes in device-specific endianness (could be little-endian or big-endian).
             // BigInteger(byte[]) always expects a Big-Endian (MSB-first) format.
             // Therefore, we convert the device-endian buffer to Big-Endian before creating the BigInteger.
-            EndiannessConverter endiannessConverter = new EndiannessConverter(openClTask.getClByteOrder(), ByteOrder.BIG_ENDIAN, byteBufferUtility);
+            EndiannessConverter endiannessConverter = new EndiannessConverter(ByteOrder.LITTLE_ENDIAN, ByteOrder.BIG_ENDIAN, byteBufferUtility);
             endiannessConverter.convertEndian(bigEndianBytes);
 
             BigInteger result = new BigInteger(1, bigEndianBytes);
@@ -733,20 +725,20 @@ public class ProbeAddressesOpenCLTest {
     @Deprecated
     private static final byte[] getPublicKeyFromByteBuffer(ByteBuffer b, int keyOffset) {
         int paddingBytes = 3;
-        int publicKeyByteLength = PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array * BYTES_FOR_INT;
+        int publicKeyByteLength = PublicKeyBytes.SEC_PUBLIC_KEY_COMPRESSED_WORDS * PublicKeyBytes.U32_NUM_BYTES;
         byte[] publicKey = new byte[publicKeyByteLength - paddingBytes];
         // its not inverted because the memory was written in OpenCL
         int offset = publicKeyByteLength * keyOffset;
         outer:
-        for (int i=0; i<PUBLIC_KEY_LENGTH_WITH_PARITY_U32Array; i++) {
-            int x = i*BYTES_FOR_INT;
-            for (int j = 0; j < BYTES_FOR_INT; j++) {
+        for (int i=0; i<PublicKeyBytes.SEC_PUBLIC_KEY_COMPRESSED_WORDS; i++) {
+            int x = i*PublicKeyBytes.U32_NUM_BYTES;
+            for (int j = 0; j < PublicKeyBytes.U32_NUM_BYTES; j++) {
                 int publicKeyOffset = x+j;
                 if (publicKeyOffset == publicKey.length) {
                     // return the public key, read of all bytes finish
                     break outer;
                 }
-                int y = BYTES_FOR_INT-j-1;
+                int y = PublicKeyBytes.U32_NUM_BYTES-j-1;
                 int byteBufferOffset = offset+x+y;
                 publicKey[publicKeyOffset] = b.get(byteBufferOffset);
             }

@@ -179,15 +179,15 @@ public class CommonDataProvider {
     }
 
     /**
-     * For {@link #bitSizesLowerThan24()}.
+     * For {@link #bitSizesAtMost24()}.
      */
-    public final static String DATA_PROVIDER_BIT_SIZES_LOWER_THAN_23 = "bitSizesLowerThan23";
+    public final static String DATA_PROVIDER_BIT_SIZES_AT_MOST_24 = "bitSizesAtMost24";
 
     @DataProvider
-    public static Object[][] bitSizesLowerThan23() {
+    public static Object[][] bitSizesAtMost24() {
         // if the constant was changed, the dataprovider and its test must be changed also
         // this constant can not change because of the maximum size in 32-bit systems
-        if(PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY != 22) {
+        if(PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY != 24) {
             throw new IllegalStateException("Adapt data provider for max chunks: " + PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY);
         }
         
@@ -214,6 +214,8 @@ public class CommonDataProvider {
             {19},
             {20},
             {21},
+            {22},
+            {23},
             {PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY}
         };
     }

@@ -75,7 +75,7 @@ public class BitHelperTest {
     }
     
     @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_LOWER_THAN_23, location = CommonDataProvider.class)
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_24, location = CommonDataProvider.class)
     public void assertBatchSizeInBitsIsInRange_bitsGivenInRange_exceptionThrown(int bits) throws IOException {
         // arrange
         BitHelper bitHelper = new BitHelper();

@@ -147,7 +147,7 @@ public class OpenCLContext {
         // Create the kernel
         kernel = clCreateKernel(program, KERNEL_NAME, null);
         
-        openClTask = new OpenClTask(context, device.getByteOrder(), producerOpenCL, bitHelper, byteBufferUtility);
+        openClTask = new OpenClTask(context, producerOpenCL, bitHelper, byteBufferUtility);
     }
 
     OpenClTask getOpenClTask() {

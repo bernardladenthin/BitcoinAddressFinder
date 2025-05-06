@@ -55,7 +55,6 @@ public class OpenClTask {
     private final CProducer cProducer;
 
     private final cl_context context;
-    private final ByteOrder clByteOrder;
     private final ByteBuffer srcByteBuffer;
     private final Pointer srcPointer;
 
@@ -65,12 +64,11 @@ public class OpenClTask {
     private final BigInteger maxPrivateKeyForBatchSize;
 
     // Only available after init
-    public OpenClTask(cl_context context, ByteOrder clByteOrder, CProducer cProducer, BitHelper bitHelper, ByteBufferUtility byteBufferUtility) {
+    public OpenClTask(cl_context context, CProducer cProducer, BitHelper bitHelper, ByteBufferUtility byteBufferUtility) {
         this.context = context;
         this.cProducer = cProducer;
         this.bitHelper = bitHelper;
         this.byteBufferUtility = byteBufferUtility;
-        this.clByteOrder = clByteOrder;
 
         int srcSizeInBytes = getSrcSizeInBytes();
         maxPrivateKeyForBatchSize = KeyUtility.getMaxPrivateKeyForBatchSize(cProducer.batchSizeInBits);
@@ -90,9 +88,27 @@ public class OpenClTask {
     }
 
     public long getDstSizeInBytes() {
-        return (long) PublicKeyBytes.CHUNK_SIZE * bitHelper.convertBitsToSize(cProducer.batchSizeInBits);
+        return (long) PublicKeyBytes.CHUNK_SIZE_NUM_BYTES * bitHelper.convertBitsToSize(cProducer.batchSizeInBits);
     }
 
+    /**
+    * Writes the base private key to the source buffer in the format expected by the OpenCL kernel.
+    * <p>
+    * The method ensures that the provided private key is valid for the current batch size. If it exceeds
+    * the allowed range, a {@link PrivateKeyTooLargeException} is thrown.
+    * <p>
+    * Internally, the private key is first converted to a byte array in Big-Endian format (as returned
+    * by {@link BigInteger#toByteArray()}). Because the OpenCL kernel expects the private key as a
+    * {@code __global const u32 *k} array in <strong>Little-Endian</strong> word order, the byte array
+    * is then converted from Big-Endian to Little-Endian before being written to the OpenCL input buffer.
+    * <p>
+    * This matches the behavior of the OpenCL kernel {@code generateKeysKernel_grid}, which reads the key
+    * using {@code copy_u32_array(k_littleEndian_local, k, ...)} assuming Little-Endian input and applies
+    * the work-item ID to the least-significant word.
+    *
+    * @param privateKeyBase the base private key used as input to the OpenCL kernel
+    * @throws PrivateKeyTooLargeException if the key is too large for the current batch size
+    */
     public void setSrcPrivateKeyChunk(BigInteger privateKeyBase) {
         if (KeyUtility.isInvalidWithBatchSize(privateKeyBase, maxPrivateKeyForBatchSize)) {
             throw new PrivateKeyTooLargeException(privateKeyBase, maxPrivateKeyForBatchSize, cProducer.batchSizeInBits);
@@ -102,7 +118,7 @@ public class OpenClTask {
         // meaning the most significant byte (MSB) comes first.
         // Therefore, the source format is always Big Endian.
         byte[] byteArray = byteBufferUtility.bigIntegerToBytes(privateKeyBase);
-        EndiannessConverter endiannessConverter = new EndiannessConverter(ByteOrder.BIG_ENDIAN, clByteOrder, byteBufferUtility);
+        EndiannessConverter endiannessConverter = new EndiannessConverter(ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN, byteBufferUtility);
         endiannessConverter.convertEndian(byteArray);
         byteBufferUtility.putToByteBuffer(srcByteBuffer, byteArray);
     }
@@ -110,11 +126,6 @@ public class OpenClTask {
     @VisibleForTesting
     public ByteBuffer getSrcByteBuffer() {
         return srcByteBuffer;
-    }
-    
-    @VisibleForTesting
-    public ByteOrder getClByteOrder() {
-        return clByteOrder;
     }
 
     public ByteBuffer executeKernel(cl_kernel kernel, cl_command_queue commandQueue) {

@@ -98,7 +98,7 @@ public class PublicKeyBytes {
     // === SEC format prefixes ===
     public static final int SEC_PREFIX_NUM_BITS                                    = BITS_PER_BYTE;
     public static final int SEC_PREFIX_NUM_BYTES                                   = 1;
-    public static final int SEC_PREFIX_WORDS                                       = U32_PER_WORD;
+    public static final int SEC_PREFIX_NUM_WORDS                                   = U32_PER_WORD;
     public static final int SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT                    = 0x04;
     public static final int SEC_PREFIX_COMPRESSED_ECDSA_POINT_EVEN_Y               = 0x02;
     public static final int SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y                = 0x03;
@@ -114,16 +114,16 @@ public class PublicKeyBytes {
     public static final int ONE_COORDINATE_NUM_BYTES                               = ONE_COORDINATE_NUM_BITS / BITS_PER_BYTE; // 32
     public static final int TWO_COORDINATES_NUM_BITS                               = ONE_COORDINATE_NUM_BITS * 2; // 512
     public static final int TWO_COORDINATES_NUM_BYTES                              = ONE_COORDINATE_NUM_BYTES * 2; // 64
-    public static final int ONE_COORDINATE_U32                                     = ONE_COORDINATE_NUM_BYTES / U32_NUM_BYTES; // 8
-    public static final int TWO_COORDINATE_U32                                     = ONE_COORDINATE_U32 * 2; // 16
+    public static final int ONE_COORDINATE_NUM_WORDS                               = ONE_COORDINATE_NUM_BYTES / U32_NUM_BYTES; // 8
+    public static final int TWO_COORDINATE_NUM_WORDS                               = ONE_COORDINATE_NUM_WORDS * 2; // 16
     
     // ==== public key length ====
     public static final int SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BITS                   = SEC_PREFIX_NUM_BITS  + TWO_COORDINATES_NUM_BITS;  // 520
     public static final int SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BYTES                  = SEC_PREFIX_NUM_BYTES + TWO_COORDINATES_NUM_BYTES; // 65
-    public static final int SEC_PUBLIC_KEY_UNCOMPRESSED_WORDS                      = SEC_PREFIX_WORDS     + TWO_COORDINATE_U32;        // 17
+    public static final int SEC_PUBLIC_KEY_UNCOMPRESSED_WORDS                      = SEC_PREFIX_NUM_WORDS + TWO_COORDINATE_NUM_WORDS;  // 17
     public static final int SEC_PUBLIC_KEY_COMPRESSED_NUM_BITS                     = SEC_PREFIX_NUM_BITS  + ONE_COORDINATE_NUM_BITS;   // 264
     public static final int SEC_PUBLIC_KEY_COMPRESSED_NUM_BYTES                    = SEC_PREFIX_NUM_BYTES + ONE_COORDINATE_NUM_BYTES;  // 33
-    public static final int SEC_PUBLIC_KEY_COMPRESSED_WORDS                        = SEC_PREFIX_WORDS     + ONE_COORDINATE_U32;        // 9
+    public static final int SEC_PUBLIC_KEY_COMPRESSED_WORDS                        = SEC_PREFIX_NUM_WORDS + ONE_COORDINATE_NUM_WORDS;  // 9
     
     // === Hash sizes in bytes ===
     public static final int SHA256_INPUT_BLOCK_SIZE_BITS                           = 512;
@@ -150,44 +150,20 @@ public class PublicKeyBytes {
     public static final int SHA256_INPUT_TOTAL_WORDS_COMPRESSED                    = SHA256_INPUT_BLOCKS_FOR_COMPRESSED_SEC * SHA256_INPUT_BLOCK_SIZE_WORDS; // 16
     
     // ==== Individual Chunk Sizes (Bytes in Java) ====
-    public static final int CHUNK_SIZE_0_BIG_ENDIAN_X                              = ONE_COORDINATE_NUM_BYTES;
-    public static final int CHUNK_SIZE_1_BIG_ENDIAN_Y                              = ONE_COORDINATE_NUM_BYTES;
-    public static final int CHUNK_SIZE_2_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX         = U32_NUM_BYTES;
-    public static final int CHUNK_SIZE_3_LITTLE_ENDIAN_UNCOMPRESSED_X              = ONE_COORDINATE_NUM_BYTES;
-    public static final int CHUNK_SIZE_4_LITTLE_ENDIAN_UNCOMPRESSED_Y              = ONE_COORDINATE_NUM_BYTES;
-    public static final int CHUNK_SIZE_5_LITTLE_ENDIAN_COMPRESSED_PREFIX           = U32_NUM_BYTES;
-    public static final int CHUNK_SIZE_6_LITTLE_ENDIAN_COMPRESSED_X                = ONE_COORDINATE_NUM_BYTES;
-    public static final int CHUNK_SIZE_7_SHA256_UNCOMPRESSED                       = SHA256_HASH_NUM_BYTES;
-    public static final int CHUNK_SIZE_8_SHA256_COMPRESSED                         = SHA256_HASH_NUM_BYTES;
-    public static final int CHUNK_SIZE_9_RIPEMD160_UNCOMPRESSED                    = RIPEMD160_HASH_NUM_BYTES;
-    public static final int CHUNK_SIZE_A_RIPEMD160_COMPRESSED                      = RIPEMD160_HASH_NUM_BYTES;
-    
-    // ==== Combined Chunk Sizes ====
-    public static final int CHUNK_SIZE_01_BIG_ENDIAN_XY                            = CHUNK_SIZE_0_BIG_ENDIAN_X + CHUNK_SIZE_1_BIG_ENDIAN_Y;
-    public static final int CHUNK_SIZE_234_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX_X_Y   = CHUNK_SIZE_2_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX + CHUNK_SIZE_3_LITTLE_ENDIAN_UNCOMPRESSED_X + CHUNK_SIZE_4_LITTLE_ENDIAN_UNCOMPRESSED_Y;
-    public static final int CHUNK_SIZE_56_LITTLE_ENDIAN_COMPRESSED_PREFIX_X        = CHUNK_SIZE_5_LITTLE_ENDIAN_COMPRESSED_PREFIX + CHUNK_SIZE_6_LITTLE_ENDIAN_COMPRESSED_X;
+    public static final int CHUNK_SIZE_00_NUM_BYTES_BIG_ENDIAN_X                   = ONE_COORDINATE_NUM_BYTES;
+    public static final int CHUNK_SIZE_01_NUM_BYTES_BIG_ENDIAN_Y                   = ONE_COORDINATE_NUM_BYTES;
+    public static final int CHUNK_SIZE_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED         = RIPEMD160_HASH_NUM_BYTES;
+    public static final int CHUNK_SIZE_11_NUM_BYTES_RIPEMD160_COMPRESSED           = RIPEMD160_HASH_NUM_BYTES;
     
     // ==== Offsets Within a Chunk ====
-    public static final int CHUNK_OFFSET_0_BIG_ENDIAN_X                            = 0;
-    public static final int CHUNK_OFFSET_1_BIG_ENDIAN_Y                            = CHUNK_OFFSET_0_BIG_ENDIAN_X                      + CHUNK_SIZE_0_BIG_ENDIAN_X;
-    public static final int CHUNK_OFFSET_2_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX       = CHUNK_OFFSET_1_BIG_ENDIAN_Y                      + CHUNK_SIZE_1_BIG_ENDIAN_Y;
-    public static final int CHUNK_OFFSET_3_LITTLE_ENDIAN_UNCOMPRESSED_X            = CHUNK_OFFSET_2_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX + CHUNK_SIZE_2_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX;
-    public static final int CHUNK_OFFSET_4_LITTLE_ENDIAN_UNCOMPRESSED_Y            = CHUNK_OFFSET_3_LITTLE_ENDIAN_UNCOMPRESSED_X      + CHUNK_SIZE_3_LITTLE_ENDIAN_UNCOMPRESSED_X;
-    public static final int CHUNK_OFFSET_5_LITTLE_ENDIAN_COMPRESSED_PREFIX         = CHUNK_OFFSET_4_LITTLE_ENDIAN_UNCOMPRESSED_Y      + CHUNK_SIZE_4_LITTLE_ENDIAN_UNCOMPRESSED_Y;
-    public static final int CHUNK_OFFSET_6_LITTLE_ENDIAN_COMPRESSED_X              = CHUNK_OFFSET_5_LITTLE_ENDIAN_COMPRESSED_PREFIX   + CHUNK_SIZE_5_LITTLE_ENDIAN_COMPRESSED_PREFIX;
-    public static final int CHUNK_OFFSET_7_SHA256_UNCOMPRESSED                     = CHUNK_OFFSET_6_LITTLE_ENDIAN_COMPRESSED_X        + CHUNK_SIZE_6_LITTLE_ENDIAN_COMPRESSED_X;
-    public static final int CHUNK_OFFSET_8_SHA256_COMPRESSED                       = CHUNK_OFFSET_7_SHA256_UNCOMPRESSED               + CHUNK_SIZE_7_SHA256_UNCOMPRESSED;
-    public static final int CHUNK_OFFSET_9_RIPEMD160_UNCOMPRESSED                  = CHUNK_OFFSET_8_SHA256_COMPRESSED                 + CHUNK_SIZE_8_SHA256_COMPRESSED;
-    public static final int CHUNK_OFFSET_A_RIPEMD160_COMPRESSED                    = CHUNK_OFFSET_9_RIPEMD160_UNCOMPRESSED            + CHUNK_SIZE_9_RIPEMD160_UNCOMPRESSED;
-    public static final int CHUNK_OFFSET_B_END_OF_CHUNK                            = CHUNK_OFFSET_A_RIPEMD160_COMPRESSED              + CHUNK_SIZE_A_RIPEMD160_COMPRESSED;
-
-    // ==== Combined Offsets ====
-    public static final int CHUNK_OFFSET_01_BIG_ENDIAN_XY                          = CHUNK_OFFSET_0_BIG_ENDIAN_X;
-    public static final int CHUNK_OFFSET_234_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX_X_Y = CHUNK_OFFSET_2_LITTLE_ENDIAN_UNCOMPRESSED_PREFIX;
-    public static final int CHUNK_OFFSET_56_LITTLE_ENDIAN_COMPRESSED_PREFIX_X      = CHUNK_OFFSET_5_LITTLE_ENDIAN_COMPRESSED_PREFIX;
+    public static final int CHUNK_OFFSET_00_NUM_BYTES_BIG_ENDIAN_X                 = 0;
+    public static final int CHUNK_OFFSET_01_NUM_BYTES_BIG_ENDIAN_Y                 = CHUNK_OFFSET_00_NUM_BYTES_BIG_ENDIAN_X                    + CHUNK_SIZE_00_NUM_BYTES_BIG_ENDIAN_X;
+    public static final int CHUNK_OFFSET_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED       = CHUNK_OFFSET_01_NUM_BYTES_BIG_ENDIAN_Y                    + CHUNK_SIZE_01_NUM_BYTES_BIG_ENDIAN_Y;
+    public static final int CHUNK_OFFSET_11_NUM_BYTES_RIPEMD160_COMPRESSED         = CHUNK_OFFSET_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED          + CHUNK_SIZE_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED;
+    public static final int CHUNK_OFFSET_99_NUM_BYTES_END_OF_CHUNK                 = CHUNK_OFFSET_11_NUM_BYTES_RIPEMD160_COMPRESSED            + CHUNK_SIZE_11_NUM_BYTES_RIPEMD160_COMPRESSED;
     
     // ==== Total Chunk Size ====
-    public static final int CHUNK_SIZE                                             = CHUNK_OFFSET_B_END_OF_CHUNK;
+    public static final int CHUNK_SIZE_NUM_BYTES                                   = CHUNK_OFFSET_99_NUM_BYTES_END_OF_CHUNK;
     
     // ==== END: SYNCHRONIZED WITH OpenCL CONSTANTS ====
     
@@ -201,7 +177,7 @@ public class PublicKeyBytes {
      * Java's maximum allowable array length.
      * </p>
      */
-    public static final int MAXIMUM_CHUNK_ELEMENTS = (int)(Integer.MAX_VALUE / CHUNK_SIZE);
+    public static final int MAXIMUM_CHUNK_ELEMENTS = (int)(Integer.MAX_VALUE / CHUNK_SIZE_NUM_BYTES);
 
     /**
      * Determines the minimum number of bits required to address the maximum array length for storing chunks.
