@@ -257,21 +257,46 @@ __constant secp256k1_t g_precomputed = {
 };
 
 /**
- * Copies a given number of u32 values from source to destination.
+ * @brief Copies a given number of u32 values from one u32 array to another.
  *
- * @param dst A pointer to the destination array.
- * @param src A pointer to the source array.
- * @param count The number of u32 elements to copy.
+ * Performs a direct word-wise copy of 32-bit values from src to dst.
+ *
+ * @param dst Destination array of u32 values.
+ * @param src Source array of u32 values.
+ * @param word_count Number of u32 values to copy.
  */
-inline void copy_u32_array(u32 *dst, const u32 *src, const int count) {
+inline void copy_u32_array_u32(u32 *dst, const u32 *src, const int word_count) {
     #pragma unroll
-    for (int i = 0; i < 8; i++) {
-        if (i < count) dst[i] = src[i];
+    for (int i = 0; i < word_count; i++) {
+        dst[i] = src[i];
+    }
+}
+
+/**
+ * @brief Copies the raw bytes of a u32 array into a uchar array.
+ *
+ * Copies word_count * 4 bytes from the source u32 array into the
+ * destination byte array starting at the given offset.
+ *
+ * @param dst Destination byte array (uchar*).
+ * @param dst_offset Byte offset in the destination array to begin writing.
+ * @param src Source array of u32 values.
+ * @param word_count Number of u32 words to copy (1 word = 4 bytes).
+ */
+inline void copy_u32_array_bytes(uchar *dst, int dst_offset, const u32 *src, const int word_count) {
+    const uchar *src_bytes = (const uchar *)src;
+    #pragma unroll
+    for (int i = 0; i < word_count * 4; i++) {
+        dst[dst_offset + i] = src_bytes[i];
     }
 }
 
 inline uchar get_lsb_of_little_endian_coordinate(const u32 *coord) {
     return as_uchar4(coord[0]).s0;
+}
+
+inline uchar get_lsb_of_big_endian_coordinate(const u32 *coord) {
+    return as_uchar4(coord[ONE_COORDINATE_NUM_WORDS - 1]).s3;
 }
 
 // ======= Swap 32-bit value (safe across OpenCL versions) =======
@@ -285,24 +310,35 @@ inline u32 swap_u32(u32 v) {
 #endif
 }
 
-inline void copy_and_reverse_endianness_u32_array(u32 *dst, int dstOffset, const u32 *src, const int length) {
-    #pragma unroll
-    for (int i = 0; i < length; i++) {
-        dst[dstOffset + i] = swap_u32(src[length-1 - i]); // reverse word order and byte order
-    }
-}
-
-inline void write_u32_array_be_bytes(const u32 *src, uchar *dst, int dst_offset, const int word_count) {
+/**
+ * @brief Copies a u32 array to another while reversing word order and byte order (endianness).
+ *
+ * The source is interpreted as little-endian; the result will be big-endian, both in word and byte order.
+ *
+ * @param dst Destination u32 array.
+ * @param dst_offset Starting index in the destination array.
+ * @param src Source u32 array.
+ * @param word_count Number of 32-bit words to copy and reverse.
+ */
+inline void copy_and_reverse_endianness_u32_array(u32 *dst, int dst_offset, const u32 *src, const int word_count) {
     #pragma unroll
     for (int i = 0; i < word_count; i++) {
-        u32 w = src[7 - i];  // reverse word order (MSB first)
-        dst[dst_offset + i * 4 + 0] = (w >> 24) & 0xff;
-        dst[dst_offset + i * 4 + 1] = (w >> 16) & 0xff;
-        dst[dst_offset + i * 4 + 2] = (w >> 8 ) & 0xff;
-        dst[dst_offset + i * 4 + 3] = (w      ) & 0xff;
+        dst[dst_offset + i] = swap_u32(src[word_count - 1 - i]);
     }
 }
 
+/**
+ * @brief Converts a byte array into an array of u32 words (big-endian).
+ *
+ * Packs 4 bytes at a time from the input byte array `src` into 32-bit words in `dst`,
+ * assuming the byte order is big-endian (most significant byte first).
+ *
+ * For example, the bytes {0x12, 0x34, 0x56, 0x78} will become the u32 word 0x12345678.
+ *
+ * @param src Input byte array (length must be at least word_count * 4).
+ * @param dst Output array of u32 words.
+ * @param word_count Number of 32-bit words to produce (reads 4 * word_count bytes from src).
+ */
 inline void pack_bytes_to_u32_words(const uchar *src, u32 *dst, const int word_count)
 {
     #pragma unroll
@@ -330,11 +366,11 @@ inline void sha256_add_padding(u32 *dst, const int padding_start_index, const u3
     dst[length_index] = bit_len;
 }
 
-inline void get_sec_bytes_uncompressed(const u32 *x_littleEndian, const u32 *y_littleEndian, uchar *out_sec)
+inline void get_sec_bytes_uncompressed(const u32 *x_bigEndian, const u32 *y_bigEndian, uchar *out_sec)
 {
     out_sec[0] = SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT;
-    write_u32_array_be_bytes(x_littleEndian, out_sec,  1, ONE_COORDINATE_NUM_WORDS);
-    write_u32_array_be_bytes(y_littleEndian, out_sec, 33, ONE_COORDINATE_NUM_WORDS);
+    copy_u32_array_bytes(out_sec,  1, x_bigEndian, ONE_COORDINATE_NUM_WORDS);
+    copy_u32_array_bytes(out_sec, 33, y_bigEndian, ONE_COORDINATE_NUM_WORDS);
 }
 
 inline uchar get_compressed_prefix_from_lsb(uchar lsb)
@@ -343,11 +379,11 @@ inline uchar get_compressed_prefix_from_lsb(uchar lsb)
                           : SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y;
 }
 
-inline void get_sec_bytes_compressed(const u32 *x_littleEndian, const u32 *y_littleEndian, uchar *out_sec)
+inline void get_sec_bytes_compressed(const u32 *x_bigEndian, const u32 *y_bigEndian, uchar *out_sec)
 {
-    uchar lsb = get_lsb_of_little_endian_coordinate(y_littleEndian);
+    uchar lsb = get_lsb_of_big_endian_coordinate(y_bigEndian);
     out_sec[0] = get_compressed_prefix_from_lsb(lsb);
-    write_u32_array_be_bytes(x_littleEndian, out_sec, 1, ONE_COORDINATE_NUM_WORDS);
+    copy_u32_array_bytes(out_sec, 1, x_bigEndian, ONE_COORDINATE_NUM_WORDS);
 }
 
 inline void transform_sec_prefix_from_uncompressed_to_compressed(uchar *out_sec)
@@ -421,17 +457,41 @@ inline void build_ripemd160_block_from_sha256(const u32 *sha256_hash, u32 *ripem
  */
 #define REUSE_FOR_COMPRESSED
 
-/*
- * Compute public key grid by varying private key's LSB using global_id.
- * Uses precomputed G and stores (X, Y) coordinates for each result.
+/**
+ * @brief
+ * Generates multiple public key candidates from a single private key base by modifying the least significant bits.
+ *
+ * This kernel computes elliptic curve public keys and their corresponding Bitcoin address hashes for a grid
+ * of private key candidates, where each candidate is derived by OR-ing the given base key with `global_id`.
+ *
+ * The output includes:
+ * - X and Y coordinates of the resulting public key (in big-endian)
+ * - RIPEMD-160 hash of the SHA-256 hash of the uncompressed public key
+ * - RIPEMD-160 hash of the SHA-256 hash of the compressed public key
+ *
+ * Computation steps per work item:
+ * 1. Take base private key from global memory and modify it by OR-ing with the thread's global ID.
+ * 2. Multiply the private key with the curve's base point G using a precomputed wNAF table.
+ * 3. Convert the resulting public key coordinates from little-endian to big-endian.
+ * 4. Store X and Y coordinates in output buffer.
+ * 5. Serialize uncompressed SEC format (0x04 + X + Y), hash it (SHA-256 then RIPEMD-160), and store the hash.
+ * 6. Serialize compressed SEC format (0x02/0x03 + X), hash it (SHA-256 then RIPEMD-160), and store the hash.
+ *
+ * Optimization:
+ * - If `REUSE_FOR_COMPRESSED` is defined, the buffer used for the uncompressed SEC format is reused for
+ *   the compressed version to reduce memory footprint.
+ *
+ * @param r Output buffer (global u32*). Must be large enough to hold all chunks per thread.
+ *          Each thread writes CHUNK_SIZE_NUM_WORDS u32 values.
+ * @param k Input buffer (global const u32*) representing a single base private key (8 words, little-endian).
  */
 __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
 {
-    u32 k_littleEndian_local[PRIVATE_KEY_LENGTH];
     // Little Endian format
+    u32 k_littleEndian_local[PRIVATE_KEY_LENGTH];
     u32 x_littleEndian_local[ONE_COORDINATE_NUM_WORDS];
     u32 y_littleEndian_local[ONE_COORDINATE_NUM_WORDS];
-    // Big Endian
+    // Big Endian format
     u32 x_bigEndian_local[ONE_COORDINATE_NUM_WORDS];
     u32 y_bigEndian_local[ONE_COORDINATE_NUM_WORDS];
     
@@ -494,7 +554,7 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
     const int r_offset = CHUNK_SIZE_NUM_WORDS * global_id;
 
     // Copy private key to local register
-    copy_u32_array(k_littleEndian_local, k, PRIVATE_KEY_MAX_NUM_WORDS);
+    copy_u32_array_u32(k_littleEndian_local, k, PRIVATE_KEY_MAX_NUM_WORDS);
 
     // Apply variation (global_id) to LSB part of key (k[0])
     k_littleEndian_local[0] |= global_id;
@@ -504,13 +564,13 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
     // create big endian
     // x
     copy_and_reverse_endianness_u32_array(x_bigEndian_local, 0, x_littleEndian_local, ONE_COORDINATE_NUM_WORDS);
-    copy_u32_array(&r[r_offset + CHUNK_OFFSET_00_NUM_WORDS_BIG_ENDIAN_X],      x_bigEndian_local, CHUNK_SIZE_00_NUM_WORDS_BIG_ENDIAN_X);
+    copy_u32_array_u32(&r[r_offset + CHUNK_OFFSET_00_NUM_WORDS_BIG_ENDIAN_X],      x_bigEndian_local, CHUNK_SIZE_00_NUM_WORDS_BIG_ENDIAN_X);
     // y
     copy_and_reverse_endianness_u32_array(y_bigEndian_local, 0, y_littleEndian_local, ONE_COORDINATE_NUM_WORDS);
-    copy_u32_array(&r[r_offset + CHUNK_OFFSET_01_NUM_WORDS_BIG_ENDIAN_Y],      y_bigEndian_local, CHUNK_SIZE_01_NUM_WORDS_BIG_ENDIAN_Y);
+    copy_u32_array_u32(&r[r_offset + CHUNK_OFFSET_01_NUM_WORDS_BIG_ENDIAN_Y],      y_bigEndian_local, CHUNK_SIZE_01_NUM_WORDS_BIG_ENDIAN_Y);
     
     // === Hash uncompressed key ===
-    get_sec_bytes_uncompressed(x_littleEndian_local, y_littleEndian_local, sec_uncompressed);
+    get_sec_bytes_uncompressed(x_bigEndian_local, y_bigEndian_local, sec_uncompressed);
     build_sha256_block_from_uncompressed_pubkey(sec_uncompressed, sha256_input_uncompressed);
     sha256_init(&sha_ctx_uncompressed);
     sha256_update(&sha_ctx_uncompressed, sha256_input_uncompressed, SHA256_INPUT_TOTAL_BYTES_UNCOMPRESSED);
@@ -519,13 +579,13 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
     ripemd160_init(&ripemd_ctx_uncompressed);
     ripemd160_update_swap(&ripemd_ctx_uncompressed, ripemd160_input_uncompressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
 
-    copy_u32_array(&r[r_offset + CHUNK_OFFSET_10_NUM_WORDS_RIPEMD160_UNCOMPRESSED], ripemd_ctx_uncompressed.h, RIPEMD160_HASH_NUM_WORDS);
+    copy_u32_array_u32(&r[r_offset + CHUNK_OFFSET_10_NUM_WORDS_RIPEMD160_UNCOMPRESSED], ripemd_ctx_uncompressed.h, RIPEMD160_HASH_NUM_WORDS);
 
     // === Hash compressed key ===
     #ifdef REUSE_FOR_COMPRESSED
         transform_sec_prefix_from_uncompressed_to_compressed(sec_compressed);
     #else
-        get_sec_bytes_compressed(x_littleEndian_local, y_littleEndian_local, sec_compressed);
+        get_sec_bytes_compressed(x_bigEndian_local, y_bigEndian_local, sec_compressed);
     #endif
     build_sha256_block_from_compressed_pubkey(sec_compressed, sha256_input_compressed);
     sha256_init(&sha_ctx_compressed);
@@ -535,5 +595,5 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
     ripemd160_init(&ripemd_ctx_compressed);
     ripemd160_update_swap(&ripemd_ctx_compressed, ripemd160_input_compressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
 
-    copy_u32_array(&r[r_offset + CHUNK_OFFSET_11_NUM_WORDS_RIPEMD160_COMPRESSED], ripemd_ctx_compressed.h, RIPEMD160_HASH_NUM_WORDS);
+    copy_u32_array_u32(&r[r_offset + CHUNK_OFFSET_11_NUM_WORDS_RIPEMD160_COMPRESSED], ripemd_ctx_compressed.h, RIPEMD160_HASH_NUM_WORDS);
 }
