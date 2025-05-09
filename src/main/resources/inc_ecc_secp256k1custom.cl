@@ -265,7 +265,23 @@ __constant secp256k1_t g_precomputed = {
  * @param src Source array of u32 values.
  * @param word_count Number of u32 values to copy.
  */
-inline void copy_u32_array_u32(u32 *dst, const u32 *src, const int word_count) {
+inline void copy_global_u32_array_private_u32(u32 *dst, __global const u32 *src, const int word_count) {
+    #pragma unroll
+    for (int i = 0; i < word_count; i++) {
+        dst[i] = src[i];
+    }
+}
+
+/**
+ * @brief Copies a given number of u32 values from one u32 array to another.
+ *
+ * Performs a direct word-wise copy of 32-bit values from src to dst.
+ *
+ * @param dst Destination array of u32 values.
+ * @param src Source array of u32 values.
+ * @param word_count Number of u32 values to copy.
+ */
+inline void copy_private_u32_array_global_u32(__global u32 *dst, const u32 *src, const int word_count) {
     #pragma unroll
     for (int i = 0; i < word_count; i++) {
         dst[i] = src[i];
@@ -554,7 +570,7 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
     const int r_offset = CHUNK_SIZE_NUM_WORDS * global_id;
 
     // Copy private key to local register
-    copy_u32_array_u32(k_littleEndian_local, k, PRIVATE_KEY_MAX_NUM_WORDS);
+    copy_global_u32_array_private_u32(k_littleEndian_local, k, PRIVATE_KEY_MAX_NUM_WORDS);
 
     // Apply variation (global_id) to LSB part of key (k[0])
     k_littleEndian_local[0] |= global_id;
@@ -564,10 +580,10 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
     // create big endian
     // x
     copy_and_reverse_endianness_u32_array(x_bigEndian_local, 0, x_littleEndian_local, ONE_COORDINATE_NUM_WORDS);
-    copy_u32_array_u32(&r[r_offset + CHUNK_OFFSET_00_NUM_WORDS_BIG_ENDIAN_X],      x_bigEndian_local, CHUNK_SIZE_00_NUM_WORDS_BIG_ENDIAN_X);
+    copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_00_NUM_WORDS_BIG_ENDIAN_X],      x_bigEndian_local, CHUNK_SIZE_00_NUM_WORDS_BIG_ENDIAN_X);
     // y
     copy_and_reverse_endianness_u32_array(y_bigEndian_local, 0, y_littleEndian_local, ONE_COORDINATE_NUM_WORDS);
-    copy_u32_array_u32(&r[r_offset + CHUNK_OFFSET_01_NUM_WORDS_BIG_ENDIAN_Y],      y_bigEndian_local, CHUNK_SIZE_01_NUM_WORDS_BIG_ENDIAN_Y);
+    copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_01_NUM_WORDS_BIG_ENDIAN_Y],      y_bigEndian_local, CHUNK_SIZE_01_NUM_WORDS_BIG_ENDIAN_Y);
     
     // === Hash uncompressed key ===
     get_sec_bytes_uncompressed(x_bigEndian_local, y_bigEndian_local, sec_uncompressed);
@@ -579,7 +595,7 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
     ripemd160_init(&ripemd_ctx_uncompressed);
     ripemd160_update_swap(&ripemd_ctx_uncompressed, ripemd160_input_uncompressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
 
-    copy_u32_array_u32(&r[r_offset + CHUNK_OFFSET_10_NUM_WORDS_RIPEMD160_UNCOMPRESSED], ripemd_ctx_uncompressed.h, RIPEMD160_HASH_NUM_WORDS);
+    copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_10_NUM_WORDS_RIPEMD160_UNCOMPRESSED], ripemd_ctx_uncompressed.h, RIPEMD160_HASH_NUM_WORDS);
 
     // === Hash compressed key ===
     #ifdef REUSE_FOR_COMPRESSED
@@ -595,5 +611,5 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
     ripemd160_init(&ripemd_ctx_compressed);
     ripemd160_update_swap(&ripemd_ctx_compressed, ripemd160_input_compressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
 
-    copy_u32_array_u32(&r[r_offset + CHUNK_OFFSET_11_NUM_WORDS_RIPEMD160_COMPRESSED], ripemd_ctx_compressed.h, RIPEMD160_HASH_NUM_WORDS);
+    copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_11_NUM_WORDS_RIPEMD160_COMPRESSED], ripemd_ctx_compressed.h, RIPEMD160_HASH_NUM_WORDS);
 }
