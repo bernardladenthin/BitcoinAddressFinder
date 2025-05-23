@@ -52,7 +52,7 @@ import static org.jocl.CL.clReleaseProgram;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class OpenCLContext {
+public class OpenCLContext implements ReleaseCLObject {
 
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
     
@@ -101,6 +101,8 @@ public class OpenCLContext {
     private cl_kernel kernel;
     private OpenClTask openClTask;
     private ByteBufferUtility byteBufferUtility;
+    
+    private boolean closed = false;
     
     public OpenCLContext(CProducerOpenCL producerOpenCL, BitHelper bitHelper) {
         this.producerOpenCL = producerOpenCL;
@@ -153,20 +155,29 @@ public class OpenCLContext {
     OpenClTask getOpenClTask() {
         return openClTask;
     }
+    
+    @Override
+    public boolean isClosed() {
+        return closed;
+    }
 
-    public void release() {
-        openClTask.releaseCl();
-        clReleaseKernel(kernel);
-        clReleaseProgram(program);
-        clReleaseCommandQueue(commandQueue);
-        clReleaseContext(context);
+    @Override
+    public void close() {
+        if (!closed) {
+            openClTask.close();
+            clReleaseKernel(kernel);
+            clReleaseProgram(program);
+            clReleaseCommandQueue(commandQueue);
+            clReleaseContext(context);
+            closed = true;
+        }
     }
 
     public OpenCLGridResult createKeys(BigInteger privateKeyBase) {
         openClTask.setSrcPrivateKeyChunk(privateKeyBase);
         ByteBuffer dstByteBuffer = openClTask.executeKernel(kernel, commandQueue);
 
-        OpenCLGridResult openCLGridResult = new OpenCLGridResult(privateKeyBase, bitHelper.convertBitsToSize(producerOpenCL.batchSizeInBits), dstByteBuffer);
+        OpenCLGridResult openCLGridResult = new OpenCLGridResult(privateKeyBase, producerOpenCL.getOverallWorkSize(bitHelper), dstByteBuffer);
         return openCLGridResult;
     }
 
@@ -179,4 +190,5 @@ public class OpenCLContext {
         }
         return contents;
     }
+
 }

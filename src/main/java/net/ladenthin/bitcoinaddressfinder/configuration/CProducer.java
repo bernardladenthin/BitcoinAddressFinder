@@ -18,6 +18,7 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 
 public class CProducer {
@@ -43,4 +44,8 @@ public class CProducer {
      * Enable to let the producer run one time only.
      */
     public boolean runOnce = false;
+    
+    public int getOverallWorkSize(BitHelper bitHelper) {
+        return bitHelper.convertBitsToSize(batchSizeInBits);
+    }
 }

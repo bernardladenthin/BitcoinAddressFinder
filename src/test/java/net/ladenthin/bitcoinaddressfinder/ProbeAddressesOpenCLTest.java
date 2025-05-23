@@ -406,16 +406,13 @@ public class ProbeAddressesOpenCLTest {
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = bitSize;
-        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
         openCLContext.init();
-        try {
             Random sr = new Random(1337);
             BigInteger secret = keyUtility.createSecret(bitSize, sr);
             BigInteger secretBase = keyUtility.killBits(secret, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
 
             openCLContext.createKeys(secretBase);
-        } finally {
-            openCLContext.release();
         }
     }
     
@@ -428,16 +425,13 @@ public class ProbeAddressesOpenCLTest {
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
-        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
         openCLContext.init();
-        try {
             Random sr = new Random(1337);
             BigInteger secret = keyUtility.createSecret(BITS_FOR_BATCH-1, sr);
             BigInteger secretBase = keyUtility.killBits(secret, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
 
             openCLContext.createKeys(secretBase);
-       } finally {
-            openCLContext.release();
        }
     }
     
@@ -483,15 +477,12 @@ public class ProbeAddressesOpenCLTest {
         
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = chunkSize;
-        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
-        openCLContext.init();
-        try {
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+            openCLContext.init();
             OpenClTask openClTask = openCLContext.getOpenClTask();
 
             // Force a key that exceeds the limit
             openClTask.setSrcPrivateKeyChunk(privateKey);
-       } finally {
-            openCLContext.release();
        }
     }
 
@@ -503,9 +494,8 @@ public class ProbeAddressesOpenCLTest {
 
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
-        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
-        openCLContext.init();
-        try {
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+            openCLContext.init();
             byte[] encoded = privateKey.toByteArray();
             assertThat("Encoded must hold exactly 33 bytes", encoded.length, is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES + 1));
             byte[] expectedStripped = Arrays.copyOfRange(encoded, 1, encoded.length);
@@ -515,7 +505,7 @@ public class ProbeAddressesOpenCLTest {
             OpenClTask openClTask = openCLContext.getOpenClTask();
             openClTask.setSrcPrivateKeyChunk(privateKey);
 
-            ByteBuffer buffer = openClTask.getSrcByteBuffer();
+            ByteBuffer buffer = openClTask.getPrivateKeySourceArgument().getByteBuffer();
             assertThat("Buffer must hold exactly 32 bytes", buffer.capacity(), is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES));
 
             byte[] openClEndianBytes = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
@@ -537,8 +527,6 @@ public class ProbeAddressesOpenCLTest {
             assertThat("bigEndianBytes content must match stripped BigInteger encoding", bigEndianBytes, is(equalTo(expectedStripped)));
             assertThat("Reconstructed BigInteger must match original private key", result, is(equalTo(privateKey)));
 
-       } finally {
-           openCLContext.release();
        }
     }
     
@@ -552,9 +540,8 @@ public class ProbeAddressesOpenCLTest {
         
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
-        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
-        openCLContext.init();
-        try {
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+            openCLContext.init();
             // Perform the actual OpenCL buffer population
             OpenClTask openClTask = openCLContext.getOpenClTask();
 
@@ -568,8 +555,6 @@ public class ProbeAddressesOpenCLTest {
 
             final boolean souts = false;
             assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
-       } finally {
-           openCLContext.release();
        }
     }
     
@@ -583,9 +568,8 @@ public class ProbeAddressesOpenCLTest {
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
-        OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
-        openCLContext.init();
-        try {
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+            openCLContext.init();
             Random random = new Random(1337);
             BigInteger secretKeyBase = keyUtility.createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, random);
 
@@ -600,8 +584,6 @@ public class ProbeAddressesOpenCLTest {
             hashPublicKeysFast(publicKeys, souts); // just for performance tests
 
             assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
-       } finally {
-           openCLContext.release();
        }
     }
 

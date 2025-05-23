@@ -373,14 +373,16 @@ The OpenCL backend includes a built-in self-test mechanism that cross-verifies r
 
 > **Note:** OpenCL generates uncompressed keys. Compressed keys can be derived from uncompressed ones with minimal overhead.
 
-| GPU Model                   | Key Range (Bits) | Grid Size (Bits) | Effective Keys/s       | Notes                            |
-|-----------------------------|------------------|------------------|------------------------|----------------------------------|
-| Nvidia RTX 2060             | 256              | 18               | 2,160,000 keys/s       |                                  |
-| Nvidia Quadro P2000         | 256              | 18               | 505,000 keys/s         |                                  |
-| Nvidia Quadro P2000         | 64               | 18               | >1,000,000 keys/s      | CPU bottleneck observed          |
-| Nvidia Quadro M2000M        | 256              | 16               | 205,000 keys/s         |                                  |
-| Nvidia GTX 1050 Ti Mobile   | 64               | 16               | >1,000,000 keys/s      | CPU bottleneck observed          |
-| Nvidia GTX 1050 Ti Mobile   | 256              | 16               | 550,000 keys/s         |                                  |
+| GPU Model                   | CPU                 | Key Range (Bits) | Grid Size (Bits) | Effective Keys/s (~)   |
+|-----------------------------|---------------------|------------------|------------------|------------------------|
+| AMD Radeon RX 7900 XTX      | AMD Ryzen 7 9800X3D | 160              | 19               | 15,000,000 keys/s      |
+| AMD Radeon RX 7900 XTX      | AMD Ryzen 7 9800X3D | 256              | 19               | 11,000,000 keys/s      |
+| NVIDIA RTX 3070 Laptop      | AMD Ryzen 7 5800H   | 160              | 19               |  6,000,000 keys/s      |
+| NVIDIA RTX 3070 Laptop      | AMD Ryzen 7 5800H   | 256              | 19               |  4,000,000 keys/s      |
+| NVIDIA RTX 3090             | AMD Ryzen 9 3950X   | 160              | 19               | 11,000,000 keys/s      |
+| NVIDIA RTX 3090             | AMD Ryzen 9 3950X   | 256              | 19               |  8,000,000 keys/s      |
+| NVIDIA RTX A3000            | Intel i7-11850H     | 256              | 19               |  3,000,000 keys/s      |
+| NVIDIA RTX A3000            | Intel i7-11850H     | 160              | 19               |  5,000,000 keys/s      |
 
 
 ## Collision Probability and Security Considerations

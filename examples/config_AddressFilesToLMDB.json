@@ -16,7 +16,9 @@
       "lmdbDirectory": "lmdb",
       "useProxyOptimal": true,
       "logStatsOnInit": true,
-      "logStatsOnClose": true
+      "logStatsOnClose": true,
+      "loadToMemoryCacheOnInit" : false,
+      "disableAddressLookup" : false
     }
   }
 }

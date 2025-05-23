@@ -79,7 +79,7 @@ public abstract class AbstractProducer implements Producer {
         try {
             BigInteger[] secrets;
             try {
-                secrets = keyProducer.createSecrets(cProducer.batchSizeInBits, cProducer.batchUsePrivateKeyIncrement);
+                secrets = keyProducer.createSecrets(cProducer.getOverallWorkSize(bitHelper), cProducer.batchUsePrivateKeyIncrement);
             } catch (NoMoreSecretsAvailableException ex) {
                 logNoMoreSecretsInSecretFactory();
                 interrupt();
@@ -92,7 +92,7 @@ public abstract class AbstractProducer implements Producer {
                     throw new RuntimeException("secrets.length != 1");
                 }
             } else {
-                if(secrets.length != bitHelper.convertBitsToSize(cProducer.batchSizeInBits)) {
+                if(secrets.length != cProducer.getOverallWorkSize(bitHelper)) {
                     throw new RuntimeException("secrets.length != bitHelper.convertBitsToSize(cProducer.batchSizeInBits)");
                 }
             }

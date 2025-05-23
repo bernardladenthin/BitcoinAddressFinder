@@ -21,5 +21,5 @@ package net.ladenthin.bitcoinaddressfinder;
 import java.math.BigInteger;
 
 public interface KeyProducer {
-    public BigInteger[] createSecrets(int batchSizeInBits, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException;
+    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException;
 }

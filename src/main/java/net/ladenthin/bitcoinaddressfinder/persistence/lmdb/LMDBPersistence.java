@@ -31,13 +31,14 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.ByteConversion;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.SeparatorFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFileOutputFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
@@ -69,6 +70,8 @@ public class LMDBPersistence implements Persistence {
     private Dbi<ByteBuffer> lmdb_h160ToAmount;
     private long increasedCounter = 0;
     private long increasedSum = 0;
+    private Set<ByteBuffer> addressCache = null;
+
 
     public LMDBPersistence(CLMDBConfigurationWrite lmdbConfigurationWrite, PersistenceUtils persistenceUtils) {
         this.lmdbConfigurationReadOnly = null;
@@ -94,13 +97,39 @@ public class LMDBPersistence implements Persistence {
             throw new IllegalArgumentException("Neither write nor read-only configuration provided.");
         }
         
+        
         logStatsIfConfigured(true);
     }
+    
+    public void loadAllAddressesToCache() {
+        logger.info("##### BEGIN: loadAllAddressesToCache #####");
+        Set<ByteBuffer> cache = new HashSet<>();
+        try (Txn<ByteBuffer> txn = env.txnRead()) {
+            try (CursorIterable<ByteBuffer> iterable = lmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
+                for (CursorIterable.KeyVal<ByteBuffer> kv : iterable) {
+                    ByteBuffer key = ByteBuffer.allocate(kv.key().remaining());
+                    key.put(kv.key()).flip();
+                    cache.add(key);
+                }
+            }
+        }
+        addressCache = cache;
+        logger.info("Loaded {} addresses into in-memory cache.", addressCache.size());
+        logger.info("##### END: loadAllAddressesToCache #####");
+    }
 
+    public void unloadAddressCache() {
+        addressCache = null;
+    }
+    
     private void initReadOnly() {
         BufferProxy<ByteBuffer> bufferProxy = getBufferProxyByUseProxyOptimal(lmdbConfigurationReadOnly.useProxyOptimal);
         env = create(bufferProxy).setMaxDbs(DB_COUNT).open(new File(lmdbConfigurationReadOnly.lmdbDirectory), EnvFlags.MDB_RDONLY_ENV, EnvFlags.MDB_NOLOCK);
         lmdb_h160ToAmount = env.openDbi(DB_NAME_HASH160_TO_COINT);
+        
+        if (lmdbConfigurationReadOnly.loadToMemoryCacheOnInit) {
+            loadAllAddressesToCache();
+        }
     }
 
     private void initWritable() {
@@ -180,7 +209,24 @@ public class LMDBPersistence implements Persistence {
     }
 
     @Override
-    public synchronized boolean containsAddress(ByteBuffer hash160) {
+    public boolean containsAddress(ByteBuffer hash160) {
+        /*
+        if (sortedAddressCache != null) {
+            byte[] key = new byte[hash160.remaining()];
+            hash160.get(key);
+            hash160.rewind(); // falls der Buffer erneut verwendet wird
+
+            return Arrays.binarySearch(sortedAddressCache, key, Arrays::compare) >= 0;
+        }
+        */
+        
+        if (lmdbConfigurationReadOnly.disableAddressLookup) {
+            return false;
+        }
+        
+        if (addressCache != null) {
+            return addressCache.contains(hash160);
+        }
         try (Txn<ByteBuffer> txn = env.txnRead()) {
             ByteBuffer byteBuffer = lmdb_h160ToAmount.get(txn, hash160);
             return byteBuffer != null;

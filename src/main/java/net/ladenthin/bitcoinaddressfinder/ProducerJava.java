@@ -54,7 +54,7 @@ public class ProducerJava extends AbstractProducer {
     }
 
     protected PublicKeyBytes[] createGrid(final BigInteger secretBase) {
-        PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[bitHelper.convertBitsToSize(producerJava.batchSizeInBits)];
+        PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[producerJava.getOverallWorkSize(bitHelper)];
         for (int i = 0; i < publicKeyBytesArray.length; i++) {
             // create uncompressed
             BigInteger gridSecret = calculateSecretKey(secretBase, i);

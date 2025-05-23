@@ -47,10 +47,11 @@ public class MockKeyProducerTest {
         // arrange
         int maximumBitLength = 1;
         int batchSizeInBits = 0;
+        int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         
         // act
-        BigInteger[] createSecrets = mockKeyProducer.createSecrets(batchSizeInBits, true);
+        BigInteger[] createSecrets = mockKeyProducer.createSecrets(overallWorkSize, true);
         
         // assert
         assertThat(createSecrets.length, is(equalTo(1)));
@@ -62,10 +63,11 @@ public class MockKeyProducerTest {
         // arrange
         int maximumBitLength = 1;
         int batchSizeInBits = 1;
+        int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         
         // act
-        BigInteger[] createSecrets = mockKeyProducer.createSecrets(batchSizeInBits, true);
+        BigInteger[] createSecrets = mockKeyProducer.createSecrets(overallWorkSize, true);
         
         // assert
         assertThat(createSecrets.length, is(equalTo(1)));
@@ -77,10 +79,11 @@ public class MockKeyProducerTest {
         // arrange
         int maximumBitLength = 1;
         int batchSizeInBits = 2;
+        int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         
         // act
-        BigInteger[] createSecrets = mockKeyProducer.createSecrets(batchSizeInBits, true);
+        BigInteger[] createSecrets = mockKeyProducer.createSecrets(overallWorkSize, true);
         
         // assert
         assertThat(createSecrets.length, is(equalTo(1)));
@@ -94,13 +97,14 @@ public class MockKeyProducerTest {
         // arrange
         int maximumBitLength = 1;
         int batchSizeInBits = 0;
+        int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         
         // act
-        BigInteger[] createSecrets = mockKeyProducer.createSecrets(batchSizeInBits, false);
+        BigInteger[] createSecrets = mockKeyProducer.createSecrets(overallWorkSize, false);
         
         // assert
-        assertThat(createSecrets.length, is(equalTo(bitHelper.convertBitsToSize(batchSizeInBits))));
+        assertThat(createSecrets.length, is(equalTo(overallWorkSize)));
         assertThat(createSecrets[0], is(equalTo(PublicKeyBytes.MIN_PRIVATE_KEY)));
     }
     
@@ -109,13 +113,14 @@ public class MockKeyProducerTest {
         // arrange
         int maximumBitLength = 1;
         int batchSizeInBits = 1;
+        int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         
         // act
-        BigInteger[] createSecrets = mockKeyProducer.createSecrets(1, false);
+        BigInteger[] createSecrets = mockKeyProducer.createSecrets(overallWorkSize, false);
         
         // assert
-        assertThat(createSecrets.length, is(equalTo(bitHelper.convertBitsToSize(batchSizeInBits))));
+        assertThat(createSecrets.length, is(equalTo(overallWorkSize)));
         assertThat(createSecrets[0], is(equalTo(BigInteger.ONE)));
         assertThat(createSecrets[1], is(equalTo(BigInteger.ZERO)));
     }
@@ -125,13 +130,14 @@ public class MockKeyProducerTest {
         // arrange
         int maximumBitLength = 1;
         int batchSizeInBits = 2;
+        int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         
         // act
-        BigInteger[] createSecrets = mockKeyProducer.createSecrets(batchSizeInBits, false);
+        BigInteger[] createSecrets = mockKeyProducer.createSecrets(overallWorkSize, false);
         
         // assert
-        assertThat(createSecrets.length, is(equalTo(bitHelper.convertBitsToSize(batchSizeInBits))));
+        assertThat(createSecrets.length, is(equalTo(overallWorkSize)));
         assertThat(createSecrets[0], is(equalTo(BigInteger.ONE)));
         assertThat(createSecrets[1], is(equalTo(BigInteger.ZERO)));
         assertThat(createSecrets[2], is(equalTo(BigInteger.ONE)));
@@ -145,10 +151,11 @@ public class MockKeyProducerTest {
     public void createSecrets_parameterBatchSizeInBitsFromDataProviderAndReturnStartSecretOnlyTrue_returnExpectedSecrets(int maximumBitLength) throws NoMoreSecretsAvailableException {
         // arrange
         int batchSizeInBits = 2;
+        int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         
         // act
-        BigInteger[] createSecrets = mockKeyProducer.createSecrets(batchSizeInBits, true);
+        BigInteger[] createSecrets = mockKeyProducer.createSecrets(overallWorkSize, true);
         
         // assert
         assertThat(createSecrets.length, is(equalTo(1)));
@@ -159,13 +166,14 @@ public class MockKeyProducerTest {
     public void createSecrets_parameterBatchSizeInBitsFromDataProviderAndReturnStartSecretOnlyFalse_returnExpectedSecrets(int maximumBitLength) throws NoMoreSecretsAvailableException {
         // arrange
         int batchSizeInBits = 2;
+        int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         
         // act
-        BigInteger[] createSecrets = mockKeyProducer.createSecrets(batchSizeInBits, false);
+        BigInteger[] createSecrets = mockKeyProducer.createSecrets(overallWorkSize, false);
         
         // assert
-        assertThat(createSecrets.length, is(equalTo(bitHelper.convertBitsToSize(batchSizeInBits))));
+        assertThat(createSecrets.length, is(equalTo(overallWorkSize)));
     }
     // </editor-fold>
 }

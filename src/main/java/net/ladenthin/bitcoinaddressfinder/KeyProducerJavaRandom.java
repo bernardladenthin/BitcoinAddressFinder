@@ -61,8 +61,8 @@ public class KeyProducerJavaRandom extends KeyProducerJava {
     }
     
     @Override
-    public BigInteger[] createSecrets(int batchSizeInBits, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
-        int length = returnStartSecretOnly ? 1 : bitHelper.convertBitsToSize(batchSizeInBits);
+    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
+        int length = returnStartSecretOnly ? 1 : overallWorkSize;
         BigInteger[] secrets = new BigInteger[length];
         for (int i = 0; i < secrets.length; i++) {
             secrets[i] = keyUtility.createSecret(cKeyProducerJavaRandom.privateKeyMaxNumBits, random);

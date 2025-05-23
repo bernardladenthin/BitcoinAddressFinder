@@ -51,8 +51,10 @@ public class KeyProducerJavaRandomTest {
         
         KeyProducerJavaRandom keyProducerJavaRandom = new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility, bitHelper);
         
+        int overallWorkSize = bitHelper.convertBitsToSize(0);
+        
         // act
-        BigInteger[] result = keyProducerJavaRandom.createSecrets(0, true);
+        BigInteger[] result = keyProducerJavaRandom.createSecrets(overallWorkSize, true);
         
         // assert
         assertThat(result.length, is(equalTo(1)));
@@ -70,8 +72,10 @@ public class KeyProducerJavaRandomTest {
         
         KeyProducerJavaRandom keyProducerJavaRandom = new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility, bitHelper);
         
+        int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
+        
         // act
-        BigInteger[] result = keyProducerJavaRandom.createSecrets(batchSizeInBits, true);
+        BigInteger[] result = keyProducerJavaRandom.createSecrets(overallWorkSize, true);
         
         // assert
         assertThat(result.length, is(equalTo(1)));
@@ -89,8 +93,10 @@ public class KeyProducerJavaRandomTest {
                 
         KeyProducerJavaRandom keyProducerJavaRandom = new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility, bitHelper);
         
+        int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
+        
         // act
-        BigInteger[] result = keyProducerJavaRandom.createSecrets(batchSizeInBits, false);
+        BigInteger[] result = keyProducerJavaRandom.createSecrets(overallWorkSize, false);
         
         // assert
         assertThat(result.length, is(equalTo(bitHelper.convertBitsToSize(batchSizeInBits))));

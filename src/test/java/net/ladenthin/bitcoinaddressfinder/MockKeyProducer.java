@@ -26,7 +26,6 @@ public class MockKeyProducer implements KeyProducer {
     private final KeyUtility keyUtility;
     private final Random random;
     private final int maximumBitLength;
-    private final BitHelper bitHelper = new BitHelper();
     
     MockKeyProducer(KeyUtility keyUtility, Random random, int maximumBitLength) {
         this.keyUtility = keyUtility;
@@ -39,8 +38,8 @@ public class MockKeyProducer implements KeyProducer {
     }
 
     @Override
-    public BigInteger[] createSecrets(int batchSizeInBits, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
-        int length = returnStartSecretOnly ? 1 : bitHelper.convertBitsToSize(batchSizeInBits);
+    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
+        int length = returnStartSecretOnly ? 1 : overallWorkSize;
         BigInteger[] secrets = new BigInteger[length];
         for (int i = 0; i < secrets.length; i++) {
             secrets[i] = keyUtility.createSecret(maximumBitLength, random);

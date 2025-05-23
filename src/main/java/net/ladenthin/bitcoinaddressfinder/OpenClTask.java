@@ -43,25 +43,127 @@ import org.jocl.cl_mem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class OpenClTask {
+public class OpenClTask implements ReleaseCLObject {
 
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
     
-    /**
-     * I din't know which is better.
-     */
-    private static final boolean USE_HOST_PTR = false;
+    private final int PRIVATE_KEY_SOURCE_SIZE_IN_BYTES = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES;
     
     private final CProducer cProducer;
 
     private final cl_context context;
-    private final ByteBuffer srcByteBuffer;
-    private final Pointer srcPointer;
-
-    private final cl_mem srcMem;
+    
+    private final SourceArgument privateKeySourceArgument;
+    
     private final BitHelper bitHelper;
     private final ByteBufferUtility byteBufferUtility;
     private final BigInteger maxPrivateKeyForBatchSize;
+    
+    private boolean closed = false;
+
+    public abstract static class CLByteBufferPointerArgument implements ReleaseCLObject {
+        /**
+         * Controls how memory is allocated for the OpenCL output buffer.
+         *
+         * If set to {@link org.jocl.CL#CL_MEM_USE_HOST_PTR}, the OpenCL buffer is created using a host pointer,
+         * meaning the host's {@link ByteBuffer} is directly used by the device (zero-copy if supported).
+         * This may reduce memory copy overhead on some platforms, but:
+         * <ul>
+         *     <li>It requires the buffer to remain valid and pinned in memory.</li>
+         *     <li>On some OpenCL implementations or devices (e.g. discrete GPUs), it may cause slower access due to lack of true zero-copy support.</li>
+         *     <li>Debugging and compatibility issues can arise if host memory alignment or page-locking requirements aren't met.</li>
+         * </ul>
+         *
+         * If set to {@link org.jocl.CL#CL_MEM_WRITE_ONLY}, the buffer is created with no reference to host memory,
+         * and OpenCL manages the memory internally. This is typically safer and potentially faster on discrete GPUs,
+         * although it requires an explicit copy back to the host after kernel execution.
+         *
+         * In most cases, {@link org.jocl.CL#CL_MEM_WRITE_ONLY} (i.e. setting this flag to {@code false}) is more robust and portable.
+         */
+        protected static final boolean USE_HOST_PTR = false;
+
+        protected final ByteBuffer byteBuffer;
+        protected final Pointer hostMemoryPointer;
+        protected final cl_mem mem;
+        protected final Pointer clMemPointer;
+        private boolean closed = false;
+
+        public CLByteBufferPointerArgument(ByteBuffer byteBuffer, Pointer hostMemoryPointer, cl_mem mem, Pointer clMemPointer) {
+            this.byteBuffer = byteBuffer;
+            this.hostMemoryPointer = hostMemoryPointer;
+            this.mem = mem;
+            this.clMemPointer = clMemPointer;
+        }
+
+        public ByteBuffer getByteBuffer() {
+            return byteBuffer;
+        }
+
+        /** Used for reading/writing data to the host via clEnqueueRead/WriteBuffer. */
+        public Pointer getHostMemoryPointer() {
+            return hostMemoryPointer;
+        }
+
+        /** Used to pass the buffer to the kernel via clSetKernelArg. */
+        public Pointer getClMemPointer() {
+            return clMemPointer;
+        }
+
+        public cl_mem getMem() {
+            return mem;
+        }
+
+        @Override
+        public boolean isClosed() {
+            return closed;
+        }
+
+        @Override
+        public void close() {
+            if (!closed) {
+                clReleaseMemObject(mem);
+                closed = true;
+            }
+        }
+    }
+
+    public static class DestinationArgument extends CLByteBufferPointerArgument {
+        
+        private DestinationArgument(ByteBuffer byteBuffer, Pointer hostMemoryPointer, cl_mem mem, Pointer clMemPointer) {
+            super(byteBuffer, hostMemoryPointer, mem, clMemPointer);
+        }
+
+        public static DestinationArgument create(cl_context context, long sizeInBytes) {
+            final ByteBuffer byteBuffer = ByteBuffer.allocateDirect(ByteBufferUtility.ensureByteBufferCapacityFitsInt(sizeInBytes));
+            final Pointer hostMemoryPointer = Pointer.to(byteBuffer);
+            final cl_mem mem;
+
+            if (USE_HOST_PTR) {
+                mem = clCreateBuffer(context, CL_MEM_USE_HOST_PTR, sizeInBytes, hostMemoryPointer, null);
+            } else {
+                mem = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeInBytes, null, null);
+            }
+            final Pointer clMemPointer = Pointer.to(mem);
+
+            return new DestinationArgument(byteBuffer, hostMemoryPointer, mem, clMemPointer);
+        }
+        
+    }
+    
+    public static class SourceArgument extends CLByteBufferPointerArgument {
+
+        private SourceArgument(ByteBuffer byteBuffer, Pointer hostMemoryPointer, cl_mem mem, Pointer clMemPointer) {
+            super(byteBuffer, hostMemoryPointer, mem, clMemPointer);
+        }
+
+        public static SourceArgument create(cl_context context, long sizeInBytes) {
+            final ByteBuffer byteBuffer = ByteBuffer.allocateDirect(ByteBufferUtility.ensureByteBufferCapacityFitsInt(sizeInBytes));
+            final Pointer hostMemoryPointer = Pointer.to(byteBuffer);
+            final cl_mem mem = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeInBytes, hostMemoryPointer, null);
+            final Pointer clMemPointer = Pointer.to(mem);
+            return new SourceArgument(byteBuffer, hostMemoryPointer, mem, clMemPointer);
+        }
+    }
 
     // Only available after init
     public OpenClTask(cl_context context, CProducer cProducer, BitHelper bitHelper, ByteBufferUtility byteBufferUtility) {
@@ -69,26 +171,12 @@ public class OpenClTask {
         this.cProducer = cProducer;
         this.bitHelper = bitHelper;
         this.byteBufferUtility = byteBufferUtility;
-
-        int srcSizeInBytes = getSrcSizeInBytes();
-        maxPrivateKeyForBatchSize = KeyUtility.getMaxPrivateKeyForBatchSize(cProducer.batchSizeInBits);
-        srcByteBuffer = ByteBuffer.allocateDirect(srcSizeInBytes);
-        srcPointer = Pointer.to(srcByteBuffer);
-        srcMem = clCreateBuffer(
-                context,
-                CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
-                srcSizeInBytes,
-                srcPointer,
-                null
-        );
-    }
-
-    public int getSrcSizeInBytes() {
-        return PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES;
+        this.maxPrivateKeyForBatchSize = KeyUtility.getMaxPrivateKeyForBatchSize(cProducer.batchSizeInBits);
+        this.privateKeySourceArgument = SourceArgument.create(context, PRIVATE_KEY_SOURCE_SIZE_IN_BYTES);
     }
 
     public long getDstSizeInBytes() {
-        return (long) PublicKeyBytes.CHUNK_SIZE_NUM_BYTES * bitHelper.convertBitsToSize(cProducer.batchSizeInBits);
+        return (long) PublicKeyBytes.CHUNK_SIZE_NUM_BYTES * cProducer.getOverallWorkSize(bitHelper);
     }
 
     /**
@@ -117,110 +205,103 @@ public class OpenClTask {
         // BigInteger.toByteArray() always returns a big-endian (MSB-first) representation, 
         // meaning the most significant byte (MSB) comes first.
         // Therefore, the source format is always Big Endian.
-        byte[] byteArray = byteBufferUtility.bigIntegerToBytes(privateKeyBase);
+        final byte[] byteArray = byteBufferUtility.bigIntegerToBytes(privateKeyBase);
         EndiannessConverter endiannessConverter = new EndiannessConverter(ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN, byteBufferUtility);
         endiannessConverter.convertEndian(byteArray);
-        byteBufferUtility.putToByteBuffer(srcByteBuffer, byteArray);
+        byteBufferUtility.putToByteBuffer(privateKeySourceArgument.getByteBuffer(), byteArray);
     }
     
     @VisibleForTesting
-    public ByteBuffer getSrcByteBuffer() {
-        return srcByteBuffer;
+    public SourceArgument getPrivateKeySourceArgument() {
+        return privateKeySourceArgument;
     }
 
     public ByteBuffer executeKernel(cl_kernel kernel, cl_command_queue commandQueue) {
         final long dstSizeInBytes = getDstSizeInBytes();
-        // allocate a new dst buffer that a clone afterwards is not necessary
-        final ByteBuffer dstByteBuffer = ByteBuffer.allocateDirect(ByteBufferUtility.ensureByteBufferCapacityFitsInt(dstSizeInBytes));
-        final Pointer dstPointer = Pointer.to(dstByteBuffer);
-        final cl_mem dstMem;
-        if (USE_HOST_PTR) {
-            dstMem = clCreateBuffer(context,
-                    CL_MEM_USE_HOST_PTR, dstSizeInBytes,
-                    dstPointer,
-                    null
-            );
-        } else {
-            dstMem = clCreateBuffer(context,
-                    CL_MEM_WRITE_ONLY, dstSizeInBytes,
-                    null,
-                    null
-            );
-        }
+        // Allocate a new destination buffer so that cloning after kernel execution is unnecessary
+        try (final DestinationArgument destinationArgument = DestinationArgument.create(context, dstSizeInBytes) ) {
+            // Set the arguments for the kernel
+            clSetKernelArg(kernel, 0, Sizeof.cl_mem, destinationArgument.getClMemPointer());
+            clSetKernelArg(kernel, 1, Sizeof.cl_mem, privateKeySourceArgument.getClMemPointer());
 
-        // Set the arguments for the kernel
-        clSetKernelArg(kernel, 0, Sizeof.cl_mem, Pointer.to(dstMem));
-        clSetKernelArg(kernel, 1, Sizeof.cl_mem, Pointer.to(srcMem));
+            // Set the work-item dimensions
+            final long global_work_size[] = new long[]{cProducer.getOverallWorkSize(bitHelper)};
+            final long localWorkSize[] = null; // new long[]{1}; // enabling the system to choose the work-group size.
+            final int workDim = 1;
 
-        // Set the work-item dimensions
-        long global_work_size[] = new long[]{bitHelper.convertBitsToSize(cProducer.batchSizeInBits)};
-        long localWorkSize[] = null; // new long[]{1}; // enabling the system to choose the work-group size.
-        int workDim = 1;
-
-        {
-            // write src buffer
-            clEnqueueWriteBuffer(
-                    commandQueue,
-                    srcMem,
-                    CL_TRUE,
-                    0,
-                    getSrcSizeInBytes(),
-                    srcPointer,
-                    0,
-                    null,
-                    null
-            );
-            clFinish(commandQueue);
-        }
-        {
-            // execute the kernel
-            long beforeExecute = System.currentTimeMillis();
-            clEnqueueNDRangeKernel(
-                    commandQueue,
-                    kernel,
-                    workDim,
-                    null,
-                    global_work_size,
-                    localWorkSize,
-                    0,
-                    null,
-                    null
-            );
-            clFinish(commandQueue);
-
-            long afterExecute = System.currentTimeMillis();
-            
-            if (logger.isTraceEnabled()) {
-                logger.trace("Executed OpenCL kernel in " + (afterExecute - beforeExecute) + "ms");
+            {
+                // write src buffer
+                clEnqueueWriteBuffer(commandQueue,
+                        privateKeySourceArgument.getMem(),
+                        CL_TRUE,
+                        0,
+                        PRIVATE_KEY_SOURCE_SIZE_IN_BYTES,
+                        privateKeySourceArgument.getHostMemoryPointer(),
+                        0,
+                        null,
+                        null
+                );
+                clFinish(commandQueue);
             }
-        }
-        {
-            // read the dst buffer
-            long beforeRead = System.currentTimeMillis();
+            {
+                // execute the kernel
+                final long beforeExecute = System.currentTimeMillis();
+                clEnqueueNDRangeKernel(
+                        commandQueue,
+                        kernel,
+                        workDim,
+                        null,
+                        global_work_size,
+                        localWorkSize,
+                        0,
+                        null,
+                        null
+                );
+                clFinish(commandQueue);
 
-            clEnqueueReadBuffer(commandQueue,
-                    dstMem,
-                    CL_TRUE,
-                    0,
-                    dstSizeInBytes,
-                    dstPointer,
-                    0,
-                    null,
-                    null
-            );
-            clFinish(commandQueue);
-            clReleaseMemObject(dstMem);
+                final long afterExecute = System.currentTimeMillis();
 
-            long afterRead = System.currentTimeMillis();
-            if (logger.isTraceEnabled()) {
-                logger.trace("Read OpenCL data "+((dstSizeInBytes / 1024) / 1024) + "Mb in " + (afterRead - beforeRead) + "ms");
+                if (logger.isTraceEnabled()) {
+                    logger.trace("Executed OpenCL kernel in " + (afterExecute - beforeExecute) + "ms");
+                }
             }
+            {
+                // read the dst buffer
+                final long beforeRead = System.currentTimeMillis();
+
+                clEnqueueReadBuffer(commandQueue,
+                        destinationArgument.getMem(),
+                        CL_TRUE,
+                        0,
+                        dstSizeInBytes,
+                        destinationArgument.getHostMemoryPointer(),
+                        0,
+                        null,
+                        null
+                );
+                clFinish(commandQueue);
+                destinationArgument.close();
+
+                final long afterRead = System.currentTimeMillis();
+                if (logger.isTraceEnabled()) {
+                    logger.trace("Read OpenCL data "+((dstSizeInBytes / 1024) / 1024) + "Mb in " + (afterRead - beforeRead) + "ms");
+                }
+            }
+            return destinationArgument.getByteBuffer();
         }
-        return dstByteBuffer;
     }
 
-    public void releaseCl() {
-        clReleaseMemObject(srcMem);
+    @Override
+    public boolean isClosed() {
+        return closed;
+    }
+    
+    @Override
+    public void close() {
+        if(!closed) {
+            privateKeySourceArgument.close();
+            // hint: destinationArgument will be released immediately
+        }
     }
 
     /**

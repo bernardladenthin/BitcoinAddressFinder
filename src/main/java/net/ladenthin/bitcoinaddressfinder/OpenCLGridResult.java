@@ -21,11 +21,6 @@ package net.ladenthin.bitcoinaddressfinder;
 import java.util.Arrays;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import static net.ladenthin.bitcoinaddressfinder.PublicKeyBytes.CHUNK_SIZE_00_NUM_BYTES_BIG_ENDIAN_X;
-import static net.ladenthin.bitcoinaddressfinder.PublicKeyBytes.CHUNK_SIZE_01_NUM_BYTES_BIG_ENDIAN_Y;
-import static net.ladenthin.bitcoinaddressfinder.PublicKeyBytes.CHUNK_SIZE_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED;
-import static net.ladenthin.bitcoinaddressfinder.PublicKeyBytes.CHUNK_SIZE_11_NUM_BYTES_RIPEMD160_COMPRESSED;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 
 public class OpenCLGridResult {
@@ -94,9 +89,11 @@ public class OpenCLGridResult {
      * @return an array of {@link PublicKeyBytes} containing the reconstructed public keys.
      */
     public PublicKeyBytes[] getPublicKeyBytes() {
+        ByteBuffer readOnlyResult = result.asReadOnlyBuffer();
         PublicKeyBytes[] publicKeys = new PublicKeyBytes[workSize];
+        
         for (int i = 0; i < workSize; i++) {
-            PublicKeyBytes publicKeyBytes = getPublicKeyFromByteBufferXY(byteBufferUtility, result, i, secretKeyBase);
+            PublicKeyBytes publicKeyBytes = getPublicKeyFromByteBufferXY(readOnlyResult, i, secretKeyBase);
             publicKeys[i] = publicKeyBytes;
         }
         return publicKeys;
@@ -127,56 +124,40 @@ public class OpenCLGridResult {
      * <p>
      * If the reconstructed secret key is zero, a predefined fallback key is returned.
      *
-     * @param byteBufferUtility utility for interacting with byte arrays and buffers
      * @param resultBuffer the buffer containing OpenCL results for all keys
      * @param keyNumber the zero-based index of the key to extract
      * @param secretKeyBase the base secret key used to derive the current key
      * @return the reconstructed {@link PublicKeyBytes} object
      * @throws RuntimeException if the key bytes are invalid (e.g. all coordinate bytes are zero)
      */
-    private static final PublicKeyBytes getPublicKeyFromByteBufferXY(ByteBufferUtility byteBufferUtility, ByteBuffer resultBuffer, int keyNumber, BigInteger secretKeyBase) {
+    private static final PublicKeyBytes getPublicKeyFromByteBufferXY(ByteBuffer resultBuffer, int keyNumber, BigInteger secretKeyBase) {
         BigInteger secret = AbstractProducer.calculateSecretKey(secretKeyBase, keyNumber);
         if(BigInteger.ZERO.equals(secret)) {
             // the calculated key is invalid, return a fallback
             return PublicKeyBytes.INVALID_KEY_ONE;
         }
         
-        // Read a chunk completely
-        byte[] kernelResultChunk = new byte[PublicKeyBytes.CHUNK_SIZE_NUM_BYTES];
-        final int keyOffsetInByteBuffer = kernelResultChunk.length * keyNumber;
-        resultBuffer.get(keyOffsetInByteBuffer, kernelResultChunk, 0, kernelResultChunk.length);
+        final int keyOffsetInByteBuffer = PublicKeyBytes.CHUNK_SIZE_NUM_BYTES * keyNumber;
         
         // Get X
-        byte[] xFromBigEndian = Arrays.copyOfRange(
-            kernelResultChunk,
-            PublicKeyBytes.CHUNK_OFFSET_00_NUM_BYTES_BIG_ENDIAN_X,
-            PublicKeyBytes.CHUNK_OFFSET_00_NUM_BYTES_BIG_ENDIAN_X + PublicKeyBytes.CHUNK_SIZE_00_NUM_BYTES_BIG_ENDIAN_X
-        );
+        byte[] xFromBigEndian = new byte[PublicKeyBytes.CHUNK_SIZE_00_NUM_BYTES_BIG_ENDIAN_X];
+        resultBuffer.get(keyOffsetInByteBuffer + PublicKeyBytes.CHUNK_OFFSET_00_NUM_BYTES_BIG_ENDIAN_X, xFromBigEndian, 0, xFromBigEndian.length);
         
         // Get Y
-        byte[] yFromBigEndian = Arrays.copyOfRange(
-            kernelResultChunk,
-            PublicKeyBytes.CHUNK_OFFSET_01_NUM_BYTES_BIG_ENDIAN_Y,
-            PublicKeyBytes.CHUNK_OFFSET_01_NUM_BYTES_BIG_ENDIAN_Y + PublicKeyBytes.CHUNK_SIZE_01_NUM_BYTES_BIG_ENDIAN_Y
-        );
+        byte[] yFromBigEndian = new byte[PublicKeyBytes.CHUNK_SIZE_01_NUM_BYTES_BIG_ENDIAN_Y];
+        resultBuffer.get(keyOffsetInByteBuffer + PublicKeyBytes.CHUNK_OFFSET_01_NUM_BYTES_BIG_ENDIAN_Y, yFromBigEndian, 0, yFromBigEndian.length);
         
         // Assemble uncompressed key
         byte[] uncompressedFromBigEndian = PublicKeyBytes.assembleUncompressedPublicKey(xFromBigEndian, yFromBigEndian);
         
         // Get RIPEMD160 for uncompressed key
-        byte[] ripemd160Uncompressed = Arrays.copyOfRange(
-            kernelResultChunk,
-            PublicKeyBytes.CHUNK_OFFSET_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED,
-            PublicKeyBytes.CHUNK_OFFSET_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED + PublicKeyBytes.CHUNK_SIZE_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED
-        );
+        byte[] ripemd160Uncompressed = new byte[PublicKeyBytes.CHUNK_SIZE_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED];
+        resultBuffer.get(keyOffsetInByteBuffer + PublicKeyBytes.CHUNK_OFFSET_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED, ripemd160Uncompressed, 0, ripemd160Uncompressed.length);
         
         // Get RIPEMD160 for uncompressed key
-        byte[] ripemd160Compressed = Arrays.copyOfRange(
-            kernelResultChunk,
-            PublicKeyBytes.CHUNK_OFFSET_11_NUM_BYTES_RIPEMD160_COMPRESSED,
-            PublicKeyBytes.CHUNK_OFFSET_11_NUM_BYTES_RIPEMD160_COMPRESSED + PublicKeyBytes.CHUNK_SIZE_11_NUM_BYTES_RIPEMD160_COMPRESSED
-        );
-        
+        byte[] ripemd160Compressed = new byte[PublicKeyBytes.CHUNK_SIZE_11_NUM_BYTES_RIPEMD160_COMPRESSED];
+        resultBuffer.get(keyOffsetInByteBuffer + PublicKeyBytes.CHUNK_OFFSET_11_NUM_BYTES_RIPEMD160_COMPRESSED, ripemd160Compressed, 0, ripemd160Compressed.length);
+
         if (ENABLE_UNCOMPRESSED_KEY_VALIDATION) {
             boolean allZero = PublicKeyBytes.isAllCoordinateBytesZero(uncompressedFromBigEndian);
             if (allZero) {
