@@ -37,6 +37,7 @@
         "delayBlockedReader": 50,
         "keyProducerId": "exampleKeyProducerSecureRandomId",
         "batchSizeInBits": 18,
+        "loopCount" : 4,
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
         "runOnce": false

@@ -49,9 +49,12 @@ public class CLMDBConfigurationReadOnly {
      * 
      * Note: Increases RAM usage linearly with the number of keys. Recommended for use cases
      * with frequent key queries and when the dataset fits comfortably in memory.
+     * 
+     * Especially useful for high-performance OpenCL-based key generation where LMDB access can become a bottleneck.
+     * A Java {@link java.util.HashSet} offers constant-time (O(1)) lookups, ensuring minimal overhead during address scanning.
      */
     public boolean loadToMemoryCacheOnInit = false;
-    
+
     /**
      * If true, {@code containsAddress(...)} will always return {@code false}, skipping both LMDB and in-memory lookups.
      *

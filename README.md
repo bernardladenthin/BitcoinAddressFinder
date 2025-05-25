@@ -147,37 +147,67 @@ To accelerate `k·G` (private key × base point), the OpenCL kernel uses:
 - **Use of Constant Memory**:
   Precomputed points are stored in **constant GPU memory** (`__constant` via `CONSTANT_AS`), allowing fast access by all threads in a workgroup.
 
-### 🔄 Planned Kernel Enhancements (Preview)
-The current kernel computes `k·G` for each thread by applying the thread ID (`global_id`) to the least significant bits of the private key. The resulting point is stored as affine `(x, y)` coordinates.
+### 🔄 Scalar Walker per Kernel (loopCount implemented)
+The OpenCL kernel now supports a **loop-based scalar walker** using the `loopCount` parameter. Each GPU thread performs multiple key derivations by:
 
-As a next step, I plan to:
-- Add an internal loop (e.g. 16,384 iterations) within the kernel
-- Each iteration performs an additional `point_add`
-- This turns the kernel into a **sequential scalar walker**, enabling:
-  - Grid scanning of private key ranges per thread
-  - Optimized batch key generation with fewer kernel dispatches
+- Computing the first point using **full scalar multiplication** via `point_mul_xy`
+- Then repeating efficient **affine point additions** via `point_add_xy` to derive subsequent keys:
+  **Pₙ₊₁ = Pₙ + G**
 
-#### 🔐 Public Key Hashing (Next Step)
-I also plan to integrate **SHA-256 + RIPEMD-160** hashing directly after point multiplication to compute the public key hash:
-- Apply `sha256(x || y)` followed by `ripemd160`
-- Enables direct GPU-side creation of Bitcoin addresses
+This enables linear traversal of keyspace per thread:
+`k₀·G, (k₀ + 1)·G, (k₀ + 2)·G, ..., (k₀ + loopCount - 1)·G`
 
-#### 🚀 MSB-Zero Scalar Walk Strategy
+It reduces kernel launch overhead and improves GPU utilization, especially in memory- or dispatch-bound scenarios.
 
-To further accelerate brute-force key scanning, I plan to combine two advanced optimizations:
+Example:
+- If `loopCount = 8`, a single thread computes 8 keys internally
+- Grid size is reduced by a factor of 8
+- Output is written to global memory per key
 
-- **Zeroing the 96 most significant bits (MSB) of the private key**:  
-  Since `RIPEMD160(SHA256(pubkey))` produces only a 160-bit hash, I can safely fix the upper 96 bits of the 256-bit private key to zero.  
-  This reduces the effective entropy to 160 bits and significantly shortens the scalar used for ECC multiplication, improving performance.
+> ✅ Lower `loopCount` values like 4 or 8 are often ideal.  
+> ❌ Too high values may reduce GPU occupancy due to fewer launched work-items.
 
-- **Sequential Scalar Walker inside the kernel**:  
-  Each GPU thread computes a single `k₀·G` using full scalar multiplication (wNAF), where `k₀` has 96 MSB set to zero and variable 160-bit LSB.  
-  Then, a `for` loop performs multiple `point_add` operations:
-  - This effectively walks linearly through the scalar space: `k₀`, `k₀+1`, `k₀+2`, ...
-  - Avoids full scalar multiplication per iteration
-  - Enables high-throughput sequential key space traversal with minimal kernel invocations
+### 🚀 In-Memory Address Cache (loadToMemoryCacheOnInit)
+To improve address lookup performance during high-speed key generation, you can enable the `loadToMemoryCacheOnInit` option.  
+This feature loads all LMDB entries into a Java `HashSet` at startup, allowing ultra-fast `O(1)` address checks.
 
-This approach massively improves GPU efficiency for address collision hunting or vanity key generation.
+This is especially useful in OpenCL or batch scenarios where thousands or millions of addresses are checked per second and LMDB access becomes a bottleneck.
+
+> ✅ Recommended when system RAM is sufficient to hold all known addresses  
+> ❌ Avoid on memory-constrained systems or with extremely large databases
+
+### 🔐 Public Key Hashing on GPU (SHA-256 + RIPEMD-160)
+The OpenCL kernel now performs **blazing fast public key hashing** directly on the GPU using:
+
+- `SHA-256(x || y)` followed by
+- `RIPEMD-160(SHA-256(x || y))`
+
+This allows each GPU thread to independently generate full Bitcoin-style public key hashes (i.e., `hash160`) **without CPU involvement**.
+
+Benefits:
+- No host-side post-processing needed
+- Fully parallelized and memory-efficient
+- Ideal for massive batch generation and filtering
+
+> ✅ Output is already in hash160 format, ready for address comparison
+
+### 🚀 MSB-Zero Scalar Walk Strategy
+To boost performance, BitcoinAddressFinder uses a **160-bit scalar optimization**:
+
+- The **96 most significant bits** of each private key are set to zero.
+- Only the **lower 160 bits** vary — matching the output size of `RIPEMD160(SHA256(pubkey))`.
+
+This shortens the ECC scalar and accelerates point multiplication.
+
+Combined with the `loopCount` walker:
+- The first point is computed via `point_mul_xy`
+- All subsequent keys use `point_add_xy` inside the kernel:
+  **Pₙ₊₁ = Pₙ + G**
+
+This enables high-throughput, grid-parallel **linear keyspace traversal** like:
+`k₀·G, (k₀+1)·G, (k₀+2)·G, ...`
+
+> ✅ Massive speedup for brute-force or batch-based searches using OpenCL
 
 ## Address Database
 The addresses are stored in a high-performance database: [LMDB](https://github.com/LMDB).
