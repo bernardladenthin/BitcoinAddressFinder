@@ -70,6 +70,7 @@ public class ProbeAddressesOpenCLTest {
      * 24: 1024Mb: executed in: 4622ms, read in: 302ms
     */
     private final static int BITS_FOR_BATCH = 8;
+    private final static int LOOP_COUNT = BITS_FOR_BATCH >> 1;
     
     private final BitHelper bitHelper = new BitHelper();
 
@@ -425,6 +426,7 @@ public class ProbeAddressesOpenCLTest {
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
+        producerOpenCL.loopCount = LOOP_COUNT;
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
         openCLContext.init();
             Random sr = new Random(1337);
@@ -494,6 +496,7 @@ public class ProbeAddressesOpenCLTest {
 
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
+        producerOpenCL.loopCount = LOOP_COUNT;
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
             openCLContext.init();
             byte[] encoded = privateKey.toByteArray();
@@ -540,6 +543,7 @@ public class ProbeAddressesOpenCLTest {
         
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
+        producerOpenCL.loopCount = LOOP_COUNT;
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
             openCLContext.init();
             // Perform the actual OpenCL buffer population
@@ -568,6 +572,7 @@ public class ProbeAddressesOpenCLTest {
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
+        producerOpenCL.loopCount = LOOP_COUNT;
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
             openCLContext.init();
             Random random = new Random(1337);

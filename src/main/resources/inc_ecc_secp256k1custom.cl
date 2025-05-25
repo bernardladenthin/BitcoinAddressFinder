@@ -256,6 +256,68 @@ __constant secp256k1_t g_precomputed = {
     }
 };
 
+// Coordinates per point
+#define COORDS_PER_POINT            (ONE_COORDINATE_NUM_WORDS * 2)
+
+// Precomputed base point offsets
+#define G_OFFSET_X1                 (0)
+#define G_OFFSET_Y1                 (G_OFFSET_X1 + ONE_COORDINATE_NUM_WORDS)
+#define G_OFFSET_NEG_Y1             (G_OFFSET_Y1 + ONE_COORDINATE_NUM_WORDS)
+
+#define G_OFFSET_X3                 (G_OFFSET_NEG_Y1 + ONE_COORDINATE_NUM_WORDS)
+#define G_OFFSET_Y3                 (G_OFFSET_X3 + ONE_COORDINATE_NUM_WORDS)
+#define G_OFFSET_NEG_Y3             (G_OFFSET_Y3 + ONE_COORDINATE_NUM_WORDS)
+
+#define G_OFFSET_X5                 (G_OFFSET_NEG_Y3 + ONE_COORDINATE_NUM_WORDS)
+#define G_OFFSET_Y5                 (G_OFFSET_X5 + ONE_COORDINATE_NUM_WORDS)
+#define G_OFFSET_NEG_Y5             (G_OFFSET_Y5 + ONE_COORDINATE_NUM_WORDS)
+
+#define G_OFFSET_X7                 (G_OFFSET_NEG_Y5 + ONE_COORDINATE_NUM_WORDS)
+#define G_OFFSET_Y7                 (G_OFFSET_X7 + ONE_COORDINATE_NUM_WORDS)
+#define G_OFFSET_NEG_Y7             (G_OFFSET_Y7 + ONE_COORDINATE_NUM_WORDS)
+
+#define G_PRECOMPUTED_TOTAL_WORDS   (G_OFFSET_NEG_Y7 + ONE_COORDINATE_NUM_WORDS)
+
+DECLSPEC void point_add_xy (PRIVATE_AS u32 *x1, PRIVATE_AS u32 *y1, PRIVATE_AS const u32 *x2, PRIVATE_AS const u32 *y2)
+{
+    u32 z1[8] = { 0 };
+    z1[0] = 1;
+
+    point_add(x1, y1, z1, x2, y2);
+
+    // z1 now holds z of result -> need to transform back to affine
+    inv_mod(z1);
+
+    u32 z2[8];
+    mul_mod(z2, z1, z1);     // z^2
+    mul_mod(x1, x1, z2);     // x_affine = x / z^2
+
+    mul_mod(z2, z2, z1);     // z^3
+    mul_mod(y1, y1, z2);     // y_affine = y / z^3
+}
+
+/**
+ * @brief Copies a given number of u32 values from __constant to __private memory.
+ *
+ * Performs a direct word-wise copy of 32-bit values from a statically allocated
+ * constant memory region (e.g., precomputed lookup tables) into private memory
+ * (thread-local registers or stack).
+ *
+ * This is useful when working with values stored in `__constant` space such as
+ * secp256k1 precomputed base points that need to be accessed with full
+ * read/write flexibility in local registers.
+ *
+ * @param dst Destination array of u32 values in __private address space.
+ * @param src Source array of u32 values in __constant address space.
+ * @param word_count Number of 32-bit words (u32) to copy.
+ */
+inline void copy_constant_u32_array_private_u32(u32 *dst, __constant const u32 *src, const int word_count) {
+    #pragma unroll
+    for (int i = 0; i < word_count; i++) {
+        dst[i] = src[i];
+    }
+}
+
 /**
  * @brief Copies a given number of u32 values from one u32 array to another.
  *
@@ -501,7 +563,7 @@ inline void build_ripemd160_block_from_sha256(const u32 *sha256_hash, u32 *ripem
  *          Each thread writes CHUNK_SIZE_NUM_WORDS u32 values.
  * @param k Input buffer (global const u32*) representing a single base private key (8 words, little-endian).
  */
-__kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
+__kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k, const u32 loopCount)
 {
     // Little Endian format
     u32 k_littleEndian_local[PRIVATE_KEY_LENGTH];
@@ -510,6 +572,11 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
     // Big Endian format
     u32 x_bigEndian_local[ONE_COORDINATE_NUM_WORDS];
     u32 y_bigEndian_local[ONE_COORDINATE_NUM_WORDS];
+
+    u32 x1_local[ONE_COORDINATE_NUM_WORDS];
+    u32 y1_local[ONE_COORDINATE_NUM_WORDS];
+    u32 z1_local[ONE_COORDINATE_NUM_WORDS] = { 0 };
+    z1_local[0] = 1; // Initialize Jacobian Z-coordinate (affine point: z = 1)
     
     u32             *sha256_input_uncompressed    ;
     u32             *ripemd160_input_uncompressed ;
@@ -563,53 +630,80 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k)
     // The above call is equivalent to get_local_size(dim)*get_group_id(dim) + get_local_id(dim)
     // size_t global_id = get_global_id(0);
     u32 global_id = get_global_id(0);
+    u32 base_offset = global_id * loopCount;
 
     //int local_id = get_local_id(0);
     //int local_size = get_local_size(0);
-    // Base offset for this work item
-    const int r_offset = CHUNK_SIZE_NUM_WORDS * global_id;
 
     // Copy private key to local register
     copy_global_u32_array_private_u32(k_littleEndian_local, k, PRIVATE_KEY_MAX_NUM_WORDS);
+    u32 baseK0 = k_littleEndian_local[0];
 
-    // Apply variation (global_id) to LSB part of key (k[0])
-    k_littleEndian_local[0] |= global_id;
+    // Copy base point G (in affine coordinates) from constant memory to local registers.
+    // This avoids repeated global memory access during the loop (e.g., for point additions).
+    copy_constant_u32_array_private_u32(x1_local, &g_precomputed.xy[G_OFFSET_X1], ONE_COORDINATE_NUM_WORDS);
+    copy_constant_u32_array_private_u32(y1_local, &g_precomputed.xy[G_OFFSET_Y1], ONE_COORDINATE_NUM_WORDS);
 
-    point_mul_xy(x_littleEndian_local, y_littleEndian_local, k_littleEndian_local, &g_precomputed);
+    for (u32 i = 0; i < loopCount; i++) {
+        u32 loop_index = base_offset + i;
+        u32 r_offset = loop_index * CHUNK_SIZE_NUM_WORDS;
 
-    // create big endian
-    // x
-    copy_and_reverse_endianness_u32_array(x_bigEndian_local, 0, x_littleEndian_local, ONE_COORDINATE_NUM_WORDS);
-    copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_00_NUM_WORDS_BIG_ENDIAN_X],      x_bigEndian_local, CHUNK_SIZE_00_NUM_WORDS_BIG_ENDIAN_X);
-    // y
-    copy_and_reverse_endianness_u32_array(y_bigEndian_local, 0, y_littleEndian_local, ONE_COORDINATE_NUM_WORDS);
-    copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_01_NUM_WORDS_BIG_ENDIAN_Y],      y_bigEndian_local, CHUNK_SIZE_01_NUM_WORDS_BIG_ENDIAN_Y);
-    
-    // === Hash uncompressed key ===
-    get_sec_bytes_uncompressed(x_bigEndian_local, y_bigEndian_local, sec_uncompressed);
-    build_sha256_block_from_uncompressed_pubkey(sec_uncompressed, sha256_input_uncompressed);
-    sha256_init(&sha_ctx_uncompressed);
-    sha256_update(&sha_ctx_uncompressed, sha256_input_uncompressed, SHA256_INPUT_TOTAL_BYTES_UNCOMPRESSED);
+        // Apply variation (global_id) to LSB part of key (k[0])
+        // We use bitwise OR (|) instead of addition (+) to modify the key,
+        // because it avoids carry propagation and is typically faster on GPU hardware.
+        //
+        // Rationale:
+        // - Addition introduces data dependencies (carry chain across bits).
+        // - Bitwise OR has no carry and maps directly to a single instruction.
+        // - On most GPU architectures (NVIDIA, AMD), bitwise operations are cheaper
+        //   than integer addition in terms of instruction latency and power usage.
+        // - Using OR guarantees deterministic variation without overflow concerns,
+        //   assuming loop_index is within expected bit range (e.g. lower N bits).
+        //
+        // Result:
+        // baseK0 | loop_index = key variation with fast, non-carrying logic.
+        k_littleEndian_local[0] = (baseK0 | loop_index);
 
-    build_ripemd160_block_from_sha256(sha_ctx_uncompressed.h, ripemd160_input_uncompressed);
-    ripemd160_init(&ripemd_ctx_uncompressed);
-    ripemd160_update_swap(&ripemd_ctx_uncompressed, ripemd160_input_uncompressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
+        if (i == 0) {
+            point_mul_xy(x_littleEndian_local, y_littleEndian_local, k_littleEndian_local, &g_precomputed);
+        } else {
+            point_add_xy(x_littleEndian_local, y_littleEndian_local, x1_local, y1_local);
+        }
 
-    copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_10_NUM_WORDS_RIPEMD160_UNCOMPRESSED], ripemd_ctx_uncompressed.h, RIPEMD160_HASH_NUM_WORDS);
+        // create big endian
+        // x
+        copy_and_reverse_endianness_u32_array(x_bigEndian_local, 0, x_littleEndian_local, ONE_COORDINATE_NUM_WORDS);
+        copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_00_NUM_WORDS_BIG_ENDIAN_X],      x_bigEndian_local, CHUNK_SIZE_00_NUM_WORDS_BIG_ENDIAN_X);
+        // y
+        copy_and_reverse_endianness_u32_array(y_bigEndian_local, 0, y_littleEndian_local, ONE_COORDINATE_NUM_WORDS);
+        copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_01_NUM_WORDS_BIG_ENDIAN_Y],      y_bigEndian_local, CHUNK_SIZE_01_NUM_WORDS_BIG_ENDIAN_Y);
 
-    // === Hash compressed key ===
-    #ifdef REUSE_FOR_COMPRESSED
-        transform_sec_prefix_from_uncompressed_to_compressed(sec_compressed);
-    #else
-        get_sec_bytes_compressed(x_bigEndian_local, y_bigEndian_local, sec_compressed);
-    #endif
-    build_sha256_block_from_compressed_pubkey(sec_compressed, sha256_input_compressed);
-    sha256_init(&sha_ctx_compressed);
-    sha256_update(&sha_ctx_compressed, sha256_input_compressed, SHA256_INPUT_TOTAL_BYTES_COMPRESSED);
+        // === Hash uncompressed key ===
+        get_sec_bytes_uncompressed(x_bigEndian_local, y_bigEndian_local, sec_uncompressed);
+        build_sha256_block_from_uncompressed_pubkey(sec_uncompressed, sha256_input_uncompressed);
+        sha256_init(&sha_ctx_uncompressed);
+        sha256_update(&sha_ctx_uncompressed, sha256_input_uncompressed, SHA256_INPUT_TOTAL_BYTES_UNCOMPRESSED);
 
-    build_ripemd160_block_from_sha256(sha_ctx_compressed.h, ripemd160_input_compressed);
-    ripemd160_init(&ripemd_ctx_compressed);
-    ripemd160_update_swap(&ripemd_ctx_compressed, ripemd160_input_compressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
+        build_ripemd160_block_from_sha256(sha_ctx_uncompressed.h, ripemd160_input_uncompressed);
+        ripemd160_init(&ripemd_ctx_uncompressed);
+        ripemd160_update_swap(&ripemd_ctx_uncompressed, ripemd160_input_uncompressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
 
-    copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_11_NUM_WORDS_RIPEMD160_COMPRESSED], ripemd_ctx_compressed.h, RIPEMD160_HASH_NUM_WORDS);
+        copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_10_NUM_WORDS_RIPEMD160_UNCOMPRESSED], ripemd_ctx_uncompressed.h, RIPEMD160_HASH_NUM_WORDS);
+
+        // === Hash compressed key ===
+        #ifdef REUSE_FOR_COMPRESSED
+            transform_sec_prefix_from_uncompressed_to_compressed(sec_compressed);
+        #else
+            get_sec_bytes_compressed(x_bigEndian_local, y_bigEndian_local, sec_compressed);
+        #endif
+        build_sha256_block_from_compressed_pubkey(sec_compressed, sha256_input_compressed);
+        sha256_init(&sha_ctx_compressed);
+        sha256_update(&sha_ctx_compressed, sha256_input_compressed, SHA256_INPUT_TOTAL_BYTES_COMPRESSED);
+
+        build_ripemd160_block_from_sha256(sha_ctx_compressed.h, ripemd160_input_compressed);
+        ripemd160_init(&ripemd_ctx_compressed);
+        ripemd160_update_swap(&ripemd_ctx_compressed, ripemd160_input_compressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
+
+        copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_11_NUM_WORDS_RIPEMD160_COMPRESSED], ripemd_ctx_compressed.h, RIPEMD160_HASH_NUM_WORDS);
+    }
 }

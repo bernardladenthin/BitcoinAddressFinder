@@ -23,6 +23,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import static org.jocl.CL.CL_MEM_READ_ONLY;
 import static org.jocl.CL.CL_MEM_USE_HOST_PTR;
 import static org.jocl.CL.CL_MEM_WRITE_ONLY;
@@ -49,7 +50,7 @@ public class OpenClTask implements ReleaseCLObject {
     
     private final int PRIVATE_KEY_SOURCE_SIZE_IN_BYTES = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES;
     
-    private final CProducer cProducer;
+    private final CProducerOpenCL cProducer;
 
     private final cl_context context;
     
@@ -166,7 +167,7 @@ public class OpenClTask implements ReleaseCLObject {
     }
 
     // Only available after init
-    public OpenClTask(cl_context context, CProducer cProducer, BitHelper bitHelper, ByteBufferUtility byteBufferUtility) {
+    public OpenClTask(cl_context context, CProducerOpenCL cProducer, BitHelper bitHelper, ByteBufferUtility byteBufferUtility) {
         this.context = context;
         this.cProducer = cProducer;
         this.bitHelper = bitHelper;
@@ -220,14 +221,30 @@ public class OpenClTask implements ReleaseCLObject {
         final long dstSizeInBytes = getDstSizeInBytes();
         // Allocate a new destination buffer so that cloning after kernel execution is unnecessary
         try (final DestinationArgument destinationArgument = DestinationArgument.create(context, dstSizeInBytes) ) {
+            // Set the work-item dimensions
+            final long totalResultCount = bitHelper.convertBitsToSize(cProducer.batchSizeInBits);
+            final int loopCount = cProducer.loopCount;
+            final long adjustedWorkSize = totalResultCount / loopCount;
+            
+            // Validate loopCount constraints
+            if (loopCount < 1) {
+                throw new IllegalArgumentException("loopCount must be >= 1.");
+            }
+            if (loopCount > totalResultCount) {
+                throw new IllegalArgumentException("loopCount must not exceed total result count. Given: " + loopCount + ", max: " + totalResultCount);
+            }
+            if (totalResultCount % loopCount != 0) {
+                throw new IllegalArgumentException("batchSizeInBits is not divisible by loopCount; result count would be invalid.");
+            }
+            
+            final long global_work_size[] = new long[]{adjustedWorkSize};
+            final long localWorkSize[] = null; // new long[]{1}; // enabling the system to choose the work-group size.
+            final int workDim = 1;
+            
             // Set the arguments for the kernel
             clSetKernelArg(kernel, 0, Sizeof.cl_mem, destinationArgument.getClMemPointer());
             clSetKernelArg(kernel, 1, Sizeof.cl_mem, privateKeySourceArgument.getClMemPointer());
-
-            // Set the work-item dimensions
-            final long global_work_size[] = new long[]{cProducer.getOverallWorkSize(bitHelper)};
-            final long localWorkSize[] = null; // new long[]{1}; // enabling the system to choose the work-group size.
-            final int workDim = 1;
+            clSetKernelArg(kernel, 2, Sizeof.cl_uint, Pointer.to(new int[] { loopCount }));
 
             {
                 // write src buffer
@@ -300,6 +317,7 @@ public class OpenClTask implements ReleaseCLObject {
     public void close() {
         if(!closed) {
             privateKeySourceArgument.close();
+            closed = true;
             // hint: destinationArgument will be released immediately
         }
     }
