@@ -18,8 +18,10 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.List;
 import java.util.regex.Pattern;
 
 public enum SeparatorFormat {
@@ -127,44 +129,69 @@ public enum SeparatorFormat {
      * prevents premature matches on partial separators that are substrings of
      * longer ones.
      *
-     * @return an array of SeparatorFormat values sorted by descending length of
-     * their symbols
+     * @return a list of SeparatorFormat values sorted by descending length of
+     *         their symbols
      */
-    public static SeparatorFormat[] getSortedSeparators() {
+    public static List<SeparatorFormat> getSortedSeparators() {
         return Arrays.stream(SeparatorFormat.values())
                 .sorted(Comparator.comparingInt(
                         (SeparatorFormat s) -> s.getSymbol().length()
                 ).reversed())
-                .toArray(SeparatorFormat[]::new);
+                .toList();
     }
-
+    
     /**
-     * Splits the given input string using the first matching
-     * {@link SeparatorFormat} found, based on descending separator length
-     * priority.
+     * Recursively splits the given input string using all defined {@link SeparatorFormat} values,
+     * in descending order of separator length.
      * <p>
-     * This method ensures that longer separators (e.g.,
-     * {@link SeparatorFormat#DOUBLE_COLON}) are considered before shorter ones
-     * (e.g., {@link SeparatorFormat#COLON}) to prevent premature splitting on
-     * partial matches.
+     * Unlike the original {@link #split(String)} implementation which applies only the first matching
+     * separator, this version performs a deep, recursive traversal, ensuring that all relevant separators
+     * (e.g., {@link SeparatorFormat#DOUBLE_COLON}, {@link SeparatorFormat#COLON}, {@link SeparatorFormat#PIPE})
+     * are applied in sequence. This guarantees complete and hierarchical resolution of mixed separator patterns.
      * <p>
-     * If no matching separator is found in the input, the method returns the
-     * input as a single-element array.
+     * This method is especially useful when inputs may include multiple nested or combined separators,
+     * and all of them must be processed in order of priority.
      * <p>
-     * Trailing and leading empty strings are preserved (e.g., {@code "|value|"}
-     * results in {@code ["", "value", ""]}).
+     * Trailing and leading empty strings are preserved (e.g., {@code "|value|"} results in {@code ["", "value", ""]}).
      *
      * @param input the string to split; must not be {@code null}
-     * @return an array of string parts resulting from the split
+     * @return an array of string parts resulting from full recursive splitting
      * @throws NullPointerException if the input is {@code null}
      */
     public static String[] split(String input) {
-        for (SeparatorFormat separator : SeparatorFormat.getSortedSeparators()) {
-            String[] parts = input.split(Pattern.quote(separator.getSymbol()), -1);
-            if (parts.length > 1) {
-                return parts;
-            }
-        }
-        return new String[]{input};
+        List<String> result = new ArrayList<>();
+        splitRecursive(input, result, getSortedSeparators(), 0);
+        return result.toArray(new String[0]);
     }
+
+    /**
+    * Helper method for recursively applying separators to the input.
+    * <p>
+    * Each separator is applied in turn, starting with the longest one. If the current
+    * separator splits the input, each resulting part is passed recursively to the next separator.
+    * If no split occurs at the current level, the method proceeds to the next separator.
+    *
+    * @param input       the string to split
+    * @param result      the list collecting all final split segments
+    * @param separators  the list of separators to apply
+    * @param index       the current separator index in the list
+    */
+   private static void splitRecursive(String input, List<String> result, List<SeparatorFormat> separators, int index) {
+       if (index >= separators.size()) {
+           result.add(input); // No more separators, store the remaining part
+           return;
+       }
+
+       SeparatorFormat separator = separators.get(index);
+       String[] parts = input.split(Pattern.quote(separator.getSymbol()), -1);
+
+       if (parts.length > 1) {
+           for (String part : parts) {
+               splitRecursive(part, result, separators, index + 1);
+           }
+       } else {
+           splitRecursive(input, result, separators, index + 1);
+       }
+   }
+
 }

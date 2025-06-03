@@ -82,6 +82,30 @@ public class AddressTxtLine {
                 return null;
             }
             return new AddressToCoin(hash160, amount);
+        } else if (address.startsWith("btco1")) {
+            // Bitcoin Oil Bech32 (P2WSH or P2WPKH)
+            // https://btc.cryptoid.info/btco/address.dws?3851.htm
+            return null;
+        } else if (address.startsWith("cdn1q")) {
+            // Canada-eCoin Bech32 (P2WSH or P2WPKH)
+            // https://btc.cryptoid.info/cdn/address.dws?cdn1qf7kyhfue3fjn4y09ec6cqqsxq56vh7q3z9ea8e.htm
+            return null;
+        } else if (address.startsWith("dc1q")) {
+            // Doichain Bech32 (P2WSH or P2WPKH)
+            // https://btc.cryptoid.info/doi/address.dws?2378564.htm
+            return null;
+        } else if (address.startsWith("df1q")) {
+            // DeFiChain Bech32 (P2WSH or P2WPKH)
+            // https://btc.cryptoid.info/dfi/address.dws?df1qvkmmsj6z602rymrx7fn82gqh68dp3v2f068gsu.htm
+            return null;
+        } else if (address.startsWith("rog1q")) {
+            // TheHolyRogerCoin Bech32 (P2WSH or P2WPKH)
+            // https://btc.cryptoid.info/roger/address.dws?139264.htm
+            return null;
+        } else if (address.startsWith("uf1q")) {
+            // UFO Bech32 (P2WSH or P2WPKH)
+            // https://btc.cryptoid.info/ufo/address.dws?570258.htm
+            return null;
         } else if (address.startsWith("fc1")) {
             // feathercoin Bech32 (P2WSH or P2WPKH)
             // https://chainz.cryptoid.info/ftc/address.dws?fc1qvr9zesajsdw8aydcndd70wxj2wdgzu6zzltsph.htm
@@ -105,6 +129,30 @@ public class AddressTxtLine {
         } else if (address.startsWith("dgb1")) {
             // digibyte Bech32 (P2WPKH or P2SH)
             return null;
+        } else if (address.startsWith("sys1")) {
+            // syscoin Bech32 (P2WPKH or P2SH)
+            return null;
+        } else if (address.startsWith("btx1")) {
+            // BitCore Bech32 (P2WPKH or P2SH)
+            return null;
+        } else if (address.startsWith("wkh_")) {
+            // BitCore (WKH)
+            return null;
+        } else if (address.startsWith("grs1")) {
+            // Groestlcoin Bech32 (P2WPKH or P2SH)
+            return null;
+        } else if (address.startsWith("tgrs1")) {
+            // Groestlcoin TestNet Bech32 (P2WPKH or P2SH)
+            return null;
+        } else if (address.startsWith("ric1")) {
+            // Riecoin Bech32 (P2WPKH or P2SH)
+            return null;
+        } else if (address.startsWith("rod1q")) {
+            // SpaceXpanse Bech32 (P2WPKH or P2SH)
+            return null;
+        } else if (address.startsWith("my1q")) {
+            // Myriad Bech32 (P2WPKH or P2SH)
+            return null;
         } else if (address.startsWith("p")) {
             // p: bitcoin cash / CashAddr (P2SH), this is a unique format and does not work
             // p: peercoin possible
@@ -114,31 +162,113 @@ public class AddressTxtLine {
             } catch (RuntimeException e) {
                 return null;
             }
-        } else if (address.startsWith("7") || address.startsWith("A") || address.startsWith("9") || address.startsWith("M") || address.startsWith("3") || address.startsWith("t") || address.startsWith("X") || address.startsWith("D") || address.startsWith("L") || address.startsWith("G") || address.startsWith("B") || address.startsWith("V") || address.startsWith("N") || address.startsWith("4") || address.startsWith("P") || address.startsWith("R")) {
-            // prefix clashes for signs: 7
+        } else if (
+                   address.startsWith("1")
+                || address.startsWith("2")
+                || address.startsWith("3")
+                || address.startsWith("4")
+                || address.startsWith("7")
+                || address.startsWith("8")
+                || address.startsWith("9")
+                || address.startsWith("a")
+                || address.startsWith("A")
+                || address.startsWith("B")
+                || address.startsWith("b")
+                || address.startsWith("C")
+                || address.startsWith("d")
+                || address.startsWith("D")
+                || address.startsWith("E")
+                || address.startsWith("F")
+                || address.startsWith("G")
+                || address.startsWith("H")
+                || address.startsWith("i")
+                || address.startsWith("J")
+                || address.startsWith("K")
+                || address.startsWith("L")
+                || address.startsWith("M")
+                || address.startsWith("N")
+                || address.startsWith("p")
+                || address.startsWith("P")
+                || address.startsWith("Q")
+                || address.startsWith("R")
+                || address.startsWith("s")
+                || address.startsWith("S")
+                || address.startsWith("t")
+                || address.startsWith("T")
+                || address.startsWith("u")
+                || address.startsWith("V")
+                || address.startsWith("W")
+                || address.startsWith("x")
+                || address.startsWith("X")
+        ) {
+            // prefix clashes for signs: 2, 7, 8, 9, A, C, M
             //
             // Base58 P2SH
-            // 7: dash
-            // A: dogecoin
-            // 9: dogecoin multisig
-            // M: litecoin
-            // 3: litecoin deprecated / bitcoin
+            // 2: Mooncoin / Particl
+            // 3: litecoin deprecated / bitcoin / Particl
+            // 7: dash / Riecoin
+            // 8: DeFiChain / BYTZ
+            // 9: dogecoin multisig / 42-coin
+            // A: dogecoin / SaluS
+            // B: CloakCoin
+            // C: UFO
+            // M: litecoin / Myriad
             // t: Zcash
             //
             // Base58 P2PKH
-            // B: curecoin
-            // X: dash
-            // D: dogecoin / digibyte
-            // L: litecoin
-            // G: bitcoin gold
-            // B: blackcoin
-            // 7: feathercoin
-            // V: vertcoin
-            // N: namecoin
-            // 4: novacoin
-            // P: Peercoin
-            // R: reddcoin
+            // 1: Terracoin
+            // 2: BitCore / Pinkcoin
+            // 4: novacoin / Myriad / 42-coin
+            // 7: feathercoin / Dimecoin
+            // 8: Vanillacash
+            // 9: Catcoin
+            // a: Firo
+            // A: AuroraCoin / Primecoin
+            // B: curecoin / BitBlocks / blackcoin / UFO / Smileycoin / Blocknet / BitcoinPlus
+            // b: Bitmark / BolivarCoin
+            // C: CloakCoin / CROWN / ChessCoin / Artbyte / Canada-eCoin
+            // d: LiteDoge / Diamond / DeFiChain
+            // D: dogecoin / digibyte / PIVX / DigitalCoin / Divicoin / ColossusXT
+            // e: Electron
+            // E: Emerald / InfiniLooP
+            // F: Groestlcoin
+            // G: bitcoin gold / Goldcash
+            // H: Herencia
+            // i: Innova / I/O Coin / Infinitecoin
+            // J: MasterNoder2
+            // K: Lynx
+            // L: litecoin / Luckycoin / Lanacoin / e-Gulden / Elite
+            // M: Mooncoin
+            // N: namecoin / Deutsche eMark / Doichain
+            // p: Element
+            // P: Peercoin / PotCoin / PAC Protocol / PutinCoin v2 / Particl / PandaCoin / PakCoin
+            // Q: Quark
+            // R: reddcoin / Komodo / NewYorkCoin / Particl / Raptoreum / SpaceXpanse
+            // s: BYTZ
+            // S: Sterlingcoin / Syscoin / SaluS / Alias
             // t: Zcash
+            // T: Trezarcoin
+            // u: Unobtanium
+            // U: Coino
+            // V: vertcoin / VeriCoin / Versacoin / TheHolyRogerCoin
+            // W: WorldCoin
+            // x: Clam / iXcoin
+            // X: dash / Validity
+            
+            // Riecoin
+            {
+                final String OP_DUP = "76";
+                final String OP_HASH160 = "a9";
+                final String OP_PUSH_20_BYTES = "14";
+                final int length20Bytes = 20;
+                final String riecoinP2SHPrefix = OP_DUP + OP_HASH160 + OP_PUSH_20_BYTES;
+                final int riecoinScriptPubKeyLengthHex = length20Bytes * 2 + riecoinP2SHPrefix.length();
+                if (address.length() >= riecoinScriptPubKeyLengthHex && address.startsWith(riecoinP2SHPrefix)) {
+                    final String hash160Hex = address.substring(riecoinP2SHPrefix.length(), length20Bytes*2+riecoinP2SHPrefix.length());
+                    final ByteBuffer hash160 = keyUtility.byteBufferUtility.getByteBufferFromHex(hash160Hex);
+                    return new AddressToCoin(hash160, amount);
+                }
+            }
 
             if (address.startsWith("t")) {
                 // ZCash has two version bytes

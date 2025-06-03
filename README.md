@@ -215,26 +215,112 @@ The database can be used to check whether a generated address has ever been used
 
 ### Import
 The importer reads multiple `.txt` or `.text` files containing addresses in arbitrary order. Each line can contain a different format.
-* P2PKH
-  * bitcoin
-  * bitcoin cash
-  * bitcoin gold
-  * blackcoin
-  * curecoin
-  * dash
-  * digibyte
-  * dogecoin
-  * feathercoin
-  * litecoin
-  * litecoin cash
-  * namecoin
-  * novacoin
-  * peercoin
-  * reddcoin
-  * vertcoin
-  * ZCash
-* P2WPKH
-  * bitcoin Bech32
+* Pay-to-Public-Key-Hash (P2PKH)
+* Pay-to-Script-Hash (P2SH)
+* Pay-to-Multisig (P2MS)
+* SegWit - Pay-to-Witness-Public-Key-Hash (P2WPKH)
+* Pay-to-Witness-Script-Key-Hash (P2WSH)
+* Payt-to-TapRoot (P2TR)
+
+Empty means not implemented by altcoin project.
+
+| Coin              | P2PKH | P2SH | P2WPKH | P2WSH  |  P2MS  |  P2TR  |
+|-------------------|:-----:|:----:|:------:|:------:|:------:|:------:|
+| 42-coin           |  ✅   | ✅   |        |        |        |       |
+| Artbyte           |  ✅   |      |        |        |        |       |
+| Alias             |  ✅   |      |        |        |        |       |
+| Auroracoin        |  ✅   |      |        |        |        |       |
+| BitBlocks         |  ✅   |      |        |        |        |       |
+| Bitcoin           |  ✅   | ✅   | ✅    | ❌     |  ❌    | ❌    |
+| Bitcoin Cash      |  ✅   | ❌   |        |        |  ❌    |       |
+| Bitcoin Gold      |  ✅   |      |        |        |        |       |
+| Bitcoin Oil       |  ✅   |      | ❌     | ❌     |        |       |
+| Bitcoin Plus      |  ✅   |      |        |        |        |       |
+| BitCore           |  ✅   |      | ❌     | ❌     |        |       |
+| Bitmark           |  ✅   |      |        |        |        |       |
+| Blackcoin         |  ✅   |      |        |        |        |       |
+| Blocknet          |  ✅   |      |        |        |        |       |
+| BolivarCoin       |  ✅   |      |        |        |        |       |
+| BYTZ              |  ✅   |      |        |        |        |       |
+| Canada-eCoin      |  ✅   |      | ❌     | ❌      |        |         |
+| Catcoin           |  ✅   |      |        |        |        |         |
+| ChessCoin         |  ✅   |      |        |        |        |         |
+| Clam              |  ✅   |      |        |        |        |         |
+| CloakCoin         |  ✅   | ✅   |        |        |        |         |
+| CROWN             |  ✅   |      |        |        |         |       |
+| Coino             |  ✅   |      |        |        |         |       |
+| ColossusXT        |  ✅   |      |        |        |         |       |
+| Curecoin          |  ✅   |      |        |        |         |       |
+| Dash              |  ✅   | ✅   |        |        |        |         |
+| DeFiChain         |  ✅   | ✅   | ❌     | ❌      |        |         |
+| Deutsche eMark    |  ✅   |      |        |        |        |         |
+| Diamond           |  ✅   |      |        |        |        |         |
+| DigiByte          |  ✅   |      | ❌     | ❌     |        |         |
+| DigitalCoin       |  ✅   |      |        |        |         |       |
+| Dimecoin          |  ✅   |      |        |        |         |       |
+| Divicoin          |  ✅   |      |        |        |         |       |
+| Dogecoin          |  ✅   | ✅   |        |        |        |         |
+| Dogecoin multisig |  ✅   | ✅   |        |        |        |         |
+| Doichain          |  ✅   |      | ❌     | ❌     |        |         |
+| e-Gulden          |  ✅   |      |        |        |         |       |
+| Electron          |  ✅   |      |        |        |         |       |
+| Element           |  ✅   |      |        |        |         |       |
+| Elite             |  ✅   |      |        |        |         |       |
+| Emerald           |  ✅   |      |        |        |         |       |
+| Feathercoin       |  ✅   |      | ❌     | ❌     |         |         |
+| Firo              |  ✅   |      |        |       |         |         |
+| Goldcash          |  ✅   |      |        |        |         |       |
+| Groestlcoin       |  ✅   |      | ❌     | ❌     |         |       |
+| Herencia          |  ✅   |      |        |        |         |       |
+| I/O Coin          |  ✅   |      |        |        |         |       |
+| Innova            |  ✅   |      |        |        |         |       |
+| InfiniLooP        |  ✅   |      |        |        |         |       |
+| Infinitecoin      |  ✅   |      |        |        |         |       |
+| iXcoin            |  ✅   |      |        |        |         |       |
+| Komodo            |  ✅   |      |        |        |         |       |
+| Lanacoin          |  ✅   |      |        |        |         |       |
+| Litecoin          |  ✅   | ✅   | ❌     | ❌     |        |         |
+| Litecoin Cash     |  ✅   |      | ❌     | ❌     |         |         |
+| LiteDoge          |  ✅   |      |        |        |         |       |
+| Luckycoin         |  ✅   |      |        |        |         |       |
+| Lynx              |  ✅   |      |        |        |         |       |
+| MasterNoder2      |  ✅   |      |        |        |         |       |
+| Mooncoin          |  ✅   | ✅   |        |        |         |       |
+| Myriad            |  ✅   | ✅   | ❌     | ❌     |        |         |
+| Namecoin          |  ✅   |      | ❌     | ❌     |         |         |
+| NewYorkCoin       |  ✅   |      |        |        |         |       |
+| Novacoin          |  ✅   |      |        |        |         |       |
+| PAC Protocol      |  ✅   |      |        |        |         |       |
+| PakCoin           |  ✅   |      |        |        |         |       |
+| PandaCoin         |  ✅   |      |        |        |         |       |
+| Particl           |  ✅   | ✅   |        |        |         |       |
+| Peercoin          |  ✅   |      |        |        |         |       |
+| Pinkcoin          |  ✅   |      |        |        |         |       |
+| Primecoin         |  ✅   |      |        |        |         |       |
+| PotCoin           |  ✅   |      |        |        |         |       |
+| PutinCoin v2      |  ✅   |      |        |        |         |       |
+| PIVX              |  ✅   |      |        |        |         |       |
+| Quark             |  ✅   |      |        |        |         |       |
+| Raptoreum         |  ✅   |      |        |        |        |         |
+| Reddcoin          |  ✅   |      |        |        |        |         |
+| Riecoin           |       | ✅   | ❌     | ❌    |         |       |
+| SaluS             |  ✅   | ✅   |        |        |         |       |
+| Smileycoin        |  ✅   |      |        |        |         |       |
+| SpaceXpanse       |  ✅   |      | ❌     | ❌     |         |       |
+| Sterlingcoin      |  ✅   |      |        |        |         |       |
+| Syscoin           |  ✅   |      | ❌     | ❌     |         |       |
+| Terracoin         |  ✅   |      |        |        |         |       |
+| TheHolyRogerCoin  | ✅    |      | ❌     | ❌     |         |       |
+| Trezarcoin        |  ✅   |      |        |        |         |       |
+| UFO               |  ✅   | ✅   | ❌     | ❌      |        |         |
+| Unobtanium        |  ✅   |      |        |        |        |         |
+| Validity          |  ✅   |      |        |        |         |       |
+| Vanillacash       |  ✅   |      |        |        |         |       |
+| VeriCoin          |  ✅   |      |        |        |         |       |
+| Versacoin         |  ✅   |      |        |        |         |       |
+| Vertcoin          |  ✅   |      | ❌     | ❌     |         |       |
+| WorldCoin         |  ✅   |      |        |        |         |       |
+| ZCash             |  ✅   | ✅   |        |        |        |         |
 
 ### Create the database by yourself
 Useful txt/text file provider:

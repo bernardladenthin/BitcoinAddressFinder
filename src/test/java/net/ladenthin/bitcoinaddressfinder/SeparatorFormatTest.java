@@ -20,8 +20,10 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
+import java.io.IOException;
 import org.junit.Test;
 import java.util.Arrays;
+import java.util.List;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
@@ -89,13 +91,32 @@ public class SeparatorFormatTest {
         assertThat(result.length, is(equalTo(1)));
         assertThat(result[0], is(equalTo(input)));
     }
-
+    
     /**
-     * Tests that when multiple separators are present, the longest one is used
-     * for splitting first.
+     * Tests that the input is recursively split on all matching separators,
+     * starting with the longest, respecting their defined priority.
      */
     @Test
-    public void split_multipleSeparatorsPresent_firstMatchUsed() {
+    public void split_inputWithMultipleValidSeparators_recursivelySplitsAll() {
+        // arrange
+        String input = "a" + SeparatorFormat.DOUBLE_COLON.getSymbol() + "b" + SeparatorFormat.SEMICOLON.getSymbol() + "c";
+
+        // act
+        String[] result = SeparatorFormat.split(input);
+
+        // assert
+        assertThat(result.length, is(equalTo(3)));
+        assertThat(result[0], is(equalTo("a")));
+        assertThat(result[1], is(equalTo("b")));
+        assertThat(result[2], is(equalTo("c")));
+    }
+
+    /**
+     * Tests that when multiple separators are present, the input is recursively
+     * split by all applicable separators, starting with the longest.
+     */
+    @Test
+    public void split_multipleSeparatorsPresent_recursivelySplitsAll() {
         // arrange
         String input = "a" + SeparatorFormat.DOUBLE_COLON.getSymbol() + "b" + SeparatorFormat.COLON.getSymbol() + "c";
 
@@ -103,9 +124,10 @@ public class SeparatorFormatTest {
         String[] result = SeparatorFormat.split(input);
 
         // assert
-        assertThat(result.length, is(equalTo(2)));
+        assertThat(result.length, is(equalTo(3)));
         assertThat(result[0], is(equalTo("a")));
-        assertThat(result[1], is(equalTo("b" + SeparatorFormat.COLON.getSymbol() + "c"))); // Only "::" should split
+        assertThat(result[1], is(equalTo("b")));
+        assertThat(result[2], is(equalTo("c")));
     }
 
     /**
@@ -145,31 +167,13 @@ public class SeparatorFormatTest {
     @Test
     public void getSortedSeparators_doubleColonBeforeColon() {
         // act
-        SeparatorFormat[] sorted = SeparatorFormat.getSortedSeparators();
+        List<SeparatorFormat> sorted = SeparatorFormat.getSortedSeparators();
 
         // assert
-        int doubleColonIndex = java.util.Arrays.asList(sorted).indexOf(SeparatorFormat.DOUBLE_COLON);
-        int colonIndex = java.util.Arrays.asList(sorted).indexOf(SeparatorFormat.COLON);
+        int doubleColonIndex = sorted.indexOf(SeparatorFormat.DOUBLE_COLON);
+        int colonIndex = sorted.indexOf(SeparatorFormat.COLON);
 
         assertThat(doubleColonIndex, is(lessThan(colonIndex)));
-    }
-
-    /**
-     * Tests that the input is split on the longest matching separator even when
-     * multiple valid separators exist.
-     */
-    @Test
-    public void split_inputWithMultipleValidSeparatorsButSplitOnLongestFirst() {
-        // arrange
-        String input = "a" + SeparatorFormat.DOUBLE_COLON.getSymbol() + "b" + SeparatorFormat.SEMICOLON.getSymbol() + "c";
-
-        // act
-        String[] result = SeparatorFormat.split(input);
-
-        // assert
-        assertThat(result.length, is(equalTo(2)));
-        assertThat(result[0], is(equalTo("a")));
-        assertThat(result[1], is(equalTo("b" + SeparatorFormat.SEMICOLON.getSymbol() + "c")));
     }
 
     /**
@@ -236,5 +240,34 @@ public class SeparatorFormatTest {
         String input = "left" + SeparatorFormat.SPACE.getSymbol() + "right";
         String[] result = SeparatorFormat.split(input);
         assertThat(result.length, is(equalTo(2)));
+    }
+    
+    @Test
+    public void split_recursiveSplitting_allRelevantSeparatorsAreResolvedInOrder() {
+        // arrange
+        String input = "first" 
+            + SeparatorFormat.DOUBLE_COLON.getSymbol() 
+            + "second" 
+            + SeparatorFormat.COLON.getSymbol() 
+            + "third" 
+            + SeparatorFormat.PIPE.getSymbol() 
+            + "fourth";
+
+        // Expected splitting order:
+        // 1. DOUBLE_COLON splits "first" and "second:third|fourth"
+        // 2. COLON splits "second" and "third|fourth"
+        // 3. PIPE splits "third" and "fourth"
+        //
+        // Expected output: ["first", "second", "third", "fourth"]
+
+        // act
+        String[] result = SeparatorFormat.split(input);
+
+        // assert
+        assertThat(result.length, is(equalTo(4)));
+        assertThat(result[0], is(equalTo("first")));
+        assertThat(result[1], is(equalTo("second")));
+        assertThat(result[2], is(equalTo("third")));
+        assertThat(result[3], is(equalTo("fourth")));
     }
 }
