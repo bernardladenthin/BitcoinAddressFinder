@@ -392,9 +392,9 @@ public enum StaticP2PKHAddress implements PublicAddress {
      */
     Validity("XeUbUeeR5igC3qoiY7ZdvRNrdq5QvBDFTS", "298f874855a346589845ecc35635cfef81788a2e"),
     /**
-     * https://chainz.cryptoid.info/xvc/address.dws?5276.htm
+     * https://chainz.cryptoid.info/xvc/address.dws?22910.htm
      */
-    Vanillacash("8U7bqgZtssjgDFTuqF5wjRpSwKJHEzmCDN", "8eee0ae5d8eaa9a0440feb600e41a1463f7d7b39"),
+    Vanillacash("8Z7GY7YR2pDLwLxqLmzca6oHXVnT6NbQzU", "c5b68ee79f2ba1af86375ab221b2e72728ec89c7"),
     /**
      * https://chainz.cryptoid.info/vrc/address.dws?531079.htm
      */
