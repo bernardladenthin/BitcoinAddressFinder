@@ -85,18 +85,20 @@ Copyright (c) 2017-2025 Bernard Ladenthin.
 - **Java 21 or newer** is required to run BitcoinAddressFinder.  
   Older versions such as Java 8, 11, or 17 are not supported.
 
-- **OpenCL (optional)**:  
-  You can choose between CPU-only and GPU-accelerated configurations.  
-  When OpenCL is enabled, elliptic curve key generation can be offloaded to one or multiple OpenCL-capable devices (e.g., GPUs), greatly increasing performance.
+- **🚀 OpenCL (optional)**:  
+  You can run this software in either **CPU-only** mode or with **GPU acceleration via OpenCL** for significantly enhanced performance.
 
-  Multi-GPU setups are fully supported — each GPU can be configured individually to parallelize the workload and scan more keys per second.
+  When OpenCL is enabled:
+  - **Elliptic Curve Key Generation** is offloaded to one or more OpenCL-capable devices (e.g., GPUs), dramatically boosting key scanning throughput.
+  - **SHA-256** and **RIPEMD-160** hashing operations are also offloaded to the GPU, further reducing CPU load and increasing overall efficiency.
+  - **Multi-GPU setups are fully supported** — each device can be configured individually, enabling efficient parallelization and scalability across multiple GPUs.
 
 ## Quickstart
 1. Download the binary (jar) from https://github.com/bernardladenthin/BitcoinAddressFinder/releases
 2. Download and extract the light database from https://github.com/bernardladenthin/BitcoinAddressFinder#use-my-prepared-database
 3. Download a configuration set like:
 - [`logbackConfiguration.xml`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/logbackConfiguration.xml)
-- [`config_Find_1OpenCLDevice.js`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/config_Find_1OpenCLDevice.js)
+- [`config_Find_1OpenCLDevice.json`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/config_Find_1OpenCLDevice.json)
 - [`run_Find_1OpenCLDevice.bat`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/run_Find_1OpenCLDevice.bat)
 4. Put all in one directory like the following structure
   * Downloads
@@ -353,14 +355,14 @@ You are also welcome to **extend this database** by importing your own address d
 If you're missing any information or have questions about usage or content, feel free to ask or open an issue.
 
 #### Light database
-* Light (5.12 GiB), Last update: April 5, 2025
+* Light (5.23 GiB), Last update: June 1, 2025
   * Contains Bitcoin addresses whith amount and many altcoin addresses with amount.
   * Static amount of 0 is used to allow best compression.
-  * Unique entries: 124362254
+  * Unique entries: 127253221
   * Mapsize: 5248 MiB
   * Time to create the database: ~9 hours
-  * Link (3.45 GiB zip archive): http://ladenthin.net/lmdb_light.zip
-  * Link extracted addresses as txt (2.15 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Light_HexHash.zip
+  * Link (3.???????? GiB zip archive): http://ladenthin.net/lmdb_light.zip
+  * Link extracted addresses as txt (4.97 GiB) (2.??????????? GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Light_HexHash.zip
 
 <details>
 <summary>Checksums lmdb_light.zip</summary>
