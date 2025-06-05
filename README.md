@@ -287,7 +287,7 @@ Empty means not implemented by altcoin project.
 | Luckycoin         |  ✅   |      |        |        |         |       |
 | Lynx              |  ✅   |      |        |        |         |       |
 | MasterNoder2      |  ✅   |      |        |        |         |       |
-| Mooncoin          |  ✅   | ✅   |        |        |         |       |
+| Mooncoin          |  ✅   | ✅   | ❌     | ❌      |         |       |
 | Myriad            |  ✅   | ✅   | ❌     | ❌     |        |         |
 | Namecoin          |  ✅   |      | ❌     | ❌     |         |         |
 | NewYorkCoin       |  ✅   |      |        |        |         |       |
@@ -358,25 +358,32 @@ If you're missing any information or have questions about usage or content, feel
 * Light (5.23 GiB), Last update: June 1, 2025
   * Contains Bitcoin addresses whith amount and many altcoin addresses with amount.
   * Static amount of 0 is used to allow best compression.
-  * Unique entries: 127253221
-  * Mapsize: 5248 MiB
+  * Unique entries: 127367117
+  * Mapsize: 5368 MiB
   * Time to create the database: ~9 hours
-  * Link (3.???????? GiB zip archive): http://ladenthin.net/lmdb_light.zip
-  * Link extracted addresses as txt (4.97 GiB) (2.??????????? GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Light_HexHash.zip
+  * Link (3.53 GiB zip archive): http://ladenthin.net/lmdb_light.zip
+  * Link extracted addresses as txt (4.98 GiB) (2.20 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Light_HexHash.zip
+
+> 💡 **Hint:** When using the light database, it is **strongly recommended** to enable the following setting in your configuration:
+> ```json
+> "loadToMemoryCacheOnInit" : true
+> ```  
+> Although LMDB is very fast, a Java `HashSet` provides true **O(1)** lookups compared to **O(log n)** (or worse) with disk-backed access.
+> Enabling this flag loads all addresses into memory at startup, resulting in significantly higher throughput during key scanning — especially for OpenCL or high-frequency batch operations.
 
 <details>
 <summary>Checksums lmdb_light.zip</summary>
 
-* CRC32: 99EE37B0
-* MD5: EAF6A6D4B7DBC64CB57804DA5BE18925
-* RipeMD160: 45A0B44CF60BE91052D4A28F77570161F5B3D5B5
-* SHA-1: 370FF92091FCD02731EACB4DF653BD37510C94E2
-* SHA-256: F5BDF608B00223B4860C60EC3C9B85965480AC1BD22A42B8AABFB8A2544562D5
-* SHA-512: 4DA942FA926B8F337565CB808EE68BCCC0508D75BFA2E054CE3D29C13264D955B6B4FA54E5F3BBFF8E87F6C1981F554F408AD1B42C94C303A79DEF241C5327B8
-* SHA3-224: F824FF851747CE699CD874916FAB7853805BFE30A1C7B33E8CC7FDBD
-* SHA3-256: 471658927AA2AC4EBC1331B6D3827EE796BD07C81580AA5E8C4BD7D5DE09533B
-* SHA3-384: DFAD1E371F653EC3A2E7BBB033AE66B85A9A7B01000FE95699D0059B4DA625A257F2CB51801789245B77553074A426AA
-* SHA3-512: 439D5B25A9D1A536118AF4D78BA8F0B6299B4E74ABC6C804D8906899D05B7ADB8129EDE357FFE3CC3854DFF57F3B27C50F50C89BB7B051771A98570041675D82
+* CRC32: D2AF2164
+* MD5: 91F13598C131BEC3457CD0BC0FFACC6E
+* RipeMD160: 7958D3303D010FF12F0D13E431A5BADEE8E0462B
+* SHA-1: 50596349A20644514A47098B296B72315B644FE3
+* SHA-256: 60F40818E1F5437DBA901DE4F07D738CBF777F97E13717E7EFCB78D68EAA8FF4
+* SHA-512: CB2ACC74EFC9E7D72E7ABA0BA5972989D15D59048D8C4E0D6BAD1B675A12A9036D73AEF457283C3F55FC227D630C68762A3803133BEB4C2069AAC06AB149B534
+* SHA3-224: 19434D79D59B6EB89341B6035C074A54AB26C0647D39962FF754474E
+* SHA3-256: 987F19BE7EA27EA764485E67B165ACEDD01B4AE534190FA7F9DC35CF9F8F3239
+* SHA3-384: DD9BAC7346D18C90B862086675A55015CB1B4D0FA7B1637114CAD9338DAAF98F2A4027EDD4A9AA0FA876CA0AC79D40F3
+* SHA3-512: B68ABD037C599F4A884E85B0FE255A57D1037641D9552F7C63D604C63403DBF2A9881B5A1BA0907FEE54808672EF6FDDD0B6EFEB71E929FD87B69E29CFFFAAC6
 
 </details>
 
@@ -398,7 +405,7 @@ If you're missing any information or have questions about usage or content, feel
 
 
 #### Full database
-* Full (57.0 GiB), Last update: April 5, 2025
+* Full (57.0 GiB), Last update: June 4, 2025
   * Contains all Bitcoin addresses which are ever used and many altcoin addresses with and without amount.
   * Static amount of 0 is used to allow best compression.
   * Unique entries: 1349299900

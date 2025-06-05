@@ -122,6 +122,10 @@ public class AddressTxtLine {
             // namecoin Bech32 (P2WSH or P2WPKH)
             // https://chainz.cryptoid.info/nmc/address.dws?nc1q2ml905jv7gx0d8z5f7kl23af0vtrjk4j0llmwr.htm
             return null;
+        } else if (address.startsWith("moon1")) {
+            // Mooncoin Bech32 (P2WSH or P2WPKH)
+            // https://chainz.cryptoid.info/moon/address.dws?moon1q2rhkqa03lq2hza99ezpfsauvgqmgqz5xjlawjq.htm
+            return null;
         } else if (address.startsWith("vtc1")) {
             // vertcoin Bech32 (P2WSH or P2WPKH)
             // https://chainz.cryptoid.info/vtc/address.dws?vtc1qa4wejdlw9lmc7ks7l8hplc9fm394u79qjj0792.htm

@@ -108,6 +108,12 @@ public enum StaticUnsupportedAddress implements PublicAddress {
      */
     LitecoinCash("lcc1qrzlsxpjl0tynu3t2fkrw2ff2dgm0pv53ern0s5"),
 
+    // Mooncoin Bech32 (P2WSH or P2WPKH)
+    /**
+     * https://chainz.cryptoid.info/moon/address.dws?moon1q2rhkqa03lq2hza99ezpfsauvgqmgqz5xjlawjq.htm
+     */
+    Mooncoin("moon1q2rhkqa03lq2hza99ezpfsauvgqmgqz5xjlawjq"),
+
     // Myriad Bech32 (P2WSH or P2WPKH)
     /**
      * https://btc.cryptoid.info/xmy/address.dws?4567225.htm
