@@ -493,6 +493,11 @@ The CPU then hashes the X and Y coordinates of the public keys to derive the cor
 #### Built-in Self-Test (BIST)
 
 The OpenCL backend includes a built-in self-test mechanism that cross-verifies results from the GPU against a CPU-generated reference. This ensures that the OpenCL device is functioning correctly and producing valid EC keys—giving end users confidence in the reliability of their hardware-accelerated address search.
+> 💡 **Hint:** To enable the built-in self-test, make sure the following configuration flag is set to `true`:  
+> ```json
+> "runtimePublicKeyCalculationCheck": true
+> ```  
+> This option is disabled by default. Enabling it is especially useful during development, debugging, or when validating new hardware setups.
 
 #### Performance Benchmarks
 
