@@ -19,8 +19,12 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import com.github.kiulian.converter.AddressConverter;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import org.bitcoinj.base.Base58;
+import org.bitcoinj.base.Bech32;
 import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.SegwitAddress;
 import org.bitcoinj.base.exceptions.AddressFormatException;
@@ -61,102 +65,125 @@ public class AddressTxtLine {
         if (address.isEmpty() || address.startsWith(IGNORE_LINE_PREFIX) || address.startsWith(ADDRESS_HEADER)) {
             return null;
         }
+        
+        // Riecoin
+        {
+            final String OP_DUP = "76";
+            final String OP_HASH160 = "a9";
+            final String OP_PUSH_20_BYTES = "14";
+            final int length20Bytes = PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES;
+            final String riecoinP2SHPrefix = OP_DUP + OP_HASH160 + OP_PUSH_20_BYTES;
+            final int riecoinScriptPubKeyLengthHex = length20Bytes * 2 + riecoinP2SHPrefix.length();
+            if (address.length() >= riecoinScriptPubKeyLengthHex && address.startsWith(riecoinP2SHPrefix)) {
+                final String hash160Hex = address.substring(riecoinP2SHPrefix.length(), length20Bytes*2+riecoinP2SHPrefix.length());
+                final ByteBuffer hash160 = keyUtility.byteBufferUtility.getByteBufferFromHex(hash160Hex);
+                return new AddressToCoin(hash160, amount);
+            }
+        }
 
+        // blockchair Multisig format prefix (P2MS)
+        if (
+               address.startsWith("d-")
+            || address.startsWith("m-")
+            || address.startsWith("s-")
+        ) {
+            return null;
+        }
+
+        if (address.startsWith("wkh_")) {
+            // BitCore (WKH) is base36 encoded hash160
+            String addressWKH = address.substring("wkh_".length());
+            
+            byte[] hash160 = new Base36Decoder().decodeBase36ToFixedLengthBytes(addressWKH, PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES);
+
+            ByteBuffer hash160AsByteBuffer = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160);
+            return new AddressToCoin(hash160AsByteBuffer, amount);
+        }
+        
         if (address.startsWith("q")) {
             // q: bitcoin cash Base58 (P2PKH)
             // convert to legacy address
             address = AddressConverter.toLegacyAddress(address);
         }
-
-        if (address.startsWith("d-") || address.startsWith("m-") || address.startsWith("s-")) {
-            // blockchair format for Bitcoin (d-) and Bitcoin Cash (m-) and (s-) (P2MS)
-            return null;
-        } else if (address.startsWith("bc1")) {
+        
+        if (
+            // bitcoin
+               address.startsWith("bc1")
+            // Bitcoin Oil
+            || address.startsWith("btco1")
+            // Canada-eCoin
+            || address.startsWith("cdn1q")
+            // Canada-eCoin
+            || address.startsWith("btx1")
+            // DeFiChain
+            || address.startsWith("df1q")
+            // digibyte
+            || address.startsWith("dgb1")
+            // Doichain
+            || address.startsWith("dc1q")
+            // Groestlcoin || Groestlcoin TestNet
+            || address.startsWith("grs1") || address.startsWith("tgrs1")
+            // feathercoin
+            || address.startsWith("fc1")
+            // litecoin cash
+            || address.startsWith("lcc1")
+            // litecoin
+            || address.startsWith("ltc1")
+            // Mooncoin
+            || address.startsWith("moon1")
+            // Myriad
+            || address.startsWith("my1q")
+            // namecoin
+            || address.startsWith("nc1")
+            // Riecoin
+            || address.startsWith("ric1")
+            // SpaceXpanse
+            || address.startsWith("rod1q")
+            // syscoin
+            || address.startsWith("sys1")
+            // TheHolyRogerCoin
+            || address.startsWith("rog1q")
+            // UFO
+            || address.startsWith("uf1q")
+            // vertcoin
+            || address.startsWith("vtc1")
+        ) {
             // bitcoin Bech32 (P2WSH or P2WPKH) or P2TR
             // supported (20 bytes): https://privatekeys.pw/address/bitcoin/bc1qazcm763858nkj2dj986etajv6wquslv8uxwczt
-            SegwitAddress segwitAddress = SegwitAddress.fromBech32(address, keyUtility.network);
-            byte[] hash = segwitAddress.getHash();
-            ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash);
-            if (hash160.limit() != PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES) {
-                // unsupported (32 bytes): https://privatekeys.pw/bitcoin/address/bc1qp762gmkychywl4elnuyuwph68hqw0uc2jkzu3ax48zfjkskslpsq8p66gf
-                return null;
+            try {
+                //Bech32.Bech32Data bech32Data = Bech32.decode(address);
+            } catch (AddressFormatException e) {
+                throw new RuntimeException(e);
+            } catch (RuntimeException e) {
+                throw e;
             }
-            return new AddressToCoin(hash160, amount);
-        } else if (address.startsWith("btco1")) {
-            // Bitcoin Oil Bech32 (P2WSH or P2WPKH)
-            // https://btc.cryptoid.info/btco/address.dws?3851.htm
-            return null;
-        } else if (address.startsWith("cdn1q")) {
-            // Canada-eCoin Bech32 (P2WSH or P2WPKH)
-            // https://btc.cryptoid.info/cdn/address.dws?cdn1qf7kyhfue3fjn4y09ec6cqqsxq56vh7q3z9ea8e.htm
-            return null;
-        } else if (address.startsWith("dc1q")) {
-            // Doichain Bech32 (P2WSH or P2WPKH)
-            // https://btc.cryptoid.info/doi/address.dws?2378564.htm
-            return null;
-        } else if (address.startsWith("df1q")) {
-            // DeFiChain Bech32 (P2WSH or P2WPKH)
-            // https://btc.cryptoid.info/dfi/address.dws?df1qvkmmsj6z602rymrx7fn82gqh68dp3v2f068gsu.htm
-            return null;
-        } else if (address.startsWith("rog1q")) {
-            // TheHolyRogerCoin Bech32 (P2WSH or P2WPKH)
-            // https://btc.cryptoid.info/roger/address.dws?139264.htm
-            return null;
-        } else if (address.startsWith("uf1q")) {
-            // UFO Bech32 (P2WSH or P2WPKH)
-            // https://btc.cryptoid.info/ufo/address.dws?570258.htm
-            return null;
-        } else if (address.startsWith("fc1")) {
-            // feathercoin Bech32 (P2WSH or P2WPKH)
-            // https://chainz.cryptoid.info/ftc/address.dws?fc1qvr9zesajsdw8aydcndd70wxj2wdgzu6zzltsph.htm
-            return null;
-        } else if (address.startsWith("lcc1")) {
-            // litecoin cash Bech32 (P2WSH or P2WPKH)
-            // https://chainz.cryptoid.info/lcc/address.dws?lcc1qrzlsxpjl0tynu3t2fkrw2ff2dgm0pv53ern0s5.htm
-            return null;
-        } else if (address.startsWith("ltc1")) {
-            // litecoin Bech32 (P2WSH or P2WPKH)
-            // https://privatekeys.pw/litecoin/address/ltc1qd5wm03t5kcdupjuyq5jffpuacnaqahvfsdu8smf8z0u0pqdqpatqsdrn8h
-            return null;
-        } else if (address.startsWith("nc1")) {
-            // namecoin Bech32 (P2WSH or P2WPKH)
-            // https://chainz.cryptoid.info/nmc/address.dws?nc1q2ml905jv7gx0d8z5f7kl23af0vtrjk4j0llmwr.htm
-            return null;
-        } else if (address.startsWith("moon1")) {
-            // Mooncoin Bech32 (P2WSH or P2WPKH)
-            // https://chainz.cryptoid.info/moon/address.dws?moon1q2rhkqa03lq2hza99ezpfsauvgqmgqz5xjlawjq.htm
-            return null;
-        } else if (address.startsWith("vtc1")) {
-            // vertcoin Bech32 (P2WSH or P2WPKH)
-            // https://chainz.cryptoid.info/vtc/address.dws?vtc1qa4wejdlw9lmc7ks7l8hplc9fm394u79qjj0792.htm
-            return null;
-        } else if (address.startsWith("dgb1")) {
-            // digibyte Bech32 (P2WPKH or P2SH)
-            return null;
-        } else if (address.startsWith("sys1")) {
-            // syscoin Bech32 (P2WPKH or P2SH)
-            return null;
-        } else if (address.startsWith("btx1")) {
-            // BitCore Bech32 (P2WPKH or P2SH)
-            return null;
-        } else if (address.startsWith("wkh_")) {
-            // BitCore (WKH)
-            return null;
-        } else if (address.startsWith("grs1")) {
-            // Groestlcoin Bech32 (P2WPKH or P2SH)
-            return null;
-        } else if (address.startsWith("tgrs1")) {
-            // Groestlcoin TestNet Bech32 (P2WPKH or P2SH)
-            return null;
-        } else if (address.startsWith("ric1")) {
-            // Riecoin Bech32 (P2WPKH or P2SH)
-            return null;
-        } else if (address.startsWith("rod1q")) {
-            // SpaceXpanse Bech32 (P2WPKH or P2SH)
-            return null;
-        } else if (address.startsWith("my1q")) {
-            // Myriad Bech32 (P2WPKH or P2SH)
-            return null;
+            // do everything manual
+            Bech32.Bech32Data bechData = Bech32.decode(address);
+            // is protected: bechData.witnessProgram();
+            Class<?> clazz = Bech32.Bech32Bytes.class;
+            Method witnessProgramMethod;
+            try {
+                witnessProgramMethod = clazz.getDeclaredMethod("witnessProgram");
+                witnessProgramMethod.setAccessible(true);
+                try {
+                    byte[] hash160AsByteArray = (byte[]) witnessProgramMethod.invoke(bechData);
+                    if (hash160AsByteArray.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_PKH) {
+                        final ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160AsByteArray);
+                        return new AddressToCoin(hash160, amount);
+                    } else if (hash160AsByteArray.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_SH) {
+                        return null;
+                    } else if (hash160AsByteArray.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_TR) {
+                        return null;
+                    } else {
+                        throw new AddressFormatException();
+                    }
+                } catch (IllegalAccessException ex) {
+                } catch (InvocationTargetException ex) {
+                }
+            } catch (NoSuchMethodException ex) {
+            } catch (SecurityException ex) {
+            }
+            throw new AddressFormatException();
         } else if (address.startsWith("p")) {
             // p: bitcoin cash / CashAddr (P2SH), this is a unique format and does not work
             // p: peercoin possible
@@ -259,21 +286,6 @@ public class AddressTxtLine {
             // x: Clam / iXcoin
             // X: dash / Validity
             
-            // Riecoin
-            {
-                final String OP_DUP = "76";
-                final String OP_HASH160 = "a9";
-                final String OP_PUSH_20_BYTES = "14";
-                final int length20Bytes = 20;
-                final String riecoinP2SHPrefix = OP_DUP + OP_HASH160 + OP_PUSH_20_BYTES;
-                final int riecoinScriptPubKeyLengthHex = length20Bytes * 2 + riecoinP2SHPrefix.length();
-                if (address.length() >= riecoinScriptPubKeyLengthHex && address.startsWith(riecoinP2SHPrefix)) {
-                    final String hash160Hex = address.substring(riecoinP2SHPrefix.length(), length20Bytes*2+riecoinP2SHPrefix.length());
-                    final ByteBuffer hash160 = keyUtility.byteBufferUtility.getByteBufferFromHex(hash160Hex);
-                    return new AddressToCoin(hash160, amount);
-                }
-            }
-
             if (address.startsWith("t")) {
                 // ZCash has two version bytes
                 ByteBuffer hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_ZCASH);
@@ -287,13 +299,12 @@ public class AddressTxtLine {
             ByteBuffer hash160;
             try {
                 hash160 = keyUtility.getHash160ByteBufferFromBase58String(address);
-            } catch (AddressFormatException.InvalidChecksum e) {
-                hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_REGULAR);
-            } catch (AddressFormatException.WrongNetwork e) {
-                // bitcoin testnet
-                hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_REGULAR);
-            } catch (AddressFormatException.InvalidDataLength e) {
-                // too short address
+            } catch (
+                    AddressFormatException.InvalidChecksum   // InvalidChecksum
+                  | AddressFormatException.WrongNetwork      // e.g. bitcoin testnet
+                  | AddressFormatException.InvalidDataLength // e.g. too short address
+                  e
+            ) {
                 hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_REGULAR);
             }
             return new AddressToCoin(hash160, amount);

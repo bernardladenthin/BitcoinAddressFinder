@@ -26,6 +26,7 @@ import java.nio.ByteOrder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticP2PKHAddress;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticP2SHAddress;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticBech32Address;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticUnsupportedAddress;
 
 public class CommonDataProvider {
@@ -281,8 +282,6 @@ public class CommonDataProvider {
     @DataProvider
     public static Object[][] bitcoinInvalidP2WPKHAddresses() {
         return new Object[][]{
-            {"bc1pmfr3p9j00pfxjh0zmgp99y8zftmd3s5pmedqhyptwy6lm87hf5ss52r5n8"},
-            {"bc1pqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqs3wf0qm"},
             {"bc1zqyqsywvzqe"},
         };
     }
@@ -446,6 +445,16 @@ public class CommonDataProvider {
     @DataProvider
     public static Object[][] staticP2SHAddresses() {
         return transformFlatToObjectArrayArray(StaticP2SHAddress.values());
+    }
+    
+    /**
+     * For {@link #staticBech32Addresses()}.
+     */
+    public final static String DATA_PROVIDER_STATIC_BECH32_ADDRESSES = "staticBech32Addresses";
+
+    @DataProvider
+    public static Object[][] staticBech32Addresses() {
+        return transformFlatToObjectArrayArray(StaticBech32Address.values());
     }
     
     /**

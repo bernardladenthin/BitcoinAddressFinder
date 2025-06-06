@@ -18,20 +18,25 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
-import static org.junit.Assert.assertEquals;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
 
 import org.junit.Test;
 
 public class HexEncodeTest {
-
+    
+    // <editor-fold defaultstate="collapsed" desc="compare BouncyCastle vs Apache Commons Hex encoding">
     @Test
-    public void testEncodeHexString() {
-        byte[] data = { (byte) 0x8f, (byte) 0xc2, (byte) 0xab, (byte) 0xde };
+    public void encodeHexString_bouncyCastleAndApacheCommons_resultMustMatch() {
+        // arrange
+        byte[] data = {(byte) 0x8F, (byte) 0xC2, (byte) 0xAB, (byte) 0xDE};
 
-        String resultBouncyCastle = org.bouncycastle.util.encoders.Hex.toHexString(data);
+        // act
+        String hexBc = org.bouncycastle.util.encoders.Hex.toHexString(data);
+        String hexApache = org.apache.commons.codec.binary.Hex.encodeHexString(data);
 
-        String resultApache = org.apache.commons.codec.binary.Hex.encodeHexString(data);
-
-        assertEquals("Die Hex-Strings sollten gleich sein", resultBouncyCastle, resultApache);
+        // assert
+        assertThat("Hex encodings from BouncyCastle and Apache Commons must match", hexBc, is(hexApache));
     }
+    // </editor-fold>
 }

@@ -19,8 +19,19 @@
 package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 
 public enum StaticUnsupportedAddress implements PublicAddress {
+    
+    // Scripts with 32 bytes
+    /**
+     * bitcoin Bech32 (P2WSH) with 32 bytes
+     * https://privatekeys.pw/bitcoin/address/bc1qp762gmkychywl4elnuyuwph68hqw0uc2jkzu3ax48zfjkskslpsq8p66gf
+     * The hash of this script has 32 bytes: 0fb4a46ec4c5c8efd73f9f09c706fa3dc0e7f30a9585c8f4d538932b42d0f860
+     */
+    Bitcoin("bc1qp762gmkychywl4elnuyuwph68hqw0uc2jkzu3ax48zfjkskslpsq8p66gf"),
+    
+    // Bitcoin Bech32 (P2WSH)
+    BitcoinP2SH("bc1pmfr3p9j00pfxjh0zmgp99y8zftmd3s5pmedqhyptwy6lm87hf5ss52r5n8"),
 
-    // P2SH (Pay to Script Hash)
+    // Bitcoin Cash Bech32 (P2WSH)
     /**
      * https://privatekeys.pw/bitcoin-cash/address/prseh0a4aejjcewhc665wjqhppgwrz2lw5txgn666a
      */
@@ -28,151 +39,35 @@ public enum StaticUnsupportedAddress implements PublicAddress {
 
     // P2MS (Pay to Multisig)
     /**
-     * https://privatekeys.pw/bitcoin-cash/address/m-6d14a66d55f88b28b41132f32d1f3059
+     * 
+     */
+    BitcoinP2MS("d-414f1537e051163a5a558d5e9ee37439"),
+    /**
+     * https://privatekeys.pw/address/bitcoin-cash/m-6d14a66d55f88b28b41132f32d1f3059
      */
     BitcoinCashP2MS("m-6d14a66d55f88b28b41132f32d1f3059"),
     /**
-     * https://privatekeys.pw/bitcoin-cash/address/s-8f1a5a77bd8e884c66044ec2081a05b0
+     * 
      */
     BitcoinCashP2MS_2("s-8f1a5a77bd8e884c66044ec2081a05b0"),
-    /**
-     * https://privatekeys.pw/bitcoin-cash/address/d-414f1537e051163a5a558d5e9ee37439
-     */
-    BitcoinP2MS("d-414f1537e051163a5a558d5e9ee37439"),
     
-    // Scripts with 32 bytes
-    /**
-     * bitcoin Bech32 (P2WSH) (Pay to Witness Script Hash) with 32 bytes
-     * https://privatekeys.pw/bitcoin/address/bc1qp762gmkychywl4elnuyuwph68hqw0uc2jkzu3ax48zfjkskslpsq8p66gf
-     * The hash of this script has 32 bytes: 0fb4a46ec4c5c8efd73f9f09c706fa3dc0e7f30a9585c8f4d538932b42d0f860
-     */
-    BitcoinP2WSH_32_BYTES("bc1qp762gmkychywl4elnuyuwph68hqw0uc2jkzu3ax48zfjkskslpsq8p66gf"),
-
-    // BitCore Bech32 (P2WSH or P2WPKH)
-    /**
-     * https://chainz.cryptoid.info/btx/address.dws?7481872.htm
-     */
-    BitCore("btx1q7tn0z9mln8dq7c73dkrfqpx4wkutqh37sdprwv"),
-    
-    // BitCore (WKH)
-    /**
-     * https://btc.cryptoid.info/btx/address.dws?6631790.htm
-     */
-    BitCoreWKH("wkh_HPOOHTFGYCOP6IBAC6KMKVUQBU6VOHYD"),
-    
-    // Bitcoin Oil Bech32 (P2WSH or P2WPKH)
-    /**
-     * https://btc.cryptoid.info/btco/address.dws?3851.htm
-     */
-    BitcoinOil("btco1q8xgl5s6sknp0kx3a7axk63p8xk797rnwp4fx7z"),
-    
-    // CanadaECoin Bech32 (P2WSH or P2WPKH)
-    /**
-     * https://btc.cryptoid.info/cdn/address.dws?cdn1qf7kyhfue3fjn4y09ec6cqqsxq56vh7q3z9ea8e.htm
-     */
-    CanadaECoin("cdn1qf7kyhfue3fjn4y09ec6cqqsxq56vh7q3z9ea8e"),
-    
-    // DeFiChain Bech32 (P2WSH or P2WPKH)
-    /**
-     * https://btc.cryptoid.info/dfi/address.dws?df1qvkmmsj6z602rymrx7fn82gqh68dp3v2f068gsu.htm
-     */
-    DeFiChain("df1qvkmmsj6z602rymrx7fn82gqh68dp3v2f068gsu"),
-    
-    // Digibyte Bech32 (P2WSH or P2WPKH)
-    /**
-     * https://dgb.tokenview.io/en/address/dgb1qnjf7e2a5ezft480kxzmhgg66pnzqk0aawxa06u
-     */
-    Digibyte("dgb1qnjf7e2a5ezft480kxzmhgg66pnzqk0aawxa06u"),
-    
-    // Doichain Bech32 (P2WSH or P2WPKH)
+    // Doichain Bech32 (P2WSH)
     /**
      * https://btc.cryptoid.info/doi/address.dws?2378564.htm
      */
-    Doichain("dc1q7pmm98r4shmvtjwy6u5ulj4tqemq00fkjgrc2a9alj5z5keaf6ysn5t2m0"),
+    DoichainP2WSH("dc1q7pmm98r4shmvtjwy6u5ulj4tqemq00fkjgrc2a9alj5z5keaf6ysn5t2m0"),
     
-    // feathercoin Bech32 (P2WSH or P2WPKH)
-    /**
-     * https://chainz.cryptoid.info/ftc/address.dws?fc1qvr9zesajsdw8aydcndd70wxj2wdgzu6zzltsph.htm
-     */
-    Feathercoin("fc1qvr9zesajsdw8aydcndd70wxj2wdgzu6zzltsph"),
-
-    // litecoin Bech32 (P2WSH or P2WPKH)
+    // litecoin Bech32 (P2WSH)
     /**
      * https://bitcoin.stackexchange.com/questions/110995/how-can-i-find-samples-for-p2tr-transactions-on-mainnet
      */
     Litecoin("ltc1qd5wm03t5kcdupjuyq5jffpuacnaqahvfsdu8smf8z0u0pqdqpatqsdrn8h"),
-
-    // litecoin cash Bech32 (P2WSH or P2WPKH)
-    /**
-     * https://chainz.cryptoid.info/lcc/address.dws?lcc1qrzlsxpjl0tynu3t2fkrw2ff2dgm0pv53ern0s5.htm
-     */
-    LitecoinCash("lcc1qrzlsxpjl0tynu3t2fkrw2ff2dgm0pv53ern0s5"),
-
-    // Mooncoin Bech32 (P2WSH or P2WPKH)
-    /**
-     * https://chainz.cryptoid.info/moon/address.dws?moon1q2rhkqa03lq2hza99ezpfsauvgqmgqz5xjlawjq.htm
-     */
-    Mooncoin("moon1q2rhkqa03lq2hza99ezpfsauvgqmgqz5xjlawjq"),
-
-    // Myriad Bech32 (P2WSH or P2WPKH)
-    /**
-     * https://btc.cryptoid.info/xmy/address.dws?4567225.htm
-     */
-    Myriad("my1qgsy2zfpk63xst000zqs6npyjzrn7udvcnlejcc"),
-
-    // namecoin Bech32 (P2WSH or P2WPKH)
-    /**
-     * https://chainz.cryptoid.info/nmc/address.dws?nc1q2ml905jv7gx0d8z5f7kl23af0vtrjk4j0llmwr.htm
-     */
-    Namecoin("nc1q2ml905jv7gx0d8z5f7kl23af0vtrjk4j0llmwr"),
     
-    // Riecoin Bech32 (P2WPKH or P2SH)
+    // Riecoin Bech32 (P2SH)
     /**
      * https://chainz.cryptoid.info/ric/address.dws?2130005.htm
      */
     Riecoin("ric1pmm582sczt9zw8zn7j5eflqlle3p9ap75wwcpjewpdp34wscg0kjsmp5h35"),
-    
-    // SpaceXpanse Bech32 (P2WPKH or P2SH)
-    /**
-     * https://btc.cryptoid.info/rod/address.dws?652202.htm
-     */
-    SpaceXpanse("rod1qkw670qzp4gg4gkg9g25jvt7z357c7ykwesha3v"),
-    
-    // syscoin Bech32 (P2WPKH or P2SH)
-    /**
-     * https://chainz.cryptoid.info/sys/address.dws?1435968.htm
-     */
-    Syscoin("sys1qync7erear7cvpkysvv0a28mj45g2ps0kq9c6qs"),
-    
-    // TheHolyRogerCoin Bech32 (P2WPKH or P2SH)
-    /**
-     * https://btc.cryptoid.info/roger/address.dws?139264.htm
-     */
-    TheHolyRogerCoin("rog1q4vs95czpvgffxtsdz0l858gkkda6nmjkzly8qy"),
-    
-    // Groestlcoin Bech32 (P2WPKH or P2SH)
-    /**
-     * https://chainz.cryptoid.info/grs/address.dws?1455068.htm
-     */
-    Groestlcoin("grs1qpuf9cmfysp6dgdxmmar9eap8qrf5p2hl6a52pj"),
-    
-    // Groestlcoin Bech32 (P2WPKH or P2SH)
-    /**
-     * https://btc.cryptoid.info/grs-test/address.dws?673.htm
-     */
-    GroestlcoinTestNet("tgrs1qw4z3xrtgx4f6w7akwpp2xa0gupmkv4yauemmm9"),
-
-    // UFO Bech32 (P2WSH or P2WPKH)
-    /**
-     * https://btc.cryptoid.info/ufo/address.dws?570258.htm
-     */
-    UFO("uf1qpp3rflelg3h79cnr9xcszr0htyk6n2hkusghed"),
-
-    // vertcoin Bech32 (P2WSH or P2WPKH)
-    /**
-     * https://chainz.cryptoid.info/vtc/address.dws?vtc1qa4wejdlw9lmc7ks7l8hplc9fm394u79qjj0792.htm
-     */
-    Vertcoin("vtc1qa4wejdlw9lmc7ks7l8hplc9fm394u79qjj0792"),
     
     // P2TR
     /**

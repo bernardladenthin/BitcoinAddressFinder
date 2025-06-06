@@ -79,6 +79,12 @@ public enum StaticP2PKHAddress implements PublicAddress {
      * https://chainz.cryptoid.info/btx/address.dws?6572703.htm
      */
     BitCore("2NuwYZ1frd3s7FPTGLqkR2zNLTviQcac7o", "6c9519147914a961d277d5daff370ae1c7c4a5fa"),
+    
+    // BitCore (WKH)
+    /**
+     * https://btc.cryptoid.info/btx/address.dws?6631790.htm
+     */
+    BitCoreWKH("wkh_HPOOHTFGYCOP6IBAC6KMKVUQBU6VOHYD", "531d86860dc97923d3dda2c2682fce57637e67e5"),
     /**
      * https://chainz.cryptoid.info/btmk/address.dws?1351759.htm
      */

@@ -130,7 +130,8 @@ public enum StaticP2SHAddress implements PublicAddress {
         return new ByteBufferUtility(true).getByteBufferFromHex(getScriptHashAsHex());
     }
 
-    public String getScriptHashAsBase58() {
+    @Deprecated
+    private String getScriptHashAsBase58() {
         final Network network = new NetworkParameterFactory().getNetwork();
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(true));
         return keyUtility.toBase58(getScriptHash());

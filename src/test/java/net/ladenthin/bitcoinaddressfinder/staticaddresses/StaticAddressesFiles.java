@@ -53,6 +53,9 @@ public class StaticAddressesFiles implements AddressesFiles {
         for (PublicAddress address : StaticP2SHAddress.values()) {
             addresses.add(address.getPublicAddress());
         }
+        for (PublicAddress address : StaticBech32Address.values()) {
+            addresses.add(address.getPublicAddress());
+        }
         return addresses;
     }
     

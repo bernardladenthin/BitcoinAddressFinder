@@ -125,51 +125,59 @@ Copyright (c) 2017-2025 Bernard Ladenthin.
   * Multiple OpenCL devices (optional)
 
 ### ⚡ ECC Scalar Multiplication Optimizations
-To accelerate `k·G` (private key × base point), the OpenCL kernel uses:
+To accelerate **elliptic curve scalar multiplication** (`k·G`, i.e. private key × base point), the OpenCL kernel applies the following optimizations:
 
-- **Windowed Non-Adjacent Form (wNAF)**:
+- **Windowed Non-Adjacent Form (wNAF)**:  
   The scalar `k` is converted to a signed digit representation using a **window size of 4**.  
   This results in digits from the set `{±1, ±3, ±5, ±7}`, with at least one zero between non-zero digits.  
-  This reduces the number of costly additions during multiplication.
+  This reduces the number of costly additions during multiplication.  
   [Further explanation of wNAF on crypto.stackexchange.com](https://crypto.stackexchange.com/questions/82013/simple-explanation-of-sliding-window-and-wnaf-methods-of-elliptic-curve-point-mu)
 
-- **Precomputed Table**:
-  The kernel precomputes and stores the following multiples of the base point `G`:
-  - `±1·G`, `±3·G`, `±5·G`, `±7·G`  
-  These are stored in the `secp256k1_t` structure and used during scalar multiplication.
+- **Precomputed Table**:  
+  The kernel precomputes and stores the following multiples of the base point `G`:  
+  `±1·G`, `±3·G`, `±5·G`, `±7·G`  
+  These are stored in the `secp256k1_t` structure and reused during scalar multiplication.
 
-- **Left-to-Right Scalar Multiplication**:
-  The multiplication loop scans the wNAF digits from most to least significant:
-  - Each iteration **always doubles** the current point.
+- **Left-to-Right Scalar Multiplication**:  
+  The multiplication loop scans the wNAF digits from most to least significant:  
+  - Each iteration **always doubles** the current point.  
   - If the current digit is non-zero, it **adds the matching precomputed point**.
 
-- **Optimized for GPGPU (not constant-time)**:
+- **Optimized for GPGPU (not constant-time)**:  
   To prioritize speed on OpenCL/CUDA devices, this implementation is **not constant-time** and may be vulnerable to side-channel attacks in adversarial environments.
 
-- **Use of Constant Memory**:
+- **Use of Constant Memory**:  
   Precomputed points are stored in **constant GPU memory** (`__constant` via `CONSTANT_AS`), allowing fast access by all threads in a workgroup.
 
-### 🔄 Scalar Walker per Kernel (loopCount implemented)
-The OpenCL kernel now supports a **loop-based scalar walker** using the `loopCount` parameter. Each GPU thread performs multiple key derivations by:
+### 🔄 Scalar Walker per Kernel (`loopCount`)
+The OpenCL kernel supports a **loop-based scalar strategy** controlled by the `loopCount` parameter. Each GPU thread generates multiple EC keys by:
 
-- Computing the first point using **full scalar multiplication** via `point_mul_xy`
-- Then repeating efficient **affine point additions** via `point_add_xy` to derive subsequent keys:
-  **Pₙ₊₁ = Pₙ + G**
+- Computing the first key via full scalar multiplication: `P₀ = k₀·G` (using `point_mul_xy`)  
+- Computing subsequent keys via efficient affine additions: `Pₙ₊₁ = Pₙ + G` (using `point_add_xy`)
 
-This enables linear traversal of keyspace per thread:
-`k₀·G, (k₀ + 1)·G, (k₀ + 2)·G, ..., (k₀ + loopCount - 1)·G`
+This enables high-throughput, grid-parallel **linear keyspace traversal** like:  
+`k₀·G, (k₀ + 1)·G, ..., (k₀ + loopCount - 1)·G`
 
-It reduces kernel launch overhead and improves GPU utilization, especially in memory- or dispatch-bound scenarios.
-
-Example:
-- If `loopCount = 8`, a single thread computes 8 keys internally
-- Grid size is reduced by a factor of 8
-- Output is written to global memory per key
+Example:  
+- If `loopCount = 8`, each thread generates 8 keys  
+- Grid size is reduced by a factor of 8  
+- All results are written to global memory
 
 > ✅ Lower `loopCount` values like 4 or 8 are often ideal.  
-> ❌ Too high values may reduce GPU occupancy due to fewer launched work-items.
+> ❌ Higher values may reduce GPU occupancy due to fewer active threads.
 
-### 🚀 In-Memory Address Cache (loadToMemoryCacheOnInit)
+### 🚀 MSB-Zero Optimization
+To accelerate elliptic curve multiplication, BitcoinAddressFinder applies a **160-bit private key optimization**:
+
+- The upper 96 bits of each 256-bit private key are set to zero  
+- Only the lower 160 bits are randomized and traversed
+
+This reduction in scalar size speeds up `k·G` computations, resulting in significantly better performance during brute-force and batch-based key scanning.
+
+> ✅ Matches the size of `RIPEMD160(SHA256(pubkey))`  
+> ✅ Especially effective when combined with OpenCL acceleration
+
+### 🚀 In-Memory Address Cache (`loadToMemoryCacheOnInit`)
 To improve address lookup performance during high-speed key generation, you can enable the `loadToMemoryCacheOnInit` option.  
 This feature loads all LMDB entries into a Java `HashSet` at startup, allowing ultra-fast `O(1)` address checks.
 
@@ -179,37 +187,19 @@ This is especially useful in OpenCL or batch scenarios where thousands or millio
 > ❌ Avoid on memory-constrained systems or with extremely large databases
 
 ### 🔐 Public Key Hashing on GPU (SHA-256 + RIPEMD-160)
-The OpenCL kernel now performs **blazing fast public key hashing** directly on the GPU using:
+The OpenCL kernel performs **blazing fast public key hashing** directly on the GPU using:
 
-- `SHA-256(x || y)` followed by
-- `RIPEMD-160(SHA-256(x || y))`
+- `SHA-256(pubkey.x || pubkey.y)` followed by  
+- `RIPEMD-160(SHA-256(pubkey))`
 
-This allows each GPU thread to independently generate full Bitcoin-style public key hashes (i.e., `hash160`) **without CPU involvement**.
+This allows each GPU thread to independently generate full Bitcoin-style public key hashes (`hash160`) **without CPU involvement**.
 
-Benefits:
-- No host-side post-processing needed
-- Fully parallelized and memory-efficient
+Benefits:  
+- No host-side post-processing needed  
+- Fully parallelized and memory-efficient  
 - Ideal for massive batch generation and filtering
 
 > ✅ Output is already in hash160 format, ready for address comparison
-
-### 🚀 MSB-Zero Scalar Walk Strategy
-To boost performance, BitcoinAddressFinder uses a **160-bit scalar optimization**:
-
-- The **96 most significant bits** of each private key are set to zero.
-- Only the **lower 160 bits** vary — matching the output size of `RIPEMD160(SHA256(pubkey))`.
-
-This shortens the ECC scalar and accelerates point multiplication.
-
-Combined with the `loopCount` walker:
-- The first point is computed via `point_mul_xy`
-- All subsequent keys use `point_add_xy` inside the kernel:
-  **Pₙ₊₁ = Pₙ + G**
-
-This enables high-throughput, grid-parallel **linear keyspace traversal** like:
-`k₀·G, (k₀+1)·G, (k₀+2)·G, ...`
-
-> ✅ Massive speedup for brute-force or batch-based searches using OpenCL
 
 ## Address Database
 The addresses are stored in a high-performance database: [LMDB](https://github.com/LMDB).
@@ -236,15 +226,15 @@ Empty means not implemented by altcoin project.
 | Bitcoin           |  ✅   | ✅   | ✅    | ❌     |  ❌    | ❌    |
 | Bitcoin Cash      |  ✅   | ❌   |        |        |  ❌    |       |
 | Bitcoin Gold      |  ✅   |      |        |        |        |       |
-| Bitcoin Oil       |  ✅   |      | ❌     | ❌     |        |       |
+| Bitcoin Oil       |  ✅   |      | ✅     | ❌     |        |       |
 | Bitcoin Plus      |  ✅   |      |        |        |        |       |
-| BitCore           |  ✅   |      | ❌     | ❌     |        |       |
+| BitCore           |  ✅   |      | ✅     | ❌     |        |       |
 | Bitmark           |  ✅   |      |        |        |        |       |
 | Blackcoin         |  ✅   |      |        |        |        |       |
 | Blocknet          |  ✅   |      |        |        |        |       |
 | BolivarCoin       |  ✅   |      |        |        |        |       |
 | BYTZ              |  ✅   |      |        |        |        |       |
-| Canada-eCoin      |  ✅   |      | ❌     | ❌      |        |         |
+| Canada-eCoin      |  ✅   |      | ✅     | ❌      |        |         |
 | Catcoin           |  ✅   |      |        |        |        |         |
 | ChessCoin         |  ✅   |      |        |        |        |         |
 | Clam              |  ✅   |      |        |        |        |         |
@@ -254,25 +244,25 @@ Empty means not implemented by altcoin project.
 | ColossusXT        |  ✅   |      |        |        |         |       |
 | Curecoin          |  ✅   |      |        |        |         |       |
 | Dash              |  ✅   | ✅   |        |        |        |         |
-| DeFiChain         |  ✅   | ✅   | ❌     | ❌      |        |         |
+| DeFiChain         |  ✅   | ✅   | ✅     | ❌      |        |         |
 | Deutsche eMark    |  ✅   |      |        |        |        |         |
 | Diamond           |  ✅   |      |        |        |        |         |
-| DigiByte          |  ✅   |      | ❌     | ❌     |        |         |
+| DigiByte          |  ✅   |      | ✅     | ❌     |        |         |
 | DigitalCoin       |  ✅   |      |        |        |         |       |
 | Dimecoin          |  ✅   |      |        |        |         |       |
 | Divicoin          |  ✅   |      |        |        |         |       |
 | Dogecoin          |  ✅   | ✅   |        |        |        |         |
 | Dogecoin multisig |  ✅   | ✅   |        |        |        |         |
-| Doichain          |  ✅   |      | ❌     | ❌     |        |         |
+| Doichain          |  ✅   |      | ✅     | ❌     |        |         |
 | e-Gulden          |  ✅   |      |        |        |         |       |
 | Electron          |  ✅   |      |        |        |         |       |
 | Element           |  ✅   |      |        |        |         |       |
 | Elite             |  ✅   |      |        |        |         |       |
 | Emerald           |  ✅   |      |        |        |         |       |
-| Feathercoin       |  ✅   |      | ❌     | ❌     |         |         |
+| Feathercoin       |  ✅   |      | ✅     | ❌     |         |         |
 | Firo              |  ✅   |      |        |       |         |         |
 | Goldcash          |  ✅   |      |        |        |         |       |
-| Groestlcoin       |  ✅   |      | ❌     | ❌     |         |       |
+| Groestlcoin       |  ✅   |      | ✅     | ❌     |         |       |
 | Herencia          |  ✅   |      |        |        |         |       |
 | I/O Coin          |  ✅   |      |        |        |         |       |
 | Innova            |  ✅   |      |        |        |         |       |
@@ -281,15 +271,15 @@ Empty means not implemented by altcoin project.
 | iXcoin            |  ✅   |      |        |        |         |       |
 | Komodo            |  ✅   |      |        |        |         |       |
 | Lanacoin          |  ✅   |      |        |        |         |       |
-| Litecoin          |  ✅   | ✅   | ❌     | ❌     |        |         |
-| Litecoin Cash     |  ✅   |      | ❌     | ❌     |         |         |
+| Litecoin          |  ✅   | ✅   | ✅     | ❌     |        |         |
+| Litecoin Cash     |  ✅   |      | ✅     | ❌     |         |         |
 | LiteDoge          |  ✅   |      |        |        |         |       |
 | Luckycoin         |  ✅   |      |        |        |         |       |
 | Lynx              |  ✅   |      |        |        |         |       |
 | MasterNoder2      |  ✅   |      |        |        |         |       |
-| Mooncoin          |  ✅   | ✅   | ❌     | ❌      |         |       |
-| Myriad            |  ✅   | ✅   | ❌     | ❌     |        |         |
-| Namecoin          |  ✅   |      | ❌     | ❌     |         |         |
+| Mooncoin          |  ✅   | ✅   | ✅     | ❌      |         |       |
+| Myriad            |  ✅   | ✅   | ✅     | ❌     |        |         |
+| Namecoin          |  ✅   |      | ✅     | ❌     |         |         |
 | NewYorkCoin       |  ✅   |      |        |        |         |       |
 | Novacoin          |  ✅   |      |        |        |         |       |
 | PAC Protocol      |  ✅   |      |        |        |         |       |
@@ -305,22 +295,22 @@ Empty means not implemented by altcoin project.
 | Quark             |  ✅   |      |        |        |         |       |
 | Raptoreum         |  ✅   |      |        |        |        |         |
 | Reddcoin          |  ✅   |      |        |        |        |         |
-| Riecoin           |       | ✅   | ❌     | ❌    |         |       |
+| Riecoin           |       | ✅   | ✅     | ❌    |         |       |
 | SaluS             |  ✅   | ✅   |        |        |         |       |
 | Smileycoin        |  ✅   |      |        |        |         |       |
-| SpaceXpanse       |  ✅   |      | ❌     | ❌     |         |       |
+| SpaceXpanse       |  ✅   |      | ✅     | ❌     |         |       |
 | Sterlingcoin      |  ✅   |      |        |        |         |       |
-| Syscoin           |  ✅   |      | ❌     | ❌     |         |       |
+| Syscoin           |  ✅   |      | ✅     | ❌     |         |       |
 | Terracoin         |  ✅   |      |        |        |         |       |
-| TheHolyRogerCoin  | ✅    |      | ❌     | ❌     |         |       |
+| TheHolyRogerCoin  | ✅    |      | ✅     | ❌     |         |       |
 | Trezarcoin        |  ✅   |      |        |        |         |       |
-| UFO               |  ✅   | ✅   | ❌     | ❌      |        |         |
+| UFO               |  ✅   | ✅   | ✅     | ❌      |        |         |
 | Unobtanium        |  ✅   |      |        |        |        |         |
 | Validity          |  ✅   |      |        |        |         |       |
 | Vanillacash       |  ✅   |      |        |        |         |       |
 | VeriCoin          |  ✅   |      |        |        |         |       |
 | Versacoin         |  ✅   |      |        |        |         |       |
-| Vertcoin          |  ✅   |      | ❌     | ❌     |         |       |
+| Vertcoin          |  ✅   |      | ✅     | ❌     |         |       |
 | WorldCoin         |  ✅   |      |        |        |         |       |
 | ZCash             |  ✅   | ✅   |        |        |        |         |
 

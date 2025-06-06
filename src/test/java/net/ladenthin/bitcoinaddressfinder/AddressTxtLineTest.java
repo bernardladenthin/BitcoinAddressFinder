@@ -156,6 +156,18 @@ public class AddressTxtLineTest {
         assertThatDefaultCoinIsSet(addressToCoin);
     }
 
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_STATIC_BECH32_ADDRESSES, location = CommonDataProvider.class)
+    public void fromLine_StaticBech32Address_returnScriptHash(StaticBech32Address address) throws IOException {
+        // act
+        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(address.getPublicAddress(), keyUtility);
+
+        // assert
+        assertThat(new ByteBufferUtility(true).getHexFromByteBuffer(addressToCoin.hash160()), is(equalTo(address.getWitnessProgramAsHex())));
+        assertThat(addressToCoin.hash160(), is(equalTo(address.getWitnessProgramAsByteBuffer())));
+        assertThatDefaultCoinIsSet(addressToCoin);
+    }
+
     @Test(expected = AddressFormatException.class)
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BITCOIN_INVALID_P2WPKH_ADDRESSES, location = CommonDataProvider.class)
     public void fromLine_InvalidP2WPKHAddressGive_throwsException(String base58) throws IOException {
