@@ -205,16 +205,54 @@ Benefits:
 The addresses are stored in a high-performance database: [LMDB](https://github.com/LMDB).
 The database can be used to check whether a generated address has ever been used.
 
-### Import
-The importer reads multiple `.txt` or `.text` files containing addresses in arbitrary order. Each line can contain a different format.
-* Pay-to-Public-Key-Hash (P2PKH)
-* Pay-to-Script-Hash (P2SH)
-* Pay-to-Multisig (P2MS)
-* SegWit - Pay-to-Witness-Public-Key-Hash (P2WPKH)
-* Pay-to-Witness-Script-Key-Hash (P2WSH)
-* Payt-to-TapRoot (P2TR)
+### Address Import Support
 
-Empty means not implemented by altcoin project.
+The importer supports reading multiple `.txt` or `.text` files, each containing one address per line in arbitrary order. Lines may vary in address type and format. Each line may also optionally include an associated coin amount.
+
+#### Supported Address Types
+
+* **P2PKH** – Pay to Public Key Hash  
+  Encoded using Base58. Most commonly used format for legacy Bitcoin addresses.
+
+* **P2SH** – Pay to Script Hash  
+  Base58-encoded address type used for multisig and other script-based spending conditions.
+
+* **P2MS** – Pay to Multisig  
+  Custom format prefixed with `d-`, `m-`, or `s-` (e.g. `m-<script>`).
+
+* **P2WPKH** – Pay to Witness Public Key Hash  
+  Native SegWit v0 address, encoded in **Bech32**.
+
+* **P2WSH** – Pay to Witness Script Hash  
+  Native SegWit v0 address for scripts, encoded in **Bech32**.
+
+* **P2TR** – Pay to Taproot  
+  Native SegWit v1 (Taproot) address, encoded using **Bech32m**.
+
+> **Note:**  
+> Bech32 was introduced in [BIP-173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki) for SegWit v0 (P2WPKH, P2WSH).  
+> Bech32m, defined in [BIP-350](https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki), is used for SegWit v1 (P2TR).
+
+#### Special Formats
+
+In addition to standard script types, the importer also recognizes and supports several special address encodings:
+
+* **Bitcoin Cash (Base58 prefix `q`)**  
+  Legacy Bitcoin Cash addresses using the `q`-prefix are automatically converted to legacy Bitcoin format.
+
+* **BitCore WKH**  
+  Custom format prefixed with `wkh_` and encoded in **Base36**.
+
+* **Riecoin P2SH as ScriptPubKey**  
+  Riecoin P2SH addresses are provided as raw ScriptPubKey hex (starting with `76a914...`).
+
+⚠️ **Unsupported or malformed lines are silently skipped during import.**
+---
+
+> **Legend:**  
+> ✅ = Supported and tested  
+> ❌ = Explicitly not supported (format known but intentionally excluded)  
+> _empty_ = Unknown or unverified — either not implemented by the altcoin project, or no valid address example was found (thus no implementation or test exists)
 
 | Coin              | P2PKH | P2SH | P2WPKH | P2WSH  |  P2MS  |  P2TR  |
 |-------------------|:-----:|:----:|:------:|:------:|:------:|:------:|
