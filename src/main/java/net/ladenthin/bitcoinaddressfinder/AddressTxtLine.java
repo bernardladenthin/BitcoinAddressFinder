@@ -106,50 +106,7 @@ public class AddressTxtLine {
             address = AddressConverter.toLegacyAddress(address);
         }
         
-        if (
-            // bitcoin
-               address.startsWith("bc1")
-            // Bitcoin Oil
-            || address.startsWith("btco1")
-            // Canada-eCoin
-            || address.startsWith("cdn1q")
-            // Canada-eCoin
-            || address.startsWith("btx1")
-            // DeFiChain
-            || address.startsWith("df1q")
-            // digibyte
-            || address.startsWith("dgb1")
-            // Doichain
-            || address.startsWith("dc1q")
-            // Groestlcoin || Groestlcoin TestNet
-            || address.startsWith("grs1") || address.startsWith("tgrs1")
-            // feathercoin
-            || address.startsWith("fc1")
-            // litecoin cash
-            || address.startsWith("lcc1")
-            // litecoin
-            || address.startsWith("ltc1")
-            // Mooncoin
-            || address.startsWith("moon1")
-            // Myriad
-            || address.startsWith("my1q")
-            // namecoin
-            || address.startsWith("nc1")
-            // Riecoin
-            || address.startsWith("ric1")
-            // SpaceXpanse
-            || address.startsWith("rod1q")
-            // syscoin
-            || address.startsWith("sys1")
-            // TheHolyRogerCoin
-            || address.startsWith("rog1q")
-            // UFO
-            || address.startsWith("uf1q")
-            // vertcoin
-            || address.startsWith("vtc1")
-        //) {}
-        ) try {
-        //try {
+        try {
             // bitcoin Bech32 (P2WSH or P2WPKH) or P2TR
             // supported (20 bytes): https://privatekeys.pw/address/bitcoin/bc1qazcm763858nkj2dj986etajv6wquslv8uxwczt
 
@@ -176,16 +133,17 @@ public class AddressTxtLine {
                         throw new AddressFormatException();
                     }
                 } catch (IllegalAccessException ex) {
+                    // skip and continue
                 } catch (InvocationTargetException ex) {
+                    // skip and continue
                 }
             } catch (NoSuchMethodException ex) {
+                // skip and continue
             } catch (SecurityException ex) {
+                // skip and continue
             }
         } catch(AddressFormatException e) {
-            // throw this exception if its sure it was an bitcoin bech32 address, otherwise keep ahead
-            //if(address.startsWith("bc1")) {
-                throw e;
-            //}
+            // skip and continue
         }
         
         if (address.startsWith("t")) {
@@ -203,8 +161,12 @@ public class AddressTxtLine {
                 return null;
             }
         } else {
-            ByteBuffer hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_REGULAR);
-            return new AddressToCoin(hash160, amount);
+            try {
+                ByteBuffer hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_REGULAR);
+                return new AddressToCoin(hash160, amount);
+            } catch (AddressFormatException e) {
+                return null;
+            }
         }
     }
 

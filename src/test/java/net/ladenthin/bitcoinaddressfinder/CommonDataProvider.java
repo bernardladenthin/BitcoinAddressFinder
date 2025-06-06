@@ -275,17 +275,37 @@ public class CommonDataProvider {
     }
     
     /**
-     * For {@link #invalidP2WPKHAddresses()}.
+     * For {@link #invalidP2WPKHAddressesValidBase58()}.
      */
-    public final static String DATA_PROVIDER_INVALID_P2WPKH_ADDRESSES = "invalidP2WPKHAddresses";
+    public final static String DATA_PROVIDER_INVALID_P2WPKH_ADDRESSES_VALID_BASE58 = "invalidP2WPKHAddressesValidBase58";
 
     @DataProvider
-    public static Object[][] invalidP2WPKHAddresses() {
+    public static Object[][] invalidP2WPKHAddressesValidBase58() {
         return new Object[][]{
-            {"bc1zqyqsywvzqe"},  // bitcoin
-            {"ltc1zqyqsywvzqe"}, // litecoin
-            {"vtc1zqyqsywvzqe"}, // vertcoin
-            {"dgb1zqyqsywvzqe"}, // digibyte
+            {"bc1zqyqsywvzqe", "67ec9df6fd91ffcc7b3100000000000000000000"},  // bitcoin
+            {"vtc1zqyqsywvzqe", "51b9d9757bfedb535b3100000000000000000000"}, // vertcoin
+            {"dgb1zqyqsywvzqe", "edaa0ede31d01c768b3100000000000000000000"}, // digibyte
+        };
+    }
+    
+    /**
+     * For {@link #invalidBase58()}.
+     */
+    public final static String DATA_PROVIDER_INVALID_BASE58 = "invalidBase58";
+
+    @DataProvider
+    public static Object[][] invalidBase58() {
+        return new Object[][]{
+            // P2PKH
+            {"1Wr0ngAddressFormat"},
+            {"1WrongAddressFormat0"},
+            {"1WrongIAddressFormat"},
+            {"1WronglAddressFormat"},
+            // P2WPKH
+            // l (small L) is appended and not a valid base58 char
+            {"bc1zqyqsywvzqel"},  // bitcoin
+            {"vtc1zqyqsywvzqel"}, // vertcoin
+            {"dgb1zqyqsywvzqel"}, // digibyte
         };
     }
     
@@ -349,22 +369,6 @@ public class CommonDataProvider {
             {18},
             {19},
             {20},
-        };
-    }
-    
-    /**
-     * For {@link #bitcoinAddressesInvalidBase58()}.
-     * A invalid base58 format can't be read.
-     */
-    public final static String DATA_PROVIDER_BITCOIN_ADDRESSES_INVALID_BASE_58 = "bitcoinAddressesInvalidBase58";
-
-    @DataProvider
-    public static Object[][] bitcoinAddressesInvalidBase58() {
-        return new Object[][]{
-            {"1Wr0ngAddressFormat"},
-            {"1WrongAddressFormat0"},
-            {"1WrongIAddressFormat"},
-            {"1WronglAddressFormat"},
         };
     }
     

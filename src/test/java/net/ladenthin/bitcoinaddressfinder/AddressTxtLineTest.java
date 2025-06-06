@@ -21,10 +21,11 @@ package net.ladenthin.bitcoinaddressfinder;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.*;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
 import org.apache.commons.codec.DecoderException;
-import org.apache.commons.codec.binary.Hex;
+import org.bouncycastle.util.encoders.Hex;
 import org.bitcoinj.base.Base58;
 import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.exceptions.AddressFormatException;
@@ -168,11 +169,25 @@ public class AddressTxtLineTest {
         assertThatDefaultCoinIsSet(addressToCoin);
     }
 
-    @Test(expected = AddressFormatException.class)
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_INVALID_P2WPKH_ADDRESSES, location = CommonDataProvider.class)
-    public void fromLine_InvalidP2WPKHAddressGive_throwsException(String base58) throws IOException {
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_INVALID_P2WPKH_ADDRESSES_VALID_BASE58, location = CommonDataProvider.class)
+    public void fromLine_InvalidP2WPKHAddressWithValidBase58Given_parseAnyway(String base58, String hash) throws IOException {
         // act
-        new AddressTxtLine().fromLine(base58, keyUtility);
+        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
+
+        // assert
+        assertThat(new ByteBufferUtility(true).getHexFromByteBuffer(addressToCoin.hash160()), is(equalTo(hash)));
+        assertThatDefaultCoinIsSet(addressToCoin);
+    }
+
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_INVALID_BASE58, location = CommonDataProvider.class)
+    public void fromLine_InvalidP2WPKHAddressWithInvalidBase58Given_parseAnyway(String base58) throws IOException {
+        // act
+        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
+
+        // assert
+        assertThat(addressToCoin, is(nullValue()));
     }
 
     @Test
@@ -207,13 +222,6 @@ public class AddressTxtLineTest {
         assertThat(hash160AsHex, is(equalTo(expectedHash160)));
     }
 
-    @Test(expected = AddressFormatException.InvalidCharacter.class)
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BITCOIN_ADDRESSES_INVALID_BASE_58, location = CommonDataProvider.class)
-    public void fromLine_bitcoinAddressInternalPurpose_throwsException(String base58) throws IOException {
-        // act
-        new AddressTxtLine().fromLine(base58, keyUtility);
-    }
-
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_CORRECT_BASE_58, location = CommonDataProvider.class)
     public void fromLine_correctBase58_hash160equals(String base58, String expectedHash160) throws IOException, DecoderException {
@@ -229,7 +237,7 @@ public class AddressTxtLineTest {
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_SRC_POS, location = CommonDataProvider.class)
     public void fromLine_correctBase58UseHigherSrcPos_copiedPartial(int srcPos) throws IOException, DecoderException {
         // act
-        String encoded = Base58.encode(Hex.decodeHex("1f" + "ffffffffffffffffffffffffffffffffffffffff"));
+        String encoded = Base58.encode(Hex.decode("1f" + "ffffffffffffffffffffffffffffffffffffffff"));
 
         byte[] hash160 = new AddressTxtLine().getHash160fromBase58AddressUnchecked(encoded, srcPos);
 
