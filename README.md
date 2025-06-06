@@ -69,17 +69,19 @@ TODO:
 ---
 
 ## About BitcoinAddressFinder
-**BitcoinAddressFinder** is a free, high-performance tool designed to rapidly scan random private keys for a wide range of cryptocurrencies — including Bitcoin, Bitcoin Cash, Bitcoin SV, Litecoin, Dogecoin, Dash, Zcash, and many more.
+**BitcoinAddressFinder** is a free, high-performance tool for scanning random private keys across a wide range of cryptocurrencies — including Bitcoin, Bitcoin Cash, Bitcoin SV, Litecoin, Dogecoin, Dash, Zcash, and many more.
 
-Its primary goal is to generate addresses (compressed and uncompressed) as efficiently as possible by combining the power of the Java Virtual Machine (JVM) with OpenCL for hardware acceleration.
+Its core purpose is to generate both **compressed** and **uncompressed** addresses with maximum efficiency, combining the portability of the **Java Virtual Machine (JVM)** with **OpenCL-powered GPU acceleration**.
 
-Once generated, each address is checked against a high-performance database (**LMDB**) to determine whether it has ever been used — effectively identifying addresses that might hold a balance. This includes detecting potential RIPEMD160 hash collisions and exploring known or partially known keyspaces.
+Each generated address is checked against a high-speed **LMDB** database to detect whether it has ever been used — identifying possible balances, known keyspaces, and even **RIPEMD160 hash collisions**.
 
-Whether you're searching for vanity addresses, verifying address usage, or experimenting with cryptographic edge cases, BitcoinAddressFinder is built for speed, flexibility, and offline use.
+🔍 Whether you're generating vanity addresses, verifying address usage, or experimenting with cryptographic edge cases, **BitcoinAddressFinder** is built for **speed**, **flexibility**, and **fully offline operation**.
 
-**Made with ❤️ in Germany**
+> 🔐 Runs air-gapped · ⚡ GPU-accelerated · 🧪 Unit-tested · 🛠️ Extensible
 
-Copyright (c) 2017-2025 Bernard Ladenthin.
+**Made with ❤️ in Germany** 
+ 
+Copyright (c) 2017-2025 Bernard Ladenthin
 
 ## Requirements
 - **Java 21 or newer** is required to run BitcoinAddressFinder.  
@@ -115,7 +117,7 @@ Copyright (c) 2017-2025 Bernard Ladenthin.
 * 📐 Supports blockchain addresses based on [secp256k1](https://en.bitcoin.it/wiki/Secp256k1)
 * 🛡️ Unit-tested, trusted open source that can be compiled easily by yourself
 * 🎯 Vanity generation of Bitcoin addresses using regex patterns
-* 🔌 Runs completely offline — no internet required or used. You can run it in a bunker with a generator in the middle of nowhere, and no one will know
+* 🔌 Runs entirely offline — no internet connection is required or used. Suitable for air-gapped systems and isolated environments — even in a bunker with a generator and zero connectivity.
 * 🤹 No synchronization required to run multiple instances. Random numbers are used, so no coordinated search strategy is needed — just run it on multiple machines
 * ⚡ Checks a high-performance database of known addresses to detect already used ones
 * 📦 Portable, platform-independent, runs on the JVM
