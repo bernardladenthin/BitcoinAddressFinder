@@ -48,13 +48,16 @@ public class AddressTxtLine {
     
     private final static int VERSION_BYTES_REGULAR = 1;
     private final static int VERSION_BYTES_ZCASH = 2;
-
+    
     /**
-     * If no coins can be found in the line {@link #DEFAULT_COIN} is used.
+     * Parses a line containing an address and optional amount.
+     * Returns {@code null} if the address is unsupported, malformed, or marked as ignored.
+     * <p>
+     * If no coin amount is specified in the line, {@link #DEFAULT_COIN} is used as a fallback.
      *
-     * @param line The line to parse.
-     * @param keyUtility The {@link KeyUtility}.
-     * @return Returns an {@link AddressToCoin} instance.
+     * @param line the line to parse
+     * @param keyUtility the {@link KeyUtility} used for conversions
+     * @return an {@link AddressToCoin} instance, or {@code null} if the address is invalid or unsupported
      */
     @Nullable
     public AddressToCoin fromLine(String line, KeyUtility keyUtility) {
@@ -66,7 +69,7 @@ public class AddressTxtLine {
             return null;
         }
         
-        // Riecoin
+        // Riecoin: ScriptPubKey-style encoded address (hex with OP codes)
         {
             final String OP_DUP = "76";
             final String OP_HASH160 = "a9";
@@ -81,7 +84,7 @@ public class AddressTxtLine {
             }
         }
 
-        // blockchair Multisig format prefix (P2MS)
+        // Blockchair Multisig (P2MS) format is not supported
         if (
                address.startsWith("d-")
             || address.startsWith("m-")
@@ -89,84 +92,63 @@ public class AddressTxtLine {
         ) {
             return null;
         }
-
+        
+        // BitCore WKH format (Base36-encoded hash160)
         if (address.startsWith("wkh_")) {
             // BitCore (WKH) is base36 encoded hash160
             String addressWKH = address.substring("wkh_".length());
-            
             byte[] hash160 = new Base36Decoder().decodeBase36ToFixedLengthBytes(addressWKH, PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES);
-
             ByteBuffer hash160AsByteBuffer = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160);
             return new AddressToCoin(hash160AsByteBuffer, amount);
         }
         
-        if (address.startsWith("q")) {
-            // q: bitcoin cash Base58 (P2PKH)
-            // convert to legacy address
-            address = AddressConverter.toLegacyAddress(address);
-        }
-        
+        // Bech32 decoding (P2WPKH, P2WSH, P2TR)
         try {
-            // bitcoin Bech32 (P2WSH or P2WPKH) or P2TR
-            // supported (20 bytes): https://privatekeys.pw/address/bitcoin/bc1qazcm763858nkj2dj986etajv6wquslv8uxwczt
-
-            // do everything manual
             Bech32.Bech32Data bechData = Bech32.decode(address);
             // is protected: bechData.witnessProgram();
             Class<?> clazz = Bech32.Bech32Bytes.class;
             Method witnessProgramMethod;
-            try {
-                witnessProgramMethod = clazz.getDeclaredMethod("witnessProgram");
-                witnessProgramMethod.setAccessible(true);
-                try {
-                    byte[] hash160AsByteArray = (byte[]) witnessProgramMethod.invoke(bechData);
-                    if (hash160AsByteArray.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_PKH) {
-                        final ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160AsByteArray);
-                        return new AddressToCoin(hash160, amount);
-                    } else if (hash160AsByteArray.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_SH) {
-                        // P2WSH is unsupported
-                        return null;
-                    } else if (hash160AsByteArray.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_TR) {
-                        // P2WTR is unsupported
-                        return null;
-                    } else {
-                        throw new AddressFormatException();
-                    }
-                } catch (IllegalAccessException ex) {
-                    // skip and continue
-                } catch (InvocationTargetException ex) {
-                    // skip and continue
-                }
-            } catch (NoSuchMethodException ex) {
-                // skip and continue
-            } catch (SecurityException ex) {
-                // skip and continue
+            witnessProgramMethod = clazz.getDeclaredMethod("witnessProgram");
+            witnessProgramMethod.setAccessible(true);
+            byte[] hash160AsByteArray = (byte[]) witnessProgramMethod.invoke(bechData);
+            if (hash160AsByteArray.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_PKH) {
+                final ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160AsByteArray);
+                return new AddressToCoin(hash160, amount);
+            } else if (hash160AsByteArray.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_SH) {
+                // P2WSH not supported
+                return null;
+            } else if (hash160AsByteArray.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_TR) {
+                // P2TR not supported
+                return null;
             }
-        } catch(AddressFormatException e) {
-            // skip and continue
+        } catch (AddressFormatException | NoSuchMethodException | IllegalAccessException | InvocationTargetException | SecurityException e) {
+            // Bech32 parsing or reflection failed; continue to next format
         }
         
-        if (address.startsWith("t")) {
-            // ZCash has two version bytes
-            ByteBuffer hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_ZCASH);
-            return new AddressToCoin(hash160, amount);
-        } else if (address.startsWith("p")) {
+        // ZCash or Peercoin with 2-byte version
+        if (address.startsWith("p") || address.startsWith("t")) {
             // p: bitcoin cash / CashAddr (P2SH), this is a unique format and does not work
             // p: peercoin possible
+            // t: ZCash has two version bytes
             try {
                 ByteBuffer hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_ZCASH);
                 return new AddressToCoin(hash160, amount);
             } catch (RuntimeException e) {
-                // will be thrown for bitcoin cash P2SH
-                return null;
+                // Fall through to other format checks
             }
-        } else {
-            try {
-                ByteBuffer hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_REGULAR);
-                return new AddressToCoin(hash160, amount);
-            } catch (AddressFormatException e) {
-                return null;
-            }
+        }
+        
+        // Bitcoin Cash 'q' prefix: convert to legacy address
+        if (address.startsWith("q")) {
+            address = AddressConverter.toLegacyAddress(address);
+        }
+        
+        // Fallback: assume Base58 with 1-byte version prefix
+        try {
+            ByteBuffer hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_REGULAR);
+            return new AddressToCoin(hash160, amount);
+        } catch (AddressFormatException e) {
+            return null;
         }
     }
 
