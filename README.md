@@ -209,6 +209,8 @@ The database can be used to check whether a generated address has ever been used
 
 The importer supports reading multiple `.txt` or `.text` files, each containing one address per line in arbitrary order. Lines may vary in address type and format. Each line may also optionally include an associated coin amount.
 
+⚠️ **Unsupported or malformed lines are silently skipped during import.**
+
 #### Supported Address Types
 
 * **P2PKH** – Pay to Public Key Hash  
@@ -246,7 +248,6 @@ In addition to standard script types, the importer also recognizes and supports 
 * **Riecoin P2SH as ScriptPubKey**  
   Riecoin P2SH addresses are provided as raw ScriptPubKey hex (starting with `76a914...`).
 
-⚠️ **Unsupported or malformed lines are silently skipped during import.**
 ---
 
 > **Legend:**  
