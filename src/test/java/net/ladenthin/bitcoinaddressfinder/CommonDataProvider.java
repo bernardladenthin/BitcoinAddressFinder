@@ -275,14 +275,17 @@ public class CommonDataProvider {
     }
     
     /**
-     * For {@link #bitcoinInvalidP2WPKHAddresses()}.
+     * For {@link #invalidP2WPKHAddresses()}.
      */
-    public final static String DATA_PROVIDER_BITCOIN_INVALID_P2WPKH_ADDRESSES = "bitcoinInvalidP2WPKHAddresses";
+    public final static String DATA_PROVIDER_INVALID_P2WPKH_ADDRESSES = "invalidP2WPKHAddresses";
 
     @DataProvider
-    public static Object[][] bitcoinInvalidP2WPKHAddresses() {
+    public static Object[][] invalidP2WPKHAddresses() {
         return new Object[][]{
-            {"bc1zqyqsywvzqe"},
+            {"bc1zqyqsywvzqe"},  // bitcoin
+            {"ltc1zqyqsywvzqe"}, // litecoin
+            {"vtc1zqyqsywvzqe"}, // vertcoin
+            {"dgb1zqyqsywvzqe"}, // digibyte
         };
     }
     

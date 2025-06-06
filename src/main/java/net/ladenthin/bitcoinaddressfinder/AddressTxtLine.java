@@ -147,16 +147,12 @@ public class AddressTxtLine {
             || address.startsWith("uf1q")
             // vertcoin
             || address.startsWith("vtc1")
-        ) {
+        //) {}
+        ) try {
+        //try {
             // bitcoin Bech32 (P2WSH or P2WPKH) or P2TR
             // supported (20 bytes): https://privatekeys.pw/address/bitcoin/bc1qazcm763858nkj2dj986etajv6wquslv8uxwczt
-            try {
-                //Bech32.Bech32Data bech32Data = Bech32.decode(address);
-            } catch (AddressFormatException e) {
-                throw new RuntimeException(e);
-            } catch (RuntimeException e) {
-                throw e;
-            }
+
             // do everything manual
             Bech32.Bech32Data bechData = Bech32.decode(address);
             // is protected: bechData.witnessProgram();
@@ -171,8 +167,10 @@ public class AddressTxtLine {
                         final ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160AsByteArray);
                         return new AddressToCoin(hash160, amount);
                     } else if (hash160AsByteArray.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_SH) {
+                        // P2WSH is unsupported
                         return null;
                     } else if (hash160AsByteArray.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_TR) {
+                        // P2WTR is unsupported
                         return null;
                     } else {
                         throw new AddressFormatException();
@@ -183,7 +181,17 @@ public class AddressTxtLine {
             } catch (NoSuchMethodException ex) {
             } catch (SecurityException ex) {
             }
-            throw new AddressFormatException();
+        } catch(AddressFormatException e) {
+            // throw this exception if its sure it was an bitcoin bech32 address, otherwise keep ahead
+            //if(address.startsWith("bc1")) {
+                throw e;
+            //}
+        }
+        
+        if (address.startsWith("t")) {
+            // ZCash has two version bytes
+            ByteBuffer hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_ZCASH);
+            return new AddressToCoin(hash160, amount);
         } else if (address.startsWith("p")) {
             // p: bitcoin cash / CashAddr (P2SH), this is a unique format and does not work
             // p: peercoin possible
@@ -191,122 +199,11 @@ public class AddressTxtLine {
                 ByteBuffer hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_ZCASH);
                 return new AddressToCoin(hash160, amount);
             } catch (RuntimeException e) {
+                // will be thrown for bitcoin cash P2SH
                 return null;
             }
-        } else if (
-                   address.startsWith("1")
-                || address.startsWith("2")
-                || address.startsWith("3")
-                || address.startsWith("4")
-                || address.startsWith("7")
-                || address.startsWith("8")
-                || address.startsWith("9")
-                || address.startsWith("a")
-                || address.startsWith("A")
-                || address.startsWith("B")
-                || address.startsWith("b")
-                || address.startsWith("C")
-                || address.startsWith("d")
-                || address.startsWith("D")
-                || address.startsWith("E")
-                || address.startsWith("F")
-                || address.startsWith("G")
-                || address.startsWith("H")
-                || address.startsWith("i")
-                || address.startsWith("J")
-                || address.startsWith("K")
-                || address.startsWith("L")
-                || address.startsWith("M")
-                || address.startsWith("N")
-                || address.startsWith("p")
-                || address.startsWith("P")
-                || address.startsWith("Q")
-                || address.startsWith("R")
-                || address.startsWith("s")
-                || address.startsWith("S")
-                || address.startsWith("t")
-                || address.startsWith("T")
-                || address.startsWith("u")
-                || address.startsWith("V")
-                || address.startsWith("W")
-                || address.startsWith("x")
-                || address.startsWith("X")
-        ) {
-            // prefix clashes for signs: 2, 7, 8, 9, A, C, M
-            //
-            // Base58 P2SH
-            // 2: Mooncoin / Particl
-            // 3: litecoin deprecated / bitcoin / Particl
-            // 7: dash / Riecoin
-            // 8: DeFiChain / BYTZ
-            // 9: dogecoin multisig / 42-coin
-            // A: dogecoin / SaluS
-            // B: CloakCoin
-            // C: UFO
-            // M: litecoin / Myriad
-            // t: Zcash
-            //
-            // Base58 P2PKH
-            // 1: Terracoin
-            // 2: BitCore / Pinkcoin
-            // 4: novacoin / Myriad / 42-coin
-            // 7: feathercoin / Dimecoin
-            // 8: Vanillacash
-            // 9: Catcoin
-            // a: Firo
-            // A: AuroraCoin / Primecoin
-            // B: curecoin / BitBlocks / blackcoin / UFO / Smileycoin / Blocknet / BitcoinPlus
-            // b: Bitmark / BolivarCoin
-            // C: CloakCoin / CROWN / ChessCoin / Artbyte / Canada-eCoin
-            // d: LiteDoge / Diamond / DeFiChain
-            // D: dogecoin / digibyte / PIVX / DigitalCoin / Divicoin / ColossusXT
-            // e: Electron
-            // E: Emerald / InfiniLooP
-            // F: Groestlcoin
-            // G: bitcoin gold / Goldcash
-            // H: Herencia
-            // i: Innova / I/O Coin / Infinitecoin
-            // J: MasterNoder2
-            // K: Lynx
-            // L: litecoin / Luckycoin / Lanacoin / e-Gulden / Elite
-            // M: Mooncoin
-            // N: namecoin / Deutsche eMark / Doichain
-            // p: Element
-            // P: Peercoin / PotCoin / PAC Protocol / PutinCoin v2 / Particl / PandaCoin / PakCoin
-            // Q: Quark
-            // R: reddcoin / Komodo / NewYorkCoin / Particl / Raptoreum / SpaceXpanse
-            // s: BYTZ
-            // S: Sterlingcoin / Syscoin / SaluS / Alias
-            // t: Zcash
-            // T: Trezarcoin
-            // u: Unobtanium
-            // U: Coino
-            // V: vertcoin / VeriCoin / Versacoin / TheHolyRogerCoin
-            // W: WorldCoin
-            // x: Clam / iXcoin
-            // X: dash / Validity
-            
-            if (address.startsWith("t")) {
-                // ZCash has two version bytes
-                ByteBuffer hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_ZCASH);
-                return new AddressToCoin(hash160, amount);
-            } else {
-                ByteBuffer hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_REGULAR);
-                return new AddressToCoin(hash160, amount);
-            }
         } else {
-            // bitcoin Base58 (P2PKH)
-            ByteBuffer hash160;
-            try {
-                hash160 = keyUtility.getHash160ByteBufferFromBase58String(address);
-            } catch (
-                    AddressFormatException.InvalidChecksum   // InvalidChecksum
-                  | AddressFormatException.WrongNetwork      // e.g. bitcoin testnet
-                  | AddressFormatException.InvalidDataLength // e.g. too short address
-                  e
-            ) {
-                hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_REGULAR);
-            }
+            ByteBuffer hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_REGULAR);
             return new AddressToCoin(hash160, amount);
         }
     }

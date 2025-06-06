@@ -169,7 +169,7 @@ public class AddressTxtLineTest {
     }
 
     @Test(expected = AddressFormatException.class)
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BITCOIN_INVALID_P2WPKH_ADDRESSES, location = CommonDataProvider.class)
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_INVALID_P2WPKH_ADDRESSES, location = CommonDataProvider.class)
     public void fromLine_InvalidP2WPKHAddressGive_throwsException(String base58) throws IOException {
         // act
         new AddressTxtLine().fromLine(base58, keyUtility);
