@@ -111,18 +111,18 @@ Copyright (c) 2017-2025 Bernard Ladenthin.
     * run_Find_1OpenCLDevice.bat
 5. Run the file run_Find_1OpenCLDevice.bat
 
-## Features
-* Supports blockchain addresses based on [secp256k1](https://en.bitcoin.it/wiki/Secp256k1).
-* Unit-tested, trusted open source that can be compiled easily by yourself.
-* Vanity generation of Bitcoin addresses using regex patterns.
-* Runs completely offline — no internet required or used. You can run it in a bunker with a generator in the middle of nowhere, and no one will know.
-* No synchronization required to run multiple instances. Random numbers are used, so no coordinated search strategy is needed — just run it on multiple machines.
-* Checks a high-performance database of known addresses to detect already used ones.
-* Portable, platform-independent, runs on the JVM.
-* Generates both uncompressed and compressed keys simultaneously.
-* EC key generation via:
-  * Multiple CPU threads
-  * Multiple OpenCL devices (optional)
+## ✨ Features
+* 📐 Supports blockchain addresses based on [secp256k1](https://en.bitcoin.it/wiki/Secp256k1)
+* 🛡️ Unit-tested, trusted open source that can be compiled easily by yourself
+* 🎯 Vanity generation of Bitcoin addresses using regex patterns
+* 🔌 Runs completely offline — no internet required or used. You can run it in a bunker with a generator in the middle of nowhere, and no one will know
+* 🤹 No synchronization required to run multiple instances. Random numbers are used, so no coordinated search strategy is needed — just run it on multiple machines
+* ⚡ Checks a high-performance database of known addresses to detect already used ones
+* 📦 Portable, platform-independent, runs on the JVM
+* 🔁 Generates both uncompressed and compressed keys simultaneously
+* 🧮 EC key generation via:
+  * 🧵 Multiple CPU threads
+  * 🖥️ Multiple OpenCL devices (optional)
 
 ### ⚡ ECC Scalar Multiplication Optimizations
 To accelerate **elliptic curve scalar multiplication** (`k·G`, i.e. private key × base point), the OpenCL kernel applies the following optimizations:
