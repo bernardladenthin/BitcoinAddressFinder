@@ -30,6 +30,16 @@ public enum StaticUnsupportedAddress implements PublicAddress {
     
     // Bitcoin Bech32 (P2WSH)
     BitcoinP2SH("bc1pmfr3p9j00pfxjh0zmgp99y8zftmd3s5pmedqhyptwy6lm87hf5ss52r5n8"),
+    
+    // Bitcoin Bech32 (P2WSH)
+    // Created with random data via https://learnmeabitcoin.com/technical/script/p2wsh/
+    // Script Hash: d698321d7b9f5883fa1bf99b9cb87a9cac9bd462affb300a844998a28d67584d
+    BitcoinP2SH_Random("bc1q66vry8tmnavg87smlxdeewr6njkfh4rz4lanqz5yfxv29rt8tpxs8z4cmm"),
+    
+    // Bitcoin Bech32 (P2TR)
+    // Created with random data via https://learnmeabitcoin.com/technical/script/p2wsh/
+    // tweaked public key: 52a5d35869fedad2a5ce56b39d78500124dfb77b612f9931d4d8f7a1398b0d18
+    BitcoinP2TRRandom("bc1p22jaxkrflmdd9fww26ee67zsqyjdldmmvyhejvw5mrm6zwvtp5vq9y5p0g"),
 
     // Bitcoin Cash Bech32 (P2WSH)
     /**

@@ -25,6 +25,11 @@ import org.bouncycastle.util.encoders.Hex;
 // P2WPKH addresses
 public enum StaticBech32Address implements PublicAddress {
     
+    // Bitcoin Bech32 (P2WPKH)
+    // Created with random data via https://learnmeabitcoin.com/technical/script/p2wsh/
+    // Public Key Hash: 458cda0e1178d8dd97598df1307ea448bc34c76e
+    BitcoinP2WPKH_Random("bc1qgkxd5rs30rvdm96e3hcnql4yfz7rf3mwdgcxkc", "458cda0e1178d8dd97598df1307ea448bc34c76e"),
+    
     // Bitcoin Oil Bech32 (P2WPKH)
     /**
      * https://btc.cryptoid.info/btco/address.dws?3851.htm

@@ -282,9 +282,24 @@ public class CommonDataProvider {
     @DataProvider
     public static Object[][] invalidP2WPKHAddressesValidBase58() {
         return new Object[][]{
-            {"bc1zqyqsywvzqe", "67ec9df6fd91ffcc7b3100000000000000000000"},  // bitcoin
+            {"bc1zqyqsywvzqeeeeeee", "5347dec05b6f03de6cc004c1ec33000000000000"},  // bitcoin
+            {"bc1zqyqsywvzqeeeeeeeee", "183a5c6b17b17eced6cd0b3e8443d6b300000000"},  // bitcoin
+            {"bc1zqyqsywvzqeeeeeeeeeeeeee1", "b3d1231a68d6dbb47594deac07a0a9fe8352188e"},  // bitcoin
             {"vtc1zqyqsywvzqe", "51b9d9757bfedb535b3100000000000000000000"}, // vertcoin
             {"dgb1zqyqsywvzqe", "edaa0ede31d01c768b3100000000000000000000"}, // digibyte
+        };
+    }
+    
+    /**
+     * For {@link #invalidBech32WitnessVersion2()}.
+     */
+    public final static String DATA_PROVIDER_INVALID_BECH32_WITNESS_VERSION_2 = "invalidBech32WitnessVersion2";
+
+    @DataProvider
+    public static Object[][] invalidBech32WitnessVersion2() {
+        return new Object[][]{
+            // Not sure where this address comes from, but it has a witness version of 2 and a witness program length of 2
+            {"bc1zqyqsywvzqe"},  // bitcoin
         };
     }
     

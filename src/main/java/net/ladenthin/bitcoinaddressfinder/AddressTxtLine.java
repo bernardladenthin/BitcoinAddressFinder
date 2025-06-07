@@ -19,9 +19,7 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import com.github.kiulian.converter.AddressConverter;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import org.bitcoinj.base.Base58;
 import org.bitcoinj.base.Bech32;
@@ -48,6 +46,26 @@ public class AddressTxtLine {
     
     private final static int VERSION_BYTES_REGULAR = 1;
     private final static int VERSION_BYTES_ZCASH = 2;
+    
+    /**
+    * Witness version 0, used for SegWit v0 addresses such as:
+    * <ul>
+    *   <li><b>P2WPKH</b> – Pay to Witness Public Key Hash</li>
+    *   <li><b>P2WSH</b> – Pay to Witness Script Hash</li>
+    * </ul>
+    * Defined in <a href="https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki">BIP-173</a>.
+    */
+   private static final int WITNESS_VERSION_0 = 0;
+
+   /**
+    * Witness version 1, introduced with Taproot (SegWit v1):
+    * <ul>
+    *   <li><b>P2TR</b> – Pay to Taproot</li>
+    * </ul>
+    * Defined in <a href="https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki">BIP-341</a> and
+    * encoded using Bech32m as specified in <a href="https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki">BIP-350</a>.
+    */
+   private static final int WITNESS_VERSION_1 = 1;
     
     /**
      * Parses a line containing an address and optional amount.
@@ -105,23 +123,33 @@ public class AddressTxtLine {
         // Bech32 decoding (P2WPKH, P2WSH, P2TR)
         try {
             Bech32.Bech32Data bechData = Bech32.decode(address);
-            // is protected: bechData.witnessProgram();
-            Class<?> clazz = Bech32.Bech32Bytes.class;
-            Method witnessProgramMethod;
-            witnessProgramMethod = clazz.getDeclaredMethod("witnessProgram");
-            witnessProgramMethod.setAccessible(true);
-            byte[] hash160AsByteArray = (byte[]) witnessProgramMethod.invoke(bechData);
-            if (hash160AsByteArray.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_PKH) {
-                final ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160AsByteArray);
-                return new AddressToCoin(hash160, amount);
-            } else if (hash160AsByteArray.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_SH) {
-                // P2WSH not supported
-                return null;
-            } else if (hash160AsByteArray.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_TR) {
-                // P2TR not supported
-                return null;
+            
+            // protected: bechData.witnessVersion();
+            short witnessVersion = invokeProtectedMethod(bechData, "witnessVersion", Short.class);
+            // protected: bechData.witnessProgram();
+            byte[] witnessProgram = invokeProtectedMethod(bechData, "witnessProgram", byte[].class);
+            
+            switch (witnessVersion) {
+                case WITNESS_VERSION_0:
+                    if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_PKH) {
+                        ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(witnessProgram);
+                        return new AddressToCoin(hash160, amount); // P2WPKH supported
+                    } else if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_SH) {
+                        byte[] scriptHash = witnessProgram;
+                        return null; // P2WSH not supported
+                    }
+                    break;
+                case WITNESS_VERSION_1:
+                    if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_TR) {
+                        byte[] tweakedPublicKey = witnessProgram;
+                        return null; // P2TR not supported
+                    }
+                    break;
+                default:
+                    // not supported
+                    return null;
             }
-        } catch (AddressFormatException | NoSuchMethodException | IllegalAccessException | InvocationTargetException | SecurityException e) {
+        } catch (AddressFormatException | ReflectiveOperationException  e) {
             // Bech32 parsing or reflection failed; continue to next format
         }
         
@@ -150,6 +178,14 @@ public class AddressTxtLine {
         } catch (AddressFormatException e) {
             return null;
         }
+    }
+    
+    @SuppressWarnings("unchecked")
+    private <T> T invokeProtectedMethod(Bech32.Bech32Bytes bech32Bytes, String methodName, Class<T> returnType) throws ReflectiveOperationException  {
+        Class<?> clazz = Bech32.Bech32Bytes.class;
+        Method method = clazz.getDeclaredMethod(methodName);
+        method.setAccessible(true);
+        return (T) method.invoke(bech32Bytes);
     }
 
     private ByteBuffer getHash160AsByteBufferFromBase58AddressUnchecked(String base58, KeyUtility keyUtility, int srcPos) {

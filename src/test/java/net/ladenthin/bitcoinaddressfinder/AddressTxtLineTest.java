@@ -179,8 +179,18 @@ public class AddressTxtLineTest {
     }
 
     @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_INVALID_BECH32_WITNESS_VERSION_2, location = CommonDataProvider.class)
+    public void fromLine_InvalidBech32WitnessVersion2_returnsNull(String base58) throws IOException {
+        // act
+        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
+
+        // assert
+        assertThat(addressToCoin, is(nullValue()));
+    }
+
+    @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_INVALID_BASE58, location = CommonDataProvider.class)
-    public void fromLine_InvalidP2WPKHAddressWithInvalidBase58Given_parseAnyway(String base58) throws IOException {
+    public void fromLine_InvalidP2WPKHAddressWithInvalidBase58Given_returnsNull(String base58) throws IOException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
 
