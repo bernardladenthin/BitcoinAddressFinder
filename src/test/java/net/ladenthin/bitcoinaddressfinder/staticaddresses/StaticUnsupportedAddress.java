@@ -46,6 +46,30 @@ public enum StaticUnsupportedAddress implements PublicAddress {
      * https://privatekeys.pw/bitcoin-cash/address/prseh0a4aejjcewhc665wjqhppgwrz2lw5txgn666a
      */
     BitcoinCashP2SH("prseh0a4aejjcewhc665wjqhppgwrz2lw5txgn666a"),
+    
+    /**
+     * Erroneous Bitcoin Cash address - invalid format or checksum.
+     * There seems to be an invalid char: F
+     */
+    BitcoinCash_Erroneous0("qnfuF7UrkAgwtxcSgZqhkV"),
+    
+    /**
+     * Erroneous Bitcoin Cash address - invalid format or checksum.
+     * There seems to be an invalid char: E
+     */
+    BitcoinCash_Erroneous1("qEPTALtCh3xTWUpTpRn1Rt"),
+    
+    /**
+     * Erroneous Bitcoin Cash address - invalid format or checksum.
+     * There seems to be an invalid char: P
+     */
+    BitcoinCash_Erroneous2("qsrPaN8AtbByikRAUJZTU8"),
+    
+    /**
+     * Erroneous Bitcoin Cash address - invalid format or checksum.
+     * There seems to be an invalid char: D
+     */
+    BitcoinCash_Erroneous3("q4DWJuRAUZv8K7bD4sDS2t"),
 
     // P2MS (Pay to Multisig)
     /**

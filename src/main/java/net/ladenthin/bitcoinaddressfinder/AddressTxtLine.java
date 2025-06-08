@@ -18,14 +18,15 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.github.kiulian.converter.AddressConverter;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.nio.ByteBuffer;
 import org.bitcoinj.base.Base58;
 import org.bitcoinj.base.Bech32;
 import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.SegwitAddress;
 import org.bitcoinj.base.exceptions.AddressFormatException;
+import org.bouncycastle.util.encoders.DecoderException;
 import org.jspecify.annotations.Nullable;
 
 
@@ -42,6 +43,7 @@ public class AddressTxtLine {
 
     public static final String IGNORE_LINE_PREFIX = "#";
     public static final String ADDRESS_HEADER = "address";
+    public static final String BITCOIN_CASH_PREFIX = "bitcoincash:";
     
     
     private final static int VERSION_BYTES_REGULAR = 1;
@@ -79,6 +81,11 @@ public class AddressTxtLine {
      */
     @Nullable
     public AddressToCoin fromLine(String line, KeyUtility keyUtility) {
+        // Remove the Bitcoin Cash prefix (which includes a colon) to avoid incorrect splitting.
+        // This ensures the address is recognized properly and not misinterpreted during parsing.
+        if(line.contains(BITCOIN_CASH_PREFIX)) {
+            line = line.replace(BITCOIN_CASH_PREFIX, "");
+        }
         String[] lineSplitted = SeparatorFormat.split(line);
         String address = lineSplitted[0];
         Coin amount = getCoinIfPossible(lineSplitted, DEFAULT_COIN);
@@ -166,9 +173,17 @@ public class AddressTxtLine {
             }
         }
         
-        // Bitcoin Cash 'q' prefix: convert to legacy address
-        if (address.startsWith("q")) {
-            address = AddressConverter.toLegacyAddress(address);
+        try {
+            // Bitcoin Cash 'q' prefix: convert to legacy address
+            if (address.startsWith("q")) {
+                byte[] payload = extractPKHFromBitcoinCashAddress(address);
+                ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(payload);
+                return new AddressToCoin(hash160, amount);
+            }
+        } catch (DecoderException e) {
+            throw e;
+        } catch (RuntimeException | ReflectiveOperationException e) {
+            return null;
         }
         
         // Fallback: assume Base58 with 1-byte version prefix
@@ -179,6 +194,19 @@ public class AddressTxtLine {
             return null;
         }
     }
+
+    public static byte[] extractPKHFromBitcoinCashAddress(String address) throws ReflectiveOperationException {
+        if (address.startsWith(BITCOIN_CASH_PREFIX)) {
+            address = address.substring(BITCOIN_CASH_PREFIX.length());
+        }
+        byte[] decoded5 = decodeBech32CharsetToValues(address);
+        byte[] decoded8 = decode5to8WithPadding(decoded5);
+        // Extracts the payload portion from the decoded Bech32 data.
+        // Skips the first byte (address type/version) and removes the last 6 bytes (checksum).
+        // The result is the raw payload encoded in 5-bit format.
+        byte[] payload = Arrays.copyOfRange(decoded8, 1, decoded8.length - 6);
+        return payload;
+    }
     
     @SuppressWarnings("unchecked")
     private <T> T invokeProtectedMethod(Bech32.Bech32Bytes bech32Bytes, String methodName, Class<T> returnType) throws ReflectiveOperationException  {
@@ -186,6 +214,63 @@ public class AddressTxtLine {
         Method method = clazz.getDeclaredMethod(methodName);
         method.setAccessible(true);
         return (T) method.invoke(bech32Bytes);
+    }
+    
+    public static byte[] decodeBech32CharsetToValues(String base32String) {
+        // Bech32 character set as defined in BIP-0173
+        final String CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+
+        // Prepare lookup table for fast character-to-value resolution
+        int[] lookup = new int[128];
+        Arrays.fill(lookup, -1);
+        for (int i = 0; i < CHARSET.length(); i++) {
+            lookup[CHARSET.charAt(i)] = i;
+        }
+
+        // Decode characters to 5-bit values
+        int len = base32String.length();
+        byte[] result = new byte[len];
+        for (int i = 0; i < len; i++) {
+            char c = base32String.charAt(i);
+            if (c >= 128 || lookup[c] == -1) {
+                throw new IllegalArgumentException("Invalid character in Bech32 string: " + c);
+            }
+            result[i] = (byte) lookup[c];
+        }
+
+        return result;
+    }
+    
+    /**
+     * Return the data, fully-decoded with 8-bits per byte.
+     * @return The data, fully-decoded as a byte array.
+     */
+    private static byte[] decode5to8(byte[] bytes) throws ReflectiveOperationException {
+        return invokeConvertBitsStatic(bytes, 0, bytes.length, 5, 8, false);
+    }
+    
+    private static byte[] decode5to8WithPadding(byte[] bytes) throws ReflectiveOperationException {
+        return invokeConvertBitsStatic(bytes, 0, bytes.length, 5, 8, true);
+    }
+    
+    private static byte[] encode8to5(byte[] data) throws ReflectiveOperationException {
+        return invokeConvertBitsStatic(data, 0, data.length, 8, 5, true);
+    }
+    
+    @SuppressWarnings("unchecked")
+    private static byte[] invokeConvertBitsStatic(byte[] in, int inStart, int inLen, int fromBits, int toBits, boolean pad) throws ReflectiveOperationException {
+        Method method = Bech32.class.getDeclaredMethod("convertBits", byte[].class, int.class, int.class, int.class, int.class, boolean.class);
+        method.setAccessible(true);
+        try {
+            return (byte[]) method.invoke(null, in, inStart, inLen, fromBits, toBits, pad);
+        } catch (ReflectiveOperationException e) {
+            // rethrow AddressFormatException if it's the underlying cause
+            Throwable cause = e.getCause();
+            if (cause instanceof AddressFormatException) {
+                throw (AddressFormatException) cause;
+            }
+            throw e;
+        }
     }
 
     private ByteBuffer getHash160AsByteBufferFromBase58AddressUnchecked(String base58, KeyUtility keyUtility, int srcPos) {

@@ -56,6 +56,10 @@ public enum StaticP2PKHAddress implements PublicAddress {
      */
     BitcoinCash("qz7xc0vl85nck65ffrsx5wvewjznp9lflgktxc5878", "bc6c3d9f3d278b6a8948e06a399974853097e9fa"),
     /**
+     * https://privatekeys.pw/address/bitcoin-cash/qzh96ajgz9ufvs4zmrzq8jr95s7nm0qlnclvk3vpe0
+     */
+    BitcoinCashWithPrefix("bitcoincash:qzh96ajgz9ufvs4zmrzq8jr95s7nm0qlnclvk3vpe0", "ae5d764811789642a2d8c403c865a43d3dbc1f9e"),
+    /**
      * https://bitinfocharts.com/de/bitcoin%20gold/address/GUGsnYNyGYDe4GT2iQKLDjKFPpd4KBXMQB
      */
     BitcoinGold("GUGsnYNyGYDe4GT2iQKLDjKFPpd4KBXMQB", "726975f819dc2043a0350257e92560e59d2e48ae"),

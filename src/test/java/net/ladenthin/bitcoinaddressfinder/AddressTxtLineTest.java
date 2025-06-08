@@ -21,6 +21,7 @@ package net.ladenthin.bitcoinaddressfinder;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.*;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
 import org.apache.commons.codec.DecoderException;
@@ -253,5 +254,35 @@ public class AddressTxtLineTest {
         String hash160AsHex = org.bouncycastle.util.encoders.Hex.toHexString(hash160);
         int expectedLastIndex = 40 - 1 - 2 * srcPos + 2;
         assertThat(hash160AsHex.lastIndexOf("f"), is(equalTo(expectedLastIndex)));
+    }
+    
+    @Test
+    public void extractPKHFromBitcoinCashAddress_withoutPrefix_returnsCorrectHash160() throws Exception {
+        // arrange
+        StaticP2PKHAddress address = StaticP2PKHAddress.BitcoinCash;
+
+        // act
+        byte[] hash160 = new AddressTxtLine().extractPKHFromBitcoinCashAddress(address.getPublicAddress());
+
+        // assert
+        ByteBuffer buffer = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160);
+        String actualHashHex = keyUtility.byteBufferUtility.getHexFromByteBuffer(buffer);
+        assertThat(actualHashHex, is(equalTo(address.getPublicKeyHashAsHex())));
+    }
+
+    @Test
+    public void extractPKHFromBitcoinCashAddress_withPrefix_returnsCorrectHash160() throws Exception {
+        // arrange
+        StaticP2PKHAddress address = StaticP2PKHAddress.BitcoinCashWithPrefix;
+
+        // act
+        byte[] hash160 = new AddressTxtLine().extractPKHFromBitcoinCashAddress(address.getPublicAddress());
+
+        // assert
+        assertThat(address.getPublicAddress(), startsWith(AddressTxtLine.BITCOIN_CASH_PREFIX));
+
+        ByteBuffer buffer = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160);
+        String actualHashHex = keyUtility.byteBufferUtility.getHexFromByteBuffer(buffer);
+        assertThat(actualHashHex, is(equalTo(address.getPublicKeyHashAsHex())));
     }
 }
