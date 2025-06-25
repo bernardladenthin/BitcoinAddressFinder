@@ -386,14 +386,14 @@ You are also welcome to **extend this database** by importing your own address d
 If you're missing any information or have questions about usage or content, feel free to ask or open an issue.
 
 #### Light database
-* Light (5.23 GiB), Last update: June 1, 2025
+* Light (5.4 GiB), Last update: June 1, 2025
   * Contains Bitcoin addresses whith amount and many altcoin addresses with amount.
   * Static amount of 0 is used to allow best compression.
-  * Unique entries: 127367117
-  * Mapsize: 5368 MiB
+  * Unique entries: 131373181
+  * Mapsize: 5536 MiB
   * Time to create the database: ~9 hours
   * Link (3.53 GiB zip archive): http://ladenthin.net/lmdb_light.zip
-  * Link extracted addresses as txt (4.98 GiB) (2.20 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Light_HexHash.zip
+  * Link extracted addresses as txt (5.13 GiB) (2.20 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Light_HexHash.zip
 
 > 💡 **Hint:** When using the light database, it is **strongly recommended** to enable the following setting in your configuration:
 > ```json
@@ -563,6 +563,33 @@ For more in-depth information on collision resistance, address reuse risks, and 
 - [BitBruteForce-Wallet – Requirements and usage](https://github.com/Xefrok/BitBruteForce-Wallet#requeriments)
 - [New Records in Collision Attacks on RIPEMD-160 and SHA-256 (ePrint 2023/285)](https://eprint.iacr.org/2023/285) – Li et al. present new records in collision attacks: 40-step RIPEMD-160 and 39-step semi-free-start SHA-256. Both hash functions are fundamental to Bitcoin address generation.
 
+### ⚠️ Security Advisory: Android RNG Vulnerability (2013) and Simulation via BitcoinAddressFinder
+In 2013, a serious vulnerability was discovered in Android’s `SecureRandom` implementation. It caused Bitcoin private keys to be exposed due to reused or predictable random values during ECDSA signature creation. This problem affected many wallet apps that generated keys directly on Android devices.
+
+BitcoinAddressFinder can be used to simulate and analyze this type of attack. With small changes, it can reproduce faulty random number generators by:
+* using fixed or repeating `k` values
+* limiting entropy to 16, 32, or 64 bits
+* replacing the secure RNG with a weak or deterministic version
+
+This makes it possible to test and study:
+* how r-collisions happen in ECDSA signatures
+* how easy it is to find reused `k` values
+* how quickly a private key can be recovered
+* how secure different RNG implementations really are
+
+BitcoinAddressFinder can generate millions of key pairs quickly. This allows researchers to create and scan large keyspaces under controlled RNG conditions. All results can be verified using the built-in self-test feature or compared against known addresses in the LMDB database.
+
+This kind of simulation is useful for:
+* learning about signature security
+* building training examples for audits or courses
+* checking RNG quality in real wallets or custom apps
+
+References:
+* [Wikipedia: RNG Attack](https://en.wikipedia.org/wiki/Random_number_generator_attack)
+* [Crypto.SE: Android SecureRandom + r-Collisions](https://crypto.stackexchange.com/questions/9694/technical-details-of-attack-on-android-bitcoin-usage-of-securerandom)
+* [The Register: Android Bug Batters Wallets](https://www.theregister.com/2013/08/12/android_bug_batters_bitcoin_wallets/)
+* [Google Blog: SecureRandom Fixes](https://android-developers.googleblog.com/2013/08/some-securerandom-thoughts.html)
+* [bitcoin.org Alert (2013-08-11)](https://bitcoin.org/en/alert/2013-08-11-android)
 
 ## Similar projects
 * The [LBC](https://lbc.cryptoguru.org/) is optimized to find keys for the [Bitcoin Puzzle Transaction](https://privatekeys.pw/puzzles/bitcoin-puzzle-tx). It require communication to a server, doesn't support altcoin and pattern matching.
