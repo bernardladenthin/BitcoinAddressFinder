@@ -259,138 +259,138 @@ In addition to standard script types, the importer also recognizes and supports 
 
 | Coin                                                                                     |  TAG  | P2PKH | P2SH | P2WPKH | P2WSH  |  P2MS  |  P2TR  |
 |------------------------------------------------------------------------------------------|:-----:|:-----:|:----:|:------:|:------:|:------:|:------:|
-| (42-coin)[https://github.com/42-coin/42]                                                 | 42    |  ✅   | ✅   |        |        |        |       |
-| (Alias)[https://github.com/aliascash]                                                    | ALIAS |  ✅   |      |        |        |        |       |
-| (Argoneum)[https://github.com/Argoneum/argoneum]                                         | AGM   |  ✅   |      |        |        |        |       |
-| (Artbyte)[https://github.com/WikiMin3R/ArtBytE]                                          | ABY   |  ✅   |      |        |        |        |       |
-| (Auroracoin)[https://github.com/aurarad/Auroracoin]                                      | AUR   |  ✅   |      |        |        |        |       |
-| (B3Coin)[https://github.com/B3-Coin/B3-CoinV2]                                           | B3    |  ✅   |      |        |        |        |       |
-| (BBQCoin)[https://github.com/BBQCoinCommunity/BBQCoin]                                   | BQC   |  ✅   |      |        |        |        |       |
-| (Bean Cash)[https://github.com/teambean/BeanCash]                                        | BEAN  |  ✅   |      |        |        |        |       |
-| (Biblepay)[https://github.com/biblepay/biblepay]                                         | BBP   |  ✅   |      |        |        |        |       |
-| (BitBay)[https://github.com/bitbaymarket/bitbay-core]                                    | BAY   |  ✅   |      |        |        |        |       |
-| (BitBlocks)[https://github.com/BitBlocksProject/BitBlocks]                               | BBK   |  ✅   |      |        |        |        |       |
-| (Bitcoin)[https://github.com/bitcoin/bitcoin]                                            | BTC   |  ✅   | ✅   | ✅    | ❌     |  ❌    | ❌    |
-| (Bitcoin Cash)[https://github.com/bitcoincashbch/bitcoin-cash]                           | BCH   |  ✅   | ❌   |        |        |  ❌    |       |
-| (Bitcoin Gold)[https://github.com/btcgpu]                                                | BTG   |  ✅   |      |        |        |        |       |
-| (Bitcoin Oil)[https://github.com/escapeneo/bitcoinoil/]                                  | BTCO  |  ✅   |      | ✅     | ❌     |        |       |
-| (Bitcoin Plus)[https://github.com/bitcoinplusorg/xbcwalletsource]                        | XBC   |  ✅   |      |        |        |        |       |
-| (BitCore)[https://github.com/bitcore-btx/bitcore]                                        | BTX   |  ✅   |      | ✅     | ❌     |        |       |
-| (Bitmark)[https://github.com/project-bitmark/bitmark]                                    | BTMK  |  ✅   |      |        |        |        |       |
-| (BlackCoin)[https://gitlab.com/blackcoin/blackcoin-more]                                 | BLK   |  ✅   |      |        |        |        |       |
-| (BlakeBitcoin)[https://github.com/BlakeBitcoin/BlakeBitcoin]                             | BBTC  |  ✅   |      |        |        |        |       |
-| (Blakecoin)[https://github.com/BlueDragon747/Blakecoin]                                  | BLC   |  ✅   |      |        |        |        |       |
-| (Blocknet)[https://github.com/BlocknetDX/BlockDX]                                        | BLOCK |  ✅   |      |        |        |        |       |
-| (BolivarCoin)[https://github.com/BOLI-Project/BolivarCoin]                               | BOLI  |  ✅   |      |        |        |        |       |
-| (BYTZ)[https://github.com/bytzcurrency]                                                  | BYTZ  |  ✅   | ???  |        |        |        |       |
-| (Canada-eCoin)[https://github.com/Canada-eCoin/eCoinCore]                                | CDN   |  ✅   |      | ✅     | ❌      |        |         |
-| (Catcoin)[https://github.com/CatcoinCore/catcoincore]                                    | CAT   |  ✅   |      |        |        |        |         |
-| (ChessCoin 0.32%)[https://github.com/AKKPP/ChessCoin032/]                                | CHESS |  ✅   |      |        |        |        |         |
-| (Clam)[https://github.com/nochowderforyou/clams]                                         | CLAM  |  ✅   |      |        |        |        |         |
-| (CloakCoin)[https://github.com/CloakProject/CloakCoin]                                   | CLOAK |  ✅   | ✅   |        |        |        |         |
-| (Coino)[https://github.com/scriptRack003756/coino]                                       | CNO   |  ✅   |      |        |        |         |       |
-| (ColossusXT)[https://github.com/ColossusCoinXT/ColossusCoinXT]                           | COLX  |  ✅   |      |        |        |         |       |
-| (Compound)[https://github.com/compounddev/Compound-Coin]                                 | COMP |  ✅   |      |        |        |         |       |
-| (CROWN)[https://github.com/Crowndev/crowncoin]                                           | CRW   |  ✅   |      |        |        |         |       |
-| (Cryptoshares)[https://github.com/Cryptosharescoin/shares]                               | SHARES|  ✅   |      |        |        |         |       |
-| (Curecoin)[https://github.com/cygnusxi/CurecoinSource]                                   | CURE  |  ✅   |      |        |        |         |       |
-| (Dash)[https://github.com/dashpay/dash]                                                  | DASH  |  ✅   | ✅   |        |        |        |         |
-| (DeFiChain)[https://github.com/DeFiCh/ain]                                               | DFI   |  ✅   | ✅   | ✅     | ❌      |        |         |
-| (Deutsche eMark)[https://github.com/emarkproject/eMark]                                  | DEM   |  ✅   |      |        |        |        |         |
-| (Diamond)[https://github.com/DMDcoin/Diamond]                                            | DMD   |  ✅   |      |        |        |        |         |
-| (DigiByte)[https://github.com/digibyte-core/digibyte]                                    | DGB   |  ✅   |      | ✅     | ❌     |        |         |
-| (DigitalCoin)[https://github.com/lomtax/digitalcoin]                                     | DGC   |  ✅   |      |        |        |         |       |
-| (Dimecoin)[https://github.com/dime-coin/dimecoin]                                        | DIME  |  ✅   |      |        |        |         |       |
-| (Divicoin)[https://github.com/DiviProject/Divi]                                          | DIVI  |  ✅   |      |        |        |         |       |
-| (Dogecoin)[https://github.com/dogecoin/dogecoin]                                         | DOGE  |  ✅   | ✅   |        |        |        |         |
-| (Dogmcoin)[https://github.com/dogmcoin/dogmcoin]                                         | DOGM  |  ✅   |      |        |        |         |       |
-| (Doichain)[https://github.com/Doichain/doichain-core]                                    | DOI   |  ✅   |      | ✅     | ❌     |        |         |
-| (e-Gulden)[https://github.com/Electronic-Gulden-Foundation/egulden]                      | EFL   |  ✅   |      |        |        |         |       |
-| (Electron)[https://github.com/Electron-Coin2014/Electron-ELT]                            | ELT   |  ✅   |      |        |        |         |       |
-| (Element (HYP))[https://github.com/Crypto-city/Element-HYP]                              | HYP   |  ✅   |      |        |        |         |       |
-| (Elite)[https://github.com/ironsniper1/Elite-Source-2.0.1.2]                             | 1337  |  ✅   |      |        |        |         |       |
-| (Emerald)[https://github.com/crypto-currency/Emerald]                                    | EMD   |  ✅   |      |        |        |         |       |
-| (EverGreenCoin)[https://github.com/EverGreenCoinDev/EverGreenCoin]                       | EGC   |  ✅   |      |        |        |         |       |
-| (Feathercoin)[https://github.com/FeatherCoin/Feathercoin]                                | FTC   |  ✅   |      | ✅     | ❌     |         |         |
-| (Firo)[https://github.com/firoorg/firo/]                                                 | FIRO  |  ✅   |      |        |       |         |         |
-| (Freedomcoin)[https://github.com/FreedomCoin-Project/FreedomCoin-Core/]                  | FREED |  ✅   |      |        |        |         |       |
-| (GapCoin)[https://github.com/gapcoin/gapcoin]                                            | GAP   |  ✅   |      |        |        |         |       |
-| (Goldcash)[https://github.com/iUNeIV/GoldCash]                                           | GOLD  |  ✅   |      |        |        |         |       |
-| (GoldCoin)[https://github.com/goldcoin/goldcoin]                                         | GLC   |  ✅   |      |        |        |         |       |
-| (Groestlcoin)[https://github.com/GroestlCoin/GroestlCoin/]                               | GRS   |  ✅   |      | ✅     | ❌     |         |       |
-| (Hemis)[https://github.com/Hemis-Blockchain/Hemis]                                       | HMS   |  ✅   |      |        |        |         |       |
-| (Herencia)[https://github.com/herenciacoin/HEIRS]                                        | HEIRS |  ✅   |      |        |        |         |       |
-| (HoboNickels)[https://github.com/Tranz5/HoboNickels]                                     | HBN   |  ✅   |      |        |        |         |       |
-| (HTMLCOIN)[https://github.com/HTMLCOIN]                                                  | HTML  |  ✅   |      |        |        |         |       |
-| (I/O Coin)[https://github.com/IOCoin/DIONS]                                              | IOC   |  ✅   |      |        |        |         |       |
-| (IDChain)[https://github.com/idchaincoin/idchaincoin]                                    | DCT   |  ✅   |      |        |        |         |       |
-| (Innova)[https://github.com/innova-foundation/innova]                                    | INN   |  ✅   |      |        |        |         |       |
-| (InfiniLooP)[https://github.com/WikiMin3R/InfiniLooP/]                                   | IL8P  |  ✅   |      |        |        |         |       |
-| (Infinitecoin)[https://github.com/infinitecoin-project/infinitecoin]                     | IFC   |  ✅   |      |        |        |         |       |
-| (iXcoin)[https://github.com/IXCore/IXCoin]                                               | IXC   |  ✅   |      |        |        |         |       |
-| (Kobocoin)[https://github.com/kobocoin/Kobocoin/]                                        | KOBO  |  ✅   |      |        |        |         |       |
-| (Komodo)[https://github.com/KomodoPlatform/komodo]                                       | KMD   |  ✅   |      |        |        |         |       |
-| (Lanacoin)[https://github.com/LanaCoin/lanacoin]                                         | LANA  |  ✅   |      |        |        |         |       |
-| (Litecoin)[https://github.com/litecoin-project/litecoin]                                 | LTC   |  ✅   | ✅   | ✅     | ❌     |        |         |
-| (Litecoin Cash)[https://github.com/litecoincash-project/litecoincash]                    | LCC   |  ✅   |      | ✅     | ❌     |         |         |
-| (LiteDoge)[https://github.com/ldoge/LDOGE]                                               | LDOGE |  ✅   |      |        |        |         |       |
-| (Lithium)[https://github.com/lithiumcoin/lithium]                                        | LIT   |  ✅   |      |        |        |         |       |
-| (Luckycoin)[https://github.com/LuckycoinFoundation/Luckycoin]                            | LKY   |  ✅   |      |        |        |         |       |
-| (Lynx)[https://github.com/getlynx/Lynx]                                                  | LYNX  |  ✅   |      |        |        |         |       |
-| (MasterNoder2)[https://github.com/jonK341/MasterNoder2]                                  | MN2   |  ✅   |      |        |        |         |       |
-| (Mooncoin)[https://github.com/%20mooncoincore/wallet/releases]                           | MOON  |  ✅   | ✅   | ✅     | ❌      |         |       |
-| (MotaCoin)[https://github.com/Jahvinci/MotaCoin]                                         | MOTA  |  ✅   |      |        |        |         |       |
-| (Myriad)[https://github.com/myriadteam/myriadcoin]                                       | XMY   |  ✅   | ✅   | ✅     | ❌     |        |         |
-| (Namecoin)[https://github.com/namecoin/namecoin-core]                                    | NMC   |  ✅   |      | ✅     | ❌     |         |         |
-| (NewYorkCoin)[https://github.com/NewYorkCoinNYC]                                         | NYC   |  ✅   |      |        |        |         |       |
-| (Novacoin)[https://github.com/novacoin-project/novacoin]                                 | NVC   |  ✅   |      |        |        |         |       |
-| (PAC Protocol)[https://github.com/pacprotocol/pacprotocol]                               | PAC   |  ✅   |      |        |        |         |       |
-| (PakCoin)[https://github.com/Pakcoin-project/pakcoin]                                    | PAK   |  ✅   |      |        |        |         |       |
-| (PandaCoin)[https://github.com/DigitalPandacoin/pandacoin]                               | PND   |  ✅   |      |        |        |         |       |
-| (Particl)[https://github.com/particl/particl-core]                                       | PART  |  ✅   | ✅   |        |        |         |       |
-| (PeepCoin)[https://github.com/PXN-Foundation/Peepcoin/]                                  | PCN   |  ✅   |      |        |        |         |       |
-| (Peercoin)[https://github.com/peercoin/peercoin]                                         | PPC   |  ✅   |      |        |        |         |       |
-| (Photon)[https://github.com/photonproject/photon]                                        | PHO   |  ✅   |      |        |        |         |       |
-| (Pinkcoin)[https://github.com/Pink2Dev/Pink2]                                            | PINK  |  ✅   |      |        |        |         |       |
-| (PIVX)[https://github.com/PIVX-Project/PIVX/]                                            | PIVX  |  ✅   |      |        |        |         |       |
-| (PotCoin)[https://github.com/potcoin/potcoin]                                            | POT   |  ✅   |      |        |        |         |       |
-| (Primecoin)[https://github.com/primecoin/primecoin]                                      | XPM   |  ✅   |      |        |        |         |       |
-| (PutinCoin v2)[https://github.com/PutinCoinPUT/PutinCoin]                                | PUT   |  ✅   |      |        |        |         |       |
-| (Quark)[https://github.com/quark-project-evolution/quark/]                               | QRK   |  ✅   |      |        |        |         |       |
-| (Raptoreum Core)[https://github.com/Raptor3um/raptoreum]                                 | RTM   |  ✅   |      |        |        |        |         |
-| (Reddcoin)[https://github.com/reddcoin-project/reddcoin]                                 | RDD   |  ✅   |      |        |        |        |         |
-| (Riecoin)[https://github.com/riecointeam/riecoin]                                        | RIC   |       | ✅   | ✅     | ❌    |         |       |
-| (SaluS)[https://github.com/saluscoin/salus]                                              | SLS   |  ✅   | ✅   |        |        |         |       |
-| (SexCoin)[https://github.com/sexcoin-project/sexcoin]                                    | SXC   |  ✅   |      |        |        |         |       |
-| (Slimcoin)[https://github.com/slimcoin-project/Slimcoin]                                 | SLM   |  ✅   |      |        |        |         |       |
-| (Smileycoin)[https://github.com/tutor-web/smileyCoin]                                    | SMLY  |  ✅   |      |        |        |         |       |
-| (Smoke)[https://github.com/cannacoin-official/cannacoin-smoke]                           | SMOKE |  ✅   |      |        |        |         |       |
-| (SpaceXpanse)[https://github.com/SpaceXpanse/rod-core-wallet]                            | ROD   |  ✅   |      | ✅     | ❌     |         |       |
-| (Sparks)[https://github.com/sparkspay/sparks/]                                           | SPK   |  ✅   |      |        |        |         |       |
-| (Stakecoin)[https://github.com/sleewis/stakecoin]                                        | STK   |  ✅   |      |        |        |         |       |
-| (Sterlingcoin)[https://github.com/Sterlingcoin/Sterlingcoin-1.6.2.0-Release]             | SLG   |  ✅   |      |        |        |         |       |
-| (Stronghands)[https://bitbucket.org/bumbacoin/stronghands-new]                           | SHND  |  ✅   |      |        |        |         |       |
-| (Syscoin)[https://github.com/syscoin/syscoin]                                            | SYS   |  ✅   |      | ✅     | ❌     |         |       |
-| (TajCoin)[https://github.com/Taj-Coin/tajcoin]                                           | TAJ   |  ✅   |      |        |        |         |       |
-| (Terracoin)[https://github.com/terracoin/terracoin]                                      | TRC   |  ✅   |      |        |        |         |       |
-| (TheHolyRogerCoin)[https://github.com/TheHolyRoger/TheHolyRogerCoin]                     | ROGER |  ✅   |      | ✅     | ❌     |         |       |
-| (Trezarcoin)[https://github.com/TrezarCoin/TrezarCoin]                                   | TZC   |  ✅   |      |        |        |         |       |
-| (Trollcoin)[https://github.com/TrollCoin2/TrollCoin-2.0]                                 | TROLL |  ✅   |      |        |        |         |       |
-| (UFO)[https://github.com/fiscalobject/ufo]                                               | UFO   |  ✅   | ✅   | ✅     | ❌      |        |         |
-| (UFOhub)[https://github.com/MyGCoin/UFOHub-Coin]                                         | UFOHUB|  ✅   |      |        |        |         |       |
-| (Unitus)[https://github.com/unitusdev/unitus]                                            | UIS   |  ✅   |      |        |        |         |       |
-| (UniversalMolecule)[https://github.com/universalmol/universalmol]                        | UMO   |  ✅   |      |        |        |         |       |
-| (Unobtanium)[https://github.com/unobtanium-official/Unobtanium]                          | UNO   |  ✅   |      |        |        |        |         |
-| (Validity)[https://github.com/RadiumCore/Validity]                                       | VAL   |  ✅   |      |        |        |         |       |
-| (Vanillacash)[https://github.com/WikiMin3R/Vanillacash]                                  | XVC   |  ✅   |      |        |        |         |       |
-| (VeriCoin)[https://github.com/vericoin/vericoin]                                         | VRC   |  ✅   |      |        |        |         |       |
-| (Versacoin)[https://github.com/versacoin/versacoin]                                      | VCN   |  ✅   |      |        |        |         |       |
-| (Vertcoin)[https://github.com/vertcoin/vertcoin]                                         | VTC   |  ✅   |      | ✅     | ❌     |         |       |
-| (VirtaCoin)[https://github.com/virtacoin/VirtaCoinProject]                               | VTA   |  ✅   |      |        |        |         |       |
-| (VirtacoinPlus)[https://github.com/virtacoinplus/virtacoinplus]                          | XVP   |  ✅   |      |        |        |         |       |
-| (WorldCoin)[https://github.com/OfficialWorldcoinGlobal/Worldcoin]                        | WDC   |  ✅   |      |        |        |         |       |
-| (Zetacoin)[https://github.com/WikiMin3R/ZetacoinE]                                       | ZET   |  ✅   |      |        |        |         |       |
-| (ZCash)[https://github.com/zcash/zcash]                                                  | ZEC   |  ✅   | ✅   |        |        |        |         |
+| [42-coin](https://github.com/42-coin/42)                                                 | 42    |  ✅   | ✅   |        |        |        |       |
+| [Alias](https://github.com/aliascash)                                                    | ALIAS |  ✅   |      |        |        |        |       |
+| [Argoneum](https://github.com/Argoneum/argoneum)                                         | AGM   |  ✅   |      |        |        |        |       |
+| [Artbyte](https://github.com/WikiMin3R/ArtBytE)                                          | ABY   |  ✅   |      |        |        |        |       |
+| [Auroracoin](https://github.com/aurarad/Auroracoin)                                      | AUR   |  ✅   |      |        |        |        |       |
+| [B3Coin](https://github.com/B3-Coin/B3-CoinV2)                                           | B3    |  ✅   |      |        |        |        |       |
+| [BBQCoin](https://github.com/BBQCoinCommunity/BBQCoin)                                   | BQC   |  ✅   |      |        |        |        |       |
+| [Bean Cash](https://github.com/teambean/BeanCash)                                        | BEAN  |  ✅   |      |        |        |        |       |
+| [Biblepay](https://github.com/biblepay/biblepay)                                         | BBP   |  ✅   |      |        |        |        |       |
+| [BitBay](https://github.com/bitbaymarket/bitbay-core)                                    | BAY   |  ✅   |      |        |        |        |       |
+| [BitBlocks](https://github.com/BitBlocksProject/BitBlocks)                               | BBK   |  ✅   |      |        |        |        |       |
+| [Bitcoin](https://github.com/bitcoin/bitcoin)                                            | BTC   |  ✅   | ✅   | ✅    | ❌     |  ❌    | ❌    |
+| [Bitcoin Cash](https://github.com/bitcoincashbch/bitcoin-cash)                           | BCH   |  ✅   | ❌   |        |        |  ❌    |       |
+| [Bitcoin Gold](https://github.com/btcgpu)                                                | BTG   |  ✅   |      |        |        |        |       |
+| [Bitcoin Oil](https://github.com/escapeneo/bitcoinoil/)                                  | BTCO  |  ✅   |      | ✅     | ❌     |        |       |
+| [Bitcoin Plus](https://github.com/bitcoinplusorg/xbcwalletsource)                        | XBC   |  ✅   |      |        |        |        |       |
+| [BitCore](https://github.com/bitcore-btx/bitcore)                                        | BTX   |  ✅   |      | ✅     | ❌     |        |       |
+| [Bitmark](https://github.com/project-bitmark/bitmark)                                    | BTMK  |  ✅   |      |        |        |        |       |
+| [BlackCoin](https://gitlab.com/blackcoin/blackcoin-more)                                 | BLK   |  ✅   |      |        |        |        |       |
+| [BlakeBitcoin](https://github.com/BlakeBitcoin/BlakeBitcoin)                             | BBTC  |  ✅   |      |        |        |        |       |
+| [Blakecoin](https://github.com/BlueDragon747/Blakecoin)                                  | BLC   |  ✅   |      |        |        |        |       |
+| [Blocknet](https://github.com/BlocknetDX/BlockDX)                                        | BLOCK |  ✅   |      |        |        |        |       |
+| [BolivarCoin](https://github.com/BOLI-Project/BolivarCoin)                               | BOLI  |  ✅   |      |        |        |        |       |
+| [BYTZ](https://github.com/bytzcurrency)                                                  | BYTZ  |  ✅   | ???  |        |        |        |       |
+| [Canada-eCoin](https://github.com/Canada-eCoin/eCoinCore)                                | CDN   |  ✅   |      | ✅     | ❌      |        |         |
+| [Catcoin](https://github.com/CatcoinCore/catcoincore)                                    | CAT   |  ✅   |      |        |        |        |         |
+| [ChessCoin 0.32%](https://github.com/AKKPP/ChessCoin032/)                                | CHESS |  ✅   |      |        |        |        |         |
+| [Clam](https://github.com/nochowderforyou/clams)                                         | CLAM  |  ✅   |      |        |        |        |         |
+| [CloakCoin](https://github.com/CloakProject/CloakCoin)                                   | CLOAK |  ✅   | ✅   |        |        |        |         |
+| [Coino](https://github.com/scriptRack003756/coino)                                       | CNO   |  ✅   |      |        |        |         |       |
+| [ColossusXT](https://github.com/ColossusCoinXT/ColossusCoinXT)                           | COLX  |  ✅   |      |        |        |         |       |
+| [Compound](https://github.com/compounddev/Compound-Coin)                                 | COMP |  ✅   |      |        |        |         |       |
+| [CROWN](https://github.com/Crowndev/crowncoin)                                           | CRW   |  ✅   |      |        |        |         |       |
+| [Cryptoshares](https://github.com/Cryptosharescoin/shares)                               | SHARES|  ✅   |      |        |        |         |       |
+| [Curecoin](https://github.com/cygnusxi/CurecoinSource)                                   | CURE  |  ✅   |      |        |        |         |       |
+| [Dash](https://github.com/dashpay/dash)                                                  | DASH  |  ✅   | ✅   |        |        |        |         |
+| [DeFiChain](https://github.com/DeFiCh/ain)                                               | DFI   |  ✅   | ✅   | ✅     | ❌      |        |         |
+| [Deutsche eMark](https://github.com/emarkproject/eMark)                                  | DEM   |  ✅   |      |        |        |        |         |
+| [Diamond](https://github.com/DMDcoin/Diamond)                                            | DMD   |  ✅   |      |        |        |        |         |
+| [DigiByte](https://github.com/digibyte-core/digibyte)                                    | DGB   |  ✅   |      | ✅     | ❌     |        |         |
+| [DigitalCoin](https://github.com/lomtax/digitalcoin)                                     | DGC   |  ✅   |      |        |        |         |       |
+| [Dimecoin](https://github.com/dime-coin/dimecoin)                                        | DIME  |  ✅   |      |        |        |         |       |
+| [Divicoin](https://github.com/DiviProject/Divi)                                          | DIVI  |  ✅   |      |        |        |         |       |
+| [Dogecoin](https://github.com/dogecoin/dogecoin)                                         | DOGE  |  ✅   | ✅   |        |        |        |         |
+| [Dogmcoin](https://github.com/dogmcoin/dogmcoin)                                         | DOGM  |  ✅   |      |        |        |         |       |
+| [Doichain](https://github.com/Doichain/doichain-core)                                    | DOI   |  ✅   |      | ✅     | ❌     |        |         |
+| [e-Gulden](https://github.com/Electronic-Gulden-Foundation/egulden)                      | EFL   |  ✅   |      |        |        |         |       |
+| [Electron](https://github.com/Electron-Coin2014/Electron-ELT)                            | ELT   |  ✅   |      |        |        |         |       |
+| [Element (HYP)](https://github.com/Crypto-city/Element-HYP)                              | HYP   |  ✅   |      |        |        |         |       |
+| [Elite](https://github.com/ironsniper1/Elite-Source-2.0.1.2)                             | 1337  |  ✅   |      |        |        |         |       |
+| [Emerald](https://github.com/crypto-currency/Emerald)                                    | EMD   |  ✅   |      |        |        |         |       |
+| [EverGreenCoin](https://github.com/EverGreenCoinDev/EverGreenCoin)                       | EGC   |  ✅   |      |        |        |         |       |
+| [Feathercoin](https://github.com/FeatherCoin/Feathercoin)                                | FTC   |  ✅   |      | ✅     | ❌     |         |         |
+| [Firo](https://github.com/firoorg/firo/)                                                 | FIRO  |  ✅   |      |        |       |         |         |
+| [Freedomcoin](https://github.com/FreedomCoin-Project/FreedomCoin-Core/)                  | FREED |  ✅   |      |        |        |         |       |
+| [GapCoin](https://github.com/gapcoin/gapcoin)                                            | GAP   |  ✅   |      |        |        |         |       |
+| [Goldcash](https://github.com/iUNeIV/GoldCash)                                           | GOLD  |  ✅   |      |        |        |         |       |
+| [GoldCoin](https://github.com/goldcoin/goldcoin)                                         | GLC   |  ✅   |      |        |        |         |       |
+| [Groestlcoin](https://github.com/GroestlCoin/GroestlCoin/)                               | GRS   |  ✅   |      | ✅     | ❌     |         |       |
+| [Hemis](https://github.com/Hemis-Blockchain/Hemis)                                       | HMS   |  ✅   |      |        |        |         |       |
+| [Herencia](https://github.com/herenciacoin/HEIRS)                                        | HEIRS |  ✅   |      |        |        |         |       |
+| [HoboNickels](https://github.com/Tranz5/HoboNickels)                                     | HBN   |  ✅   |      |        |        |         |       |
+| [HTMLCOIN](https://github.com/HTMLCOIN)                                                  | HTML  |  ✅   |      |        |        |         |       |
+| [I/O Coin](https://github.com/IOCoin/DIONS)                                              | IOC   |  ✅   |      |        |        |         |       |
+| [IDChain](https://github.com/idchaincoin/idchaincoin)                                    | DCT   |  ✅   |      |        |        |         |       |
+| [Innova](https://github.com/innova-foundation/innova)                                    | INN   |  ✅   |      |        |        |         |       |
+| [InfiniLooP](https://github.com/WikiMin3R/InfiniLooP/)                                   | IL8P  |  ✅   |      |        |        |         |       |
+| [Infinitecoin](https://github.com/infinitecoin-project/infinitecoin)                     | IFC   |  ✅   |      |        |        |         |       |
+| [iXcoin](https://github.com/IXCore/IXCoin)                                               | IXC   |  ✅   |      |        |        |         |       |
+| [Kobocoin](https://github.com/kobocoin/Kobocoin/)                                        | KOBO  |  ✅   |      |        |        |         |       |
+| [Komodo](https://github.com/KomodoPlatform/komodo)                                       | KMD   |  ✅   |      |        |        |         |       |
+| [Lanacoin](https://github.com/LanaCoin/lanacoin)                                         | LANA  |  ✅   |      |        |        |         |       |
+| [Litecoin](https://github.com/litecoin-project/litecoin)                                 | LTC   |  ✅   | ✅   | ✅     | ❌     |        |         |
+| [Litecoin Cash](https://github.com/litecoincash-project/litecoincash)                    | LCC   |  ✅   |      | ✅     | ❌     |         |         |
+| [LiteDoge](https://github.com/ldoge/LDOGE)                                               | LDOGE |  ✅   |      |        |        |         |       |
+| [Lithium](https://github.com/lithiumcoin/lithium)                                        | LIT   |  ✅   |      |        |        |         |       |
+| [Luckycoin](https://github.com/LuckycoinFoundation/Luckycoin)                            | LKY   |  ✅   |      |        |        |         |       |
+| [Lynx](https://github.com/getlynx/Lynx)                                                  | LYNX  |  ✅   |      |        |        |         |       |
+| [MasterNoder2](https://github.com/jonK341/MasterNoder2)                                  | MN2   |  ✅   |      |        |        |         |       |
+| [Mooncoin](https://github.com/%20mooncoincore/wallet/releases)                           | MOON  |  ✅   | ✅   | ✅     | ❌      |         |       |
+| [MotaCoin](https://github.com/Jahvinci/MotaCoin)                                         | MOTA  |  ✅   |      |        |        |         |       |
+| [Myriad](https://github.com/myriadteam/myriadcoin)                                       | XMY   |  ✅   | ✅   | ✅     | ❌     |        |         |
+| [Namecoin](https://github.com/namecoin/namecoin-core)                                    | NMC   |  ✅   |      | ✅     | ❌     |         |         |
+| [NewYorkCoin](https://github.com/NewYorkCoinNYC)                                         | NYC   |  ✅   |      |        |        |         |       |
+| [Novacoin](https://github.com/novacoin-project/novacoin)                                 | NVC   |  ✅   |      |        |        |         |       |
+| [PAC Protocol](https://github.com/pacprotocol/pacprotocol)                               | PAC   |  ✅   |      |        |        |         |       |
+| [PakCoin](https://github.com/Pakcoin-project/pakcoin)                                    | PAK   |  ✅   |      |        |        |         |       |
+| [PandaCoin](https://github.com/DigitalPandacoin/pandacoin)                               | PND   |  ✅   |      |        |        |         |       |
+| [Particl](https://github.com/particl/particl-core)                                       | PART  |  ✅   | ✅   |        |        |         |       |
+| [PeepCoin](https://github.com/PXN-Foundation/Peepcoin/)                                  | PCN   |  ✅   |      |        |        |         |       |
+| [Peercoin](https://github.com/peercoin/peercoin)                                         | PPC   |  ✅   |      |        |        |         |       |
+| [Photon](https://github.com/photonproject/photon)                                        | PHO   |  ✅   |      |        |        |         |       |
+| [Pinkcoin](https://github.com/Pink2Dev/Pink2)                                            | PINK  |  ✅   |      |        |        |         |       |
+| [PIVX](https://github.com/PIVX-Project/PIVX/)                                            | PIVX  |  ✅   |      |        |        |         |       |
+| [PotCoin](https://github.com/potcoin/potcoin)                                            | POT   |  ✅   |      |        |        |         |       |
+| [Primecoin](https://github.com/primecoin/primecoin)                                      | XPM   |  ✅   |      |        |        |         |       |
+| [PutinCoin v2](https://github.com/PutinCoinPUT/PutinCoin)                                | PUT   |  ✅   |      |        |        |         |       |
+| [Quark](https://github.com/quark-project-evolution/quark/)                               | QRK   |  ✅   |      |        |        |         |       |
+| [Raptoreum Core](https://github.com/Raptor3um/raptoreum)                                 | RTM   |  ✅   |      |        |        |        |         |
+| [Reddcoin](https://github.com/reddcoin-project/reddcoin)                                 | RDD   |  ✅   |      |        |        |        |         |
+| [Riecoin](https://github.com/riecointeam/riecoin)                                        | RIC   |       | ✅   | ✅     | ❌    |         |       |
+| [SaluS](https://github.com/saluscoin/salus)                                              | SLS   |  ✅   | ✅   |        |        |         |       |
+| [SexCoin](https://github.com/sexcoin-project/sexcoin)                                    | SXC   |  ✅   |      |        |        |         |       |
+| [Slimcoin](https://github.com/slimcoin-project/Slimcoin)                                 | SLM   |  ✅   |      |        |        |         |       |
+| [Smileycoin](https://github.com/tutor-web/smileyCoin)                                    | SMLY  |  ✅   |      |        |        |         |       |
+| [Smoke](https://github.com/cannacoin-official/cannacoin-smoke)                           | SMOKE |  ✅   |      |        |        |         |       |
+| [SpaceXpanse](https://github.com/SpaceXpanse/rod-core-wallet)                            | ROD   |  ✅   |      | ✅     | ❌     |         |       |
+| [Sparks](https://github.com/sparkspay/sparks/)                                           | SPK   |  ✅   |      |        |        |         |       |
+| [Stakecoin](https://github.com/sleewis/stakecoin)                                        | STK   |  ✅   |      |        |        |         |       |
+| [Sterlingcoin](https://github.com/Sterlingcoin/Sterlingcoin-1.6.2.0-Release)             | SLG   |  ✅   |      |        |        |         |       |
+| [Stronghands](https://bitbucket.org/bumbacoin/stronghands-new)                           | SHND  |  ✅   |      |        |        |         |       |
+| [Syscoin](https://github.com/syscoin/syscoin)                                            | SYS   |  ✅   |      | ✅     | ❌     |         |       |
+| [TajCoin](https://github.com/Taj-Coin/tajcoin)                                           | TAJ   |  ✅   |      |        |        |         |       |
+| [Terracoin](https://github.com/terracoin/terracoin)                                      | TRC   |  ✅   |      |        |        |         |       |
+| [TheHolyRogerCoin](https://github.com/TheHolyRoger/TheHolyRogerCoin)                     | ROGER |  ✅   |      | ✅     | ❌     |         |       |
+| [Trezarcoin](https://github.com/TrezarCoin/TrezarCoin)                                   | TZC   |  ✅   |      |        |        |         |       |
+| [Trollcoin](https://github.com/TrollCoin2/TrollCoin-2.0)                                 | TROLL |  ✅   |      |        |        |         |       |
+| [UFO](https://github.com/fiscalobject/ufo)                                               | UFO   |  ✅   | ✅   | ✅     | ❌      |        |         |
+| [UFOhub](https://github.com/MyGCoin/UFOHub-Coin)                                         | UFOHUB|  ✅   |      |        |        |         |       |
+| [Unitus](https://github.com/unitusdev/unitus)                                            | UIS   |  ✅   |      |        |        |         |       |
+| [UniversalMolecule](https://github.com/universalmol/universalmol)                        | UMO   |  ✅   |      |        |        |         |       |
+| [Unobtanium](https://github.com/unobtanium-official/Unobtanium)                          | UNO   |  ✅   |      |        |        |        |         |
+| [Validity](https://github.com/RadiumCore/Validity)                                       | VAL   |  ✅   |      |        |        |         |       |
+| [Vanillacash](https://github.com/WikiMin3R/Vanillacash)                                  | XVC   |  ✅   |      |        |        |         |       |
+| [VeriCoin](https://github.com/vericoin/vericoin)                                         | VRC   |  ✅   |      |        |        |         |       |
+| [Versacoin](https://github.com/versacoin/versacoin)                                      | VCN   |  ✅   |      |        |        |         |       |
+| [Vertcoin](https://github.com/vertcoin/vertcoin)                                         | VTC   |  ✅   |      | ✅     | ❌     |         |       |
+| [VirtaCoin](https://github.com/virtacoin/VirtaCoinProject)                               | VTA   |  ✅   |      |        |        |         |       |
+| [VirtacoinPlus](https://github.com/virtacoinplus/virtacoinplus)                          | XVP   |  ✅   |      |        |        |         |       |
+| [WorldCoin](https://github.com/OfficialWorldcoinGlobal/Worldcoin)                        | WDC   |  ✅   |      |        |        |         |       |
+| [Zetacoin](https://github.com/WikiMin3R/ZetacoinE)                                       | ZET   |  ✅   |      |        |        |         |       |
+| [ZCash](https://github.com/zcash/zcash)                                                  | ZEC   |  ✅   | ✅   |        |        |        |         |
 
 ### Create the database by yourself
 Useful txt/text file provider:
