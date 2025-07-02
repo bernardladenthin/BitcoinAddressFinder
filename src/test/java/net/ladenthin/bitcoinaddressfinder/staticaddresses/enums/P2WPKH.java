@@ -16,19 +16,32 @@
  *
  */
 // @formatter:on
-package net.ladenthin.bitcoinaddressfinder.staticaddresses;
+package net.ladenthin.bitcoinaddressfinder.staticaddresses.enums;
 
 import java.nio.ByteBuffer;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
+import net.ladenthin.bitcoinaddressfinder.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
+import org.bitcoinj.base.Network;
 import org.bouncycastle.util.encoders.Hex;
 
 // P2WPKH addresses
-public enum StaticBech32Address implements PublicAddress {
+public enum P2WPKH implements PublicAddress {
+    
+    /**
+     * https://privatekeys.pw/address/bitcoin/bc1qazcm763858nkj2dj986etajv6wquslv8uxwczt
+     */
+    Bitcoin("bc1qazcm763858nkj2dj986etajv6wquslv8uxwczt", "e8b1bf6a27a1e76929b229f595f64cd381c87d87"),
     
     // Bitcoin Bech32 (P2WPKH)
     // Created with random data via https://learnmeabitcoin.com/technical/script/p2wsh/
     // Public Key Hash: 458cda0e1178d8dd97598df1307ea448bc34c76e
     BitcoinP2WPKH_Random("bc1qgkxd5rs30rvdm96e3hcnql4yfz7rf3mwdgcxkc", "458cda0e1178d8dd97598df1307ea448bc34c76e"),
+    
+    /**
+     * https://privatekeys.pw/bitcoin/address/bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq
+     */
+    BitcoinP2WPKH("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq", "e8df018c7e326cc253faac7e46cdc51e68542c42"),
     
     // Bitcoin Oil Bech32 (P2WPKH)
     /**
@@ -41,6 +54,12 @@ public enum StaticBech32Address implements PublicAddress {
      * https://chainz.cryptoid.info/btx/address.dws?7481872.htm
      */
     BitCore("btx1q7tn0z9mln8dq7c73dkrfqpx4wkutqh37sdprwv", "f2e6f1177f99da0f63d16d869004d575b8b05e3e"),
+    
+    // BitCore (WKH)
+    /**
+     * https://btc.cryptoid.info/btx/address.dws?6631790.htm
+     */
+    BitCoreWKH("wkh_HPOOHTFGYCOP6IBAC6KMKVUQBU6VOHYD", "531d86860dc97923d3dda2c2682fce57637e67e5"),
     
     // CanadaECoin Bech32 (P2WPKH)
     /**
@@ -155,7 +174,7 @@ public enum StaticBech32Address implements PublicAddress {
     private final String publicAddress;
     private final String witnessProgramAsHex;
     
-    StaticBech32Address(String publicAddress, String witnessProgramAsHex) {
+    P2WPKH(String publicAddress, String witnessProgramAsHex) {
         this.publicAddress = publicAddress;
         this.witnessProgramAsHex = witnessProgramAsHex;
     }
@@ -175,5 +194,11 @@ public enum StaticBech32Address implements PublicAddress {
     
     public ByteBuffer getWitnessProgramAsByteBuffer() {
         return new ByteBufferUtility(true).getByteBufferFromHex(getWitnessProgramAsHex());
+    }
+    
+    public String getWitnessProgramAsBase58() {
+        final Network network = new NetworkParameterFactory().getNetwork();
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(true));
+        return keyUtility.toBase58(getWitnessProgram());
     }
 }

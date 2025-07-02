@@ -32,6 +32,7 @@ import net.ladenthin.bitcoinaddressfinder.SeparatorFormat;
 import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.COMMA;
 import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.SEMICOLON;
 import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.TAB_SPLIT;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.StaticBech32Address;
 import org.bitcoinj.base.Coin;
 import org.junit.rules.TemporaryFolder;
 
@@ -83,33 +84,36 @@ public class TestAddressesFiles implements AddressesFiles {
 
         TestAddresses42 uc = new TestAddresses42(NUMBER_OF_ADRESSES, false);
         TestAddresses42 co = new TestAddresses42(NUMBER_OF_ADRESSES, true);
+        
+        final String witnessProgramAsBase58 = StaticBech32Address.BitcoinP2WPKH.getWitnessProgramAsBase58();
+        final String witnessProgramAsHex = StaticBech32Address.BitcoinP2WPKH.getWitnessProgramAsHex();
 
         // DynamicWidthBase58BitcoinAddressWithAmount
         addFormattedAddresses(
             uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount,
             uc::getIndexAsBase58String,
-            () -> StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsBase58(),
+            () -> witnessProgramAsBase58,
             List.of(AMOUNT_FIRST_ADDRESS_AS_STRING, AMOUNT_OTHER_ADDRESSES_AS_STRING)
         );
 
         addFormattedAddresses(
             compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount,
             co::getIndexAsBase58String,
-            () -> StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsBase58(),
+            () -> witnessProgramAsBase58,
             List.of(AMOUNT_FIRST_ADDRESS_AS_STRING, AMOUNT_OTHER_ADDRESSES_AS_STRING)
         );
 
         addFormattedAddresses(
             uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount,
             uc::getIndexAsBase58String,
-            () -> StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsBase58(),
+            () -> witnessProgramAsBase58,
             List.of(STATIC_EMPTY_AMOUNT_AS_STRING)
         );
 
         addFormattedAddresses(
             compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount,
             co::getIndexAsBase58String,
-            () -> StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsBase58(),
+            () -> witnessProgramAsBase58,
             List.of(STATIC_EMPTY_AMOUNT_AS_STRING)
         );
 
@@ -117,28 +121,28 @@ public class TestAddressesFiles implements AddressesFiles {
         addFormattedAddresses(
             uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress,
             uc::getIndexAsBase58String,
-            () -> StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsBase58(),
+            () -> witnessProgramAsBase58,
             NO_AMOUNTS
         );
 
         addFormattedAddresses(
             compressedTestAddressesAsFixedWidthBase58BitcoinAddress,
             co::getIndexAsBase58String,
-            () -> StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsBase58(),
+            () -> witnessProgramAsBase58,
             NO_AMOUNTS
         );
 
         addFormattedAddresses(
             uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress,
             uc::getIndexAsBase58String,
-            () -> StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsBase58(),
+            () -> witnessProgramAsBase58,
             NO_AMOUNTS
         );
 
         addFormattedAddresses(
             compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress,
             co::getIndexAsBase58String,
-            () -> StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsBase58(),
+            () -> witnessProgramAsBase58,
             NO_AMOUNTS
         );
 
@@ -146,28 +150,28 @@ public class TestAddressesFiles implements AddressesFiles {
         addFormattedAddresses(
             uncompressedTestAddressesAsHexHash,
             uc::getIndexAsHash160HexEncoded,
-            () -> StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsHex(),
+            () -> witnessProgramAsHex,
             NO_AMOUNTS
         );
 
         addFormattedAddresses(
             compressedTestAddressesAsHexHash,
             co::getIndexAsHash160HexEncoded,
-            () -> StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsHex(),
+            () -> witnessProgramAsHex,
             NO_AMOUNTS
         );
 
         addFormattedAddresses(
             uncompressedTestAddressesWithStaticAmountAsHexHash,
             uc::getIndexAsHash160HexEncoded,
-            () -> StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsHex(),
+            () -> witnessProgramAsHex,
             NO_AMOUNTS
         );
 
         addFormattedAddresses(
             compressedTestAddressesWithStaticAmountAsHexHash,
             co::getIndexAsHash160HexEncoded,
-            () -> StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicKeyHashAsHex(),
+            () -> witnessProgramAsHex,
             NO_AMOUNTS
         );
     }
@@ -218,7 +222,7 @@ public class TestAddressesFiles implements AddressesFiles {
         {
             listThree.add("# Test");
             listThree.add("1WrOngAddressFormat");
-            listThree.add(StaticP2PKHAddress.BitcoinSegregatedWitness.getPublicAddress());
+            listThree.add(StaticBech32Address.BitcoinP2WPKH.getPublicAddress());
             listThree.add(testAddresses.getIndexAsBase58String(4));
 
             if (addInvalidAddresses) {

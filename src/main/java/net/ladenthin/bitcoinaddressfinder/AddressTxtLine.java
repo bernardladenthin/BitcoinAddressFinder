@@ -18,6 +18,7 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import com.google.common.hash.Hashing;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.nio.ByteBuffer;
@@ -46,8 +47,9 @@ public class AddressTxtLine {
     public static final String BITCOIN_CASH_PREFIX = "bitcoincash:";
     
     
-    private final static int VERSION_BYTES_REGULAR = 1;
-    private final static int VERSION_BYTES_ZCASH = 2;
+    public final static int VERSION_BYTES_REGULAR = 1;
+    public final static int VERSION_BYTES_ZCASH = 2;
+    public final static int CHECKSUM_BYTES_REGULAR = 4;
     
     /**
     * Witness version 0, used for SegWit v0 addresses such as:
@@ -105,7 +107,7 @@ public class AddressTxtLine {
             if (address.length() >= riecoinScriptPubKeyLengthHex && address.startsWith(riecoinP2SHPrefix)) {
                 final String hash160Hex = address.substring(riecoinP2SHPrefix.length(), length20Bytes*2+riecoinP2SHPrefix.length());
                 final ByteBuffer hash160 = keyUtility.byteBufferUtility.getByteBufferFromHex(hash160Hex);
-                return new AddressToCoin(hash160, amount);
+                return new AddressToCoin(hash160, amount, AddressType.P2PKH_OR_P2SH);
             }
         }
 
@@ -124,7 +126,7 @@ public class AddressTxtLine {
             String addressWKH = address.substring("wkh_".length());
             byte[] hash160 = new Base36Decoder().decodeBase36ToFixedLengthBytes(addressWKH, PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES);
             ByteBuffer hash160AsByteBuffer = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160);
-            return new AddressToCoin(hash160AsByteBuffer, amount);
+            return new AddressToCoin(hash160AsByteBuffer, amount, AddressType.P2WPKH);
         }
         
         // Bech32 decoding (P2WPKH, P2WSH, P2TR)
@@ -140,7 +142,7 @@ public class AddressTxtLine {
                 case WITNESS_VERSION_0:
                     if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_PKH) {
                         ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(witnessProgram);
-                        return new AddressToCoin(hash160, amount); // P2WPKH supported
+                        return new AddressToCoin(hash160, amount, AddressType.P2WPKH); // P2WPKH supported
                     } else if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_SH) {
                         byte[] scriptHash = witnessProgram;
                         return null; // P2WSH not supported
@@ -166,8 +168,8 @@ public class AddressTxtLine {
             // p: peercoin possible
             // t: ZCash has two version bytes
             try {
-                ByteBuffer hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_ZCASH);
-                return new AddressToCoin(hash160, amount);
+                AddressToCoin addressToCoin = parseBase58Address(address, VERSION_BYTES_ZCASH, CHECKSUM_BYTES_REGULAR, keyUtility);
+                return new AddressToCoin(addressToCoin.hash160(), amount, addressToCoin.type());
             } catch (RuntimeException e) {
                 // Fall through to other format checks
             }
@@ -178,7 +180,7 @@ public class AddressTxtLine {
             if (address.startsWith("q")) {
                 byte[] payload = extractPKHFromBitcoinCashAddress(address);
                 ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(payload);
-                return new AddressToCoin(hash160, amount);
+                return new AddressToCoin(hash160, amount, AddressType.P2PKH_OR_P2SH);
             }
         } catch (DecoderException e) {
             throw e;
@@ -188,8 +190,8 @@ public class AddressTxtLine {
         
         // Fallback: assume Base58 with 1-byte version prefix
         try {
-            ByteBuffer hash160 = getHash160AsByteBufferFromBase58AddressUnchecked(address, keyUtility, VERSION_BYTES_REGULAR);
-            return new AddressToCoin(hash160, amount);
+            AddressToCoin addressToCoin = parseBase58Address(address, VERSION_BYTES_REGULAR, CHECKSUM_BYTES_REGULAR, keyUtility);
+            return new AddressToCoin(addressToCoin.hash160(), amount, addressToCoin.type());
         } catch (AddressFormatException e) {
             return null;
         }
@@ -272,19 +274,60 @@ public class AddressTxtLine {
             throw e;
         }
     }
-
-    private ByteBuffer getHash160AsByteBufferFromBase58AddressUnchecked(String base58, KeyUtility keyUtility, int srcPos) {
-        byte[] hash160 = getHash160fromBase58AddressUnchecked(base58, srcPos);
-        ByteBuffer hash160AsByteBuffer = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160);
-        return hash160AsByteBuffer;
-    }
-
-    byte[] getHash160fromBase58AddressUnchecked(String base58, int srcPos) {
+    
+    AddressToCoin parseBase58Address(String base58, int versionBytes, int checksumBytes, KeyUtility keyUtility) {
         byte[] decoded = Base58.decode(base58);
+        
+        final byte[] version;
+        if (versionBytes > 0) {
+            // copy version bytes
+            version = new byte[versionBytes];
+            System.arraycopy(decoded, 0, version, 0, version.length);
+        } else {
+            version = null;
+        }
+        
         byte[] hash160 = new byte[20];
-        int toCopy = Math.min(decoded.length - srcPos, hash160.length);
-        System.arraycopy(decoded, srcPos, hash160, 0, toCopy);
-        return hash160;
+        int storedBytes = Math.min(decoded.length - versionBytes, hash160.length);
+        {
+            // copy hash160
+            System.arraycopy(decoded, versionBytes, hash160, 0, storedBytes);
+        }
+        
+        final byte[] checksum;
+        if (decoded.length >= versionBytes + hash160.length + checksumBytes) {
+            checksum = new byte[checksumBytes];
+            // copy cheksum
+            System.arraycopy(decoded, versionBytes + storedBytes, checksum, 0, checksum.length);
+            //String checksumAsHex = org.apache.commons.codec.binary.Hex.encodeHexString(checksum);
+        } else {
+            checksum = null;
+        }
+        
+        boolean checksumMatches = false;
+        if (version != null && checksum != null) {
+            byte[] payload = new byte[version.length + hash160.length];
+            System.arraycopy(version, 0, payload, 0, version.length);
+            System.arraycopy(hash160, 0, payload, version.length, hash160.length);
+
+            byte[] firstHash = Hashing.sha256().hashBytes(payload).asBytes();
+            byte[] secondHash = Hashing.sha256().hashBytes(firstHash).asBytes();
+            byte[] calculatedChecksum = Arrays.copyOfRange(secondHash, 0, checksumBytes);
+
+            checksumMatches = Arrays.equals(calculatedChecksum, checksum);
+        }
+        
+        //String decodedAsHex = org.apache.commons.codec.binary.Hex.encodeHexString(decoded);
+        //String hash160AsHex = org.apache.commons.codec.binary.Hex.encodeHexString(hash160);
+
+        ByteBuffer hash160AsByteBuffer = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160);
+        
+        // fallback
+        AddressType addressType = AddressType.P2PKH_OR_P2SH;
+        
+        String versionAsHex = org.apache.commons.codec.binary.Hex.encodeHexString(version);
+        AddressToCoin addressToCoin = new AddressToCoin(hash160AsByteBuffer, DEFAULT_COIN, addressType);
+        return addressToCoin;
     }
 
     @Nullable

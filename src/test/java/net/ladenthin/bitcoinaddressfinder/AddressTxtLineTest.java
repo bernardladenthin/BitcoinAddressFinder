@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.*;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.*;
 import org.apache.commons.codec.DecoderException;
 import org.bouncycastle.util.encoders.Hex;
 import org.bitcoinj.base.Base58;
@@ -131,40 +132,44 @@ public class AddressTxtLineTest {
         // assert
         assertThat(addressToCoin, is(nullValue()));
     }
-
+    
+    // <editor-fold desc="staticaddresses.enums">
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_STATIC_P2PKH_ADDRESSES, location = CommonDataProvider.class)
-    public void fromLine_StaticP2PKHAddress_returnPublicKeyHash(StaticP2PKHAddress address) throws IOException {
+    public void fromLine_StaticP2PKHAddress_returnPublicKeyHash(P2PKH address) throws IOException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(address.getPublicAddress(), keyUtility);
 
         // assert
         assertThat(new ByteBufferUtility(true).getHexFromByteBuffer(addressToCoin.hash160()), is(equalTo(address.getPublicKeyHashAsHex())));
         assertThat(addressToCoin.hash160(), is(equalTo(address.getPublicKeyHashAsByteBuffer())));
+        assertThat(addressToCoin.type(), is(AddressType.P2PKH_OR_P2SH));
         assertThatDefaultCoinIsSet(addressToCoin);
     }
 
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_STATIC_P2SH_ADDRESSES, location = CommonDataProvider.class)
-    public void fromLine_StaticP2SHAddress_returnScriptHash(StaticP2SHAddress address) throws IOException {
+    public void fromLine_StaticP2SHAddress_returnScriptHash(P2SH address) throws IOException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(address.getPublicAddress(), keyUtility);
 
         // assert
         assertThat(new ByteBufferUtility(true).getHexFromByteBuffer(addressToCoin.hash160()), is(equalTo(address.getScriptHashAsHex())));
         assertThat(addressToCoin.hash160(), is(equalTo(address.getScriptHashAsByteBuffer())));
+        assertThat(addressToCoin.type(), is(AddressType.P2PKH_OR_P2SH));
         assertThatDefaultCoinIsSet(addressToCoin);
     }
 
     @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_STATIC_BECH32_ADDRESSES, location = CommonDataProvider.class)
-    public void fromLine_StaticBech32Address_returnScriptHash(StaticBech32Address address) throws IOException {
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_STATIC_P2WPKH_ADDRESSES, location = CommonDataProvider.class)
+    public void fromLine_StaticP2WSHAddress_returnScriptHash(P2WPKH address) throws IOException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(address.getPublicAddress(), keyUtility);
 
         // assert
         assertThat(new ByteBufferUtility(true).getHexFromByteBuffer(addressToCoin.hash160()), is(equalTo(address.getWitnessProgramAsHex())));
         assertThat(addressToCoin.hash160(), is(equalTo(address.getWitnessProgramAsByteBuffer())));
+        assertThat(addressToCoin.type(), is(AddressType.P2WPKH));
         assertThatDefaultCoinIsSet(addressToCoin);
     }
 
@@ -178,6 +183,7 @@ public class AddressTxtLineTest {
         assertThat(new ByteBufferUtility(true).getHexFromByteBuffer(addressToCoin.hash160()), is(equalTo(hash)));
         assertThatDefaultCoinIsSet(addressToCoin);
     }
+    // </editor-fold>
 
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_INVALID_BECH32_WITNESS_VERSION_2, location = CommonDataProvider.class)
@@ -244,22 +250,23 @@ public class AddressTxtLineTest {
 
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_SRC_POS, location = CommonDataProvider.class)
-    public void fromLine_correctBase58UseHigherSrcPos_copiedPartial(int srcPos) throws IOException, DecoderException {
+    public void fromLine_correctBase58UseHigherSrcPos_copiedPartial(int versionBytes) throws IOException, DecoderException {
         // act
         String encoded = Base58.encode(Hex.decode("1f" + "ffffffffffffffffffffffffffffffffffffffff"));
 
-        byte[] hash160 = new AddressTxtLine().getHash160fromBase58AddressUnchecked(encoded, srcPos);
+        AddressToCoin addressToCoin = new AddressTxtLine().parseBase58Address(encoded, versionBytes, AddressTxtLine.CHECKSUM_BYTES_REGULAR, keyUtility);
 
         // assert
+        byte[] hash160 = keyUtility.byteBufferUtility.byteBufferToBytes(addressToCoin.hash160());
         String hash160AsHex = org.bouncycastle.util.encoders.Hex.toHexString(hash160);
-        int expectedLastIndex = 40 - 1 - 2 * srcPos + 2;
+        int expectedLastIndex = 40 - 1 - 2 * versionBytes + 2;
         assertThat(hash160AsHex.lastIndexOf("f"), is(equalTo(expectedLastIndex)));
     }
     
     @Test
     public void extractPKHFromBitcoinCashAddress_withoutPrefix_returnsCorrectHash160() throws Exception {
         // arrange
-        StaticP2PKHAddress address = StaticP2PKHAddress.BitcoinCash;
+        P2PKH address = P2PKH.BitcoinCash;
 
         // act
         byte[] hash160 = new AddressTxtLine().extractPKHFromBitcoinCashAddress(address.getPublicAddress());
@@ -273,7 +280,7 @@ public class AddressTxtLineTest {
     @Test
     public void extractPKHFromBitcoinCashAddress_withPrefix_returnsCorrectHash160() throws Exception {
         // arrange
-        StaticP2PKHAddress address = StaticP2PKHAddress.BitcoinCashWithPrefix;
+        P2PKH address = P2PKH.BitcoinCashWithPrefix;
 
         // act
         byte[] hash160 = new AddressTxtLine().extractPKHFromBitcoinCashAddress(address.getPublicAddress());

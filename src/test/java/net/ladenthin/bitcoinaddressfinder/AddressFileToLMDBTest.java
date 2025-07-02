@@ -29,6 +29,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.*;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2PKH;
 import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.LegacyAddress;
 import org.junit.Before;
@@ -100,7 +101,7 @@ public class AddressFileToLMDBTest extends LMDBBase {
         try {
             assertThat(persistence.count(), is(equalTo((long)staticAddressesFiles.getSupportedAddresses().size())));
             
-            for (StaticP2PKHAddress staticTestAddress : StaticP2PKHAddress.values()) {
+            for (P2PKH staticTestAddress : P2PKH.values()) {
                 ByteBuffer hash160AsByteBuffer = staticTestAddress.getPublicKeyHashAsByteBuffer();
                 boolean contains = persistence.containsAddress(hash160AsByteBuffer);
                 assertThat(contains, is(equalTo(Boolean.TRUE)));

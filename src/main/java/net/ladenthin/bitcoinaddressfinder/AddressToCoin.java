@@ -27,7 +27,7 @@ import org.jspecify.annotations.NonNull;
  *
  * <p>Note: hash160 is expected to be exactly {@code PublicKeyBytes.HASH160_SIZE} bytes long.</p>
  */
-public record AddressToCoin(@NonNull ByteBuffer hash160, @NonNull Coin coin) {
+public record AddressToCoin(@NonNull ByteBuffer hash160, @NonNull Coin coin, @NonNull AddressType type) {
 
     public AddressToCoin {
         if (hash160.limit() != PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES) {
@@ -40,6 +40,7 @@ public record AddressToCoin(@NonNull ByteBuffer hash160, @NonNull Coin coin) {
         return "AddressToCoin{" +
                 "hash160=" + new ByteBufferUtility(false).getHexFromByteBuffer(hash160) +
                 ", coin=" + coin +
+                ", type=" + type +
                 '}';
     }
 }

@@ -22,9 +22,12 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.bitcoinj.base.Coin;
 import org.junit.rules.TemporaryFolder;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.*;
 
 public class StaticAddressesFiles implements AddressesFiles {
 
@@ -47,23 +50,9 @@ public class StaticAddressesFiles implements AddressesFiles {
     
     public List<String> getSupportedAddresses() {
         List<String> addresses = new ArrayList<>();
-        for (PublicAddress address : StaticP2PKHAddress.values()) {
-            addresses.add(address.getPublicAddress());
-        }
-        for (PublicAddress address : StaticP2SHAddress.values()) {
-            addresses.add(address.getPublicAddress());
-        }
-        for (PublicAddress address : StaticBech32Address.values()) {
-            addresses.add(address.getPublicAddress());
-        }
-        return addresses;
-    }
-    
-    public List<String> getUnsupportedAddresses() {
-        List<String> addresses = new ArrayList<>();
-        for (PublicAddress address : StaticUnsupportedAddress.values()) {
-            addresses.add(address.getPublicAddress());
-        }
+        addresses.addAll(extractAddresses(P2PKH.class));
+        addresses.addAll(extractAddresses(P2SH.class));
+        addresses.addAll(extractAddresses(P2WPKH.class));
         return addresses;
     }
     
@@ -72,6 +61,16 @@ public class StaticAddressesFiles implements AddressesFiles {
         addresses.addAll(getSupportedAddresses());
         addresses.addAll(getUnsupportedAddresses());
         return addresses;
+    }
+    
+    public List<String> getUnsupportedAddresses() {
+        return extractAddresses(StaticUnsupportedAddress.class);
+    }
+    
+    private <T extends Enum<T> & PublicAddress> List<String> extractAddresses(Class<T> enumClass) {
+        return Arrays.stream(enumClass.getEnumConstants())
+                     .map(PublicAddress::getPublicAddress)
+                     .collect(Collectors.toList());
     }
 
     @Override
