@@ -32,7 +32,7 @@ import net.ladenthin.bitcoinaddressfinder.SeparatorFormat;
 import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.COMMA;
 import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.SEMICOLON;
 import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.TAB_SPLIT;
-import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.StaticBech32Address;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2WPKH;
 import org.bitcoinj.base.Coin;
 import org.junit.rules.TemporaryFolder;
 
@@ -85,8 +85,8 @@ public class TestAddressesFiles implements AddressesFiles {
         TestAddresses42 uc = new TestAddresses42(NUMBER_OF_ADRESSES, false);
         TestAddresses42 co = new TestAddresses42(NUMBER_OF_ADRESSES, true);
         
-        final String witnessProgramAsBase58 = StaticBech32Address.BitcoinP2WPKH.getWitnessProgramAsBase58();
-        final String witnessProgramAsHex = StaticBech32Address.BitcoinP2WPKH.getWitnessProgramAsHex();
+        final String witnessProgramAsBase58 = P2WPKH.BitcoinP2WPKH.getWitnessProgramAsBase58();
+        final String witnessProgramAsHex = P2WPKH.BitcoinP2WPKH.getWitnessProgramAsHex();
 
         // DynamicWidthBase58BitcoinAddressWithAmount
         addFormattedAddresses(
@@ -222,7 +222,7 @@ public class TestAddressesFiles implements AddressesFiles {
         {
             listThree.add("# Test");
             listThree.add("1WrOngAddressFormat");
-            listThree.add(StaticBech32Address.BitcoinP2WPKH.getPublicAddress());
+            listThree.add(P2WPKH.BitcoinP2WPKH.getPublicAddress());
             listThree.add(testAddresses.getIndexAsBase58String(4));
 
             if (addInvalidAddresses) {
