@@ -18,12 +18,58 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+import java.time.Instant;
+
 public class CKeyProducerJavaRandom extends CKeyProducerJava {
     
+    /** Default BIP32 path used for external addresses (BIP44). */
+    public static final String DEFAULT_BIP32_PATH = "M/44H/0H/0H/0";
+
+    /**
+     * Defines which PRNG implementation to use for key generation.
+     * See {@link CKeyProducerJavaRandomInstance} for available options.
+     */
     public CKeyProducerJavaRandomInstance keyProducerJavaRandomInstance;
-    
+
     /**
      * Used for {@link CKeyProducerJavaRandomInstance#RANDOM_CUSTOM_SEED}.
+     * Also optionally used by {@link CKeyProducerJavaRandomInstance#SHA1_PRNG}
+     * if deterministic output is desired.
      */
-    public long customSeed;
+    public Long customSeed;
+
+    /**
+     * Used only with {@link CKeyProducerJavaRandomInstance#BIP39_SEED}.
+     * Must be a valid BIP39 mnemonic phrase (typically 12 or 24 words).
+     */
+    public String mnemonic;
+
+    /**
+     * Optional passphrase used in combination with the BIP39 mnemonic.
+     * Used only with {@link CKeyProducerJavaRandomInstance#BIP39_SEED}.
+     * Can be an empty string.
+     */
+    public String passphrase;
+
+    /**
+     * Optional base path for BIP32/BIP44 derivation, e.g., "M/44H/0H/0H/0".
+     * Used only with {@link CKeyProducerJavaRandomInstance#BIP39_SEED}.
+     */
+    public String bip32Path = DEFAULT_BIP32_PATH;
+    
+    /**
+     * Optional wallet creation time (in epoch seconds) used for BIP39 seed.
+     * If not set, defaults to {@link java.time.Instant#ofEpochSecond(long)} Instant.ofEpochSecond(0).
+     * Used only with {@link CKeyProducerJavaRandomInstance#BIP39_SEED}.
+     */
+    public Long creationTimeSeconds;
+
+    /**
+     * Returns the creation time as an Instant.
+     * Defaults to Instant.ofEpochSecond(0) if not set.
+     */
+    public Instant getCreationTimeInstant() {
+        return Instant.ofEpochSecond(this.creationTimeSeconds != null ? this.creationTimeSeconds : 0L);
+    }
+
 }

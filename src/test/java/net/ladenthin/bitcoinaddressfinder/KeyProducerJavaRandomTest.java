@@ -103,4 +103,69 @@ public class KeyProducerJavaRandomTest {
     }
     // </editor-fold>
     
+    
+    // <editor-fold defaultstate="collapsed" desc="testAllRNGs">
+    private BigInteger[] generateSecrets(CKeyProducerJavaRandomInstance instance, Long customSeed) throws NoMoreSecretsAvailableException {
+        CKeyProducerJavaRandom config = new CKeyProducerJavaRandom();
+        config.keyProducerId = keyProducerId;
+        config.keyProducerJavaRandomInstance = instance;
+        config.customSeed = customSeed;
+        config.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
+        if (instance == CKeyProducerJavaRandomInstance.BIP39_SEED) {
+            config.mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+            config.passphrase = "";
+            config.bip32Path = CKeyProducerJavaRandom.DEFAULT_BIP32_PATH;
+            config.creationTimeSeconds = 0L;
+        }
+        KeyProducerJavaRandom producer = new KeyProducerJavaRandom(config, keyUtility, bitHelper);
+        return producer.createSecrets(bitHelper.convertBitsToSize(0), true);
+    }
+
+    @Test
+    public void testSecureRandom() throws NoMoreSecretsAvailableException {
+        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomInstance.SECURE_RANDOM, null);
+        assertThat(result.length, is(equalTo(1)));
+    }
+
+    @Test
+    public void testRandomSeedCurrentTimeMillis() throws NoMoreSecretsAvailableException {
+        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomInstance.RANDOM_CURRENT_TIME_MILLIS_SEED, null);
+        assertThat(result.length, is(equalTo(1)));
+    }
+
+    @Test
+    public void testRandomCustomSeed_default() throws NoMoreSecretsAvailableException {
+        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED, null);
+        assertThat(result.length, is(equalTo(1)));
+    }
+
+    @Test
+    public void testRandomCustomSeed_fixed() throws NoMoreSecretsAvailableException {
+        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED, 123456789L);
+        assertThat(result.length, is(equalTo(1)));
+    }
+
+    @Test
+    public void testSha1Prng_default() throws NoMoreSecretsAvailableException {
+        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomInstance.SHA1_PRNG, null);
+        assertThat(result.length, is(equalTo(1)));
+    }
+
+    @Test
+    public void testSha1Prng_fixed() throws NoMoreSecretsAvailableException {
+        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomInstance.SHA1_PRNG, 987654321L);
+        assertThat(result.length, is(equalTo(1)));
+    }
+
+    @Test
+    public void testBip39Seed() throws NoMoreSecretsAvailableException {
+        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomInstance.BIP39_SEED, null);
+        assertThat(result.length, is(equalTo(1)));
+    }
+    // </editor-fold>
+    
+    @Test
+    public void testDefaultBip32PathConstant() {
+        assertThat(CKeyProducerJavaRandom.DEFAULT_BIP32_PATH, is("M/44H/0H/0H/0"));
+    }
 }

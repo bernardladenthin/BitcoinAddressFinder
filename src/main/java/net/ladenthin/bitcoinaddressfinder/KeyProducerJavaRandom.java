@@ -49,11 +49,34 @@ public class KeyProducerJavaRandom extends KeyProducerJava {
                     throw new RuntimeException(e);
                 }
                 break;
-            case RANDOM_SEED_CURRENT_TIME_MILLIS:
+            case RANDOM_CURRENT_TIME_MILLIS_SEED:
                 random = new Random(System.currentTimeMillis());
                 break;
             case RANDOM_CUSTOM_SEED:
-                random = new Random(cKeyProducerJavaRandom.customSeed);
+                random = new Random();
+                if (cKeyProducerJavaRandom.customSeed != null) {
+                    random.setSeed(cKeyProducerJavaRandom.customSeed); // only if explicitly configured
+                }
+                break;
+            case SHA1_PRNG:
+                try {
+                    random = SecureRandom.getInstance("SHA1PRNG");
+                    
+                    // To simulate bug: do NOT set a seed at all
+                    if (cKeyProducerJavaRandom.customSeed != null) {
+                        random.setSeed(cKeyProducerJavaRandom.customSeed); // only if explicitly configured
+                    }
+                } catch (NoSuchAlgorithmException e) {
+                    throw new RuntimeException(e);
+                }
+                break;
+            case BIP39_SEED:
+                random = new BIP39KeyProducer(
+                    cKeyProducerJavaRandom.mnemonic,
+                    cKeyProducerJavaRandom.passphrase,
+                    cKeyProducerJavaRandom.bip32Path,
+                    cKeyProducerJavaRandom.getCreationTimeInstant()
+                );
                 break;
             default:
                 throw new RuntimeException("Unknown keyProducerJavaRandomInstance: " + cKeyProducerJavaRandom.keyProducerJavaRandomInstance);
