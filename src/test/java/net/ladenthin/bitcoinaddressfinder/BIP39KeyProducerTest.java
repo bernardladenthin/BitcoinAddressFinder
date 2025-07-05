@@ -18,18 +18,31 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import com.tngtech.java.junit.dataprovider.DataProviderRunner;
+import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.time.Instant;
+import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import java.text.Normalizer;
+import java.text.Normalizer.Form;
 import static org.hamcrest.Matchers.*;
+import org.apache.commons.codec.binary.Hex;
 import org.junit.Test;
 
 import org.bitcoinj.crypto.DeterministicKey;
+import org.bitcoinj.crypto.HDKeyDerivation;
+import org.bitcoinj.crypto.MnemonicCode;
+import org.bitcoinj.params.MainNetParams;
+import org.bitcoinj.wallet.DeterministicSeed;
+import org.junit.runner.RunWith;
+
+@RunWith(DataProviderRunner.class)
 public class BIP39KeyProducerTest {
 
     @Test
-    public void nextKey_fromKnownMnemonic_returnsExpectedPrivateKey() {
+    public void nextKey_givenKnownMnemonic_returnsExpectedPrivateKey() {
         // arrange
         String mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
         String passphrase = "";
@@ -70,7 +83,7 @@ public class BIP39KeyProducerTest {
     }
 
     @Test
-    public void appendPath_createsExtendedPath() {
+    public void appendPath_givenBasePathAndIndex_returnsExtendedHDPath() {
         // arrange
         String path = CKeyProducerJavaRandom.DEFAULT_BIP32_PATH;
         int index = 5;
@@ -85,4 +98,62 @@ public class BIP39KeyProducerTest {
         assertThat(extended.size(), is(5));
         assertThat(extended.get(4).num(), is(index));
     }
+    
+    @Test
+    public void bip39Vector_givenEnglishMnemonic_returnsExpectedSeedAndXprv() throws Exception {
+        // Arrange
+        String passphrase = "TREZOR";
+        String entropyHex = "00000000000000000000000000000000";
+        String expectedMnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        String expectedSeedHex = "c55257c360c07c72029aebc1b53c05ed0362ada38ead3e3e9efa3708e53495531f09a6987599d18264c1e1c92f2cf141630c7a3c4ab7c81b2f001698e7463b04";
+        String expectedXprv = "xprv9s21ZrQH143K3h3fDYiay8mocZ3afhfULfb5GX8kCBdno77K4HiA15Tg23wpbeF1pLfs1c5SPmYHrEpTuuRhxMwvKDwqdKiGJS9XFKzUsAF";
+
+        byte[] entropy = Hex.decodeHex(entropyHex);
+        List<String> mnemonic = MnemonicCode.INSTANCE.toMnemonic(entropy);
+        assertThat(String.join(" ", mnemonic), is(expectedMnemonic));
+
+        DeterministicSeed seed = DeterministicSeed.ofMnemonic(expectedMnemonic, passphrase);
+        assertThat(Hex.encodeHexString(seed.getSeedBytes()), is(expectedSeedHex));
+
+        // Act
+        DeterministicKey masterKey = HDKeyDerivation.createMasterPrivateKey(seed.getSeedBytes());
+
+        // Assert
+        assertThat(masterKey.serializePrivB58(MainNetParams.get().network()), is(expectedXprv));
+    }
+    
+    @Test
+    @UseDataProvider(value = BIP39DataProvider.DATA_PROVIDER_BIP39_TEST_VECTORS, location = BIP39DataProvider.class)
+    public void bip39Vector_givenTestVector_returnsExpectedSeedAndXprvForLanguage(String language, String entropyHex, String mnemonicStr, String passphrase, String expectedSeedHex, String expectedXprv) throws Exception {
+        // Arrange
+        byte[] entropy = Hex.decodeHex(entropyHex);
+        
+        final BIP39Wordlist wordList = BIP39Wordlist.fromLanguageName(language);
+        
+        MnemonicCode mnemonicCode = new MnemonicCode(
+            wordList.getWordListStream(),
+            null
+        );
+
+        List<String> mnemonic = mnemonicCode.toMnemonic(entropy);
+        
+        String normalizedMnemonic = Normalizer.normalize(mnemonicStr, Form.NFKD);
+        String normalizedPassphrase = Normalizer.normalize(passphrase, Form.NFKD);
+
+        // Assert mnemonic
+        assertThat("Language: " + language, String.join(wordList.getSeparator(), mnemonic), is(mnemonicStr));
+
+        // Generate seed
+        DeterministicSeed seed = DeterministicSeed.ofMnemonic(normalizedMnemonic, normalizedPassphrase);
+
+        // Assert seed bytes
+        assertThat("Language: " + language, Hex.encodeHexString(seed.getSeedBytes()), is(expectedSeedHex));
+
+        // Generate master key from seed
+        DeterministicKey masterKey = HDKeyDerivation.createMasterPrivateKey(seed.getSeedBytes());
+
+        // Assert xprv
+        assertThat("Language: " + language, masterKey.serializePrivB58(MainNetParams.get().network()), is(expectedXprv));
+    }
+    
 }

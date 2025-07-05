@@ -261,7 +261,23 @@ public class ConsumerJava implements Consumer {
     }
     
     /**
-     * Try to log safe informations which may not thrown an exception.
+     * Logs key information in a safe and robust way to avoid losing critical data
+     * in case of a runtime exception.
+     * <p>
+     * The primary goal of this method is to ensure that if a valid secret key (i.e., a hit)
+     * is found, its corresponding BigInteger value is immediately logged. Since logging a
+     * BigInteger is unlikely to fail, this is the first and most essential piece of information.
+     * <p>
+     * Logging additional details such as the uncompressed/compressed public keys and their
+     * hash160 values may theoretically trigger runtime exceptions (e.g., due to malformed data
+     * or encoding issues). To mitigate the risk of losing the crucial secret value in such rare
+     * cases, it is logged first.
+     * <p>
+     * All logs are prefixed consistently with {@code HIT_SAFE_PREFIX} to make hits easily searchable.
+     *
+     * @param publicKeyBytes         the public key bytes wrapper
+     * @param hash160Uncompressed    the hash160 of the uncompressed public key
+     * @param hash160Compressed      the hash160 of the compressed public key
      */
     private void safeLog(PublicKeyBytes publicKeyBytes, byte[] hash160Uncompressed, byte[] hash160Compressed) {
         logger.info(HIT_SAFE_PREFIX +"publicKeyBytes.getSecretKey(): " + publicKeyBytes.getSecretKey());

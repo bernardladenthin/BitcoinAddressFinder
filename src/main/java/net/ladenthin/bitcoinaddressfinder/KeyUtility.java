@@ -18,6 +18,7 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -43,8 +44,6 @@ public class KeyUtility {
     @NonNull
     public final Network network;
     public final ByteBufferUtility byteBufferUtility;
-    
-    private final MnemonicCode mnemonicCode = MnemonicCode.INSTANCE;
 
     public KeyUtility(Network network, ByteBufferUtility byteBufferUtility) {
         this.network = network;
@@ -148,11 +147,35 @@ public class KeyUtility {
         String logPublicKeyHash160 = "publicKeyHash160Hex: [" + publicKeyHash160Hex + "]";
         String logPublicKeyHash160Base58 = "publicKeyHash160Base58: [" + publicKeyHash160Base58 + "]";
         String logCompressed = "Compressed: [" + key.isCompressed() + "]";
-        List<String> mnemonic = mnemonicCode.toMnemonic(privateKeyBytes);
-        String logMnemonic = "Mnemonic: " + mnemonic.toString();
+        String logMnemonic = createMnemonics(privateKeyBytes);
 
         String space = " ";
         return logprivateKeyBigInteger + space + logprivateKeyBytes + space + logprivateKeyHex + space + logWiF + space + logPublicKeyAsHex + space + logPublicKeyHash160 + space + logPublicKeyHash160Base58 + space + logCompressed + space + logMnemonic;
+    }
+
+    public String createMnemonics(byte[] privateKeyBytes) {
+        StringBuilder logMnemonic = new StringBuilder("Mnemonic:");
+        for (BIP39Wordlist wordList : BIP39Wordlist.values()) {
+            try {
+                MnemonicCode mnemonicCode = new MnemonicCode(wordList.getWordListStream(), null);
+                List<String> mnemonics = mnemonicCode.toMnemonic(privateKeyBytes);
+                logMnemonic.append(" ");
+                logMnemonic.append(wordList.name());
+                logMnemonic.append(": [");
+                boolean first = true;
+                for(String mnemonic : mnemonics) {
+                    if (!first) {
+                        logMnemonic.append(wordList.getSeparator());
+                    }
+                    logMnemonic.append(mnemonic);
+                    first = false;
+                }
+                logMnemonic.append("]");
+            } catch (IOException | IllegalArgumentException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+        return logMnemonic.toString();
     }
 
     // <editor-fold defaultstate="collapsed" desc="ByteBuffer LegacyAddress conversion">

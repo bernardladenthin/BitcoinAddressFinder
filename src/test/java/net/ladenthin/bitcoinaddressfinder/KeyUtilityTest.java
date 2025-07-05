@@ -30,7 +30,6 @@ import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
 import org.junit.Before;
 import org.junit.Test;
-import org.bitcoinj.crypto.MnemonicCode;
 import org.bitcoinj.crypto.MnemonicException;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
@@ -186,7 +185,8 @@ public class KeyUtilityTest {
         String keyDetails = keyUtility.createKeyDetails(ecKey);
 
         // assert
-        assertThat(keyDetails, is(equalTo("privateKeyBigInteger: [" + staticKey.privateKeyBigInteger + "] privateKeyBytes: [" + Arrays.toString(staticKey.privateKeyBytes) + "] privateKeyHex: [" + staticKey.privateKeyHex + "] WiF: [" + staticKey.privateKeyWiFUncompressed + "] publicKeyAsHex: [" + staticKey.publicKeyUncompressedHex + "] publicKeyHash160Hex: [" + staticKey.publicKeyUncompressedHash160Hex + "] publicKeyHash160Base58: [" + staticKey.publicKeyUncompressed + "] Compressed: [false] Mnemonic: " + MnemonicCode.INSTANCE.toMnemonic(ecKey.getPrivKeyBytes()))));
+        String mnemonics = keyUtility.createMnemonics(ecKey.getPrivKeyBytes());
+        assertThat(keyDetails, is(equalTo("privateKeyBigInteger: [" + staticKey.privateKeyBigInteger + "] privateKeyBytes: [" + Arrays.toString(staticKey.privateKeyBytes) + "] privateKeyHex: [" + staticKey.privateKeyHex + "] WiF: [" + staticKey.privateKeyWiFUncompressed + "] publicKeyAsHex: [" + staticKey.publicKeyUncompressedHex + "] publicKeyHash160Hex: [" + staticKey.publicKeyUncompressedHash160Hex + "] publicKeyHash160Base58: [" + staticKey.publicKeyUncompressed + "] Compressed: [false] " + mnemonics)));
     }
 
     @Test
@@ -202,7 +202,8 @@ public class KeyUtilityTest {
         String keyDetails = keyUtility.createKeyDetails(ecKey);
 
         // assert
-        assertThat(keyDetails, is(equalTo("privateKeyBigInteger: [" + staticKey.privateKeyBigInteger + "] privateKeyBytes: [" + Arrays.toString(staticKey.privateKeyBytes) + "] privateKeyHex: [" + staticKey.privateKeyHex + "] WiF: [" + staticKey.privateKeyWiFCompressed + "] publicKeyAsHex: [" + staticKey.publicKeyCompressedHex + "] publicKeyHash160Hex: [" + staticKey.publicKeyCompressedHash160Hex + "] publicKeyHash160Base58: [" + staticKey.publicKeyCompressed + "] Compressed: [true] Mnemonic: " + MnemonicCode.INSTANCE.toMnemonic(ecKey.getPrivKeyBytes()))));
+        String mnemonics = keyUtility.createMnemonics(ecKey.getPrivKeyBytes());
+        assertThat(keyDetails, is(equalTo("privateKeyBigInteger: [" + staticKey.privateKeyBigInteger + "] privateKeyBytes: [" + Arrays.toString(staticKey.privateKeyBytes) + "] privateKeyHex: [" + staticKey.privateKeyHex + "] WiF: [" + staticKey.privateKeyWiFCompressed + "] publicKeyAsHex: [" + staticKey.publicKeyCompressedHex + "] publicKeyHash160Hex: [" + staticKey.publicKeyCompressedHash160Hex + "] publicKeyHash160Base58: [" + staticKey.publicKeyCompressed + "] Compressed: [true] " + mnemonics)));
     }
     // </editor-fold>
     

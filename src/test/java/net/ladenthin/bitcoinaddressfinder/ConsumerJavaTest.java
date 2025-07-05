@@ -25,7 +25,9 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
@@ -507,21 +509,60 @@ public class ConsumerJavaTest {
         
         List<String> arguments = logCaptorInfo.getAllValues();
         
-        if (compressed) {
-            assertThat(arguments.get(0), is(equalTo("hit: safe log: publicKeyBytes.getSecretKey(): 73")));
-            assertThat(arguments.get(1), is(equalTo("hit: safe log: publicKeyBytes.getUncompressed(): 04af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45f98a3fd831eb2b749a93b0e6f35cfb40c8cd5aa667a15581bc2feded498fd9c6")));
-            assertThat(arguments.get(2), is(equalTo("hit: safe log: publicKeyBytes.getCompressed(): 02af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45")));
-            assertThat(arguments.get(3), is(equalTo("hit: safe log: hash160Uncompressed: 2a6f34a72c181bdd4e6d91ffa69e84fd6c49b207")));
-            assertThat(arguments.get(4), is(equalTo("hit: safe log: hash160Compressed: c065379323a549fc3547bcb1937d5dcb48df2396")));
-            assertThat(arguments.get(5), is(equalTo("vanity pattern match: privateKeyBigInteger: [73] privateKeyBytes: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 73]] privateKeyHex: [0000000000000000000000000000000000000000000000000000000000000049] WiF: [KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU7fj3itoEY] publicKeyAsHex: [02af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45] publicKeyHash160Hex: [c065379323a549fc3547bcb1937d5dcb48df2396] publicKeyHash160Base58: [1JYHzX3ndZEcnjrWSQ9VC7324TJ9BAoGy4] Compressed: [true] Mnemonic: [abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abuse, differ]")));
-        } else {
-            assertThat(arguments.get(0), is(equalTo("hit: safe log: publicKeyBytes.getSecretKey(): 73")));
-            assertThat(arguments.get(1), is(equalTo("hit: safe log: publicKeyBytes.getUncompressed(): 04af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45f98a3fd831eb2b749a93b0e6f35cfb40c8cd5aa667a15581bc2feded498fd9c6")));
-            assertThat(arguments.get(2), is(equalTo("hit: safe log: publicKeyBytes.getCompressed(): 02af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45")));
-            assertThat(arguments.get(3), is(equalTo("hit: safe log: hash160Uncompressed: 2a6f34a72c181bdd4e6d91ffa69e84fd6c49b207")));
-            assertThat(arguments.get(4), is(equalTo("hit: safe log: hash160Compressed: c065379323a549fc3547bcb1937d5dcb48df2396")));
-            assertThat(arguments.get(5), is(equalTo("vanity pattern match: privateKeyBigInteger: [73] privateKeyBytes: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 73]] privateKeyHex: [0000000000000000000000000000000000000000000000000000000000000049] WiF: [5HpHagT65TZzG1PH3CSu63k8DbpvD8s5ip4nEB3kEsreJwwNRRr] publicKeyAsHex: [04af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45f98a3fd831eb2b749a93b0e6f35cfb40c8cd5aa667a15581bc2feded498fd9c6] publicKeyHash160Hex: [2a6f34a72c181bdd4e6d91ffa69e84fd6c49b207] publicKeyHash160Base58: [14sNbmEhgiGX6BZe9Q5PCgTQT3576mniZt] Compressed: [false] Mnemonic: [abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abandon, abuse, differ]")));
+        BigInteger secret = BigInteger.valueOf(73);
+        ECKey ecKey = keyUtility.createECKey(secret, true);
+        String mnemonics = keyUtility.createMnemonics(ecKey.getPrivKeyBytes());
+        
+        Map<BIP39Wordlist, String> map = new HashMap<>();
+        map.put(BIP39Wordlist.CHINESE_SIMPLIFIED, "的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 这 铁");
+        map.put(BIP39Wordlist.CHINESE_TRADITIONAL, "的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 這 鐵");
+        map.put(BIP39Wordlist.CZECH, "abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace ananas internet");
+        map.put(BIP39Wordlist.ENGLISH, "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abuse differ");
+        map.put(BIP39Wordlist.FRENCH, "abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abreuver cylindre");
+        map.put(BIP39Wordlist.ITALIAN, "abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco accenno disposto");
+        // attention: japanese has a special separator
+        map.put(BIP39Wordlist.JAPANESE, "あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あさい　くなん");
+        map.put(BIP39Wordlist.KOREAN, "가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가슴 목걸이");
+        map.put(BIP39Wordlist.PORTUGUESE, "abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abranger conectar");
+        map.put(BIP39Wordlist.RUSSIAN, "абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац агитация завтра");
+        map.put(BIP39Wordlist.SPANISH, "ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco abuelo cuota");
+        map.put(BIP39Wordlist.TURKISH, "abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur absürt fason");
+        
+        assertThat(map.size(), is(BIP39Wordlist.values().length));
+       
+        for (Map.Entry<BIP39Wordlist, String> entry : map.entrySet()) {
+            BIP39Wordlist bip39Wordlist = entry.getKey();
+            String expectedMnemonic = entry.getValue();
+            assertThat(mnemonics, containsString(expectedMnemonic));
         }
+        
+        assertThat(arguments.get(0), is(equalTo("hit: safe log: publicKeyBytes.getSecretKey(): 73")));
+        assertThat(arguments.get(1), is(equalTo("hit: safe log: publicKeyBytes.getUncompressed(): 04af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45f98a3fd831eb2b749a93b0e6f35cfb40c8cd5aa667a15581bc2feded498fd9c6")));
+        assertThat(arguments.get(2), is(equalTo("hit: safe log: publicKeyBytes.getCompressed(): 02af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45")));
+        assertThat(arguments.get(3), is(equalTo("hit: safe log: hash160Uncompressed: 2a6f34a72c181bdd4e6d91ffa69e84fd6c49b207")));
+        assertThat(arguments.get(4), is(equalTo("hit: safe log: hash160Compressed: c065379323a549fc3547bcb1937d5dcb48df2396")));
+        
+        final String privateKeyBytes = "[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 73]";
+        final String privateKeyHex = "0000000000000000000000000000000000000000000000000000000000000049";
+        final String wif;
+        final String publicKeyAsHex;
+        final String publicKeyHash160Hex;
+        final String publicKeyHash160Base58;
+        
+        if (compressed) {
+            wif = "KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU7fj3itoEY";
+            publicKeyAsHex = "02af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45";
+            publicKeyHash160Hex = "c065379323a549fc3547bcb1937d5dcb48df2396";
+            publicKeyHash160Base58 = "1JYHzX3ndZEcnjrWSQ9VC7324TJ9BAoGy4";
+        } else {
+            wif = "5HpHagT65TZzG1PH3CSu63k8DbpvD8s5ip4nEB3kEsreJwwNRRr";
+            publicKeyAsHex = "04af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45f98a3fd831eb2b749a93b0e6f35cfb40c8cd5aa667a15581bc2feded498fd9c6";
+            publicKeyHash160Hex = "2a6f34a72c181bdd4e6d91ffa69e84fd6c49b207";
+            publicKeyHash160Base58 = "14sNbmEhgiGX6BZe9Q5PCgTQT3576mniZt";
+        }
+        
+        String expectedMessage = "vanity pattern match: privateKeyBigInteger: [73] privateKeyBytes: ["+privateKeyBytes+"] privateKeyHex: ["+privateKeyHex+"] WiF: [" + wif +"] publicKeyAsHex: ["+publicKeyAsHex+"] publicKeyHash160Hex: ["+publicKeyHash160Hex+"] publicKeyHash160Base58: ["+publicKeyHash160Base58+"] Compressed: ["+compressed+"] "+ mnemonics;
+        assertThat(arguments.get(5), is(equalTo(expectedMessage)));
     }
 
     private ByteBuffer createHash160ByteBuffer() {
