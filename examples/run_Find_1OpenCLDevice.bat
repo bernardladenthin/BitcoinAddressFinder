@@ -11,6 +11,6 @@ java ^
 -Xmx16G ^
 -Dlogback.configurationFile=logbackConfiguration.xml ^
 -jar ^
-bitcoinaddressfinder-1.4.0-jar-with-dependencies.jar ^
+bitcoinaddressfinder-1.5.0-jar-with-dependencies.jar ^
 config_Find_1OpenCLDevice.json
 rem >> log_Find_1OpenCLDevice.txt 2>&1
