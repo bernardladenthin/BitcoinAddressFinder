@@ -192,59 +192,13 @@ public class KeyUtility {
     }
     // </editor-fold>
 
-    /**
-     * Different order for the generateKeysKernel_transform_public kernel
-     * Example for:
-     * <pre>68e23530deb6d5011ab56d8ad9f7b4a3b424f1112f08606357497495929f72dc<pre>
-     * which will be transformed to
-     * <pre>929f72dc 57497495 2f086063 b424f111 d9f7b4a3 1ab56d8a deb6d501 68e23530</pre>.
-     * @param b
-     * @return 
-     */
     @Deprecated
-    private static int[] privateKeyIntsFromByteArray(byte[] b) {
-        int[] intArray = new int[8];
-        byteArrayToIntArray(b, 0, intArray, 7);
-        byteArrayToIntArray(b, 4, intArray, 6);
-        byteArrayToIntArray(b, 8, intArray, 5);
-        byteArrayToIntArray(b, 12, intArray, 4);
-        byteArrayToIntArray(b, 16, intArray, 3);
-        byteArrayToIntArray(b, 20, intArray, 2);
-        byteArrayToIntArray(b, 24, intArray, 1);
-        byteArrayToIntArray(b, 28, intArray, 0);
-        return intArray;
+    static int byteArrayToInt(byte[] b) {
+        return byteArrayToInt(b, 0);
     }
 
     @Deprecated
-    private static byte[] publicKeyByteArrayFromIntArray(int[] i) {
-        // we need: 1 + 32 bytes
-        byte[] b = new byte[33];
-        // extraxt the last int and move to the right position, only one byte is needed
-        // this prevent an allocation of 36 bytes and got a slice of 33 afterwards
-        intToByteArray(i[8], b, 0);
-        b[32] = b[0];
-
-        intToByteArray(i[0], b, 0);
-        intToByteArray(i[1], b, 4);
-        intToByteArray(i[2], b, 8);
-        intToByteArray(i[3], b, 12);
-        intToByteArray(i[4], b, 16);
-        intToByteArray(i[5], b, 20);
-        intToByteArray(i[6], b, 24);
-        intToByteArray(i[7], b, 28);
-        return b;
-    }
-
-    @Deprecated
-    private static int byteArrayToInt(byte[] b) {
-        return b[3] & 0xFF
-                | (b[2] & 0xFF) << 8
-                | (b[1] & 0xFF) << 16
-                | (b[0] & 0xFF) << 24;
-    }
-
-    @Deprecated
-    private static int byteArrayToInt(byte[] b, int offsetByteArray) {
+    static int byteArrayToInt(byte[] b, int offsetByteArray) {
         return b[3 + offsetByteArray] & 0xFF
                 | (b[2 + offsetByteArray] & 0xFF) << 8
                 | (b[1 + offsetByteArray] & 0xFF) << 16
@@ -252,26 +206,19 @@ public class KeyUtility {
     }
 
     @Deprecated
-    private static void byteArrayToIntArray(byte[] b, int offsetByteArray, int[] i, int offsetIntArray) {
-        int newInt = b[3 + offsetByteArray] & 0xFF
-                | (b[2 + offsetByteArray] & 0xFF) << 8
-                | (b[1 + offsetByteArray] & 0xFF) << 16
-                | (b[0 + offsetByteArray] & 0xFF) << 24;
-        i[offsetIntArray] = newInt;
+    static void byteArrayToIntArray(byte[] b, int offsetByteArray, int[] i, int offsetIntArray) {
+        i[offsetIntArray] = byteArrayToInt(b, offsetByteArray);
     }
 
     @Deprecated
-    private static byte[] intToByteArray(int a) {
-        return new byte[]{
-            (byte) ((a >> 24) & 0xFF),
-            (byte) ((a >> 16) & 0xFF),
-            (byte) ((a >> 8) & 0xFF),
-            (byte) (a & 0xFF)
-        };
+    static byte[] intToByteArray(int a) {
+        byte[] b = new byte[4];
+        intToByteArray(a, b, 0);
+        return b;
     }
 
     @Deprecated
-    private static void intToByteArray(int a, byte[] b, int offset) {
+    static void intToByteArray(int a, byte[] b, int offset) {
         b[0 + offset] = (byte) ((a >> 24) & 0xFF);
         b[1 + offset] = (byte) ((a >> 16) & 0xFF);
         b[2 + offset] = (byte) ((a >> 8) & 0xFF);

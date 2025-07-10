@@ -440,7 +440,7 @@ public class KeyUtilityTest {
     }
     // </editor-fold>
     
-    // <editor-fold defaultstate="collapsed" desc="replaceInvalidPrivateKeys">
+    // <editor-fold defaultstate="collapsed" desc="convertIntToBytesAndBack">
     @Test
     public void replaceInvalidPrivateKeys_mixedArray_replacesInvalids() {
         BigInteger[] secrets = new BigInteger[]{
@@ -456,6 +456,55 @@ public class KeyUtilityTest {
         assertThat(secrets[2], is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
     }
 
+    // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="byteToIntAndViceVersa">
+        @Test
+    public void byteToIntAndViceVersa_roundTripConversion_successful() {
+        // Test a range of values including edge cases
+        int[] testValues = {
+            0,
+            1,
+            -1,
+            Integer.MAX_VALUE,
+            Integer.MIN_VALUE,
+            0x12345678,
+            0x87654321
+        };
+
+        for (int original : testValues) {
+            byte[] bytes = KeyUtility.intToByteArray(original);
+            int result = KeyUtility.byteArrayToInt(bytes);
+
+            assertThat("Failed round-trip for value: " + original, result, is(equalTo(original)));
+        }
+    }
+
+    @Test
+    public void byteToIntAndViceVersa_offsetRoundTripConversion_successful() {
+        int original = 0xCAFEBABE;
+        byte[] buffer = new byte[8];
+        int offset = 2;
+
+        // Write to buffer with offset
+        KeyUtility.intToByteArray(original, buffer, offset);
+
+        // Read from same offset
+        int result = KeyUtility.byteArrayToInt(buffer, offset);
+
+        assertThat(result, is(equalTo(original)));
+    }
+
+    @Test
+    public void byteArrayToIntArray_roundTrip_successful() {
+        int original = 0x0A0B0C0D;
+        byte[] bytes = KeyUtility.intToByteArray(original);
+        int[] result = new int[1];
+
+        KeyUtility.byteArrayToIntArray(bytes, 0, result, 0);
+
+        assertThat(result[0], is(equalTo(original)));
+    }
     // </editor-fold>
     
 }
