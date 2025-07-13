@@ -19,6 +19,8 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import ch.qos.logback.classic.Level;
+import com.tngtech.java.junit.dataprovider.DataProviderRunner;
+import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -34,7 +36,9 @@ import org.bitcoinj.base.Network;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
 
+@RunWith(DataProviderRunner.class)
 public class LMDBPersistencePerformanceTest {
     
     @Rule
@@ -53,7 +57,8 @@ public class LMDBPersistencePerformanceTest {
     private final static int PRODUCER_THREADS = KEYS_QUEUE_SIZE;
     
     @Test
-    public void runProber_performanceTest() throws IOException, InterruptedException, IllegalArgumentException, NoSuchFieldException, IllegalAccessException {
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BLOOM_FILTER_ENABLED, location = CommonDataProvider.class)
+    public void runProber_performanceTest(boolean useBloomFilter) throws IOException, InterruptedException, IllegalArgumentException, NoSuchFieldException, IllegalAccessException {
         new LMDBPlatformAssume().assumeLMDBExecution();
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
@@ -67,6 +72,7 @@ public class LMDBPersistencePerformanceTest {
         cConsumerJava.delayEmptyConsumer = 1;
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        cConsumerJava.lmdbConfigurationReadOnly.useBloomFilter = useBloomFilter;
         cConsumerJava.runtimePublicKeyCalculationCheck = ManualDebugConstants.ENABLE_RUNTIME_PUBLIC_KEY_CALCULATION_CHECK;
         
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);

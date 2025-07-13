@@ -18,6 +18,8 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.persistence.lmdb;
 
+import com.google.common.hash.BloomFilter;
+import com.google.common.hash.Funnels;
 import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import org.lmdbjava.CursorIterable;
@@ -31,10 +33,8 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.ByteConversion;
@@ -70,7 +70,7 @@ public class LMDBPersistence implements Persistence {
     private Dbi<ByteBuffer> lmdb_h160ToAmount;
     private long increasedCounter = 0;
     private long increasedSum = 0;
-    private Set<ByteBuffer> addressCache = null;
+    private BloomFilter<byte[]> addressBloomFilter = null;
 
 
     public LMDBPersistence(CLMDBConfigurationWrite lmdbConfigurationWrite, PersistenceUtils persistenceUtils) {
@@ -101,25 +101,34 @@ public class LMDBPersistence implements Persistence {
         logStatsIfConfigured(true);
     }
     
-    public void loadAllAddressesToCache() {
-        logger.info("##### BEGIN: loadAllAddressesToCache #####");
-        Set<ByteBuffer> cache = new HashSet<>();
+    public void buildAddressBloomFilter() {
+        logger.info("##### BEGIN: buildAddressBloomFilter #####");
+        // Attention: slow!
+        long count = count();
+
+        BloomFilter<byte[]> filter = BloomFilter.create(Funnels.byteArrayFunnel(), count, lmdbConfigurationReadOnly.bloomFilterFpp);
+        long inserted = 0;
+
         try (Txn<ByteBuffer> txn = env.txnRead()) {
             try (CursorIterable<ByteBuffer> iterable = lmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
                 for (CursorIterable.KeyVal<ByteBuffer> kv : iterable) {
-                    ByteBuffer key = ByteBuffer.allocate(kv.key().remaining());
-                    key.put(kv.key()).flip();
-                    cache.add(key);
+                    ByteBuffer key = kv.key();
+                    byte[] keyBytes = new byte[key.remaining()];
+                    key.get(keyBytes);
+                    key.rewind();
+                    filter.put(keyBytes);
+                    inserted++;
                 }
             }
         }
-        addressCache = cache;
-        logger.info("Loaded {} addresses into in-memory cache.", addressCache.size());
-        logger.info("##### END: loadAllAddressesToCache #####");
+
+        addressBloomFilter = filter;
+        logger.info("Inserted {} addresses into BloomFilter", inserted);
+        logger.info("##### END: buildAddressBloomFilter #####");
     }
 
-    public void unloadAddressCache() {
-        addressCache = null;
+    public void unloadBloomFilter() {
+        addressBloomFilter = null;
     }
     
     private void initReadOnly() {
@@ -127,8 +136,8 @@ public class LMDBPersistence implements Persistence {
         env = create(bufferProxy).setMaxDbs(DB_COUNT).open(new File(lmdbConfigurationReadOnly.lmdbDirectory), EnvFlags.MDB_RDONLY_ENV, EnvFlags.MDB_NOLOCK);
         lmdb_h160ToAmount = env.openDbi(DB_NAME_HASH160_TO_COINT);
         
-        if (lmdbConfigurationReadOnly.loadToMemoryCacheOnInit) {
-            loadAllAddressesToCache();
+        if (lmdbConfigurationReadOnly.useBloomFilter) {
+            buildAddressBloomFilter();
         }
     }
 
@@ -210,23 +219,24 @@ public class LMDBPersistence implements Persistence {
 
     @Override
     public boolean containsAddress(ByteBuffer hash160) {
-        /*
-        if (sortedAddressCache != null) {
-            byte[] key = new byte[hash160.remaining()];
-            hash160.get(key);
-            hash160.rewind(); // falls der Buffer erneut verwendet wird
-
-            return Arrays.binarySearch(sortedAddressCache, key, Arrays::compare) >= 0;
-        }
-        */
-        
         if (lmdbConfigurationReadOnly.disableAddressLookup) {
             return false;
         }
         
-        if (addressCache != null) {
-            return addressCache.contains(hash160);
+        byte[] hash160AsByteArray = new byte[hash160.remaining()];
+        hash160.get(hash160AsByteArray);
+        hash160.rewind();
+        
+        // Use Bloom filter if available for fast pre-check
+        if (addressBloomFilter != null) {
+            boolean mightContain = addressBloomFilter.mightContain(hash160AsByteArray);
+            if (!mightContain) {
+                return false; // definitely not present
+            }
+            // Possibly in DB, proceed to verify
         }
+        
+        // Perform LMDB lookup (always happens if no Bloom filter is present)
         try (Txn<ByteBuffer> txn = env.txnRead()) {
             ByteBuffer byteBuffer = lmdb_h160ToAmount.get(txn, hash160);
             return byteBuffer != null;

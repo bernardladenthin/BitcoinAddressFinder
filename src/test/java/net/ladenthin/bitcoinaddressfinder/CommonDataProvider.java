@@ -509,6 +509,22 @@ public class CommonDataProvider {
     }
     
     /**
+     * Data provider for testing with Bloom filter enabled and disabled.
+     * <p>
+     * Supplies {@code true} (Bloom filter active) and {@code false} (Bloom filter inactive),
+     * to verify correctness and performance behavior in both configurations.
+     */
+    public final static String DATA_PROVIDER_BLOOM_FILTER_ENABLED = "bloomFilterEnabled";
+
+    @DataProvider
+    public static Object[][] bloomFilterEnabled() {
+        return new Object[][]{
+            {true},
+            {false},
+        };
+    }
+    
+    /**
      * For {@link #largePrivateKeys()}.
      */
     public final static String DATA_PROVIDER_LARGE_PRIVATE_KEYS = "largePrivateKeys";

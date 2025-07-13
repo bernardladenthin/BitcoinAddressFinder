@@ -22,6 +22,7 @@ import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -50,7 +51,7 @@ public class LMDBToAddressFileTest extends LMDBBase {
         // arrange
         AtomicBoolean shouldRun = new AtomicBoolean(true);
         TestAddressesFiles testAddressesFiles = new TestAddressesFiles(compressed);
-        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false);
+        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false, false);
 
         // act
         File file = folder.newFile();
@@ -58,7 +59,7 @@ public class LMDBToAddressFileTest extends LMDBBase {
 
         // assert
         try {
-            List<String> contents = FileUtils.readLines(file, "UTF-8");
+            List<String> contents = FileUtils.readLines(file, StandardCharsets.UTF_8);
 
             // set/sort the result because the list might not have the same order for different test executions
             Set<String> contentsAsSet = new HashSet<>(contents);
@@ -87,7 +88,7 @@ public class LMDBToAddressFileTest extends LMDBBase {
         // arrange
         AtomicBoolean shouldRun = new AtomicBoolean(true);
         TestAddressesFiles testAddressesFiles = new TestAddressesFiles(compressed);
-        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false);
+        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false, false);
 
         // act
         File file = folder.newFile();
@@ -95,7 +96,7 @@ public class LMDBToAddressFileTest extends LMDBBase {
 
         // assert
         try {
-            List<String> contents = FileUtils.readLines(file, "UTF-8");
+            List<String> contents = FileUtils.readLines(file, StandardCharsets.UTF_8);
 
             // set/sort the result because the list might not have the same order for different test executions
             Set<String> contentsAsSet = new HashSet<>(contents);
@@ -124,7 +125,7 @@ public class LMDBToAddressFileTest extends LMDBBase {
         // arrange
         AtomicBoolean shouldRun = new AtomicBoolean(true);
         TestAddressesFiles testAddressesFiles = new TestAddressesFiles(compressed);
-        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false);
+        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false, false);
 
         // act
         File file = folder.newFile();
@@ -132,7 +133,7 @@ public class LMDBToAddressFileTest extends LMDBBase {
 
         // assert
         try {
-            List<String> contents = FileUtils.readLines(file, "UTF-8");
+            List<String> contents = FileUtils.readLines(file, StandardCharsets.UTF_8);
 
             // set/sort the result because the list might not have the same order for different test executions
             Set<String> contentsAsSet = new HashSet<>(contents);
