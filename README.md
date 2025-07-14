@@ -179,14 +179,34 @@ This reduction in scalar size speeds up `k·G` computations, resulting in signif
 > ✅ Matches the size of `RIPEMD160(SHA256(pubkey))`  
 > ✅ Especially effective when combined with OpenCL acceleration
 
-### 🚀 In-Memory Address Cache (`loadToMemoryCacheOnInit`)
-To improve address lookup performance during high-speed key generation, you can enable the `loadToMemoryCacheOnInit` option.  
-This feature loads all LMDB entries into a Java `HashSet` at startup, allowing ultra-fast `O(1)` address checks.
+### 🚀 Bloom Filter Address Cache (`useBloomFilter`)
+As of version 1.5.0, a memory-efficient Bloom filter can be used to significantly accelerate address checks:
 
-This is especially useful in OpenCL or batch scenarios where thousands or millions of addresses are checked per second and LMDB access becomes a bottleneck.
+```json
+"useBloomFilter": true
+```
 
-> ✅ Recommended when system RAM is sufficient to hold all known addresses  
-> ❌ Avoid on memory-constrained systems or with extremely large databases
+Instead of loading all addresses into a Java `HashSet`, a compact Bloom filter is loaded into RAM. This enables ultra-fast `containsAddress()` checks with minimal memory usage — even for millions or billions of entries.
+Advantages:
+- ✅ O(1) lookup speed (comparable to HashSet)
+- ✅ Low memory usage, even with large datasets
+- ✅ No false negatives (real matches are always detected)
+- ⚠️ Possible false positives → only trigger additional LMDB lookups
+
+#### 🔧 Tuning Accuracy with `bloomFilterFpp`
+The expected false positive probability (FPP) can be configured:
+{ "bloomFilterFpp": 0.01 }
+| Value | Description |
+|-------|-------------|
+| `0.01` | ✅ Only ~1% false positives – high accuracy, more memory |
+| `0.05` | ⚖️ Balanced tradeoff between memory and performance |
+| `0.1`–`0.2` | 🪶 Very memory-efficient – suitable if some false positives are acceptable |
+
+```json
+"useBloomFilter": true,
+"bloomFilterFpp": 0.01
+```
+Recommended setting for best balance between speed and memory usage.
 
 ### 🔐 Public Key Hashing on GPU (SHA-256 + RIPEMD-160)
 The OpenCL kernel performs **blazing fast public key hashing** directly on the GPU using:
@@ -282,7 +302,7 @@ In addition to standard script types, the importer also recognizes and supports 
 | [Blakecoin](https://github.com/BlueDragon747/Blakecoin)                                  | BLC   |  ✅   |      |        |        |        |       |
 | [Blocknet](https://github.com/BlocknetDX/BlockDX)                                        | BLOCK |  ✅   |      |        |        |        |       |
 | [BolivarCoin](https://github.com/BOLI-Project/BolivarCoin)                               | BOLI  |  ✅   |      |        |        |        |       |
-| [BYTZ](https://github.com/bytzcurrency)                                                  | BYTZ  |  ✅   | ???  |        |        |        |       |
+| [BYTZ](https://github.com/bytzcurrency)                                                  | BYTZ  |  ✅   | ✅   |        |        |        |       |
 | [Canada-eCoin](https://github.com/Canada-eCoin/eCoinCore)                                | CDN   |  ✅   |      | ✅     | ❌      |        |         |
 | [Catcoin](https://github.com/CatcoinCore/catcoincore)                                    | CAT   |  ✅   |      |        |        |        |         |
 | [ChessCoin 0.32%](https://github.com/AKKPP/ChessCoin032/)                                | CHESS |  ✅   |      |        |        |        |         |
