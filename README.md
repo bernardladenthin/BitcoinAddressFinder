@@ -480,7 +480,7 @@ LMDBToAddressFile_Light_HexHash.zip	SHA3-512	29CA44CD666D7B8CF9EAD4B340620FBB7ED
 * Full (57.0 GiB), Last update: June 4, 2025
   * Contains all Bitcoin addresses which are ever used and many altcoin addresses with and without amount.
   * Static amount of 0 is used to allow best compression.
-  * Unique entries: 1349299900
+  * Unique entries: 1377481459
   * Mapsize: 58368 MiB
   * Time to create the database: ~54 hours
   * Link (33.4 GiB zip archive): http://ladenthin.net/lmdb_full.zip
@@ -861,12 +861,29 @@ You must not use this tool for:
 
 ### Legal References by Jurisdiction
 
-Below are some non-exhaustive legal frameworks that may apply depending on your region:
+Below is a non-exhaustive collection of legal frameworks that **may** apply depending on your jurisdiction.
+
+> ⚠️ **Important Note**: The following information is provided for informational purposes only and **does not constitute legal advice**.  
+> You should always consult with a **qualified legal professional** before engaging in any activity related to cryptographic systems or asset recovery.  
+> I merely present relevant legal context, not binding interpretations or actionable recommendations.
 
 #### Germany
 
 - **§ 202c StGB** – *Vorbereiten des Ausspähens und Abfangens von Daten*  
   (Preparation of spying or intercepting data)
+- **OLG Braunschweig, Beschluss vom 18.09.2024 – 1 Ws 185/24**  
+  In einem aufsehenerregenden Fall entschied das OLG, dass der Zugriff auf eine Wallet mittels eines bekannten (nicht rechtswidrig erlangten) Seeds **nicht** als Straftat im Sinne der §§ 202a, 263a oder 303a StGB gewertet werden kann.  
+  Der Angeklagte hatte eine Wallet für einen Dritten erstellt und sich später mittels der Seed-Phrase Zugriff auf Token im Wert von rund 2,5 Mio. € verschafft.  
+  Das Gericht urteilte jedoch:
+
+  - **Kein Diebstahl**: Kryptowährungen sind keine „Sachen“ im Sinne des § 242 StGB.  
+  - **Kein Ausspähen von Daten (§ 202a StGB)**: Der Zugriff mittels bekannter Passwörter ist kein *Überwinden* einer Zugangssicherung.  
+  - **Kein Computerbetrug (§ 263a StGB)**: Eine Krypto-Transaktion impliziert keine „Täuschung“ oder „Miterklärung einer Berechtigung“.  
+  - **Keine Datenveränderung (§ 303a StGB)**: Die eigentliche Änderung erfolgt durch die Blockchain-Netzwerkbetreiber – nicht durch den User selbst.
+
+  > 🔍 Fazit: Der *„Kryptodiebstahl“* per bekanntem Seed ist unter Umständen **nicht strafbar** – bleibt aber **zivilrechtlich angreifbar**.  
+  > Quelle: [OLG Braunschweig Beschluss 1 Ws 185/24 (juris.de)](https://www.juris.de/static/infodienst/autoren/D_NJRE001604034.htm)  
+  > Bericht: [heise.de Artikel vom 11.07.2025](https://www.heise.de/news/Oberlandesgericht-Virtuelle-Entwendung-von-Kryptowerten-bleibt-straflos-10484771.html)
 
 #### United States
 
