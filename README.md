@@ -193,6 +193,13 @@ Advantages:
 - ✅ No false negatives (real matches are always detected)
 - ⚠️ Possible false positives → only trigger additional LMDB lookups
 
+#### Estimated Memory Usage:
+| fpp    | Light Database (~132M) | Full Database (~1.37B)  |
+|--------|------------------------|-------------------------|
+| 0.1    | ~**80 MB**             | ~**800 MB**             |
+| 0.05   | ~**100 MB**            | ~**1024 MB**            |
+| 0.01   | ~**151 MB**            | ~**1574 MB**            |
+
 #### 🔧 Tuning Accuracy with `bloomFilterFpp`
 The expected false positive probability (FPP) can be configured:
 
@@ -642,7 +649,8 @@ Minimal:
 ```json
 {
   "keyProducerJavaRandomInstance": "BIP39_SEED",
-  "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+  "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+  "passphrase": ""
 }
 ```
 
