@@ -577,15 +577,6 @@ This flexibility lets you switch between **production-grade entropy** and **dete
 | `RANDOM_CUSTOM_SEED` | ⚠️ `java.util.Random` with user-supplied seed. Fully deterministic; useful for reproducible fuzzing or fixed keyspaces. |
 | `SHA1_PRNG` | ⚠️ Legacy “SHA1PRNG” engine (Android pre-2013). Lets you reproduce the historic SecureRandom bug. |
 
-#### Extra fields (for `BIP39_SEED` only)
-
-| JSON field | Type | Default | Purpose |
-|------------|------|---------|---------|
-| `mnemonic` | string | — | 12/24-word BIP39 sentence |
-| `passphrase` | string | `""` | Optional BIP39 salt (“wallet password”) |
-| `bip32Path` | string | `"M/44H/0H/0H/0"` (constant `DEFAULT_BIP32_PATH`) | Base derivation path; must start with `M/` |
-| `creationTimeSeconds` | number | `0` | Epoch-seconds creation timestamp; fed to `DeterministicSeed.ofMnemonic` |
-
 #### Examples
 ##### 🔐 `SECURE_RANDOM`  
 Best choice for real wallet generation – uses system CSPRNG (e.g. `/dev/urandom`, Windows CNG).
@@ -675,6 +666,14 @@ With custom seed:
 HD-wallet-style derivation: mnemonic + passphrase → BIP32/BIP44 keys.
 
 Hierarchical deterministic key generator using a BIP39 mnemonic and optional passphrase. Allows full BIP32/BIP44 path derivation and reproducible HD wallets.
+
+| JSON field | Type | Default | Purpose |
+|------------|------|---------|---------|
+| `mnemonic` | string | — | 12/24-word BIP39 sentence |
+| `passphrase` | string | `""` | Optional BIP39 salt (“wallet password”) |
+| `hardened` | boolean | `false` | 	Whether to use hardened key derivation (adds 0x80000000 to indices) |
+| `bip32Path` | string | `"M/44H/0H/0H/0"` (constant `DEFAULT_BIP32_PATH`) | Base derivation path; must start with `M/` |
+| `creationTimeSeconds` | number | `0` | Epoch-seconds creation timestamp; fed to `DeterministicSeed.ofMnemonic` |
 
 Minimal:
 ```json
