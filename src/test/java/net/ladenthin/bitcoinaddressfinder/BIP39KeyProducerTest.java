@@ -22,11 +22,11 @@ import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.time.Instant;
 import java.util.List;
-import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import java.text.Normalizer;
 import java.text.Normalizer.Form;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
 import static org.hamcrest.Matchers.*;
 import org.apache.commons.codec.binary.Hex;
 import org.junit.Test;
@@ -36,6 +36,7 @@ import org.bitcoinj.crypto.HDKeyDerivation;
 import org.bitcoinj.crypto.MnemonicCode;
 import org.bitcoinj.params.MainNetParams;
 import org.bitcoinj.wallet.DeterministicSeed;
+import static org.junit.Assert.fail;
 import org.junit.runner.RunWith;
 
 @RunWith(DataProviderRunner.class)
@@ -46,10 +47,11 @@ public class BIP39KeyProducerTest {
         // arrange
         String mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
         String passphrase = "";
-        String bip32Path = CKeyProducerJavaRandom.DEFAULT_BIP32_PATH;
+        String bip32Path = CKeyProducerJavaBip39.DEFAULT_BIP32_PATH;
         Instant creationTime = Instant.ofEpochSecond(0);
+        boolean hardened = false;
 
-        BIP39KeyProducer producer = new BIP39KeyProducer(mnemonic, passphrase, bip32Path, creationTime);
+        BIP39KeyProducer producer = new BIP39KeyProducer(mnemonic, passphrase, bip32Path, creationTime, hardened);
 
         // act
         DeterministicKey key = producer.nextKey(); // M/44H/0H/0H/0/0
@@ -64,10 +66,11 @@ public class BIP39KeyProducerTest {
         // arrange
         String mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
         String passphrase = "";
-        String bip32Path = CKeyProducerJavaRandom.DEFAULT_BIP32_PATH;
+        String bip32Path = CKeyProducerJavaBip39.DEFAULT_BIP32_PATH;
         Instant creationTime = Instant.ofEpochSecond(0);
+        boolean hardened = false;
 
-        BIP39KeyProducer producer = new BIP39KeyProducer(mnemonic, passphrase, bip32Path, creationTime);
+        BIP39KeyProducer producer = new BIP39KeyProducer(mnemonic, passphrase, bip32Path, creationTime, hardened);
 
         byte[] bytes1 = new byte[16];
         byte[] bytes2 = new byte[16];
@@ -85,7 +88,7 @@ public class BIP39KeyProducerTest {
     @Test
     public void appendPath_givenBasePathAndIndex_returnsExtendedHDPath() {
         // arrange
-        String path = CKeyProducerJavaRandom.DEFAULT_BIP32_PATH;
+        String path = CKeyProducerJavaBip39.DEFAULT_BIP32_PATH;
         int index = 5;
 
         // act
@@ -156,4 +159,31 @@ public class BIP39KeyProducerTest {
         assertThat("Language: " + language, masterKey.serializePrivB58(MainNetParams.get().network()), is(expectedXprv));
     }
     
+    @Test(expected = NoMoreSecretsAvailableException.class)
+    public void nextKey_counterOverflow_throwsException() {
+        // arrange
+        String mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        String passphrase = "";
+        String bip32Path = "M/44H/0H/0H/0";
+        boolean hardened = false;
+
+        BIP39KeyProducer producer = new BIP39KeyProducer(mnemonic, passphrase, bip32Path, Instant.ofEpochSecond(0), hardened);
+
+        producer.counter.set(Integer.MAX_VALUE);
+
+        try {
+            // act
+            producer.nextKey();
+        } catch (NoMoreSecretsAvailableException e) {
+            fail("Exception thrown too early: " + e.getMessage());
+        }
+
+        // This call should overflow and throw NoMoreSecretsAvailableException
+        producer.nextKey();
+    }
+    
+    @Test
+    public void testDefaultBip32PathConstant() {
+        assertThat(CKeyProducerJavaBip39.DEFAULT_BIP32_PATH, is("M/44H/0H/0H/0"));
+    }
 }

@@ -27,6 +27,7 @@ import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
 import org.bitcoinj.base.Network;
+import org.bitcoinj.crypto.DeterministicKey;
 import org.bitcoinj.crypto.ECKey;
 import org.junit.Before;
 import org.junit.Test;
@@ -507,4 +508,59 @@ public class KeyUtilityTest {
     }
     // </editor-fold>
     
+    // <editor-fold defaultstate="collapsed" desc="createSecrets">
+    @Test
+    public void createSecrets_returnStartSecretOnlyTrue_returnsOneSecret() throws NoMoreSecretsAvailableException {
+        // arrange
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+        int privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
+        Random random = new Random(123);
+        int overallWorkSize = 10;
+        boolean returnStartSecretOnly = true;
+
+        // act
+        BigInteger[] secrets = keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, random);
+
+        // assert
+        assertThat(secrets.length, is(1));
+        assertThat(secrets[0], is(notNullValue()));
+    }
+
+    @Test
+    public void createSecrets_returnStartSecretOnlyFalse_returnsAllSecrets() throws NoMoreSecretsAvailableException {
+        // arrange
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+        int privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
+        Random random = new Random(123);
+        int overallWorkSize = 5;
+        boolean returnStartSecretOnly = false;
+
+        // act
+        BigInteger[] secrets = keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, random);
+
+        // assert
+        assertThat(secrets.length, is(overallWorkSize));
+        for (BigInteger secret : secrets) {
+            assertThat(secret, is(notNullValue()));
+        }
+    }
+
+    @Test(expected = NoMoreSecretsAvailableException.class)
+    public void createSecrets_zeroLength_throwsException() throws NoMoreSecretsAvailableException {
+        // arrange
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+        int privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
+        Random random = new Random() {
+            @Override
+            public void nextBytes(byte[] bytes) {
+                throw new NoMoreSecretsAvailableException();
+            }
+        };
+        int overallWorkSize = 1;
+        boolean returnStartSecretOnly = false;
+
+        // act
+        keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, random);
+    }
+    // </editor-fold>
 }

@@ -191,6 +191,15 @@ public class KeyUtility {
         return LegacyAddress.fromPubKeyHash(network, byteBufferUtility.byteBufferToBytes(byteBuffer));
     }
     // </editor-fold>
+    
+    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly, int privateKeyMaxNumBits, Random random) throws NoMoreSecretsAvailableException {
+        int length = returnStartSecretOnly ? 1 : overallWorkSize;
+        BigInteger[] secrets = new BigInteger[length];
+        for (int i = 0; i < secrets.length; i++) {
+            secrets[i] = createSecret(privateKeyMaxNumBits, random);
+        }
+        return secrets;
+    }
 
     @Deprecated
     static int byteArrayToInt(byte[] b) {

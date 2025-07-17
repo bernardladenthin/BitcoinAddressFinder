@@ -28,12 +28,12 @@ public class KeyProducerJavaRandom extends KeyProducerJava {
 
     private final CKeyProducerJavaRandom cKeyProducerJavaRandom;
     private final KeyUtility keyUtility;
+    private final BitHelper bitHelper;
     
     /**
      * It is already thread local, no need for {@link java.util.concurrent.ThreadLocalRandom}.
      */
     private final Random random;
-    private final BitHelper bitHelper;
     
     public KeyProducerJavaRandom(CKeyProducerJavaRandom cKeyProducerJavaRandom, KeyUtility keyUtility, BitHelper bitHelper) {
         super(cKeyProducerJavaRandom);
@@ -70,14 +70,6 @@ public class KeyProducerJavaRandom extends KeyProducerJava {
                     throw new RuntimeException(e);
                 }
                 break;
-            case BIP39_SEED:
-                random = new BIP39KeyProducer(
-                    cKeyProducerJavaRandom.mnemonic,
-                    cKeyProducerJavaRandom.passphrase,
-                    cKeyProducerJavaRandom.bip32Path,
-                    cKeyProducerJavaRandom.getCreationTimeInstant()
-                );
-                break;
             default:
                 throw new RuntimeException("Unknown keyProducerJavaRandomInstance: " + cKeyProducerJavaRandom.keyProducerJavaRandomInstance);
         }
@@ -85,11 +77,6 @@ public class KeyProducerJavaRandom extends KeyProducerJava {
     
     @Override
     public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
-        int length = returnStartSecretOnly ? 1 : overallWorkSize;
-        BigInteger[] secrets = new BigInteger[length];
-        for (int i = 0; i < secrets.length; i++) {
-            secrets[i] = keyUtility.createSecret(cKeyProducerJavaRandom.privateKeyMaxNumBits, random);
-        }
-        return secrets;
+        return keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, cKeyProducerJavaRandom.privateKeyMaxNumBits, random);
     }
 }

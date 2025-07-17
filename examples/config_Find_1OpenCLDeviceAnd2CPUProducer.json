@@ -3,21 +3,21 @@
   "finder": {
     "keyProducerJavaRandom": [
       {
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
-        "customSeed": 0,
         "keyProducerId": "exampleKeyProducerSecureRandomId_1",
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
-        "customSeed": 0,
         "keyProducerId": "exampleKeyProducerSecureRandomId_2",
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
+        "keyProducerId": "exampleKeyProducerSecureRandomId_3",
         "keyProducerJavaRandomInstance": "SECURE_RANDOM",
         "customSeed": 0,
-        "keyProducerId": "exampleKeyProducerSecureRandomId_3",
         "privateKeyMaxNumBits": 256
       }
     ],

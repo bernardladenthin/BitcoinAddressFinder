@@ -3,51 +3,51 @@
   "finder": {
     "keyProducerJavaRandom": [
       {
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
-        "customSeed": 0,
         "keyProducerId": "exampleKeyProducerSecureRandomId_1",
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
-        "customSeed": 0,
         "keyProducerId": "exampleKeyProducerSecureRandomId_2",
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
-        "customSeed": 0,
         "keyProducerId": "exampleKeyProducerSecureRandomId_3",
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
-        "customSeed": 0,
         "keyProducerId": "exampleKeyProducerSecureRandomId_4",
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
-        "customSeed": 0,
         "keyProducerId": "exampleKeyProducerSecureRandomId_5",
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
-        "customSeed": 0,
         "keyProducerId": "exampleKeyProducerSecureRandomId_6",
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
-        "customSeed": 0,
         "keyProducerId": "exampleKeyProducerSecureRandomId_7",
+        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
+        "keyProducerId": "exampleKeyProducerSecureRandomId_8",
         "keyProducerJavaRandomInstance": "SECURE_RANDOM",
         "customSeed": 0,
-        "keyProducerId": "exampleKeyProducerSecureRandomId_8",
         "privateKeyMaxNumBits": 256
       }
     ],

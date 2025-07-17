@@ -568,7 +568,7 @@ BitcoinAddressFinder supports multiple pseudorandom number generators (PRNGs) fo
 Pick one in your JSON via the `keyProducerJavaRandomInstance` field, e.g. `"keyProducerJavaRandomInstance": "SECURE_RANDOM"`.
 This flexibility lets you switch between **production-grade entropy** and **deterministic or deliberately weak sources** for audits and research.
 
-#### Supported PRNG Modes
+#### Supported PRNG Modes (key producer java random)
 
 | Value | Description |
 |-------|-------------|
@@ -576,7 +576,6 @@ This flexibility lets you switch between **production-grade entropy** and **dete
 | `RANDOM_CURRENT_TIME_MILLIS_SEED` | ⚠️ `java.util.Random` seeded with the current timestamp. **Insecure**; handy for replaying time-window RNG flaws. |
 | `RANDOM_CUSTOM_SEED` | ⚠️ `java.util.Random` with user-supplied seed. Fully deterministic; useful for reproducible fuzzing or fixed keyspaces. |
 | `SHA1_PRNG` | ⚠️ Legacy “SHA1PRNG” engine (Android pre-2013). Lets you reproduce the historic SecureRandom bug. |
-| `BIP39_SEED` | ✅ HD-wallet-style derivation: mnemonic + passphrase → BIP32/BIP44 keys. Powered by bitcoinj and our `BIP39KeyProducer`. |
 
 #### Extra fields (for `BIP39_SEED` only)
 
@@ -591,17 +590,27 @@ This flexibility lets you switch between **production-grade entropy** and **dete
 ##### 🔐 `SECURE_RANDOM`  
 Best choice for real wallet generation – uses system CSPRNG (e.g. `/dev/urandom`, Windows CNG).
 ```json
-{
-  "keyProducerJavaRandomInstance": "SECURE_RANDOM"
-}
+...
+"keyProducerJavaRandom": [
+  {
+    "keyProducerId": "exampleKeyProducerId",
+    "keyProducerJavaRandomInstance": "SECURE_RANDOM"
+  }
+],
+...
 ```
 
 ##### 🕰️ `RANDOM_CURRENT_TIME_MILLIS_SEED`  
 Recreates time-based vulnerabilities using `java.util.Random` seeded with the current system time.
 ```json
-{
-  "keyProducerJavaRandomInstance": "RANDOM_CURRENT_TIME_MILLIS_SEED"
-}
+...
+"keyProducerJavaRandom": [
+  {
+    "keyProducerId": "exampleKeyProducerId",
+    "keyProducerJavaRandomInstance": "RANDOM_CURRENT_TIME_MILLIS_SEED"
+  }
+],
+...
 ```
 
 ##### 🧪 `RANDOM_CUSTOM_SEED`
@@ -610,17 +619,27 @@ Fully deterministic PRNG using `java.util.Random` with a user-defined seed. Usef
 Fully deterministic output. Useful for reproducible tests or fixed keyspace scans.
 Without explicit seed:
 ```json
-{
-  "keyProducerJavaRandomInstance": "RANDOM_CUSTOM_SEED"
-}
+...
+"keyProducerJavaRandom": [
+  {
+    "keyProducerId": "exampleKeyProducerId",
+    "keyProducerJavaRandomInstance": "RANDOM_CUSTOM_SEED"
+  }
+],
+...
 ```
 
 With custom deterministic seed:
 ```json
-{
-  "keyProducerJavaRandomInstance": "RANDOM_CUSTOM_SEED",
-  "customSeed": 123456789
-}
+...
+"keyProducerJavaRandom": [
+  {
+    "keyProducerId": "exampleKeyProducerId",
+    "keyProducerJavaRandomInstance": "RANDOM_CUSTOM_SEED",
+    "customSeed": 123456789
+  }
+],
+...
 ```
 
 ##### ⚠️ `SHA1_PRNG`
@@ -629,49 +648,69 @@ Legacy deterministic PRNG using `"SHA1PRNG"`. Used to reproduce the 2013 Android
 Simulates old Android bug. May produce the same keys if seeded poorly or not at all.
 Without seed:
 ```json
-{
-  "keyProducerJavaRandomInstance": "SHA1_PRNG"
-}
+...
+"keyProducerJavaRandom": [
+  {
+    "keyProducerId": "exampleKeyProducerId",
+    "keyProducerJavaRandomInstance": "SHA1_PRNG"
+  }
+],
+...
 ```
 
 With custom seed:
 ```json
-{
-  "keyProducerJavaRandomInstance": "SHA1_PRNG",
-  "customSeed": 987654321
-}
+...
+"keyProducerJavaRandom": [
+  {
+    "keyProducerId": "exampleKeyProducerId",
+    "keyProducerJavaRandomInstance": "SHA1_PRNG",
+    "customSeed": 987654321
+  }
+],
+...
 ```
 
-##### 🔐 `BIP39_SEED`  
+#### 🔐 `BIP39_SEED` (key producer java bip 39)
+HD-wallet-style derivation: mnemonic + passphrase → BIP32/BIP44 keys.
+
 Hierarchical deterministic key generator using a BIP39 mnemonic and optional passphrase. Allows full BIP32/BIP44 path derivation and reproducible HD wallets.
 
 Minimal:
 ```json
-{
-  "keyProducerJavaRandomInstance": "BIP39_SEED",
-  "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
-  "passphrase": ""
-}
+...
+"keyProducerJavaBip39": [
+    {
+      "keyProducerId": "exampleKeyProducerId",
+      "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+    }
+],
+...
 ```
 
 Full:
 ```json
-{
-  "keyProducerJavaRandomInstance": "BIP39_SEED",
-  "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
-  "passphrase": "correct horse battery staple",
-  "bip32Path": "M/44H/0H/0H/0",
-  "creationTimeSeconds": 1650000000
-}
+...
+"keyProducerJavaBip39": [
+    {
+      "keyProducerId": "exampleKeyProducerId",
+      "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+      "passphrase": "correct horse battery staple",
+      "hardened" : false,
+      "bip32Path": "M/44H/0H/0H/0",
+      "creationTimeSeconds": 1650000000
+    }
+],
+...
 ```
 
-#### Use Cases
-| Use Case                        | Recommended PRNG                                |
+#### Key producer for Use Cases
+| Use Case                        | Recommended key producer                        |
 |---------------------------------|-------------------------------------------------|
-| 🔐 Secure wallet generation     | `SECURE_RANDOM`, `BIP39_SEED`                   |
+| 🔐 Secure wallet generation     | `SECURE_RANDOM`, `BIP39`                   |
 | 🧪 Testing deterministic output | `RANDOM_CUSTOM_SEED`                            |
 | 🕵️ Simulating vulnerabilities   | `RANDOM_CURRENT_TIME_MILLIS_SEED`               |
-| 🔄 Reproducible scans           | `SHA1_PRNG`, `RANDOM_CUSTOM_SEED`, `BIP39_SEED` |
+| 🔄 Reproducible scans           | `SHA1_PRNG`, `RANDOM_CUSTOM_SEED`, `BIP39` |
 
 > ⚠️ **Security Warning**: This software is intended for research and educational purposes. Do **not** use it in production or on systems connected to the internet.
 

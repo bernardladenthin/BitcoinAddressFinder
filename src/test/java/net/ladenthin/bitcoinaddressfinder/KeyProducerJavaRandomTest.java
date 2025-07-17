@@ -111,12 +111,6 @@ public class KeyProducerJavaRandomTest {
         config.keyProducerJavaRandomInstance = instance;
         config.customSeed = customSeed;
         config.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
-        if (instance == CKeyProducerJavaRandomInstance.BIP39_SEED) {
-            config.mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-            config.passphrase = "";
-            config.bip32Path = CKeyProducerJavaRandom.DEFAULT_BIP32_PATH;
-            config.creationTimeSeconds = 0L;
-        }
         KeyProducerJavaRandom producer = new KeyProducerJavaRandom(config, keyUtility, bitHelper);
         return producer.createSecrets(bitHelper.convertBitsToSize(0), true);
     }
@@ -156,16 +150,5 @@ public class KeyProducerJavaRandomTest {
         BigInteger[] result = generateSecrets(CKeyProducerJavaRandomInstance.SHA1_PRNG, 987654321L);
         assertThat(result.length, is(equalTo(1)));
     }
-
-    @Test
-    public void testBip39Seed() throws NoMoreSecretsAvailableException {
-        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomInstance.BIP39_SEED, null);
-        assertThat(result.length, is(equalTo(1)));
-    }
     // </editor-fold>
-    
-    @Test
-    public void testDefaultBip32PathConstant() {
-        assertThat(CKeyProducerJavaRandom.DEFAULT_BIP32_PATH, is("M/44H/0H/0H/0"));
-    }
 }

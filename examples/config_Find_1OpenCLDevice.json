@@ -1,11 +1,21 @@
 {
   "command": "Find",
   "finder": {
+    "keyProducerJavaBip39": [
+        {
+            "keyProducerId": "exampleKeyProducerJavaBip39Id",
+            "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+            "passphrase": "correct horse battery staple",
+            "hardened" : false,
+            "bip32Path": "M/44H/0H/0H/0",
+            "creationTimeSeconds": 1650000000
+        }
+    ],
     "keyProducerJavaRandom": [
       {
+        "keyProducerId": "exampleKeyProducerSecureRandomId",
         "keyProducerJavaRandomInstance": "SECURE_RANDOM",
         "customSeed": 0,
-        "keyProducerId": "exampleKeyProducerSecureRandomId",
         "privateKeyMaxNumBits": 256
       }
     ],

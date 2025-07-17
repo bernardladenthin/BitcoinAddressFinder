@@ -32,10 +32,12 @@ import org.lmdbjava.Txn;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLongArray;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.ByteConversion;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
@@ -123,7 +125,8 @@ public class LMDBPersistence implements Persistence {
         }
 
         addressBloomFilter = filter;
-        logger.info("Inserted {} addresses into BloomFilter", inserted);
+        long size = getApproximateSizeBytes(filter);
+        logger.info("Inserted {} addresses into BloomFilter with size of {}", inserted, formatSize(size));
         logger.info("##### END: buildAddressBloomFilter #####");
     }
 
@@ -396,5 +399,33 @@ public class LMDBPersistence implements Persistence {
         long count = count();
         logger.info("LMDB contains " + count + " unique entries.");
         logger.info("##### END: LMDB stats #####");
+    }
+
+    public static long getApproximateSizeBytes(BloomFilter<?> bloomFilter) {
+        try {
+            // Access private field: bits
+            Field bitsField = BloomFilter.class.getDeclaredField("bits");
+            bitsField.setAccessible(true);
+            Object bits = bitsField.get(bloomFilter);
+
+            // Access internal AtomicLongArray: data
+            Field dataField = bits.getClass().getDeclaredField("data");
+            dataField.setAccessible(true);
+            AtomicLongArray data = (AtomicLongArray) dataField.get(bits);
+
+            return data.length() * Long.BYTES; // 8 bytes per long
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to estimate BloomFilter size", e);
+        }
+    }
+
+    public static String formatSize(long sizeInBytes) {
+        if (sizeInBytes >= 1024 * 1024) {
+            return String.format("%.2f MB", sizeInBytes / 1024.0 / 1024.0);
+        } else if (sizeInBytes >= 1024) {
+            return String.format("%.2f KB", sizeInBytes / 1024.0);
+        } else {
+            return sizeInBytes + " bytes";
+        }
     }
 }

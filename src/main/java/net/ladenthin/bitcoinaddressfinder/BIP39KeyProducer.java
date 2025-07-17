@@ -18,6 +18,7 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.time.Instant;
 import java.util.ArrayList;
 import org.bitcoinj.crypto.ChildNumber;
@@ -37,20 +38,26 @@ public class BIP39KeyProducer extends java.util.Random {
 
     private final DeterministicKeyChain keyChain;
     private final List<ChildNumber> basePath;
-    private final AtomicInteger counter = new AtomicInteger(0);
+    private final boolean hardened;
+    @VisibleForTesting
+    final AtomicInteger counter = new AtomicInteger(0);
 
-    public BIP39KeyProducer(String mnemonic, String passphrase, String bip44BasePath, Instant creationTime) {
+    public BIP39KeyProducer(String mnemonic, String passphrase, String bip44BasePath, Instant creationTime, boolean hardened) {
         DeterministicSeed seed = DeterministicSeed.ofMnemonic(mnemonic, passphrase, creationTime);
         this.keyChain = DeterministicKeyChain.builder().seed(seed).build();
         this.basePath = HDPath.parsePath(bip44BasePath); // e.g., "M/44H/0H/0H/0"
+        this.hardened = hardened;
     }
-
+    
     /**
      * Returns the next derived key along the BIP44 path.
      */
-    public DeterministicKey nextKey() {
+    public DeterministicKey nextKey() throws NoMoreSecretsAvailableException {
         int index = counter.getAndIncrement();
-        List<ChildNumber> path = append(basePath, new ChildNumber(index, false));
+        if (index < 0) {
+            throw new NoMoreSecretsAvailableException("Child index overflow: counter exceeded Integer.MAX_VALUE");
+        }
+        List<ChildNumber> path = append(basePath, new ChildNumber(index, hardened));
         return keyChain.getKeyByPath(path, true);
     }
     

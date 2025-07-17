@@ -65,16 +65,5 @@ public enum CKeyProducerJavaRandomInstance {
      * 🛠 Historically used on Android (notably flawed pre-2013).
      * ❗ Potential attack surface if used in old or custom wallets.
      */
-    SHA1_PRNG,
-
-    /**
-     * Deterministic key generation from a BIP39 mnemonic seed (e.g. 12 or 24 words).
-     * 
-     * ✅ Industry standard for HD wallets.
-     * 🔁 Fully deterministic and recoverable.
-     * ❌ Security depends entirely on the mnemonic entropy.
-     * 
-     * Not vulnerable if the mnemonic is generated securely (uses 128–256 bits of entropy).
-     */
-    BIP39_SEED
+    SHA1_PRNG
 }

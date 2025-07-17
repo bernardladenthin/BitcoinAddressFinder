@@ -24,6 +24,7 @@ import java.util.List;
 public class CFinder {
     
     public List<CKeyProducerJavaRandom> keyProducerJavaRandom = new ArrayList<>();
+    public List<CKeyProducerJavaBip39> keyProducerJavaBip39 = new ArrayList<>();
     
     public CConsumerJava consumerJava;
     

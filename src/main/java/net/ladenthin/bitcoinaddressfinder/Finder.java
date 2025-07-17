@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,16 +31,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
-import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
-import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
-import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
-import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.util.function.*;
 
 public class Finder implements Interruptable {
 
@@ -72,22 +70,42 @@ public class Finder implements Interruptable {
     
     public Finder(CFinder finder) {
         this.finder = finder;
-
     }
     
     public void startKeyProducer() {
         logger.info("startKeyProducer");
-        if (finder.keyProducerJavaRandom != null) {
-            for (CKeyProducerJavaRandom cKeyProducerJavaRandom : finder.keyProducerJavaRandom) {
-                KeyProducerJavaRandom keyProducerJavaRandom = new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility, bitHelper);
-                if (cKeyProducerJavaRandom.keyProducerId == null) {
+        processKeyProducers(
+            finder.keyProducerJavaRandom,
+            cKeyProducerJavaRandom -> new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility, bitHelper),
+            cKeyProducerJavaRandom -> cKeyProducerJavaRandom.keyProducerId,
+            keyProducers
+        );
+
+        processKeyProducers(
+            finder.keyProducerJavaBip39,
+            cKeyProducerJavaBip39 -> new KeyProducerJavaBip39(cKeyProducerJavaBip39, keyUtility, bitHelper),
+            cKeyProducerJavaBip39 -> cKeyProducerJavaBip39.keyProducerId,
+            keyProducers
+        );
+    }
+    
+    private <T, K> void processKeyProducers(
+        List<T> configList,
+        Function<T, K> constructor,
+        Function<T, String> getId,
+        Map<String, K> keyProducers
+    ) {
+        if (configList != null) {
+            for (T config : configList) {
+                String keyProducerId = getId.apply(config);
+                if (keyProducerId == null) {
                     throw new KeyProducerIdNullException();
                 }
-                boolean containsKey = keyProducers.containsKey(cKeyProducerJavaRandom.keyProducerId);
-                if (containsKey) {
-                    throw new KeyProducerIdIsNotUniqueException(cKeyProducerJavaRandom.keyProducerId);
+                if (keyProducers.containsKey(keyProducerId)) {
+                    throw new KeyProducerIdIsNotUniqueException(keyProducerId);
                 }
-                keyProducers.put(cKeyProducerJavaRandom.keyProducerId, keyProducerJavaRandom);
+                K keyProducer = constructor.apply(config);
+                keyProducers.put(keyProducerId, keyProducer);
             }
         }
     }
@@ -104,30 +122,44 @@ public class Finder implements Interruptable {
 
     public void configureProducer() {
         logger.info("configureProducer");
-        if (finder.producerJava != null) {
-            for (CProducerJava cProducerJava : finder.producerJava) {
-                bitHelper.assertBatchSizeInBitsIsInRange(cProducerJava.batchSizeInBits);
-                KeyProducer keyProducer = getKeyProducerJava(cProducerJava);
-                ProducerJava producerJava = new ProducerJava(cProducerJava, consumerJava, keyUtility, keyProducer, bitHelper);
-                javaProducers.add(producerJava);
-            }
-        }
+        processProducers(
+            finder.producerJava,
+            bitHelper::assertBatchSizeInBitsIsInRange,
+            this::getKeyProducerJava,
+            (config, keyProducer) -> new ProducerJava(config, consumerJava, keyUtility, keyProducer, bitHelper),
+            javaProducers
+        );
 
-        if (finder.producerJavaSecretsFiles != null) {
-            for (CProducerJavaSecretsFiles cProducerJavaSecretsFiles : finder.producerJavaSecretsFiles) {
-                bitHelper.assertBatchSizeInBitsIsInRange(cProducerJavaSecretsFiles.batchSizeInBits);
-                KeyProducer keyProducer = getKeyProducerJava(cProducerJavaSecretsFiles);
-                ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(cProducerJavaSecretsFiles, consumerJava, keyUtility, keyProducer, bitHelper);
-                javaProducersSecretsFiles.add(producerJavaSecretsFiles);
-            }
-        }
+        processProducers(
+            finder.producerJavaSecretsFiles,
+            bitHelper::assertBatchSizeInBitsIsInRange,
+            this::getKeyProducerJava,
+            (config, keyProducer) -> new ProducerJavaSecretsFiles(config, consumerJava, keyUtility, keyProducer, bitHelper),
+            javaProducersSecretsFiles
+        );
 
-        if (finder.producerOpenCL != null) {
-            for (CProducerOpenCL cProducerOpenCL : finder.producerOpenCL) {
-                bitHelper.assertBatchSizeInBitsIsInRange(cProducerOpenCL.batchSizeInBits);
-                KeyProducer keyProducer = getKeyProducerJava(cProducerOpenCL);
-                ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, consumerJava, keyUtility, keyProducer, bitHelper);
-                openCLProducers.add(producerOpenCL);
+        processProducers(
+            finder.producerOpenCL,
+            bitHelper::assertBatchSizeInBitsIsInRange,
+            this::getKeyProducerJava,
+            (config, keyProducer) -> new ProducerOpenCL(config, consumerJava, keyUtility, keyProducer, bitHelper),
+            openCLProducers
+        );
+    }
+    
+    private <T extends CProducer, P> void processProducers(
+        List<T> configs,
+        java.util.function.Consumer<Integer> batchSizeAssert,
+        Function<T, KeyProducer> getKeyProducer,
+        BiFunction<T, KeyProducer, P> producerConstructor,
+        Collection<P> targetCollection
+    ) {
+        if (configs != null) {
+            for (T config : configs) {
+                batchSizeAssert.accept(config.batchSizeInBits);
+                KeyProducer keyProducer = getKeyProducer.apply(config);
+                P producer = producerConstructor.apply(config, keyProducer);
+                targetCollection.add(producer);
             }
         }
     }
