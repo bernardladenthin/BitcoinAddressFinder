@@ -515,11 +515,12 @@ public class KeyUtilityTest {
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
         int privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
         Random random = new Random(123);
+        SecretSupplier randomSupplier = new RandomSecretSupplier(random);
         int overallWorkSize = 10;
         boolean returnStartSecretOnly = true;
 
         // act
-        BigInteger[] secrets = keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, random);
+        BigInteger[] secrets = keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, randomSupplier);
 
         // assert
         assertThat(secrets.length, is(1));
@@ -532,11 +533,12 @@ public class KeyUtilityTest {
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
         int privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
         Random random = new Random(123);
+        SecretSupplier randomSupplier = new RandomSecretSupplier(random);
         int overallWorkSize = 5;
         boolean returnStartSecretOnly = false;
 
         // act
-        BigInteger[] secrets = keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, random);
+        BigInteger[] secrets = keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, randomSupplier);
 
         // assert
         assertThat(secrets.length, is(overallWorkSize));
@@ -556,11 +558,12 @@ public class KeyUtilityTest {
                 throw new NoMoreSecretsAvailableException();
             }
         };
+        SecretSupplier randomSupplier = new RandomSecretSupplier(random);
         int overallWorkSize = 1;
         boolean returnStartSecretOnly = false;
 
         // act
-        keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, random);
+        keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, randomSupplier);
     }
     // </editor-fold>
 }

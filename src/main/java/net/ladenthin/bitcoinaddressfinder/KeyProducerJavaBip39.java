@@ -26,6 +26,7 @@ public class KeyProducerJavaBip39 extends KeyProducerJava {
     private final CKeyProducerJavaBip39 cKeyProducerJavaBip39;
     private final KeyUtility keyUtility;
     private final BitHelper bitHelper;
+    private final SecretSupplier randomSupplier;
     private final BIP39KeyProducer bip39KeyProducer;
     
     public KeyProducerJavaBip39(CKeyProducerJavaBip39 cKeyProducerJavaBip39, KeyUtility keyUtility, BitHelper bitHelper) {
@@ -41,10 +42,11 @@ public class KeyProducerJavaBip39 extends KeyProducerJava {
             cKeyProducerJavaBip39.getCreationTimeInstant(),
             cKeyProducerJavaBip39.hardened
         );
+        randomSupplier = new RandomSecretSupplier(bip39KeyProducer);
     }
 
     @Override
     public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
-        return keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, cKeyProducerJavaBip39.privateKeyMaxNumBits, bip39KeyProducer);
+        return keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, cKeyProducerJavaBip39.privateKeyMaxNumBits, randomSupplier);
     }
 }

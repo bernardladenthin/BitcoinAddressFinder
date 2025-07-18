@@ -29,6 +29,7 @@ public class KeyProducerJavaRandom extends KeyProducerJava {
     private final CKeyProducerJavaRandom cKeyProducerJavaRandom;
     private final KeyUtility keyUtility;
     private final BitHelper bitHelper;
+    private final SecretSupplier randomSupplier;
     
     /**
      * It is already thread local, no need for {@link java.util.concurrent.ThreadLocalRandom}.
@@ -73,10 +74,11 @@ public class KeyProducerJavaRandom extends KeyProducerJava {
             default:
                 throw new RuntimeException("Unknown keyProducerJavaRandomInstance: " + cKeyProducerJavaRandom.keyProducerJavaRandomInstance);
         }
+        randomSupplier = new RandomSecretSupplier(random);
     }
     
     @Override
     public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
-        return keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, cKeyProducerJavaRandom.privateKeyMaxNumBits, random);
+        return keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, cKeyProducerJavaRandom.privateKeyMaxNumBits, randomSupplier);
     }
 }

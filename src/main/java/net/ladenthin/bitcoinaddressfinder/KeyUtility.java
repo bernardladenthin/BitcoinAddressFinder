@@ -192,11 +192,11 @@ public class KeyUtility {
     }
     // </editor-fold>
     
-    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly, int privateKeyMaxNumBits, Random random) throws NoMoreSecretsAvailableException {
+    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly, int privateKeyMaxNumBits, SecretSupplier supplier) throws NoMoreSecretsAvailableException {
         int length = returnStartSecretOnly ? 1 : overallWorkSize;
         BigInteger[] secrets = new BigInteger[length];
         for (int i = 0; i < secrets.length; i++) {
-            secrets[i] = createSecret(privateKeyMaxNumBits, random);
+            secrets[i] = supplier.nextSecret(privateKeyMaxNumBits);
         }
         return secrets;
     }
