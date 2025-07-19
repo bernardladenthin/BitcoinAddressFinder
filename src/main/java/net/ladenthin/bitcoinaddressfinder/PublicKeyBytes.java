@@ -59,13 +59,16 @@ public class PublicKeyBytes {
      * @see #MAX_PRIVATE_KEY
      * @see org.bitcoinj.crypto.ECKey#fromPrivate(BigInteger, boolean)
      */
-    public static final BigInteger MIN_VALID_PRIVATE_KEY = BigInteger.valueOf(2);
+    public static final BigInteger MIN_VALID_PRIVATE_KEY = BigInteger.TWO;
+    public static final String MIN_VALID_PRIVATE_KEY_HEX = MIN_VALID_PRIVATE_KEY.toString(BitHelper.RADIX_HEX).toUpperCase();
+    
+    public static final String MAX_PRIVATE_KEY_HEX = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141";
 
     /**
      * The maximum valid private key according to the secp256k1 specification.
      * <p>
      * The valid range for secp256k1 private keys is technically defined as 
-     * {@code 0x1} to {@code 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141} (inclusive).
+     * {@code 0x1} to {@link MAX_PRIVATE_KEY_HEX} (inclusive).
      * This value represents the order of the secp256k1 curve (also called the group order).
      * </p>
      * <p>
@@ -77,7 +80,7 @@ public class PublicKeyBytes {
      * @see #MIN_VALID_PRIVATE_KEY
      * @see org.bitcoinj.crypto.ECKey
      */
-    public static final BigInteger MAX_PRIVATE_KEY = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16);
+    public static final BigInteger MAX_PRIVATE_KEY = new BigInteger(MAX_PRIVATE_KEY_HEX, BitHelper.RADIX_HEX);
 
     /**
      * I choose a random value for a replacement.

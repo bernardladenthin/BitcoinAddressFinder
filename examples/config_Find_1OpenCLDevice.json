@@ -1,6 +1,13 @@
 {
   "command": "Find",
   "finder": {
+    "keyProducerJavaIncremental": [
+        {
+            "keyProducerId": "exampleKeyProducerJavaIncremental",
+            "startAddress" : "0000000000000000000000000000000000000000000000000000000000000002",
+            "endAddress"   : "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
+        }
+    ],
     "keyProducerJavaBip39": [
         {
             "keyProducerId": "exampleKeyProducerJavaBip39Id",

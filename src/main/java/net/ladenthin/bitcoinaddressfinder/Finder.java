@@ -87,6 +87,13 @@ public class Finder implements Interruptable {
             cKeyProducerJavaBip39 -> cKeyProducerJavaBip39.keyProducerId,
             keyProducers
         );
+
+        processKeyProducers(
+            finder.keyProducerJavaIncremental,
+            cKeyProducerJavaIncremental -> new KeyProducerJavaIncremental(cKeyProducerJavaIncremental, keyUtility, bitHelper),
+            cKeyProducerJavaIncremental -> cKeyProducerJavaIncremental.keyProducerId,
+            keyProducers
+        );
     }
     
     private <T, K> void processKeyProducers(

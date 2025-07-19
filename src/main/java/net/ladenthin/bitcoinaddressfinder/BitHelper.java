@@ -22,6 +22,8 @@ import java.math.BigInteger;
 
 public class BitHelper {
     
+    public static final int RADIX_HEX = 16;
+    
     public int convertBitsToSize(int bits) {
         return 1 << bits;
     }

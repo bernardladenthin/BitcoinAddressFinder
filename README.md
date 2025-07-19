@@ -568,6 +568,19 @@ BitcoinAddressFinder supports multiple pseudorandom number generators (PRNGs) fo
 Pick one in your JSON via the `keyProducerJavaRandomInstance` field, e.g. `"keyProducerJavaRandomInstance": "SECURE_RANDOM"`.
 This flexibility lets you switch between **production-grade entropy** and **deterministic or deliberately weak sources** for audits and research.
 
+#### Key producer Use Cases
+* 🔐 Secure wallet generation
+* 🧪 Testing deterministic output
+* 🕵️ Simulating vulnerabilities
+* 🔄 Reproducible scans
+
+> ⚠️ **Security Warning**: This software is intended for research and educational purposes. Do **not** use it in production or on systems connected to the internet.
+
+A secure environment should be fully isolated — ideally an air-gapped computer (physically disconnected from all networks).  
+The software is highly optimized for performance and **not designed to run in constant time**, which means it may be vulnerable to **side-channel attacks** on shared or exposed systems.
+
+For generated vanity addresses or private keys, consider storing them safely using a [paper wallet](https://en.bitcoin.it/wiki/Paper_wallet).
+
 #### Supported PRNG Modes (key producer java random)
 
 | Value | Description |
@@ -703,20 +716,48 @@ Full:
 ...
 ```
 
-#### Key producer for Use Cases
-| Use Case                        | Recommended key producer                        |
-|---------------------------------|-------------------------------------------------|
-| 🔐 Secure wallet generation     | `SECURE_RANDOM`, `BIP39`                   |
-| 🧪 Testing deterministic output | `RANDOM_CUSTOM_SEED`                            |
-| 🕵️ Simulating vulnerabilities   | `RANDOM_CURRENT_TIME_MILLIS_SEED`               |
-| 🔄 Reproducible scans           | `SHA1_PRNG`, `RANDOM_CUSTOM_SEED`, `BIP39` |
+#### 🔢 incremental scanning (key producer java incremental)
+This mode generates private keys **sequentially in batches** within a specified key range. It is especially useful for:
 
-> ⚠️ **Security Warning**: This software is intended for research and educational purposes. Do **not** use it in production or on systems connected to the internet.
+- **Systematic scanning** of a defined keyspace range (e.g., for key recovery or cryptographic research)
+- **Batch processing** optimized for GPU/OpenCL parallelization
+- Ensuring **deterministic and reproducible key generation** from start to end
 
-A secure environment should be fully isolated — ideally an air-gapped computer (physically disconnected from all networks).  
-The software is highly optimized for performance and **not designed to run in constant time**, which means it may be vulnerable to **side-channel attacks** on shared or exposed systems.
+---
 
-For generated vanity addresses or private keys, consider storing them safely using a [paper wallet](https://en.bitcoin.it/wiki/Paper_wallet).
+#### Configuration Fields
+| JSON field     | Type   | Default                                                                                    | Purpose                                                      |
+|----------------|--------|--------------------------------------------------------------------------------------------|--------------------------------------------------------------|
+| `startAddress` | string | `0000000000000000000000000000000000000000000000000000000000000002`                         | Hex string of the first private key in the range (inclusive) |
+| `endAddress`   | string | `FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141` (secp256k1 group order) | Hex string of the last private key in the range (inclusive)  |
+
+#### How it works
+- Scanning begins **at `startAddress`**, producing sequential private keys in batches of size `batchSize`, up to and including `endAddress`.
+- Each batch contains exactly `batchSize` keys.
+- If the next full batch would go **beyond `endAddress`**, the process stops with an **exception**.
+- The **`endAddress` is inclusive**, but **partial batches are not allowed by default** — batches must fit completely inside the range.
+- For optimal performance, especially with OpenCL, configure `batchSize` and your GPU's grid size so that batches align perfectly within the range. This prevents errors and maximizes throughput.
+
+> **Note:** If unsure, set the `endAddress` slightly higher to closely match the batch size. This helps avoid exceptions and ensures efficient scanning.
+
+---
+
+#### Example JSON Configuration
+Example minimal configuration:
+
+```json
+...
+{
+  "keyProducerJavaIncremental": [
+    {
+      "keyProducerId": "exampleKeyProducerId",
+      "startAddress": "0000000000000000000000000000000000000000000000000000000000000002",
+      "endAddress": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
+    }
+  ]
+}
+...
+```
 
 ### Mixed Modes
 You can combine **vanity address generation** with **database lookups** to enhance functionality and efficiency.

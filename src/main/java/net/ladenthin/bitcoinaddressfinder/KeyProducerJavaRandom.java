@@ -24,9 +24,8 @@ import java.security.SecureRandom;
 import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 
-public class KeyProducerJavaRandom extends KeyProducerJava {
+public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRandom> {
 
-    private final CKeyProducerJavaRandom cKeyProducerJavaRandom;
     private final KeyUtility keyUtility;
     private final BitHelper bitHelper;
     private final SecretSupplier randomSupplier;
@@ -38,7 +37,6 @@ public class KeyProducerJavaRandom extends KeyProducerJava {
     
     public KeyProducerJavaRandom(CKeyProducerJavaRandom cKeyProducerJavaRandom, KeyUtility keyUtility, BitHelper bitHelper) {
         super(cKeyProducerJavaRandom);
-        this.cKeyProducerJavaRandom = cKeyProducerJavaRandom;
         this.keyUtility = keyUtility;
         this.bitHelper = bitHelper;
         
@@ -79,6 +77,6 @@ public class KeyProducerJavaRandom extends KeyProducerJava {
     
     @Override
     public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
-        return keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, cKeyProducerJavaRandom.privateKeyMaxNumBits, randomSupplier);
+        return keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, this.cKeyProducerJava.privateKeyMaxNumBits, randomSupplier);
     }
 }

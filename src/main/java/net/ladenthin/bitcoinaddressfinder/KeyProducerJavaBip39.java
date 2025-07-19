@@ -21,9 +21,8 @@ package net.ladenthin.bitcoinaddressfinder;
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
 
-public class KeyProducerJavaBip39 extends KeyProducerJava {
+public class KeyProducerJavaBip39 extends KeyProducerJava<CKeyProducerJavaBip39> {
 
-    private final CKeyProducerJavaBip39 cKeyProducerJavaBip39;
     private final KeyUtility keyUtility;
     private final BitHelper bitHelper;
     private final SecretSupplier randomSupplier;
@@ -31,7 +30,6 @@ public class KeyProducerJavaBip39 extends KeyProducerJava {
     
     public KeyProducerJavaBip39(CKeyProducerJavaBip39 cKeyProducerJavaBip39, KeyUtility keyUtility, BitHelper bitHelper) {
         super(cKeyProducerJavaBip39);
-        this.cKeyProducerJavaBip39 = cKeyProducerJavaBip39;
         this.keyUtility = keyUtility;
         this.bitHelper = bitHelper;
         
@@ -47,6 +45,6 @@ public class KeyProducerJavaBip39 extends KeyProducerJava {
 
     @Override
     public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
-        return keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, cKeyProducerJavaBip39.privateKeyMaxNumBits, randomSupplier);
+        return keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, this.cKeyProducerJava.privateKeyMaxNumBits, randomSupplier);
     }
 }
