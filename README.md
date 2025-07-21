@@ -774,28 +774,25 @@ The private key range is specified by two 64-character hex strings: `startAddres
 ...
 ```
 
-#### 🌐 `SOCKET_STREAM` (key producer java socket)  
-Read raw private keys from a TCP socket stream (client or server mode).  
-Useful for piping externally generated secrets (e.g., from Python, Go, etc.) directly into the finder.
+#### 🌐 `SOCKET_STREAM` (key producer via ZeroMQ)
+Receive raw private keys via a ZeroMQ `PULL` socket.
+Ideal for decoupled key streaming where producers push keys using ZeroMQ `PUSH` sockets.
 
-| JSON field | Type | Default | Purpose |
-|------------|------|---------|---------|
-| `keyProducerId` | string | — | Unique identifier for this key producer |
-| `host` | string | — | Host to connect to or bind on (e.g. `localhost`) |
-| `port` | number | — | TCP port to connect or bind |
-| `mode` | string enum (`CLIENT`, `SERVER`) | — | Defines whether the producer should connect to a socket or accept one |
-| `reconnectDelayMillis` | number | `200` | Delay between reconnect attempts |
-| `maxRetries` | number | `5` | Number of retry attempts before giving up (and throwing `NoMoreSecretsAvailableException`) |
+| JSON field         | Type                         | Default               | Description                                 |
+|--------------------|------------------------------|------------------------|---------------------------------------------|
+| keyProducerId      | string                       | —                      | Unique identifier for this key producer     |
+| address            | string                       | tcp://localhost:5555   | The ZeroMQ address to bind or connect to    |
+| mode               | string enum (BIND, CONNECT)  | CONNECT                | Whether this socket binds to or connects    |
+| `timeoutMillis`    | number                       | `-1`                   | Receive timeout in milliseconds:<br> `0` = non-blocking,<br> `-1` = infinite,<br> `>0` = wait that long |
+| logReceivedSecret  | boolean                      | false                  | Whether to log each received secret in hex  |
 
 Minimal:
 ```json
 ...
-"keyProducerJavaSocket": [
+"keyProducerJavaZmq": [
     {
-      "keyProducerId": "exampleKeyProducerId",
-      "host": "localhost",
-      "port": 12345,
-      "mode": "CLIENT"
+        "keyProducerId": "exampleKeyProducerId",
+        "address": "tcp://localhost:5555"
     }
 ],
 ...
@@ -804,20 +801,13 @@ Minimal:
 Full:
 ```json
 ...
-"keyProducerJavaSocket": [
+"keyProducerJavaZmq": [
     {
-      "keyProducerId": "exampleKeyProducerId",
-      "host": "localhost",
-      "port": 12345,
-      "mode": "SERVER",
-      "reconnectDelayMillis": 500,
-      "maxRetries": 10,
-      "timeout": 3000,
-      "logReceivedSecret" : true,
-      "connectionRetryCount" : 5,
-      "readRetryCount" : 5,
-      "retryDelayMillisConnect" : 10000,
-      "retryDelayMillisRead" : 10000,
+        "keyProducerId": "exampleKeyProducerId",
+        "address": "tcp://localhost:5555",
+        "mode": "BIND",
+        "timeoutMillis": -1,
+        "logReceivedSecret": true
     }
 ],
 ...
@@ -826,36 +816,58 @@ Full:
 
 ##### Example: Python Socket Stream Server:
 ```python
-import socket
+import zmq
 import os
 import time
 import binascii
+from enum import Enum
 
-HOST = 'localhost'
-PORT = 12345
+class Mode(Enum):
+    CONNECT = "connect"
+    BIND = "bind"
+
+ADDRESS = "tcp://localhost:5555"
+MODE = Mode.CONNECT  # Change to Mode.BIND to switch
+
+context = zmq.Context()
 
 while True:
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((HOST, PORT))
-            print(f"Connected to {HOST}:{PORT}")
-            while True:
-                private_key = os.urandom(32)
-                print("Sending key:", binascii.hexlify(private_key).decode())
-                s.sendall(private_key)
-                time.sleep(0.01)  # Slight delay to avoid flooding
-    except ConnectionRefusedError:
-        print("Connection refused, retrying in 1 second...")
+        socket = context.socket(zmq.PUSH)
+        socket.setsockopt(zmq.SNDHWM, 1) # Limit send queue to 1 message
+
+        if MODE == Mode.BIND:
+            socket.bind(ADDRESS)
+            print(f"Bound to {ADDRESS}")
+        else:
+            socket.connect(ADDRESS)
+            print(f"Connected to {ADDRESS}")
+
+        while True:
+            private_key = os.urandom(32)
+            print("Sending key:", binascii.hexlify(private_key).decode())
+            try:
+                socket.send(private_key, flags=zmq.NOBLOCK)
+            except zmq.Again:
+                print("Send queue full, message not sent.")
+            time.sleep(1.0)
+
+    except zmq.ZMQError as e:
+        print(f"ZMQ error occurred: {e}, retrying in 1 second...")
         time.sleep(1)
-    except BrokenPipeError:
-        print("Connection lost, reconnecting...")
-        time.sleep(1)
+
+    finally:
+        try:
+            socket.close()
+        except:
+            pass
 ```
 
 ##### 🔄 Protocol
-* Each private key must be exactly 32 raw bytes, sent binary, with no delimiter or framing.
-* Keys are interpreted as big-endian (new BigInteger(1, bytes) in Java).
-* Sending fewer than 32 bytes will cause blocking or exceptions.
+* Each private key must be exactly 32 raw bytes, sent as a single ZeroMQ message.
+* Messages are interpreted as unsigned big-endian (`new BigInteger(1, bytes)` in Java).
+* No framing or delimiters needed—ZeroMQ handles message boundaries.
+* Messages larger or smaller than 32 bytes will be discarded or raise errors.
 
 
 ### Mixed Modes

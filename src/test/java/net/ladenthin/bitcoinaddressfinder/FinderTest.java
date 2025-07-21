@@ -36,7 +36,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomInstance;
-import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
@@ -257,8 +257,8 @@ public class FinderTest {
             case KeyProducerJavaBip39:
                 configureKeyProducerJavaBip39(keyProducerId, cFinder);
                 break;
-            case KeyProducerJavaSocket:
-                configureKeyProducerJavaSocket(keyProducerId, cFinder);
+            case KeyProducerJavaZmq:
+                configureKeyProducerJavaZmq(keyProducerId, cFinder);
                 break;
             default:
                 throw new IllegalArgumentException("Unknown KeyProducerType: " + keyProducerType);
@@ -355,12 +355,10 @@ public class FinderTest {
         cFinder.keyProducerJavaIncremental.add(incremental);
 
         // 4. JavaSocket
-        CKeyProducerJavaSocket socket = new CKeyProducerJavaSocket();
-        socket.keyProducerId = "socketId";
-        socket.host = "localhost";
-        socket.port = 12345;
-        socket.mode = net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket.Mode.CLIENT;
-        cFinder.keyProducerJavaSocket.add(socket);
+        CKeyProducerJavaZmq zmq = new CKeyProducerJavaZmq();
+        zmq.keyProducerId = "zmqId";
+        zmq.address = KeyProducerJavaZmqTest.findFreeZmqAddress();
+        cFinder.keyProducerJavaZmq.add(zmq);
 
         Finder finder = new Finder(cFinder);
 
@@ -368,13 +366,13 @@ public class FinderTest {
         finder.startKeyProducer();
 
         // Assert
-        assertThat(finder.getKeyProducers().keySet(), hasItems("randomId", "bip39Id", "incrementalId", "socketId"));
+        assertThat(finder.getKeyProducers().keySet(), hasItems("randomId", "bip39Id", "incrementalId", "zmqId"));
 
         // Additionally assert each instance is of expected class type
         assertThat(finder.getKeyProducers().get("randomId"), instanceOf(KeyProducerJavaRandom.class));
         assertThat(finder.getKeyProducers().get("bip39Id"), instanceOf(KeyProducerJavaBip39.class));
         assertThat(finder.getKeyProducers().get("incrementalId"), instanceOf(KeyProducerJavaIncremental.class));
-        assertThat(finder.getKeyProducers().get("socketId"), instanceOf(KeyProducerJavaSocket.class));
+        assertThat(finder.getKeyProducers().get("zmqId"), instanceOf(KeyProducerJavaZmq.class));
         
         // Interrupt and free producers
         finder.interrupt();
@@ -422,13 +420,14 @@ public class FinderTest {
         cFinder.keyProducerJavaBip39.add(bip39);
     }
     
-    private void configureKeyProducerJavaSocket(String keyProducerId, CFinder cFinder) {
-        CKeyProducerJavaSocket socket = new CKeyProducerJavaSocket();
-        socket.keyProducerId = keyProducerId;
-        socket.host = "localhost"; // or any dummy valid host for testing
-        socket.port = 12345;       // dummy port
-        socket.mode = CKeyProducerJavaSocket.Mode.CLIENT;
-        cFinder.keyProducerJavaSocket.add(socket);
+    private void configureKeyProducerJavaZmq(String keyProducerId, CFinder cFinder) {
+        CKeyProducerJavaZmq zmq = new CKeyProducerJavaZmq();
+        zmq.address = KeyProducerJavaZmqTest.findFreeZmqAddress();
+        // A timeout is required to ensure the producer can terminate.
+        // Without it, the producer may block indefinitely while waiting for keys.
+        zmq.timeoutMillis = 10_000;
+        zmq.keyProducerId = keyProducerId;
+        cFinder.keyProducerJavaZmq.add(zmq);
     }
     
     private void configureConsumerJava(CFinder cFinder) throws IOException {

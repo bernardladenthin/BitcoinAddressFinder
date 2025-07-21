@@ -276,7 +276,7 @@ public class KeyUtility {
      * integer
      * @return a positive BigInteger constructed from the buffer
      */
-    public static BigInteger bigIntegerFromUnsignedByteArray(byte[] buffer) {
+    public BigInteger bigIntegerFromUnsignedByteArray(byte[] buffer) {
         if (buffer.length != PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES) {
             throw new IllegalArgumentException("Expected buffer of length " + PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES);
         }

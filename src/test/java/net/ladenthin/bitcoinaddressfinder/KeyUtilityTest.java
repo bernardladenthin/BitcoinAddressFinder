@@ -585,6 +585,7 @@ public class KeyUtilityTest {
     // <editor-fold defaultstate="collapsed" desc="bigIntegerFromUnsignedByteArray">
     @Test
     public void bigIntegerFromUnsignedByteArray_exact32Bytes_constructsCorrectly() {
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
         // arrange
         byte[] buffer = new byte[32];
         buffer[30] = 0x12;
@@ -594,7 +595,7 @@ public class KeyUtilityTest {
         BigInteger expected = new BigInteger("1234", 16);
 
         // act
-        BigInteger result = KeyUtility.bigIntegerFromUnsignedByteArray(buffer);
+        BigInteger result = keyUtility.bigIntegerFromUnsignedByteArray(buffer);
 
         // assert
         assertThat(result, is(equalTo(expected)));
@@ -602,9 +603,10 @@ public class KeyUtilityTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void bigIntegerFromUnsignedByteArray_wrongLength_throwsException() {
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
         // too short
         byte[] invalid = new byte[31];
-        KeyUtility.bigIntegerFromUnsignedByteArray(invalid);
+        keyUtility.bigIntegerFromUnsignedByteArray(invalid);
     }
     // </editor-fold>
 }

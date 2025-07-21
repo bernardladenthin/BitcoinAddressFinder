@@ -96,14 +96,14 @@ public class AbstractProducerTest {
         when(logger.isTraceEnabled()).thenReturn(true);
         abstractProducerTestImpl.setLogger(logger);
 
-        BigInteger secret = new BigInteger(Hex.decodeHex(givenSecret));
+        BigInteger secret = new BigInteger(1, Hex.decodeHex(givenSecret));
         boolean logSecretBase = true;
 
         // act
         BigInteger secretBase = abstractProducerTestImpl.createSecretBase(secret, logSecretBase);
 
         // assert
-        assertThat(Hex.encodeHexString(secretBase.toByteArray()), is(equalTo(expectedSecretBase)));
+        assertThat(keyUtility.bigIntegerToFixedLengthHex(secretBase), is(equalTo(expectedSecretBase)));
 
         ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
         verify(logger, times(1)).info(logCaptor.capture());
