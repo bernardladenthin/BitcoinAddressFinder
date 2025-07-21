@@ -147,15 +147,15 @@ public abstract class AbstractProducer implements Producer {
         BigInteger secretBase = keyUtility.killBits(secret, killBits);
         
         if(logSecretBase) {
-            logger.info("secretBase: " + org.bouncycastle.util.encoders.Hex.toHexString(secretBase.toByteArray()) + "/" + cProducer.batchSizeInBits);
+            logger.info("secretBase: " + keyUtility.bigIntegerToFixedLengthHex(secretBase) + "/" + cProducer.batchSizeInBits);
         }
             
         if (logger.isTraceEnabled()) {
             logger.trace("secret BigInteger: " + secret);
-            logger.trace("secret as byte array: " + Hex.encodeHexString(secret.toByteArray()));
+            logger.trace("secret as byte array: " + keyUtility.bigIntegerToFixedLengthHex(secret));
             logger.trace("killBits: " + Hex.encodeHexString(killBits.toByteArray()));
             logger.trace("secretBase: " + secretBase);
-            logger.trace("secretBase as byte array: " + Hex.encodeHexString(secretBase.toByteArray()));
+            logger.trace("secretBase as byte array: " + keyUtility.bigIntegerToFixedLengthHex(secretBase));
         }
 
         return secretBase;

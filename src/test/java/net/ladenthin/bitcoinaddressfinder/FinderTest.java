@@ -18,6 +18,8 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import com.tngtech.java.junit.dataprovider.DataProviderRunner;
+import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
 import org.junit.Rule;
 import org.junit.Test;
@@ -30,15 +32,20 @@ import java.time.Duration;
 import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomInstance;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
+import org.junit.runner.RunWith;
 
+@RunWith(DataProviderRunner.class)
 public class FinderTest {
 
     @Rule
@@ -231,7 +238,8 @@ public class FinderTest {
     
     // <editor-fold defaultstate="collapsed" desc="testFullCycle">
     @Test
-    public void testFullCycle_producerJavaSetAndInitialized_statesCorrect() throws IOException, InterruptedException {
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_LOCAL_JAVA_KEY_PRODUCER, location = CommonDataProvider.class)
+    public void testFullCycle_keyProducerJavaRandomSetAndInitialized_statesCorrect(CommonDataProvider.KeyProducerTypesLocal keyProducerType) throws IOException, InterruptedException {
         // arrange
         CFinder cFinder = new CFinder();
         String keyProducerId = "exampleId";
@@ -239,7 +247,22 @@ public class FinderTest {
         cProducerJava.keyProducerId = keyProducerId;
         cProducerJava.runOnce = false;
         cFinder.producerJava.add(cProducerJava);
-        configureKeyProducerJavaRandom(keyProducerId, cFinder);
+        switch (keyProducerType) {
+            case KeyProducerJavaRandom:
+                configureKeyProducerJavaRandom(keyProducerId, cFinder);
+                break;
+            case KeyProducerJavaIncremental:
+                configureKeyProducerJavaIncremental(keyProducerId, cFinder);
+                break;
+            case KeyProducerJavaBip39:
+                configureKeyProducerJavaBip39(keyProducerId, cFinder);
+                break;
+            case KeyProducerJavaSocket:
+                configureKeyProducerJavaSocket(keyProducerId, cFinder);
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown KeyProducerType: " + keyProducerType);
+        }
         
         configureConsumerJava(cFinder);
         Finder finder = new Finder(cFinder);
@@ -307,6 +330,59 @@ public class FinderTest {
     }
     // </editor-fold>
     
+    @Test
+    public void startKeyProducer_allConfiguredKeyProducerTypes_haveInstances() throws IOException {
+        // Arrange
+        CFinder cFinder = new CFinder();
+
+        // Configure one instance for each KeyProducer type
+        // 1. JavaRandom
+        CKeyProducerJavaRandom javaRandom = new CKeyProducerJavaRandom();
+        javaRandom.keyProducerId = "randomId";
+        javaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
+        javaRandom.customSeed = 123L;
+        cFinder.keyProducerJavaRandom.add(javaRandom);
+
+        // 2. JavaBip39
+        CKeyProducerJavaBip39 bip39 = new CKeyProducerJavaBip39();
+        bip39.keyProducerId = "bip39Id";
+        bip39.mnemonic = KeyProducerJavaBip39Test.MNEMONIC;
+        cFinder.keyProducerJavaBip39.add(bip39);
+
+        // 3. JavaIncremental
+        CKeyProducerJavaIncremental incremental = new CKeyProducerJavaIncremental();
+        incremental.keyProducerId = "incrementalId";
+        cFinder.keyProducerJavaIncremental.add(incremental);
+
+        // 4. JavaSocket
+        CKeyProducerJavaSocket socket = new CKeyProducerJavaSocket();
+        socket.keyProducerId = "socketId";
+        socket.host = "localhost";
+        socket.port = 12345;
+        socket.mode = net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket.Mode.CLIENT;
+        cFinder.keyProducerJavaSocket.add(socket);
+
+        Finder finder = new Finder(cFinder);
+
+        // Act
+        finder.startKeyProducer();
+
+        // Assert
+        assertThat(finder.getKeyProducers().keySet(), hasItems("randomId", "bip39Id", "incrementalId", "socketId"));
+
+        // Additionally assert each instance is of expected class type
+        assertThat(finder.getKeyProducers().get("randomId"), instanceOf(KeyProducerJavaRandom.class));
+        assertThat(finder.getKeyProducers().get("bip39Id"), instanceOf(KeyProducerJavaBip39.class));
+        assertThat(finder.getKeyProducers().get("incrementalId"), instanceOf(KeyProducerJavaIncremental.class));
+        assertThat(finder.getKeyProducers().get("socketId"), instanceOf(KeyProducerJavaSocket.class));
+        
+        // Interrupt and free producers
+        finder.interrupt();
+
+        // Assert keyProducers map is empty after interrupt
+        assertThat(finder.getKeyProducers().keySet(), is(empty()));
+    }
+    
     private void configureProducerWithExamples(CFinder cFinder) {
         String keyProducerId_producerJava = "exampleId_producerJava";
         String keyProducerId_producerJavaSecretsFiles = "exampleId_producerJavaSecretsFiles";
@@ -331,6 +407,28 @@ public class FinderTest {
         cKeyProducerJavaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
         cKeyProducerJavaRandom.customSeed = 0L;
         cFinder.keyProducerJavaRandom.add(cKeyProducerJavaRandom);
+    }
+    
+    private void configureKeyProducerJavaIncremental(String keyProducerId, CFinder cFinder) {
+        CKeyProducerJavaIncremental incremental = new CKeyProducerJavaIncremental();
+        incremental.keyProducerId = keyProducerId;
+        cFinder.keyProducerJavaIncremental.add(incremental);
+    }
+    
+    private void configureKeyProducerJavaBip39(String keyProducerId, CFinder cFinder) {
+        CKeyProducerJavaBip39 bip39 = new CKeyProducerJavaBip39();
+        bip39.keyProducerId = keyProducerId;
+        bip39.mnemonic = KeyProducerJavaBip39Test.MNEMONIC;
+        cFinder.keyProducerJavaBip39.add(bip39);
+    }
+    
+    private void configureKeyProducerJavaSocket(String keyProducerId, CFinder cFinder) {
+        CKeyProducerJavaSocket socket = new CKeyProducerJavaSocket();
+        socket.keyProducerId = keyProducerId;
+        socket.host = "localhost"; // or any dummy valid host for testing
+        socket.port = 12345;       // dummy port
+        socket.mode = CKeyProducerJavaSocket.Mode.CLIENT;
+        cFinder.keyProducerJavaSocket.add(socket);
     }
     
     private void configureConsumerJava(CFinder cFinder) throws IOException {

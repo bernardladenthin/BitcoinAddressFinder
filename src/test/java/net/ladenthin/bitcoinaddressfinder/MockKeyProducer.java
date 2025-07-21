@@ -47,5 +47,9 @@ public class MockKeyProducer implements KeyProducer {
         return secrets;
     }
 
+    @Override
+    public void interrupt() {
+    }
+
     
 }

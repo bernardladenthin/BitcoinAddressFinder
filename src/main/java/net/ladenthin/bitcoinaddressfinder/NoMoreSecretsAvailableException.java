@@ -28,10 +28,18 @@ package net.ladenthin.bitcoinaddressfinder;
 public class NoMoreSecretsAvailableException extends RuntimeException {
     
     public NoMoreSecretsAvailableException() {
-        super("No more secrets available.");
+        super();
     }
-    
-    public NoMoreSecretsAvailableException(String s) {
-        super(s);
+
+    public NoMoreSecretsAvailableException(String message) {
+        super(message);
+    }
+
+    public NoMoreSecretsAvailableException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    public NoMoreSecretsAvailableException(Throwable cause) {
+        super(cause);
     }
 }

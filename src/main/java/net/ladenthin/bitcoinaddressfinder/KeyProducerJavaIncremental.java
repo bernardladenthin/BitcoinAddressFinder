@@ -54,4 +54,8 @@ public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJava
         
         return secrets;
     }
+
+    @Override
+    public void interrupt() {
+    }
 }

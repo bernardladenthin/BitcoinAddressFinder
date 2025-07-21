@@ -759,6 +759,105 @@ Example minimal configuration:
 ...
 ```
 
+🧩 This configuration incrementally searches a defined range of private keys. It is particularly suited for brute-force challenges, such as the [71st Bitcoin puzzle transaction](https://privatekeys.pw/puzzles/bitcoin-puzzle-tx?status=unsolved#p71).  
+The private key range is specified by two 64-character hex strings: `startAddress` and `endAddress`.
+
+```json
+...
+"keyProducerJavaIncremental": [
+    {
+      "keyProducerId": "exampleKeyProducerJavaIncremental",
+      "startAddress": "0000000000000000000000000000000000000000000000400000000000000000",
+      "endAddress":   "00000000000000000000000000000000000000000000007fffffffffffffffff"
+    }
+],
+...
+```
+
+#### 🌐 `SOCKET_STREAM` (key producer java socket)  
+Read raw private keys from a TCP socket stream (client or server mode).  
+Useful for piping externally generated secrets (e.g., from Python, Go, etc.) directly into the finder.
+
+| JSON field | Type | Default | Purpose |
+|------------|------|---------|---------|
+| `keyProducerId` | string | — | Unique identifier for this key producer |
+| `host` | string | — | Host to connect to or bind on (e.g. `localhost`) |
+| `port` | number | — | TCP port to connect or bind |
+| `mode` | string enum (`CLIENT`, `SERVER`) | — | Defines whether the producer should connect to a socket or accept one |
+| `reconnectDelayMillis` | number | `200` | Delay between reconnect attempts |
+| `maxRetries` | number | `5` | Number of retry attempts before giving up (and throwing `NoMoreSecretsAvailableException`) |
+
+Minimal:
+```json
+...
+"keyProducerJavaSocket": [
+    {
+      "keyProducerId": "exampleKeyProducerId",
+      "host": "localhost",
+      "port": 12345,
+      "mode": "CLIENT"
+    }
+],
+...
+```
+
+Full:
+```json
+...
+"keyProducerJavaSocket": [
+    {
+      "keyProducerId": "exampleKeyProducerId",
+      "host": "localhost",
+      "port": 12345,
+      "mode": "SERVER",
+      "reconnectDelayMillis": 500,
+      "maxRetries": 10,
+      "timeout": 3000,
+      "logReceivedSecret" : true,
+      "connectionRetryCount" : 5,
+      "readRetryCount" : 5,
+      "retryDelayMillisConnect" : 10000,
+      "retryDelayMillisRead" : 10000,
+    }
+],
+...
+```
+
+
+##### Example: Python Socket Stream Server:
+```python
+import socket
+import os
+import time
+import binascii
+
+HOST = 'localhost'
+PORT = 12345
+
+while True:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((HOST, PORT))
+            print(f"Connected to {HOST}:{PORT}")
+            while True:
+                private_key = os.urandom(32)
+                print("Sending key:", binascii.hexlify(private_key).decode())
+                s.sendall(private_key)
+                time.sleep(0.01)  # Slight delay to avoid flooding
+    except ConnectionRefusedError:
+        print("Connection refused, retrying in 1 second...")
+        time.sleep(1)
+    except BrokenPipeError:
+        print("Connection lost, reconnecting...")
+        time.sleep(1)
+```
+
+##### 🔄 Protocol
+* Each private key must be exactly 32 raw bytes, sent binary, with no delimiter or framing.
+* Keys are interpreted as big-endian (new BigInteger(1, bytes) in Java).
+* Sending fewer than 32 bytes will cause blocking or exceptions.
+
+
 ### Mixed Modes
 You can combine **vanity address generation** with **database lookups** to enhance functionality and efficiency.
 

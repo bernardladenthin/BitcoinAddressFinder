@@ -20,7 +20,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJava;
 
-public abstract class KeyProducerJava<T extends CKeyProducerJava>  extends AbstractKeyProducer {
+public abstract class KeyProducerJava<T extends CKeyProducerJava> extends AbstractKeyProducer {
 
     protected final T cKeyProducerJava;
     

@@ -27,7 +27,6 @@ import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
 import org.bitcoinj.base.Network;
-import org.bitcoinj.crypto.DeterministicKey;
 import org.bitcoinj.crypto.ECKey;
 import org.junit.Before;
 import org.junit.Test;
@@ -564,6 +563,48 @@ public class KeyUtilityTest {
 
         // act
         keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, randomSupplier);
+    }
+    // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="bigIntegerToFixedLengthHex">
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_LARGE_SECRETS_AS_HEX, location = CommonDataProvider.class)
+    public void bigIntegerToFixedLengthHex_knownBigInteger_correctHex(String largeSecretsAsHex) {
+        // arrange
+        BigInteger input = new BigInteger(largeSecretsAsHex, 16);
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+
+        // act
+        String result = keyUtility.bigIntegerToFixedLengthHex(input);
+
+        // assert
+        assertThat(result, is(equalTo(largeSecretsAsHex)));
+    }
+    // </editor-fold>
+    
+    // <editor-fold defaultstate="collapsed" desc="bigIntegerFromUnsignedByteArray">
+    @Test
+    public void bigIntegerFromUnsignedByteArray_exact32Bytes_constructsCorrectly() {
+        // arrange
+        byte[] buffer = new byte[32];
+        buffer[30] = 0x12;
+        buffer[31] = 0x34;
+
+        // expected value is 0x000000...001234 = 0x1234
+        BigInteger expected = new BigInteger("1234", 16);
+
+        // act
+        BigInteger result = KeyUtility.bigIntegerFromUnsignedByteArray(buffer);
+
+        // assert
+        assertThat(result, is(equalTo(expected)));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void bigIntegerFromUnsignedByteArray_wrongLength_throwsException() {
+        // too short
+        byte[] invalid = new byte[31];
+        KeyUtility.bigIntegerFromUnsignedByteArray(invalid);
     }
     // </editor-fold>
 }

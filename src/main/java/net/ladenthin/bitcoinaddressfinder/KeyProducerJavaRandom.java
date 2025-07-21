@@ -79,4 +79,8 @@ public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRando
     public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
         return keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, this.cKeyProducerJava.privateKeyMaxNumBits, randomSupplier);
     }
+
+    @Override
+    public void interrupt() {
+    }
 }

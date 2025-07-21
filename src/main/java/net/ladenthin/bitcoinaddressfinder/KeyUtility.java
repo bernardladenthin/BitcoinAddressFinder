@@ -248,4 +248,38 @@ public class KeyUtility {
             bytes[i + 2] = tmp2;
         }
     }
+
+    /**
+     * Converts a BigInteger to a fixed-length 64-character (32-byte) lowercase
+     * hex string. Preserves leading zeros, which are otherwise dropped by
+     * BigInteger.toByteArray().
+     *
+     * @param value The BigInteger to convert.
+     * @return A 64-character hex string representing the value as a 256-bit
+     * number.
+     */
+    public String bigIntegerToFixedLengthHex(BigInteger value) {
+        byte[] raw = value.toByteArray();
+        byte[] result = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
+        int srcPos = Math.max(0, raw.length - result.length);
+        int length = Math.min(result.length, raw.length);
+        System.arraycopy(raw, srcPos, result, result.length - length, length);
+        return Hex.toHexString(result);
+    }
+
+    /**
+     * Converts a 32-byte array into a positive BigInteger, preserving leading
+     * zeros. The array must be exactly
+     * {@link PublicKeyBytes#PRIVATE_KEY_MAX_NUM_BYTES} bytes.
+     *
+     * @param buffer a 32-byte array representing the unsigned big-endian
+     * integer
+     * @return a positive BigInteger constructed from the buffer
+     */
+    public static BigInteger bigIntegerFromUnsignedByteArray(byte[] buffer) {
+        if (buffer.length != PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES) {
+            throw new IllegalArgumentException("Expected buffer of length " + PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES);
+        }
+        return new BigInteger(1, buffer);
+    }
 }

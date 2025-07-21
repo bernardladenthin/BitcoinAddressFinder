@@ -20,6 +20,6 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
 
-public interface KeyProducer {
+public interface KeyProducer extends Interruptable {
     public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException;
 }

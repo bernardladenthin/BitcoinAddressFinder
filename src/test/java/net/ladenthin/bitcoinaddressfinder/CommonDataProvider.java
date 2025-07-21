@@ -27,6 +27,38 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.*;
 
 public class CommonDataProvider {
+    
+    /**
+     * For {@link #cSecretFormat()}.
+     */
+    public final static String DATA_PROVIDER_LARGE_SECRETS_AS_HEX = "largeSecretsAsHex";
+
+    /**
+    * Provides valid 64-character (32-byte) hex strings representing large unsigned secrets.
+    * 
+    * These values are used to verify correct conversion from hex to BigInteger and back to hex,
+    * without losing leading zero bytes — a common issue with BigInteger.toByteArray().
+    *
+    * ⚠️ Important:
+    * - Avoid using {@code new BigInteger(...).toByteArray()} directly, as it may introduce a leading sign byte (0x00)
+    *   or drop leading zeros depending on the value.
+    * - Instead, use {@code BigInteger.toString(16)} cautiously, or prefer utility methods like
+    *   {@code keyUtility.bigIntegerToFixedLengthHex(...)} to ensure fixed-length 64-char hex encoding.
+    *
+    * These test cases help detect and avoid those pitfalls.
+    */
+    @DataProvider
+    public static Object[][] largeSecretsAsHex() {
+        return new Object[][] {
+            {"0000000000000000000000000000000000000000000000000000000000000000"},
+            {"0000000000000000000000000000000000000000000000000000000000000001"},
+            {"0000000000000000000000000000000000000000000000400000000000000000"},
+            {"00000000000000000000000000000000000000000000007fffffffffffffffff"},
+            {"2c7419465eaba472fd5ff50055a363e55936567a72995be2788aebb4ae74f3ff"},
+            {"a6eaa2a8fa07686f3ef73736ea4668f5dbcc1f7c178b99afcacdadb64f0ce8bf"}, // must remain 64 hex chars; don't truncate/pad during conversion
+            {PublicKeyBytes.MAX_PRIVATE_KEY_HEX.toLowerCase()},
+        };
+    }
 
     /**
      * For {@link #cSecretFormat()}.
@@ -50,6 +82,28 @@ public class CommonDataProvider {
             {ByteOrder.BIG_ENDIAN, ByteOrder.BIG_ENDIAN, false},
             {ByteOrder.LITTLE_ENDIAN, ByteOrder.BIG_ENDIAN, true},
             {ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN, true},
+        };
+    }
+    
+    public static enum KeyProducerTypesLocal {
+        KeyProducerJavaBip39,
+        KeyProducerJavaIncremental,
+        KeyProducerJavaRandom,
+        KeyProducerJavaSocket;
+    }
+    
+    /**
+     * For {@link FinderTest}.
+     */
+    public static final String DATA_PROVIDER_LOCAL_JAVA_KEY_PRODUCER = "localJavaKeyProducer";
+
+    @DataProvider
+    public static Object[][] localJavaKeyProducer() {
+        return new Object[][] {
+            {KeyProducerTypesLocal.KeyProducerJavaBip39},
+            {KeyProducerTypesLocal.KeyProducerJavaIncremental},
+            {KeyProducerTypesLocal.KeyProducerJavaRandom},
+            {KeyProducerTypesLocal.KeyProducerJavaSocket}
         };
     }
 

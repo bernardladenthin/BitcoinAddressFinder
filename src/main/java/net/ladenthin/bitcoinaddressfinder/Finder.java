@@ -94,6 +94,13 @@ public class Finder implements Interruptable {
             cKeyProducerJavaIncremental -> cKeyProducerJavaIncremental.keyProducerId,
             keyProducers
         );
+
+        processKeyProducers(
+            finder.keyProducerJavaSocket,
+            cKeyProducerJavaSocket -> new KeyProducerJavaSocket(cKeyProducerJavaSocket, keyUtility, bitHelper),
+            cKeyProducerJavaSocket -> cKeyProducerJavaSocket.keyProducerId,
+            keyProducers
+        );
     }
     
     private <T, K> void processKeyProducers(
@@ -132,7 +139,7 @@ public class Finder implements Interruptable {
         processProducers(
             finder.producerJava,
             bitHelper::assertBatchSizeInBitsIsInRange,
-            this::getKeyProducerJava,
+            this::getKeyProducer,
             (config, keyProducer) -> new ProducerJava(config, consumerJava, keyUtility, keyProducer, bitHelper),
             javaProducers
         );
@@ -140,7 +147,7 @@ public class Finder implements Interruptable {
         processProducers(
             finder.producerJavaSecretsFiles,
             bitHelper::assertBatchSizeInBitsIsInRange,
-            this::getKeyProducerJava,
+            this::getKeyProducer,
             (config, keyProducer) -> new ProducerJavaSecretsFiles(config, consumerJava, keyUtility, keyProducer, bitHelper),
             javaProducersSecretsFiles
         );
@@ -148,7 +155,7 @@ public class Finder implements Interruptable {
         processProducers(
             finder.producerOpenCL,
             bitHelper::assertBatchSizeInBitsIsInRange,
-            this::getKeyProducerJava,
+            this::getKeyProducer,
             (config, keyProducer) -> new ProducerOpenCL(config, consumerJava, keyUtility, keyProducer, bitHelper),
             openCLProducers
         );
@@ -171,7 +178,7 @@ public class Finder implements Interruptable {
         }
     }
 
-    public KeyProducer getKeyProducerJava(CProducer cProducer) throws RuntimeException {
+    public KeyProducer getKeyProducer(CProducer cProducer) throws RuntimeException {
         KeyProducer keyProducer = keyProducers.get(cProducer.keyProducerId);
         if(keyProducer == null) {
             throw new KeyProducerIdUnknownException(cProducer.keyProducerId);
@@ -213,15 +220,25 @@ public class Finder implements Interruptable {
     
     @Override
     public void interrupt() {
-        logger.info("interrupt called: delegate interrupt to all producer");
+        logger.info("interrupt called: delegate interrupt to all keyProducers and producers");
+        
+        // Interrupt all Producers
         for (Producer producer : getAllProducers()) {
-            logger.info("Interrupt: " + producer.toString());
+            logger.info("Interrupt Producer: " + producer.toString());
             producer.interrupt();
             logger.info("waitTillProducerNotRunning ...");
             producer.waitTillProducerNotRunning();
             producer.releaseProducer();
         }
         freeAllProducers();
+        
+        // Interrupt all KeyProducers
+        for (KeyProducer keyProducer : getKeyProducers().values()) {
+            logger.info("Interrupt KeyProducer: " + keyProducer.toString());
+            keyProducer.interrupt();
+        }
+        freeAllKeyProducers();
+
         logger.info("All producers released and freed.");
     }
     
@@ -241,6 +258,10 @@ public class Finder implements Interruptable {
         javaProducers.clear();
         javaProducersSecretsFiles.clear();
         openCLProducers.clear();
+    }
+    
+    public void freeAllKeyProducers() {
+        keyProducers.clear();
     }
     
     public List<Consumer> getAllConsumers() {
