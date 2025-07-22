@@ -37,6 +37,8 @@ import org.zeromq.SocketType;
 
 public class KeyProducerJavaZmqTest {
 
+    private static final int WAIT_TIME = 1000;
+    
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
@@ -124,7 +126,7 @@ public class KeyProducerJavaZmqTest {
         Future<Void> senderFuture = executorService.submit(() -> {
             try (ZContext context = new ZContext(); ZMQ.Socket socket = context.createSocket(ZMQ.PUSH)) {
                 socket.connect(address);
-                Thread.sleep(100); // wait for receiver
+                Thread.sleep(WAIT_TIME); // wait for receiver
                 socket.send(secretBytes);
             }
             return null;
@@ -205,7 +207,7 @@ public class KeyProducerJavaZmqTest {
         });
 
         // Let it enter the blocking receive
-        Thread.sleep(200);
+        Thread.sleep(WAIT_TIME);
 
         // Now interrupt from another thread (will close socket/context)
         producer.interrupt();
