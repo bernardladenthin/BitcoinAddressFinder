@@ -18,6 +18,7 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import com.google.common.annotations.VisibleForTesting;
 import java.time.Instant;
 import java.util.ArrayList;

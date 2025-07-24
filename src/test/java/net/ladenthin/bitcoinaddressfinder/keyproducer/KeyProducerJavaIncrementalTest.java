@@ -16,13 +16,16 @@
  *
  */
 // @formatter:on
-package net.ladenthin.bitcoinaddressfinder;
+package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
 import java.math.BigInteger;
+import net.ladenthin.bitcoinaddressfinder.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
 import static org.junit.Assert.fail;

@@ -24,6 +24,7 @@ import java.math.BigInteger;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

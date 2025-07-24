@@ -38,6 +38,15 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.function.*;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdIsNotUniqueException;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdNullException;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdUnknownException;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaBip39;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaIncremental;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaRandom;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocket;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaZmq;
 
 public class Finder implements Interruptable {
 

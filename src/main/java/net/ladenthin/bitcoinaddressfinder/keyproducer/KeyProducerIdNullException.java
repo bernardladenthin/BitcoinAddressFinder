@@ -1,6 +1,6 @@
 // @formatter:off
 /**
- * Copyright 2025 Bernard Ladenthin bernard.ladenthin@gmail.com
+ * Copyright 2024 Bernard Ladenthin bernard.ladenthin@gmail.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,11 @@
  *
  */
 // @formatter:on
-package net.ladenthin.bitcoinaddressfinder;
+package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
-import java.math.BigInteger;
-
-@FunctionalInterface
-public interface SecretSupplier {
-    BigInteger nextSecret(int bitLength) throws NoMoreSecretsAvailableException;
+public class KeyProducerIdNullException extends RuntimeException {
+    
+    public KeyProducerIdNullException() {
+        super("Key producer id must not be null.");
+    }
 }

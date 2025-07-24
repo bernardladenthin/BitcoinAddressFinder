@@ -24,6 +24,7 @@ import java.math.BigInteger;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;

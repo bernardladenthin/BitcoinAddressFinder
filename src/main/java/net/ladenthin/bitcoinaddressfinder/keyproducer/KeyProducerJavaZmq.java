@@ -16,7 +16,7 @@
  *
  */
 // @formatter:on
-package net.ladenthin.bitcoinaddressfinder;
+package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
@@ -24,6 +24,9 @@ import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
 
 import java.math.BigInteger;
+import net.ladenthin.bitcoinaddressfinder.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import org.zeromq.SocketType;
 
 public class KeyProducerJavaZmq extends KeyProducerJava<CKeyProducerJavaZmq> {

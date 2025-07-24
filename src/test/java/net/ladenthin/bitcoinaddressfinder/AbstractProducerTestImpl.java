@@ -20,6 +20,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 
 public class AbstractProducerTestImpl extends AbstractProducer {
 

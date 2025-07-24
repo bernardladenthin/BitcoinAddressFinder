@@ -16,11 +16,8 @@
  *
  */
 // @formatter:on
-package net.ladenthin.bitcoinaddressfinder;
+package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-public class KeyProducerIdUnknownException extends RuntimeException {
+public abstract class AbstractKeyProducer implements KeyProducer {
     
-    public KeyProducerIdUnknownException(String id) {
-        super("Key producer id is unknown: " + id);
-    }
 }

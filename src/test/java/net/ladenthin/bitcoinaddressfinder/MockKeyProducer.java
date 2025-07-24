@@ -18,8 +18,10 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import java.math.BigInteger;
 import java.util.Random;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 
 public class MockKeyProducer implements KeyProducer {
 

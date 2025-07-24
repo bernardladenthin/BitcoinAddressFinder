@@ -16,7 +16,7 @@
  *
  */
 // @formatter:on
-package net.ladenthin.bitcoinaddressfinder;
+package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 /**
  * Exception thrown when no more secrets are available.

@@ -18,6 +18,7 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;

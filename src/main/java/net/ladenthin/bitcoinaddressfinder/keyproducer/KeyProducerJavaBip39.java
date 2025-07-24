@@ -16,9 +16,14 @@
  *
  */
 // @formatter:on
-package net.ladenthin.bitcoinaddressfinder;
+package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import java.math.BigInteger;
+import net.ladenthin.bitcoinaddressfinder.BIP39KeyProducer;
+import net.ladenthin.bitcoinaddressfinder.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.RandomSecretSupplier;
+import net.ladenthin.bitcoinaddressfinder.SecretSupplier;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
 
 public class KeyProducerJavaBip39 extends KeyProducerJava<CKeyProducerJavaBip39> {

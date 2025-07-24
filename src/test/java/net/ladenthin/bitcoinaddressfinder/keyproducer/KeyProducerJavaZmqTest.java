@@ -16,9 +16,8 @@
  *
  */
 // @formatter:on
-package net.ladenthin.bitcoinaddressfinder;
+package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-import java.io.IOException;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
 import org.bitcoinj.base.Network;
 import org.junit.After;
@@ -28,8 +27,12 @@ import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
 
 import java.math.BigInteger;
-import java.net.ServerSocket;
 import java.util.concurrent.*;
+import net.ladenthin.bitcoinaddressfinder.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
+import net.ladenthin.bitcoinaddressfinder.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
+import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;

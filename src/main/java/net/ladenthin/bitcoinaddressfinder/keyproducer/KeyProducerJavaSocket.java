@@ -16,7 +16,7 @@
  *
  */
 // @formatter:on
-package net.ladenthin.bitcoinaddressfinder;
+package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import com.google.common.annotations.VisibleForTesting;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
@@ -27,6 +27,9 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.locks.ReentrantLock;
+import net.ladenthin.bitcoinaddressfinder.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

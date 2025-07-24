@@ -43,9 +43,13 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOn
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaBip39Test;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.*;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaRandom;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocketTest;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaZmqTest;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
-import org.junit.Ignore;
 import org.junit.runner.RunWith;
 
 @RunWith(DataProviderRunner.class)
