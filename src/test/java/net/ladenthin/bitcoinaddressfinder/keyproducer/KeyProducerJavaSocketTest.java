@@ -19,7 +19,6 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.DataInputStream;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import org.junit.After;
@@ -36,7 +35,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
-import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
@@ -494,38 +492,6 @@ public class KeyProducerJavaSocketTest {
         assertThat(secrets.length, is(0));
 
         cleanup(client, serverFuture, serverSocket);
-    }
-
-    @Test(expected = NoMoreSecretsAvailableException.class)
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_24, location = CommonDataProvider.class)
-    public void createSecrets_largeWorkSize_exceedsMemoryOrTimeout_throwsException(int bits) throws Exception {
-        int port = findFreePort();
-
-        ServerSocket serverSocket = new ServerSocket(port);
-        serverSocket.setSoTimeout(500);  // <-- ensures accept() doesn't block forever
-
-        Future<Void> serverFuture = executorService.submit(() -> {
-            try {
-                try (Socket ignored = serverSocket.accept()) {
-                    // shouldn't happen in this test
-                }
-            } catch (SocketTimeoutException expected) {
-                // expected if no client connects
-            }
-            return null;
-        });
-
-        CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        clientConfig.timeout = 1000;
-        // Set a strict limit for testing
-        clientConfig.maxWorkSize = 1 << bits; // 2^bits
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
-
-        try {
-            client.createSecrets(clientConfig.maxWorkSize + 1, false);
-        } finally {
-            cleanup(client, serverFuture, serverSocket);
-        }
     }
 
     @Test(expected = NoMoreSecretsAvailableException.class)

@@ -18,9 +18,7 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
-
-public class CKeyProducerJavaSocket extends CKeyProducerJava {
+public class CKeyProducerJavaSocket extends CKeyProducerJavaReceiver {
     
     public enum Mode {
         CLIENT,
@@ -36,9 +34,6 @@ public class CKeyProducerJavaSocket extends CKeyProducerJava {
     /** Socket read and connection timeout in milliseconds */
     public int timeout = 3000;
 
-    /** Enable logging of each received secret as hex */
-    public boolean logReceivedSecret = false;
-
     /** Operating mode: client or server */
     public Mode mode = Mode.SERVER;
 
@@ -53,9 +48,6 @@ public class CKeyProducerJavaSocket extends CKeyProducerJava {
 
     /** Delay in milliseconds between retry attempts */
     public int retryDelayMillisRead = 1000;
-    
-    /** Maximum allowed work size (number of secrets to generate) — 2^24 = 16,777,216*/
-    public int maxWorkSize = 1 << PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY;
 
     /** Maximum retry attempts when partially reading a single secret */
     public int readPartialRetryCount = 5;

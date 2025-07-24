@@ -22,6 +22,9 @@ import com.tngtech.java.junit.dataprovider.DataProvider;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.*;
@@ -96,10 +99,10 @@ public class CommonDataProvider {
     /**
      * For {@link FinderTest}.
      */
-    public static final String DATA_PROVIDER_LOCAL_JAVA_KEY_PRODUCER = "localJavaKeyProducer";
+    public static final String DATA_PROVIDER_KEY_PRODUCER_TYPES = "keyProducerTypes";
 
     @DataProvider
-    public static Object[][] localJavaKeyProducer() {
+    public static Object[][] keyProducerTypes() {
         return new Object[][] {
             {KeyProducerTypesLocal.KeyProducerJavaBip39},
             {KeyProducerTypesLocal.KeyProducerJavaIncremental},
@@ -107,6 +110,45 @@ public class CommonDataProvider {
             {KeyProducerTypesLocal.KeyProducerJavaSocket},
             {KeyProducerTypesLocal.KeyProducerJavaZmq}
         };
+    }
+    
+    /**
+    * For tests validating combinations of key producer types and bit sizes.
+    */
+   public static final String DATA_PROVIDER_JAVA_KEY_PRODUCER_AND_BIT_SIZE = "keyProducerTypeAndBitSize";
+
+    @DataProvider
+    public static Object[][] keyProducerTypeAndBitSize() {
+        return mergeMany(
+            keyProducerTypes(),    // e.g., Socket, ZMQ, etc.
+            bitSizesAtMost24()     // e.g., 0–24
+        );
+    }
+   
+    /**
+     * Merges multiple Object[][] data providers into a cartesian product.
+     * Each Object[][] must be a 2D array, where each row is a test case argument set.
+     *
+     * Example:
+     * mergeMany(dp1, dp2, dp3) → returns all combinations of dp1 × dp2 × dp3
+     */
+    public static Object[][] mergeMany(Object[][]... providers) {
+        List<Object[]> result = new ArrayList<>();
+        mergeRecursive(providers, 0, new ArrayList<>(), result);
+        return result.toArray(new Object[0][]);
+    }
+
+    private static void mergeRecursive(Object[][][] providers, int index, List<Object> current, List<Object[]> result) {
+        if (index == providers.length) {
+            result.add(current.toArray());
+            return;
+        }
+
+        for (Object[] row : providers[index]) {
+            List<Object> next = new ArrayList<>(current);
+            Collections.addAll(next, row);
+            mergeRecursive(providers, index + 1, next, result);
+        }
     }
 
     /**

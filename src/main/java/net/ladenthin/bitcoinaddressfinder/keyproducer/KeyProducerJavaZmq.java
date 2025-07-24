@@ -54,6 +54,7 @@ public class KeyProducerJavaZmq extends KeyProducerJava<CKeyProducerJavaZmq> {
 
     @Override
     public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
+        verifyWorkSize(overallWorkSize, cKeyProducerJava.maxWorkSize);
         int count = returnStartSecretOnly ? 1 : overallWorkSize;
         BigInteger[] secrets = new BigInteger[count];
 

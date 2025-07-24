@@ -36,6 +36,7 @@ public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJava
 
     @Override
     public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
+        verifyWorkSize(overallWorkSize, cKeyProducerJava.maxWorkSize);
         final BigInteger endAddress = cKeyProducerJava.getEndAddress();
         if (currentValue.compareTo(endAddress) > 0) {
             throw new NoMoreSecretsAvailableException(currentValue + " exceeds ");

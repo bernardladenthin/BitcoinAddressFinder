@@ -18,7 +18,7 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
-public class CKeyProducerJavaZmq extends CKeyProducerJava {
+public class CKeyProducerJavaZmq extends CKeyProducerJavaReceiver {
     
     public enum Mode {
         CONNECT,
@@ -42,7 +42,4 @@ public class CKeyProducerJavaZmq extends CKeyProducerJava {
      * This maps to the ZMQ socket option `RCVTIMEO`.
      */
     public int timeout = -1;
-
-    /** Whether to log the received keys in hex */
-    public boolean logReceivedSecret = false;
 }

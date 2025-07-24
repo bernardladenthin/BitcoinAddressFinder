@@ -245,8 +245,8 @@ public class FinderTest {
     
     // <editor-fold defaultstate="collapsed" desc="testFullCycle">
     @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_LOCAL_JAVA_KEY_PRODUCER, location = CommonDataProvider.class)
-    public void testFullCycle_keyProducerJavaRandomSetAndInitialized_statesCorrect(CommonDataProvider.KeyProducerTypesLocal keyProducerType) throws IOException, InterruptedException {
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_KEY_PRODUCER_TYPES, location = CommonDataProvider.class)
+    public void testFullCycle_keyProducerJavaSetAndInitialized_statesCorrect(CommonDataProvider.KeyProducerTypesLocal keyProducerType) throws IOException, InterruptedException {
         // arrange
         CFinder cFinder = new CFinder();
         String keyProducerId = "exampleId";
@@ -437,16 +437,10 @@ public class FinderTest {
         cFinder.keyProducerJavaBip39.add(bip39);
     }
     
-    /**
-     * A timeout is required to ensure the producer can terminate.
-     * Without it, the producer may block indefinitely while waiting for keys.
-     */
-    private final static int TIMEOUT_FOR_TERMINATE = 3_000;
-    
     private void configureKeyProducerJavaSocket(String keyProducerId, CFinder cFinder) {
         CKeyProducerJavaSocket socket = new CKeyProducerJavaSocket();
         socket.port = KeyProducerJavaSocketTest.findFreePort();
-        socket.timeout = TIMEOUT_FOR_TERMINATE;
+        socket.timeout = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
         socket.keyProducerId = keyProducerId;
         cFinder.keyProducerJavaSocket.add(socket);
     }
@@ -454,7 +448,7 @@ public class FinderTest {
     private void configureKeyProducerJavaZmq(String keyProducerId, CFinder cFinder) {
         CKeyProducerJavaZmq zmq = new CKeyProducerJavaZmq();
         zmq.address = KeyProducerJavaZmqTest.findFreeZmqAddress();
-        zmq.timeout = TIMEOUT_FOR_TERMINATE;
+        zmq.timeout = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
         zmq.keyProducerId = keyProducerId;
         cFinder.keyProducerJavaZmq.add(zmq);
     }

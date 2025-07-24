@@ -117,9 +117,7 @@ public class KeyProducerJavaSocket extends KeyProducerJava<CKeyProducerJavaSocke
     
     @Override
     public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
-        if (overallWorkSize < 0 || overallWorkSize > cKeyProducerJava.maxWorkSize) {
-            throw new NoMoreSecretsAvailableException("Unreasonable work size: " + overallWorkSize);
-        }
+        verifyWorkSize(overallWorkSize, cKeyProducerJava.maxWorkSize);
         int length = returnStartSecretOnly ? 1 : overallWorkSize;
         BigInteger[] secrets = new BigInteger[length];
         byte[] buffer = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];

@@ -27,4 +27,10 @@ public abstract class KeyProducerJava<T extends CKeyProducerJava> extends Abstra
     public KeyProducerJava(T cKeyProducerJava) {
         this.cKeyProducerJava = cKeyProducerJava;
     }
+
+    public void verifyWorkSize(int overallWorkSize, int maxWorkSize) throws NoMoreSecretsAvailableException {
+        if (overallWorkSize < 0 || overallWorkSize > maxWorkSize) {
+            throw new IllegalArgumentException("Unreasonable work size: " + overallWorkSize);
+        }
+    }
 }

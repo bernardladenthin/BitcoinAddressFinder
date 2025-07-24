@@ -32,5 +32,4 @@ public class CKeyProducerJavaRandom extends CKeyProducerJava {
      * if deterministic output is desired.
      */
     public Long customSeed;
-
 }
