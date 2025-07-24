@@ -96,6 +96,13 @@ public class Finder implements Interruptable {
         );
 
         processKeyProducers(
+            finder.keyProducerJavaSocket,
+            cKeyProducerJavaSocket -> new KeyProducerJavaSocket(cKeyProducerJavaSocket, keyUtility, bitHelper),
+            cKeyProducerJavaSocket -> cKeyProducerJavaSocket.keyProducerId,
+            keyProducers
+        );
+
+        processKeyProducers(
             finder.keyProducerJavaZmq,
             cKeyProducerJavaZmq -> new KeyProducerJavaZmq(cKeyProducerJavaZmq, keyUtility, bitHelper),
             cKeyProducerJavaZmq -> cKeyProducerJavaZmq.keyProducerId,

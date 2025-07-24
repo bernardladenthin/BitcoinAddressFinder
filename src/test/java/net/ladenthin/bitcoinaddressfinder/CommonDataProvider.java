@@ -89,6 +89,7 @@ public class CommonDataProvider {
         KeyProducerJavaBip39,
         KeyProducerJavaIncremental,
         KeyProducerJavaRandom,
+        KeyProducerJavaSocket,
         KeyProducerJavaZmq;
     }
     
@@ -103,6 +104,7 @@ public class CommonDataProvider {
             {KeyProducerTypesLocal.KeyProducerJavaBip39},
             {KeyProducerTypesLocal.KeyProducerJavaIncremental},
             {KeyProducerTypesLocal.KeyProducerJavaRandom},
+            {KeyProducerTypesLocal.KeyProducerJavaSocket},
             {KeyProducerTypesLocal.KeyProducerJavaZmq}
         };
     }

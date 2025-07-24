@@ -46,7 +46,7 @@ public class KeyProducerJavaZmq extends KeyProducerJava<CKeyProducerJavaZmq> {
             socket.connect(cKeyProducerJava.address);
         }
 
-        socket.setReceiveTimeOut(cKeyProducerJava.timeoutMillis);
+        socket.setReceiveTimeOut(cKeyProducerJava.timeout);
     }
 
     @Override

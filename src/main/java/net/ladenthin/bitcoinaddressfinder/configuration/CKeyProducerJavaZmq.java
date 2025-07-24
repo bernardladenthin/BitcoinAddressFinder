@@ -41,7 +41,7 @@ public class CKeyProducerJavaZmq extends CKeyProducerJava {
      *
      * This maps to the ZMQ socket option `RCVTIMEO`.
      */
-    public int timeoutMillis = -1;
+    public int timeout = -1;
 
     /** Whether to log the received keys in hex */
     public boolean logReceivedSecret = false;

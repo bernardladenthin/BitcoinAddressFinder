@@ -54,16 +54,8 @@ public class KeyProducerJavaZmqTest {
         executorService.shutdownNow();
     }
     
-    public static int findFreePort() {
-        try (ServerSocket socket = new ServerSocket(0)) {
-            return socket.getLocalPort();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-    
     public static String findFreeZmqAddress() {
-        return "tcp://127.0.0.1:" + findFreePort();
+        return "tcp://127.0.0.1:" + KeyProducerJavaSocketTest.findFreePort();
     }
 
     private CKeyProducerJavaZmq createBindConfig(String address) {
@@ -148,7 +140,7 @@ public class KeyProducerJavaZmqTest {
         String address = findFreeZmqAddress();
 
         CKeyProducerJavaZmq config = createBindConfig(address);
-        config.timeoutMillis = 500;
+        config.timeout = 500;
 
         KeyProducerJavaZmq producer = new KeyProducerJavaZmq(config, keyUtility, bitHelper);
         producer.createSecrets(1, true);
@@ -194,7 +186,7 @@ public class KeyProducerJavaZmqTest {
 
         // Setup ZMQ PULL socket that will wait for messages
         CKeyProducerJavaZmq config = createBindConfig(address);
-        config.timeoutMillis = -1; // block indefinitely
+        config.timeout = -1; // block indefinitely
         KeyProducerJavaZmq producer = new KeyProducerJavaZmq(config, keyUtility, bitHelper);
 
         // Start a thread that will block on createSecrets

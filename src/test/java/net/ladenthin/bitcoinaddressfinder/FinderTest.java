@@ -30,12 +30,14 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
+import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaZmq;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomInstance;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
@@ -43,6 +45,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFile
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
+import org.junit.Ignore;
 import org.junit.runner.RunWith;
 
 @RunWith(DataProviderRunner.class)
@@ -260,6 +263,9 @@ public class FinderTest {
             case KeyProducerJavaZmq:
                 configureKeyProducerJavaZmq(keyProducerId, cFinder);
                 break;
+            case KeyProducerJavaSocket:
+                configureKeyProducerJavaSocket(keyProducerId, cFinder);
+                break;
             default:
                 throw new IllegalArgumentException("Unknown KeyProducerType: " + keyProducerType);
         }
@@ -355,6 +361,12 @@ public class FinderTest {
         cFinder.keyProducerJavaIncremental.add(incremental);
 
         // 4. JavaSocket
+        CKeyProducerJavaSocket socket = new CKeyProducerJavaSocket();
+        socket.keyProducerId = "socketId";
+        socket.port = KeyProducerJavaSocketTest.findFreePort();
+        cFinder.keyProducerJavaSocket.add(socket);
+
+        // 4. JavaZmq
         CKeyProducerJavaZmq zmq = new CKeyProducerJavaZmq();
         zmq.keyProducerId = "zmqId";
         zmq.address = KeyProducerJavaZmqTest.findFreeZmqAddress();
@@ -366,12 +378,13 @@ public class FinderTest {
         finder.startKeyProducer();
 
         // Assert
-        assertThat(finder.getKeyProducers().keySet(), hasItems("randomId", "bip39Id", "incrementalId", "zmqId"));
+        assertThat(finder.getKeyProducers().keySet(), hasItems("randomId", "bip39Id", "incrementalId", "socketId", "zmqId"));
 
         // Additionally assert each instance is of expected class type
         assertThat(finder.getKeyProducers().get("randomId"), instanceOf(KeyProducerJavaRandom.class));
         assertThat(finder.getKeyProducers().get("bip39Id"), instanceOf(KeyProducerJavaBip39.class));
         assertThat(finder.getKeyProducers().get("incrementalId"), instanceOf(KeyProducerJavaIncremental.class));
+        assertThat(finder.getKeyProducers().get("socketId"), instanceOf(KeyProducerJavaSocket.class));
         assertThat(finder.getKeyProducers().get("zmqId"), instanceOf(KeyProducerJavaZmq.class));
         
         // Interrupt and free producers
@@ -420,12 +433,24 @@ public class FinderTest {
         cFinder.keyProducerJavaBip39.add(bip39);
     }
     
+    /**
+     * A timeout is required to ensure the producer can terminate.
+     * Without it, the producer may block indefinitely while waiting for keys.
+     */
+    private final static int TIMEOUT_FOR_TERMINATE = 3_000;
+    
+    private void configureKeyProducerJavaSocket(String keyProducerId, CFinder cFinder) {
+        CKeyProducerJavaSocket socket = new CKeyProducerJavaSocket();
+        socket.port = KeyProducerJavaSocketTest.findFreePort();
+        socket.timeout = TIMEOUT_FOR_TERMINATE;
+        socket.keyProducerId = keyProducerId;
+        cFinder.keyProducerJavaSocket.add(socket);
+    }
+    
     private void configureKeyProducerJavaZmq(String keyProducerId, CFinder cFinder) {
         CKeyProducerJavaZmq zmq = new CKeyProducerJavaZmq();
         zmq.address = KeyProducerJavaZmqTest.findFreeZmqAddress();
-        // A timeout is required to ensure the producer can terminate.
-        // Without it, the producer may block indefinitely while waiting for keys.
-        zmq.timeoutMillis = 10_000;
+        zmq.timeout = TIMEOUT_FOR_TERMINATE;
         zmq.keyProducerId = keyProducerId;
         cFinder.keyProducerJavaZmq.add(zmq);
     }

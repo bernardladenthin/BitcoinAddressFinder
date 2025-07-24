@@ -774,16 +774,107 @@ The private key range is specified by two 64-character hex strings: `startAddres
 ...
 ```
 
+#### 🌐 `SOCKET_STREAM` (key producer java socket)  
+Read raw private keys from a TCP socket stream (client or server mode).  
+Useful for piping externally generated secrets (e.g., from Python, Go, etc.) directly into the finder.
+
+| JSON Field                    | Type                             | Default       | Description                                                                         |
+|-------------------------------|----------------------------------|---------------|-------------------------------------------------------------------------------------|
+| `keyProducerId`               | string                           | —             | Unique identifier for this key producer                                             |
+| `mode`                        | string enum (`CLIENT`, `SERVER`) | `"SERVER"`    | Whether to connect to a remote socket (`CLIENT`) or wait for connections (`SERVER`) |
+| `host`                        | string                           | `"localhost"` | Remote host to connect to (used only in `CLIENT` mode)                              |
+| `port`                        | number                           | `12345`       | TCP port to connect to or bind on                                                   |
+| `timeout`                     | number                           | `3000`        | Socket read timeout in milliseconds                                                 |
+| `logReceivedSecret`           | boolean                          | `false`       | Whether to log each received private key as a hex string                            |
+| `connectionRetryCount`        | number                           | `5`           | Number of times to retry establishing a socket connection                           |
+| `retryDelayMillisConnect`     | number                           | `1000`        | Delay between connection retry attempts (in milliseconds)                           |
+| `readRetryCount`              | number                           | `3`           | Number of attempts to retry reading a full secret after I/O failure                 |
+| `retryDelayMillisRead`        | number                           | `1000`        | Delay between read retry attempts (in milliseconds)                                 |
+| `readPartialRetryCount`       | number                           | `5`           | Number of retries when partially reading a single 32-byte secret                    |
+| `readPartialRetryDelayMillis` | number                           | `20`          | Delay between partial read retries (in milliseconds)                                |
+| `maxWorkSize`                 | number                           | `16777216`    | Maximum number of secrets to request in a single call                               |
+
+
+Minimal:
+```json
+...
+"keyProducerJavaSocket": [
+    {
+        "keyProducerId": "exampleKeyProducerId",
+        "host": "localhost",
+        "port": 12345,
+        "mode": "SERVER"
+    }
+],
+...
+```
+
+Full:
+```json
+...
+"keyProducerJavaSocket": [
+    {
+        "keyProducerId": "exampleKeyProducerId",
+        "host": "localhost",
+        "port": 12345,
+        "mode": "SERVER",
+        "timeout": 3000,
+        "logReceivedSecret": true,
+        "connectionRetryCount": 5,
+        "retryDelayMillisConnect": 1000,
+        "readRetryCount": 5,
+        "retryDelayMillisRead": 1000,
+        "readPartialRetryCount": 5,
+        "readPartialRetryDelayMillis": 20,
+        "maxWorkSize": 16777216
+    }
+],
+...
+```
+
+##### Example: Python Socket Stream Server:
+```python
+import socket
+import os
+import time
+import binascii
+
+HOST = 'localhost'
+PORT = 12345
+
+while True:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((HOST, PORT))
+            print(f"Connected to {HOST}:{PORT}")
+            while True:
+                private_key = os.urandom(32)
+                print("Sending key:", binascii.hexlify(private_key).decode())
+                s.sendall(private_key)
+                time.sleep(1.0) # Slight delay to avoid flooding
+    except ConnectionRefusedError:
+        print("Connection refused, retrying in 1 second...")
+        time.sleep(1)
+    except BrokenPipeError:
+        print("Connection lost, reconnecting...")
+        time.sleep(1)
+```
+
+##### 🔄 Protocol
+* Each private key must be exactly 32 raw bytes, sent binary, with no delimiter or framing.
+* Keys are interpreted as big-endian (new BigInteger(1, bytes) in Java).
+* Sending fewer than 32 bytes will cause blocking or exceptions.
+
 #### 🌐 `SOCKET_STREAM` (key producer via ZeroMQ)
 Receive raw private keys via a ZeroMQ `PULL` socket.
 Ideal for decoupled key streaming where producers push keys using ZeroMQ `PUSH` sockets.
 
-| JSON field         | Type                         | Default               | Description                                 |
+| JSON field         | Type                         | Default                | Description                                 |
 |--------------------|------------------------------|------------------------|---------------------------------------------|
 | keyProducerId      | string                       | —                      | Unique identifier for this key producer     |
 | address            | string                       | tcp://localhost:5555   | The ZeroMQ address to bind or connect to    |
-| mode               | string enum (BIND, CONNECT)  | CONNECT                | Whether this socket binds to or connects    |
-| `timeoutMillis`    | number                       | `-1`                   | Receive timeout in milliseconds:<br> `0` = non-blocking,<br> `-1` = infinite,<br> `>0` = wait that long |
+| mode               | string enum (BIND, CONNECT)  | BIND                   | Whether this socket binds to or connects    |
+| timeout            | number                       | `-1`                   | Receive timeout in milliseconds:<br> `0` = non-blocking,<br> `-1` = infinite,<br> `>0` = wait that long |
 | logReceivedSecret  | boolean                      | false                  | Whether to log each received secret in hex  |
 
 Minimal:
@@ -806,7 +897,7 @@ Full:
         "keyProducerId": "exampleKeyProducerId",
         "address": "tcp://localhost:5555",
         "mode": "BIND",
-        "timeoutMillis": -1,
+        "timeout": -1,
         "logReceivedSecret": true
     }
 ],
@@ -850,7 +941,7 @@ while True:
                 socket.send(private_key, flags=zmq.NOBLOCK)
             except zmq.Again:
                 print("Send queue full, message not sent.")
-            time.sleep(1.0)
+            time.sleep(1.0) # Slight delay to avoid flooding
 
     except zmq.ZMQError as e:
         print(f"ZMQ error occurred: {e}, retrying in 1 second...")
