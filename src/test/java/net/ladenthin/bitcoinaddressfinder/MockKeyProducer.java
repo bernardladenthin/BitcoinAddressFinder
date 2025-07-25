@@ -22,17 +22,21 @@ import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableExce
 import java.math.BigInteger;
 import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
+import static org.mockito.Mockito.mock;
+import org.slf4j.Logger;
 
 public class MockKeyProducer implements KeyProducer {
 
     private final KeyUtility keyUtility;
     private final Random random;
     private final int maximumBitLength;
+    private Logger mockLogger;
     
     MockKeyProducer(KeyUtility keyUtility, Random random, int maximumBitLength) {
         this.keyUtility = keyUtility;
         this.random = random;
         this.maximumBitLength = maximumBitLength;
+        mockLogger = mock(Logger.class);
     }
     
     MockKeyProducer(KeyUtility keyUtility, Random random) {
@@ -53,5 +57,9 @@ public class MockKeyProducer implements KeyProducer {
     public void interrupt() {
     }
 
+    @Override
+    public Logger getLogger() {
+        return mockLogger;
+    }
     
 }

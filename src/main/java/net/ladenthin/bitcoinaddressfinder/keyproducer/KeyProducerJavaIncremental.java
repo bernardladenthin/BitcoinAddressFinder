@@ -23,14 +23,15 @@ import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
 
 public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJavaIncremental> {
     
     @NonNull
     private BigInteger currentValue;
     
-    public KeyProducerJavaIncremental(CKeyProducerJavaIncremental cKeyProducerJavaIncremental, KeyUtility keyUtility, BitHelper bitHelper) {
-        super(cKeyProducerJavaIncremental);
+    public KeyProducerJavaIncremental(CKeyProducerJavaIncremental cKeyProducerJavaIncremental, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
+        super(cKeyProducerJavaIncremental, logger);
         this.currentValue = new BigInteger(cKeyProducerJavaIncremental.startAddress, BitHelper.RADIX_HEX);
     }
 

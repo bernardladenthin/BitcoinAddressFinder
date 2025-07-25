@@ -31,6 +31,8 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremen
 import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.Test;
+import static org.mockito.Mockito.mock;
+import org.slf4j.Logger;
 
 /**
  * Tests for KeyProducerJavaIncremental with respect to key range boundaries and batch handling.
@@ -138,6 +140,8 @@ public class KeyProducerJavaIncrementalTest {
     private BitHelper bitHelper;
     private String startHex;
     private String endHex;
+    
+    private Logger mockLogger;
 
     @Before
     public void setUp() {
@@ -145,13 +149,14 @@ public class KeyProducerJavaIncrementalTest {
         bitHelper = new BitHelper();
         startHex = PublicKeyBytes.MIN_VALID_PRIVATE_KEY_HEX;
         endHex = "000000000000000000000000000000000000000000000000000000000000000A";
+        mockLogger = mock(Logger.class);
     }
 
-    private KeyProducerJavaIncremental createProducer(String start, String end) {
+    private KeyProducerJavaIncremental createKeyProducerJavaIncremental(String start, String end) {
         CKeyProducerJavaIncremental config = new CKeyProducerJavaIncremental();
         config.startAddress = start;
         config.endAddress = end;
-        return new KeyProducerJavaIncremental(config, keyUtility, bitHelper);
+        return new KeyProducerJavaIncremental(config, keyUtility, bitHelper, mockLogger);
     }
 
     /**
@@ -160,7 +165,7 @@ public class KeyProducerJavaIncrementalTest {
      */
     @Test
     public void createSecrets_returnStartSecretOnlyTrue_returnsOneSecret() throws Exception {
-        KeyProducerJavaIncremental producer = createProducer(startHex, endHex);
+        KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(startHex, endHex);
         BigInteger[] secrets = producer.createSecrets(5, true);
         assertThat(secrets.length, is(equalTo(1)));
         assertThat(secrets[0], is(equalTo(new BigInteger(startHex, BitHelper.RADIX_HEX))));
@@ -172,7 +177,7 @@ public class KeyProducerJavaIncrementalTest {
      */
     @Test
     public void createSecrets_returnStartSecretOnlyFalse_returnsBatchSecrets() throws Exception {
-        KeyProducerJavaIncremental producer = createProducer(startHex, endHex);
+        KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(startHex, endHex);
         int batchSize = 5;
         BigInteger[] secrets = producer.createSecrets(batchSize, false);
         assertThat(secrets.length, is(equalTo(batchSize)));
@@ -191,7 +196,7 @@ public class KeyProducerJavaIncrementalTest {
      */
     @Test(expected = NoMoreSecretsAvailableException.class)
     public void createSecrets_startExceedsEnd_throwsException() throws Exception {
-        KeyProducerJavaIncremental producer = createProducer(
+        KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
                 "0000000000000000000000000000000000000000000000000000000000000010",
                 "0000000000000000000000000000000000000000000000000000000000000005"
         );
@@ -204,7 +209,7 @@ public class KeyProducerJavaIncrementalTest {
      */
     @Test(expected = NoMoreSecretsAvailableException.class)
     public void createSecrets_batchExceedsEnd_throwsException() throws Exception {
-        KeyProducerJavaIncremental producer = createProducer(
+        KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
                 startHex,
                 "0000000000000000000000000000000000000000000000000000000000000003"
         );
@@ -217,7 +222,7 @@ public class KeyProducerJavaIncrementalTest {
      */
     @Test
     public void createSecrets_currentValueAdvancesByBatchSize() throws Exception {
-        KeyProducerJavaIncremental producer = createProducer(startHex, endHex);
+        KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(startHex, endHex);
         int batchSize = 3;
         
         BigInteger expectedFirstBatchStart = new BigInteger(startHex, BitHelper.RADIX_HEX);
@@ -243,7 +248,7 @@ public class KeyProducerJavaIncrementalTest {
     @Test
     public void createSecrets_endAddressExactlyAtBatchBoundary_allBatchesValid() throws Exception {
         // Setup: start=1, end=4 (allowed keys: 1, 2, 3, 4)
-        KeyProducerJavaIncremental producer = createProducer(
+        KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
             "0000000000000000000000000000000000000000000000000000000000000001",
             "0000000000000000000000000000000000000000000000000000000000000004"
         );
@@ -269,7 +274,7 @@ public class KeyProducerJavaIncrementalTest {
     @Test(expected = NoMoreSecretsAvailableException.class)
     public void createSecrets_threeBatches_twoElementsEach_thirdThrowsException() throws Exception {
         // Setup: start = 1, end = 5 (allowed keys: 1, 2, 3, 4, 5)
-        KeyProducerJavaIncremental producer = createProducer(
+        KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
             "0000000000000000000000000000000000000000000000000000000000000001",
             "0000000000000000000000000000000000000000000000000000000000000004"
         );
@@ -290,7 +295,7 @@ public class KeyProducerJavaIncrementalTest {
     @Test(expected = NoMoreSecretsAvailableException.class)
     public void createSecrets_endAddressInclusive_butPartialBatchNotAllowed_throwsException() throws Exception {
         // Setup: start=1, end=5 (allowed keys: 1, 2, 3, 4, 5)
-        KeyProducerJavaIncremental producer = createProducer(
+        KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
             "0000000000000000000000000000000000000000000000000000000000000001",
             "0000000000000000000000000000000000000000000000000000000000000005"
         );
@@ -310,7 +315,7 @@ public class KeyProducerJavaIncrementalTest {
     @Test
     public void createSecrets_endAddressInclusive_partialBatchAllowedWithReturnStartOnly_noException() throws Exception {
         // Setup: start=1, end=5 (allowed keys: 1, 2, 3, 4, 5)
-        KeyProducerJavaIncremental producer = createProducer(
+        KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
             "0000000000000000000000000000000000000000000000000000000000000001",
             "0000000000000000000000000000000000000000000000000000000000000005"
         );

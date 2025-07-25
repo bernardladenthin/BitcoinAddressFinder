@@ -30,6 +30,9 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
+import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaBip39;
+import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaIncremental;
+import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaSocket;
 import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaZmq;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
@@ -51,6 +54,7 @@ import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaZmqTest;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import org.junit.runner.RunWith;
+import org.slf4j.Logger;
 
 @RunWith(DataProviderRunner.class)
 public class FinderTest {
@@ -254,20 +258,26 @@ public class FinderTest {
         cProducerJava.keyProducerId = keyProducerId;
         cProducerJava.runOnce = false;
         cFinder.producerJava.add(cProducerJava);
+        final Class keyProducerClass;
         switch (keyProducerType) {
             case KeyProducerJavaRandom:
+                keyProducerClass = KeyProducerJavaRandom.class;
                 configureKeyProducerJavaRandom(keyProducerId, cFinder);
                 break;
             case KeyProducerJavaIncremental:
+                keyProducerClass = KeyProducerJavaIncremental.class;
                 configureKeyProducerJavaIncremental(keyProducerId, cFinder);
                 break;
             case KeyProducerJavaBip39:
+                keyProducerClass = KeyProducerJavaBip39.class;
                 configureKeyProducerJavaBip39(keyProducerId, cFinder);
                 break;
             case KeyProducerJavaZmq:
+                keyProducerClass = KeyProducerJavaZmq.class;
                 configureKeyProducerJavaZmq(keyProducerId, cFinder);
                 break;
             case KeyProducerJavaSocket:
+                keyProducerClass = KeyProducerJavaSocket.class;
                 configureKeyProducerJavaSocket(keyProducerId, cFinder);
                 break;
             default:
@@ -284,6 +294,14 @@ public class FinderTest {
             finder.startKeyProducer();
             // assert
             assertThat(finder.getKeyProducers().keySet(), hasSize(1));
+        }
+        // assert logger is correctly bound to the concrete class
+        {
+            KeyProducer keyProducer = finder.getKeyProducers().get(keyProducerId);
+            Logger logger = keyProducer.getLogger();
+
+            // Verify logger name matches the fully qualified class name
+            assertThat(logger.getName(), is(keyProducerClass.getCanonicalName()));
         }
         {
             // pre-assert

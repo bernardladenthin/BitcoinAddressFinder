@@ -40,6 +40,8 @@ import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import static org.mockito.Mockito.mock;
+import org.slf4j.Logger;
 
 @RunWith(DataProviderRunner.class)
 public class KeyProducerJavaTest {
@@ -52,11 +54,13 @@ public class KeyProducerJavaTest {
     
     private KeyUtility keyUtility;
     private BitHelper bitHelper;
+    private Logger mockLogger;
     
     @Before
     public void setUp() {
         keyUtility = new KeyUtility(null, null);
         bitHelper = new BitHelper();
+        mockLogger = mock(Logger.class);
     }
     
     @Test
@@ -88,23 +92,23 @@ public class KeyProducerJavaTest {
         switch (keyProducerType) {
             case KeyProducerJavaRandom:
                 CKeyProducerJavaRandom configureKeyProducerJavaRandom = configureKeyProducerJavaRandom(keyProducerId, maxWorkSize);
-                keyProducer = new KeyProducerJavaRandom(configureKeyProducerJavaRandom, keyUtility, bitHelper);
+                keyProducer = new KeyProducerJavaRandom(configureKeyProducerJavaRandom, keyUtility, bitHelper, mockLogger);
                 break;
             case KeyProducerJavaIncremental:
                 CKeyProducerJavaIncremental configureKeyProducerJavaIncremental = configureKeyProducerJavaIncremental(keyProducerId, maxWorkSize);
-                keyProducer = new KeyProducerJavaIncremental(configureKeyProducerJavaIncremental, keyUtility, bitHelper);
+                keyProducer = new KeyProducerJavaIncremental(configureKeyProducerJavaIncremental, keyUtility, bitHelper, mockLogger);
                 break;
             case KeyProducerJavaBip39:
                 CKeyProducerJavaBip39 configureKeyProducerJavaBip39 = configureKeyProducerJavaBip39(keyProducerId, maxWorkSize);
-                keyProducer = new KeyProducerJavaBip39(configureKeyProducerJavaBip39, keyUtility, bitHelper);
+                keyProducer = new KeyProducerJavaBip39(configureKeyProducerJavaBip39, keyUtility, bitHelper, mockLogger);
                 break;
             case KeyProducerJavaZmq:
                 CKeyProducerJavaZmq configureKeyProducerJavaZmq = configureKeyProducerJavaZmq(keyProducerId, maxWorkSize);
-                keyProducer = new KeyProducerJavaZmq(configureKeyProducerJavaZmq, keyUtility, bitHelper);
+                keyProducer = new KeyProducerJavaZmq(configureKeyProducerJavaZmq, keyUtility, bitHelper, mockLogger);
                 break;
             case KeyProducerJavaSocket:
                 CKeyProducerJavaSocket configureKeyProducerJavaSocket = configureKeyProducerJavaSocket(keyProducerId, maxWorkSize);
-                keyProducer = new KeyProducerJavaSocket(configureKeyProducerJavaSocket, keyUtility, bitHelper);
+                keyProducer = new KeyProducerJavaSocket(configureKeyProducerJavaSocket, keyUtility, bitHelper, mockLogger);
                 break;
             default:
                 throw new IllegalArgumentException("Unknown KeyProducerType: " + keyProducerType);

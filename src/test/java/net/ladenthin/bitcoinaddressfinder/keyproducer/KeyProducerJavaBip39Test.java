@@ -29,7 +29,10 @@ import org.bitcoinj.base.Network;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import org.junit.Before;
 import org.junit.Test;
+import static org.mockito.Mockito.mock;
+import org.slf4j.Logger;
 
 public class KeyProducerJavaBip39Test {
     
@@ -38,9 +41,18 @@ public class KeyProducerJavaBip39Test {
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
+    private Logger mockLogger;
     
     String keyProducerId = "exampleId";
     
+    @Before
+    public void setUp() {
+        mockLogger = mock(Logger.class);
+    }
+
+    private KeyProducerJavaBip39 createKeyProducerJavaBip39(CKeyProducerJavaBip39 config) {
+        return new KeyProducerJavaBip39(config, keyUtility, bitHelper, mockLogger);
+    }
     
     private BigInteger[] generateSecrets() throws NoMoreSecretsAvailableException {
         CKeyProducerJavaBip39 config = new CKeyProducerJavaBip39();
@@ -51,7 +63,7 @@ public class KeyProducerJavaBip39Test {
         config.creationTimeSeconds = 0L;
         config.hardened = false;
         
-        KeyProducerJavaBip39 producer = new KeyProducerJavaBip39(config, keyUtility, bitHelper);
+        KeyProducerJavaBip39 producer = createKeyProducerJavaBip39(config);
         return producer.createSecrets(bitHelper.convertBitsToSize(0), true);
     }
     

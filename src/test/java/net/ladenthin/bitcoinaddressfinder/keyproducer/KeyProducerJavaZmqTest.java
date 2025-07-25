@@ -36,6 +36,8 @@ import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.mockito.Mockito.mock;
+import org.slf4j.Logger;
 import org.zeromq.SocketType;
 
 public class KeyProducerJavaZmqTest {
@@ -46,15 +48,21 @@ public class KeyProducerJavaZmqTest {
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
     private ExecutorService executorService;
+    private Logger mockLogger;
 
     @Before
     public void setup() {
         executorService = Executors.newCachedThreadPool();
+        mockLogger = mock(Logger.class);
     }
 
     @After
     public void teardown() {
         executorService.shutdownNow();
+    }
+
+    private KeyProducerJavaZmq createKeyProducerJavaZmq(CKeyProducerJavaZmq config) {
+        return new KeyProducerJavaZmq(config, keyUtility, bitHelper, mockLogger);
     }
     
     public static String findFreeZmqAddress() {
@@ -86,7 +94,7 @@ public class KeyProducerJavaZmqTest {
 
             // Client config connects to that address
             CKeyProducerJavaZmq config = createConnectConfig(address);
-            KeyProducerJavaZmq keyProducer = new KeyProducerJavaZmq(config, keyUtility, bitHelper);
+            KeyProducerJavaZmq keyProducer = createKeyProducerJavaZmq(config);
 
             // Create dummy key
             byte[] secretBytes = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
@@ -112,23 +120,27 @@ public class KeyProducerJavaZmqTest {
     @Test
     public void createSecrets_success_receivesOneKey() throws Exception {
         String address = findFreeZmqAddress();
+
         byte[] secretBytes = new byte[32];
         for (int i = 0; i < secretBytes.length; i++) {
             secretBytes[i] = (byte) i;
         }
         BigInteger expected = new BigInteger(1, secretBytes);
 
+        // Create the BIND receiver first (so it’s ready to accept)
+        CKeyProducerJavaZmq config = createBindConfig(address);
+        KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
+
+        // Now spawn the sender thread
         Future<Void> senderFuture = executorService.submit(() -> {
             try (ZContext context = new ZContext(); ZMQ.Socket socket = context.createSocket(ZMQ.PUSH)) {
+                Thread.sleep(50); // let the receiver settle
                 socket.connect(address);
-                Thread.sleep(WAIT_TIME); // wait for receiver
+                Thread.sleep(50); // let connection establish
                 socket.send(secretBytes);
             }
             return null;
         });
-
-        CKeyProducerJavaZmq config = createBindConfig(address);
-        KeyProducerJavaZmq producer = new KeyProducerJavaZmq(config, keyUtility, bitHelper);
 
         BigInteger[] secrets = producer.createSecrets(1, true);
         assertThat(secrets.length, is(1));
@@ -145,7 +157,7 @@ public class KeyProducerJavaZmqTest {
         CKeyProducerJavaZmq config = createBindConfig(address);
         config.timeout = 500;
 
-        KeyProducerJavaZmq producer = new KeyProducerJavaZmq(config, keyUtility, bitHelper);
+        KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
         producer.createSecrets(1, true);
     }
 
@@ -169,7 +181,7 @@ public class KeyProducerJavaZmqTest {
         });
 
         CKeyProducerJavaZmq config = createBindConfig(address);
-        KeyProducerJavaZmq producer = new KeyProducerJavaZmq(config, keyUtility, bitHelper);
+        KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
 
         BigInteger[] secrets = producer.createSecrets(3, false);
         assertThat(secrets.length, is(3));
@@ -190,7 +202,7 @@ public class KeyProducerJavaZmqTest {
         // Setup ZMQ PULL socket that will wait for messages
         CKeyProducerJavaZmq config = createBindConfig(address);
         config.timeout = -1; // block indefinitely
-        KeyProducerJavaZmq producer = new KeyProducerJavaZmq(config, keyUtility, bitHelper);
+        KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
 
         // Start a thread that will block on createSecrets
         Future<BigInteger[]> future = executorService.submit(() -> {

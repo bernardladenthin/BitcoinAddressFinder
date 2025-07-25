@@ -33,8 +33,11 @@ import org.bitcoinj.base.Network;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import static org.mockito.Mockito.mock;
+import org.slf4j.Logger;
 
 @RunWith(DataProviderRunner.class)
 public class KeyProducerJavaRandomTest {
@@ -42,8 +45,18 @@ public class KeyProducerJavaRandomTest {
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
+    private Logger mockLogger;
     
     String keyProducerId = "exampleId";
+    
+    @Before
+    public void setUp() {
+        mockLogger = mock(Logger.class);
+    }
+
+    private KeyProducerJavaRandom createKeyProducerJavaRandom(CKeyProducerJavaRandom cKeyProducerJavaRandom) {
+        return new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility, bitHelper, mockLogger);
+    }
     
     // <editor-fold defaultstate="collapsed" desc="createStatisticsMessage">
     @Test
@@ -55,7 +68,7 @@ public class KeyProducerJavaRandomTest {
         cKeyProducerJavaRandom.customSeed = 0L;
         cKeyProducerJavaRandom.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
         
-        KeyProducerJavaRandom keyProducerJavaRandom = new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility, bitHelper);
+        KeyProducerJavaRandom keyProducerJavaRandom = createKeyProducerJavaRandom(cKeyProducerJavaRandom);
         
         int overallWorkSize = bitHelper.convertBitsToSize(0);
         
@@ -76,7 +89,7 @@ public class KeyProducerJavaRandomTest {
         cKeyProducerJavaRandom.customSeed = 0L;
         cKeyProducerJavaRandom.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
         
-        KeyProducerJavaRandom keyProducerJavaRandom = new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility, bitHelper);
+        KeyProducerJavaRandom keyProducerJavaRandom = createKeyProducerJavaRandom(cKeyProducerJavaRandom);
         
         int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         
@@ -97,7 +110,7 @@ public class KeyProducerJavaRandomTest {
         cKeyProducerJavaRandom.customSeed = 0L;
         cKeyProducerJavaRandom.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
                 
-        KeyProducerJavaRandom keyProducerJavaRandom = new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility, bitHelper);
+        KeyProducerJavaRandom keyProducerJavaRandom = createKeyProducerJavaRandom(cKeyProducerJavaRandom);
         
         int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         
@@ -116,7 +129,7 @@ public class KeyProducerJavaRandomTest {
         config.keyProducerJavaRandomInstance = instance;
         config.customSeed = customSeed;
         config.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
-        KeyProducerJavaRandom producer = new KeyProducerJavaRandom(config, keyUtility, bitHelper);
+        KeyProducerJavaRandom producer = createKeyProducerJavaRandom(config);
         return producer.createSecrets(bitHelper.convertBitsToSize(0), true);
     }
 

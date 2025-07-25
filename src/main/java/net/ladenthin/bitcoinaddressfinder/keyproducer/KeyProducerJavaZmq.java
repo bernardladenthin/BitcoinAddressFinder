@@ -18,30 +18,27 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-
-import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
-import org.zeromq.ZContext;
-import org.zeromq.ZMQ;
-
-import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import org.slf4j.Logger;
 import org.zeromq.SocketType;
+import org.zeromq.ZContext;
+import org.zeromq.ZMQ;
+import org.zeromq.ZMQException;
 
-public class KeyProducerJavaZmq extends KeyProducerJava<CKeyProducerJavaZmq> {
+public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaZmq> {
 
-    private final KeyUtility keyUtility;
     private final ZContext context;
     private final ZMQ.Socket socket;
+    private final Thread receiverThread;
+    
+    public KeyProducerJavaZmq(CKeyProducerJavaZmq config, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
+        super(config, keyUtility, logger);
 
-    private volatile boolean shouldStop = false;
-
-    public KeyProducerJavaZmq(CKeyProducerJavaZmq config, KeyUtility keyUtility, BitHelper bitHelper) {
-        super(config);
-        this.keyUtility = keyUtility;
-        this.context = new ZContext();
-        this.socket = context.createSocket(SocketType.PULL);
+        context = new ZContext();
+        socket = context.createSocket(SocketType.PULL);
 
         if (cKeyProducerJava.mode == CKeyProducerJavaZmq.Mode.BIND) {
             socket.bind(cKeyProducerJava.address);
@@ -49,55 +46,49 @@ public class KeyProducerJavaZmq extends KeyProducerJava<CKeyProducerJavaZmq> {
             socket.connect(cKeyProducerJava.address);
         }
 
-        socket.setReceiveTimeOut(cKeyProducerJava.timeout);
+        // Fallback to 1000 ms if timeout not set
+        int internalTimeout = cKeyProducerJava.timeout > 0 ? cKeyProducerJava.timeout : 1000;
+        socket.setReceiveTimeOut(internalTimeout);
+
+        receiverThread = new Thread(() -> {
+            while (!shouldStop && !Thread.currentThread().isInterrupted()) {
+                try {
+                    byte[] msg = socket.recv(0); // blocking up to timeout
+                    if (msg != null) {
+                        if (msg.length == PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES) {
+                            addSecret(msg);
+                        } else {
+                            System.err.println("Received invalid secret length: " + msg.length);
+                        }
+                    }
+                    // if msg is null: it's a timeout — just loop again
+                } catch (ZMQException e) {
+                    if (shouldStop || e.getErrorCode() == ZMQ.Error.ETERM.getCode()) break;
+                    e.printStackTrace(); // unexpected ZMQ errors
+                }
+            }
+        }, "ZMQ-Receiver");
+
+        receiverThread.setDaemon(true);
+        receiverThread.start();
     }
 
     @Override
-    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
-        verifyWorkSize(overallWorkSize, cKeyProducerJava.maxWorkSize);
-        int count = returnStartSecretOnly ? 1 : overallWorkSize;
-        BigInteger[] secrets = new BigInteger[count];
-
-        for (int i = 0; i < count; i++) {
-            if (shouldStop) {
-                throw new NoMoreSecretsAvailableException("Interrupted before receiving key.");
-            }
-
-            try {
-                byte[] msg = socket.recv();
-
-                if (msg == null) {
-                    throw new NoMoreSecretsAvailableException("Timeout while receiving key.");
-                }
-
-                if (msg.length != PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES) {
-                    throw new NoMoreSecretsAvailableException("Received malformed key of length " + msg.length);
-                }
-
-                BigInteger key = keyUtility.bigIntegerFromUnsignedByteArray(msg);
-                secrets[i] = key;
-
-                if (cKeyProducerJava.logReceivedSecret) {
-                    System.out.println("Received key: " + keyUtility.bigIntegerToFixedLengthHex(key));
-                }
-            } catch (org.zeromq.ZMQException e) {
-                if (shouldStop || e.getErrorCode() == ZMQ.Error.ETERM.getCode()) {
-                    throw new NoMoreSecretsAvailableException("Receive interrupted due to socket/context shutdown", e);
-                }
-                throw e; // rethrow other unexpected ZMQ errors
-            }
-        }
-
-        return secrets;
+    protected int getReadTimeout() {
+        return cKeyProducerJava.timeout > 0 ? cKeyProducerJava.timeout : 1000;
     }
 
     @Override
     public void interrupt() {
         shouldStop = true;
-        close();
+        receiverThread.interrupt(); // allow thread to exit if blocked
     }
 
     public void close() {
+        interrupt();
+        try {
+            receiverThread.join(500);
+        } catch (InterruptedException ignored) {}
         socket.close();
         context.close();
     }

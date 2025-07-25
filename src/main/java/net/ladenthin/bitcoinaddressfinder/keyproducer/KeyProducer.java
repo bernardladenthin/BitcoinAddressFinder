@@ -20,7 +20,9 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.Interruptable;
+import org.slf4j.Logger;
 
 public interface KeyProducer extends Interruptable {
     public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException;
+    public Logger getLogger();
 }

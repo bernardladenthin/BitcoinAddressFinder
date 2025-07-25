@@ -27,6 +27,7 @@ import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.RandomSecretSupplier;
 import net.ladenthin.bitcoinaddressfinder.SecretSupplier;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
+import org.slf4j.Logger;
 
 public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRandom> {
 
@@ -39,8 +40,8 @@ public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRando
      */
     private final Random random;
     
-    public KeyProducerJavaRandom(CKeyProducerJavaRandom cKeyProducerJavaRandom, KeyUtility keyUtility, BitHelper bitHelper) {
-        super(cKeyProducerJavaRandom);
+    public KeyProducerJavaRandom(CKeyProducerJavaRandom cKeyProducerJavaRandom, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
+        super(cKeyProducerJavaRandom, logger);
         this.keyUtility = keyUtility;
         this.bitHelper = bitHelper;
         
