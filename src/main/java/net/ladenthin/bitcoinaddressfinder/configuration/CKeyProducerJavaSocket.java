@@ -31,11 +31,11 @@ public class CKeyProducerJavaSocket extends CKeyProducerJavaReceiver {
     /** Port number to connect to or listen on */
     public int port = 12345;
 
-    /** Socket read and connection timeout in milliseconds */
-    public int timeout = 3000;
-
     /** Operating mode: client or server */
     public Mode mode = Mode.SERVER;
+
+    /** Socket read and connection timeout in milliseconds */
+    public int timeout = 3000;
 
     /** Number of attempts to reconnect if connection fails */
     public int connectionRetryCount = 5;

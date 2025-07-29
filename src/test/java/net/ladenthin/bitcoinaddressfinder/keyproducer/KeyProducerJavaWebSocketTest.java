@@ -150,7 +150,7 @@ public class KeyProducerJavaWebSocketTest {
         };
 
         client.connectBlocking();
-        connected.await(1, TimeUnit.SECONDS);
+        waitForOpen(client, 2000); // waits up to 2000ms
 
         client.send(invalid);
 
@@ -162,5 +162,16 @@ public class KeyProducerJavaWebSocketTest {
 
         producer.interrupt();
         client.close();
+    }
+    
+    public static void waitForOpen(WebSocketClient client, int timeoutMillis) throws InterruptedException {
+        int retries = Math.max(1, timeoutMillis / 50);
+        while (!client.isOpen() && retries-- > 0) {
+            Thread.sleep(50);
+        }
+
+        if (!client.isOpen()) {
+            throw new IllegalStateException("WebSocket not open after " + timeoutMillis + "ms");
+        }
     }
 }
