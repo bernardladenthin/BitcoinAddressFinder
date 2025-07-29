@@ -149,8 +149,8 @@ public class KeyProducerJavaWebSocketTest {
             @Override public void onError(Exception ex) { ex.printStackTrace(); }
         };
 
-        client.connectBlocking();
-        waitForOpen(client, 2000); // waits up to 2000ms
+        client.connectBlocking(); // blocks at socket level
+        waitForConnectionOrFail(client, connected, 2000);
 
         client.send(invalid);
 
@@ -164,13 +164,9 @@ public class KeyProducerJavaWebSocketTest {
         client.close();
     }
     
-    public static void waitForOpen(WebSocketClient client, int timeoutMillis) throws InterruptedException {
-        int retries = Math.max(1, timeoutMillis / 50);
-        while (!client.isOpen() && retries-- > 0) {
-            Thread.sleep(50);
-        }
-
-        if (!client.isOpen()) {
+    public static void waitForConnectionOrFail(WebSocketClient client, CountDownLatch latch, int timeoutMillis) throws InterruptedException {
+        boolean opened = latch.await(timeoutMillis, TimeUnit.MILLISECONDS);
+        if (!opened || !client.isOpen()) {
             throw new IllegalStateException("WebSocket not open after " + timeoutMillis + "ms");
         }
     }
