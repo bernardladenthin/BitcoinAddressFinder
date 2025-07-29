@@ -26,6 +26,40 @@
         "privateKeyMaxNumBits": 256
       }
     ],
+    "keyProducerJavaSocket": [
+        {
+            "keyProducerId": "exampleKeyProducerJavaSocket",
+            "logReceivedSecret": true,
+            "maxWorkSize": 16777216,
+            "host": "localhost",
+            "port": 5555,
+            "mode": "SERVER",
+            "timeout": 3000,
+            "connectionRetryCount": 5,
+            "readRetryCount": 5,
+            "retryDelayMillisConnect": 1000,
+            "retryDelayMillisRead": 1000,
+            "readPartialRetryCount": 5,
+            "readPartialRetryDelayMillis": 20
+        }
+    ],
+	"keyProducerJavaWebSocket": [
+		{
+			"keyProducerId": "exampleKeyProducerJavaWebSocket",
+			"logReceivedSecret": true,
+			"port": 8080,
+			"timeout": 1000
+		}
+	],
+	"keyProducerJavaZmq": [
+		{
+			"keyProducerId": "exampleKeyProducerJavaZmq",
+			"logReceivedSecret": true,
+			"address": "tcp://127.0.0.1:5557",
+			"mode": "BIND",
+			"timeout": -1
+		}
+	],
     "consumerJava": {
       "lmdbConfigurationReadOnly": {
         "lmdbDirectory": "lmdb",

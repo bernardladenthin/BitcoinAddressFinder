@@ -41,7 +41,7 @@ public class CKeyProducerJavaSocket extends CKeyProducerJavaReceiver {
     public int connectionRetryCount = 5;
 
     /** Number of attempts to retry reading a secret after I/O failure */
-    public int readRetryCount = 3;
+    public int readRetryCount = 5;
 
     /** Delay in milliseconds between retry attempts */
     public int retryDelayMillisConnect = 1000;

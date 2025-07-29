@@ -35,6 +35,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremen
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomInstance;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
 import static org.junit.Assert.fail;
 import org.junit.Before;
@@ -102,13 +103,17 @@ public class KeyProducerJavaTest {
                 CKeyProducerJavaBip39 configureKeyProducerJavaBip39 = configureKeyProducerJavaBip39(keyProducerId, maxWorkSize);
                 keyProducer = new KeyProducerJavaBip39(configureKeyProducerJavaBip39, keyUtility, bitHelper, mockLogger);
                 break;
-            case KeyProducerJavaZmq:
-                CKeyProducerJavaZmq configureKeyProducerJavaZmq = configureKeyProducerJavaZmq(keyProducerId, maxWorkSize);
-                keyProducer = new KeyProducerJavaZmq(configureKeyProducerJavaZmq, keyUtility, bitHelper, mockLogger);
-                break;
             case KeyProducerJavaSocket:
                 CKeyProducerJavaSocket configureKeyProducerJavaSocket = configureKeyProducerJavaSocket(keyProducerId, maxWorkSize);
                 keyProducer = new KeyProducerJavaSocket(configureKeyProducerJavaSocket, keyUtility, bitHelper, mockLogger);
+                break;
+            case KeyProducerJavaWebSocket:
+                CKeyProducerJavaWebSocket configureKeyProducerJavaWebSocket = configureKeyProducerJavaWebSocket(keyProducerId, maxWorkSize);
+                keyProducer = new KeyProducerJavaWebSocket(configureKeyProducerJavaWebSocket, keyUtility, bitHelper, mockLogger);
+                break;
+            case KeyProducerJavaZmq:
+                CKeyProducerJavaZmq configureKeyProducerJavaZmq = configureKeyProducerJavaZmq(keyProducerId, maxWorkSize);
+                keyProducer = new KeyProducerJavaZmq(configureKeyProducerJavaZmq, keyUtility, bitHelper, mockLogger);
                 break;
             default:
                 throw new IllegalArgumentException("Unknown KeyProducerType: " + keyProducerType);
@@ -169,6 +174,15 @@ public class KeyProducerJavaTest {
         socket.keyProducerId = keyProducerId;
         socket.maxWorkSize = maxWorkSize;
         return socket;
+    }
+    
+    private CKeyProducerJavaWebSocket configureKeyProducerJavaWebSocket(String keyProducerId, int maxWorkSize) {
+        CKeyProducerJavaWebSocket webSocket = new CKeyProducerJavaWebSocket();
+        webSocket.port = KeyProducerJavaSocketTest.findFreePort();
+        webSocket.timeout = TIMEOUT_FOR_TERMINATE;
+        webSocket.keyProducerId = keyProducerId;
+        webSocket.maxWorkSize = maxWorkSize;
+        return webSocket;
     }
     
     private CKeyProducerJavaZmq configureKeyProducerJavaZmq(String keyProducerId, int maxWorkSize) {

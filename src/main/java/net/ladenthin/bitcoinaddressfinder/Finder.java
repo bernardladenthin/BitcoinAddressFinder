@@ -46,6 +46,7 @@ import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaBip39;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaIncremental;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaRandom;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocket;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaZmq;
 
 public class Finder implements Interruptable {
@@ -108,6 +109,13 @@ public class Finder implements Interruptable {
             finder.keyProducerJavaSocket,
             cKeyProducerJavaSocket -> new KeyProducerJavaSocket(cKeyProducerJavaSocket, keyUtility, bitHelper, LoggerFactory.getLogger(KeyProducerJavaSocket.class)),
             cKeyProducerJavaSocket -> cKeyProducerJavaSocket.keyProducerId,
+            keyProducers
+        );
+
+        processKeyProducers(
+            finder.keyProducerJavaWebSocket,
+            cKeyProducerJavaWebSocket -> new KeyProducerJavaWebSocket(cKeyProducerJavaWebSocket, keyUtility, bitHelper, LoggerFactory.getLogger(KeyProducerJavaWebSocket.class)),
+            cKeyProducerJavaWebSocket -> cKeyProducerJavaWebSocket.keyProducerId,
             keyProducers
         );
 

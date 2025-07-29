@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bit Pattern Visualizer</title>
+  <style>
+    body {
+      font-family: monospace;
+      background-color: #f4f4f4;
+      padding: 2rem;
+    }
+    h1 {
+      text-align: center;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(16, 24px);
+      grid-template-rows: repeat(16, 24px);
+      gap: 2px;
+      margin: 1rem auto;
+      width: fit-content;
+    }
+    .cell {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #000;
+      color: #fff;
+      font-size: 10px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .cell.on {
+      background-color: orange;
+      color: #111;
+    }
+    .controls, .output {
+      margin: 1rem auto;
+      max-width: 800px;
+    }
+    textarea {
+      width: 100%;
+      height: 400px;
+      font-family: monospace;
+    }
+    .output pre {
+      background: white;
+      padding: 1rem;
+      border: 1px solid #ccc;
+      overflow-x: auto;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+    }
+    button {
+      margin: 0.25rem;
+      padding: 0.5rem 1rem;
+    }
+    .input-row {
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Bit Pattern Visualizer – Phase 1</h1>
+
+  <div class="controls">
+    <label>JavaScript: createNumber(round)</label>
+    <textarea id="userScript">
+// Example: Randomize only the last 71 LSB bits
+
+function setBitsInRange(secret, randomBytes, bitOffset, bitCount) {
+  for (let i = 0; i < bitCount; i++) {
+    const bitVal = (randomBytes[Math.floor(i / 8)] >> (7 - (i % 8))) & 1;
+    const bitIndex = bitOffset + i;
+    const byteIndex = Math.floor(bitIndex / 8);
+    const bitPos = 7 - (bitIndex % 8);
+    if (bitVal) {
+      secret[byteIndex] |= (1 << bitPos);
+    }
+  }
+}
+
+function create_random_LSB(bitsToSet) {
+  const secret = new Uint8Array(32); // 256 bits = 32 bytes
+  const bitOffset = 0; // start at LSB
+  const randomBytes = new Uint8Array(Math.ceil(bitsToSet / 8));
+  crypto.getRandomValues(randomBytes);
+  setBitsInRange(secret, randomBytes, bitOffset, bitsToSet);
+  return secret;
+}
+
+function createNumber(round) {
+  return create_random_LSB(71);
+}
+</textarea>
+    <div class="input-row">
+      <label for="wsUrl">WebSocket URL:</label>
+      <input type="text" id="wsUrl" value="ws://127.0.0.1:8080" />
+      <button onclick="connectWebSocket()">Connect</button>
+      <button onclick="disconnectWebSocket()">Disconnect</button>
+    </div>
+    <div class="input-row">
+      <label for="delay">Interval (ms):</label>
+      <input type="number" id="delay" value="1000" min="10" step="10">
+    </div>
+    <button onclick="startRounds()">Start</button>
+    <button onclick="stopRounds()">Stop</button>
+    <span id="roundDisplay">Round: 0</span>
+  </div>
+
+  <div id="bitGrid" class="grid"></div>
+
+  <div class="output">
+    <div><strong>Bit Sequence (MSB→LSB):</strong></div>
+    <pre id="bitString"></pre>
+    <div><strong>HEX:</strong></div>
+    <pre id="hexString"></pre>
+  </div>
+
+  <script>
+    let round = 0;
+    let running = false;
+    let intervalId = null;
+    let ws = null;
+
+    function connectWebSocket() {
+      const url = document.getElementById("wsUrl").value;
+      if (ws && ws.readyState <= 1) return;
+      ws = new WebSocket(url);
+      ws.onopen = () => console.log("WebSocket connected");
+      ws.onmessage = (event) => console.log("Received:", event.data);
+      ws.onerror = (err) => console.error("WebSocket error:", err);
+      ws.onclose = () => console.log("WebSocket closed");
+    }
+
+    function disconnectWebSocket() {
+      if (ws) ws.close();
+    }
+
+    function startRounds() {
+      if (running) return;
+      const delay = parseInt(document.getElementById("delay").value, 10) || 1000;
+      running = true;
+      intervalId = setInterval(() => {
+        round++;
+        document.getElementById("roundDisplay").textContent = `Round: ${round}`;
+        runUserCode(round);
+      }, delay);
+    }
+
+    function stopRounds() {
+      running = false;
+      clearInterval(intervalId);
+    }
+
+    function runUserCode(currentRound) {
+      const code = document.getElementById("userScript").value;
+      const wrapper = `(function(round) {
+        ${code}
+        return createNumber(round);
+      })`;
+
+      try {
+        const generatedFunc = eval(wrapper);
+        const result = generatedFunc(currentRound);
+        updateGrid(result);
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(result);
+        }
+      } catch (e) {
+        console.error("Error in user script:", e);
+      }
+    }
+
+    function updateGrid(byteArray) {
+      const bitGrid = document.getElementById("bitGrid");
+      bitGrid.innerHTML = "";
+      const bits = [];
+
+      for (let i = 0; i < byteArray.length; i++) {
+        for (let b = 7; b >= 0; b--) {
+          bits.push((byteArray[i] >> b) & 1);
+        }
+      }
+
+      while (bits.length < 256) bits.push(0);
+      bits.length = 256;
+
+      const reversed = [...bits].reverse();
+      for (let i = 0; i < 256; i++) {
+        const div = document.createElement("div");
+        div.className = "cell" + (reversed[i] ? " on" : "");
+        div.textContent = 256 - i;
+        bitGrid.appendChild(div);
+      }
+
+      document.getElementById("bitString").textContent = reversed.join("");
+      let hex = "";
+      for (let i = 0; i < 32; i++) {
+        let byte = 0;
+        for (let j = 0; j < 8; j++) {
+          byte = (byte << 1) | reversed[i * 8 + j];
+        }
+        hex += byte.toString(16).padStart(2, "0");
+      }
+      document.getElementById("hexString").textContent = hex;
+    }
+
+    runUserCode(0);
+  </script>
+</body>
+</html>

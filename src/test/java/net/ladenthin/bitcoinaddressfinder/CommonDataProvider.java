@@ -93,6 +93,7 @@ public class CommonDataProvider {
         KeyProducerJavaIncremental,
         KeyProducerJavaRandom,
         KeyProducerJavaSocket,
+        KeyProducerJavaWebSocket,
         KeyProducerJavaZmq;
     }
     
@@ -103,13 +104,9 @@ public class CommonDataProvider {
 
     @DataProvider
     public static Object[][] keyProducerTypes() {
-        return new Object[][] {
-            {KeyProducerTypesLocal.KeyProducerJavaBip39},
-            {KeyProducerTypesLocal.KeyProducerJavaIncremental},
-            {KeyProducerTypesLocal.KeyProducerJavaRandom},
-            {KeyProducerTypesLocal.KeyProducerJavaSocket},
-            {KeyProducerTypesLocal.KeyProducerJavaZmq}
-        };
+        return Arrays.stream(KeyProducerTypesLocal.values())
+            .map(type -> new Object[]{type})
+            .toArray(Object[][]::new);
     }
     
     /**

@@ -27,6 +27,7 @@ public class CFinder {
     public List<CKeyProducerJavaBip39> keyProducerJavaBip39 = new ArrayList<>();
     public List<CKeyProducerJavaIncremental> keyProducerJavaIncremental = new ArrayList<>();
     public List<CKeyProducerJavaSocket> keyProducerJavaSocket = new ArrayList<>();
+    public List<CKeyProducerJavaWebSocket> keyProducerJavaWebSocket = new ArrayList<>();
     public List<CKeyProducerJavaZmq> keyProducerJavaZmq = new ArrayList<>();
     
     public CConsumerJava consumerJava;

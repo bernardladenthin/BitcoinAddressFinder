@@ -121,8 +121,4 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
         } catch (InterruptedException ex) {
         }
     }
-
-    public void close() {
-        interrupt();
-    }
 }

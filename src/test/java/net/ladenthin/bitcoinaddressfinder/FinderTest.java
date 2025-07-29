@@ -41,6 +41,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremen
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomInstance;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
@@ -272,13 +273,17 @@ public class FinderTest {
                 keyProducerClass = KeyProducerJavaBip39.class;
                 configureKeyProducerJavaBip39(keyProducerId, cFinder);
                 break;
-            case KeyProducerJavaZmq:
-                keyProducerClass = KeyProducerJavaZmq.class;
-                configureKeyProducerJavaZmq(keyProducerId, cFinder);
-                break;
             case KeyProducerJavaSocket:
                 keyProducerClass = KeyProducerJavaSocket.class;
                 configureKeyProducerJavaSocket(keyProducerId, cFinder);
+                break;
+            case KeyProducerJavaWebSocket:
+                keyProducerClass = KeyProducerJavaWebSocket.class;
+                configureKeyProducerJavaWebSocket(keyProducerId, cFinder);
+                break;
+            case KeyProducerJavaZmq:
+                keyProducerClass = KeyProducerJavaZmq.class;
+                configureKeyProducerJavaZmq(keyProducerId, cFinder);
                 break;
             default:
                 throw new IllegalArgumentException("Unknown KeyProducerType: " + keyProducerType);
@@ -388,7 +393,13 @@ public class FinderTest {
         socket.port = KeyProducerJavaSocketTest.findFreePort();
         cFinder.keyProducerJavaSocket.add(socket);
 
-        // 4. JavaZmq
+        // 5. JavaWebSocket
+        CKeyProducerJavaWebSocket webSocket = new CKeyProducerJavaWebSocket();
+        webSocket.keyProducerId = "webSocketId";
+        webSocket.port = KeyProducerJavaSocketTest.findFreePort();
+        cFinder.keyProducerJavaWebSocket.add(webSocket);
+
+        // 6. JavaZmq
         CKeyProducerJavaZmq zmq = new CKeyProducerJavaZmq();
         zmq.keyProducerId = "zmqId";
         zmq.address = KeyProducerJavaZmqTest.findFreeZmqAddress();
@@ -400,13 +411,14 @@ public class FinderTest {
         finder.startKeyProducer();
 
         // Assert
-        assertThat(finder.getKeyProducers().keySet(), hasItems("randomId", "bip39Id", "incrementalId", "socketId", "zmqId"));
+        assertThat(finder.getKeyProducers().keySet(), hasItems("randomId", "bip39Id", "incrementalId", "socketId", "webSocketId", "zmqId"));
 
         // Additionally assert each instance is of expected class type
         assertThat(finder.getKeyProducers().get("randomId"), instanceOf(KeyProducerJavaRandom.class));
         assertThat(finder.getKeyProducers().get("bip39Id"), instanceOf(KeyProducerJavaBip39.class));
         assertThat(finder.getKeyProducers().get("incrementalId"), instanceOf(KeyProducerJavaIncremental.class));
         assertThat(finder.getKeyProducers().get("socketId"), instanceOf(KeyProducerJavaSocket.class));
+        assertThat(finder.getKeyProducers().get("webSocketId"), instanceOf(KeyProducerJavaWebSocket.class));
         assertThat(finder.getKeyProducers().get("zmqId"), instanceOf(KeyProducerJavaZmq.class));
         
         // Interrupt and free producers
@@ -461,6 +473,14 @@ public class FinderTest {
         socket.timeout = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
         socket.keyProducerId = keyProducerId;
         cFinder.keyProducerJavaSocket.add(socket);
+    }
+    
+    private void configureKeyProducerJavaWebSocket(String keyProducerId, CFinder cFinder) {
+        CKeyProducerJavaWebSocket socket = new CKeyProducerJavaWebSocket();
+        socket.port = KeyProducerJavaSocketTest.findFreePort();
+        socket.timeout = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
+        socket.keyProducerId = keyProducerId;
+        cFinder.keyProducerJavaWebSocket.add(socket);
     }
     
     private void configureKeyProducerJavaZmq(String keyProducerId, CFinder cFinder) {

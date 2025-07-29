@@ -112,7 +112,7 @@ public class KeyProducerJavaZmqTest {
             assertThat(secrets.length, is(1));
             assertThat(secrets[0], equalTo(expected));
 
-            keyProducer.close();
+            keyProducer.interrupt();
             sender.close();
         }
     }
@@ -146,7 +146,7 @@ public class KeyProducerJavaZmqTest {
         assertThat(secrets.length, is(1));
         assertThat(secrets[0], is(expected));
 
-        producer.close();
+        producer.interrupt();
         senderFuture.get(1, TimeUnit.SECONDS);
     }
 
@@ -191,7 +191,7 @@ public class KeyProducerJavaZmqTest {
             assertThat(secrets[i].toByteArray()[secrets[i].toByteArray().length - 1], is(expected));
         }
 
-        producer.close();
+        producer.interrupt();
         senderFuture.get(1, TimeUnit.SECONDS);
     }
     

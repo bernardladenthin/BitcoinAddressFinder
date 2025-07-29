@@ -1077,6 +1077,8 @@ References:
 * https://github.com/Noname400/Hunt-to-Mnemonic
 * https://github.com/Py-Project/Bitcoin-wallet-cracker
 * https://github.com/johncantrell97/bip39-solver-gpu
+* https://github.com/ilkerccom/bitcrackrandomiser
+* https://btcpuzzle.info/
 
 ### Deep learning private key prediction
 An export of the full database can be used to predict private keys with deep learning. A funny idea: https://github.com/DRSZL/BitcoinTensorFlowPrivateKeyPrediction

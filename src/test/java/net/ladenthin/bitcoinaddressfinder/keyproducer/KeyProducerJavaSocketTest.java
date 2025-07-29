@@ -166,7 +166,7 @@ public class KeyProducerJavaSocketTest {
 
         // Wait for server to complete
         serverFuture.get(2, TimeUnit.SECONDS);
-        serverKeyProducer.close();
+        serverKeyProducer.interrupt();
     }
     
     private void waitUntilPortOpen(int timeoutMillis) throws Exception {
@@ -347,7 +347,7 @@ public class KeyProducerJavaSocketTest {
         }
 
         // Close client forcibly (simulate socket closed)
-        client.close();
+        client.interrupt();
 
         // Try reuse and expect specific exception
         try {
@@ -656,7 +656,7 @@ public class KeyProducerJavaSocketTest {
             assertTrue("Timeout did not occur as expected", duration >= 1000 && duration <= 1200);
             assertThat(e.getMessage(), containsString("Timeout while waiting for secret"));
         } finally {
-            server.close();
+            server.interrupt();
         }
     }
     
@@ -665,7 +665,7 @@ public class KeyProducerJavaSocketTest {
     }
     
     private void cleanup(KeyProducerJavaSocket client, Future<?> serverFuture, ServerSocket serverSocket, long timeout, TimeUnit unit) throws Exception {
-        if (client != null) client.close();
+        if (client != null) client.interrupt();
         if (serverFuture != null) serverFuture.get(timeout, unit);
         if (serverSocket != null && !serverSocket.isClosed()) serverSocket.close();
     }
