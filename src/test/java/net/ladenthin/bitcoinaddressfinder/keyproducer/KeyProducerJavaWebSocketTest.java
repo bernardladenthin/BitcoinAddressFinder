@@ -138,6 +138,8 @@ public class KeyProducerJavaWebSocketTest {
     public void createSecrets_invalidMessageLength_ignoredByServer() throws Exception {
         CKeyProducerJavaWebSocket config = createConfig();
         KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
+        
+        new ConnectionUtils().waitUntilTcpPortOpen("localhost", config.port, 2000);
 
         byte[] invalid = new byte[16]; // Invalid size
         CountDownLatch connected = new CountDownLatch(1);
