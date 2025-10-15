@@ -997,6 +997,42 @@ The OpenCL backend includes a built-in self-test mechanism that cross-verifies r
 > ```  
 > This option is disabled by default. Enabling it is especially useful during development, debugging, or when validating new hardware setups.
 
+#### ⚠️ BIP-39 Deterministic Keys and Batch Mode Limitation
+
+If you configure a **BIP-39 key producer** (e.g. `keyProducerJavaBip39`) together with OpenCL acceleration, please read this carefully.
+
+The BIP-39 key producer creates **deterministic private keys** derived from your mnemonic, passphrase, and BIP32 path.  
+This derivation space is **finite** — once all child keys along the defined path are exhausted, the producer will throw  
+a `NoMoreSecretsAvailableException`. This can happen relatively quickly in GPU batch configurations.
+
+In your JSON configuration, you may have enabled:
+
+```java
+/**
+ * The batch mode will use a private key increment internal to increase the performance.
+ */
+public boolean batchUsePrivateKeyIncrement = true;
+```
+
+When `batchUsePrivateKeyIncrement` is set to `true`, the OpenCL producer calls:
+
+```java
+secrets = keyProducer.createSecrets(cProducer.getOverallWorkSize(bitHelper), cProducer.batchUsePrivateKeyIncrement);
+```
+
+Internally this sets `returnStartSecretOnly = true`, meaning that **only the first BIP-39-derived key** is passed to the GPU.  
+The OpenCL kernel then uses that single key as a **base key**, incrementing the **least significant bits (LSB)** in parallel across all GPU threads to explore adjacent keyspaces.
+
+> ⚠️ **Use extreme caution:**  
+> - The effective search space on the GPU is *not* the same as the full BIP-39 derivation sequence.  
+> - This mode is intended purely for experimental or high-performance batch testing — not for full HD-wallet traversal.  
+> - Once all deterministic child keys are consumed, a `NoMoreSecretsAvailableException` will occur.
+
+For technical details, see:
+- [`KeyProducerJavaBip39.java`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/KeyProducerJavaBip39.java)
+- [`BIP39KeyProducer.java`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/src/main/java/net/ladenthin/bitcoinaddressfinder/BIP39KeyProducer.java#L46)
+
+
 #### Performance Benchmarks
 
 > **Note:** OpenCL generates uncompressed keys. Compressed keys can be derived from uncompressed ones with minimal overhead.
