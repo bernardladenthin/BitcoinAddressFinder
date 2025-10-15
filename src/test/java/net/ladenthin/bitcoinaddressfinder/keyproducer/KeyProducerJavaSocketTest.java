@@ -117,7 +117,7 @@ public class KeyProducerJavaSocketTest {
         try (Socket clientSocket = new Socket("localhost", port);
              DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream())) {
 
-            byte[] secret = makeSecretBytes();
+            byte[] secret = new KeyProducerTestUtility().createZeroedSecret();
             out.write(secret);
             out.flush();
         }
@@ -157,7 +157,7 @@ public class KeyProducerJavaSocketTest {
         // Client: connect and send exactly 1 secret
         try (Socket clientSocket = new Socket(serverConfig.host, serverConfig.port);
              DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream())) {
-            byte[] secret = makeSecretBytes();
+            byte[] secret = new KeyProducerTestUtility().createZeroedSecret();
             out.write(secret);
             out.flush();
             // Wait briefly to let server finish reading
@@ -207,7 +207,7 @@ public class KeyProducerJavaSocketTest {
         int port = findFreePort();
 
         // The secret bytes to send (32 bytes = 256 bits)
-        byte[] secretBytes = makeSecretBytes((byte)0xCC);
+        byte[] secretBytes = new KeyProducerTestUtility().createFilledSecret((byte)0xCC);
         BigInteger expected = new BigInteger(1, secretBytes);
 
         ServerSocket serverSocket = new ServerSocket(port);
@@ -302,18 +302,6 @@ public class KeyProducerJavaSocketTest {
         // Final cleanup
         cleanup(client, serverFuture, serverSocket, clientSocketTimeout, TimeUnit.MILLISECONDS);
     }
-    
-    private byte[] makeSecretBytes() {
-        return makeSecretBytes((byte)0x0);
-    }
-    
-    private byte[] makeSecretBytes(byte fillByte) {
-        byte[] secretBytes = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
-        for (int i = 0; i < secretBytes.length; i++) {
-            secretBytes[i] = fillByte;
-        }
-        return secretBytes;
-    }
 
     @Test
     public void createSecrets_afterClose_reconnectsAndReadsSuccessfully() throws Exception {
@@ -325,7 +313,7 @@ public class KeyProducerJavaSocketTest {
         Future<Void> serverFuture = executorService.submit(() -> {
             try (Socket s = serverSocket.accept();
                  DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
-                byte[] secretBytes = makeSecretBytes((byte)(0));
+                byte[] secretBytes = new KeyProducerTestUtility().createZeroedSecret();
                 dos.write(secretBytes);
                 dos.flush();
                 Thread.sleep(100); // keep open shortly
@@ -369,7 +357,7 @@ public class KeyProducerJavaSocketTest {
             try (Socket s = serverSocket.accept();
                  DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
                 for (int i = 0; i < 3; i++) {
-                    byte[] secretBytes = makeSecretBytes((byte) (i + 10));
+                    byte[] secretBytes = new KeyProducerTestUtility().createFilledSecret((byte) (i + 10));
                     dos.write(secretBytes);
                     dos.flush();
                     Thread.sleep(50);
@@ -394,6 +382,8 @@ public class KeyProducerJavaSocketTest {
     @Test
     public void createSecrets_connectionRetry_worksWhenServerStartsLate() throws Exception {
         int port = findFreePort();
+        
+        final byte fillByte = (byte)99;
 
         // Server that only starts after a delay (simulate late server start)
         Future<Void> serverFuture = executorService.submit(() -> {
@@ -401,7 +391,7 @@ public class KeyProducerJavaSocketTest {
             try (ServerSocket serverSocket = new ServerSocket(port);
                  Socket s = serverSocket.accept();
                  DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
-                byte[] secretBytes = makeSecretBytes((byte) 99);
+                byte[] secretBytes = new KeyProducerTestUtility().createFilledSecret(fillByte);
                 dos.write(secretBytes);
                 dos.flush();
             }
@@ -419,7 +409,7 @@ public class KeyProducerJavaSocketTest {
         BigInteger[] secrets = client.createSecrets(1, true);
 
         assertThat(secrets.length, is(1));
-        assertThat(secrets[0].toByteArray()[secrets[0].toByteArray().length - 1], is(equalTo((byte) 99)));
+        new KeyProducerTestUtility().assertFilledSecret(secrets[0], fillByte);
 
         cleanup(client, serverFuture, null, 3, TimeUnit.SECONDS);
     }

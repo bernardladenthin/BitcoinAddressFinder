@@ -32,7 +32,6 @@ import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -97,7 +96,7 @@ public class KeyProducerJavaZmqTest {
             KeyProducerJavaZmq keyProducer = createKeyProducerJavaZmq(config);
 
             // Create dummy key
-            byte[] secretBytes = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
+            byte[] secretBytes = new KeyProducerTestUtility().createZeroedSecret();
             for (int i = 0; i < secretBytes.length; i++) {
                 secretBytes[i] = (byte) (i + 1);
             }
@@ -121,10 +120,7 @@ public class KeyProducerJavaZmqTest {
     public void createSecrets_success_receivesOneKey() throws Exception {
         String address = findFreeZmqAddress();
 
-        byte[] secretBytes = new byte[32];
-        for (int i = 0; i < secretBytes.length; i++) {
-            secretBytes[i] = (byte) i;
-        }
+        byte[] secretBytes = new KeyProducerTestUtility().createZeroedSecret();
         BigInteger expected = new BigInteger(1, secretBytes);
 
         // Create the BIND receiver first (so it’s ready to accept)
@@ -134,9 +130,9 @@ public class KeyProducerJavaZmqTest {
         // Now spawn the sender thread
         Future<Void> senderFuture = executorService.submit(() -> {
             try (ZContext context = new ZContext(); ZMQ.Socket socket = context.createSocket(ZMQ.PUSH)) {
-                Thread.sleep(50); // let the receiver settle
+                Thread.sleep(300); // let the receiver settle
                 socket.connect(address);
-                Thread.sleep(50); // let connection establish
+                Thread.sleep(300); // let connection establish
                 socket.send(secretBytes);
             }
             return null;
@@ -164,17 +160,16 @@ public class KeyProducerJavaZmqTest {
     @Test
     public void createSecrets_multipleKeys_success() throws Exception {
         String address = findFreeZmqAddress();
+        
+        final int numberOfSecrets = 3;
 
         Future<Void> senderFuture = executorService.submit(() -> {
             try (ZContext context = new ZContext(); ZMQ.Socket socket = context.createSocket(ZMQ.PUSH)) {
                 socket.connect(address);
-                for (int i = 0; i < 3; i++) {
-                    byte[] secretBytes = new byte[32];
-                    for (int j = 0; j < secretBytes.length; j++) {
-                        secretBytes[j] = (byte) (i + 1);
-                    }
+                for (int i = 0; i < numberOfSecrets; i++) {
+                    byte[] secretBytes = new KeyProducerTestUtility().createIncrementedSecret((byte) i);
                     socket.send(secretBytes);
-                    Thread.sleep(50);
+                    Thread.sleep(300);
                 }
             }
             return null;
@@ -183,13 +178,10 @@ public class KeyProducerJavaZmqTest {
         CKeyProducerJavaZmq config = createBindConfig(address);
         KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
 
-        BigInteger[] secrets = producer.createSecrets(3, false);
-        assertThat(secrets.length, is(3));
+        BigInteger[] secrets = producer.createSecrets(numberOfSecrets, false);
+        assertThat(secrets.length, is(numberOfSecrets));
 
-        for (int i = 0; i < secrets.length; i++) {
-            byte expected = (byte) (i + 1);
-            assertThat(secrets[i].toByteArray()[secrets[i].toByteArray().length - 1], is(expected));
-        }
+        new KeyProducerTestUtility().assertIncrementedSecrets(secrets);
 
         producer.interrupt();
         senderFuture.get(1, TimeUnit.SECONDS);

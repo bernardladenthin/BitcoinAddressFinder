@@ -22,7 +22,6 @@ import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
 import org.bitcoinj.base.Network;
 import org.java_websocket.client.WebSocketClient;
@@ -77,10 +76,7 @@ public class KeyProducerJavaWebSocketTest {
         KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
 
         // WebSocket client to send a valid 32-byte secret
-        byte[] secret = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
-        for (int i = 0; i < secret.length; i++) {
-            secret[i] = (byte) 0x42;
-        }
+        byte[] secret = new KeyProducerUtility().createZeroedSecret();
         BigInteger expected = new BigInteger(1, secret);
 
         CountDownLatch connected = new CountDownLatch(1);
