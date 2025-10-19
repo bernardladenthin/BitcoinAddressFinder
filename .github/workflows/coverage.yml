@@ -41,11 +41,11 @@ jobs:
 
     # https://github.com/marketplace/actions/coveralls-github-action
     - name: Coveralls GitHub Action
-      run: mvn -B coveralls:report --define repoToken=${{ secrets.COVERALLS_TOKEN }}
-    # https://github.com/coverallsapp/github-action/issues/22
       uses: coverallsapp/github-action@v2
       with:
         github-token: ${{ secrets.COVERALLS_TOKEN }}
+        file: target/site/jacoco/jacoco.xml
+        format: jacoco
 
     # https://github.com/codecov/codecov-action
     - name: Codecov GitHub Action
