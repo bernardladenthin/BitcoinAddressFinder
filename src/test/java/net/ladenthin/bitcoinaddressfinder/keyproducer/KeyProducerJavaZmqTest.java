@@ -149,7 +149,7 @@ public class KeyProducerJavaZmqTest {
         String address = findFreeZmqAddress();
 
         CKeyProducerJavaZmq config = createBindConfig(address);
-        config.timeout = 500;
+        config.timeout = TestTimeProvider.DEFAULT_TIMEOUT;
 
         KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
         producer.createSecrets(1, true);

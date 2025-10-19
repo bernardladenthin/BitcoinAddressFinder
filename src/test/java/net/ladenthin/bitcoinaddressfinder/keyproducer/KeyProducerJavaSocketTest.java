@@ -122,9 +122,9 @@ public class KeyProducerJavaSocketTest {
             out.flush();
         }
 
-        serverFuture.get(2, TimeUnit.SECONDS);
+        serverFuture.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
     }
-    
+
     @Test
     public void openCloseConnection_serverMode_success() throws Exception {
         int port = findFreePort();
@@ -132,7 +132,7 @@ public class KeyProducerJavaSocketTest {
 
         // Set up server
         CKeyProducerJavaSocket serverConfig = createServerConfig(port);
-        serverConfig.timeout = 2000; // Optional: short timeout for read
+        serverConfig.timeout = TestTimeProvider.DEFAULT_SOCKET_TIMEOUT;
         serverConfig.readRetryCount = 3;
         serverConfig.connectionRetryCount = 10;
         serverConfig.retryDelayMillisConnect = 100;
@@ -165,7 +165,7 @@ public class KeyProducerJavaSocketTest {
         }
 
         // Wait for server to complete
-        serverFuture.get(2, TimeUnit.SECONDS);
+        serverFuture.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
         serverKeyProducer.interrupt();
     }
     
