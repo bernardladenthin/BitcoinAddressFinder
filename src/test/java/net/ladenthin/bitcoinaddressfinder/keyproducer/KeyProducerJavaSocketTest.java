@@ -651,7 +651,7 @@ public class KeyProducerJavaSocketTest {
     }
     
     private void cleanup(KeyProducerJavaSocket client, Future<?> serverFuture, ServerSocket serverSocket) throws Exception {
-        cleanup(client, serverFuture, serverSocket, 1, TimeUnit.SECONDS);
+        cleanup(client, serverFuture, serverSocket, TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
     }
     
     private void cleanup(KeyProducerJavaSocket client, Future<?> serverFuture, ServerSocket serverSocket, long timeout, TimeUnit unit) throws Exception {
