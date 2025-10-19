@@ -34,14 +34,13 @@ import org.slf4j.Logger;
 import java.math.BigInteger;
 import java.net.URI;
 import java.util.concurrent.*;
+import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.mockito.Mockito.mock;
 
 public class KeyProducerJavaWebSocketTest {
-
-    private static final int TIMEOUT_MS = 2000;
 
     private KeyUtility keyUtility;
     private BitHelper bitHelper;
@@ -66,7 +65,7 @@ public class KeyProducerJavaWebSocketTest {
     private CKeyProducerJavaWebSocket createConfig() {
         CKeyProducerJavaWebSocket config = new CKeyProducerJavaWebSocket();
         config.port = KeyProducerJavaSocketTest.findFreePort();
-        config.timeout = TIMEOUT_MS;
+        config.timeout = TestTimeProvider.DEFAULT_SOCKET_TIMEOUT;
         return config;
     }
 
@@ -89,7 +88,7 @@ public class KeyProducerJavaWebSocketTest {
         };
 
         client.connectBlocking();
-        connected.await(1, TimeUnit.SECONDS);
+        connected.await(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TestTimeProvider.TIME_UNIT);
 
         client.send(secret);
 
@@ -104,7 +103,7 @@ public class KeyProducerJavaWebSocketTest {
     @Test(expected = NoMoreSecretsAvailableException.class)
     public void createSecrets_timeoutWithoutMessage_throwsException() throws Exception {
         CKeyProducerJavaWebSocket config = createConfig();
-        config.timeout = 500;
+        config.timeout = TestTimeProvider.DEFAULT_TIMEOUT;
         KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
 
         producer.createSecrets(1, true);
@@ -123,7 +122,7 @@ public class KeyProducerJavaWebSocketTest {
             }
         });
 
-        Thread.sleep(200); // Give time to enter blocking poll
+        Thread.sleep(TestTimeProvider.DEFAULT_DELAY);
         producer.interrupt();
 
         BigInteger[] result = future.get(2, TimeUnit.SECONDS);
@@ -135,9 +134,9 @@ public class KeyProducerJavaWebSocketTest {
         CKeyProducerJavaWebSocket config = createConfig();
         KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
         
-        new ConnectionUtils().waitUntilTcpPortOpen("localhost", config.port, 2000);
+        new ConnectionUtils().waitUntilTcpPortOpen("localhost", config.port, TestTimeProvider.DEFAULT_SOCKET_TIMEOUT);
 
-        byte[] invalid = new byte[16]; // Invalid size
+        byte[] invalidSecret = new KeyProducerTestUtility().createInvalidSecret();
         CountDownLatch connected = new CountDownLatch(1);
 
         WebSocketClient client = new WebSocketClient(new URI("ws://localhost:" + config.port)) {
@@ -148,9 +147,9 @@ public class KeyProducerJavaWebSocketTest {
         };
 
         client.connectBlocking(); // blocks at socket level
-        waitForConnectionOrFail(client, connected, 2000);
+        waitForConnectionOrFail(client, connected, TestTimeProvider.DEFAULT_SOCKET_TIMEOUT);
 
-        client.send(invalid);
+        client.send(invalidSecret);
 
         try {
             producer.createSecrets(1, true);

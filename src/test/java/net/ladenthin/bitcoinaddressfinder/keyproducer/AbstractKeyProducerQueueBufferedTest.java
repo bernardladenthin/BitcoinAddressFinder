@@ -57,7 +57,7 @@ public class AbstractKeyProducerQueueBufferedTest {
 
         @Override
         protected int getReadTimeout() {
-            return 500; // milliseconds
+            return TestTimeProvider.DEFAULT_SOCKET_TIMEOUT;
         }
 
         @Override
@@ -74,24 +74,24 @@ public class AbstractKeyProducerQueueBufferedTest {
     public void createSecrets_returnsSecret_whenAvailableInQueue() throws Exception {
         CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
         TestKeyProducer producer = createTestKeyProducer(config);
-
-        byte[] secret = new byte[32]; // valid length
-        Arrays.fill(secret, (byte) 0xAB);
+        
+        byte[] secret = new KeyProducerTestUtility().createFilledSecret((byte) 0xAB);
+        BigInteger expectedSecret = new BigInteger(1, secret);
         producer.addSecret(secret);
-
+        
         BigInteger[] secrets = producer.createSecrets(1, true);
-
+        
         assertEquals(1, secrets.length);
-        assertEquals(new BigInteger(1, secret), secrets[0]);
+        assertEquals(expectedSecret, secrets[0]);
     }
     
     @Test
     public void createSecrets_readsMultipleSecrets() throws Exception {
         CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
         TestKeyProducer producer = createTestKeyProducer(config);
-
-        byte[] secret = new byte[32];
-        Arrays.fill(secret, (byte) 0x01);
+        
+        byte[] secret = new KeyProducerTestUtility().createFilledSecret((byte) 0xAB);
+        BigInteger expectedSecret = new BigInteger(1, secret);
 
         producer.addSecret(secret);
         producer.addSecret(secret);
@@ -100,7 +100,7 @@ public class AbstractKeyProducerQueueBufferedTest {
 
         assertEquals(2, secrets.length);
         for (BigInteger bi : secrets) {
-            assertEquals(new BigInteger(1, secret), bi);
+            assertEquals(expectedSecret, bi);
         }
     }
     
@@ -109,8 +109,8 @@ public class AbstractKeyProducerQueueBufferedTest {
         CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
         TestKeyProducer producer = createTestKeyProducer(config);
 
-        byte[] badSecret = new byte[31]; // invalid length
-        producer.addSecret(badSecret);
+        byte[] invalidSecret = new KeyProducerTestUtility().createInvalidSecret();
+        producer.addSecret(invalidSecret);
 
         producer.createSecrets(1, true); // should throw
     }
@@ -140,10 +140,9 @@ public class AbstractKeyProducerQueueBufferedTest {
 
         TestKeyProducer producer = createTestKeyProducer(config);
 
-        byte[] secret = new byte[32];
-        Arrays.fill(secret, (byte) 0x77);
-
+        byte[] secret = new KeyProducerTestUtility().createFilledSecret((byte) 0xAB);
         BigInteger expectedSecret = new BigInteger(1, secret);
+        
         String expectedHex = keyUtility.bigIntegerToFixedLengthHex(expectedSecret);
 
         producer.addSecret(secret);

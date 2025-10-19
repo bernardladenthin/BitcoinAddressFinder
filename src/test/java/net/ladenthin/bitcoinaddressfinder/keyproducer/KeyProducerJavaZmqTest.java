@@ -130,9 +130,9 @@ public class KeyProducerJavaZmqTest {
         // Now spawn the sender thread
         Future<Void> senderFuture = executorService.submit(() -> {
             try (ZContext context = new ZContext(); ZMQ.Socket socket = context.createSocket(ZMQ.PUSH)) {
-                Thread.sleep(300); // let the receiver settle
+                Thread.sleep(TestTimeProvider.DEFAULT_SETTLE_DELAY); // let the receiver settle
                 socket.connect(address);
-                Thread.sleep(300); // let connection establish
+                Thread.sleep(TestTimeProvider.DEFAULT_ESTABLISH_DELAY); // let connection establish
                 socket.send(secretBytes);
             }
             return null;
@@ -156,12 +156,18 @@ public class KeyProducerJavaZmqTest {
         KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
         producer.createSecrets(1, true);
     }
-
+    
     @Test
     public void createSecrets_multipleKeys_success() throws Exception {
         String address = findFreeZmqAddress();
-        
         final int numberOfSecrets = 3;
+
+        // Bind receiver first (small but important ordering)
+        CKeyProducerJavaZmq config = createBindConfig(address);
+        KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
+
+        // Latch to ensure all sends actually happened
+        final CountDownLatch sentLatch = new CountDownLatch(numberOfSecrets);
 
         Future<Void> senderFuture = executorService.submit(() -> {
             try (ZContext context = new ZContext(); ZMQ.Socket socket = context.createSocket(ZMQ.PUSH)) {
@@ -169,22 +175,25 @@ public class KeyProducerJavaZmqTest {
                 for (int i = 0; i < numberOfSecrets; i++) {
                     byte[] secretBytes = new KeyProducerTestUtility().createIncrementedSecret((byte) i);
                     socket.send(secretBytes);
-                    Thread.sleep(300);
+                    sentLatch.countDown();
+                    Thread.sleep(TestTimeProvider.DEFAULT_SEND_DELAY);
                 }
             }
             return null;
         });
 
-        CKeyProducerJavaZmq config = createBindConfig(address);
-        KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
-
         BigInteger[] secrets = producer.createSecrets(numberOfSecrets, false);
         assertThat(secrets.length, is(numberOfSecrets));
-
         new KeyProducerTestUtility().assertIncrementedSecrets(secrets);
 
+        // Wait until the sender really pushed all messages
+        boolean allSent = sentLatch.await(
+            (long) numberOfSecrets * TestTimeProvider.DEFAULT_SEND_DELAY + TestTimeProvider.DEFAULT_DELAY, TimeUnit.MILLISECONDS
+        );
+        assertThat("Sender did not send all secrets in time", allSent, is(true));
+
         producer.interrupt();
-        senderFuture.get(1, TimeUnit.SECONDS);
+        senderFuture.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
     }
     
     @Test

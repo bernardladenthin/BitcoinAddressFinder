@@ -133,4 +133,23 @@ public class KeyProducerTestUtility {
            is(equalTo(fillByte))
        );
    }
+    
+    /**
+     * Creates a deliberately invalid secret byte array for negative or edge-case testing.
+     * <p>
+     * The returned array is one byte shorter than the valid private key length defined by
+     * {@link PublicKeyBytes#PRIVATE_KEY_MAX_NUM_BYTES}, ensuring it will be rejected by
+     * validation logic that enforces correct secret sizes.
+     * <p>
+     * This method is typically used in unit tests to verify that components such as
+     * {@code KeyProducerJavaZmq} or {@code AbstractKeyProducerQueueBuffered}
+     * properly handle malformed or truncated input.
+     *
+     * @return a new byte array with a length of
+     *         {@code PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES - 1}, representing an invalid secret.
+     */
+    public byte[] createInvalidSecret() {
+        return new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES - 1];
+    }
+    
 }
