@@ -26,6 +26,7 @@ public class TestTimeProvider {
 
     public final static int DEFAULT_DELAY = 500;
     public final static int DEFAULT_SEND_DELAY = 300;
+    public final static int DEFAULT_SEND_WAIT = 1000;
     public final static int DEFAULT_SETTLE_DELAY = 300;
     public final static int DEFAULT_ESTABLISH_DELAY = 300;
     public final static int DEFAULT_TIMEOUT = 500;

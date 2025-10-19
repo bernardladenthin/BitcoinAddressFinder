@@ -40,8 +40,6 @@ import org.slf4j.Logger;
 import org.zeromq.SocketType;
 
 public class KeyProducerJavaZmqTest {
-
-    private static final int WAIT_TIME = 1000;
     
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
@@ -215,7 +213,7 @@ public class KeyProducerJavaZmqTest {
         });
 
         // Let it enter the blocking receive
-        Thread.sleep(WAIT_TIME);
+        Thread.sleep(TestTimeProvider.DEFAULT_SEND_WAIT);
 
         // Now interrupt from another thread (will close socket/context)
         producer.interrupt();
