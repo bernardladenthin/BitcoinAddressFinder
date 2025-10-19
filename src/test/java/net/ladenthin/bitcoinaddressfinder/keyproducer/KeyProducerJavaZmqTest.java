@@ -141,7 +141,7 @@ public class KeyProducerJavaZmqTest {
         assertThat(secrets[0], is(expected));
 
         producer.interrupt();
-        senderFuture.get(1, TimeUnit.SECONDS);
+        senderFuture.get(TestTimeProvider.DEFAULT_SEND_WAIT, TestTimeProvider.TIME_UNIT);
     }
 
     @Test(expected = NoMoreSecretsAvailableException.class)
