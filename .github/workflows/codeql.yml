@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: "12 1 * * 0"
 
+env:
+  javaversion: '21'
+  javadistribution: 'temurin'
+
 jobs:
   analyze:
     name: Analyze
@@ -26,11 +30,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Set up JDK 21
+      - name: Set up JDK ${{ env.javaversion }} ${{ env.javadistribution }}
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
+          java-version: ${{ env.javaversion }}
+          distribution: ${{ env.javadistribution }}
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
