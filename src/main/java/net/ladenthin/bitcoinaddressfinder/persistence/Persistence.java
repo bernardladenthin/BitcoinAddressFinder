@@ -54,14 +54,16 @@ public interface Persistence {
     void increaseDatabaseSize(long toIncrease);
     
     /**
-     * Counter of increase.
-     * @return 
+     * Retrieves the current value of the increased counter.
+     *
+     * @return the value of the increased counter as a long.
      */
     long getIncreasedCounter();
     
     /**
-     * The sum of increase in bytes.
-     * @return 
+     * Returns the total sum of all increments applied to the persistence storage.
+     *
+     * @return the accumulated sum of all increment operations in the persistence storage
      */
     long getIncreasedSum();
     

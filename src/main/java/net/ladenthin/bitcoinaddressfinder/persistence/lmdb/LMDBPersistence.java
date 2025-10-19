@@ -170,10 +170,17 @@ public class LMDBPersistence implements Persistence {
     }
 
     /**
-     * https://github.com/lmdbjava/lmdbjava/wiki/Buffers
+     * Returns the appropriate ByteBuffer proxy implementation based on the optimization preference.
+     * <p>
+     * LMDB requires a proxy to handle direct ByteBuffers. Two implementations are available:
+     * - PROXY_OPTIMAL: Uses JNI and unsafe operations for better performance but requires specific JVM permissions
+     * - PROXY_SAFE: Uses pure Java implementation that's more portable but slower
+     * <p>
+     * For more details, see: https://github.com/lmdbjava/lmdbjava/wiki/Buffers
      *
-     * @param useProxyOptimal
-     * @return
+     * @param useProxyOptimal true to use the optimized JNI implementation (PROXY_OPTIMAL),
+     *                        false to use the safe Java implementation (PROXY_SAFE)
+     * @return the selected {@link BufferProxy} implementation for ByteBuffer operations
      */
     private BufferProxy<ByteBuffer> getBufferProxyByUseProxyOptimal(boolean useProxyOptimal) {
         if (useProxyOptimal) {
@@ -313,7 +320,7 @@ public class LMDBPersistence implements Persistence {
         try {
             putNewAmountUnsafe(hash160, amount);
         } catch (org.lmdbjava.Env.MapFullException e) {
-            if (lmdbConfigurationWrite.increaseMapAutomatically == true) {
+            if (lmdbConfigurationWrite.increaseMapAutomatically) {
                 increaseDatabaseSize(new ByteConversion().mibToBytes(lmdbConfigurationWrite.increaseSizeInMiB));
                 /**
                  * It is possible that the exception will be thrown again, in this case increaseSizeInMiB should be changed and it's a configuration issue.
@@ -413,7 +420,7 @@ public class LMDBPersistence implements Persistence {
             dataField.setAccessible(true);
             AtomicLongArray data = (AtomicLongArray) dataField.get(bits);
 
-            return data.length() * Long.BYTES; // 8 bytes per long
+            return (long) data.length() * Long.BYTES; // 8 bytes per long
         } catch (Exception e) {
             throw new RuntimeException("Failed to estimate BloomFilter size", e);
         }

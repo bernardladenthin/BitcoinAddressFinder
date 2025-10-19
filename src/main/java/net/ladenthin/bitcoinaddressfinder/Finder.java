@@ -235,7 +235,7 @@ public class Finder implements Interruptable {
         
         // no producers are running anymore, the consumer can be interrupted
         if (consumerJava != null) {
-            logger.info("Interrupt: " + consumerJava.toString());
+            logger.info("Interrupt: " + consumerJava);
             consumerJava.interrupt();
             consumerJava = null;
         }

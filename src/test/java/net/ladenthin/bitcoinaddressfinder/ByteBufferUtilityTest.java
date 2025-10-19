@@ -251,7 +251,7 @@ public class ByteBufferUtilityTest {
         Object prev = prevField.get(cleaner);
 
         if (testWithAddress) {
-            long address = getAddressFromDirectBuffer((DirectBuffer)directBuffer);
+            long address = getAddressFromDirectBuffer(directBuffer);
             addressTest = address == 0L;
         }
 
@@ -376,7 +376,7 @@ public class ByteBufferUtilityTest {
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
 
         // act
-        byte[] keyWithoutLeadingZeros = byteBufferUtility.bigIntegerToBytes(key);
+        byte[] keyWithoutLeadingZeros = ByteBufferUtility.bigIntegerToBytes(key);
 
         // assert
         assertThat(keyWithoutLeadingZeros.length, is(equalTo(32)));

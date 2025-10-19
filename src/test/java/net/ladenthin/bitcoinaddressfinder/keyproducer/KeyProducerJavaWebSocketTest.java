@@ -134,7 +134,7 @@ public class KeyProducerJavaWebSocketTest {
         CKeyProducerJavaWebSocket config = createConfig();
         KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
         
-        new ConnectionUtils().waitUntilTcpPortOpen("localhost", config.port, TestTimeProvider.DEFAULT_SOCKET_TIMEOUT);
+        ConnectionUtils.waitUntilTcpPortOpen("localhost", config.port, TestTimeProvider.DEFAULT_SOCKET_TIMEOUT);
 
         byte[] invalidSecret = new KeyProducerTestUtility().createInvalidSecret();
         CountDownLatch connected = new CountDownLatch(1);

@@ -144,7 +144,7 @@ public enum SeparatorFormat {
      * Recursively splits the given input string using all defined {@link SeparatorFormat} values,
      * in descending order of separator length.
      * <p>
-     * Unlike the original {@link #split(String)} implementation which applies only the first matching
+     * Unlike the original {@link String#split(String)} implementation which applies only the first matching
      * separator, this version performs a deep, recursive traversal, ensuring that all relevant separators
      * (e.g., {@link SeparatorFormat#DOUBLE_COLON}, {@link SeparatorFormat#COLON}, {@link SeparatorFormat#PIPE})
      * are applied in sequence. This guarantees complete and hierarchical resolution of mixed separator patterns.

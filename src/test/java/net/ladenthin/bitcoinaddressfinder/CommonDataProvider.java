@@ -88,13 +88,13 @@ public class CommonDataProvider {
         };
     }
     
-    public static enum KeyProducerTypesLocal {
+    public enum KeyProducerTypesLocal {
         KeyProducerJavaBip39,
         KeyProducerJavaIncremental,
         KeyProducerJavaRandom,
         KeyProducerJavaSocket,
         KeyProducerJavaWebSocket,
-        KeyProducerJavaZmq;
+        KeyProducerJavaZmq
     }
     
     /**
@@ -314,7 +314,7 @@ public class CommonDataProvider {
     }
     
     /**
-     * For {@link #compressedAndAmount()}.
+     * For {@link #compressedAndStaticAmount()}.
      */
     public final static String DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT = "compressedAndStaticAmount";
 
@@ -730,7 +730,7 @@ public class CommonDataProvider {
     }
     
     /**
-     * For {@link #largePrivate32ByteKeys()}.
+     * For {@link #privateKeys32ByteRequiringStrip()}.
      */
     public final static String DATA_PROVIDER_PRIVATE_KEYS_32_BYTE_REQUIRING_STRIP = "privateKeys32ByteRequiringStrip";
 
@@ -746,7 +746,7 @@ public class CommonDataProvider {
     }
     
     /**
-     * For {@link bigIntegerVariants}.
+     * For {@link #bigIntegerVariants()}.
      */
     public final static String DATA_PROVIDER_BIG_INTEGER_VARIANTS = "bigIntegerVariants";
     

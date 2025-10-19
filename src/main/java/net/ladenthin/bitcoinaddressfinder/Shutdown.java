@@ -19,5 +19,5 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 public interface Shutdown {
-    public void shutdown();
+    void shutdown();
 }

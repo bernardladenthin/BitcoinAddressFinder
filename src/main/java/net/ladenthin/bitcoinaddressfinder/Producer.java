@@ -25,7 +25,7 @@ public interface Producer extends Runnable, Interruptable, ProducerStateProvider
     
     /**
      * Initialize the producer to procue keys with
-     * {@link #produceKeys(int, java.util.Random)} continuously.
+     * {@link #produceKeys()} continuously.
      */
     void initProducer();
     
@@ -43,14 +43,17 @@ public interface Producer extends Runnable, Interruptable, ProducerStateProvider
     void produceKeys();
     
     /**
-     * Process the secret base.
-     * @param secretBase
+     * Processes a provided secret base, which may be used for key generation or other cryptographic
+     * operations in the implementation of the producer.
+     *
+     * @param secretBase the secret base value to be processed, represented as a {@link BigInteger}
      */
     void processSecretBase(BigInteger secretBase);
     
     /**
-     * Process the secret.
-     * @param secrets
+     * Processes an array of secrets represented as BigInteger values.
+     *
+     * @param secrets an array of BigInteger objects representing the secrets to be processed
      */
     void processSecrets(BigInteger[] secrets);
     

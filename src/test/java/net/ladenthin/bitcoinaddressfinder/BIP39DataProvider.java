@@ -31,7 +31,7 @@ import java.util.Map;
 public class BIP39DataProvider {
 
     /**
-     * For {@link net.ladenthin.bitcoinaddressfinder.Bip39Test}.
+     * For {@link net.ladenthin.bitcoinaddressfinder.BIP39KeyProducerTest}.
      */
     public final static String DATA_PROVIDER_BIP39_TEST_VECTORS = "bip39TestVectors";
     

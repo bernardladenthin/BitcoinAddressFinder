@@ -72,7 +72,7 @@ public enum BIP39Wordlist {
     * {@code /mnemonic/wordlist/{fileName}}, where {@code fileName} corresponds
     * to the file name associated with the enum constant (e.g. {@code english.txt}).
     * <p>
-    * This method is used to initialize a {@link MnemonicCode} instance with the correct
+    * This method is used to initialize a {@link org.bitcoinj.crypto.MnemonicCode} instance with the correct
     * wordlist for a given language.
     *
     * @return the input stream of the wordlist file for this language, or {@code null}

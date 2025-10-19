@@ -41,11 +41,11 @@ public class AddressToCoinTest {
         ECKey keyUncompressed = new TestAddresses42(1, false).getECKeys().get(0);
         ECKey keyCompressed = new TestAddresses42(1, true).getECKeys().get(0);
         
-        AddressToCoin addressToCoinUncompressed = new AddressToCoin(keyUtility.byteBufferUtility.byteArrayToByteBuffer(keyUncompressed.getPubKeyHash()), Coin.COIN, AddressType.P2PKH_OR_P2SH);
-        AddressToCoin addressToCoinUncompressed2 = new AddressToCoin(keyUtility.byteBufferUtility.byteArrayToByteBuffer(keyUncompressed.getPubKeyHash()), Coin.COIN, AddressType.P2PKH_OR_P2SH);
+        AddressToCoin addressToCoinUncompressed = new AddressToCoin(keyUtility.byteBufferUtility().byteArrayToByteBuffer(keyUncompressed.getPubKeyHash()), Coin.COIN, AddressType.P2PKH_OR_P2SH);
+        AddressToCoin addressToCoinUncompressed2 = new AddressToCoin(keyUtility.byteBufferUtility().byteArrayToByteBuffer(keyUncompressed.getPubKeyHash()), Coin.COIN, AddressType.P2PKH_OR_P2SH);
         
-        AddressToCoin addressToCoinCompressed = new AddressToCoin(keyUtility.byteBufferUtility.byteArrayToByteBuffer(keyCompressed.getPubKeyHash()), Coin.COIN, AddressType.P2PKH_OR_P2SH);
-        AddressToCoin addressToCoinCompressed2 = new AddressToCoin(keyUtility.byteBufferUtility.byteArrayToByteBuffer(keyCompressed.getPubKeyHash()), Coin.COIN, AddressType.P2PKH_OR_P2SH);
+        AddressToCoin addressToCoinCompressed = new AddressToCoin(keyUtility.byteBufferUtility().byteArrayToByteBuffer(keyCompressed.getPubKeyHash()), Coin.COIN, AddressType.P2PKH_OR_P2SH);
+        AddressToCoin addressToCoinCompressed2 = new AddressToCoin(keyUtility.byteBufferUtility().byteArrayToByteBuffer(keyCompressed.getPubKeyHash()), Coin.COIN, AddressType.P2PKH_OR_P2SH);
         
         // assert
         EqualHashCodeToStringTestHelper equalHashCodeToStringTestHelper = new EqualHashCodeToStringTestHelper(addressToCoinUncompressed, addressToCoinUncompressed2, addressToCoinCompressed, addressToCoinCompressed2);
@@ -58,7 +58,7 @@ public class AddressToCoinTest {
     @Test(expected = IllegalArgumentException.class)
     public void createAddressToCoin_invalidAddressSizeGiven_ToStringAndEqualsAndHashCode() throws IOException, InterruptedException {
         // arrange
-        ByteBuffer byteBuffer32bytes = keyUtility.byteBufferUtility.getByteBufferFromHex("0000000000000000000000000000000000000000000000000000000000000000");
+        ByteBuffer byteBuffer32bytes = keyUtility.byteBufferUtility().getByteBufferFromHex("0000000000000000000000000000000000000000000000000000000000000000");
         // act
         new AddressToCoin(byteBuffer32bytes, Coin.COIN, AddressType.P2PKH_OR_P2SH);
         // assert

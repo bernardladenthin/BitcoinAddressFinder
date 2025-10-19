@@ -23,6 +23,6 @@ import net.ladenthin.bitcoinaddressfinder.Interruptable;
 import org.slf4j.Logger;
 
 public interface KeyProducer extends Interruptable {
-    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException;
-    public Logger getLogger();
+    BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException;
+    Logger getLogger();
 }

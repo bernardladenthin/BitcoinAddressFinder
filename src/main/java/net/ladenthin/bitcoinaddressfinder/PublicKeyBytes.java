@@ -32,9 +32,9 @@ import org.slf4j.Logger;
 public class PublicKeyBytes {
     
     /**
-     * Use {@link com.​google.​common.​hash.Hashing} and
+     * Use {@link com.google.common.hash.Hashing} and
      * {@link org.bouncycastle.crypto.digests.RIPEMD160Digest} instead
-     * {@link org.bitcoinj.core.Utils#sha256hash160(byte[])}.
+     * {@link org.bitcoinj.crypto.internal.CryptoUtils#sha256hash160(byte[])}.
      */
     public static final boolean USE_SHA256_RIPEMD160_FAST = true;
 
@@ -68,7 +68,7 @@ public class PublicKeyBytes {
      * The maximum valid private key according to the secp256k1 specification.
      * <p>
      * The valid range for secp256k1 private keys is technically defined as 
-     * {@code 0x1} to {@link MAX_PRIVATE_KEY_HEX} (inclusive).
+     * {@code 0x1} to {@link #MAX_PRIVATE_KEY_HEX} (inclusive).
      * This value represents the order of the secp256k1 curve (also called the group order).
      * </p>
      * <p>
@@ -176,11 +176,11 @@ public class PublicKeyBytes {
      * integer value addressable in Java ({@link Integer#MAX_VALUE}) and the storage requirement for two coordinates.
      * <p>
      * The calculation divides {@link Integer#MAX_VALUE} by the number of bytes needed to store a OpenCL chunk,
-     * as defined by {@link PublicKeyBytes#CHUNK_SIZE}, ensuring the array's indexing does not surpass
+     * as defined by {@link PublicKeyBytes#CHUNK_SIZE_NUM_BYTES}, ensuring the array's indexing does not surpass
      * Java's maximum allowable array length.
      * </p>
      */
-    public static final int MAXIMUM_CHUNK_ELEMENTS = (int)(Integer.MAX_VALUE / CHUNK_SIZE_NUM_BYTES);
+    public static final int MAXIMUM_CHUNK_ELEMENTS = Integer.MAX_VALUE / CHUNK_SIZE_NUM_BYTES;
 
     /**
      * Determines the minimum number of bits required to address the maximum array length for storing chunks.
@@ -380,7 +380,7 @@ public class PublicKeyBytes {
 
     /**
      * Calculates RIPEMD160(SHA256(input)). This is used in Address
-     * calculations. Same as {@link Utils#sha256hash160(byte[])} but using
+     * calculations. Same as {@link org.bitcoinj.crypto.internal.CryptoUtils#sha256hash160(byte[])} but using
      * {@link DigestUtils}.
      */
     public static byte[] sha256hash160Fast(byte[] input) {

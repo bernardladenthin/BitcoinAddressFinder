@@ -55,12 +55,12 @@ public class OpenCLBuilderTest {
     @Test
     public void isOpenCL2_0OrGreater_OpenCLVersion1_2Given_ReturnFalse() throws IOException {
         OpenCLBuilder openCLBuilder = new OpenCLBuilder();
-        assertThat(openCLBuilder.isOpenCL2_0OrGreater(OpenCLDevice.getComparableVersionFromDeviceVersion("OpenCL 1.2")), is(equalTo(Boolean.FALSE)));
+        assertThat(OpenCLBuilder.isOpenCL2_0OrGreater(OpenCLDevice.getComparableVersionFromDeviceVersion("OpenCL 1.2")), is(equalTo(Boolean.FALSE)));
     }
     
     @Test
     public void isOpenCL2_0OrGreater_OpenCLVersion3_0_CUDA_Given_ReturnFalse() throws IOException {
         OpenCLBuilder openCLBuilder = new OpenCLBuilder();
-        assertThat(openCLBuilder.isOpenCL2_0OrGreater(OpenCLDevice.getComparableVersionFromDeviceVersion("OpenCL 3.0 CUDA")), is(equalTo(Boolean.TRUE)));
+        assertThat(OpenCLBuilder.isOpenCL2_0OrGreater(OpenCLDevice.getComparableVersionFromDeviceVersion("OpenCL 3.0 CUDA")), is(equalTo(Boolean.TRUE)));
     }
 }

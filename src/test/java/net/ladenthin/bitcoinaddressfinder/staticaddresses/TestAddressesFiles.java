@@ -21,11 +21,7 @@ package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
@@ -231,7 +227,7 @@ public class TestAddressesFiles implements AddressesFiles {
                 testAddresses.getIndexAsBase58String(1) + TAB_SPLIT.getSymbol() + amountOtherAddresses,
                 testAddresses.getIndexAsBase58String(2) + SEMICOLON.getSymbol() + "1"
         ));
-        Files.write(two.toPath(), Arrays.asList(
+        Files.write(two.toPath(), Collections.singletonList(
                 testAddresses.getIndexAsBase58String(3)
         ));
         

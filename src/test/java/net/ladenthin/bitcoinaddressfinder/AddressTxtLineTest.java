@@ -212,7 +212,7 @@ public class AddressTxtLineTest {
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
 
         // assert
-        String hash160AsHex = keyUtility.byteBufferUtility.getHexFromByteBuffer(addressToCoin.hash160());
+        String hash160AsHex = keyUtility.byteBufferUtility().getHexFromByteBuffer(addressToCoin.hash160());
         assertThat(hash160AsHex, is(equalTo(expectedHash160)));
     }
 
@@ -233,7 +233,7 @@ public class AddressTxtLineTest {
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
 
         // assert
-        String hash160AsHex = keyUtility.byteBufferUtility.getHexFromByteBuffer(addressToCoin.hash160());
+        String hash160AsHex = keyUtility.byteBufferUtility().getHexFromByteBuffer(addressToCoin.hash160());
         assertThat(hash160AsHex, is(equalTo(expectedHash160)));
     }
 
@@ -244,7 +244,7 @@ public class AddressTxtLineTest {
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
 
         // assert
-        String hash160AsHex = keyUtility.byteBufferUtility.getHexFromByteBuffer(addressToCoin.hash160());
+        String hash160AsHex = keyUtility.byteBufferUtility().getHexFromByteBuffer(addressToCoin.hash160());
         assertThat(hash160AsHex, is(equalTo(expectedHash160)));
     }
 
@@ -257,7 +257,7 @@ public class AddressTxtLineTest {
         AddressToCoin addressToCoin = new AddressTxtLine().parseBase58Address(encoded, versionBytes, AddressTxtLine.CHECKSUM_BYTES_REGULAR, keyUtility);
 
         // assert
-        byte[] hash160 = keyUtility.byteBufferUtility.byteBufferToBytes(addressToCoin.hash160());
+        byte[] hash160 = keyUtility.byteBufferUtility().byteBufferToBytes(addressToCoin.hash160());
         String hash160AsHex = org.bouncycastle.util.encoders.Hex.toHexString(hash160);
         int expectedLastIndex = 40 - 1 - 2 * versionBytes + 2;
         assertThat(hash160AsHex.lastIndexOf("f"), is(equalTo(expectedLastIndex)));
@@ -269,11 +269,11 @@ public class AddressTxtLineTest {
         P2PKH address = P2PKH.BitcoinCash;
 
         // act
-        byte[] hash160 = new AddressTxtLine().extractPKHFromBitcoinCashAddress(address.getPublicAddress());
+        byte[] hash160 = AddressTxtLine.extractPKHFromBitcoinCashAddress(address.getPublicAddress());
 
         // assert
-        ByteBuffer buffer = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160);
-        String actualHashHex = keyUtility.byteBufferUtility.getHexFromByteBuffer(buffer);
+        ByteBuffer buffer = keyUtility.byteBufferUtility().byteArrayToByteBuffer(hash160);
+        String actualHashHex = keyUtility.byteBufferUtility().getHexFromByteBuffer(buffer);
         assertThat(actualHashHex, is(equalTo(address.getPublicKeyHashAsHex())));
     }
 
@@ -283,13 +283,13 @@ public class AddressTxtLineTest {
         P2PKH address = P2PKH.BitcoinCashWithPrefix;
 
         // act
-        byte[] hash160 = new AddressTxtLine().extractPKHFromBitcoinCashAddress(address.getPublicAddress());
+        byte[] hash160 = AddressTxtLine.extractPKHFromBitcoinCashAddress(address.getPublicAddress());
 
         // assert
         assertThat(address.getPublicAddress(), startsWith(AddressTxtLine.BITCOIN_CASH_PREFIX));
 
-        ByteBuffer buffer = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160);
-        String actualHashHex = keyUtility.byteBufferUtility.getHexFromByteBuffer(buffer);
+        ByteBuffer buffer = keyUtility.byteBufferUtility().byteArrayToByteBuffer(hash160);
+        String actualHashHex = keyUtility.byteBufferUtility().getHexFromByteBuffer(buffer);
         assertThat(actualHashHex, is(equalTo(address.getPublicKeyHashAsHex())));
     }
 }

@@ -19,5 +19,5 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 public enum ProducerState {
-    UNINITIALIZED, INITIALIZED, RUNNING, NOT_RUNNING;
+    UNINITIALIZED, INITIALIZED, RUNNING, NOT_RUNNING
 }

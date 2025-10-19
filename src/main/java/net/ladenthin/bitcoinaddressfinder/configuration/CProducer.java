@@ -26,7 +26,7 @@ public class CProducer {
     public String keyProducerId;
     
     /**
-     * Range: {@code 0} (inclusive) to {@link PublicKeyBytes#BIT_COUNT_FOR_MAX_COORDINATE_PAIRS_ARRAY} (inclusive).
+     * Range: {@code 0} (inclusive) to {@link PublicKeyBytes#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY} (inclusive).
      */
     public int batchSizeInBits = 0;
     

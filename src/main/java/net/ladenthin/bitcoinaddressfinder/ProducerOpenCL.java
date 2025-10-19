@@ -91,7 +91,7 @@ public class ProducerOpenCL extends AbstractProducer {
     
     protected static class ResultReaderRunnable implements Runnable {
         
-        private Logger logger = LoggerFactory.getLogger(this.getClass());
+        private final Logger logger = LoggerFactory.getLogger(this.getClass());
         
         private final OpenCLGridResult openCLGridResult;
         private final Consumer consumer;

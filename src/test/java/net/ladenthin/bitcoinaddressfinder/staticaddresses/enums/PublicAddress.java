@@ -24,5 +24,5 @@ public interface PublicAddress {
      * Returns the public address.
      * @return the public address.
      */
-    public String getPublicAddress();
+    String getPublicAddress();
 }

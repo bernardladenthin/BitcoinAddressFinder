@@ -19,5 +19,5 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 public interface Interruptable {
-    public void interrupt();
+    void interrupt();
 }

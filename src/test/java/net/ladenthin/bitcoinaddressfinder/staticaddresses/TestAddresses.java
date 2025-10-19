@@ -24,7 +24,7 @@ import org.bitcoinj.crypto.ECKey;
 
 public interface TestAddresses {
     
-    public int getNumberOfAddresses();
+    int getNumberOfAddresses();
     
     List<ECKey> getECKeys();
     
@@ -32,11 +32,11 @@ public interface TestAddresses {
     
     List<String> getAsBase58StringList();
     
-    public String getIndexAsBase58String(int index);
+    String getIndexAsBase58String(int index);
 
-    public String getIndexAsHash160HexEncoded(int index);
+    String getIndexAsHash160HexEncoded(int index);
     
-    public byte[] getIndexAsHash160(int index);
+    byte[] getIndexAsHash160(int index);
     
-    public ByteBuffer getIndexAsHash160ByteBuffer(int index);
+    ByteBuffer getIndexAsHash160ByteBuffer(int index);
 }

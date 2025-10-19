@@ -100,7 +100,7 @@ public class OpenCLContext implements ReleaseCLObject {
     private cl_program program;
     private cl_kernel kernel;
     private OpenClTask openClTask;
-    private ByteBufferUtility byteBufferUtility;
+    private final ByteBufferUtility byteBufferUtility;
     
     private boolean closed = false;
     
@@ -126,8 +126,8 @@ public class OpenCLContext implements ReleaseCLObject {
             producerOpenCL.deviceIndex
         );
         
-        device = selection.getDevice();
-        cl_context_properties contextProperties = selection.getContextProperties();
+        device = selection.device();
+        cl_context_properties contextProperties = selection.contextProperties();
         cl_device_id[] cl_device_ids = new cl_device_id[]{device.device()};
         
         // Create a context for the selected device

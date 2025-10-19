@@ -20,27 +20,7 @@ package net.ladenthin.bitcoinaddressfinder.opencl;
 
 import org.jocl.cl_context_properties;
 
-public class OpenCLDeviceSelection {
-    
-    private final OpenCLPlatform platform;
-    private final OpenCLDevice device;
-    private final cl_context_properties contextProperties;
+public record OpenCLDeviceSelection(OpenCLPlatform platform, OpenCLDevice device,
+                                    cl_context_properties contextProperties) {
 
-    public OpenCLDeviceSelection(OpenCLPlatform platform, OpenCLDevice device, cl_context_properties contextProperties) {
-        this.platform = platform;
-        this.device = device;
-        this.contextProperties = contextProperties;
-    }
-
-    public OpenCLPlatform getPlatform() {
-        return platform;
-    }
-
-    public OpenCLDevice getDevice() {
-        return device;
-    }
-
-    public cl_context_properties getContextProperties() {
-        return contextProperties;
-    }
 }

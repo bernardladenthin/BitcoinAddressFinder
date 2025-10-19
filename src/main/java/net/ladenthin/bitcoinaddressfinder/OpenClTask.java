@@ -206,10 +206,10 @@ public class OpenClTask implements ReleaseCLObject {
         // BigInteger.toByteArray() always returns a big-endian (MSB-first) representation, 
         // meaning the most significant byte (MSB) comes first.
         // Therefore, the source format is always Big Endian.
-        final byte[] byteArray = byteBufferUtility.bigIntegerToBytes(privateKeyBase);
+        final byte[] byteArray = ByteBufferUtility.bigIntegerToBytes(privateKeyBase);
         EndiannessConverter endiannessConverter = new EndiannessConverter(ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN, byteBufferUtility);
         endiannessConverter.convertEndian(byteArray);
-        byteBufferUtility.putToByteBuffer(privateKeySourceArgument.getByteBuffer(), byteArray);
+        ByteBufferUtility.putToByteBuffer(privateKeySourceArgument.getByteBuffer(), byteArray);
     }
     
     @VisibleForTesting
@@ -237,8 +237,8 @@ public class OpenClTask implements ReleaseCLObject {
                 throw new IllegalArgumentException("batchSizeInBits is not divisible by loopCount; result count would be invalid.");
             }
             
-            final long global_work_size[] = new long[]{adjustedWorkSize};
-            final long localWorkSize[] = null; // new long[]{1}; // enabling the system to choose the work-group size.
+            final long[] global_work_size = new long[]{adjustedWorkSize};
+            final long[] localWorkSize = null; // new long[]{1}; // enabling the system to choose the work-group size.
             final int workDim = 1;
             
             // Set the arguments for the kernel

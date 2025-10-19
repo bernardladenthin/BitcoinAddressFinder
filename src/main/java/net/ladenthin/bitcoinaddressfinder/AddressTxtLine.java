@@ -106,7 +106,7 @@ public class AddressTxtLine {
             final int riecoinScriptPubKeyLengthHex = length20Bytes * 2 + riecoinP2SHPrefix.length();
             if (address.length() >= riecoinScriptPubKeyLengthHex && address.startsWith(riecoinP2SHPrefix)) {
                 final String hash160Hex = address.substring(riecoinP2SHPrefix.length(), length20Bytes*2+riecoinP2SHPrefix.length());
-                final ByteBuffer hash160 = keyUtility.byteBufferUtility.getByteBufferFromHex(hash160Hex);
+                final ByteBuffer hash160 = keyUtility.byteBufferUtility().getByteBufferFromHex(hash160Hex);
                 return new AddressToCoin(hash160, amount, AddressType.P2PKH_OR_P2SH);
             }
         }
@@ -125,7 +125,7 @@ public class AddressTxtLine {
             // BitCore (WKH) is base36 encoded hash160
             String addressWKH = address.substring("wkh_".length());
             byte[] hash160 = new Base36Decoder().decodeBase36ToFixedLengthBytes(addressWKH, PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES);
-            ByteBuffer hash160AsByteBuffer = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160);
+            ByteBuffer hash160AsByteBuffer = keyUtility.byteBufferUtility().byteArrayToByteBuffer(hash160);
             return new AddressToCoin(hash160AsByteBuffer, amount, AddressType.P2WPKH);
         }
         
@@ -141,7 +141,7 @@ public class AddressTxtLine {
             switch (witnessVersion) {
                 case WITNESS_VERSION_0:
                     if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_PKH) {
-                        ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(witnessProgram);
+                        ByteBuffer hash160 = keyUtility.byteBufferUtility().byteArrayToByteBuffer(witnessProgram);
                         return new AddressToCoin(hash160, amount, AddressType.P2WPKH); // P2WPKH supported
                     } else if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_SH) {
                         byte[] scriptHash = witnessProgram;
@@ -179,7 +179,7 @@ public class AddressTxtLine {
             // Bitcoin Cash 'q' prefix: convert to legacy address
             if (address.startsWith("q")) {
                 byte[] payload = extractPKHFromBitcoinCashAddress(address);
-                ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(payload);
+                ByteBuffer hash160 = keyUtility.byteBufferUtility().byteArrayToByteBuffer(payload);
                 return new AddressToCoin(hash160, amount, AddressType.P2PKH_OR_P2SH);
             }
         } catch (DecoderException e) {
@@ -299,7 +299,7 @@ public class AddressTxtLine {
             checksum = new byte[checksumBytes];
             // copy cheksum
             System.arraycopy(decoded, versionBytes + storedBytes, checksum, 0, checksum.length);
-            //String checksumAsHex = org.apache.commons.codec.binary.Hex.encodeHexString(checksum);
+            String checksumAsHex = org.apache.commons.codec.binary.Hex.encodeHexString(checksum);
         } else {
             checksum = null;
         }
@@ -315,17 +315,23 @@ public class AddressTxtLine {
             byte[] calculatedChecksum = Arrays.copyOfRange(secondHash, 0, checksumBytes);
 
             checksumMatches = Arrays.equals(calculatedChecksum, checksum);
+            if (false) {
+                // TODO: For debugging only
+                String versionAsHex = org.apache.commons.codec.binary.Hex.encodeHexString(version);
+            }
         }
-        
-        //String decodedAsHex = org.apache.commons.codec.binary.Hex.encodeHexString(decoded);
-        //String hash160AsHex = org.apache.commons.codec.binary.Hex.encodeHexString(hash160);
 
-        ByteBuffer hash160AsByteBuffer = keyUtility.byteBufferUtility.byteArrayToByteBuffer(hash160);
+        if (false) {
+            // TODO: For debugging only
+            String decodedAsHex = org.apache.commons.codec.binary.Hex.encodeHexString(decoded);
+            String hash160AsHex = org.apache.commons.codec.binary.Hex.encodeHexString(hash160);
+        }
+
+        ByteBuffer hash160AsByteBuffer = keyUtility.byteBufferUtility().byteArrayToByteBuffer(hash160);
         
         // fallback
         AddressType addressType = AddressType.P2PKH_OR_P2SH;
-        
-        String versionAsHex = org.apache.commons.codec.binary.Hex.encodeHexString(version);
+
         AddressToCoin addressToCoin = new AddressToCoin(hash160AsByteBuffer, DEFAULT_COIN, addressType);
         return addressToCoin;
     }
@@ -335,7 +341,7 @@ public class AddressTxtLine {
         if (lineSplitted.length > 1) {
             String amountString = lineSplitted[1];
             try {
-                return Coin.valueOf(Long.valueOf(amountString));
+                return Coin.valueOf(Long.parseLong(amountString));
             } catch (NumberFormatException e) {
                 return defaultValue;
             }

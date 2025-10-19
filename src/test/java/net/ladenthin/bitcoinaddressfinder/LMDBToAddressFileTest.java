@@ -66,13 +66,13 @@ public class LMDBToAddressFileTest extends LMDBBase {
             
             final Set<String> expected;
             if (compressed && useStaticAmount) {
-                expected = testAddressesFiles.compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount;
+                expected = TestAddressesFiles.compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount;
             } else if(compressed) {
-                expected = testAddressesFiles.compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount;
+                expected = TestAddressesFiles.compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount;
             } else if(useStaticAmount) {
-                expected = testAddressesFiles.uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount;
+                expected = TestAddressesFiles.uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount;
             } else {
-                expected = testAddressesFiles.uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount;
+                expected = TestAddressesFiles.uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount;
             }
             
             assertThat(contentsAsSet, is(equalTo(expected)));
@@ -103,13 +103,13 @@ public class LMDBToAddressFileTest extends LMDBBase {
 
             final Set<String> expected;
             if (compressed && useStaticAmount) {
-                expected = testAddressesFiles.compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress;
+                expected = TestAddressesFiles.compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress;
             } else if(compressed) {
-                expected = testAddressesFiles.compressedTestAddressesAsFixedWidthBase58BitcoinAddress;
+                expected = TestAddressesFiles.compressedTestAddressesAsFixedWidthBase58BitcoinAddress;
             } else if(useStaticAmount) {
-                expected = testAddressesFiles.uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress;
+                expected = TestAddressesFiles.uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress;
             } else {
-                expected = testAddressesFiles.uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress;
+                expected = TestAddressesFiles.uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress;
             }
             
             assertThat(contentsAsSet, is(equalTo(expected)));
@@ -140,13 +140,13 @@ public class LMDBToAddressFileTest extends LMDBBase {
 
             final Set<String> expected;
             if (compressed && useStaticAmount) {
-                expected = testAddressesFiles.compressedTestAddressesWithStaticAmountAsHexHash;
+                expected = TestAddressesFiles.compressedTestAddressesWithStaticAmountAsHexHash;
             } else if(compressed) {
-                expected = testAddressesFiles.compressedTestAddressesAsHexHash;
+                expected = TestAddressesFiles.compressedTestAddressesAsHexHash;
             } else if(useStaticAmount) {
-                expected = testAddressesFiles.uncompressedTestAddressesWithStaticAmountAsHexHash;
+                expected = TestAddressesFiles.uncompressedTestAddressesWithStaticAmountAsHexHash;
             } else {
-                expected = testAddressesFiles.uncompressedTestAddressesAsHexHash;
+                expected = TestAddressesFiles.uncompressedTestAddressesAsHexHash;
             }
             
             assertThat(contentsAsSet, is(equalTo(expected)));

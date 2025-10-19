@@ -30,7 +30,7 @@ public class MockKeyProducer implements KeyProducer {
     private final KeyUtility keyUtility;
     private final Random random;
     private final int maximumBitLength;
-    private Logger mockLogger;
+    private final Logger mockLogger;
     
     MockKeyProducer(KeyUtility keyUtility, Random random, int maximumBitLength) {
         this.keyUtility = keyUtility;

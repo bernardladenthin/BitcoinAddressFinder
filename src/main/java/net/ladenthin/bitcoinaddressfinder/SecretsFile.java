@@ -68,7 +68,7 @@ public class SecretsFile extends AbstractPlaintextFile {
             default:
                 throw new UnknownSecretFormatException(secretFormat);
         }
-        final BigInteger secrets[] = new BigInteger[1];
+        final BigInteger[] secrets = new BigInteger[1];
         secrets[0] = secret;
         secretConsumer.accept(secrets);
     }

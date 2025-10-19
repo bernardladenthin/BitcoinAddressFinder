@@ -84,12 +84,12 @@ public class EqualHashCodeToStringTestHelper {
     }
 
     private void assertDifferenceReference() {
-        Assert.assertTrue(instanceA != instanceADifferentReference);
-        Assert.assertTrue(instanceA != instanceB);
-        Assert.assertTrue(instanceA != instanceBDifferentReference);
-        
-        Assert.assertTrue(instanceB != instanceBDifferentReference);
-        Assert.assertTrue(instanceB != instanceA);
-        Assert.assertTrue(instanceB != instanceADifferentReference);
+        Assert.assertNotSame(instanceA, instanceADifferentReference);
+        Assert.assertNotSame(instanceA, instanceB);
+        Assert.assertNotSame(instanceA, instanceBDifferentReference);
+
+        Assert.assertNotSame(instanceB, instanceBDifferentReference);
+        Assert.assertNotSame(instanceB, instanceA);
+        Assert.assertNotSame(instanceB, instanceADifferentReference);
     }
 }

@@ -80,12 +80,12 @@ public class OpenCLBuilder {
     
     public List<OpenCLPlatform> build() {
         // Obtain the number of platforms
-        int numPlatforms[] = new int[1];
+        int[] numPlatforms = new int[1];
         clGetPlatformIDs(0, null, numPlatforms);
 
         // Obtain the platform IDs
         List<OpenCLPlatform> openCLPlatforms = new ArrayList<>();
-        cl_platform_id platforms[] = new cl_platform_id[numPlatforms[0]];
+        cl_platform_id[] platforms = new cl_platform_id[numPlatforms[0]];
         clGetPlatformIDs(platforms.length, platforms, null);
 
         for (int i=0; i<platforms.length; i++) {
@@ -99,11 +99,11 @@ public class OpenCLBuilder {
             String platformName = getString(platformId, CL_PLATFORM_NAME);
             
             // Obtain the number of devices for the current platform
-            int numDevicesArray[] = new int[1];
+            int[] numDevicesArray = new int[1];
             clGetDeviceIDs(platformId, CL_DEVICE_TYPE_ALL, 0, null, numDevicesArray);
             int numDevices = numDevicesArray[0];
             
-            cl_device_id devicesArray[] = new cl_device_id[numDevices];
+            cl_device_id[] devicesArray = new cl_device_id[numDevices];
             clGetDeviceIDs(platformId, CL_DEVICE_TYPE_ALL, numDevices, devicesArray, null);
 
             List<OpenCLDevice> openCLDevices = new ArrayList<>();
@@ -130,7 +130,7 @@ public class OpenCLBuilder {
         long deviceType = getLong(device, CL_DEVICE_TYPE);
         int maxComputeUnits = getInt(device, CL_DEVICE_MAX_COMPUTE_UNITS);
         long maxWorkItemDimensions = getLong(device, CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS);
-        long maxWorkItemSizes[] = getSizes(device, CL_DEVICE_MAX_WORK_ITEM_SIZES, 3);
+        long[] maxWorkItemSizes = getSizes(device, CL_DEVICE_MAX_WORK_ITEM_SIZES, 3);
         long maxWorkGroupSize = getSize(device, CL_DEVICE_MAX_WORK_GROUP_SIZE);
         long maxClockFrequency = getLong(device, CL_DEVICE_MAX_CLOCK_FREQUENCY);
         int addressBits = getInt(device, CL_DEVICE_ADDRESS_BITS);
@@ -231,10 +231,7 @@ public class OpenCLBuilder {
 
     public static boolean isOpenCL2_0OrGreater(ComparableVersion openCLDeviceVersion) {
         final ComparableVersion v2_0 = new ComparableVersion("2.0");
-        if (openCLDeviceVersion.compareTo(v2_0) >= 0) {
-            return true;
-        }
-        return false;
+        return openCLDeviceVersion.compareTo(v2_0) >= 0;
     }
     
     /**
@@ -259,7 +256,7 @@ public class OpenCLBuilder {
      */
     private static int[] getInts(cl_device_id device, int paramName, int numValues)
     {
-        int values[] = new int[numValues];
+        int[] values = new int[numValues];
         clGetDeviceInfo(device, paramName, (long)Sizeof.cl_int * numValues, Pointer.to(values), null);
         return values;
     }
@@ -286,7 +283,7 @@ public class OpenCLBuilder {
      */
     private static long[] getLongs(cl_device_id device, int paramName, int numValues)
     {
-        long values[] = new long[numValues];
+        long[] values = new long[numValues];
         clGetDeviceInfo(device, paramName, (long)Sizeof.cl_long * numValues, Pointer.to(values), null);
         return values;
     }
@@ -301,11 +298,11 @@ public class OpenCLBuilder {
     private static String getString(cl_device_id device, int paramName)
     {
         // Obtain the length of the string that will be queried
-        long size[] = new long[1];
+        long[] size = new long[1];
         clGetDeviceInfo(device, paramName, 0, null, size);
 
         // Create a buffer of the appropriate size and fill it with the info
-        byte buffer[] = new byte[(int)size[0]];
+        byte[] buffer = new byte[(int)size[0]];
         clGetDeviceInfo(device, paramName, buffer.length, Pointer.to(buffer), null);
 
         // Create a string from the buffer (excluding the trailing \0 byte)
@@ -322,11 +319,11 @@ public class OpenCLBuilder {
     private static String getString(cl_platform_id platform, int paramName)
     {
         // Obtain the length of the string that will be queried
-        long size[] = new long[1];
+        long[] size = new long[1];
         clGetPlatformInfo(platform, paramName, 0, null, size);
 
         // Create a buffer of the appropriate size and fill it with the info
-        byte buffer[] = new byte[(int)size[0]];
+        byte[] buffer = new byte[(int)size[0]];
         clGetPlatformInfo(platform, paramName, buffer.length, Pointer.to(buffer), null);
 
         // Create a string from the buffer (excluding the trailing \0 byte)
@@ -362,7 +359,7 @@ public class OpenCLBuilder {
             ByteBufferUtility.ensureByteBufferCapacityFitsInt(size)).order(ByteOrder.nativeOrder());
         clGetDeviceInfo(device, paramName, size, 
             Pointer.to(buffer), null);
-        long values[] = new long[numValues];
+        long[] values = new long[numValues];
         if (Sizeof.size_t == 4)
         {
             for (int i=0; i<numValues; i++)

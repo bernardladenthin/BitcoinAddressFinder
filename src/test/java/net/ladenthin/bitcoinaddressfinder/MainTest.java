@@ -26,6 +26,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.cli.Main;
+
+import static net.ladenthin.bitcoinaddressfinder.cli.Main.printAllStackTracesWithDelay;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -72,10 +74,12 @@ public class MainTest {
         Main.main(new String[]{config_AddressFilesToLMDB_json.toAbsolutePath().toString()});
         
         Main.main(new String[]{config_LMDBToAddressFile_json.toAbsolutePath().toString()});
-        
-        //Main.main(new String[]{config_Find_SecretsFile_json.toAbsolutePath().toString()});
-        
-        //printAllStackTracesWithDelay(10_000L);
+
+        // FIXME: It seems there is one thread remaining open and I need to find and fix the locking thread.
+        if (false) {
+            Main.main(new String[]{config_Find_SecretsFile_json.toAbsolutePath().toString()});
+            printAllStackTracesWithDelay(10_000L);
+        }
     }
     // </editor-fold>
     

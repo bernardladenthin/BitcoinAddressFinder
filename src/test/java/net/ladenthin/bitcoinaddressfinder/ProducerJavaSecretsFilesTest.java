@@ -66,7 +66,7 @@ public class ProducerJavaSecretsFilesTest {
         WITH_COMMENT("#WithComment"),
         WITH_SPECIAL_CHARACTER("schön, für schälen $%&?`´");
 
-        private String string;
+        private final String string;
 
         PrivateKey(String string) {
             this.string = string;
@@ -209,7 +209,7 @@ public class ProducerJavaSecretsFilesTest {
                 sb.append(secret.string);
                 break;
             case BIG_INTEGER:
-                sb.append(secret.getBigInteger().toString());
+                sb.append(secret.getBigInteger());
                 break;
             case SHA256:
                 sb.append(secret.getSHA256());

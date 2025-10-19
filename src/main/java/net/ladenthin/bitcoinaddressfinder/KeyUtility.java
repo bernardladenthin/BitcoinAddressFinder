@@ -40,25 +40,21 @@ import org.jspecify.annotations.NonNull;
  * https://stackoverflow.com/questions/21087651/how-to-efficiently-change-endianess-of-byte-array-in-java
  * https://stackoverflow.com/questions/7619058/convert-a-byte-array-to-integer-in-java-and-vice-versa
  */
-public class KeyUtility {
-
-    @NonNull
-    public final Network network;
-    public final ByteBufferUtility byteBufferUtility;
+public record KeyUtility(@NonNull Network network, ByteBufferUtility byteBufferUtility) {
 
     public KeyUtility(Network network, ByteBufferUtility byteBufferUtility) {
         this.network = network;
         this.byteBufferUtility = byteBufferUtility;
     }
-    
+
     public BigInteger killBits(BigInteger bigInteger, BigInteger killBits) {
         return bigInteger.andNot(killBits);
     }
-    
+
     /**
      * Calculates the maximum allowed private key value that can safely be used as a base
      * for grid-based key generation without exceeding the secp256k1 private key limit.
-     *
+     * <p>
      * This is necessary for chunked or grid-based generation where the base key is incremented
      * by up to 2^batchSizeInBits - 1.
      *
@@ -83,30 +79,30 @@ public class KeyUtility {
 
         return maxSafeKey;
     }
-    
-    public static  boolean isInvalidWithBatchSize(BigInteger privateKeyBase, BigInteger maxPrivateKeyForBatchSize) {
+
+    public static boolean isInvalidWithBatchSize(BigInteger privateKeyBase, BigInteger maxPrivateKeyForBatchSize) {
         return privateKeyBase.compareTo(maxPrivateKeyForBatchSize) > 0;
     }
-    
+
     public static boolean isOutsidePrivateKeyRange(BigInteger secret) {
-        return secret.compareTo(PublicKeyBytes.MIN_VALID_PRIVATE_KEY) < 0 
-            || secret.compareTo(PublicKeyBytes.MAX_PRIVATE_KEY) > 0;
+        return secret.compareTo(PublicKeyBytes.MIN_VALID_PRIVATE_KEY) < 0
+                || secret.compareTo(PublicKeyBytes.MAX_PRIVATE_KEY) > 0;
 
     }
-    
+
     public static BigInteger returnValidPrivateKey(BigInteger secret) {
         if (isOutsidePrivateKeyRange(secret)) {
             return INVALID_PRIVATE_KEY_REPLACEMENT;
         }
         return secret;
     }
-    
+
     public static void replaceInvalidPrivateKeys(BigInteger[] secrets) {
         for (int i = 0; i < secrets.length; i++) {
             secrets[i] = returnValidPrivateKey(secrets[i]);
         }
     }
-    
+
     /**
      * Require networkParameters.
      */
@@ -164,7 +160,7 @@ public class KeyUtility {
                 logMnemonic.append(wordList.name());
                 logMnemonic.append(": [");
                 boolean first = true;
-                for(String mnemonic : mnemonics) {
+                for (String mnemonic : mnemonics) {
                     if (!first) {
                         logMnemonic.append(wordList.getSeparator());
                     }
@@ -192,7 +188,7 @@ public class KeyUtility {
         return LegacyAddress.fromPubKeyHash(network, byteBufferUtility.byteBufferToBytes(byteBuffer));
     }
     // </editor-fold>
-    
+
     public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly, int privateKeyMaxNumBits, SecretSupplier supplier) throws NoMoreSecretsAvailableException {
         int length = returnStartSecretOnly ? 1 : overallWorkSize;
         BigInteger[] secrets = new BigInteger[length];
@@ -212,7 +208,7 @@ public class KeyUtility {
         return b[3 + offsetByteArray] & 0xFF
                 | (b[2 + offsetByteArray] & 0xFF) << 8
                 | (b[1 + offsetByteArray] & 0xFF) << 16
-                | (b[0 + offsetByteArray] & 0xFF) << 24;
+                | (b[offsetByteArray] & 0xFF) << 24;
     }
 
     @Deprecated
@@ -229,7 +225,7 @@ public class KeyUtility {
 
     @Deprecated
     static void intToByteArray(int a, byte[] b, int offset) {
-        b[0 + offset] = (byte) ((a >> 24) & 0xFF);
+        b[offset] = (byte) ((a >> 24) & 0xFF);
         b[1 + offset] = (byte) ((a >> 16) & 0xFF);
         b[2 + offset] = (byte) ((a >> 8) & 0xFF);
         b[3 + offset] = (byte) (a & 0xFF);
@@ -274,7 +270,7 @@ public class KeyUtility {
      * {@link PublicKeyBytes#PRIVATE_KEY_MAX_NUM_BYTES} bytes.
      *
      * @param buffer a 32-byte array representing the unsigned big-endian
-     * integer
+     *               integer
      * @return a positive BigInteger constructed from the buffer
      */
     public BigInteger bigIntegerFromUnsignedByteArray(byte[] buffer) {

@@ -70,7 +70,7 @@ public class ConsumerJavaTest {
     private final BitHelper bitHelper = new BitHelper();
     
     /**
-     * Returns an example key. {@link https://privatekeys.pw/key/0000000000000000000000000000000000000000000000000000000000000049}
+     * Returns an example key. <a href="https://privatekeys.pw/key/0000000000000000000000000000000000000000000000000000000000000049">Example key</a>
      * @return an example key.
      */
     public static PublicKeyBytes[] createExamplePublicKeyBytesfromPrivateKey73() {
@@ -128,7 +128,7 @@ public class ConsumerJavaTest {
         consumerJava.startStatisticsTimer();
 
         // sleep close to runTimes+1 cycles to let the tasks run runTimes times
-        Thread.sleep((cConsumerJava.printStatisticsEveryNSeconds * (runTimes +1) * 1000) - 300);
+        Thread.sleep(((long) cConsumerJava.printStatisticsEveryNSeconds * (runTimes +1) * 1000) - 300);
         
         // assert
         consumerJava.interrupt();

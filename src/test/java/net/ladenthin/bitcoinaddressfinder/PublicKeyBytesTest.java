@@ -98,7 +98,7 @@ public class PublicKeyBytesTest {
     @Test
     public void maxPrivateKeyAsHexString_isEqualToConstant() {
         // arrange
-        String maxPrivateKeyAsHexString = Hex.encodeHexString(byteBufferUtility.bigIntegerToBytes(PublicKeyBytes.MAX_PRIVATE_KEY));
+        String maxPrivateKeyAsHexString = Hex.encodeHexString(ByteBufferUtility.bigIntegerToBytes(PublicKeyBytes.MAX_PRIVATE_KEY));
         // act
         
         // assert

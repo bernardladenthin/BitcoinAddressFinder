@@ -45,7 +45,7 @@ public class LMDBPersistenceTest {
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
     
-    private Random random = new Random(1337);
+    private final Random random = new Random(1337);
     
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);

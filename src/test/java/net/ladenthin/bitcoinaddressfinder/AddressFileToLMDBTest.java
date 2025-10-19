@@ -165,7 +165,7 @@ public class AddressFileToLMDBTest extends LMDBBase {
         Persistence persistence = createAndFillAndOpenLMDB(false, addressesFiles, false, useBloomFilter);
 
         try {
-            ByteBuffer hash160 = keyUtility.byteBufferUtility.byteArrayToByteBuffer(TestAddressesFiles.NON_EXISTING_ADDRESS);
+            ByteBuffer hash160 = keyUtility.byteBufferUtility().byteArrayToByteBuffer(TestAddressesFiles.NON_EXISTING_ADDRESS);
 
             boolean contains = persistence.containsAddress(hash160);
             assertThat("containsAddress() must return false for a known non-existing address used for negative testing.", contains, is(false));

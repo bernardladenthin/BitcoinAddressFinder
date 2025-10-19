@@ -112,9 +112,9 @@ public class ProbeAddressesOpenCLTest {
 
         // Create input- and output data 
         int n = 10;
-        float srcArrayA[] = new float[n];
-        float srcArrayB[] = new float[n];
-        float dstArray[] = new float[n];
+        float[] srcArrayA = new float[n];
+        float[] srcArrayB = new float[n];
+        float[] dstArray = new float[n];
         for (int i = 0; i < n; i++) {
             srcArrayA[i] = i;
             srcArrayB[i] = i;
@@ -133,12 +133,12 @@ public class ProbeAddressesOpenCLTest {
         CL.setExceptionsEnabled(true);
 
         // Obtain the number of platforms
-        int numPlatformsArray[] = new int[1];
+        int[] numPlatformsArray = new int[1];
         clGetPlatformIDs(0, null, numPlatformsArray);
         int numPlatforms = numPlatformsArray[0];
 
         // Obtain a platform ID
-        cl_platform_id platforms[] = new cl_platform_id[numPlatforms];
+        cl_platform_id[] platforms = new cl_platform_id[numPlatforms];
         clGetPlatformIDs(platforms.length, platforms, null);
         cl_platform_id platform = platforms[platformIndex];
 
@@ -147,12 +147,12 @@ public class ProbeAddressesOpenCLTest {
         contextProperties.addProperty(CL_CONTEXT_PLATFORM, platform);
 
         // Obtain the number of devices for the platform
-        int numDevicesArray[] = new int[1];
+        int[] numDevicesArray = new int[1];
         clGetDeviceIDs(platform, deviceType, 0, null, numDevicesArray);
         int numDevices = numDevicesArray[0];
 
         // Obtain a device ID 
-        cl_device_id devices[] = new cl_device_id[numDevices];
+        cl_device_id[] devices = new cl_device_id[numDevices];
         clGetDeviceIDs(platform, deviceType, numDevices, devices, null);
         cl_device_id device = devices[deviceIndex];
 
@@ -194,7 +194,7 @@ public class ProbeAddressesOpenCLTest {
         clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(dstMem));
 
         // Set the work-item dimensions
-        long global_work_size[] = new long[]{n};
+        long[] global_work_size = new long[]{n};
 
         // Execute the kernel
         clEnqueueNDRangeKernel(commandQueue, kernel, 1, null,
@@ -295,11 +295,11 @@ public class ProbeAddressesOpenCLTest {
         
         // Create input- and output data
         // out:
-        int src_points_out[] = new int[ACCESS_BUNDLE];
-        int src_z_heap[] = new int[ACCESS_BUNDLE];
+        int[] src_points_out = new int[ACCESS_BUNDLE];
+        int[] src_z_heap = new int[ACCESS_BUNDLE];
         // in:
-        int src_row_in[] = new int[ACCESS_BUNDLE * ACCESS_STRIDE * ROW_SIZE];
-        int src_col_in[] = new int[ACCESS_BUNDLE * COL_SIZE];
+        int[] src_row_in = new int[ACCESS_BUNDLE * ACCESS_STRIDE * ROW_SIZE];
+        int[] src_col_in = new int[ACCESS_BUNDLE * COL_SIZE];
 
         Pointer pointsOut = Pointer.to(src_points_out);
         Pointer zHeap = Pointer.to(src_z_heap);
@@ -316,12 +316,12 @@ public class ProbeAddressesOpenCLTest {
         CL.setExceptionsEnabled(true);
 
         // Obtain the number of platforms
-        int numPlatformsArray[] = new int[1];
+        int[] numPlatformsArray = new int[1];
         clGetPlatformIDs(0, null, numPlatformsArray);
         int numPlatforms = numPlatformsArray[0];
 
         // Obtain a platform ID
-        cl_platform_id platforms[] = new cl_platform_id[numPlatforms];
+        cl_platform_id[] platforms = new cl_platform_id[numPlatforms];
         clGetPlatformIDs(platforms.length, platforms, null);
         cl_platform_id platform = platforms[platformIndex];
 
@@ -330,12 +330,12 @@ public class ProbeAddressesOpenCLTest {
         contextProperties.addProperty(CL_CONTEXT_PLATFORM, platform);
 
         // Obtain the number of devices for the platform
-        int numDevicesArray[] = new int[1];
+        int[] numDevicesArray = new int[1];
         clGetDeviceIDs(platform, deviceType, 0, null, numDevicesArray);
         int numDevices = numDevicesArray[0];
 
         // Obtain a device ID 
-        cl_device_id devices[] = new cl_device_id[numDevices];
+        cl_device_id[] devices = new cl_device_id[numDevices];
         clGetDeviceIDs(platform, deviceType, numDevices, devices, null);
         cl_device_id device = devices[deviceIndex];
 
@@ -389,7 +389,7 @@ public class ProbeAddressesOpenCLTest {
         
         
         // Set the work-item dimensions
-        long global_work_size[] = new long[]{ACCESS_BUNDLE, };
+        long[] global_work_size = new long[]{ACCESS_BUNDLE, };
 
         // Execute the kernel
         clEnqueueNDRangeKernel(commandQueue, kernel_ec_add_grid, 1, null,

@@ -118,7 +118,7 @@ public class Secp256k1 {
         // BigInteger k = kin.mod(p); // do not use this !
         System.out.println(" SECP256K1_Q: " + SECP256K1_Q);
         System.out.println("           p: " + p);
-        System.out.println("curve: " + curve.toString());
+        System.out.println("curve: " + curve);
         final int length = k.bitLength();
         final byte[] binarray = new byte[length];
         for (int i = 0; i <= length - 1; i++) {

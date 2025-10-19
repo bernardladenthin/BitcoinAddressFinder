@@ -161,8 +161,8 @@ public class SeparatorFormatTest {
     }
 
     /**
-     * Verifies that the {@link SeparatorFormat.DOUBLE_COLON} separator appears
-     * before the {@link SeparatorFormat.COLON} in the sorted separator list.
+     * Verifies that the {@link SeparatorFormat#DOUBLE_COLON} separator appears
+     * before the {@link SeparatorFormat#COLON} in the sorted separator list.
      */
     @Test
     public void getSortedSeparators_doubleColonBeforeColon() {
