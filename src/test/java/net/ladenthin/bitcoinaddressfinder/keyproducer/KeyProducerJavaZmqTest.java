@@ -25,6 +25,9 @@ import org.junit.Before;
 import org.junit.Test;
 import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 
 import java.math.BigInteger;
 import java.util.concurrent.*;
@@ -35,9 +38,11 @@ import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.*;
+
 import org.slf4j.Logger;
 import org.zeromq.SocketType;
+import org.zeromq.ZMQException;
 
 public class KeyProducerJavaZmqTest {
     
@@ -221,5 +226,50 @@ public class KeyProducerJavaZmqTest {
         // Assert the future exits cleanly within timeout
         BigInteger[] result = future.get(2, TimeUnit.SECONDS);
         assertThat("Result should be null due to interruption", result, is(nullValue()));
+
+        // Verify no unexpected ZMQ errors were logged
+        verify(mockLogger, never()).error(eq("ZMQ error"), any(ZMQException.class));
     }
+
+    @Test
+    public void createSecrets_invalidSecretLength_errorLogged() throws Exception {
+        try (ZContext context = new ZContext()) {
+            String address = findFreeZmqAddress();
+
+            // Server socket (push) binds
+            ZMQ.Socket sender = context.createSocket(SocketType.PUSH);
+            sender.bind(address);
+
+            // Client config connects to that address
+            CKeyProducerJavaZmq config = createConnectConfig(address);
+            KeyProducerJavaZmq keyProducer = createKeyProducerJavaZmq(config);
+
+            // Create invalid secret with wrong length (e.g., 16 bytes instead of 32)
+            byte[] invalidSecretBytes = new byte[16];
+            for (int i = 0; i < invalidSecretBytes.length; i++) {
+                invalidSecretBytes[i] = (byte) (i + 1);
+            }
+
+            // Send invalid secret
+            sender.send(invalidSecretBytes, 0);
+
+            // Wait a bit to ensure the receiver thread processes the message
+            Thread.sleep(TestTimeProvider.DEFAULT_SEND_WAIT);
+
+            // Now send a valid secret so createSecrets can return
+            byte[] validSecretBytes = new KeyProducerTestUtility().createZeroedSecret();
+            sender.send(validSecretBytes, 0);
+
+            // Receive - should get only the valid secret
+            BigInteger[] secrets = keyProducer.createSecrets(1, true);
+            assertThat(secrets.length, is(1));
+
+            // Verify logger was called with error message for invalid length
+            verify(mockLogger).error("Received invalid secret length: 16");
+
+            keyProducer.interrupt();
+            sender.close();
+        }
+    }
+
 }

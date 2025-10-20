@@ -58,13 +58,13 @@ public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyPro
                         if (msg.length == PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES) {
                             addSecret(msg);
                         } else {
-                            System.err.println("Received invalid secret length: " + msg.length);
+                            logger.error("Received invalid secret length: " + msg.length);
                         }
                     }
                     // if msg is null: it's a timeout — just loop again
                 } catch (ZMQException e) {
                     if (shouldStop || e.getErrorCode() == ZMQ.Error.ETERM.getCode()) break;
-                    e.printStackTrace(); // unexpected ZMQ errors
+                    logger.error("ZMQ error", e); // unexpected ZMQ errors
                 }
             }
         }, "ZMQ-Receiver");
