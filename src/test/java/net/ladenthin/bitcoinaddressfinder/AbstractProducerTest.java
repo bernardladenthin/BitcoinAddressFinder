@@ -190,7 +190,7 @@ public class AbstractProducerTest {
     }
     // </editor-fold>
 
-    public static void verifyReleaseProducer(AbstractProducer abstractProducer) {
+    static void verifyReleaseProducer(AbstractProducer abstractProducer) {
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
         abstractProducer.setLogger(logger);
@@ -212,7 +212,7 @@ public class AbstractProducerTest {
         }
     }
 
-    public static void verifyInitProducer(AbstractProducer abstractProducer) {
+    static void verifyInitProducer(AbstractProducer abstractProducer) {
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
         abstractProducer.setLogger(logger);
@@ -234,4 +234,42 @@ public class AbstractProducerTest {
             assertThat(arguments.get(0), is(equalTo("Init producer.")));
         }
     }
+
+    // <editor-fold defaultstate="collapsed" desc="run">
+    @Test
+    public void run_exceptionInProduceKeys_exceptionCaughtAndLoggedToError() throws IOException, InterruptedException {
+        // arrange
+        CProducer cProducer = new CProducer();
+        MockConsumer mockConsumer = new MockConsumer();
+        Random random = new Random(1);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper) {
+            @Override
+            public void produceKeys() {
+                throw new RuntimeException("Test exception");
+            }
+        };
+
+        Logger logger = mock(Logger.class);
+        abstractProducerTestImpl.setLogger(logger);
+        abstractProducerTestImpl.initProducer();
+
+        // act
+        abstractProducerTestImpl.run();
+
+        // assert
+        assertThat(abstractProducerTestImpl.state, is(equalTo(ProducerState.NOT_RUNNING)));
+
+        ArgumentCaptor<String> logCaptorMessage = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Exception> logCaptorException = ArgumentCaptor.forClass(Exception.class);
+        verify(logger, times(1)).error(logCaptorMessage.capture(), logCaptorException.capture());
+
+        List<String> arguments = logCaptorMessage.getAllValues();
+        List<Exception> exceptions = logCaptorException.getAllValues();
+
+        assertThat(arguments.get(0), is(equalTo("Error in produceKeys")));
+        assertThat(exceptions.get(0).getMessage(), is(equalTo("Test exception")));
+    }
+    // </editor-fold>
 }

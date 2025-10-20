@@ -40,7 +40,7 @@ public interface Producer extends Runnable, Interruptable, ProducerStateProvider
      * 
      * Specifically, any 256-bit number between {@code 0x1} and {@link PublicKeyBytes#MAX_PRIVATE_KEY} is a valid private key.
      */
-    void produceKeys();
+    void produceKeys() throws Exception;
     
     /**
      * Processes a provided secret base, which may be used for key generation or other cryptographic

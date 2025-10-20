@@ -25,9 +25,7 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
@@ -173,24 +171,38 @@ public class Main implements Runnable, Interruptable {
         runLatch.countDown();
         
         if (false) {
-            printAllStackTracesWithDelay(2_000L);
+            printAllStackTracesWithDelay(2_000L, true);
         }
     }
-    
-    public static void printAllStackTracesWithDelay(long delayMillis) {
-        try {
-            Thread.sleep(delayMillis);
-        } catch (InterruptedException ignored) {
-            // Intentionally ignored
+
+    public static void printAllStackTracesWithDelay(long delayMillis, boolean includeDaemons) {
+        try { Thread.sleep(delayMillis); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+
+        Map<Thread, StackTraceElement[]> all = Thread.getAllStackTraces();
+
+        List<Map.Entry<Thread, StackTraceElement[]>> entries = new ArrayList<>(all.entrySet());
+        entries.sort(Comparator
+                .comparing((Map.Entry<Thread, StackTraceElement[]> e) -> {
+                    String n = e.getKey().getName();
+                    return n == null ? "" : n;
+                })
+                .thenComparingLong(e -> e.getKey().getId()));
+
+        boolean printedAny = false;
+        for (Map.Entry<Thread, StackTraceElement[]> e : entries) {
+            Thread t = e.getKey();
+            if (!includeDaemons && t.isDaemon()) continue; // previous behavior
+
+            printedAny = true;
+            System.out.println("##################################################");
+            System.out.println("# Thread: " + t + " | state=" + t.getState() + " | daemon=" + t.isDaemon());
+            for (StackTraceElement el : e.getValue()) System.out.println("  at " + el);
         }
 
-        Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
-        for (Thread thread : threadSet) {
-            System.out.println("##################################################");
-            System.out.println("# Thread: " + thread);
-            for (StackTraceElement element : thread.getStackTrace()) {
-                System.out.println(element);
-            }
+        if (!printedAny) {
+            System.out.println(includeDaemons
+                    ? "No threads to print."
+                    : "No non-daemon threads found. JVM should be able to exit normally.");
         }
     }
     

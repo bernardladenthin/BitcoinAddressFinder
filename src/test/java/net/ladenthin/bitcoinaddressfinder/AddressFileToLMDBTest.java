@@ -62,18 +62,16 @@ public class AddressFileToLMDBTest extends LMDBBase {
 
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
-    public void addressFilesToLMDB_createLMDB_containingTestAddressesHashesWithCorrectAmount(boolean compressed, boolean useStaticAmount) throws IOException {
+    public void addressFilesToLMDB_createLMDB_containingTestAddressesHashesWithCorrectAmount(boolean compressed, boolean useStaticAmount) throws Exception {
         // arrange, act
         AddressesFiles addressesFiles = new TestAddressesFiles(compressed);
-        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, addressesFiles, false, false);
-
-        // assert
-        try {
+        try (Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, addressesFiles, false, false)) {
+            // assert
             assertThat(persistence.count(), is(equalTo(6L)));
-            
+
             Coin[] amounts = new Coin[TestAddressesFiles.NUMBER_OF_ADRESSES];
             String[] base58Adresses = addressesFiles.getTestAddresses().getAsBase58StringList().toArray(new String[0]);
-            
+
             for (int i = 0; i < amounts.length; i++) {
                 String base58Adresse = base58Adresses[i];
                 LegacyAddress fromBase58 = LegacyAddress.fromBase58(base58Adresse, network);
@@ -85,20 +83,17 @@ public class AddressFileToLMDBTest extends LMDBBase {
                     assertThat(amounts[i], is(equalTo(TestAddressesFiles.AMOUNTS[i])));
                 }
             }
-        } finally {
-            persistence.close();
         }
     }
 
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_STATIC_AMOUNT, location = CommonDataProvider.class)
-    public void addressFilesToLMDB_createLMDBWithStaticAddresses_containingStaticHashes(boolean useStaticAmount) throws IOException {
+    public void addressFilesToLMDB_createLMDBWithStaticAddresses_containingStaticHashes(boolean useStaticAmount) throws Exception {
         // arrange, act
         StaticAddressesFiles staticAddressesFiles = new StaticAddressesFiles();
-        Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, staticAddressesFiles, false, false);
 
         // assert
-        try {
+        try (Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, staticAddressesFiles, false, false)) {
             assertThat(persistence.count(), is(equalTo((long)staticAddressesFiles.getSupportedAddresses().size())));
             
             for (P2PKH staticTestAddress : P2PKH.values()) {
@@ -106,25 +101,20 @@ public class AddressFileToLMDBTest extends LMDBBase {
                 boolean contains = persistence.containsAddress(hash160AsByteBuffer);
                 assertThat(contains, is(equalTo(Boolean.TRUE)));
             }
-        } finally {
-            persistence.close();
         }
     }
     
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BLOOM_FILTER_ENABLED, location = CommonDataProvider.class)
-    public void containsAddress_behavesCorrectly_withOrWithoutBloomFilter(boolean useBloomFilter) throws IOException {
+    public void containsAddress_behavesCorrectly_withOrWithoutBloomFilter(boolean useBloomFilter) throws Exception {
         AddressesFiles addressesFiles = new TestAddressesFiles(true);
-        Persistence persistence = createAndFillAndOpenLMDB(false, addressesFiles, false, useBloomFilter);
 
-        try {
+        try (Persistence persistence = createAndFillAndOpenLMDB(false, addressesFiles, false, useBloomFilter)) {
             TestAddresses testAddresses = addressesFiles.getTestAddresses();
             ByteBuffer hash160 = testAddresses.getIndexAsHash160ByteBuffer(0);
 
             boolean contains = persistence.containsAddress(hash160);
             assertThat("Should find known address", contains, is(true));
-        } finally {
-            persistence.close();
         }
     }
 
@@ -133,14 +123,13 @@ public class AddressFileToLMDBTest extends LMDBBase {
      * {@link java.nio.BufferUnderflowException} because zero values are stored with {@code byteBuffer.capacity() == 0}.
      */
     @Test
-    public void addressFilesToLMDB_addressWithAmountOfZero_noExceptionThrown() throws IOException {
+    public void addressFilesToLMDB_addressWithAmountOfZero_noExceptionThrown() throws Exception {
         // arrange, act
         AddressesFileSpecialUsecases addressesFileSpecialUsecases = new AddressesFileSpecialUsecases();
         //TestAddressesFiles testAddressesFiles = new TestAddressesFiles(true);
-        Persistence persistence = createAndFillAndOpenLMDB(false, addressesFileSpecialUsecases, false, false);
 
         // assert
-        try {
+        try (Persistence persistence = createAndFillAndOpenLMDB(false, addressesFileSpecialUsecases, false, false)) {
             assertThat(persistence.count(), is(equalTo((long)addressesFileSpecialUsecases.getAllAddresses().size())));
             
             TestAddresses testAddresses = addressesFileSpecialUsecases.getTestAddresses();
@@ -153,24 +142,19 @@ public class AddressFileToLMDBTest extends LMDBBase {
                 boolean contains = persistence.containsAddress(hash160);
                 assertThat(contains, is(equalTo(Boolean.TRUE)));
             }
-        } finally {
-            persistence.close();
         }
     }
 
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BLOOM_FILTER_ENABLED, location = CommonDataProvider.class)
-    public void containsAddress_returnsFalseForUnknownAddress(boolean useBloomFilter) throws IOException {
+    public void containsAddress_returnsFalseForUnknownAddress(boolean useBloomFilter) throws Exception {
         AddressesFiles addressesFiles = new TestAddressesFiles(true);
-        Persistence persistence = createAndFillAndOpenLMDB(false, addressesFiles, false, useBloomFilter);
 
-        try {
+        try (Persistence persistence = createAndFillAndOpenLMDB(false, addressesFiles, false, useBloomFilter)) {
             ByteBuffer hash160 = keyUtility.byteBufferUtility().byteArrayToByteBuffer(TestAddressesFiles.NON_EXISTING_ADDRESS);
 
             boolean contains = persistence.containsAddress(hash160);
             assertThat("containsAddress() must return false for a known non-existing address used for negative testing.", contains, is(false));
-        } finally {
-            persistence.close();
         }
     }
 }

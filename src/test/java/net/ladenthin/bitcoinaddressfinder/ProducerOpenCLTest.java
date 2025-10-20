@@ -248,7 +248,7 @@ public class ProducerOpenCLTest {
     
     // <editor-fold defaultstate="collapsed" desc="produceKeys">
     @Test(expected = IllegalStateException.class)
-    public void produceKeys_notInitialized_illegalStateExceptionThrown() throws IOException, InterruptedException {
+    public void produceKeys_notInitialized_illegalStateExceptionThrown() throws Exception {
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
@@ -264,7 +264,7 @@ public class ProducerOpenCLTest {
     
     @Test
     @OpenCLTest
-    public void produceKeys_initialized_keysInConsumer() throws IOException, InterruptedException {
+    public void produceKeys_initialized_keysInConsumer() throws Exception {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 

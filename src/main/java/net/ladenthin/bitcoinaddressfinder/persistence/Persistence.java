@@ -27,10 +27,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFileOutputFormat;
 import org.bitcoinj.base.Coin;
 
-public interface Persistence {
+public interface Persistence extends AutoCloseable {
 
     void init();
-    void close();
     boolean isClosed();
     long count();
     Coin getAmount(ByteBuffer hash160);

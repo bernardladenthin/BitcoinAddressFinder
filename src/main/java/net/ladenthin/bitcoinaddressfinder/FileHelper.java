@@ -29,7 +29,7 @@ public class FileHelper {
     private final Logger logger = LoggerFactory.getLogger(FileHelper.class);
     
     public List<File> stringsToFiles(List<String> strings) {
-        List<File> files = new ArrayList<File>();
+        List<File> files = new ArrayList<>();
         for (String string : strings) {
             files.add(new File(string));
         }

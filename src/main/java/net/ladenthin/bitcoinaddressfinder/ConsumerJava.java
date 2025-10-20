@@ -345,7 +345,11 @@ public class ConsumerJava implements Consumer {
             logger.error("Interrupted while awaiting consumer termination.", ex);
             throw new RuntimeException(ex);
         }
-        persistence.close();
+        try {
+            persistence.close();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         logger.debug("Interrupt complete: resources released and persistence closed.");
     }
     

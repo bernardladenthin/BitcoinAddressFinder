@@ -74,7 +74,12 @@ public abstract class AbstractProducer implements Producer {
     public void run() {
         state = ProducerState.RUNNING;
         while (shouldRun.get()) {
-            produceKeys();
+            try {
+                produceKeys();
+            } catch (Exception e) {
+                logger.error("Error in produceKeys", e);
+                break;
+            }
             if (cProducer.runOnce) {
                 break;
             }
@@ -83,7 +88,7 @@ public abstract class AbstractProducer implements Producer {
     }
     
     @Override
-    public void produceKeys() {
+    public void produceKeys() throws Exception {
         try {
             BigInteger[] secrets;
             try {

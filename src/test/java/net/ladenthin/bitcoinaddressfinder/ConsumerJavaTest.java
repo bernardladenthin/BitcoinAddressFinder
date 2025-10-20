@@ -32,6 +32,7 @@ import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
+import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses1337;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
@@ -46,16 +47,13 @@ import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.hamcrest.core.StringStartsWith.startsWith;
+import static org.mockito.Mockito.*;
+
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
-import static org.mockito.Mockito.atLeast;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import org.slf4j.Logger;
 
 @RunWith(DataProviderRunner.class)
@@ -278,7 +276,7 @@ public class ConsumerJavaTest {
     
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
-    public void runProber_testAddressGiven_hitExpected(boolean compressed, boolean useStaticAmount) throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
+    public void runProber_testAddressGiven_hitExpected(boolean compressed, boolean useStaticAmount) throws Exception {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
         File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, useStaticAmount, false);
@@ -336,7 +334,7 @@ public class ConsumerJavaTest {
 
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
-    public void runProber_unknownAddressGiven_missExpectedAndLogMessagesInDebugAndTrace(boolean compressed, boolean useStaticAmount) throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
+    public void runProber_unknownAddressGiven_missExpectedAndLogMessagesInDebugAndTrace(boolean compressed, boolean useStaticAmount) throws Exception {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
         File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, useStaticAmount, false);
@@ -563,6 +561,30 @@ public class ConsumerJavaTest {
         
         String expectedMessage = "vanity pattern match: privateKeyBigInteger: [73] privateKeyBytes: ["+privateKeyBytes+"] privateKeyHex: ["+privateKeyHex+"] WiF: [" + wif +"] publicKeyAsHex: ["+publicKeyAsHex+"] publicKeyHash160Hex: ["+publicKeyHash160Hex+"] publicKeyHash160Base58: ["+publicKeyHash160Base58+"] Compressed: ["+compressed+"] "+ mnemonics;
         assertThat(arguments.get(5), is(equalTo(expectedMessage)));
+    }
+
+
+    @Test(expected = RuntimeException.class)
+    public void interrupt_persistenceCloseThrowsException_runtimeExceptionThrown() throws Exception {
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+        TestAddressesFiles testAddresses = new TestAddressesFiles(false);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
+
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        consumerJava.initLMDB();
+
+        // Mock the persistence to throw an exception on close
+        Persistence mockPersistence = mock(Persistence.class);
+        when(mockPersistence.isClosed()).thenReturn(false);
+        doThrow(new RuntimeException("Simulated close failure")).when(mockPersistence).close();
+        consumerJava.persistence = mockPersistence;
+
+        // act - should throw RuntimeException
+        consumerJava.interrupt();
     }
 
     private ByteBuffer createHash160ByteBuffer() {

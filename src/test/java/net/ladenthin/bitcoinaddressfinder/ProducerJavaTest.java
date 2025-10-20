@@ -89,7 +89,7 @@ public class ProducerJavaTest {
     
     // <editor-fold defaultstate="collapsed" desc="produceKeys">
     @Test
-    public void produceKeys_BatchSizeInBitsEqualsKeyMaxNumBits_noExceptionThrown() throws IOException, InterruptedException {
+    public void produceKeys_BatchSizeInBitsEqualsKeyMaxNumBits_noExceptionThrown() throws Exception {
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.batchUsePrivateKeyIncrement = true;
         cProducerJava.batchSizeInBits = 2;
@@ -113,7 +113,7 @@ public class ProducerJavaTest {
     }
 
     @Test
-    public void produceKeys_KeyMaxNumBitsLowerThanBatchSizeInBits_produceBatchSizeInBitsNevertheless() throws IOException, InterruptedException {
+    public void produceKeys_KeyMaxNumBitsLowerThanBatchSizeInBits_produceBatchSizeInBitsNevertheless() throws Exception {
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.batchUsePrivateKeyIncrement = true;
         cProducerJava.batchSizeInBits = 4;
@@ -149,7 +149,7 @@ public class ProducerJavaTest {
     }
 
     @Test
-    public void produceKeys_privateKeyMaxNumBitsIsVeryLowAndProduceReplacedKeys_keysEqualsReplacement() throws IOException, InterruptedException {
+    public void produceKeys_privateKeyMaxNumBitsIsVeryLowAndProduceReplacedKeys_keysEqualsReplacement() throws Exception {
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.batchUsePrivateKeyIncrement = true;
         cProducerJava.batchSizeInBits = 1;
@@ -171,7 +171,7 @@ public class ProducerJavaTest {
     }
     
     @Test
-    public void produceKeys_privateKeyMaxNumBitsIsLowAndProduceReplacedKeys_keysEqualsReplacement() throws IOException, InterruptedException {
+    public void produceKeys_privateKeyMaxNumBitsIsLowAndProduceReplacedKeys_keysEqualsReplacement() throws Exception {
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.batchUsePrivateKeyIncrement = false;
         cProducerJava.batchSizeInBits = 4;
@@ -207,7 +207,7 @@ public class ProducerJavaTest {
     }
 
     @Test
-    public void produceKeys_SomeBitRanges_consumerContainsData() throws IOException, InterruptedException {
+    public void produceKeys_SomeBitRanges_consumerContainsData() throws Exception {
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.batchUsePrivateKeyIncrement = true;
         cProducerJava.batchSizeInBits = 3;

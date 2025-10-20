@@ -72,14 +72,8 @@ public class MainTest {
     public void testRoundtrip_configurationsGiven_lmdbCreatedExportedAndRunFindSecretsFile() throws IOException, InterruptedException {
         // arrange, act, assert
         Main.main(new String[]{config_AddressFilesToLMDB_json.toAbsolutePath().toString()});
-        
         Main.main(new String[]{config_LMDBToAddressFile_json.toAbsolutePath().toString()});
-
-        // FIXME: It seems there is one thread remaining open and I need to find and fix the locking thread.
-        if (false) {
-            Main.main(new String[]{config_Find_SecretsFile_json.toAbsolutePath().toString()});
-            printAllStackTracesWithDelay(10_000L);
-        }
+        Main.main(new String[]{config_Find_SecretsFile_json.toAbsolutePath().toString()});
     }
     // </editor-fold>
     
@@ -134,6 +128,20 @@ public class MainTest {
         verify(logger, times(1)).error(logCaptor.capture());
         List<String> arguments = logCaptor.getAllValues();
         assertThat(arguments.get(0), is(equalTo("Invalid arguments. Pass path to configuration as first argument.")));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="printAllStackTracesWithDelay">
+    @Test
+    public void printAllStackTracesWithDelay_includeDaemonsTrue_noExceptionThrown() {
+        // act
+        printAllStackTracesWithDelay(0, true);
+    }
+
+    @Test
+    public void printAllStackTracesWithDelay_includeDaemonsFalse_noExceptionThrown() {
+        // act
+        printAllStackTracesWithDelay(0, false);
     }
     // </editor-fold>
 }

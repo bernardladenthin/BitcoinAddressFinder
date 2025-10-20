@@ -62,29 +62,30 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
         final Network network = new NetworkParameterFactory().getNetwork();
 
         PersistenceUtils persistenceUtils = new PersistenceUtils(network);
-        persistence = new LMDBPersistence(addressFilesToLMDB.lmdbConfigurationWrite, persistenceUtils);
-        logger.info("Init LMDB ...");
-        persistence.init();
-        logger.info("... init LMDB done.");
+        try(LMDBPersistence persistence = new LMDBPersistence(addressFilesToLMDB.lmdbConfigurationWrite, persistenceUtils)) {
+            this.persistence = persistence;
+            logger.info("Init LMDB ...");
+            persistence.init();
+            logger.info("... init LMDB done.");
 
-        try {
-            FileHelper fileHelper = new FileHelper();
-            List<File> files = fileHelper.stringsToFiles(addressFilesToLMDB.addressesFiles);
-            fileHelper.assertFilesExists(files);
-            
-            logger.info("Iterate address files ...");
-            for (File file : files) {
-                if (!shouldRun.get()) {
-                    break;
-                }
-                AddressFile addressFile = new AddressFile(
-                    file,
-                    readStatistic,
-                    network,
-                    this::supported,
-                    this::unsupported
-                );
-                
+            try {
+                FileHelper fileHelper = new FileHelper();
+                List<File> files = fileHelper.stringsToFiles(addressFilesToLMDB.addressesFiles);
+                fileHelper.assertFilesExists(files);
+
+                logger.info("Iterate address files ...");
+                for (File file : files) {
+                    if (!shouldRun.get()) {
+                        break;
+                    }
+                    AddressFile addressFile = new AddressFile(
+                            file,
+                            readStatistic,
+                            network,
+                            this::supported,
+                            this::unsupported
+                    );
+
                 logger.info("process " + file.getAbsolutePath());
                 currentAddressFile.set(addressFile);
                 addressFile.readFile();
@@ -98,11 +99,10 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
             for (String error : readStatistic.errors) {
                 logger.info("Error in line: " + error);
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        } finally {
-            persistence.close();
         }
     }
     
