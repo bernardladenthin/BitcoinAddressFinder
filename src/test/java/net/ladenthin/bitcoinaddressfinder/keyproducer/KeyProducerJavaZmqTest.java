@@ -175,6 +175,10 @@ public class KeyProducerJavaZmqTest {
         Future<Void> senderFuture = executorService.submit(() -> {
             try (ZContext context = new ZContext(); ZMQ.Socket socket = context.createSocket(ZMQ.PUSH)) {
                 socket.connect(address);
+
+                // Let the ZMQ connection fully establish before the first send:
+                Thread.sleep(TestTimeProvider.DEFAULT_ESTABLISH_DELAY);
+
                 for (int i = 0; i < numberOfSecrets; i++) {
                     byte[] secretBytes = new KeyProducerTestUtility().createIncrementedSecret((byte) i);
                     socket.send(secretBytes);
