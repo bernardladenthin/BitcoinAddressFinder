@@ -18,6 +18,8 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,7 +32,7 @@ public class CFinder {
     public List<CKeyProducerJavaWebSocket> keyProducerJavaWebSocket = new ArrayList<>();
     public List<CKeyProducerJavaZmq> keyProducerJavaZmq = new ArrayList<>();
     
-    public CConsumerJava consumerJava;
+    public @Nullable CConsumerJava consumerJava;
     
     public List<CProducerJava> producerJava = new ArrayList<>();
     public List<CProducerJavaSecretsFiles> producerJavaSecretsFiles = new ArrayList<>();

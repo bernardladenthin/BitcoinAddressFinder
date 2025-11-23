@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -40,6 +41,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.MnemonicException;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +72,7 @@ public class ConsumerJava implements Consumer {
     @VisibleForTesting
     ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 
-    protected Persistence persistence;
+    protected @Nullable Persistence persistence;
     private final PersistenceUtils persistenceUtils;
     
     private final List<Future<Void>> consumers = new ArrayList<>();
@@ -78,7 +80,7 @@ public class ConsumerJava implements Consumer {
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
     
     protected final AtomicLong vanityHits = new AtomicLong();
-    private final Pattern vanityPattern;
+    private final @Nullable Pattern vanityPattern;
     
     @VisibleForTesting
     final AtomicBoolean shouldRun = new AtomicBoolean(true);
@@ -214,8 +216,9 @@ public class ConsumerJava implements Consumer {
                 }
 
                 if (consumerJava.enableVanity) {
+                    var localVanityPattern = Objects.requireNonNull(vanityPattern);
                     String uncompressedKeyHashAsBase58 = publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility);
-                    Matcher uncompressedKeyHashAsBase58Matcher = vanityPattern.matcher(uncompressedKeyHashAsBase58);
+                    Matcher uncompressedKeyHashAsBase58Matcher = localVanityPattern.matcher(uncompressedKeyHashAsBase58);
                     if (uncompressedKeyHashAsBase58Matcher.matches()) {
                         // immediately log the secret
                         safeLog(publicKeyBytes, hash160Uncompressed, hash160Compressed);
@@ -292,7 +295,8 @@ public class ConsumerJava implements Consumer {
         if (logger.isTraceEnabled()) {
             logger.trace("Time before persistence.containsAddress: " + timeBefore);
         }
-        boolean containsAddress = persistence.containsAddress(hash160AsByteBuffer);
+        Persistence localPersistence = Objects.requireNonNull(persistence);
+        boolean containsAddress = localPersistence.containsAddress(hash160AsByteBuffer);
         long timeAfter = System.currentTimeMillis();
         long timeDelta = timeAfter - timeBefore;
         checkedKeys.incrementAndGet();
@@ -346,7 +350,11 @@ public class ConsumerJava implements Consumer {
             throw new RuntimeException(ex);
         }
         try {
-            persistence.close();
+            if(persistence != null){
+                Persistence localPersistence = Objects.requireNonNull(persistence);
+                localPersistence.close();
+                persistence = null;
+            }
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

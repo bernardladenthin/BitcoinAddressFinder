@@ -18,6 +18,8 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,5 +33,5 @@ public class CAddressFilesToLMDB {
     /**
      * The configuration to write a LMDB database.
      */
-    public CLMDBConfigurationWrite lmdbConfigurationWrite;
+    public @Nullable CLMDBConfigurationWrite lmdbConfigurationWrite;
 }

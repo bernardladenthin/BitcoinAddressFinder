@@ -19,9 +19,10 @@
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import org.jspecify.annotations.Nullable;
 
 public class CKeyProducerJava {
-    public String keyProducerId;
+    public @Nullable String keyProducerId;
     
     /**
      * (2<sup>{@code maxNumBits}</sup> - 1) can be set to a lower value to improve a search on specific ranges (e.g. the puzzle transaction <a href="https://privatekeys.pw/puzzles/bitcoin-puzzle-tx">bitcoin-puzzle-tx</a> ).

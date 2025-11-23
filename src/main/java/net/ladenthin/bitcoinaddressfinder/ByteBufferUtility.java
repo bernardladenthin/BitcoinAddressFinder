@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import jdk.internal.misc.Unsafe;
 import org.bouncycastle.util.encoders.Hex;
+import org.jspecify.annotations.Nullable;
 
 public class ByteBufferUtility {
     
@@ -41,9 +42,9 @@ public class ByteBufferUtility {
      * https://stackoverflow.com/questions/13003871/how-do-i-get-the-instance-of-sun-misc-unsafe
      * https://stackoverflow.com/questions/29301755/got-securityexception-in-java
      * https://bugs.openjdk.org/browse/JDK-8171377
-     * @param byteBuffer nullable, the ByteBuffer to free 
+     * @param byteBuffer the ByteBuffer to free
      */
-    public void freeByteBuffer(ByteBuffer byteBuffer) {
+    public void freeByteBuffer(@Nullable ByteBuffer byteBuffer) {
         if (byteBuffer == null) {
             return;
         }

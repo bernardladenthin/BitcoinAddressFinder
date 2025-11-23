@@ -18,8 +18,11 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+
 public class CConsumerJava {
-    public CLMDBConfigurationReadOnly lmdbConfigurationReadOnly;
+    public @NonNull CLMDBConfigurationReadOnly lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
     public int printStatisticsEveryNSeconds = 60;
     public int threads = 4;
     /**
@@ -53,5 +56,5 @@ public class CConsumerJava {
     
     public boolean enableVanity = false;
     
-    public String vanityPattern;
+    public @Nullable String vanityPattern;
 }

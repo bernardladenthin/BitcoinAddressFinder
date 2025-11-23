@@ -22,6 +22,8 @@ import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
 import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.lmdbjava.CursorIterable;
 import org.lmdbjava.Dbi;
 import org.lmdbjava.Env;
@@ -64,10 +66,10 @@ public class LMDBPersistence implements Persistence {
     
     private final Logger logger = LoggerFactory.getLogger(LMDBPersistence.class);
 
-    private final PersistenceUtils persistenceUtils;
-    private final CLMDBConfigurationWrite lmdbConfigurationWrite;
-    private final CLMDBConfigurationReadOnly lmdbConfigurationReadOnly;
-    private final KeyUtility keyUtility;
+    private final @NonNull PersistenceUtils persistenceUtils;
+    private final @Nullable CLMDBConfigurationWrite lmdbConfigurationWrite;
+    private final @Nullable CLMDBConfigurationReadOnly lmdbConfigurationReadOnly;
+    private final @NonNull KeyUtility keyUtility;
     private Env<ByteBuffer> env;
     private Dbi<ByteBuffer> lmdb_h160ToAmount;
     private long increasedCounter = 0;

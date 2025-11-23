@@ -20,10 +20,11 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import org.jspecify.annotations.Nullable;
 
 public class CProducer {
     
-    public String keyProducerId;
+    public @Nullable String keyProducerId;
     
     /**
      * Range: {@code 0} (inclusive) to {@link PublicKeyBytes#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY} (inclusive).

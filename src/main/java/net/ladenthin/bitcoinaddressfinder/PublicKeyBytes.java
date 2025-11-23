@@ -27,6 +27,8 @@ import org.bitcoinj.core.Utils;
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.internal.CryptoUtils;
 import org.bouncycastle.crypto.digests.RIPEMD160Digest;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 public class PublicKeyBytes {
@@ -201,28 +203,28 @@ public class PublicKeyBytes {
     public final static int PUBLIC_KEY_UNCOMPRESSED_BYTES = SEC_PREFIX_NUM_BYTES + TWO_COORDINATES_NUM_BYTES;
     public final static int PUBLIC_KEY_COMPRESSED_BYTES   = SEC_PREFIX_NUM_BYTES + ONE_COORDINATE_NUM_BYTES;
 
-    private final byte[] uncompressed;
-    private final byte[] compressed;
+    private final byte @NonNull [] uncompressed;
+    private final byte @NonNull [] compressed;
     
     /**
      * Lazy initialization.
      */
-    private byte[] uncompressedKeyHash;
+    private byte @Nullable [] uncompressedKeyHash;
     
     /**
      * Lazy initialization.
      */
-    private byte[] compressedKeyHash;
+    private byte @Nullable [] compressedKeyHash;
     
     /**
      * Lazy initialization.
      */
-    private String uncompressedKeyHashBase58;
+    private @Nullable String uncompressedKeyHashBase58;
     
     /**
      * Lazy initialization.
      */
-    private String compressedKeyHashBase58;
+    private @Nullable String compressedKeyHashBase58;
     
     private final BigInteger secretKey;
     
@@ -254,13 +256,13 @@ public class PublicKeyBytes {
         this(secretKey, uncompressed, createCompressedBytes(uncompressed), uncompressedKeyHash, compressedKeyHash);
     }
     
-    public PublicKeyBytes(BigInteger secretKey, byte[] uncompressed, byte[] compressed) {
+    public PublicKeyBytes(BigInteger secretKey, byte @NonNull [] uncompressed, byte @NonNull [] compressed) {
         this.secretKey = secretKey;
         this.uncompressed = uncompressed;
         this.compressed = compressed;
     }
     
-    public PublicKeyBytes(BigInteger secretKey, byte[] uncompressed, byte[] compressed, byte[] uncompressedKeyHash, byte[] compressedKeyHash) {
+    public PublicKeyBytes(BigInteger secretKey, byte @NonNull [] uncompressed, byte @NonNull [] compressed, byte @Nullable [] uncompressedKeyHash, byte @Nullable [] compressedKeyHash) {
         this.secretKey = secretKey;
         this.uncompressed = uncompressed;
         this.compressed = compressed;
@@ -291,7 +293,7 @@ public class PublicKeyBytes {
      * @param uncompressed the full uncompressed public key byte array in SEC format ({@code 04 || X || Y})
      * @return the compressed public key byte array in SEC format
      */
-    public static byte[] createCompressedBytes(byte[] uncompressed) {
+    public static byte @NonNull [] createCompressedBytes(byte @NonNull [] uncompressed) {
         // add one byte for format sign
         byte[] compressed = new byte[PUBLIC_KEY_COMPRESSED_BYTES];
         // parity
@@ -327,7 +329,7 @@ public class PublicKeyBytes {
      * @param y the Y coordinate in Big-Endian (MSB-first) order
      * @return the assembled uncompressed public key byte array in SEC format
      */
-    public static byte[] assembleUncompressedPublicKey(byte[] x, byte[] y) {
+    public static byte @NonNull [] assembleUncompressedPublicKey(byte @NonNull [] x, byte @NonNull [] y) {
         byte[] uncompressed = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
         // prefix
         uncompressed[0] = SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT;
@@ -356,7 +358,7 @@ public class PublicKeyBytes {
        return true;
    }
    
-   private static byte[] calculateHash160(byte[] input) {
+   private static byte @NonNull [] calculateHash160(byte[] input) {
         if (USE_SHA256_RIPEMD160_FAST) {
             return sha256hash160Fast(input);
         } else {
@@ -364,14 +366,14 @@ public class PublicKeyBytes {
         }
     }
 
-    public byte[] getUncompressedKeyHash() {
+    public byte @NonNull [] getUncompressedKeyHash() {
         if (uncompressedKeyHash == null) {
             uncompressedKeyHash = calculateHash160(uncompressed);
         }
         return uncompressedKeyHash;
     }
 
-    public byte[] getCompressedKeyHash() {
+    public byte @NonNull [] getCompressedKeyHash() {
         if (compressedKeyHash == null) {
             compressedKeyHash = calculateHash160(compressed);
         }
@@ -392,14 +394,14 @@ public class PublicKeyBytes {
         return out;
     }
 
-    public String getCompressedKeyHashAsBase58(KeyUtility keyUtility) {
+    public @NonNull String getCompressedKeyHashAsBase58(@NonNull KeyUtility keyUtility) {
         if (uncompressedKeyHashBase58 == null) {
             uncompressedKeyHashBase58 = keyUtility.toBase58(getCompressedKeyHash());
         }
         return uncompressedKeyHashBase58;
     }
 
-    public String getUncompressedKeyHashAsBase58(KeyUtility keyUtility) {
+    public @NonNull String getUncompressedKeyHashAsBase58(@NonNull KeyUtility keyUtility) {
         if (compressedKeyHashBase58 == null) {
             compressedKeyHashBase58 = keyUtility.toBase58(getUncompressedKeyHash());
         }

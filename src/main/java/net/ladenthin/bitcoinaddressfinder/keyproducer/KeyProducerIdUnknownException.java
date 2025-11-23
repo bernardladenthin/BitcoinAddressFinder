@@ -18,9 +18,11 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
+import org.jspecify.annotations.Nullable;
+
 public class KeyProducerIdUnknownException extends RuntimeException {
     
-    public KeyProducerIdUnknownException(String id) {
+    public KeyProducerIdUnknownException(@Nullable String id) {
         super("Key producer id is unknown: " + id);
     }
 }

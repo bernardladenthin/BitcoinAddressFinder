@@ -22,11 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -160,28 +156,29 @@ public class Finder implements Interruptable {
 
     public void configureProducer() {
         logger.info("configureProducer");
+        var localConsumerJava = Objects.requireNonNull(consumerJava);
         processProducers(
-            finder.producerJava,
-            bitHelper::assertBatchSizeInBitsIsInRange,
-            this::getKeyProducer,
-            (config, keyProducer) -> new ProducerJava(config, consumerJava, keyUtility, keyProducer, bitHelper),
-            javaProducers
+                finder.producerJava,
+                bitHelper::assertBatchSizeInBitsIsInRange,
+                this::getKeyProducer,
+                (config, keyProducer) -> new ProducerJava(config, localConsumerJava, keyUtility, keyProducer, bitHelper),
+                javaProducers
         );
 
         processProducers(
-            finder.producerJavaSecretsFiles,
-            bitHelper::assertBatchSizeInBitsIsInRange,
-            this::getKeyProducer,
-            (config, keyProducer) -> new ProducerJavaSecretsFiles(config, consumerJava, keyUtility, keyProducer, bitHelper),
-            javaProducersSecretsFiles
+                finder.producerJavaSecretsFiles,
+                bitHelper::assertBatchSizeInBitsIsInRange,
+                this::getKeyProducer,
+                (config, keyProducer) -> new ProducerJavaSecretsFiles(config, localConsumerJava, keyUtility, keyProducer, bitHelper),
+                javaProducersSecretsFiles
         );
 
         processProducers(
-            finder.producerOpenCL,
-            bitHelper::assertBatchSizeInBitsIsInRange,
-            this::getKeyProducer,
-            (config, keyProducer) -> new ProducerOpenCL(config, consumerJava, keyUtility, keyProducer, bitHelper),
-            openCLProducers
+                finder.producerOpenCL,
+                bitHelper::assertBatchSizeInBitsIsInRange,
+                this::getKeyProducer,
+                (config, keyProducer) -> new ProducerOpenCL(config, localConsumerJava, keyUtility, keyProducer, bitHelper),
+                openCLProducers
         );
     }
     

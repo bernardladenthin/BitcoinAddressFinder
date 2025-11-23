@@ -32,7 +32,10 @@ import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.Finder;
 import net.ladenthin.bitcoinaddressfinder.Interruptable;
 import net.ladenthin.bitcoinaddressfinder.LMDBToAddressFile;
+import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
+import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
+import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBToAddressFile;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import org.slf4j.Logger;
@@ -135,7 +138,8 @@ public class Main implements Runnable, Interruptable {
         
         switch (configuration.command) {
             case Find:
-                Finder finder = new Finder(configuration.finder);
+                CFinder cFinder = Objects.requireNonNull(configuration.finder);
+                Finder finder = new Finder(cFinder);
                 interruptables.add(finder);
                 // key producer first
                 finder.startKeyProducer();
@@ -150,12 +154,14 @@ public class Main implements Runnable, Interruptable {
                 finder.shutdownAndAwaitTermination();
                 break;
             case LMDBToAddressFile:
-                LMDBToAddressFile lmdbToAddressFile = new LMDBToAddressFile(configuration.lmdbToAddressFile);
+                CLMDBToAddressFile cLMDBToAddressFile = Objects.requireNonNull(configuration.lmdbToAddressFile);
+                LMDBToAddressFile lmdbToAddressFile = new LMDBToAddressFile(cLMDBToAddressFile);
                 interruptables.add(lmdbToAddressFile);
                 lmdbToAddressFile.run();
                 break;
             case AddressFilesToLMDB:
-                AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(configuration.addressFilesToLMDB);
+                CAddressFilesToLMDB cAddressFilesToLMDB = Objects.requireNonNull(configuration.addressFilesToLMDB);
+                AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(cAddressFilesToLMDB);
                 interruptables.add(addressFilesToLMDB);
                 addressFilesToLMDB.run();
                 break;

@@ -18,6 +18,7 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -40,9 +42,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     private final Logger logger = LoggerFactory.getLogger(AddressFilesToLMDB.class);
 
-    private final CAddressFilesToLMDB addressFilesToLMDB;
-
-    private LMDBPersistence persistence;
+    private final @NonNull CAddressFilesToLMDB addressFilesToLMDB;
 
     private final AtomicLong addressCounter = new AtomicLong();
 
@@ -53,7 +53,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
     
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
     
-    public AddressFilesToLMDB(CAddressFilesToLMDB addressFilesToLMDB) {
+    public AddressFilesToLMDB( @NonNull CAddressFilesToLMDB addressFilesToLMDB) {
         this.addressFilesToLMDB = addressFilesToLMDB;
     }
 
@@ -62,16 +62,35 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
         final Network network = new NetworkParameterFactory().getNetwork();
 
         PersistenceUtils persistenceUtils = new PersistenceUtils(network);
-        try(LMDBPersistence persistence = new LMDBPersistence(addressFilesToLMDB.lmdbConfigurationWrite, persistenceUtils)) {
-            this.persistence = persistence;
+        CLMDBConfigurationWrite lmdbConfigurationWrite = Objects.requireNonNull(addressFilesToLMDB.lmdbConfigurationWrite);
+        try(LMDBPersistence persistence = new LMDBPersistence(lmdbConfigurationWrite, persistenceUtils)) {
             logger.info("Init LMDB ...");
             persistence.init();
             logger.info("... init LMDB done.");
 
             try {
                 FileHelper fileHelper = new FileHelper();
-                List<File> files = fileHelper.stringsToFiles(addressFilesToLMDB.addressesFiles);
+                List<String> addressesFiles = Objects.requireNonNull(addressFilesToLMDB.addressesFiles);
+                List<File> files = fileHelper.stringsToFiles(addressesFiles);
                 fileHelper.assertFilesExists(files);
+
+                java.util.function.Consumer<AddressToCoin> supported =
+                        addressToCoin -> {
+                            ByteBuffer hash160 = addressToCoin.hash160();
+                            persistence.putNewAmount(hash160, addressToCoin.coin());
+                            addressCounter.incrementAndGet();
+
+                            if (addressCounter.get() % PROGRESS_LOG == 0) {
+                                logProgress();
+                            }
+                        };
+
+                java.util.function.Consumer<String> unsupported =
+                        line -> {
+                            if (readStatistic.unsupported % PROGRESS_LOG == 0) {
+                                logProgress();
+                            }
+                        };
 
                 logger.info("Iterate address files ...");
                 for (File file : files) {
@@ -82,8 +101,8 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
                             file,
                             readStatistic,
                             network,
-                            this::supported,
-                            this::unsupported
+                            supported,
+                            unsupported
                     );
 
                 logger.info("process " + file.getAbsolutePath());
@@ -103,22 +122,6 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-        }
-    }
-    
-    private void supported(AddressToCoin addressToCoin) {
-        ByteBuffer hash160 = addressToCoin.hash160();
-        persistence.putNewAmount(hash160, addressToCoin.coin());
-        addressCounter.incrementAndGet();
-
-        if (addressCounter.get() % PROGRESS_LOG == 0) {
-            logProgress();
-        }
-    }
-
-    private void unsupported(String line) {
-        if (readStatistic.unsupported % PROGRESS_LOG == 0) {
-            logProgress();
         }
     }
 

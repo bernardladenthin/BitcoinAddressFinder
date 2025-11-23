@@ -28,6 +28,7 @@ import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.SegwitAddress;
 import org.bitcoinj.base.exceptions.AddressFormatException;
 import org.bouncycastle.util.encoders.DecoderException;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 
@@ -336,8 +337,8 @@ public class AddressTxtLine {
         return addressToCoin;
     }
 
-    @Nullable
-    private Coin getCoinIfPossible(String[] lineSplitted, Coin defaultValue) throws NumberFormatException {
+    @NonNull
+    private Coin getCoinIfPossible(@NonNull String[] lineSplitted, @NonNull Coin defaultValue) throws NumberFormatException {
         if (lineSplitted.length > 1) {
             String amountString = lineSplitted[1];
             try {
