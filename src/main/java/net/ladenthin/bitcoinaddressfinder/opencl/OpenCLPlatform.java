@@ -18,12 +18,12 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.opencl;
 
+import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.Immutable;
-import java.io.Serializable;
-import java.util.Collections;
-import java.util.List;
 import org.jocl.cl_context_properties;
 import org.jspecify.annotations.NonNull;
+
+import java.io.Serializable;
 
 /**
  * Represents an OpenCL platform and its associated devices.
@@ -35,13 +35,14 @@ import org.jspecify.annotations.NonNull;
 @Immutable
 public record OpenCLPlatform(
     @NonNull String platformName,
+    @SuppressWarnings("Immutable")
     @NonNull cl_context_properties contextProperties,
-    @NonNull List<OpenCLDevice> openCLDevices
+    @NonNull ImmutableList<@NonNull OpenCLDevice> openCLDevices
 ) implements Serializable {
 
-    public OpenCLPlatform(String platformName, cl_context_properties contextProperties, List<OpenCLDevice> openCLDevices) {
+    public OpenCLPlatform(String platformName, cl_context_properties contextProperties, ImmutableList<@NonNull OpenCLDevice> openCLDevices) {
         this.platformName = platformName;
         this.contextProperties = contextProperties;
-        this.openCLDevices = Collections.unmodifiableList(openCLDevices);
+        this.openCLDevices = openCLDevices;
     }
 }

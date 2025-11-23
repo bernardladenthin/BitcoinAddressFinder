@@ -21,6 +21,7 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import java.io.DataInputStream;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
+import org.jspecify.annotations.Nullable;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -650,11 +651,11 @@ public class KeyProducerJavaSocketTest {
         }
     }
     
-    private void cleanup(KeyProducerJavaSocket client, Future<?> serverFuture, ServerSocket serverSocket) throws Exception {
+    private void cleanup(@Nullable KeyProducerJavaSocket client, @Nullable Future<?> serverFuture, @Nullable ServerSocket serverSocket) throws Exception {
         cleanup(client, serverFuture, serverSocket, TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
     }
     
-    private void cleanup(KeyProducerJavaSocket client, Future<?> serverFuture, ServerSocket serverSocket, long timeout, TimeUnit unit) throws Exception {
+    private void cleanup(@Nullable KeyProducerJavaSocket client, @Nullable Future<?> serverFuture, @Nullable ServerSocket serverSocket, long timeout, TimeUnit unit) throws Exception {
         if (client != null) client.interrupt();
         if (serverFuture != null) serverFuture.get(timeout, unit);
         if (serverSocket != null && !serverSocket.isClosed()) serverSocket.close();

@@ -224,26 +224,6 @@ public class PublicKeyBytesTest {
             assertThat("Expected zero at index " + i, result[i], is((byte) 0x00));
         }
     }
-
-    @Test(expected = NullPointerException.class)
-    public void assembleUncompressedPublicKey_nullInput_throwsException() {
-        // arrange
-        byte[] x = null;
-        byte[] y = new byte[PublicKeyBytes.ONE_COORDINATE_NUM_BYTES];
-
-        // act
-        PublicKeyBytes.assembleUncompressedPublicKey(x, y);
-    }
-    
-    @Test(expected = NullPointerException.class)
-    public void assembleUncompressedPublicKey_yIsNull_throwsNullPointerException() {
-        // arrange
-        byte[] x = new byte[PublicKeyBytes.ONE_COORDINATE_NUM_BYTES];
-        byte[] y = null; // deliberately null to trigger NPE
-
-        // act
-        PublicKeyBytes.assembleUncompressedPublicKey(x, y);
-    }
     
     @Test
     public void assembleUncompressedPublicKey_validXAndY_assemblesCorrectly() {

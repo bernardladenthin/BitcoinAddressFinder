@@ -21,14 +21,15 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
-import net.ladenthin.bitcoinaddressfinder.BitHelper;
-import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
+
+import net.ladenthin.bitcoinaddressfinder.*;
+
 import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaBip39;
 import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaIncremental;
 import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaRandom;
 import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaSocket;
 import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaZmq;
-import net.ladenthin.bitcoinaddressfinder.KeyUtility;
+
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
@@ -38,6 +39,8 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
 import static org.junit.Assert.fail;
+
+import org.bitcoinj.base.Network;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -56,10 +59,12 @@ public class KeyProducerJavaTest {
     private KeyUtility keyUtility;
     private BitHelper bitHelper;
     private Logger mockLogger;
+
+    private final Network network = new NetworkParameterFactory().getNetwork();
     
     @Before
     public void setUp() {
-        keyUtility = new KeyUtility(null, null);
+        keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
         bitHelper = new BitHelper();
         mockLogger = mock(Logger.class);
     }
@@ -162,7 +167,7 @@ public class KeyProducerJavaTest {
     private CKeyProducerJavaBip39 configureKeyProducerJavaBip39(String keyProducerId, int maxWorkSize) {
         CKeyProducerJavaBip39 bip39 = new CKeyProducerJavaBip39();
         bip39.keyProducerId = keyProducerId;
-        bip39.mnemonic = KeyProducerJavaBip39Test.MNEMONIC;
+        bip39.mnemonic = CKeyProducerJavaBip39.MNEMONIC;
         bip39.maxWorkSize = maxWorkSize;
         return bip39;
     }

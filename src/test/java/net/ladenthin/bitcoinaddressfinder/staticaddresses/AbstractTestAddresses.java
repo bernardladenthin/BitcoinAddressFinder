@@ -42,7 +42,7 @@ public abstract class AbstractTestAddresses implements TestAddresses {
     public AbstractTestAddresses(int randomSeed, int numberOfAddresses, boolean compressed) {
         Random random = new Random(randomSeed);
         for (int i = 0; i < numberOfAddresses; i++) {
-            BigInteger secret = new KeyUtility(null, new ByteBufferUtility(false)).createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, random);
+            BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false)).createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, random);
             ECKey ecKey = ECKey.fromPrivate(secret, compressed);
             ecKeys.add(ecKey);
         }

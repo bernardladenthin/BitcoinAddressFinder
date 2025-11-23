@@ -19,7 +19,11 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+
+import com.google.common.collect.ImmutableList;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
@@ -74,7 +78,7 @@ public class OpenCLDeviceTest {
             true,
             40,
             3,
-            new long[]{1024, 1024, 64},
+            ImmutableList.copyOf(List.of(1024L, 1024L, 64L)),
             1024,
             1290,
             64,
@@ -154,21 +158,9 @@ public class OpenCLDeviceTest {
     
     // <editor-fold defaultstate="collapsed" desc="formatWorkItemSizes">
     @Test
-    public void formatWorkItemSizes_nullInput_returnsNone() {
-        // arrange
-        long[] input = null;
-
-        // act
-        String result = OpenCLDevice.formatWorkItemSizes(input);
-
-        // assert
-        assertThat(result, is("(none)"));
-    }
-
-    @Test
     public void formatWorkItemSizes_emptyInput_returnsNone() {
         // arrange
-        long[] input = new long[0];
+        List<Long> input = Collections.emptyList();
 
         // act
         String result = OpenCLDevice.formatWorkItemSizes(input);
@@ -180,7 +172,7 @@ public class OpenCLDeviceTest {
     @Test
     public void formatWorkItemSizes_singleElement_returnsElement() {
         // arrange
-        long[] input = {42};
+        List<Long> input = List.of(42L);
 
         // act
         String result = OpenCLDevice.formatWorkItemSizes(input);
@@ -192,7 +184,7 @@ public class OpenCLDeviceTest {
     @Test
     public void formatWorkItemSizes_threeElements_returnsFormattedString() {
         // arrange
-        long[] input = {64, 128, 256};
+        List<Long> input = List.of(64L, 128L, 256L);
 
         // act
         String result = OpenCLDevice.formatWorkItemSizes(input);
@@ -204,7 +196,7 @@ public class OpenCLDeviceTest {
     @Test
     public void formatWorkItemSizes_fiveElements_returnsFormattedString() {
         // arrange
-        long[] input = {1, 2, 3, 4, 5};
+        List<Long> input = List.of(1L, 2L, 3L, 4L, 5L);
 
         // act
         String result = OpenCLDevice.formatWorkItemSizes(input);

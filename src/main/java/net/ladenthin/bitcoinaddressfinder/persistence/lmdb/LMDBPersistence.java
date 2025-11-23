@@ -335,10 +335,17 @@ public class LMDBPersistence implements Persistence {
     public void putNewAmount(ByteBuffer hash160, Coin amount) {
         putNewAmountWithAutoIncrease(hash160, amount);
     }
-    
+
     /**
-     * If an {@link org.lmdbjava.Env.MapFullException} was thrown during a put. The map might be increased if configured.
-     * The increase value needs to be high enough. Otherwise the next put fails nevertheless.
+     * Inserts a value into LMDB and optionally grows the map if it is full.
+     *
+     * <p>If {@link org.lmdbjava.Env.MapFullException} occurs and
+     * {@link CLMDBConfigurationWrite#increaseMapAutomatically} is enabled,
+     * the map size is increased by {@link CLMDBConfigurationWrite#increaseSizeInMiB}
+     * and the insert is retried once.
+     *
+     * <p>If the second attempt also fails, the configured increase size is too small.
+     * If automatic growth is disabled, the original exception is rethrown.
      */
     private void putNewAmountWithAutoIncrease(ByteBuffer hash160, Coin amount) {
         CLMDBConfigurationWrite localLmdbConfigurationWrite = Objects.requireNonNull(lmdbConfigurationWrite);
@@ -348,10 +355,8 @@ public class LMDBPersistence implements Persistence {
         } catch (org.lmdbjava.Env.MapFullException e) {
             if (localLmdbConfigurationWrite.increaseMapAutomatically) {
                 increaseDatabaseSize(new ByteConversion().mibToBytes(lmdbConfigurationWrite.increaseSizeInMiB));
-                /**
-                 * It is possible that the exception will be thrown again, in this case increaseSizeInMiB should be changed and it's a configuration issue.
-                 * See {@link CLMDBConfigurationWrite#increaseSizeInMiB}.
-                 */
+                // It is possible that the exception will be thrown again, in this case increaseSizeInMiB should be changed and it's a configuration issue.
+                // See {@link CLMDBConfigurationWrite#increaseSizeInMiB}.
                 putNewAmountUnsafe(hash160, amount);
             } else {
                 throw e;

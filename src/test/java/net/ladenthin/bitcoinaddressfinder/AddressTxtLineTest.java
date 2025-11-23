@@ -22,6 +22,8 @@ import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Objects;
+
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.*;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.*;
@@ -29,6 +31,7 @@ import org.apache.commons.codec.DecoderException;
 import org.bouncycastle.util.encoders.Hex;
 import org.bitcoinj.base.Base58;
 import org.bitcoinj.base.Coin;
+import org.jspecify.annotations.Nullable;
 import org.junit.Before;
 import org.junit.Test;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -74,6 +77,7 @@ public class AddressTxtLineTest {
     public void fromLine_uncompressedBitcoinAddressGiven_ReturnHash160AndDefaultCoin() throws IOException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticKey.publicKeyUncompressed, keyUtility);
+        Objects.requireNonNull(addressToCoin);
 
         // assert
         assertThat(addressToCoin.hash160(), is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
@@ -84,6 +88,7 @@ public class AddressTxtLineTest {
     public void fromLine_compressedBitcoinAddressGiven_ReturnHash160AndDefaultCoin() throws IOException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticKey.publicKeyCompressed, keyUtility);
+        Objects.requireNonNull(addressToCoin);
 
         // assert
         assertThat(addressToCoin.hash160(), is(equalTo(staticKey.byteBufferPublicKeyCompressed)));
@@ -97,6 +102,7 @@ public class AddressTxtLineTest {
         long coin = 123987L;
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticKey.publicKeyUncompressed + addressSeparator + coin, keyUtility);
+        Objects.requireNonNull(addressToCoin);
 
         // assert
         assertThat(addressToCoin.hash160(), is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
@@ -108,6 +114,7 @@ public class AddressTxtLineTest {
     public void fromLine_uncompressedBitcoinAddressGivenWithInvalidAmount_ReturnHash160AndDefaultCoin(String addressSeparator) throws IOException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticKey.publicKeyUncompressed + addressSeparator + "XYZ", keyUtility);
+        Objects.requireNonNull(addressToCoin);
 
         // assert
         assertThat(addressToCoin.hash160(), is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
@@ -139,6 +146,7 @@ public class AddressTxtLineTest {
     public void fromLine_StaticP2PKHAddress_returnPublicKeyHash(P2PKH address) throws IOException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(address.getPublicAddress(), keyUtility);
+        Objects.requireNonNull(addressToCoin);
 
         // assert
         assertThat(new ByteBufferUtility(true).getHexFromByteBuffer(addressToCoin.hash160()), is(equalTo(address.getPublicKeyHashAsHex())));
@@ -152,6 +160,7 @@ public class AddressTxtLineTest {
     public void fromLine_StaticP2SHAddress_returnScriptHash(P2SH address) throws IOException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(address.getPublicAddress(), keyUtility);
+        Objects.requireNonNull(addressToCoin);
 
         // assert
         assertThat(new ByteBufferUtility(true).getHexFromByteBuffer(addressToCoin.hash160()), is(equalTo(address.getScriptHashAsHex())));
@@ -165,6 +174,7 @@ public class AddressTxtLineTest {
     public void fromLine_StaticP2WSHAddress_returnScriptHash(P2WPKH address) throws IOException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(address.getPublicAddress(), keyUtility);
+        Objects.requireNonNull(addressToCoin);
 
         // assert
         assertThat(new ByteBufferUtility(true).getHexFromByteBuffer(addressToCoin.hash160()), is(equalTo(address.getWitnessProgramAsHex())));
@@ -178,6 +188,7 @@ public class AddressTxtLineTest {
     public void fromLine_InvalidP2WPKHAddressWithValidBase58Given_parseAnyway(String base58, String hash) throws IOException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
+        Objects.requireNonNull(addressToCoin);
 
         // assert
         assertThat(new ByteBufferUtility(true).getHexFromByteBuffer(addressToCoin.hash160()), is(equalTo(hash)));
@@ -210,6 +221,7 @@ public class AddressTxtLineTest {
     public void fromLine_bitcoinCashAddressChecksumInvalid_parseAnyway(String base58, String expectedHash160) throws IOException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
+        Objects.requireNonNull(addressToCoin);
 
         // assert
         String hash160AsHex = keyUtility.byteBufferUtility().getHexFromByteBuffer(addressToCoin.hash160());
@@ -231,6 +243,7 @@ public class AddressTxtLineTest {
     public void fromLine_bitcoinAddressChecksumInvalid_parseAnyway(String base58, String expectedHash160) throws IOException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
+        Objects.requireNonNull(addressToCoin);
 
         // assert
         String hash160AsHex = keyUtility.byteBufferUtility().getHexFromByteBuffer(addressToCoin.hash160());
@@ -242,6 +255,7 @@ public class AddressTxtLineTest {
     public void fromLine_correctBase58_hash160equals(String base58, String expectedHash160) throws IOException, DecoderException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
+        Objects.requireNonNull(addressToCoin);
 
         // assert
         String hash160AsHex = keyUtility.byteBufferUtility().getHexFromByteBuffer(addressToCoin.hash160());

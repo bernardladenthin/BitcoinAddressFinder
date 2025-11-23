@@ -18,8 +18,10 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import com.google.common.collect.ImmutableList;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
+import org.jspecify.annotations.NonNull;
 import org.junit.Test;
 import java.util.Collections;
 import java.util.List;
@@ -38,7 +40,7 @@ public class OpenCLPlatformTest {
     public void constructor_validArguments_returnsPlatform() {
         // arrange
         String platformName = "Test Platform";
-        List<OpenCLDevice> devices = Collections.emptyList();
+        ImmutableList<@NonNull OpenCLDevice> devices = ImmutableList.<OpenCLDevice>builder().build();
 
         // act
         OpenCLPlatform platform = new OpenCLPlatform(platformName, new cl_context_properties(), devices);
@@ -48,18 +50,6 @@ public class OpenCLPlatformTest {
         assertThat(platform.platformName(), is(equalTo(platformName)));
         assertThat(platform.openCLDevices(), is(devices));
     }
-
-    @Test(expected = UnsupportedOperationException.class)
-    public void constructor_givenModifiableList_resultingListIsUnmodifiable() {
-        // arrange
-        List<OpenCLDevice> mutableList = new java.util.ArrayList<>();
-
-        // act
-        OpenCLPlatform platform = new OpenCLPlatform("Immutable Test", new cl_context_properties(), mutableList);
-
-        // try to modify list (should throw)
-        platform.openCLDevices().add(null);
-    }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="toString">
@@ -68,7 +58,7 @@ public class OpenCLPlatformTest {
     public void toString_containsPlatformName() {
         // arrange
         String platformName = "Platform A";
-        OpenCLPlatform platform = new OpenCLPlatform(platformName, new cl_context_properties(), Collections.emptyList());
+        OpenCLPlatform platform = new OpenCLPlatform(platformName, new cl_context_properties(), ImmutableList.<OpenCLDevice>builder().build());
 
         // act
         String result = platform.toString();

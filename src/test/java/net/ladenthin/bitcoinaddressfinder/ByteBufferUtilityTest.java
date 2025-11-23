@@ -392,18 +392,6 @@ public class ByteBufferUtilityTest {
     
     // <editor-fold defaultstate="collapsed" desc="reverse">
     @Test
-    public void reverse_nullArray_doesNothing() {
-        // arrange
-        ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
-        
-        // act
-        byteBufferUtility.reverse(null);
-
-        // assert
-        // No exception expected, nothing to assert
-    }
-
-    @Test
     public void reverse_singleElement_noChange() {
         // arrange
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);

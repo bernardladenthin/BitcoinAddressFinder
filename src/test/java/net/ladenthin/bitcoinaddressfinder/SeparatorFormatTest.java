@@ -131,16 +131,6 @@ public class SeparatorFormatTest {
     }
 
     /**
-     * Tests that passing null as input to split() throws a
-     * NullPointerException.
-     */
-    @Test(expected = NullPointerException.class)
-    public void split_nullInput_throwsNullPointerException() {
-        // act
-        SeparatorFormat.split(null);
-    }
-
-    /**
      * Tests that if the input starts and ends with a separator, the result
      * contains empty prefix and suffix parts.
      */

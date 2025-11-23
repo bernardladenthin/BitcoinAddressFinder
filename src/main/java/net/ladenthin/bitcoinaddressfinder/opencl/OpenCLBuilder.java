@@ -23,6 +23,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.LongStream;
+
+import com.google.common.collect.ImmutableList;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 import static org.jocl.CL.CL_CONTEXT_PLATFORM;
@@ -73,6 +76,7 @@ import org.jocl.Sizeof;
 import org.jocl.cl_context_properties;
 import org.jocl.cl_device_id;
 import org.jocl.cl_platform_id;
+import org.jspecify.annotations.NonNull;
 
 public class OpenCLBuilder {
     
@@ -111,8 +115,8 @@ public class OpenCLBuilder {
                 OpenCLDevice openCLDevice = createOpenCLDevice(device);
                 openCLDevices.add(openCLDevice);
             }
-            
-            OpenCLPlatform openCLPlatform = new OpenCLPlatform(platformName, contextProperties, openCLDevices);
+
+            OpenCLPlatform openCLPlatform = new OpenCLPlatform(platformName, contextProperties, ImmutableList.copyOf(openCLDevices));
             openCLPlatforms.add(openCLPlatform);
         }
         
@@ -169,7 +173,7 @@ public class OpenCLBuilder {
                 endianLittle,
                 maxComputeUnits,
                 maxWorkItemDimensions,
-                maxWorkItemSizes,
+                longsToImmutableList(maxWorkItemSizes),
                 maxWorkGroupSize,
                 maxClockFrequency,
                 addressBits,
@@ -199,8 +203,15 @@ public class OpenCLBuilder {
         
         return openCLDevice;
     }
-    
-    
+
+    private static ImmutableList<@NonNull Long> longsToImmutableList(long[] array) {
+        ImmutableList.Builder<@NonNull Long> b = ImmutableList.builderWithExpectedSize(array.length);
+        for (long l : array) {
+            b.add(l);
+        }
+        return b.build();
+    }
+
     public static boolean isOpenCLnativeLibraryLoadable() {
         try {
             Class.forName("org.jocl.CL");

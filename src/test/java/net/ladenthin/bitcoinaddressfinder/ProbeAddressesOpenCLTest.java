@@ -38,6 +38,7 @@ import static org.jocl.CL.*;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 import java.util.stream.Collectors;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
@@ -59,6 +60,8 @@ import org.slf4j.Logger;
 @RunWith(DataProviderRunner.class)
 public class ProbeAddressesOpenCLTest {
 
+    public static final String ADDRESSES_CSV = "addresses.csv";
+
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
     
@@ -76,7 +79,6 @@ public class ProbeAddressesOpenCLTest {
 
     @Rule
     public TemporaryFolder tempFolder = new TemporaryFolder();
-    private File tempAddressesFile;
 
     @Before
     public void init() throws IOException {
@@ -88,7 +90,7 @@ public class ProbeAddressesOpenCLTest {
     }
 
     public void createTemporaryAddressesFile() throws IOException {
-        tempAddressesFile = tempFolder.newFile("addresses.csv");
+        File tempAddressesFile = tempFolder.newFile(ADDRESSES_CSV);
         fillAddressesFiles(tempAddressesFile);
     }
 
@@ -481,7 +483,7 @@ public class ProbeAddressesOpenCLTest {
         producerOpenCL.batchSizeInBits = chunkSize;
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
             openCLContext.init();
-            OpenClTask openClTask = openCLContext.getOpenClTask();
+            OpenClTask openClTask = Objects.requireNonNull(openCLContext.getOpenClTask());
 
             // Force a key that exceeds the limit
             openClTask.setSrcPrivateKeyChunk(privateKey);
@@ -505,7 +507,7 @@ public class ProbeAddressesOpenCLTest {
             assertThat("ExpectedStripped must hold exactly 32 bytes", expectedStripped.length, is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES));
 
             // Perform the actual OpenCL buffer population
-            OpenClTask openClTask = openCLContext.getOpenClTask();
+            OpenClTask openClTask = Objects.requireNonNull(openCLContext.getOpenClTask());
             openClTask.setSrcPrivateKeyChunk(privateKey);
 
             ByteBuffer buffer = openClTask.getPrivateKeySourceArgument().getByteBuffer();
@@ -547,7 +549,7 @@ public class ProbeAddressesOpenCLTest {
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
             openCLContext.init();
             // Perform the actual OpenCL buffer population
-            OpenClTask openClTask = openCLContext.getOpenClTask();
+            OpenClTask openClTask = Objects.requireNonNull(openCLContext.getOpenClTask());
 
             openClTask.setSrcPrivateKeyChunk(privateKey);
 

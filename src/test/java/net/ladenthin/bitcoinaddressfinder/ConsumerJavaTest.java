@@ -25,10 +25,8 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
+
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
@@ -248,7 +246,8 @@ public class ConsumerJavaTest {
         consumerJava.initLMDB();
         
         // assert
-        assertThat(consumerJava.persistence.isClosed(), is(equalTo(Boolean.FALSE)));
+        Persistence persistence = Objects.requireNonNull(consumerJava.persistence);
+        assertThat(persistence.isClosed(), is(equalTo(Boolean.FALSE)));
     }
     
     @Test
@@ -263,15 +262,16 @@ public class ConsumerJavaTest {
 
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
-        
+        Persistence persistence = Objects.requireNonNull(consumerJava.persistence);
+
         // pre-assert
-        assertThat(consumerJava.persistence.isClosed(), is(equalTo(Boolean.FALSE)));
+        assertThat(persistence.isClosed(), is(equalTo(Boolean.FALSE)));
         
         // act
         consumerJava.interrupt();
         
         // assert
-        assertThat(consumerJava.persistence.isClosed(), is(equalTo(Boolean.TRUE)));
+        assertThat(persistence.isClosed(), is(equalTo(Boolean.TRUE)));
     }
     
     @Test

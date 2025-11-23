@@ -40,9 +40,9 @@ import org.jspecify.annotations.NonNull;
  * https://stackoverflow.com/questions/21087651/how-to-efficiently-change-endianess-of-byte-array-in-java
  * https://stackoverflow.com/questions/7619058/convert-a-byte-array-to-integer-in-java-and-vice-versa
  */
-public record KeyUtility(@NonNull Network network, ByteBufferUtility byteBufferUtility) {
+public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility byteBufferUtility) {
 
-    public KeyUtility(Network network, ByteBufferUtility byteBufferUtility) {
+    public KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility byteBufferUtility) {
         this.network = network;
         this.byteBufferUtility = byteBufferUtility;
     }

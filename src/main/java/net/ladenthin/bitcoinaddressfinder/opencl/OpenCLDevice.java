@@ -23,9 +23,15 @@ import java.io.PrintStream;
 import java.io.Serializable;
 import java.nio.ByteOrder;
 import java.nio.charset.Charset;
+import java.util.Collection;
+import java.util.List;
+
+import com.google.common.collect.ImmutableList;
+import com.google.errorprone.annotations.Immutable;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.jocl.CL;
 import org.jocl.cl_device_id;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Represents an OpenCL device and its properties.
@@ -68,7 +74,9 @@ import org.jocl.cl_device_id;
  * @param preferredVectorWidthFloat  See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT}
  * @param preferredVectorWidthDouble See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE}
  */
+@Immutable
 public record OpenCLDevice(
+    @SuppressWarnings("Immutable")
     cl_device_id device,
     String deviceName,
     String deviceVendor,
@@ -80,7 +88,7 @@ public record OpenCLDevice(
     boolean endianLittle,
     int maxComputeUnits,
     long maxWorkItemDimensions,
-    long[] maxWorkItemSizes,
+    ImmutableList<@NonNull Long> maxWorkItemSizes,
     long maxWorkGroupSize,
     long maxClockFrequency,
     int addressBits,
@@ -161,12 +169,12 @@ public record OpenCLDevice(
         return baos.toString(charset);
     }
     
-    public static String formatWorkItemSizes(long[] sizes) {
-        if (sizes == null || sizes.length == 0) return "(none)";
+    public static String formatWorkItemSizes(List<Long> sizes) {
+        if (sizes.isEmpty()) return "(none)";
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < sizes.length; i++) {
-            sb.append(sizes[i]);
-            if (i < sizes.length - 1) sb.append(" / ");
+        for (int i = 0; i < sizes.size(); i++) {
+            sb.append(sizes.get(i));
+            if (i < sizes.size() - 1) sb.append(" / ");
         }
         return sb.toString();
     }

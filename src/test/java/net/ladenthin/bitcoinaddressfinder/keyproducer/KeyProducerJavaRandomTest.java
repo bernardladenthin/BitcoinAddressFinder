@@ -33,6 +33,8 @@ import org.bitcoinj.base.Network;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+
+import org.jspecify.annotations.Nullable;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -123,7 +125,7 @@ public class KeyProducerJavaRandomTest {
     // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc="testAllRNGs">
-    private BigInteger[] generateSecrets(CKeyProducerJavaRandomInstance instance, Long customSeed) throws NoMoreSecretsAvailableException {
+    private BigInteger[] generateSecrets(CKeyProducerJavaRandomInstance instance, @Nullable Long customSeed) throws NoMoreSecretsAvailableException {
         CKeyProducerJavaRandom config = new CKeyProducerJavaRandom();
         config.keyProducerId = keyProducerId;
         config.keyProducerJavaRandomInstance = instance;

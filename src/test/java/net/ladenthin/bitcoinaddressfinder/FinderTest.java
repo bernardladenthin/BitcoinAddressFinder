@@ -21,6 +21,8 @@ package net.ladenthin.bitcoinaddressfinder;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
+
+import org.jspecify.annotations.Nullable;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -30,6 +32,8 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
+
 import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaBip39;
 import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaIncremental;
 import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaSocket;
@@ -302,7 +306,7 @@ public class FinderTest {
         }
         // assert logger is correctly bound to the concrete class
         {
-            KeyProducer keyProducer = finder.getKeyProducers().get(keyProducerId);
+            KeyProducer keyProducer = Objects.requireNonNull(finder.getKeyProducers().get(keyProducerId));
             Logger logger = keyProducer.getLogger();
 
             // Verify logger name matches the fully qualified class name
@@ -379,7 +383,7 @@ public class FinderTest {
         // 2. JavaBip39
         CKeyProducerJavaBip39 bip39 = new CKeyProducerJavaBip39();
         bip39.keyProducerId = "bip39Id";
-        bip39.mnemonic = KeyProducerJavaBip39Test.MNEMONIC;
+        bip39.mnemonic = CKeyProducerJavaBip39.MNEMONIC;
         cFinder.keyProducerJavaBip39.add(bip39);
 
         // 3. JavaIncremental
@@ -446,7 +450,7 @@ public class FinderTest {
         configureKeyProducerJavaRandom(keyProducerId_producerOpenCL, cFinder);
     }
     
-    private void configureKeyProducerJavaRandom(String keyProducerId, CFinder cFinder) {
+    private void configureKeyProducerJavaRandom(@Nullable String keyProducerId, CFinder cFinder) {
         CKeyProducerJavaRandom cKeyProducerJavaRandom = new CKeyProducerJavaRandom();
         cKeyProducerJavaRandom.keyProducerId = keyProducerId;
         cKeyProducerJavaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
@@ -463,7 +467,7 @@ public class FinderTest {
     private void configureKeyProducerJavaBip39(String keyProducerId, CFinder cFinder) {
         CKeyProducerJavaBip39 bip39 = new CKeyProducerJavaBip39();
         bip39.keyProducerId = keyProducerId;
-        bip39.mnemonic = KeyProducerJavaBip39Test.MNEMONIC;
+        bip39.mnemonic = CKeyProducerJavaBip39.MNEMONIC;
         cFinder.keyProducerJavaBip39.add(bip39);
     }
     

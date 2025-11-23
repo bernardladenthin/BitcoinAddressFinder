@@ -23,12 +23,13 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
 import java.math.BigInteger;
-import net.ladenthin.bitcoinaddressfinder.BitHelper;
-import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+
+import net.ladenthin.bitcoinaddressfinder.*;
 
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
 import static org.junit.Assert.fail;
+
+import org.bitcoinj.base.Network;
 import org.junit.Before;
 import org.junit.Test;
 import static org.mockito.Mockito.mock;
@@ -136,6 +137,9 @@ import org.slf4j.Logger;
  */
 public class KeyProducerJavaIncrementalTest {
 
+    private final Network network = new NetworkParameterFactory().getNetwork();
+    private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
+
     private KeyUtility keyUtility;
     private BitHelper bitHelper;
     private String startHex;
@@ -145,7 +149,7 @@ public class KeyProducerJavaIncrementalTest {
 
     @Before
     public void setUp() {
-        keyUtility = new KeyUtility(null, null);
+        keyUtility = new KeyUtility(network, byteBufferUtility);
         bitHelper = new BitHelper();
         startHex = PublicKeyBytes.MIN_VALID_PRIVATE_KEY_HEX;
         endHex = "000000000000000000000000000000000000000000000000000000000000000A";

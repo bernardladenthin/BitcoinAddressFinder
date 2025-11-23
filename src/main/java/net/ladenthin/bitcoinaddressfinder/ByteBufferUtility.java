@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import jdk.internal.misc.Unsafe;
 import org.bouncycastle.util.encoders.Hex;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public class ByteBufferUtility {
@@ -178,10 +179,7 @@ public class ByteBufferUtility {
     /**
      * https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java
      */
-    public void reverse(byte[] array) {
-        if (array == null) {
-            return;
-        }
+    public void reverse(byte @NonNull [] array) {
         if (USE_XOR_SWAP) {
             int len = array.length;
             for (int i = 0; i < len / 2; i++) {
