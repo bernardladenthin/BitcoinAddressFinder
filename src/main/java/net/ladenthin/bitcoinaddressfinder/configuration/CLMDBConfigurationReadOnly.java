@@ -18,13 +18,11 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
-import org.jspecify.annotations.Nullable;
-
 public class CLMDBConfigurationReadOnly {
     /**
      * The directory of the LMDB database.
      */
-    public @Nullable String lmdbDirectory;
+    public String lmdbDirectory = "";
     
     /**
      * Whether to use the optimal LMDB proxy implementation 

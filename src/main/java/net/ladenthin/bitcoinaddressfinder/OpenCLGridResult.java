@@ -37,12 +37,10 @@ public class OpenCLGridResult {
      * </p>
      */
     private static final boolean ENABLE_UNCOMPRESSED_KEY_VALIDATION = false;
-
-    private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
     
     private final BigInteger secretKeyBase;
     private final int workSize;
-    private ByteBuffer result;
+    private final ByteBuffer result;
     
     OpenCLGridResult(BigInteger secretKeyBase, int workSize, ByteBuffer result) {
         this.secretKeyBase = secretKeyBase;
@@ -60,12 +58,6 @@ public class OpenCLGridResult {
 
     public ByteBuffer getResult() {
         return result;
-    }
-    
-    public void freeResult() {
-        // free and do not use anymore
-        byteBufferUtility.freeByteBuffer(result);
-        result = null;
     }
     
     /**

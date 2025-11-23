@@ -24,18 +24,20 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import java.util.concurrent.*;
 
 public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaSocket> {
 
-    private ServerSocket serverSocket;
-    private Socket socket;
-    private DataInputStream inputStream;
+    private @Nullable ServerSocket serverSocket;
+    private @Nullable Socket socket;
+    private @Nullable DataInputStream inputStream;
     private Future<?> readerFuture;
 
     private final ExecutorService readerExecutor = Executors.newSingleThreadExecutor();
@@ -65,8 +67,9 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
                         logger.info("Connected to server at {}:{}", cKeyProducerJava.getHost(), cKeyProducerJava.getPort());
                     }
 
-                    socket.setSoTimeout(cKeyProducerJava.timeout);
-                    inputStream = new DataInputStream(socket.getInputStream());
+                    Socket localSocket = Objects.requireNonNull(socket);
+                    localSocket.setSoTimeout(cKeyProducerJava.timeout);
+                    inputStream = new DataInputStream(localSocket.getInputStream());
 
                     byte[] buffer = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
                     while (!shouldStop) {

@@ -26,6 +26,8 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
@@ -49,6 +51,8 @@ import org.jocl.cl_queue_properties;
 import org.jocl.CL;
 import static org.jocl.CL.clReleaseKernel;
 import static org.jocl.CL.clReleaseProgram;
+
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,20 +98,19 @@ public class OpenCLContext implements ReleaseCLObject {
     private final CProducerOpenCL producerOpenCL;
     private final BitHelper bitHelper;
 
-    private OpenCLDevice device;
-    private cl_context context;
-    private cl_command_queue commandQueue;
-    private cl_program program;
-    private cl_kernel kernel;
-    private OpenClTask openClTask;
-    private final ByteBufferUtility byteBufferUtility;
+    private @Nullable OpenCLDevice device;
+    private @Nullable cl_context context;
+    private @Nullable cl_command_queue commandQueue;
+    private @Nullable cl_program program;
+    private @Nullable cl_kernel kernel;
+    private @Nullable OpenClTask openClTask;
+    private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
     
     private boolean closed = false;
     
     public OpenCLContext(CProducerOpenCL producerOpenCL, BitHelper bitHelper) {
         this.producerOpenCL = producerOpenCL;
         this.bitHelper = bitHelper;
-        this.byteBufferUtility = new ByteBufferUtility(true);
     }
     
     public void init() throws IOException {
@@ -152,6 +155,7 @@ public class OpenCLContext implements ReleaseCLObject {
         openClTask = new OpenClTask(context, producerOpenCL, bitHelper, byteBufferUtility);
     }
 
+    @Nullable
     OpenClTask getOpenClTask() {
         return openClTask;
     }
@@ -163,19 +167,38 @@ public class OpenCLContext implements ReleaseCLObject {
 
     @Override
     public void close() {
+        device = null;
         if (!closed) {
-            openClTask.close();
-            clReleaseKernel(kernel);
-            clReleaseProgram(program);
-            clReleaseCommandQueue(commandQueue);
-            clReleaseContext(context);
+            if (openClTask != null) {
+                openClTask = null;
+            }
+            if (kernel != null) {
+                clReleaseKernel(kernel);
+                kernel = null;
+            }
+            if (program != null) {
+                clReleaseProgram(program);
+                program = null;
+            }
+            if (commandQueue != null) {
+                clReleaseCommandQueue(commandQueue);
+                commandQueue = null;
+            }
+            if (context != null) {
+                clReleaseContext(context);
+                context = null;
+            }
             closed = true;
         }
     }
 
     public OpenCLGridResult createKeys(BigInteger privateKeyBase) {
-        openClTask.setSrcPrivateKeyChunk(privateKeyBase);
-        ByteBuffer dstByteBuffer = openClTask.executeKernel(kernel, commandQueue);
+        OpenClTask localOpenClTask = Objects.requireNonNull(openClTask);
+        cl_kernel localKernel = Objects.requireNonNull(kernel);
+        cl_command_queue localCommandQueue = Objects.requireNonNull(commandQueue);
+
+        localOpenClTask.setSrcPrivateKeyChunk(privateKeyBase);
+        ByteBuffer dstByteBuffer = localOpenClTask.executeKernel(localKernel, localCommandQueue);
 
         OpenCLGridResult openCLGridResult = new OpenCLGridResult(privateKeyBase, producerOpenCL.getOverallWorkSize(bitHelper), dstByteBuffer);
         return openCLGridResult;

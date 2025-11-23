@@ -18,10 +18,12 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+import org.jspecify.annotations.Nullable;
+
 public class CConfiguration {
-    public CCommand command;
+    public CCommand command = CCommand.OpenCLInfo;
     
-    public CLMDBToAddressFile lmdbToAddressFile;
-    public CAddressFilesToLMDB addressFilesToLMDB;
-    public CFinder finder;
+    public @Nullable CLMDBToAddressFile lmdbToAddressFile;
+    public @Nullable CAddressFilesToLMDB addressFilesToLMDB;
+    public @Nullable CFinder finder;
 }

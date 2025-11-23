@@ -20,9 +20,9 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 
 public class CLMDBToAddressFile {
 
-    public CLMDBConfigurationReadOnly lmdbConfigurationReadOnly;
+    public CLMDBConfigurationReadOnly lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
     
-    public String addressesFile;
+    public String addressesFile = "";
     
-    public CAddressFileOutputFormat addressFileOutputFormat;
+    public CAddressFileOutputFormat addressFileOutputFormat = CAddressFileOutputFormat.HexHash;
 }

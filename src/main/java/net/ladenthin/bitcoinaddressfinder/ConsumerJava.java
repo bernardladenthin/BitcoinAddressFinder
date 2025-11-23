@@ -171,9 +171,10 @@ public class ConsumerJava implements Consumer {
                 e.printStackTrace();
             }
         }
-        
+
         if (threadLocalReuseableByteBuffer != null) {
             byteBufferUtility.freeByteBuffer(threadLocalReuseableByteBuffer);
+            threadLocalReuseableByteBuffer = null;
         }
         logger.info("end consumeKeysRunner");
     }

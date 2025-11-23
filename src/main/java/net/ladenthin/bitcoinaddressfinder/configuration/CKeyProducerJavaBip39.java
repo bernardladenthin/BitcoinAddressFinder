@@ -18,9 +18,13 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+import org.jspecify.annotations.Nullable;
+
 import java.time.Instant;
 
 public class CKeyProducerJavaBip39 extends CKeyProducerJava {
+
+    public static final String MNEMONIC = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
     
     /** Default BIP32 path used for external addresses (BIP44). */
     public static final String DEFAULT_BIP32_PATH = "M/44H/0H/0H/0";
@@ -28,7 +32,7 @@ public class CKeyProducerJavaBip39 extends CKeyProducerJava {
     /**
      * Must be a valid BIP39 mnemonic phrase (typically 12 or 24 words).
      */
-    public String mnemonic;
+    public String mnemonic = MNEMONIC;
 
     /**
      * Optional passphrase used in combination with the BIP39 mnemonic.
@@ -68,7 +72,7 @@ public class CKeyProducerJavaBip39 extends CKeyProducerJava {
      * Optional wallet creation time (in epoch seconds) used for BIP39 seed.
      * If not set, defaults to {@link java.time.Instant#ofEpochSecond(long)} Instant.ofEpochSecond(0).
      */
-    public Long creationTimeSeconds;
+    public @Nullable Long creationTimeSeconds;
     
     /**
      * Returns the creation time as an Instant.

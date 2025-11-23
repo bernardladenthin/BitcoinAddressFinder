@@ -35,9 +35,7 @@ import static org.mockito.Mockito.mock;
 import org.slf4j.Logger;
 
 public class KeyProducerJavaBip39Test {
-    
-    public static final String MNEMONIC = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-    
+
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
@@ -58,7 +56,7 @@ public class KeyProducerJavaBip39Test {
         CKeyProducerJavaBip39 config = new CKeyProducerJavaBip39();
         config.keyProducerId = keyProducerId;
         config.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
-        config.mnemonic = MNEMONIC;
+        config.mnemonic = CKeyProducerJavaBip39.MNEMONIC;
         config.passphrase = "";
         config.creationTimeSeconds = 0L;
         config.hardened = false;

@@ -555,7 +555,9 @@ public class ProbeAddressesOpenCLTest {
 
             OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
             PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
-            createKeys.freeResult();
+
+            final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
+            byteBufferUtility.freeByteBuffer(createKeys.getResult());
 
             final boolean souts = false;
             assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
@@ -582,7 +584,9 @@ public class ProbeAddressesOpenCLTest {
 
             OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
             PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
-            createKeys.freeResult();
+
+            final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
+            byteBufferUtility.freeByteBuffer(createKeys.getResult());
 
             final boolean souts = false;
             hashPublicKeys(publicKeys, souts); // just for performance tests

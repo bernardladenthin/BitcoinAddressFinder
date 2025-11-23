@@ -20,6 +20,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,8 +37,6 @@ public class LMDBToAddressFile implements Runnable, Interruptable {
     private final Network network = new NetworkParameterFactory().getNetwork();
 
     private final CLMDBToAddressFile lmdbToAddressFile;
-
-    private LMDBPersistence persistence;
     
     private final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
@@ -48,19 +47,19 @@ public class LMDBToAddressFile implements Runnable, Interruptable {
     @Override
     public void run() {
         PersistenceUtils persistenceUtils = new PersistenceUtils(network);
-        persistence = new LMDBPersistence(lmdbToAddressFile.lmdbConfigurationReadOnly, persistenceUtils);
-        persistence.init();
-        try {
+        try (LMDBPersistence persistence = new LMDBPersistence(lmdbToAddressFile.lmdbConfigurationReadOnly, persistenceUtils)) {
+            persistence.init();
             logger.info("writeAllAmounts ...");
             File addressesFile = new File(lmdbToAddressFile.addressesFile);
             // delete before write all addresses
-            addressesFile.delete();
+            boolean deleted = addressesFile.delete();
+            if(deleted) {
+                logger.info("deleted existing address file " + addressesFile);
+            }
             persistence.writeAllAmountsToAddressFile(addressesFile, lmdbToAddressFile.addressFileOutputFormat, shouldRun);
             logger.info("writeAllAmounts done");
         } catch (IOException e) {
             throw new RuntimeException(e);
-        } finally {
-            persistence.close();
         }
     }
 
