@@ -26,6 +26,8 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
+import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
@@ -146,12 +148,12 @@ public class Finder implements Interruptable {
 
     public void startConsumer() {
         logger.info("startConsumer");
-        if (finder.consumerJava != null) {
-            consumerJava = new ConsumerJava(finder.consumerJava, keyUtility, persistenceUtils);
-            consumerJava.initLMDB();
-            consumerJava.startConsumer();
-            consumerJava.startStatisticsTimer();
-        }
+        CConsumerJava localCConsumerJava = Objects.requireNonNull(finder.consumerJava);
+
+        consumerJava = new ConsumerJava(localCConsumerJava, keyUtility, persistenceUtils);
+        consumerJava.initLMDB();
+        consumerJava.startConsumer();
+        consumerJava.startStatisticsTimer();
     }
 
     public void configureProducer() {

@@ -18,7 +18,7 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
-interface Consumer extends Interruptable {
+public interface Consumer extends Interruptable {
 
     void consumeKeys(PublicKeyBytes[] publicKeyBytes) throws InterruptedException;
 

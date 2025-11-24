@@ -83,8 +83,10 @@ public class FinderTest {
         // arrange
         CFinder cFinder = new CFinder();
         configureProducerWithExamples(cFinder);
+        configureConsumerJava(cFinder);
         Finder finder = new Finder(cFinder);
         finder.startKeyProducer();
+        finder.startConsumer();
         finder.configureProducer();
         // act
         finder.interrupt();
@@ -127,8 +129,10 @@ public class FinderTest {
         // arrange
         CFinder cFinder = new CFinder();
         configureProducerWithExamples(cFinder);
+        configureConsumerJava(cFinder);
         Finder finder = new Finder(cFinder);
         finder.startKeyProducer();
+        finder.startConsumer();
         finder.configureProducer();
         // act
         finder.shutdownAndAwaitTermination();
@@ -192,8 +196,10 @@ public class FinderTest {
         // arrange
         CFinder cFinder = new CFinder();
         configureProducerWithExamples(cFinder);
+        configureConsumerJava(cFinder);
         Finder finder = new Finder(cFinder);
         finder.startKeyProducer();
+        finder.startConsumer();
         finder.configureProducer();
         // act
         List<Producer> allProducers = finder.getAllProducers();
@@ -241,10 +247,11 @@ public class FinderTest {
         cProducerJava.keyProducerId = null;
         cFinder.producerJava.add(cProducerJava);
         configureKeyProducerJavaRandom("unknownId", cFinder);
-        
         configureConsumerJava(cFinder);
+
         Finder finder = new Finder(cFinder);
-        
+
+        finder.startConsumer();
         finder.startKeyProducer();
         
         // act
