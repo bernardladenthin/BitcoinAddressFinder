@@ -1094,6 +1094,32 @@ References:
 * [Google Blog: SecureRandom Fixes](https://android-developers.googleblog.com/2013/08/some-securerandom-thoughts.html)
 * [bitcoin.org Alert (2013-08-11)](https://bitcoin.org/en/alert/2013-08-11-android)
 
+### Example: Weak RNG in an embedded Ethereum wallet (TinyMT32 seeded from `micros()`)
+
+Issue: https://github.com/AlphaWallet/Web3E/issues/31
+
+Credits / Found by Jean-Philippe Aumasson: https://github.com/veorq
+
+`KeyID::generatePrivateKey()` relies on `random_buffer()`, which uses `tinyMT32` as its PRNG. The PRNG is initialized only once using a 32-bit seed derived from `micros()`.
+
+This is *not a cryptographically secure RNG,* and the 32-bit timer seed makes the generated private keys predictable and brute-forceable. All keys produced by the current implementation are vulnerable. A hardware CSPRNG or proper DRBG must be used instead.
+
+Links:
+* https://github.com/AlphaWallet/Web3E/blob/c19324cc209b11fd4389d1c782a7e6ffbc391cfb/src/KeyID.cpp#L48-L50
+* https://github.com/AlphaWallet/Web3E/blob/c19324cc209b11fd4389d1c782a7e6ffbc391cfb/src/Trezor/rand.c#L362-L364
+
+Although this vulnerability originates from an **Ethereum-based embedded wallet**, it demonstrates the same class of weaknesses relevant to Bitcoin and all ECDSA-based systems: **private keys generated from low-entropy or predictable random sources**.
+
+In this implementation, the wallet uses `TinyMT32` as its PRNG and seeds it only once with a 32-bit microsecond timer:
+
+```tinymt32_init(&tinymt, (uint32_t)micros());```
+
+TinyMT32 is *not* a cryptographically secure RNG, and seeding it with a 32-bit timestamp collapses the effective key space from 2²⁵⁶ to only 2³² possible seeds. An attacker who can approximate the device’s boot time can brute-force all feasible seeds, reproduce the PRNG stream, and reconstruct the wallet’s private keys.
+
+This resembles the historic Android `SecureRandom` vulnerability: the elliptic-curve cryptography itself is secure, but the **randomness used to create keys is not**.
+
+BitcoinAddressFinder can simulate this type of scenario by generating keys using intentionally weak or deterministic RNGs and scanning the resulting restricted key ranges. This makes it possible to study how insecure RNGs can compromise wallets.
+
 ## Similar projects
 * The [LBC](https://lbc.cryptoguru.org/) is optimized to find keys for the [Bitcoin Puzzle Transaction](https://privatekeys.pw/puzzles/bitcoin-puzzle-tx). It require communication to a server, doesn't support altcoin and pattern matching.
 * https://privatekeys.pw/scanner/bitcoin
