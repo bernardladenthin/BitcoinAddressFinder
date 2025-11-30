@@ -148,7 +148,7 @@ public class MockKeyProducerTest {
     
     // <editor-fold defaultstate="collapsed" desc="createStatisticsMessage">
     @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_24, location = CommonDataProvider.class)
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX, location = CommonDataProvider.class)
     public void createSecrets_parameterBatchSizeInBitsFromDataProviderAndReturnStartSecretOnlyTrue_returnExpectedSecrets(int maximumBitLength) throws NoMoreSecretsAvailableException {
         // arrange
         int batchSizeInBits = 2;
@@ -163,7 +163,7 @@ public class MockKeyProducerTest {
     }
     
     @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_24, location = CommonDataProvider.class)
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX, location = CommonDataProvider.class)
     public void createSecrets_parameterBatchSizeInBitsFromDataProviderAndReturnStartSecretOnlyFalse_returnExpectedSecrets(int maximumBitLength) throws NoMoreSecretsAvailableException {
         // arrange
         int batchSizeInBits = 2;

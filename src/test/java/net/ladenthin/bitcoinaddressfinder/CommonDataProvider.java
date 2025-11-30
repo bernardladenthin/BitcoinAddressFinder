@@ -118,7 +118,7 @@ public class CommonDataProvider {
     public static Object[][] keyProducerTypeAndBitSize() {
         return mergeMany(
             keyProducerTypes(),    // e.g., Socket, ZMQ, etc.
-            bitSizesAtMost24()     // e.g., 0–24
+            bitSizesAtMostMax()     // e.g., 0 – PublicKeyBytes#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY
         );
     }
    
@@ -272,45 +272,20 @@ public class CommonDataProvider {
     }
 
     /**
-     * For {@link #bitSizesAtMost24()}.
+     * For {@link #bitSizesAtMostMax()}.
      */
-    public final static String DATA_PROVIDER_BIT_SIZES_AT_MOST_24 = "bitSizesAtMost24";
+    public final static String DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX = "bitSizesAtMostMax";
 
     @DataProvider
-    public static Object[][] bitSizesAtMost24() {
-        // if the constant was changed, the dataprovider and its test must be changed also
-        // this constant can not change because of the maximum size in 32-bit systems
-        if(PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY != 24) {
-            throw new IllegalStateException("Adapt data provider for max chunks: " + PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY);
+    public static Object[][] bitSizesAtMostMax() {
+        final int max = PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY;
+
+        Object[][] data = new Object[max + 1][1];
+        for (int i = 0; i <= max; i++) {
+            data[i][0] = i;
         }
-        
-        return new Object[][]{
-            {0},
-            {1},
-            {2},
-            {3},
-            {4},
-            {5},
-            {6},
-            {7},
-            {8},
-            {9},
-            {10},
-            {11},
-            {12},
-            {13},
-            {14},
-            {15},
-            {16},
-            {17},
-            {18},
-            {19},
-            {20},
-            {21},
-            {22},
-            {23},
-            {PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY}
-        };
+
+        return data;
     }
     
     /**
