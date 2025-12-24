@@ -46,8 +46,7 @@ public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyPro
             socket.connect(cKeyProducerJava.address);
         }
 
-        // Fallback to 1000 ms if timeout not set
-        int internalTimeout = cKeyProducerJava.timeout > 0 ? cKeyProducerJava.timeout : 1000;
+        int internalTimeout = getReadTimeout();
         socket.setReceiveTimeOut(internalTimeout);
 
         receiverThread = new Thread(() -> {
@@ -75,7 +74,7 @@ public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyPro
 
     @Override
     protected int getReadTimeout() {
-        return cKeyProducerJava.timeout > 0 ? cKeyProducerJava.timeout : 1000;
+        return cKeyProducerJava.timeout;
     }
 
     @Override

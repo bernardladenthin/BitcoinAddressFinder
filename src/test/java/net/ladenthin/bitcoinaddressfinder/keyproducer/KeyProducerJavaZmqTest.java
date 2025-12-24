@@ -167,6 +167,10 @@ public class KeyProducerJavaZmqTest {
 
         // Bind receiver first (small but important ordering)
         CKeyProducerJavaZmq config = createBindConfig(address);
+        config.timeout =
+                TestTimeProvider.DEFAULT_ESTABLISH_DELAY
+                        + numberOfSecrets * TestTimeProvider.DEFAULT_SEND_DELAY
+                        + TestTimeProvider.DEFAULT_DELAY; // safety margin
         KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
 
         // Latch to ensure all sends actually happened

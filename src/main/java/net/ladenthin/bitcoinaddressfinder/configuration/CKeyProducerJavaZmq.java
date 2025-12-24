@@ -19,7 +19,7 @@
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
 public class CKeyProducerJavaZmq extends CKeyProducerJavaReceiver {
-    
+
     public enum Mode {
         CONNECT,
         BIND
@@ -32,14 +32,30 @@ public class CKeyProducerJavaZmq extends CKeyProducerJavaReceiver {
     public Mode mode = Mode.BIND;
 
     /**
-     * Timeout for the receive operation in milliseconds.
+     * Timeout for receiving secrets, in milliseconds.
      *
-     * A value of:
-     * - `0` means `recv` returns immediately, returning null if no message is available.
-     * - `-1` (default) means `recv` will block until a message is available (infinite wait).
-     * - Any positive value causes `recv` to wait that amount of time before giving up and returning null.
+     * <p>This timeout is applied consistently to:
+     * <ul>
+     *   <li>the underlying ZMQ socket receive operation (RCVTIMEO)</li>
+     *   <li>the internal secret queue polling</li>
+     * </ul>
      *
-     * This maps to the ZMQ socket option `RCVTIMEO`.
+     * <p>Semantics:
+     * <ul>
+     *   <li>Must be a strictly positive value (&gt; 0)</li>
+     *   <li>Specifies the maximum time to wait for each receive operation</li>
+     * </ul>
+     *
+     * <p>Notes:
+     * <ul>
+     *   <li>Infinite blocking is intentionally not supported</li>
+     *   <li>Values less than or equal to zero are invalid and may lead to undefined behavior</li>
+     *   <li>Timeouts are enforced to guarantee responsive shutdown and deterministic behavior</li>
+     * </ul>
+     *
+     * <p>This value maps directly to the ZMQ socket option {@code RCVTIMEO}.
+     *
+     * <p>Default: {@code 1000} ms
      */
-    public int timeout = -1;
+    public int timeout = 1000;
 }
