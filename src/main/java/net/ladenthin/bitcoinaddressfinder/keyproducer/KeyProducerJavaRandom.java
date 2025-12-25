@@ -39,7 +39,8 @@ public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRando
      * It is already thread local, no need for {@link java.util.concurrent.ThreadLocalRandom}.
      */
     private final Random random;
-    
+
+    @SuppressWarnings({"squid:S2245"})
     public KeyProducerJavaRandom(CKeyProducerJavaRandom cKeyProducerJavaRandom, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
         super(cKeyProducerJavaRandom, logger);
         this.keyUtility = keyUtility;
@@ -54,9 +55,11 @@ public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRando
                 }
                 break;
             case RANDOM_CURRENT_TIME_MILLIS_SEED:
+                // EXPLOIT for: https://cwe.mitre.org/data/definitions/338
                 random = new Random(System.currentTimeMillis());
                 break;
             case RANDOM_CUSTOM_SEED:
+                // EXPLOIT for: https://cwe.mitre.org/data/definitions/338
                 random = new Random();
                 if (cKeyProducerJavaRandom.customSeed != null) {
                     random.setSeed(cKeyProducerJavaRandom.customSeed); // only if explicitly configured
