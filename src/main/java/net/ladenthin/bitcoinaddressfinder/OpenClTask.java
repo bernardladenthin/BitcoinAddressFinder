@@ -48,7 +48,7 @@ public class OpenClTask implements ReleaseCLObject {
 
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
     
-    private final int PRIVATE_KEY_SOURCE_SIZE_IN_BYTES = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES;
+    private final static int PRIVATE_KEY_SOURCE_SIZE_IN_BYTES = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES;
     
     private final CProducerOpenCL cProducer;
 

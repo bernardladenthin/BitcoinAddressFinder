@@ -42,11 +42,6 @@ import org.jspecify.annotations.NonNull;
  */
 public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility byteBufferUtility) {
 
-    public KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility byteBufferUtility) {
-        this.network = network;
-        this.byteBufferUtility = byteBufferUtility;
-    }
-
     public BigInteger killBits(BigInteger bigInteger, BigInteger killBits) {
         return bigInteger.andNot(killBits);
     }
