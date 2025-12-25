@@ -56,7 +56,7 @@ public class KeyProducerJavaBip39Test {
         CKeyProducerJavaBip39 config = new CKeyProducerJavaBip39();
         config.keyProducerId = keyProducerId;
         config.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
-        config.mnemonic = CKeyProducerJavaBip39.MNEMONIC;
+        config.mnemonic = CKeyProducerJavaBip39.DEFAULT_MNEMONIC;
         config.passphrase = "";
         config.creationTimeSeconds = 0L;
         config.hardened = false;

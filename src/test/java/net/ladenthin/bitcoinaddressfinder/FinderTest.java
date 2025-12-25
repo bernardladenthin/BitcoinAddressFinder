@@ -34,10 +34,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 
-import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaBip39;
-import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaIncremental;
-import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaSocket;
-import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaZmq;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
@@ -51,7 +47,6 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOn
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
-import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaBip39Test;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.*;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaRandom;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocketTest;
@@ -390,7 +385,7 @@ public class FinderTest {
         // 2. JavaBip39
         CKeyProducerJavaBip39 bip39 = new CKeyProducerJavaBip39();
         bip39.keyProducerId = "bip39Id";
-        bip39.mnemonic = CKeyProducerJavaBip39.MNEMONIC;
+        bip39.mnemonic = CKeyProducerJavaBip39.DEFAULT_MNEMONIC;
         cFinder.keyProducerJavaBip39.add(bip39);
 
         // 3. JavaIncremental
@@ -474,7 +469,7 @@ public class FinderTest {
     private void configureKeyProducerJavaBip39(String keyProducerId, CFinder cFinder) {
         CKeyProducerJavaBip39 bip39 = new CKeyProducerJavaBip39();
         bip39.keyProducerId = keyProducerId;
-        bip39.mnemonic = CKeyProducerJavaBip39.MNEMONIC;
+        bip39.mnemonic = CKeyProducerJavaBip39.DEFAULT_MNEMONIC;
         cFinder.keyProducerJavaBip39.add(bip39);
     }
     

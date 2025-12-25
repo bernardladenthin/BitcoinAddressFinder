@@ -24,12 +24,6 @@ import java.io.IOException;
 
 import net.ladenthin.bitcoinaddressfinder.*;
 
-import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaBip39;
-import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaIncremental;
-import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaRandom;
-import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaSocket;
-import static net.ladenthin.bitcoinaddressfinder.CommonDataProvider.KeyProducerTypesLocal.KeyProducerJavaZmq;
-
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
@@ -167,7 +161,7 @@ public class KeyProducerJavaTest {
     private CKeyProducerJavaBip39 configureKeyProducerJavaBip39(String keyProducerId, int maxWorkSize) {
         CKeyProducerJavaBip39 bip39 = new CKeyProducerJavaBip39();
         bip39.keyProducerId = keyProducerId;
-        bip39.mnemonic = CKeyProducerJavaBip39.MNEMONIC;
+        bip39.mnemonic = CKeyProducerJavaBip39.DEFAULT_MNEMONIC;
         bip39.maxWorkSize = maxWorkSize;
         return bip39;
     }

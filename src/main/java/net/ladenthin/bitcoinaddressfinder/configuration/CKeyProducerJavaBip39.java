@@ -24,7 +24,7 @@ import java.time.Instant;
 
 public class CKeyProducerJavaBip39 extends CKeyProducerJava {
 
-    public static final String MNEMONIC = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+    public static final String DEFAULT_MNEMONIC = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
     
     /** Default BIP32 path used for external addresses (BIP44). */
     public static final String DEFAULT_BIP32_PATH = "M/44H/0H/0H/0";
@@ -32,7 +32,7 @@ public class CKeyProducerJavaBip39 extends CKeyProducerJava {
     /**
      * Must be a valid BIP39 mnemonic phrase (typically 12 or 24 words).
      */
-    public String mnemonic = MNEMONIC;
+    public String mnemonic = DEFAULT_MNEMONIC;
 
     /**
      * Optional passphrase used in combination with the BIP39 mnemonic.
