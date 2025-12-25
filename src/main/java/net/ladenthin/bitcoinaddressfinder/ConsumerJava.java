@@ -346,9 +346,9 @@ public class ConsumerJava implements Consumer {
             if (!terminated) {
                 logger.warn("Timeout reached. Some consumer threads may not have terminated cleanly.");
             }
-        } catch (InterruptedException ex) {
-            logger.error("Interrupted while awaiting consumer termination.", ex);
-            throw new RuntimeException(ex);
+        } catch (InterruptedException e) {
+            logger.error("Interrupted while awaiting consumer termination.", e);
+            throw new RuntimeException(e);
         }
         try {
             if(persistence != null){

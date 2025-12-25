@@ -29,6 +29,9 @@ import org.bitcoinj.base.Network;
 
 import static org.junit.Assert.assertEquals;
 import java.util.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import org.slf4j.Logger;
@@ -53,6 +56,9 @@ public class AbstractKeyProducerQueueBufferedTest {
     static class TestKeyProducer extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaReceiver> {
         public TestKeyProducer(CKeyProducerJavaReceiver config, KeyUtility keyUtility, Logger logger) {
             super(config, keyUtility, logger);
+        }
+        public TestKeyProducer(CKeyProducerJavaReceiver config, KeyUtility keyUtility, Logger logger, BlockingQueue<byte[]> queue) {
+            super(config, keyUtility, logger, queue);
         }
 
         @Override
@@ -150,5 +156,23 @@ public class AbstractKeyProducerQueueBufferedTest {
 
         // Verify that logger.info was called with the expected message
         verify(mockLogger, times(1)).info(eq("Received key: {}"), eq(expectedHex));
+    }
+
+    @Test()
+    public void addSecret_throwsWhenQueueFull() {
+        CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
+
+        BlockingQueue<byte[]> queue = new LinkedBlockingQueue<>(1);
+        TestKeyProducer producer = new TestKeyProducer(config, keyUtility, mockLogger, queue);
+
+        byte[] secret = new KeyProducerTestUtility().createFilledSecret((byte) 0xAB);
+
+        producer.addSecret(secret); // fills queue
+        producer.addSecret(secret); // must fail
+
+        verify(mockLogger).error(
+                eq("Secret queue is full, ignore secret: {}"),
+                eq(secret)
+        );
     }
 }

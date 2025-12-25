@@ -174,8 +174,8 @@ public class ConsumerJavaTest {
         consumerJava.consumeKeysExecutorService.submit(() -> {
             try {
                 Thread.sleep(ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY);
-            } catch (InterruptedException ex) {
-                throw new RuntimeException(ex);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
             }
         });
         // act

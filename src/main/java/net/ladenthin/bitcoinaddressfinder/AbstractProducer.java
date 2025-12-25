@@ -150,7 +150,7 @@ public abstract class AbstractProducer implements Producer {
         while(state == ProducerState.RUNNING) {
             try {
                 Thread.sleep(SLEEP_WAIT_TILL_RUNNING);
-            } catch (InterruptedException ex) {
+            } catch (InterruptedException e) {
             }
         }
     }

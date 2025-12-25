@@ -34,12 +34,24 @@ import org.slf4j.Logger;
 public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJavaReceiver> extends KeyProducerJava<T> {
 
     protected final KeyUtility keyUtility;
-    protected final BlockingQueue<byte[]> secretQueue = new LinkedBlockingQueue<>();
+    protected final BlockingQueue<byte[]> secretQueue;
     protected volatile boolean shouldStop = false;
     
     public AbstractKeyProducerQueueBuffered(T config, KeyUtility keyUtility, Logger logger) {
         super(config, logger);
         this.keyUtility = keyUtility;
+        this.secretQueue = new LinkedBlockingQueue<>();
+    }
+
+    protected AbstractKeyProducerQueueBuffered(
+            T config,
+            KeyUtility keyUtility,
+            Logger logger,
+            BlockingQueue<byte[]> queue
+    ) {
+        super(config, logger);
+        this.keyUtility = keyUtility;
+        this.secretQueue = queue;
     }
 
     @Override
@@ -83,7 +95,7 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
     protected void sleep(int millis) {
         try {
             Thread.sleep(millis);
-        } catch (InterruptedException ignored) {
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
     }
@@ -93,7 +105,9 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
      */
     protected void addSecret(byte[] secret) {
         if (!shouldStop) {
-            secretQueue.offer(secret);
+            if (!secretQueue.offer(secret)) {
+                logger.error("Secret queue is full, ignore secret: {}", secret);
+            }
         }
     }
 

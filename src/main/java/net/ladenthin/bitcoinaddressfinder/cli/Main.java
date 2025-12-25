@@ -219,8 +219,8 @@ public class Main implements Runnable, Interruptable {
             try {
                 logger.info("runLatch await");
                 runLatch.await(30, TimeUnit.SECONDS);
-            } catch (InterruptedException ex) {
-                throw new RuntimeException(ex);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
             }
             logger.info("Finish shutdown hook.");
         }));

@@ -228,8 +228,8 @@ public class Finder implements Interruptable {
         try {
             producerExecutorService.shutdown();
             producerExecutorService.awaitTermination(AWAIT_DURATION_TERMINATE.get(ChronoUnit.SECONDS), TimeUnit.SECONDS);
-        } catch (InterruptedException ex) {
-            throw new RuntimeException(ex);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
         
         // no producers are running anymore, the consumer can be interrupted
