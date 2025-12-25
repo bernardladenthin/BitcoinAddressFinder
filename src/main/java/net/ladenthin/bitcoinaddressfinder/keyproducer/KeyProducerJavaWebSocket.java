@@ -94,8 +94,8 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
         if (webSocketServer != null) {
             try {
                 webSocketServer.stop();
-            } catch (Exception e) {
-                logger.warn("Error stopping WebSocket server", e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         }
     }

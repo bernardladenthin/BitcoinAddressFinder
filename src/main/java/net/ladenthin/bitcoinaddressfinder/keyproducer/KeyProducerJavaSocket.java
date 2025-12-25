@@ -121,7 +121,8 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
         closeConnections();
         try {
             readerExecutor.awaitTermination(500, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException ex) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 }

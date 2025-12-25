@@ -83,7 +83,9 @@ public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyPro
         receiverThread.interrupt(); // allow thread to exit if blocked
         try {
             receiverThread.join(500);
-        } catch (InterruptedException ignored) {}
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
         socket.close();
         context.close();
     }
