@@ -93,7 +93,7 @@ public class ConsumerJava implements Consumer {
         this.keysQueue = new LinkedBlockingQueue<>(consumerJava.queueSize);
         this.keyUtility = keyUtility;
         this.persistenceUtils = persistenceUtils;
-        if (consumerJava.enableVanity) {
+        if (consumerJava.enableVanity && consumerJava.vanityPattern != null) {
             this.vanityPattern = Pattern.compile(consumerJava.vanityPattern);
         } else {
             vanityPattern = null;
@@ -151,7 +151,7 @@ public class ConsumerJava implements Consumer {
      */
     private void consumeKeysRunner() {
         logger.info("start consumeKeysRunner");
-        ByteBuffer threadLocalReuseableByteBuffer = ByteBuffer.allocateDirect(PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES);
+        final ByteBuffer threadLocalReuseableByteBuffer = ByteBuffer.allocateDirect(PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES);
         
         while (shouldRun.get()) {
             if (keysQueue.size() >= consumerJava.queueSize) {
@@ -168,14 +168,11 @@ public class ConsumerJava implements Consumer {
             } catch (Exception e) {
                 // log every Exception because it's hard to debug and we do not break down the thread loop
                 logger.error("Error in consumeKeysRunner()." , e);
-                e.printStackTrace();
             }
         }
 
-        if (threadLocalReuseableByteBuffer != null) {
-            byteBufferUtility.freeByteBuffer(threadLocalReuseableByteBuffer);
-            threadLocalReuseableByteBuffer = null;
-        }
+        byteBufferUtility.freeByteBuffer(threadLocalReuseableByteBuffer);
+
         logger.info("end consumeKeysRunner");
     }
     

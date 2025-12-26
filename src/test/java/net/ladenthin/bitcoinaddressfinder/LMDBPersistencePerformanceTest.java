@@ -38,6 +38,10 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
+
 @RunWith(DataProviderRunner.class)
 public class LMDBPersistencePerformanceTest {
     
@@ -97,6 +101,14 @@ public class LMDBPersistencePerformanceTest {
         producerShouldRun.set(false);
         // Gracefully stop consumer threads and release all resources
         consumerJava.interrupt();
+
+        assertThat(consumerJava.persistence, is(nullValue()));
+        assertThat(consumerJava.shouldRun.get(), is(false ));
+        assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(true));
+        assertThat(consumerJava.scheduledExecutorService.isTerminated(), is(true));
+        assertThat(consumerJava.consumeKeysExecutorService.isShutdown(), is(true));
+        assertThat(consumerJava.consumeKeysExecutorService.isTerminated(), is(true));
+
     }
 
     private void createProducerThreads(ThreadPoolExecutor threadPoolExecutor, ConsumerJava consumerJava, PublicKeyBytes[] publicKeyByteses, AtomicBoolean producerShouldRun) {
