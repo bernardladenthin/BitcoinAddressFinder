@@ -97,7 +97,9 @@ Copyright (c) 2017-2025 Bernard Ladenthin
   - **Multi-GPU setups are fully supported** — each device can be configured individually, enabling efficient parallelization and scalability across multiple GPUs.
 
 ## Quickstart
-1. Download the binary (jar) from https://github.com/bernardladenthin/BitcoinAddressFinder/releases
+1. Download Software
+- Release: Download the binary (jar) from https://github.com/bernardladenthin/BitcoinAddressFinder/releases
+- Nightly: Download the binary (jar) newest build from github: https://nightly.link/bernardladenthin/BitcoinAddressFinder/workflows/assembly/main/jar%20binaries.zip
 2. Download and extract the light database from https://github.com/bernardladenthin/BitcoinAddressFinder#use-my-prepared-database
 3. Download a configuration set like:
 - [`logbackConfiguration.xml`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/logbackConfiguration.xml)
