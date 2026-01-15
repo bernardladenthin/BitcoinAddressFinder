@@ -1050,6 +1050,8 @@ For technical details, see:
 | NVIDIA RTX 3090             | AMD Ryzen 9 3950X   | 256              | 19               |  8,000,000 keys/s      |
 | NVIDIA RTX A3000            | Intel i7-11850H     | 256              | 19               |  3,000,000 keys/s      |
 | NVIDIA RTX A3000            | Intel i7-11850H     | 160              | 19               |  5,000,000 keys/s      |
+| AMD Radeon 8060S            | AMD AI MAX+ 395     | 256              | 16               |  9,200,000 keys/s      |
+| AMD Radeon 8060S            | AMD AI MAX+ 395     | 160              | 16               | 11,000,000 keys/s      |
 
 
 ## Collision Probability and Security Considerations
