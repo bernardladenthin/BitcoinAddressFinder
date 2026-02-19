@@ -152,6 +152,10 @@ public enum P2PKH implements PublicAddress {
      */
     CloakCoin("C5REwXC5GL9HN3bLy6XcikhwLzitcE2Kha", "86d65f6ff0ecacf26f33a31a7d74f22f426ff77b"),
     /**
+     * https://chainz.cryptoid.info/cnote/address.dws?CPZPjKt9Bm6CAiV3ycS8dd4W5toJPbJive.htm
+     */
+    CNote("CPZPjKt9Bm6CAiV3ycS8dd4W5toJPbJive", "4dd34d4a0938d11f0a4f2c2ac8e60115e0696c63"),
+    /**
      * https://chainz.cryptoid.info/cno/address.dws?221360.htm
      */
     Coino("UWdeqR8s34asJ1qEtWdWeCyNDqg3aXeCjH", "5edf2ec006b5312443f66cc966472d2b1b385b89"),
@@ -180,6 +184,10 @@ public enum P2PKH implements PublicAddress {
      */
     Dash("XdAUmwtig27HBG6WfYyHAzP8n6XC9jESEw", "1b2a522cc8d42b0be7ceb8db711416794d50c846"),
     /**
+     * https://chainz.cryptoid.info/defcon/address.dws?DK18QNPWoD4PYRXDSzWsyoTLSPhxmEYKRn.htm
+     */
+    Defcon("DK18QNPWoD4PYRXDSzWsyoTLSPhxmEYKRn", "980ffd3fd11b82d4e5f7e049e62c41269f7170e2"),
+    /**
      * https://chainz.cryptoid.info/dfi/address.dws?2581182.htm
      */
     DeFiChain("dbxMfrpLMQXUdcdz8dUs5gp97nzH5A2br5", "f7330ba6437fe7454c8e46f967fc28ca01cd5d2f"),
@@ -191,6 +199,10 @@ public enum P2PKH implements PublicAddress {
      * https://chainz.cryptoid.info/dmd/address.dws?250463.htm
      */
     Diamond("dZ2n5pMvviVjps7kJ4CYMniakSeDLjz4su", "d720b604208ce237d575dc2223fec7214488864a"),
+    /**
+     * https://chainz.cryptoid.info/dimi/address.dws?E78M6JWfXF219B721XmUatwPtcXonWPtua.htm
+     */
+    DiminutiveCoin("E78M6JWfXF219B721XmUatwPtcXonWPtua", "92034764067da1cfe5a5c7e3f0a34f58a47dd878"),
     /**
      * https://dgb.tokenview.io/en/address/DUFy8rH6dxkGutvo43WZryXjR3DU612sjh
      */
@@ -375,6 +387,10 @@ public enum P2PKH implements PublicAddress {
      * https://bitinfocharts.com/de/novacoin/address/4aLpet1cqwr6TuEb8grfAnpvD1eJbTqyvN
      */
     Novacoin("4aLpet1cqwr6TuEb8grfAnpvD1eJbTqyvN", "e261b8251b26231b0e2d62d7f6698d7acee1dbae"),
+    /**
+     * https://chainz.cryptoid.info/owc/address.dws?AdNSnHTdxx57E7PbQsZ2jKy8JaM3m4P9yc.htm
+     */
+    Oduwacoin("AdNSnHTdxx57E7PbQsZ2jKy8JaM3m4P9yc", "ece47177e78e643426d866903bde1ec426a07378"),
     /**
      * https://chainz.cryptoid.info/pnd/address.dws?5.htm
      */

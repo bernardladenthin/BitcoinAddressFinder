@@ -322,6 +322,7 @@ In addition to standard script types, the importer also recognizes and supports 
 | [ChessCoin 0.32%](https://github.com/AKKPP/ChessCoin032/)                                | CHESS |  ✅   |      |        |        |        |         |
 | [Clam](https://github.com/nochowderforyou/clams)                                         | CLAM  |  ✅   |      |        |        |        |         |
 | [CloakCoin](https://github.com/CloakProject/CloakCoin)                                   | CLOAK |  ✅   | ✅   |        |        |        |         |
+| [C-Note](https://github.com/cnote-chain/CNOTE)                                           | CNOTE |  ✅   |     |        |        |        |         |
 | [Coino](https://github.com/scriptRack003756/coino)                                       | CNO   |  ✅   |      |        |        |         |       |
 | [ColossusXT](https://github.com/ColossusCoinXT/ColossusCoinXT)                           | COLX  |  ✅   |      |        |        |         |       |
 | [Compound](https://github.com/compounddev/Compound-Coin)                                 | COMP |  ✅   |      |        |        |         |       |
@@ -329,9 +330,11 @@ In addition to standard script types, the importer also recognizes and supports 
 | [Cryptoshares](https://github.com/Cryptosharescoin/shares)                               | SHARES|  ✅   |      |        |        |         |       |
 | [Curecoin](https://github.com/cygnusxi/CurecoinSource)                                   | CURE  |  ✅   |      |        |        |         |       |
 | [Dash](https://github.com/dashpay/dash)                                                  | DASH  |  ✅   | ✅   |        |        |        |         |
+| [Defcon](https://github.com/defcon-project/defcon)                                       | DEFCON|  ✅   | ✅   |        |         |        |         |
 | [DeFiChain](https://github.com/DeFiCh/ain)                                               | DFI   |  ✅   | ✅   | ✅     | ❌      |        |         |
 | [Deutsche eMark](https://github.com/emarkproject/eMark)                                  | DEM   |  ✅   |      |        |        |        |         |
 | [Diamond](https://github.com/DMDcoin/Diamond)                                            | DMD   |  ✅   |      |        |        |        |         |
+| [DiminutiveCoin](https://github.com/MadCatMining/DiminutiveCoin)                         | DIMI  |  ✅   |      |        |        |        |         |
 | [DigiByte](https://github.com/digibyte-core/digibyte)                                    | DGB   |  ✅   |      | ✅     | ❌     |        |         |
 | [DigitalCoin](https://github.com/lomtax/digitalcoin)                                     | DGC   |  ✅   |      |        |        |         |       |
 | [Dimecoin](https://github.com/dime-coin/dimecoin)                                        | DIME  |  ✅   |      |        |        |         |       |
@@ -378,6 +381,7 @@ In addition to standard script types, the importer also recognizes and supports 
 | [Namecoin](https://github.com/namecoin/namecoin-core)                                    | NMC   |  ✅   |      | ✅     | ❌     |         |         |
 | [NewYorkCoin](https://github.com/NewYorkCoinNYC)                                         | NYC   |  ✅   |      |        |        |         |       |
 | [Novacoin](https://github.com/novacoin-project/novacoin)                                 | NVC   |  ✅   |      |        |        |         |       |
+| [Oduwacoin](https://github.com/ODUWAX/oduwacoin)                                         | OWC   |  ✅   |      |        |        |         |       |
 | [PAC Protocol](https://github.com/pacprotocol/pacprotocol)                               | PAC   |  ✅   |      |        |        |         |       |
 | [PakCoin](https://github.com/Pakcoin-project/pakcoin)                                    | PAK   |  ✅   |      |        |        |         |       |
 | [PandaCoin](https://github.com/DigitalPandacoin/pandacoin)                               | PND   |  ✅   |      |        |        |         |       |

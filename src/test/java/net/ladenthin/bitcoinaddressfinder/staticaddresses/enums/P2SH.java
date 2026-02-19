@@ -51,6 +51,10 @@ public enum P2SH implements PublicAddress {
      */
     Dash("7dZe6LvtGPd2TLPpARzThqdF4YwAZvAKDv", "7a5c931f83bb3a356c2dcf72b24e1bea461df587"),
     /**
+     * https://chainz.cryptoid.info/defcon/address.dws?jp6qj5arxERb9xyvRPAHxrvFj9M4BchNdgRbWP9SNnU8aM2VfX65CVckJ4rkeDncswpJv1A.htm
+     */
+    Defcon("jp6qj5arxERb9xyvRPAHxrvFj9M4BchNdgRbWP9SNnU8aM2VfX65CVckJ4rkeDncswpJv1A", "5b20fbd82666a13dda6c27be3a867e043cf048d5"),
+    /**
      * https://chainz.cryptoid.info/dfi/address.dws?2770030.htm
      */
     DeFiChain("8W8yVQDEaQiJ5PB4Hy8CvKj9pBtD3zqkhb", "a520c86a08366941cd90d22e11ac1c7eefa2db37"),
