@@ -89,7 +89,7 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
     }
     
     private void logProgress() {
-        logger.info("Progress: Unsupported: " + readStatistic.unsupported + ". Errors: " + readStatistic.errors.size() + ". Current File progress: " + String.format("%.2f", readStatistic.currentFileProgress) + "%.");
+        logger.info("Progress: Unsupported: " + readStatistic.getUnsupportedTotal() + ". Errors: " + readStatistic.errors.size() + ". Current File progress: " + String.format("%.2f", readStatistic.currentFileProgress) + "%.");
     }
 
     @Override

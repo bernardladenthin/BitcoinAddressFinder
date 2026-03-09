@@ -18,13 +18,17 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import org.junit.Test;
+
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.aMapWithSize;
+import static org.hamcrest.Matchers.anEmptyMap;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
-import org.junit.Test;
 
 public class ReadStatisticTest {
 
@@ -39,12 +43,21 @@ public class ReadStatisticTest {
     }
 
     @Test
-    public void readStatistic_newInstance_unsupportedIsZero() {
+    public void readStatistic_newInstance_unsupportedReasonsIsEmpty() {
         // arrange, act
         ReadStatistic readStatistic = new ReadStatistic();
 
         // assert
-        assertThat(readStatistic.unsupported, is(equalTo(0L)));
+        assertThat(readStatistic.unsupportedReasons, is(anEmptyMap()));
+    }
+
+    @Test
+    public void readStatistic_newInstance_unsupportedTotalIsZero() {
+        // arrange, act
+        ReadStatistic readStatistic = new ReadStatistic();
+
+        // assert
+        assertThat(readStatistic.getUnsupportedTotal(), is(equalTo(0L)));
     }
 
     @Test
@@ -66,9 +79,68 @@ public class ReadStatisticTest {
     }
     // </editor-fold>
 
-    // <editor-fold defaultstate="collapsed" desc="mutation">
+    // <editor-fold defaultstate="collapsed" desc="incrementUnsupported">
     @Test
-    public void readStatistic_incrementSuccessful_reflectsNewValue() {
+    public void readStatistic_incrementUnsupported_addsReasonToMap() {
+        // arrange
+        ReadStatistic readStatistic = new ReadStatistic();
+
+        // act
+        readStatistic.incrementUnsupported("address is empty");
+
+        // assert
+        assertThat(readStatistic.unsupportedReasons, hasEntry("address is empty", 1L));
+    }
+
+    @Test
+    public void readStatistic_incrementUnsupportedTwiceWithSameReason_accumulatesCount() {
+        // arrange
+        ReadStatistic readStatistic = new ReadStatistic();
+
+        // act
+        readStatistic.incrementUnsupported("address is empty");
+        readStatistic.incrementUnsupported("address is empty");
+
+        // assert
+        assertThat(readStatistic.unsupportedReasons, hasEntry("address is empty", 2L));
+    }
+
+    @Test
+    public void readStatistic_incrementUnsupportedWithDifferentReasons_eachReasonTrackedSeparately() {
+        // arrange
+        ReadStatistic readStatistic = new ReadStatistic();
+
+        // act
+        readStatistic.incrementUnsupported("address is empty");
+        readStatistic.incrementUnsupported("P2TR is not supported");
+
+        // assert
+        assertThat(readStatistic.unsupportedReasons, aMapWithSize(2));
+        assertThat(readStatistic.unsupportedReasons, hasEntry("address is empty", 1L));
+        assertThat(readStatistic.unsupportedReasons, hasEntry("P2TR is not supported", 1L));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="getUnsupportedTotal">
+    @Test
+    public void readStatistic_getUnsupportedTotal_sumsAllReasons() {
+        // arrange
+        ReadStatistic readStatistic = new ReadStatistic();
+        readStatistic.incrementUnsupported("address is empty");
+        readStatistic.incrementUnsupported("address is empty");
+        readStatistic.incrementUnsupported("P2TR is not supported");
+
+        // act
+        long total = readStatistic.getUnsupportedTotal();
+
+        // assert
+        assertThat(total, is(equalTo(3L)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="fields">
+    @Test
+    public void readStatistic_setSuccessful_reflectsNewValue() {
         // arrange
         ReadStatistic readStatistic = new ReadStatistic();
 
@@ -77,18 +149,6 @@ public class ReadStatisticTest {
 
         // assert
         assertThat(readStatistic.successful, is(equalTo(42L)));
-    }
-
-    @Test
-    public void readStatistic_incrementUnsupported_reflectsNewValue() {
-        // arrange
-        ReadStatistic readStatistic = new ReadStatistic();
-
-        // act
-        readStatistic.unsupported = 7L;
-
-        // assert
-        assertThat(readStatistic.unsupported, is(equalTo(7L)));
     }
 
     @Test
@@ -129,7 +189,8 @@ public class ReadStatisticTest {
 
         // assert
         assertThat(result, containsString("successful="));
-        assertThat(result, containsString("unsupported="));
+        assertThat(result, containsString("unsupportedTotal="));
+        assertThat(result, containsString("unsupportedReasons="));
         assertThat(result, containsString("currentFileProgress="));
         assertThat(result, containsString("errors="));
     }
@@ -138,20 +199,42 @@ public class ReadStatisticTest {
     @ToStringTest
     public void toString_withModifiedValues_containsUpdatedValues() {
         // arrange
-        ReadStatistic readStatistic = new ReadStatistic();
-        readStatistic.successful = 10L;
-        readStatistic.unsupported = 3L;
-        readStatistic.currentFileProgress = 75.0;
-        readStatistic.errors.add("some error");
+        ReadStatistic readStatistic = createReadStatisticWithAllFieldsSet();
 
         // act
         String result = readStatistic.toString();
 
         // assert
         assertThat(result, containsString("successful=10"));
-        assertThat(result, containsString("unsupported=3"));
+        assertThat(result, containsString("unsupportedTotal=3"));
+        assertThat(result, containsString("address is empty=2"));
+        assertThat(result, containsString("P2TR is not supported=1"));
         assertThat(result, containsString("currentFileProgress=75.0"));
         assertThat(result, containsString("some error"));
+    }
+
+    @Test
+    @ToStringTest
+    public void toString_withModifiedValues_equalsExpectedFullString() {
+        // arrange
+        ReadStatistic readStatistic = createReadStatisticWithAllFieldsSet();
+
+        // act
+        String result = readStatistic.toString();
+
+        // assert
+        assertThat(result, is(equalTo("ReadStatistic{successful=10, unsupportedTotal=3, unsupportedReasons={address is empty=2, P2TR is not supported=1}, currentFileProgress=75.0, errors=[some error]}")));
+    }
+
+    private static ReadStatistic createReadStatisticWithAllFieldsSet() {
+        ReadStatistic readStatistic = new ReadStatistic();
+        readStatistic.successful = 10L;
+        readStatistic.incrementUnsupported("address is empty");
+        readStatistic.incrementUnsupported("address is empty");
+        readStatistic.incrementUnsupported("P2TR is not supported");
+        readStatistic.currentFileProgress = 75.0;
+        readStatistic.errors.add("some error");
+        return readStatistic;
     }
     // </editor-fold>
 }

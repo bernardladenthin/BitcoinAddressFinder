@@ -51,7 +51,7 @@ public class AddressFile extends AbstractPlaintextFile {
             readStatistic.successful++;
         } catch (AddressFormatNotAcceptedException e) {
             unsupportedConsumer.accept(line);
-            readStatistic.unsupported++;
+            readStatistic.incrementUnsupported(e.getReason());
         }
     }
 }

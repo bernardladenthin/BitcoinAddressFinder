@@ -87,7 +87,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
                 java.util.function.Consumer<String> unsupported =
                         line -> {
-                            if (readStatistic.unsupported % PROGRESS_LOG == 0) {
+                            if (readStatistic.getUnsupportedTotal() % PROGRESS_LOG == 0) {
                                 logProgress();
                             }
                         };
@@ -126,7 +126,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
     }
 
     private void logProgress() {
-        logger.info("Progress: " + addressCounter.get() + " addresses. Unsupported: " + readStatistic.unsupported + ". Errors: " + readStatistic.errors.size() + ". Current File progress: " + String.format("%.2f", readStatistic.currentFileProgress) + "%.");
+        logger.info("Progress: " + addressCounter.get() + " addresses. Unsupported: " + readStatistic.getUnsupportedTotal() + ". Errors: " + readStatistic.errors.size() + ". Current File progress: " + String.format("%.2f", readStatistic.currentFileProgress) + "%.");
     }
 
     @Override
