@@ -1,0 +1,646 @@
+# Unit Test Writing Guide — BitcoinAddressFinder
+
+Derived by analysis of all 73 test files in `src/test/java/net/ladenthin/bitcoinaddressfinder/`.
+This guide is the authoritative reference for writing and improving tests in this project.
+
+---
+
+## 1. File Structure & Header
+
+Every test file **must** start with the formatter-off block enclosing the Apache 2.0 license header, exactly as shown:
+
+```java
+// @formatter:off
+/**
+ * Copyright <YEAR> Bernard Ladenthin bernard.ladenthin@gmail.com
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * ...
+ */
+// @formatter:on
+package net.ladenthin.bitcoinaddressfinder;
+```
+
+- The `// @formatter:off` / `// @formatter:on` pair wraps **only** the license block.
+- The year must match the file creation year (not the current year).
+
+---
+
+## 2. Test Framework
+
+| Concern | Choice |
+|---|---|
+| Test runner | JUnit 4 (`@Test`, `@Before`, `@Rule`, etc.) |
+| Parameterized tests | `com.tngtech.java.junit.dataprovider` (`@RunWith(DataProviderRunner.class)`, `@UseDataProvider`) |
+| Assertions | Hamcrest only — `assertThat(actual, is(equalTo(expected)))` |
+| Mocking | Mockito (`mock()`, `verify()`, `when()`, `ArgumentCaptor`) |
+| Temp file system | JUnit `@Rule public TemporaryFolder folder = new TemporaryFolder()` |
+
+**Do NOT use:**
+- `assertEquals` / `assertTrue` / `assertFalse` from `org.junit.Assert` — use Hamcrest equivalents.
+- TestNG or JUnit 5.
+
+---
+
+## 3. Class-Level Setup
+
+### Class Declaration
+
+```java
+@RunWith(DataProviderRunner.class)   // only when @UseDataProvider is used in this class
+public class FooTest {
+```
+
+Omit `@RunWith` if no data providers are used.
+
+### Shared Instance Fields
+
+Declare shared utilities as `private final` instance fields:
+
+```java
+private final Network network = new NetworkParameterFactory().getNetwork();
+private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+private final BitHelper bitHelper = new BitHelper();
+```
+
+Mocks that need fresh state per test are declared at field level but initialized in `@Before`:
+
+```java
+private Logger mockLogger;
+
+@Before
+public void setUp() {
+    mockLogger = mock(Logger.class);
+}
+```
+
+An empty `@Before` method should be omitted entirely. Only keep it if it does meaningful work.
+
+### TemporaryFolder (file-system tests)
+
+```java
+@Rule
+public TemporaryFolder folder = new TemporaryFolder();
+```
+
+---
+
+## 4. Code Folding — Grouping Tests by Method Under Test
+
+Tests within a class **must** be grouped using NetBeans-style editor fold regions, one fold per method/feature under test:
+
+```java
+// <editor-fold defaultstate="collapsed" desc="methodName">
+@Test
+public void methodName_conditionA_expectedResultA() { ... }
+
+@Test
+public void methodName_conditionB_expectedResultB() { ... }
+// </editor-fold>
+```
+
+Rules:
+- The `desc` attribute equals the method name (or a short feature label for non-method groups).
+- `defaultstate="collapsed"` is mandatory on every fold.
+- All tests for the same method go inside a single fold.
+- Tests that exercise different methods **must** be in different folds.
+- The fold order in the file should match logical reading order (simple cases first, edge cases and exceptions last).
+
+---
+
+## 5. Test Method Naming
+
+Pattern: **`methodUnderTest_inputOrCondition_expectedBehavior`**
+
+```
+fromLine_addressLineIsEmpty_returnNull
+createECKey_TestUncompressed
+getMaxPrivateKeyForBatchSize_batchSize0_returnsMaxPrivateKey
+getMaxPrivateKeyForBatchSize_bitSizeNegative_throwsException
+putNewAmount_initialLMDBSetTo1MiB_fillWithTooMuchValues_exceptionThrown
+interrupt_keysQueueNotEmpty_consumerNotRunningWaitedInternallyForTheDuration
+```
+
+Rules:
+- All three segments are **required** and separated by underscores.
+- Use camelCase within each segment.
+- The `expected` segment describes the observable outcome, not the implementation step.
+  - Good: `_returnsMaxPrivateKey`, `_throwsException`, `_returnNull`, `_noExceptionThrown`
+  - Bad: `_works`, `_correct`, `_test`
+- Exception tests: the segment ends with `_throwsException` or `_exceptionThrown`.
+- No-op / smoke tests: use `_noExceptionThrown`.
+- Logging assertion tests: include `_logsError` / `_logged` / `_containsClassNameAndIdentityHash`.
+- `toString` tests: use `_whenCalled_containsClassNameAndIdentityHash` (for default toString) or describe the exact content.
+
+---
+
+## 6. Test Body — AAA Structure
+
+Every test body **must** follow the Arrange / Act / Assert structure with explicit section comments:
+
+```java
+@Test
+public void methodName_conditionGiven_expectedResult() {
+    // arrange
+    Foo foo = new Foo(42);
+
+    // act
+    String result = foo.bar();
+
+    // assert
+    assertThat(result, is(equalTo("expected")));
+}
+```
+
+Additional rules:
+- Use `// pre-assert` for assertions on the initial state, placed before `// act`.
+- `// arrange` section may be omitted only when there is genuinely nothing to arrange (the object is created in the act).
+- Never merge arrange and act into a single line if it harms readability.
+- Keep the act to a **single method call** whenever possible.
+
+---
+
+## 7. Assertions — Hamcrest Style
+
+All assertions use the Hamcrest `assertThat` form:
+
+```java
+// equality
+assertThat(result, is(equalTo(expected)));
+
+// null / not null
+assertThat(result, is(nullValue()));
+assertThat(result, is(notNullValue()));
+
+// boolean
+assertThat(flag, is(true));
+assertThat(flag, is(false));
+
+// negation
+assertThat(result, is(not(equalTo(unexpected))));
+
+// strings
+assertThat(message, containsString("substring"));
+assertThat(message, matchesPattern("Regex\\d+"));
+assertThat(output, not(emptyOrNullString()));
+
+// collections
+assertThat(list, hasSize(3));
+assertThat(list, is(empty()));
+assertThat(list, hasItems("a", "b"));
+
+// numbers / comparable
+assertThat(index, is(lessThan(colonIndex)));
+assertThat(waitTime, is(greaterThan(minExpected)));
+
+// type
+assertThat(obj, instanceOf(KeyProducerJavaRandom.class));
+```
+
+**Imports to use:**
+```java
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;   // or import specific matchers
+```
+
+Do **not** use:
+- `org.junit.Assert.assertEquals`
+- `org.junit.Assert.assertTrue` / `assertFalse`
+- `Assert.assertNotNull`
+
+---
+
+## 8. Exception Testing
+
+### Simple expected exception (no message check needed)
+
+```java
+@Test(expected = IllegalArgumentException.class)
+public void getMaxPrivateKeyForBatchSize_bitSizeNegative_throwsException() {
+    // act
+    KeyUtility.getMaxPrivateKeyForBatchSize(-1);
+}
+```
+
+### Exception with message verification
+
+Use try/catch when the exception message must be asserted:
+
+```java
+@Test
+public void nextKey_counterOverflow_throwsException() {
+    // arrange
+    BIP39KeyProducer producer = ...;
+    producer.counter.set(Integer.MAX_VALUE);
+
+    try {
+        // verify first call does NOT throw
+        producer.nextKey();
+    } catch (NoMoreSecretsAvailableException e) {
+        fail("Exception thrown too early: " + e.getMessage());
+    }
+
+    // act — this call should throw
+    // (declare @Test(expected=...) on the method)
+    producer.nextKey();
+}
+```
+
+### Exception with full message assertions
+
+```java
+PrivateKeyTooLargeException ex = new PrivateKeyTooLargeException(key, maxKey, batch);
+assertThat(ex.getMessage(), containsString("0x" + key.toString(16)));
+assertThat(ex.getMessage(), containsString("batchSizeInBits = " + batch));
+```
+
+---
+
+## 9. Data Providers (Parameterized Tests)
+
+### Centralized in CommonDataProvider
+
+All data providers belong in `CommonDataProvider`. Each provider follows this pattern:
+
+```java
+// 1. Constant for the provider name
+public final static String DATA_PROVIDER_MY_CASES = "myCases";
+
+// 2. Javadoc linking to which test it serves
+/**
+ * For {@link FooTest}.
+ */
+@DataProvider
+public static Object[][] myCases() {
+    return new Object[][] {
+        { inputA, expectedA },
+        { inputB, expectedB },
+    };
+}
+```
+
+### Consuming a data provider
+
+```java
+@RunWith(DataProviderRunner.class)
+public class FooTest {
+
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_MY_CASES, location = CommonDataProvider.class)
+    public void foo_inputGiven_returnsExpected(TypeA input, TypeB expected) {
+        // arrange
+        Foo foo = new Foo();
+
+        // act
+        TypeB result = foo.bar(input);
+
+        // assert
+        assertThat(result, is(equalTo(expected)));
+    }
+}
+```
+
+### Enum-based providers
+
+Iterate over all enum values using the shared helper:
+
+```java
+@DataProvider
+public static Object[][] staticP2PKHAddresses() {
+    return transformFlatToObjectArrayArray(P2PKH.values());
+}
+```
+
+### Cartesian product providers
+
+Use `mergeMany(dp1, dp2)` from `CommonDataProvider` for cross-product combinations:
+
+```java
+@DataProvider
+public static Object[][] keyProducerTypeAndBitSize() {
+    return mergeMany(keyProducerTypes(), bitSizesAtMostMax());
+}
+```
+
+---
+
+## 10. Custom Marker Annotations
+
+Apply the appropriate marker annotation alongside `@Test` when applicable:
+
+| Annotation | When to use |
+|---|---|
+| `@AwaitTimeTest` | Test involves `ExecutorService.awaitTermination` or `Thread.sleep` timing |
+| `@ToStringTest` | Test validates a `toString()` implementation |
+| `@OpenCLTest` | Test requires an OpenCL-capable device |
+
+Example:
+
+```java
+@ToStringTest
+@Test
+public void toString_whenCalled_containsClassNameAndIdentityHash() {
+    // ...
+    assertThat(output, matchesPattern("ProducerJava@\\p{XDigit}+"));
+}
+```
+
+---
+
+## 11. Timing / Await Tests
+
+Tests that assert on timing durations must:
+1. Be annotated with `@AwaitTimeTest`.
+2. Use `AwaitTimeTests.AWAIT_DURATION` (20 s) as the configurable duration.
+3. Use `AwaitTimeTests.IMPRECISION` (2 s) as the tolerance.
+4. Override the static constant before the test runs.
+
+```java
+@AwaitTimeTest
+@Test
+public void interrupt_keysQueueNotEmpty_consumerNotRunningWaitedInternallyForTheDuration()
+        throws IOException, InterruptedException {
+    // Change await duration
+    ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY = AwaitTimeTests.AWAIT_DURATION;
+
+    // ... arrange ...
+
+    long beforeAct = System.currentTimeMillis();
+    consumerJava.interrupt();
+
+    long afterAct = System.currentTimeMillis();
+    Duration waitTime = Duration.ofMillis(afterAct - beforeAct);
+
+    assertThat(waitTime, is(greaterThan(
+        ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY.minus(AwaitTimeTests.IMPRECISION)
+    )));
+}
+```
+
+---
+
+## 12. Mocking & Logger Verification
+
+### Injecting a mock logger
+
+```java
+Logger logger = mock(Logger.class);
+when(logger.isTraceEnabled()).thenReturn(true);
+objectUnderTest.setLogger(logger);
+```
+
+### Capturing and asserting log output
+
+```java
+ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
+verify(logger, times(1)).info(logCaptor.capture());
+List<String> arguments = logCaptor.getAllValues();
+assertThat(arguments.get(0), is(equalTo("Init producer.")));
+```
+
+### Verifying no interaction
+
+```java
+verify(logger, never()).error(anyString());
+```
+
+### Verifying with argument matchers
+
+```java
+verify(logger).error(contains("fromPrivateCompressed.getPubKeyHash()"));
+verify(mockLogger, times(1)).info(eq("Received key: {}"), eq(expectedHex));
+```
+
+---
+
+## 13. Platform Assumptions
+
+Tests that require a specific platform conditionally skip using assume classes:
+
+```java
+@Test
+@OpenCLTest
+public void testRoundtripOpenCLProducer_...() {
+    new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+    // test body
+}
+```
+
+Assume classes available:
+- `OpenCLPlatformAssume` — OpenCL GPU device required
+- `LMDBPlatformAssume` — LMDB native library required
+- `PlatformAssume` — generic OS assumptions
+
+---
+
+## 14. Equals / HashCode / ToString Contract Tests
+
+Use `EqualHashCodeToStringTestHelper` for objects with value semantics. Create two independent instances of "A" and two of "B":
+
+```java
+// arrange
+FooObject a1 = new FooObject(valueForA);
+FooObject a2 = new FooObject(valueForA);   // same data, different reference
+FooObject b1 = new FooObject(valueForB);
+FooObject b2 = new FooObject(valueForB);
+
+// assert — A equals A, B equals B, A not equal to B
+new EqualHashCodeToStringTestHelper(a1, a2, b1, b2)
+    .assertEqualsHashCodeToStringAIsDifferentToB();
+
+// OR — A equals B (same semantic content)
+new EqualHashCodeToStringTestHelper(a1, a2, b1, b2)
+    .assertEqualsHashCodeToStringAIsEqualToB();
+```
+
+For `toString()` tests that verify default Java object identity format:
+```java
+assertThat(output, matchesPattern("ClassName@\\p{XDigit}+"));
+```
+
+For `toString()` tests that verify structured content:
+```java
+assertThat(output, is(equalTo("AddressToCoin{hash160=..., coin=100000000, type=P2PKH_OR_P2SH}")));
+```
+
+---
+
+## 15. Randomness — Fixed Seeds for Reproducibility
+
+All `Random` instances in tests **must** use a fixed seed:
+
+```java
+private final Random random = new Random(1337);
+// or
+Random random = new Random(42);
+```
+
+Never use `new Random()` (unseeded) in tests. Document the seed's significance in a comment when it matters:
+
+```java
+/**
+ * This random is fine to produce with lower private key bits: 1; 0; 1; 0
+ */
+private final Random random = new Random(1);
+```
+
+---
+
+## 16. Static Address Constants
+
+Use the static address enums and helper classes for test data — never hard-code raw addresses inline:
+
+| Class | Purpose |
+|---|---|
+| `StaticKey` | A single known private key with all derived forms |
+| `TestAddresses42` | A set of addresses derived from seed 42 |
+| `TestAddresses1337` | A set of addresses derived from seed 1337 |
+| `P2PKH` enum | Known valid P2PKH public addresses with expected hashes |
+| `P2SH` enum | Known valid P2SH script hash addresses |
+| `P2WPKH` enum | Known valid native SegWit addresses |
+| `StaticUnsupportedAddress` enum | Addresses that must be rejected |
+
+---
+
+## 17. LMDB / File System Tests
+
+- Always use `folder.newFolder("lmdb")` from `TemporaryFolder` — never create folders manually.
+- Use `TestAddressesLMDB.createTestLMDB(folder, testAddresses, useStaticAmount, ...)` to create pre-populated test databases.
+- Use `TestAddressesFiles` to provide corresponding address file sets.
+
+```java
+TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
+File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, useStaticAmount, false);
+```
+
+---
+
+## 18. OpenCL Tests
+
+- Annotate with `@OpenCLTest`.
+- Call the assume method as the **first statement** of the test body.
+- Do not gate the entire class — only gate individual test methods.
+
+---
+
+## 19. Import Style
+
+Group imports in this order (no blank lines within groups, blank line between groups):
+1. Standard Java (`java.*`, `javax.*`)
+2. Third-party libraries (alphabetical)
+3. Project classes (`net.ladenthin.*`)
+4. Static imports (last, alphabetical)
+
+Prefer **specific static imports** over wildcard when used once or twice:
+```java
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
+```
+
+Use wildcard static import when many matchers are used:
+```java
+import static org.hamcrest.Matchers.*;
+```
+
+---
+
+## 20. What NOT To Do
+
+| Anti-pattern | Correct alternative |
+|---|---|
+| `assertEquals(expected, actual)` | `assertThat(actual, is(equalTo(expected)))` |
+| `assertTrue(condition)` | `assertThat(condition, is(true))` |
+| `Assert.assertNotNull(x)` | `assertThat(x, is(notNullValue()))` |
+| `System.out.println(...)` in test | Remove; use logger assertions instead |
+| Unseeded `new Random()` | `new Random(fixedSeed)` |
+| Hard-coded address strings | Use `StaticKey`, `P2PKH`, etc. |
+| Missing `// arrange / act / assert` | Add the section comments always |
+| Missing editor fold | Wrap each method group in `<editor-fold>` |
+| Non-conforming test name like `testme()` | Rename to `methodName_condition_expectation()` |
+| Empty `@Before` method | Remove it |
+| `@RunWith(DataProviderRunner.class)` without `@UseDataProvider` | Remove the `@RunWith` |
+
+---
+
+## 21. Test Anatomy — Complete Reference Example
+
+```java
+// @formatter:off
+/**
+ * Copyright 2025 Bernard Ladenthin bernard.ladenthin@gmail.com
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * ...
+ */
+// @formatter:on
+package net.ladenthin.bitcoinaddressfinder;
+
+import com.tngtech.java.junit.dataprovider.DataProviderRunner;
+import com.tngtech.java.junit.dataprovider.UseDataProvider;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+
+@RunWith(DataProviderRunner.class)
+public class ExampleTest {
+
+    private final Network network = new NetworkParameterFactory().getNetwork();
+    private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+
+    // <editor-fold defaultstate="collapsed" desc="someMethod">
+    @Test
+    public void someMethod_validInputGiven_returnsExpectedResult() {
+        // arrange
+        Example sut = new Example();
+
+        // act
+        String result = sut.someMethod("validInput");
+
+        // assert
+        assertThat(result, is(equalTo("expectedResult")));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void someMethod_nullGiven_throwsException() {
+        // arrange
+        Example sut = new Example();
+
+        // act
+        sut.someMethod(null);
+    }
+
+    @Test
+    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_MY_CASES, location = CommonDataProvider.class)
+    public void someMethod_parameterizedInput_returnsExpectedResult(String input, String expected) {
+        // arrange
+        Example sut = new Example();
+
+        // act
+        String result = sut.someMethod(input);
+
+        // assert
+        assertThat(result, is(equalTo(expected)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="toString">
+    @ToStringTest
+    @Test
+    public void toString_whenCalled_containsClassNameAndIdentityHash() {
+        // arrange
+        Example sut = new Example();
+
+        // act
+        String output = sut.toString();
+
+        // assert
+        assertThat(output, not(emptyOrNullString()));
+        assertThat(output, matchesPattern("Example@\\p{XDigit}+"));
+    }
+    // </editor-fold>
+}
+```
