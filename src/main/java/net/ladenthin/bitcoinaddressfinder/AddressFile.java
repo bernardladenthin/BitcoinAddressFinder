@@ -45,11 +45,11 @@ public class AddressFile extends AbstractPlaintextFile {
     @Override
     protected void processLine(String line) {
         AddressTxtLine addressTxtLine = new AddressTxtLine();
-        AddressToCoin addressToCoin = addressTxtLine.fromLine(line, keyUtility);
-        if (addressToCoin != null) {
+        try {
+            AddressToCoin addressToCoin = addressTxtLine.fromLine(line, keyUtility);
             addressConsumer.accept(addressToCoin);
             readStatistic.successful++;
-        } else {
+        } catch (AddressFormatNotAcceptedException e) {
             unsupportedConsumer.accept(line);
             readStatistic.unsupported++;
         }

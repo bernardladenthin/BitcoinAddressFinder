@@ -29,7 +29,6 @@ import org.bitcoinj.base.SegwitAddress;
 import org.bitcoinj.base.exceptions.AddressFormatException;
 import org.bouncycastle.util.encoders.DecoderException;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 
 
 /**
@@ -51,6 +50,25 @@ public class AddressTxtLine {
     public final static int VERSION_BYTES_REGULAR = 1;
     public final static int VERSION_BYTES_ZCASH = 2;
     public final static int CHECKSUM_BYTES_REGULAR = 4;
+
+    public static final String REASON_EMPTY = "address is empty";
+
+    /**
+     * Reason used when the line starts with {@link #IGNORE_LINE_PREFIX} ({@code "#"}).
+     * <p>
+     * This check is performed on the raw line <em>before</em> {@link SeparatorFormat#split},
+     * because {@code "#"} is also registered as {@link SeparatorFormat#HASH}. Splitting first
+     * would always produce an empty first token for {@code "#..."} lines, masking this reason
+     * with {@link #REASON_EMPTY} instead.
+     */
+    public static final String REASON_IGNORE_PREFIX = "address starts with ignore prefix";
+    public static final String REASON_ADDRESS_HEADER = "address starts with address header";
+    public static final String REASON_P2MS_NOT_SUPPORTED = "Blockchair Multisig (P2MS) format is not supported";
+    public static final String REASON_P2WSH_NOT_SUPPORTED = "P2WSH is not supported";
+    public static final String REASON_P2TR_NOT_SUPPORTED = "P2TR is not supported";
+    public static final String REASON_UNSUPPORTED_WITNESS_VERSION = "unsupported witness version";
+    public static final String REASON_BITCOIN_CASH_Q_ADDRESS_NOT_PARSABLE = "Bitcoin Cash address is not parsable";
+    public static final String REASON_INVALID_BASE58 = "invalid Base58 address";
     
     /**
     * Witness version 0, used for SegWit v0 addresses such as:
@@ -74,16 +92,24 @@ public class AddressTxtLine {
     
     /**
      * Parses a line containing an address and optional amount.
-     * Returns {@code null} if the address is unsupported, malformed, or marked as ignored.
+     * Throws {@link AddressFormatNotAcceptedException} if the address is unsupported,
+     * malformed, or marked as ignored.
      * <p>
      * If no coin amount is specified in the line, {@link #DEFAULT_COIN} is used as a fallback.
      *
      * @param line the line to parse
      * @param keyUtility the {@link KeyUtility} used for conversions
-     * @return an {@link AddressToCoin} instance, or {@code null} if the address is invalid or unsupported
+     * @return an {@link AddressToCoin} instance — never {@code null}
+     * @throws AddressFormatNotAcceptedException if the address format is not accepted,
+     *         with a reason message describing why
      */
-    @Nullable
-    public AddressToCoin fromLine(String line, KeyUtility keyUtility) {
+    @NonNull
+    public AddressToCoin fromLine(String line, KeyUtility keyUtility) throws AddressFormatNotAcceptedException {
+        // Checked before splitting: "#" is also a SeparatorFormat separator, so splitting first
+        // would always produce an empty first token for "#..." lines, masking this reason.
+        if (line.trim().startsWith(IGNORE_LINE_PREFIX)) {
+            throw new AddressFormatNotAcceptedException(REASON_IGNORE_PREFIX);
+        }
         // Remove the Bitcoin Cash prefix (which includes a colon) to avoid incorrect splitting.
         // This ensures the address is recognized properly and not misinterpreted during parsing.
         if(line.contains(BITCOIN_CASH_PREFIX)) {
@@ -93,8 +119,11 @@ public class AddressTxtLine {
         String address = lineSplitted[0];
         Coin amount = getCoinIfPossible(lineSplitted, DEFAULT_COIN);
         address = address.trim();
-        if (address.isEmpty() || address.startsWith(IGNORE_LINE_PREFIX) || address.startsWith(ADDRESS_HEADER)) {
-            return null;
+        if (address.isEmpty()) {
+            throw new AddressFormatNotAcceptedException(REASON_EMPTY);
+        }
+        if (address.startsWith(ADDRESS_HEADER)) {
+            throw new AddressFormatNotAcceptedException(REASON_ADDRESS_HEADER);
         }
         
         // Riecoin: ScriptPubKey-style encoded address (hex with OP codes)
@@ -118,7 +147,7 @@ public class AddressTxtLine {
             || address.startsWith("m-")
             || address.startsWith("s-")
         ) {
-            return null;
+            throw new AddressFormatNotAcceptedException(REASON_P2MS_NOT_SUPPORTED);
         }
         
         // BitCore WKH format (Base36-encoded hash160)
@@ -146,18 +175,17 @@ public class AddressTxtLine {
                         return new AddressToCoin(hash160, amount, AddressType.P2WPKH); // P2WPKH supported
                     } else if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_SH) {
                         byte[] scriptHash = witnessProgram;
-                        return null; // P2WSH not supported
+                        throw new AddressFormatNotAcceptedException(REASON_P2WSH_NOT_SUPPORTED);
                     }
                     break;
                 case WITNESS_VERSION_1:
                     if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_TR) {
                         byte[] tweakedPublicKey = witnessProgram;
-                        return null; // P2TR not supported
+                        throw new AddressFormatNotAcceptedException(REASON_P2TR_NOT_SUPPORTED);
                     }
                     break;
                 default:
-                    // not supported
-                    return null;
+                    throw new AddressFormatNotAcceptedException(REASON_UNSUPPORTED_WITNESS_VERSION);
             }
         } catch (AddressFormatException | ReflectiveOperationException  e) {
             // Bech32 parsing or reflection failed; continue to next format
@@ -186,7 +214,7 @@ public class AddressTxtLine {
         } catch (DecoderException e) {
             throw e;
         } catch (RuntimeException | ReflectiveOperationException e) {
-            return null;
+            throw new AddressFormatNotAcceptedException(REASON_BITCOIN_CASH_Q_ADDRESS_NOT_PARSABLE);
         }
         
         // Fallback: assume Base58 with 1-byte version prefix
@@ -194,7 +222,7 @@ public class AddressTxtLine {
             AddressToCoin addressToCoin = parseBase58Address(address, VERSION_BYTES_REGULAR, CHECKSUM_BYTES_REGULAR, keyUtility);
             return new AddressToCoin(addressToCoin.hash160(), amount, addressToCoin.type());
         } catch (AddressFormatException e) {
-            return null;
+            throw new AddressFormatNotAcceptedException(REASON_INVALID_BASE58);
         }
     }
 
