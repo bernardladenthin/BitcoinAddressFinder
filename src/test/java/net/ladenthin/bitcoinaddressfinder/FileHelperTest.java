@@ -24,20 +24,26 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.fail;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 public class FileHelperTest {
+
+    @Rule
+    public TemporaryFolder folder = new TemporaryFolder();
+
+    private final FileHelper fileHelper = new FileHelper();
 
     // <editor-fold defaultstate="collapsed" desc="stringsToFiles">
     @Test
     public void stringsToFiles_emptyList_returnsEmptyList() {
-        // arrange
-        FileHelper fileHelper = new FileHelper();
-
         // act
         List<File> result = fileHelper.stringsToFiles(Collections.emptyList());
 
@@ -48,7 +54,6 @@ public class FileHelperTest {
     @Test
     public void stringsToFiles_singlePath_returnsFileWithSamePath() {
         // arrange
-        FileHelper fileHelper = new FileHelper();
         String path = "/some/path/to/file.txt";
 
         // act
@@ -62,7 +67,6 @@ public class FileHelperTest {
     @Test
     public void stringsToFiles_multiplePaths_returnsFilesInSameOrder() {
         // arrange
-        FileHelper fileHelper = new FileHelper();
         List<String> paths = Arrays.asList("/first/file.txt", "/second/file.txt", "/third/file.txt");
 
         // act
@@ -79,62 +83,57 @@ public class FileHelperTest {
     // <editor-fold defaultstate="collapsed" desc="assertFilesExists">
     @Test
     public void assertFilesExists_emptyList_noExceptionThrown() {
-        // arrange
-        FileHelper fileHelper = new FileHelper();
-
-        // act, assert (no exception expected)
+        // act
         fileHelper.assertFilesExists(Collections.emptyList());
+
+        // assert
     }
 
     @Test
     public void assertFilesExists_existingFile_noExceptionThrown() throws IOException {
         // arrange
-        FileHelper fileHelper = new FileHelper();
-        File tempFile = File.createTempFile("filehelper_test", ".tmp");
-        tempFile.deleteOnExit();
+        File tempFile = folder.newFile("filehelper_test.tmp");
 
-        // act, assert (no exception expected)
+        // act
         fileHelper.assertFilesExists(Collections.singletonList(tempFile));
+
+        // assert
     }
 
     @Test
     public void assertFilesExists_multipleExistingFiles_noExceptionThrown() throws IOException {
         // arrange
-        FileHelper fileHelper = new FileHelper();
-        File tempFile1 = File.createTempFile("filehelper_test_a", ".tmp");
-        File tempFile2 = File.createTempFile("filehelper_test_b", ".tmp");
-        tempFile1.deleteOnExit();
-        tempFile2.deleteOnExit();
+        File tempFile1 = folder.newFile("filehelper_test_a.tmp");
+        File tempFile2 = folder.newFile("filehelper_test_b.tmp");
 
-        // act, assert (no exception expected)
+        // act
         fileHelper.assertFilesExists(Arrays.asList(tempFile1, tempFile2));
+
+        // assert
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void assertFilesExists_missingFile_throwsIllegalArgumentException() {
         // arrange
-        FileHelper fileHelper = new FileHelper();
         File nonExistentFile = new File("/this/path/does/not/exist/file.txt");
 
-        // act, assert
+        // act
         fileHelper.assertFilesExists(Collections.singletonList(nonExistentFile));
     }
 
     @Test
     public void assertFilesExists_missingFile_exceptionMessageContainsFilePath() {
         // arrange
-        FileHelper fileHelper = new FileHelper();
         File nonExistentFile = new File("/this/path/does/not/exist/file.txt");
 
         // act
         try {
             fileHelper.assertFilesExists(Collections.singletonList(nonExistentFile));
+            fail("Expected IllegalArgumentException was not thrown");
         } catch (IllegalArgumentException e) {
             // assert
-            assertThat(e.getMessage(), org.hamcrest.Matchers.containsString(nonExistentFile.toString()));
-            return;
+            assertThat(e.getMessage(), containsString(nonExistentFile.toString()));
         }
-        throw new AssertionError("Expected IllegalArgumentException was not thrown");
     }
     // </editor-fold>
 }
