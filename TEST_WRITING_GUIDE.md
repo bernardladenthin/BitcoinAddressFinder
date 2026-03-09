@@ -152,8 +152,43 @@ public void methodName_conditionGiven_expectedResult() {
 }
 ```
 
-Additional rules:
-- Use `// pre-assert` for assertions on the initial state, placed before `// act`.
+### `// pre-assert` — two valid positions
+
+`// pre-assert` is a named section that asserts a condition without it being the primary assertion of the test. It may appear in **two** positions:
+
+**1. Before `// act`** — to assert on the initial state or verify preconditions of the input:
+
+```java
+// arrange
+P2PKH address = P2PKH.BitcoinCashWithPrefix;
+
+// pre-assert
+assertThat(address.getPublicAddress(), startsWith(AddressTxtLine.BITCOIN_CASH_PREFIX));
+
+// act
+byte[] hash160 = AddressTxtLine.extractPKHFromBitcoinCashAddress(address.getPublicAddress());
+
+// assert
+assertThat(actualHashHex, is(equalTo(address.getPublicKeyHashAsHex())));
+```
+
+**2. Between `// act` and `// assert`** — as a guard check whose failure would make the primary assertions meaningless (e.g., a null-check before accessing fields):
+
+```java
+// act
+AddressToCoin addressToCoin = new AddressTxtLine().fromLine(input, keyUtility);
+
+// pre-assert
+assertThat(addressToCoin, is(notNullValue()));
+
+// assert
+assertThat(addressToCoin.hash160(), is(equalTo(expectedHash)));
+assertThatDefaultCoinIsSet(addressToCoin);
+```
+
+Rules:
+- A `// pre-assert` between `// act` and `// assert` must check only a **prerequisite** for the primary assertions — not the outcome itself. Null-guard checks are the canonical use-case.
+- Do **not** use `Objects.requireNonNull(...)` as a guard check; use `assertThat(x, is(notNullValue()))` inside a `// pre-assert` section instead.
 - `// arrange` section may be omitted only when there is genuinely nothing to arrange (the object is created in the act).
 - Never merge arrange and act into a single line if it harms readability.
 - Keep the act to a **single method call** whenever possible.
@@ -553,6 +588,8 @@ import static org.hamcrest.Matchers.*;
 | `assertEquals(expected, actual)` | `assertThat(actual, is(equalTo(expected)))` |
 | `assertTrue(condition)` | `assertThat(condition, is(true))` |
 | `Assert.assertNotNull(x)` | `assertThat(x, is(notNullValue()))` |
+| `Objects.requireNonNull(x)` as a guard in tests | `// pre-assert` section with `assertThat(x, is(notNullValue()))` |
+| Null-guard inside `// assert` when more assertions follow | Move to a `// pre-assert` section between `// act` and `// assert` |
 | `System.out.println(...)` in test | Remove; use logger assertions instead |
 | Unseeded `new Random()` | `new Random(fixedSeed)` |
 | Hard-coded address strings | Use `StaticKey`, `P2PKH`, etc. |
