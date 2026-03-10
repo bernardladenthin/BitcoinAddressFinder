@@ -553,9 +553,49 @@ File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, us
 
 ## 18. OpenCL Tests
 
+### When `@OpenCLTest` + assume IS required
+
+A test must be annotated with `@OpenCLTest` and call `assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable()` (or a similar assume method) as its **first statement** when the test body actually invokes OpenCL API functions — for example:
+
+- `CL.stringFor_*` or any other `CL.*` native call
+- `OpenCLBuilder.build()` or any method that loads or queries the OpenCL runtime
+- Any code path that triggers native library loading
+
+```java
+@OpenCLTest
+@Test
+public void build_oneOpenCLDevice_returnsPlatformWithDevice() {
+    new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+    // test body that calls OpenCL APIs
+}
+```
+
+Rules:
 - Annotate with `@OpenCLTest`.
 - Call the assume method as the **first statement** of the test body.
 - Do not gate the entire class — only gate individual test methods.
+
+### When `@OpenCLTest` + assume is NOT required
+
+Tests that **only** use JOCL wrapper types (e.g. `cl_device_id`, `cl_context_properties`, `cl_platform_id`) as plain Java objects — without calling any native OpenCL API function — do **not** need `@OpenCLTest` or an assume call. These wrapper classes are ordinary Java objects that can be instantiated and passed around without loading the OpenCL native library.
+
+```java
+// No @OpenCLTest needed — cl_context_properties is just a Java object here
+@Test
+public void constructor_validArguments_returnsPlatform() {
+    // arrange
+    cl_context_properties properties = new cl_context_properties();
+    // ... build list of plain Java objects ...
+
+    // act
+    OpenCLPlatform platform = new OpenCLPlatform(0, properties, deviceList);
+
+    // assert
+    assertThat(platform.getProperties(), is(equalTo(properties)));
+}
+```
+
+**Decision rule:** Ask "does this test call any method that ultimately invokes a native OpenCL function?" If yes → `@OpenCLTest` + assume. If no (only Java object construction and list operations) → no annotation needed.
 
 ---
 
