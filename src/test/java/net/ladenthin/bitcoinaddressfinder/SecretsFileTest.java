@@ -31,6 +31,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -41,6 +42,7 @@ import org.junit.rules.TemporaryFolder;
 public class SecretsFileTest {
 
     private final Network network = new NetworkParameterFactory().getNetwork();
+    private final StaticKey staticKey = new StaticKey();
 
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
@@ -119,10 +121,9 @@ public class SecretsFileTest {
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
         SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.DUMPED_RIVATE_KEY, readStatistic, captured::add);
-        // 5HueCGU8rMjxECyDialwujzZLVzfKkmvNoBm41ktLzmVqKS3khF is WIF for private key = 1 (mainnet, uncompressed)
 
         // act
-        secretsFile.processLine("5HueCGU8rMjxECyDialwujzZLVzfKkmvNoBm41ktLzmVqKS3khF");
+        secretsFile.processLine(staticKey.privateKeyWiFUncompressed);
 
         // assert
         assertThat(captured.size(), is(equalTo(1)));
@@ -131,19 +132,18 @@ public class SecretsFileTest {
     }
 
     @Test
-    public void processLine_dumpedPrivateKeyFormat_consumerReceivesPrivateKeyOne() throws Exception {
+    public void processLine_dumpedPrivateKeyFormat_consumerReceivesExpectedPrivateKey() throws Exception {
         // arrange
         File file = folder.newFile("secrets.txt");
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
         SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.DUMPED_RIVATE_KEY, readStatistic, captured::add);
-        // 5HueCGU8rMjxECyDialwujzZLVzfKkmvNoBm41ktLzmVqKS3khF is WIF for private key = 1 (mainnet, uncompressed)
 
         // act
-        secretsFile.processLine("5HueCGU8rMjxECyDialwujzZLVzfKkmvNoBm41ktLzmVqKS3khF");
+        secretsFile.processLine(staticKey.privateKeyWiFUncompressed);
 
         // assert
-        assertThat(captured.get(0)[0], is(equalTo(BigInteger.ONE)));
+        assertThat(captured.get(0)[0], is(equalTo(staticKey.privateKeyBigInteger)));
     }
 
     @Test
