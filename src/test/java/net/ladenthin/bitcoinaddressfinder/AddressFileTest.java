@@ -67,9 +67,7 @@ public class AddressFileTest {
         // arrange
         File file = folder.newFile("addresses.txt");
         ReadStatistic readStatistic = new ReadStatistic();
-        List<AddressToCoin> addressCapture = new ArrayList<>();
-        List<String> unsupportedCapture = new ArrayList<>();
-        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, unsupportedCapture::add);
+        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressToCoin -> {}, line -> {});
 
         // act
         addressFile.processLine(P2PKH.Bitcoin.getPublicAddress());
@@ -117,9 +115,7 @@ public class AddressFileTest {
         // arrange
         File file = folder.newFile("addresses.txt");
         ReadStatistic readStatistic = new ReadStatistic();
-        List<AddressToCoin> addressCapture = new ArrayList<>();
-        List<String> unsupportedCapture = new ArrayList<>();
-        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, unsupportedCapture::add);
+        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressToCoin -> {}, line -> {});
 
         // act
         addressFile.processLine("");
