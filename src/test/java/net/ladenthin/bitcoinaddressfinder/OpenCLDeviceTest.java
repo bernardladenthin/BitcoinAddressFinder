@@ -19,6 +19,7 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -39,6 +40,32 @@ import org.jocl.cl_device_id;
 
 public class OpenCLDeviceTest {
     
+    // <editor-fold defaultstate="collapsed" desc="getByteOrder">
+    @Test
+    public void getByteOrder_endianLittleTrue_returnsLittleEndian() {
+        // arrange
+        OpenCLDevice device = createTestDeviceWithEndianness(true);
+
+        // act
+        ByteOrder result = device.getByteOrder();
+
+        // assert
+        assertThat(result, is(equalTo(ByteOrder.LITTLE_ENDIAN)));
+    }
+
+    @Test
+    public void getByteOrder_endianLittleFalse_returnsBigEndian() {
+        // arrange
+        OpenCLDevice device = createTestDeviceWithEndianness(false);
+
+        // act
+        ByteOrder result = device.getByteOrder();
+
+        // assert
+        assertThat(result, is(equalTo(ByteOrder.BIG_ENDIAN)));
+    }
+    // </editor-fold>
+
     // <editor-fold defaultstate="collapsed" desc="toStringPretty">
     @Test
     @OpenCLTest
@@ -268,5 +295,23 @@ public class OpenCLDeviceTest {
         assertThat(version.toString(), equalTo("3.0"));
     }
 
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="helper">
+    // CL_DEVICE_TYPE_GPU = (1 << 2) = 4, used as a plain literal to avoid native library loading
+    private static final long DEVICE_TYPE_GPU = 4L;
+
+    private static OpenCLDevice createTestDeviceWithEndianness(boolean endianLittle) {
+        return new OpenCLDevice(
+            new cl_device_id(), "TestDevice", "TestVendor", "1.0",
+            "FULL_PROFILE", "OpenCL 2.0", "", DEVICE_TYPE_GPU,
+            endianLittle, 1, 1L, ImmutableList.of(64L), 64L, 1000L, 32,
+            1024L * 1024L, 1024L * 1024L * 1024L, 0L, 1,
+            32L * 1024L, 64L * 1024L, 0L,
+            1, 128, 8, 0L,
+            4096L, 4096L, 2048L, 2048L, 2048L,
+            1, 1, 1, 1, 1, 1
+        );
+    }
     // </editor-fold>
 }
