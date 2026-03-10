@@ -337,6 +337,35 @@ After modifying or creating any `*Test.java` file, automatically verify that all
 
 ---
 
+## Pull Request Workflow
+
+After pushing commits to a feature branch, **always** create a pull request automatically using the `gh` CLI (if available):
+
+```bash
+gh pr create \
+  --title "<short summary of changes>" \
+  --body "$(cat <<'EOF'
+## Summary
+- <bullet points describing what changed and why>
+
+## Test plan
+- [ ] Relevant test classes pass
+- [ ] Full CI matrix passes
+
+<session URL>
+EOF
+)"
+```
+
+After creating the PR, **monitor CI results** and fix any failures without waiting to be asked:
+
+1. Poll check status: `gh pr checks <number> --watch` (or `gh run list` / `gh run view`)
+2. If a check fails, read the log (`gh run view <run-id> --log-failed`), identify the root cause, fix it, commit, and push.
+3. Repeat until all required checks pass.
+4. If `gh` is not available in the current environment, note this to the user so they can verify CI results manually.
+
+---
+
 ## Key Design Principles
 
 1. **Performance first** — key generation is the hot path; minimize allocations, use byte arrays not objects.
