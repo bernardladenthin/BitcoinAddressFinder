@@ -61,7 +61,7 @@ public class FileHelperTest {
 
         // assert
         assertThat(result, hasSize(1));
-        assertThat(result.get(0).getPath(), is(equalTo(path)));
+        assertThat(result.get(0), is(equalTo(new File(path))));
     }
 
     @Test
@@ -74,9 +74,9 @@ public class FileHelperTest {
 
         // assert
         assertThat(result, hasSize(3));
-        assertThat(result.get(0).getPath(), is(equalTo("/first/file.txt")));
-        assertThat(result.get(1).getPath(), is(equalTo("/second/file.txt")));
-        assertThat(result.get(2).getPath(), is(equalTo("/third/file.txt")));
+        assertThat(result.get(0), is(equalTo(new File(paths.get(0)))));
+        assertThat(result.get(1), is(equalTo(new File(paths.get(1)))));
+        assertThat(result.get(2), is(equalTo(new File(paths.get(2)))));
     }
     // </editor-fold>
 
