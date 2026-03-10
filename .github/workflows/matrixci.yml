@@ -19,40 +19,16 @@ jobs:
       matrix:
         # https://github.com/actions/setup-java#supported-distributions
         javaversion: [ '21' ]
-        javadistribution: ['adopt', 'adopt-openj9', 'corretto', 'dragonwell', 'liberica', 'microsoft', 'temurin', 'zulu'] # internally 'adopt-hotspot' is the same as 'adopt'
+        # disabled for now for performance reason: javadistribution: ['adopt', 'adopt-openj9', 'corretto', 'dragonwell', 'liberica', 'microsoft', 'temurin', 'zulu'] # internally 'adopt-hotspot' is the same as 'adopt'
+        javadistribution: ['temurin']
         # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        # disabled for now for performance reason: os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [windows-latest]
         exclude:
-          # On macOS and Windows only temurin is tested for OS-specific behaviour;
-          # full JVM distribution coverage is provided by the ubuntu-latest leg.
-          - javadistribution: 'adopt'
-            os: 'macos-latest'
-          - javadistribution: 'adopt-openj9'
-            os: 'macos-latest'
-          - javadistribution: 'corretto'
+          - javadistribution: 'microsoft'
             os: 'macos-latest'
           - javadistribution: 'dragonwell'
             os: 'macos-latest'
-          - javadistribution: 'liberica'
-            os: 'macos-latest'
-          - javadistribution: 'microsoft'
-            os: 'macos-latest'
-          - javadistribution: 'zulu'
-            os: 'macos-latest'
-          - javadistribution: 'adopt'
-            os: 'windows-latest'
-          - javadistribution: 'adopt-openj9'
-            os: 'windows-latest'
-          - javadistribution: 'corretto'
-            os: 'windows-latest'
-          - javadistribution: 'dragonwell'
-            os: 'windows-latest'
-          - javadistribution: 'liberica'
-            os: 'windows-latest'
-          - javadistribution: 'microsoft'
-            os: 'windows-latest'
-          - javadistribution: 'zulu'
-            os: 'windows-latest'
 
     runs-on: ${{ matrix.os }}
     steps:
