@@ -51,15 +51,14 @@ public class AddressFileTest {
         File file = folder.newFile("addresses.txt");
         ReadStatistic readStatistic = new ReadStatistic();
         List<AddressToCoin> addressCapture = new ArrayList<>();
-        List<String> unsupportedCapture = new ArrayList<>();
-        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, unsupportedCapture::add);
+        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, line -> {});
 
         // act
         addressFile.processLine(P2PKH.Bitcoin.getPublicAddress());
 
         // assert
         assertThat(addressCapture.size(), is(equalTo(1)));
-        assertThat(unsupportedCapture.size(), is(equalTo(0)));
+        assertThat(addressCapture.get(0).type(), is(equalTo(AddressType.P2PKH_OR_P2SH)));
     }
 
     @Test
@@ -82,32 +81,30 @@ public class AddressFileTest {
         File file = folder.newFile("addresses.txt");
         ReadStatistic readStatistic = new ReadStatistic();
         List<AddressToCoin> addressCapture = new ArrayList<>();
-        List<String> unsupportedCapture = new ArrayList<>();
-        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, unsupportedCapture::add);
+        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, line -> {});
 
         // act
         addressFile.processLine(P2WPKH.Bitcoin.getPublicAddress());
 
         // assert
         assertThat(addressCapture.size(), is(equalTo(1)));
-        assertThat(unsupportedCapture.size(), is(equalTo(0)));
+        assertThat(addressCapture.get(0).type(), is(equalTo(AddressType.P2WPKH)));
     }
 
     @Test
-    public void processLine_emptyLine_unsupportedConsumerCalledOnce() throws IOException {
+    public void processLine_emptyLine_unsupportedConsumerReceivesEmptyString() throws IOException {
         // arrange
         File file = folder.newFile("addresses.txt");
         ReadStatistic readStatistic = new ReadStatistic();
-        List<AddressToCoin> addressCapture = new ArrayList<>();
         List<String> unsupportedCapture = new ArrayList<>();
-        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, unsupportedCapture::add);
+        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressToCoin -> {}, unsupportedCapture::add);
 
         // act
         addressFile.processLine("");
 
         // assert
-        assertThat(addressCapture.size(), is(equalTo(0)));
         assertThat(unsupportedCapture.size(), is(equalTo(1)));
+        assertThat(unsupportedCapture.get(0), is(equalTo("")));
     }
 
     @Test
@@ -125,37 +122,35 @@ public class AddressFileTest {
     }
 
     @Test
-    public void processLine_commentLine_unsupportedConsumerCalledOnce() throws IOException {
+    public void processLine_commentLine_unsupportedConsumerReceivesCommentString() throws IOException {
         // arrange
         File file = folder.newFile("addresses.txt");
         ReadStatistic readStatistic = new ReadStatistic();
-        List<AddressToCoin> addressCapture = new ArrayList<>();
         List<String> unsupportedCapture = new ArrayList<>();
-        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, unsupportedCapture::add);
+        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressToCoin -> {}, unsupportedCapture::add);
 
         // act
         addressFile.processLine("# this is a comment");
 
         // assert
-        assertThat(addressCapture.size(), is(equalTo(0)));
         assertThat(unsupportedCapture.size(), is(equalTo(1)));
+        assertThat(unsupportedCapture.get(0), is(equalTo("# this is a comment")));
     }
 
     @Test
-    public void processLine_addressHeaderLine_unsupportedConsumerCalledOnce() throws IOException {
+    public void processLine_addressHeaderLine_unsupportedConsumerReceivesHeaderString() throws IOException {
         // arrange
         File file = folder.newFile("addresses.txt");
         ReadStatistic readStatistic = new ReadStatistic();
-        List<AddressToCoin> addressCapture = new ArrayList<>();
         List<String> unsupportedCapture = new ArrayList<>();
-        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, unsupportedCapture::add);
+        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressToCoin -> {}, unsupportedCapture::add);
 
         // act
         addressFile.processLine(AddressTxtLine.ADDRESS_HEADER);
 
         // assert
-        assertThat(addressCapture.size(), is(equalTo(0)));
         assertThat(unsupportedCapture.size(), is(equalTo(1)));
+        assertThat(unsupportedCapture.get(0), is(equalTo(AddressTxtLine.ADDRESS_HEADER)));
     }
 
     @Test
@@ -164,8 +159,7 @@ public class AddressFileTest {
         File file = folder.newFile("addresses.txt");
         ReadStatistic readStatistic = new ReadStatistic();
         List<AddressToCoin> addressCapture = new ArrayList<>();
-        List<String> unsupportedCapture = new ArrayList<>();
-        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, unsupportedCapture::add);
+        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, line -> {});
 
         // act
         addressFile.processLine(P2PKH.Bitcoin.getPublicAddress());
@@ -174,6 +168,8 @@ public class AddressFileTest {
         // assert
         assertThat(readStatistic.successful, is(equalTo(2L)));
         assertThat(addressCapture.size(), is(equalTo(2)));
+        assertThat(addressCapture.get(0).type(), is(equalTo(AddressType.P2PKH_OR_P2SH)));
+        assertThat(addressCapture.get(1).type(), is(equalTo(AddressType.P2PKH_OR_P2SH)));
     }
     // </editor-fold>
 
@@ -185,14 +181,14 @@ public class AddressFileTest {
         FileUtils.writeStringToFile(file, P2PKH.Bitcoin.getPublicAddress() + "\n", StandardCharsets.UTF_8.name());
         ReadStatistic readStatistic = new ReadStatistic();
         List<AddressToCoin> addressCapture = new ArrayList<>();
-        List<String> unsupportedCapture = new ArrayList<>();
-        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, unsupportedCapture::add);
+        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, line -> {});
 
         // act
         addressFile.readFile();
 
         // assert
         assertThat(addressCapture.size(), is(equalTo(1)));
+        assertThat(addressCapture.get(0).type(), is(equalTo(AddressType.P2PKH_OR_P2SH)));
         assertThat(readStatistic.successful, is(equalTo(1L)));
     }
 
@@ -201,17 +197,14 @@ public class AddressFileTest {
         // arrange
         File file = folder.newFile("addresses.txt");
         ReadStatistic readStatistic = new ReadStatistic();
-        List<AddressToCoin> addressCapture = new ArrayList<>();
-        List<String> unsupportedCapture = new ArrayList<>();
-        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, unsupportedCapture::add);
+        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressToCoin -> {}, line -> {});
 
         // act
         addressFile.readFile();
 
         // assert
-        assertThat(addressCapture.size(), is(equalTo(0)));
-        assertThat(unsupportedCapture.size(), is(equalTo(0)));
         assertThat(readStatistic.successful, is(equalTo(0L)));
+        assertThat(readStatistic.getUnsupportedTotal(), is(equalTo(0L)));
     }
 
     @Test
@@ -232,8 +225,11 @@ public class AddressFileTest {
 
         // assert
         assertThat(addressCapture.size(), is(equalTo(2)));
+        assertThat(addressCapture.get(0).type(), is(equalTo(AddressType.P2PKH_OR_P2SH)));
+        assertThat(addressCapture.get(1).type(), is(equalTo(AddressType.P2PKH_OR_P2SH)));
         assertThat(readStatistic.successful, is(equalTo(2L)));
         assertThat(unsupportedCapture.size(), is(equalTo(1)));
+        assertThat(unsupportedCapture.get(0), is(equalTo("# comment line")));
         assertThat(readStatistic.getUnsupportedTotal(), is(equalTo(1L)));
     }
     // </editor-fold>
