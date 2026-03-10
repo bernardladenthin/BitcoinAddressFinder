@@ -18,20 +18,20 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.List;
+import com.google.common.collect.ImmutableList;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDeviceSelection;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatformSelector;
 import org.jocl.cl_context_properties;
 import org.jocl.cl_device_id;
+import org.junit.Test;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
-import org.junit.Test;
 
 public class OpenCLPlatformSelectorTest {
 
