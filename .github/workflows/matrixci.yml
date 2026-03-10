@@ -23,10 +23,36 @@ jobs:
         # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
         os: [macos-latest, ubuntu-latest, windows-latest]
         exclude:
-          - javadistribution: 'microsoft'
+          # On macOS and Windows only temurin is tested for OS-specific behaviour;
+          # full JVM distribution coverage is provided by the ubuntu-latest leg.
+          - javadistribution: 'adopt'
+            os: 'macos-latest'
+          - javadistribution: 'adopt-openj9'
+            os: 'macos-latest'
+          - javadistribution: 'corretto'
             os: 'macos-latest'
           - javadistribution: 'dragonwell'
             os: 'macos-latest'
+          - javadistribution: 'liberica'
+            os: 'macos-latest'
+          - javadistribution: 'microsoft'
+            os: 'macos-latest'
+          - javadistribution: 'zulu'
+            os: 'macos-latest'
+          - javadistribution: 'adopt'
+            os: 'windows-latest'
+          - javadistribution: 'adopt-openj9'
+            os: 'windows-latest'
+          - javadistribution: 'corretto'
+            os: 'windows-latest'
+          - javadistribution: 'dragonwell'
+            os: 'windows-latest'
+          - javadistribution: 'liberica'
+            os: 'windows-latest'
+          - javadistribution: 'microsoft'
+            os: 'windows-latest'
+          - javadistribution: 'zulu'
+            os: 'windows-latest'
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -38,7 +64,7 @@ jobs:
         distribution: ${{ matrix.javadistribution }}
         cache: maven
     - name: Build with Maven
-      run: mvn -B "-Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=false" --update-snapshots test --file pom.xml
+      run: mvn -B --no-transfer-progress "-Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=false" test --file pom.xml
     - name: Upload Surefire Reports and JVM Crash Logs
       if: always()
       uses: actions/upload-artifact@v4
