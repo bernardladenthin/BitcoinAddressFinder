@@ -30,16 +30,42 @@ public class OpenCLContextTest {
 
     private final BitHelper bitHelper = new BitHelper();
 
+    // <editor-fold defaultstate="collapsed" desc="constructor">
+    @Test
+    public void constructor_defaultConstructor_noExceptionThrown() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+
+        // act
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // assert
+        assertThat(openCLContext, is(notNullValue()));
+    }
+
+    @Test
+    public void constructor_mockLoggerGiven_noExceptionThrown() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        Logger mockLogger = mock(Logger.class);
+
+        // act
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper, mockLogger);
+
+        // assert
+        assertThat(openCLContext, is(notNullValue()));
+    }
+    // </editor-fold>
+
     // <editor-fold defaultstate="collapsed" desc="init">
     @OpenCLTest
     @Test
     public void init_defaultConfiguration_logsSelectedDeviceInfo() throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // arrange
-        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
-        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
         Logger mockLogger = mock(Logger.class);
-        openCLContext.setLogger(mockLogger);
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper, mockLogger);
 
         try {
             // act
@@ -52,22 +78,6 @@ public class OpenCLContextTest {
         } finally {
             openCLContext.close();
         }
-    }
-    // </editor-fold>
-
-    // <editor-fold defaultstate="collapsed" desc="setLogger">
-    @Test
-    public void setLogger_mockLoggerGiven_loggerReplaced() {
-        // arrange
-        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
-        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
-        Logger mockLogger = mock(Logger.class);
-
-        // act
-        openCLContext.setLogger(mockLogger);
-
-        // assert — no exception thrown, logger is set (verified indirectly via usage)
-        assertThat(mockLogger, is(notNullValue()));
     }
     // </editor-fold>
 }

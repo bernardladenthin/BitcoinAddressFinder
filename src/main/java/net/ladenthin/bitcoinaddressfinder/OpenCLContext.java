@@ -59,12 +59,7 @@ import org.slf4j.LoggerFactory;
 
 public class OpenCLContext implements ReleaseCLObject {
 
-    protected Logger logger = LoggerFactory.getLogger(this.getClass());
-    
-    @VisibleForTesting
-    void setLogger(Logger logger) {
-        this.logger = logger;
-    }
+    private final Logger logger;
 
     public String[] getOpenCLPrograms() throws IOException {
         List<String> resourceNamesContent = getResourceNamesContent(getResourceNames());
@@ -115,8 +110,14 @@ public class OpenCLContext implements ReleaseCLObject {
     private boolean closed = false;
     
     public OpenCLContext(CProducerOpenCL producerOpenCL, BitHelper bitHelper) {
+        this(producerOpenCL, bitHelper, LoggerFactory.getLogger(OpenCLContext.class));
+    }
+
+    @VisibleForTesting
+    OpenCLContext(CProducerOpenCL producerOpenCL, BitHelper bitHelper, Logger logger) {
         this.producerOpenCL = producerOpenCL;
         this.bitHelper = bitHelper;
+        this.logger = logger;
     }
     
     public void init() throws IOException {

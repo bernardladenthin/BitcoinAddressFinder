@@ -418,11 +418,15 @@ public void interrupt_keysQueueNotEmpty_consumerNotRunningWaitedInternallyForThe
 
 ### Injecting a mock logger
 
+Prefer constructor injection over setter injection (see `CODE_WRITING_GUIDE.md` for the production-side pattern):
+
 ```java
 Logger logger = mock(Logger.class);
 when(logger.isTraceEnabled()).thenReturn(true);
-objectUnderTest.setLogger(logger);
+ObjectUnderTest objectUnderTest = new ObjectUnderTest(config, logger);
 ```
+
+Legacy code may still use `setLogger()`. When touching such code, migrate to constructor injection where feasible.
 
 ### Capturing and asserting log output
 

@@ -337,6 +337,12 @@ After modifying or creating any `*Test.java` file, automatically verify that all
 
 ---
 
+## Code Writing Compliance
+
+After modifying or creating any production `.java` file, automatically verify that all rules from `CODE_WRITING_GUIDE.md` are applied to the modified class. Apply all fixable violations on your own without asking. Only report violations that cannot be resolved without a large refactoring. Consider the task complete only after all auto-fixable rules are satisfied.
+
+---
+
 ## Pull Request Workflow
 
 ### Step 1 — Detect whether `gh` is available
