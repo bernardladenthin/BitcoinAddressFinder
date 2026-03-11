@@ -255,19 +255,24 @@ The importer supports reading multiple `.txt` or `.text` files, each containing 
 * **P2SH** – Pay to Script Hash
   Base58-encoded address type used for multisig and other script-based spending conditions.
 
+* **P2WPKH** – Pay to Witness Public Key Hash
+  Native SegWit v0 address, encoded in **Bech32**. One private key deterministically produces one address.
+
+#### Unsupported Address Types
+
 * **P2MS** – Pay to Multisig
   Custom format prefixed with `d-`, `m-`, or `s-` (e.g. `m-<script>`).
-
-* **P2WPKH** – Pay to Witness Public Key Hash
-  Native SegWit v0 address, encoded in **Bech32**.
+  ❌ **Not Supported:** Script-based format. Private keys cannot deterministically generate P2MS addresses without knowing the script.
 
 * **P2WSH** – Pay to Witness Script Hash
   Native SegWit v0 address for scripts, encoded in **Bech32**.
+  ❌ **Not Supported:** Script Hash format. Addresses depend on the script hash, not directly on the public key.
 
 * **P2TR** – Pay to Taproot
   Native SegWit v1 (Taproot) address, encoded using **Bech32m**.
+  ❌ **Not Supported:** Requires key tweaking based on an optional script. Without knowing the script, you cannot generate matching P2TR addresses from a private key. One private key can create infinite different P2TR addresses. This breaks the tool's design, which maps private keys to deterministic addresses.
 
-> **Note:**
+> **Note on Witness Versions:**
 > Bech32 was introduced in [BIP-173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki) for SegWit v0 (P2WPKH, P2WSH).
 > Bech32m, defined in [BIP-350](https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki), is used for SegWit v1 (P2TR).
 
