@@ -777,3 +777,4 @@ public record OpenCLPlatform(...) { ... }
 - [ ] Multi-line expected strings use Java text blocks (`""" ... """`).
 - [ ] Records with mutable third-party fields use `@SuppressWarnings("Immutable")` on the specific field.
 - [ ] Behaviour injection in production constructors uses functional interfaces (`Consumer<T>`, `Function<T,R>`) rather than subclassing.
+- [ ] Existing correct inline comments in modified test code are preserved — only removed if factually wrong or describing deleted code.
