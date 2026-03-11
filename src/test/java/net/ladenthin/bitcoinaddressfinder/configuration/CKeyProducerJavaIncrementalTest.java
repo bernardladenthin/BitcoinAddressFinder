@@ -120,6 +120,19 @@ public class CKeyProducerJavaIncrementalTest {
     }
 
     @Test
+    public void getEndAddress_maxPrivateKeyHexEndAddress_returnsMaxPrivateKey() {
+        // arrange
+        CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
+        sut.endAddress = PublicKeyBytes.MAX_PRIVATE_KEY_HEX;
+
+        // act
+        BigInteger result = sut.getEndAddress();
+
+        // assert
+        assertThat(result, is(equalTo(PublicKeyBytes.MAX_PRIVATE_KEY)));
+    }
+
+    @Test
     public void getEndAddress_minValidPrivateKeyHexEndAddress_returnsMinValidPrivateKey() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
