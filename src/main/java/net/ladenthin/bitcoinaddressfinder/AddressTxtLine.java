@@ -19,9 +19,6 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import com.google.common.hash.Hashing;
-import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.nio.ByteBuffer;
 import org.bitcoinj.base.Base58;
 import org.bitcoinj.base.Bech32;
 import org.bitcoinj.base.Coin;
@@ -30,6 +27,8 @@ import org.bitcoinj.base.exceptions.AddressFormatException;
 import org.bouncycastle.util.encoders.DecoderException;
 import org.jspecify.annotations.NonNull;
 
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 /**
  * Most txt files have a common format which uses Base58 address and separated
@@ -89,6 +88,8 @@ public class AddressTxtLine {
     * encoded using Bech32m as specified in <a href="https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki">BIP-350</a>.
     */
    private static final int WITNESS_VERSION_1 = 1;
+
+    Bech32Helper bech32Helper = new Bech32Helper();
     
     /**
      * Parses a line containing an address and optional amount.
@@ -164,9 +165,9 @@ public class AddressTxtLine {
             Bech32.Bech32Data bechData = Bech32.decode(address);
             
             // protected: bechData.witnessVersion();
-            short witnessVersion = invokeProtectedMethod(bechData, "witnessVersion", Short.class);
+            short witnessVersion = bech32Helper.getWitnessVersion(bechData);
             // protected: bechData.witnessProgram();
-            byte[] witnessProgram = invokeProtectedMethod(bechData, "witnessProgram", byte[].class);
+            byte[] witnessProgram = bech32Helper.getWitnessPrograms(bechData);
             
             switch (witnessVersion) {
                 case WITNESS_VERSION_0:
@@ -207,7 +208,7 @@ public class AddressTxtLine {
         try {
             // Bitcoin Cash 'q' prefix: convert to legacy address
             if (address.startsWith("q")) {
-                byte[] payload = extractPKHFromBitcoinCashAddress(address);
+                byte[] payload = bech32Helper.extractPKHFromBitcoinCashAddress(address);
                 ByteBuffer hash160 = keyUtility.byteBufferUtility().byteArrayToByteBuffer(payload);
                 return new AddressToCoin(hash160, amount, AddressType.P2PKH_OR_P2SH);
             }
@@ -225,86 +226,8 @@ public class AddressTxtLine {
             throw new AddressFormatNotAcceptedException(REASON_INVALID_BASE58);
         }
     }
-
-    public static byte[] extractPKHFromBitcoinCashAddress(String address) throws ReflectiveOperationException {
-        if (address.startsWith(BITCOIN_CASH_PREFIX)) {
-            address = address.substring(BITCOIN_CASH_PREFIX.length());
-        }
-        byte[] decoded5 = decodeBech32CharsetToValues(address);
-        byte[] decoded8 = decode5to8WithPadding(decoded5);
-        // Extracts the payload portion from the decoded Bech32 data.
-        // Skips the first byte (address type/version) and removes the last 6 bytes (checksum).
-        // The result is the raw payload encoded in 5-bit format.
-        byte[] payload = Arrays.copyOfRange(decoded8, 1, decoded8.length - 6);
-        return payload;
-    }
     
-    @SuppressWarnings("unchecked")
-    private <T> T invokeProtectedMethod(Bech32.Bech32Bytes bech32Bytes, String methodName, Class<T> returnType) throws ReflectiveOperationException  {
-        Class<?> clazz = Bech32.Bech32Bytes.class;
-        Method method = clazz.getDeclaredMethod(methodName);
-        method.setAccessible(true);
-        return (T) method.invoke(bech32Bytes);
-    }
-    
-    public static byte[] decodeBech32CharsetToValues(String base32String) {
-        // Bech32 character set as defined in BIP-0173
-        final String CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
-
-        // Prepare lookup table for fast character-to-value resolution
-        int[] lookup = new int[128];
-        Arrays.fill(lookup, -1);
-        for (int i = 0; i < CHARSET.length(); i++) {
-            lookup[CHARSET.charAt(i)] = i;
-        }
-
-        // Decode characters to 5-bit values
-        int len = base32String.length();
-        byte[] result = new byte[len];
-        for (int i = 0; i < len; i++) {
-            char c = base32String.charAt(i);
-            if (c >= 128 || lookup[c] == -1) {
-                throw new IllegalArgumentException("Invalid character in Bech32 string: " + c);
-            }
-            result[i] = (byte) lookup[c];
-        }
-
-        return result;
-    }
-    
-    /**
-     * Return the data, fully-decoded with 8-bits per byte.
-     * @return The data, fully-decoded as a byte array.
-     */
-    private static byte[] decode5to8(byte[] bytes) throws ReflectiveOperationException {
-        return invokeConvertBitsStatic(bytes, 0, bytes.length, 5, 8, false);
-    }
-    
-    private static byte[] decode5to8WithPadding(byte[] bytes) throws ReflectiveOperationException {
-        return invokeConvertBitsStatic(bytes, 0, bytes.length, 5, 8, true);
-    }
-    
-    private static byte[] encode8to5(byte[] data) throws ReflectiveOperationException {
-        return invokeConvertBitsStatic(data, 0, data.length, 8, 5, true);
-    }
-    
-    @SuppressWarnings("unchecked")
-    private static byte[] invokeConvertBitsStatic(byte[] in, int inStart, int inLen, int fromBits, int toBits, boolean pad) throws ReflectiveOperationException {
-        Method method = Bech32.class.getDeclaredMethod("convertBits", byte[].class, int.class, int.class, int.class, int.class, boolean.class);
-        method.setAccessible(true);
-        try {
-            return (byte[]) method.invoke(null, in, inStart, inLen, fromBits, toBits, pad);
-        } catch (ReflectiveOperationException e) {
-            // rethrow AddressFormatException if it's the underlying cause
-            Throwable cause = e.getCause();
-            if (cause instanceof AddressFormatException) {
-                throw (AddressFormatException) cause;
-            }
-            throw e;
-        }
-    }
-    
-    AddressToCoin parseBase58Address(String base58, int versionBytes, int checksumBytes, KeyUtility keyUtility) {
+    static AddressToCoin parseBase58Address(String base58, int versionBytes, int checksumBytes, KeyUtility keyUtility) {
         byte[] decoded = Base58.decode(base58);
         
         final byte[] version;
