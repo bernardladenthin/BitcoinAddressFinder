@@ -221,9 +221,9 @@ public class Base36DecoderTest {
     }
 
     @Test(expected = NumberFormatException.class)
-    public void decodeBase36ToFixedLengthBytes_invalidCharacterG_throwsException() {
+    public void decodeBase36ToFixedLengthBytes_invalidCharacterSpace_throwsException() {
         // arrange
-        String invalidBase36 = "123g456"; // 'g' is invalid in base36
+        String invalidBase36 = "123 456"; // space is invalid in base36
 
         // act
         decoder.decodeBase36ToFixedLengthBytes(invalidBase36, 20);
