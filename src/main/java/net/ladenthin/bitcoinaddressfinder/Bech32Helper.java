@@ -30,8 +30,11 @@ public class Bech32Helper {
 
     /**
      * Bech32 character set as defined in BIP-0173.
+     * The position of each character in this string defines its 5-bit integer value (0–31).
+     *
+     * @see <a href="https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki">BIP-173</a>
      */
-    final static String CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+    public static final String CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
     /**
      * Lookup table for fast Bech32 character-to-value resolution.
@@ -45,6 +48,16 @@ public class Bech32Helper {
         }
     }
 
+    /**
+     * Decodes a Bech32-encoded string into an array of 5-bit integer values.
+     * Each character is looked up in {@link #CHARSET}; its index (0–31) becomes
+     * the corresponding byte in the result.
+     *
+     * @param base32String the Bech32 character string to decode; must contain only characters
+     *                     present in {@link #CHARSET}
+     * @return a byte array of 5-bit values, one per input character
+     * @throws IllegalArgumentException if any character is not in the Bech32 character set
+     */
     public byte[] decodeBech32CharsetToValues(String base32String) {
         // Decode characters to 5-bit values
         int len = base32String.length();
@@ -92,6 +105,17 @@ public class Bech32Helper {
         }
     }
 
+    /**
+     * Extracts the raw 20-byte Public Key Hash (PKH) from a Bitcoin Cash CashAddr address.
+     * The optional {@code bitcoincash:} prefix is stripped if present before decoding.
+     * After Bech32 decoding, the first byte (address type/version) and the last 6 bytes
+     * (CashAddr checksum) are discarded; the remaining bytes form the PKH.
+     *
+     * @param address the Bitcoin Cash CashAddr address, with or without the {@code bitcoincash:} prefix
+     * @return the 20-byte PKH extracted from the address
+     * @throws ReflectiveOperationException if the internal {@code Bech32.convertBits} method
+     *                                      cannot be accessed via reflection
+     */
     public byte[] extractPKHFromBitcoinCashAddress(String address) throws ReflectiveOperationException {
         if (address.startsWith(BITCOIN_CASH_PREFIX)) {
             address = address.substring(BITCOIN_CASH_PREFIX.length());
@@ -104,10 +128,32 @@ public class Bech32Helper {
         return Arrays.copyOfRange(decoded8, 1, decoded8.length - 6);
     }
 
+    /**
+     * Returns the witness program bytes from a decoded Bech32 SegWit address.
+     * Accesses the protected {@code witnessProgram()} method of {@link Bech32.Bech32Data}
+     * via reflection because it is not exposed in the public API.
+     *
+     * @param bechData the decoded Bech32 data, typically obtained from {@link Bech32#decode(String)}
+     * @return the raw witness program bytes (e.g., the 20-byte PKH for P2WPKH)
+     * @throws ReflectiveOperationException if the protected method cannot be accessed
+     */
     public byte[] getWitnessPrograms(Bech32.Bech32Data bechData) throws ReflectiveOperationException {
         return invokeProtectedMethod(bechData, "witnessProgram", byte[].class);
     }
 
+    /**
+     * Returns the witness version from a decoded Bech32 SegWit address.
+     * Accesses the protected {@code witnessVersion()} method of {@link Bech32.Bech32Data}
+     * via reflection because it is not exposed in the public API.
+     * <ul>
+     *   <li>Version 0 — P2WPKH and P2WSH (BIP-173)</li>
+     *   <li>Version 1 — P2TR / Taproot (BIP-341, encoded with Bech32m per BIP-350)</li>
+     * </ul>
+     *
+     * @param bechData the decoded Bech32 data, typically obtained from {@link Bech32#decode(String)}
+     * @return the witness version as a {@link Short}
+     * @throws ReflectiveOperationException if the protected method cannot be accessed
+     */
     public Short getWitnessVersion(Bech32.Bech32Data bechData) throws ReflectiveOperationException {
         return invokeProtectedMethod(bechData, "witnessVersion", Short.class);
     }

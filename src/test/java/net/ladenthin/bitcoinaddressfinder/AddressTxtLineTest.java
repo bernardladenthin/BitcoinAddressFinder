@@ -18,8 +18,6 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.nio.ByteBuffer;
-
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import org.apache.commons.codec.DecoderException;
@@ -335,36 +333,4 @@ public class AddressTxtLineTest {
     }
     // </editor-fold>
 
-    // <editor-fold defaultstate="collapsed" desc="extractPKHFromBitcoinCashAddress">
-    @Test
-    public void extractPKHFromBitcoinCashAddress_withoutPrefix_returnsCorrectHash160() throws ReflectiveOperationException {
-        // arrange
-        P2PKH address = P2PKH.BitcoinCash;
-
-        // act
-        byte[] hash160 = new Bech32Helper().extractPKHFromBitcoinCashAddress(address.getPublicAddress());
-
-        // assert
-        ByteBuffer buffer = keyUtility.byteBufferUtility().byteArrayToByteBuffer(hash160);
-        String actualHashHex = keyUtility.byteBufferUtility().getHexFromByteBuffer(buffer);
-        assertThat(actualHashHex, is(equalTo(address.getPublicKeyHashAsHex())));
-    }
-
-    @Test
-    public void extractPKHFromBitcoinCashAddress_withPrefix_returnsCorrectHash160() throws ReflectiveOperationException {
-        // arrange
-        P2PKH address = P2PKH.BitcoinCashWithPrefix;
-
-        // pre-assert
-        assertThat(address.getPublicAddress(), startsWith(AddressTxtLine.BITCOIN_CASH_PREFIX));
-
-        // act
-        byte[] hash160 = new Bech32Helper().extractPKHFromBitcoinCashAddress(address.getPublicAddress());
-
-        // assert
-        ByteBuffer buffer = keyUtility.byteBufferUtility().byteArrayToByteBuffer(hash160);
-        String actualHashHex = keyUtility.byteBufferUtility().getHexFromByteBuffer(buffer);
-        assertThat(actualHashHex, is(equalTo(address.getPublicKeyHashAsHex())));
-    }
-    // </editor-fold>
 }
