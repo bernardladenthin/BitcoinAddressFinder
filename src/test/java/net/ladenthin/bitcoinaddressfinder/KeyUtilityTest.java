@@ -27,6 +27,7 @@ import java.util.Random;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
+import org.bitcoinj.base.LegacyAddress;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
 import org.junit.Before;
@@ -608,6 +609,113 @@ public class KeyUtilityTest {
         // too short
         byte[] invalid = new byte[31];
         keyUtility.bigIntegerFromUnsignedByteArray(invalid);
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="toBase58">
+    @Test
+    public void toBase58_knownHash160_returnsExpectedBase58Address() {
+        // arrange
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+        StaticKey staticKey = new StaticKey();
+        byte[] hash160 = new ByteBufferUtility(false).byteBufferToBytes(staticKey.byteBufferPublicKeyUncompressed);
+
+        // act
+        String result = keyUtility.toBase58(hash160);
+
+        // assert
+        assertThat(result, is(equalTo(staticKey.publicKeyUncompressed)));
+    }
+
+    @Test
+    public void toBase58_compressedHash160_returnsExpectedBase58Address() {
+        // arrange
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+        StaticKey staticKey = new StaticKey();
+        byte[] hash160 = new ByteBufferUtility(false).byteBufferToBytes(staticKey.byteBufferPublicKeyCompressed);
+
+        // act
+        String result = keyUtility.toBase58(hash160);
+
+        // assert
+        assertThat(result, is(equalTo(staticKey.publicKeyCompressed)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="addressToByteBuffer">
+    @Test
+    public void addressToByteBuffer_validAddress_returnsCorrectByteBuffer() {
+        // arrange
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+        StaticKey staticKey = new StaticKey();
+        LegacyAddress address = LegacyAddress.fromBase58(staticKey.publicKeyUncompressed, network);
+
+        // act
+        ByteBuffer result = keyUtility.addressToByteBuffer(address);
+
+        // assert
+        assertThat(result, is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
+    }
+
+    @Test
+    public void addressToByteBuffer_roundTripWithByteBufferToAddress_returnsOriginalAddress() {
+        // arrange
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+        StaticKey staticKey = new StaticKey();
+        LegacyAddress originalAddress = LegacyAddress.fromBase58(staticKey.publicKeyCompressed, network);
+
+        // act
+        ByteBuffer buffer = keyUtility.addressToByteBuffer(originalAddress);
+        LegacyAddress roundTripped = keyUtility.byteBufferToAddress(buffer);
+
+        // assert
+        assertThat(roundTripped, is(equalTo(originalAddress)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="byteBufferToAddress">
+    @Test
+    public void byteBufferToAddress_validBuffer_returnsCorrectAddress() {
+        // arrange
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+        StaticKey staticKey = new StaticKey();
+
+        // act
+        LegacyAddress result = keyUtility.byteBufferToAddress(staticKey.byteBufferPublicKeyCompressed);
+
+        // assert
+        assertThat(result.toBase58(), is(equalTo(staticKey.publicKeyCompressed)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="createMnemonics">
+    @Test
+    public void createMnemonics_validPrivateKeyBytes_returnsNonEmptyMnemonicString() {
+        // arrange
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+        StaticKey staticKey = new StaticKey();
+
+        // act
+        String result = keyUtility.createMnemonics(staticKey.privateKeyBytes);
+
+        // assert
+        assertThat(result, not(emptyOrNullString()));
+        assertThat(result, containsString("Mnemonic:"));
+    }
+
+    @Test
+    public void createMnemonics_validPrivateKeyBytes_containsAllWordLists() {
+        // arrange
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+        StaticKey staticKey = new StaticKey();
+
+        // act
+        String result = keyUtility.createMnemonics(staticKey.privateKeyBytes);
+
+        // assert
+        for (BIP39Wordlist wordList : BIP39Wordlist.values()) {
+            assertThat(result, containsString(wordList.name()));
+        }
     }
     // </editor-fold>
 }
