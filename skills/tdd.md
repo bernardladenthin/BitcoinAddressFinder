@@ -118,3 +118,57 @@ public class Bech32HelperTest {
     // </editor-fold>
 }
 ```
+
+---
+
+## 3. Master Prompt Template — Self-Learning Refactoring
+
+Use this template when extracting static methods into a helper class. The key addition is the **self-check loop at the end**: after completing the refactoring, assess whether the practice was useful and document any new patterns discovered.
+
+### Template
+
+```
+Extract static methods [METHOD_NAMES] from [SOURCE_CLASS] into a new non-static helper class [HELPER_CLASS].
+
+Follow skills/tdd.md § 1. Create [TEST_CLASS] with full coverage per TEST_WRITING_GUIDE.md.
+Move existing tests from [SOURCE_TEST_CLASS] to [TEST_CLASS].
+Follow CODE_WRITING_GUIDE.md and CLAUDE.md for all production and test code.
+
+After completion:
+- Assess if this practice was useful (code clarity, testability, reusability).
+- If useful and not yet documented: document it clearly in skills/tdd.md, TEST_WRITING_GUIDE.md,
+  CODE_WRITING_GUIDE.md, or CLAUDE.md as appropriate.
+```
+
+### Example
+
+```
+Extract static methods decodeBech32CharsetToValues, decode5to8, decode5to8WithPadding, encode8to5
+from AddressTxtLine into a new non-static helper class Bech32Helper.
+
+Follow skills/tdd.md § 1. Create Bech32HelperTest with full coverage per TEST_WRITING_GUIDE.md.
+Move existing tests from AddressTxtLineTest to Bech32HelperTest.
+Follow CODE_WRITING_GUIDE.md and CLAUDE.md for all production and test code.
+
+After completion:
+- Assess if this practice was useful (code clarity, testability, reusability).
+- If useful and not yet documented: document it clearly in skills/tdd.md, TEST_WRITING_GUIDE.md,
+  CODE_WRITING_GUIDE.md, or CLAUDE.md as appropriate.
+```
+
+### Why the Documentation Loop?
+
+This refactoring pattern is powerful for:
+- **Testability**: extracted methods can be unit-tested in isolation.
+- **Reusability**: the helper becomes a recognized, documented component.
+- **Clarity**: domain classes stay focused on their primary responsibility.
+
+However, the pattern is only truly **useful** if:
+1. The extracted methods are genuinely related (2+ methods, same concept).
+2. The extracted methods have a stable API.
+3. The helper class is **documented** in the guides so future developers know it exists.
+
+The **self-check loop** ensures that:
+- Ad-hoc extractions don't create undocumented utility classes.
+- Patterns that prove useful across multiple refactorings become formal, codified guidance.
+- The guides grow organically as the codebase evolves.
