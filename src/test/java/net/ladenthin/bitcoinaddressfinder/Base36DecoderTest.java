@@ -64,15 +64,13 @@ public class Base36DecoderTest {
         // arrange
         String base36Encoded = "0";
         int expectedLength = 20;
+        byte[] expectedAllZeros = new byte[expectedLength];
 
         // act
         byte[] result = decoder.decodeBase36ToFixedLengthBytes(base36Encoded, expectedLength);
 
         // assert
-        assertThat(result.length, is(equalTo(expectedLength)));
-        for (byte b : result) {
-            assertThat(b, is(equalTo((byte) 0)));
-        }
+        assertThat(result, is(expectedAllZeros));
     }
     // </editor-fold>
 
@@ -82,7 +80,8 @@ public class Base36DecoderTest {
         // arrange
         byte[] original = {0x01, 0x02, 0x03}; // 3 bytes
         String base36Encoded = new BigInteger(1, original).toString(36);
-        int expectedLength = 20;
+        final int expectedLength = 20;
+        final int paddingLength = expectedLength - original.length;
 
         // act
         byte[] result = decoder.decodeBase36ToFixedLengthBytes(base36Encoded, expectedLength);
@@ -90,9 +89,10 @@ public class Base36DecoderTest {
         // assert
         assertThat(result.length, is(equalTo(expectedLength)));
         // The original bytes should be right-aligned (at the end)
-        assertThat(Arrays.copyOfRange(result, 17, 20), is(original));
+        assertThat(Arrays.copyOfRange(result, paddingLength, expectedLength), is(original));
         // Leading bytes should be padded with zeros
-        assertThat(Arrays.copyOfRange(result, 0, 17), is(new byte[17]));
+        byte[] expectedPadding = new byte[paddingLength];
+        assertThat(Arrays.copyOfRange(result, 0, paddingLength), is(expectedPadding));
     }
 
     @Test
@@ -100,16 +100,16 @@ public class Base36DecoderTest {
         // arrange
         byte[] original = {(byte) 0xAB};
         String base36Encoded = new BigInteger(1, original).toString(36);
+        final int targetLength = 10;
 
         // act
-        byte[] result = decoder.decodeBase36ToFixedLengthBytes(base36Encoded, 10);
+        byte[] result = decoder.decodeBase36ToFixedLengthBytes(base36Encoded, targetLength);
 
         // assert
-        assertThat(result.length, is(equalTo(10)));
-        assertThat(result[9], is(equalTo((byte) 0xAB)));
-        for (int i = 0; i < 9; i++) {
-            assertThat(result[i], is(equalTo((byte) 0)));
-        }
+        assertThat(result.length, is(equalTo(targetLength)));
+        assertThat(result[targetLength - 1], is(equalTo((byte) 0xAB)));
+        byte[] expectedPadding = new byte[targetLength - 1];
+        assertThat(Arrays.copyOfRange(result, 0, targetLength - 1), is(expectedPadding));
     }
 
     @Test
@@ -117,15 +117,17 @@ public class Base36DecoderTest {
         // arrange
         byte[] original = {0x12, 0x34};
         String base36Encoded = new BigInteger(1, original).toString(36);
-        int targetLength = 5;
+        final int targetLength = 5;
+        final int paddingLength = targetLength - original.length;
 
         // act
         byte[] result = decoder.decodeBase36ToFixedLengthBytes(base36Encoded, targetLength);
 
         // assert
         assertThat(result.length, is(equalTo(targetLength)));
-        assertThat(Arrays.copyOfRange(result, 3, 5), is(original));
-        assertThat(Arrays.copyOfRange(result, 0, 3), is(new byte[3]));
+        assertThat(Arrays.copyOfRange(result, paddingLength, targetLength), is(original));
+        byte[] expectedPadding = new byte[paddingLength];
+        assertThat(Arrays.copyOfRange(result, 0, paddingLength), is(expectedPadding));
     }
     // </editor-fold>
 
@@ -180,18 +182,15 @@ public class Base36DecoderTest {
     @Test
     public void decodeBase36ToFixedLengthBytes_allMaxBytes_decodesCorrectly() {
         // arrange
-        byte[] original = new byte[5];
-        Arrays.fill(original, (byte) 0xFF);
-        String base36Encoded = new BigInteger(1, original).toString(36);
+        byte[] expected = new byte[5];
+        Arrays.fill(expected, (byte) 0xFF);
+        String base36Encoded = new BigInteger(1, expected).toString(36);
 
         // act
-        byte[] result = decoder.decodeBase36ToFixedLengthBytes(base36Encoded, 5);
+        byte[] result = decoder.decodeBase36ToFixedLengthBytes(base36Encoded, expected.length);
 
         // assert
-        assertThat(result.length, is(equalTo(5)));
-        for (int i = 0; i < 5; i++) {
-            assertThat(result[i], is(equalTo((byte) 0xFF)));
-        }
+        assertThat(result, is(expected));
     }
     // </editor-fold>
 
