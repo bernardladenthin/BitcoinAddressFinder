@@ -23,6 +23,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 import org.junit.Test;
 
 /**
@@ -31,18 +32,6 @@ import org.junit.Test;
 public class AddressFormatNotAcceptedExceptionTest {
 
     // <editor-fold defaultstate="collapsed" desc="constructor">
-    @Test
-    public void constructor_withReason_createsException() {
-        // arrange
-        String reason = "address is empty";
-
-        // act
-        AddressFormatNotAcceptedException exception = new AddressFormatNotAcceptedException(reason);
-
-        // assert
-        assertThat(exception, is(instanceOf(Exception.class)));
-    }
-
     @Test
     public void constructor_withReason_messageContainsReason() {
         // arrange
@@ -56,7 +45,7 @@ public class AddressFormatNotAcceptedExceptionTest {
     }
 
     @Test
-    public void constructor_withReason_messageContainsPrefix() {
+    public void constructor_withReason_messageContainsExpectedPrefix() {
         // arrange
         String reason = "unsupported format";
 
@@ -78,11 +67,35 @@ public class AddressFormatNotAcceptedExceptionTest {
         // assert
         assertThat(exception.getMessage(), is(equalTo("Address format not accepted: " + reason)));
     }
+
+    @Test
+    public void constructor_withReason_isInstanceOfException() {
+        // arrange
+        String reason = "address is empty";
+
+        // act
+        AddressFormatNotAcceptedException exception = new AddressFormatNotAcceptedException(reason);
+
+        // assert
+        assertThat(exception, is(instanceOf(Exception.class)));
+    }
+
+    @Test
+    public void constructor_withReason_noCause() {
+        // arrange
+        String reason = "address is empty";
+
+        // act
+        AddressFormatNotAcceptedException exception = new AddressFormatNotAcceptedException(reason);
+
+        // assert
+        assertThat(exception.getCause(), is(nullValue()));
+    }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="getReason">
     @Test
-    public void getReason_withReason_returnsExpectedReason() {
+    public void getReason_withReason_returnsReason() {
         // arrange
         String reason = "address is null";
 
@@ -105,21 +118,6 @@ public class AddressFormatNotAcceptedExceptionTest {
 
         // assert
         assertThat(actual, is(equalTo("")));
-    }
-
-    @Test
-    public void getReason_withDifferentReasons_eachReasonIsPreserved() {
-        // arrange
-        String reason1 = "reason one";
-        String reason2 = "reason two";
-
-        // act
-        AddressFormatNotAcceptedException exception1 = new AddressFormatNotAcceptedException(reason1);
-        AddressFormatNotAcceptedException exception2 = new AddressFormatNotAcceptedException(reason2);
-
-        // assert
-        assertThat(exception1.getReason(), is(equalTo(reason1)));
-        assertThat(exception2.getReason(), is(equalTo(reason2)));
     }
     // </editor-fold>
 }

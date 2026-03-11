@@ -26,95 +26,111 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import org.junit.Test;
 
+/**
+ * Unit tests for {@link NoMoreSecretsAvailableException}.
+ */
 public class NoMoreSecretsAvailableExceptionTest {
 
-    // <editor-fold defaultstate="collapsed" desc="NoMoreSecretsAvailableException">
+    // <editor-fold defaultstate="collapsed" desc="constructor">
     @Test
-    public void noMoreSecretsAvailableException_noArgConstructor_isRuntimeException() {
-        // arrange, act
-        NoMoreSecretsAvailableException ex = new NoMoreSecretsAvailableException();
+    public void constructor_noArg_isInstanceOfRuntimeException() {
+        // act
+        NoMoreSecretsAvailableException exception = new NoMoreSecretsAvailableException();
 
         // assert
-        assertThat(ex, is(instanceOf(RuntimeException.class)));
+        assertThat(exception, is(instanceOf(RuntimeException.class)));
     }
 
     @Test
-    public void noMoreSecretsAvailableException_noArgConstructor_noCause() {
-        // arrange, act
-        NoMoreSecretsAvailableException ex = new NoMoreSecretsAvailableException();
+    public void constructor_noArg_nullMessage() {
+        // act
+        NoMoreSecretsAvailableException exception = new NoMoreSecretsAvailableException();
 
         // assert
-        assertThat(ex.getCause(), is(nullValue()));
+        assertThat(exception.getMessage(), is(nullValue()));
     }
 
     @Test
-    public void noMoreSecretsAvailableException_messageConstructor_messageIsPreserved() {
+    public void constructor_noArg_noCause() {
+        // act
+        NoMoreSecretsAvailableException exception = new NoMoreSecretsAvailableException();
+
+        // assert
+        assertThat(exception.getCause(), is(nullValue()));
+    }
+
+    @Test
+    public void constructor_withMessage_messageIsPreserved() {
         // arrange
         String message = "no more secrets in the file";
 
         // act
-        NoMoreSecretsAvailableException ex = new NoMoreSecretsAvailableException(message);
+        NoMoreSecretsAvailableException exception = new NoMoreSecretsAvailableException(message);
 
         // assert
-        assertThat(ex.getMessage(), is(equalTo(message)));
+        assertThat(exception.getMessage(), is(equalTo(message)));
     }
 
     @Test
-    public void noMoreSecretsAvailableException_messageConstructor_noCause() {
-        // arrange, act
-        NoMoreSecretsAvailableException ex = new NoMoreSecretsAvailableException("a message");
+    public void constructor_withMessage_noCause() {
+        // arrange
+        String message = "a message";
+
+        // act
+        NoMoreSecretsAvailableException exception = new NoMoreSecretsAvailableException(message);
 
         // assert
-        assertThat(ex.getCause(), is(nullValue()));
+        assertThat(exception.getCause(), is(nullValue()));
     }
 
     @Test
-    public void noMoreSecretsAvailableException_messageCauseConstructor_messageIsPreserved() {
+    public void constructor_withMessageAndCause_messageIsPreserved() {
         // arrange
         String message = "wrapped IO failure";
         Throwable cause = new RuntimeException("root cause");
 
         // act
-        NoMoreSecretsAvailableException ex = new NoMoreSecretsAvailableException(message, cause);
+        NoMoreSecretsAvailableException exception = new NoMoreSecretsAvailableException(message, cause);
 
         // assert
-        assertThat(ex.getMessage(), containsString(message));
+        assertThat(exception.getMessage(), containsString(message));
     }
 
     @Test
-    public void noMoreSecretsAvailableException_messageCauseConstructor_causeIsPreserved() {
+    public void constructor_withMessageAndCause_causeIsPreserved() {
         // arrange
+        String message = "msg";
         Throwable cause = new RuntimeException("root cause");
 
         // act
-        NoMoreSecretsAvailableException ex = new NoMoreSecretsAvailableException("msg", cause);
+        NoMoreSecretsAvailableException exception = new NoMoreSecretsAvailableException(message, cause);
 
         // assert
-        assertThat(ex.getCause(), is(equalTo(cause)));
+        assertThat(exception.getCause(), is(equalTo(cause)));
     }
 
     @Test
-    public void noMoreSecretsAvailableException_causeConstructor_causeIsPreserved() {
+    public void constructor_withCause_causeIsPreserved() {
         // arrange
         Throwable cause = new IllegalStateException("underlying cause");
 
         // act
-        NoMoreSecretsAvailableException ex = new NoMoreSecretsAvailableException(cause);
+        NoMoreSecretsAvailableException exception = new NoMoreSecretsAvailableException(cause);
 
         // assert
-        assertThat(ex.getCause(), is(equalTo(cause)));
+        assertThat(exception.getCause(), is(equalTo(cause)));
     }
 
     @Test
-    public void noMoreSecretsAvailableException_causeConstructor_messageContainsCauseMessage() {
+    public void constructor_withCause_messageContainsCauseMessage() {
         // arrange
         Throwable cause = new IllegalStateException("underlying cause");
 
         // act
-        NoMoreSecretsAvailableException ex = new NoMoreSecretsAvailableException(cause);
+        NoMoreSecretsAvailableException exception = new NoMoreSecretsAvailableException(cause);
 
         // assert
-        assertThat(ex.getMessage(), containsString("underlying cause"));
+        assertThat(exception.getMessage(), containsString("underlying cause"));
     }
     // </editor-fold>
 }

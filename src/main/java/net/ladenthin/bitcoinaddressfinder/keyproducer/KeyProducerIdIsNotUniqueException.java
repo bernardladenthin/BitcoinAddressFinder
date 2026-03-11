@@ -18,9 +18,22 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
+/**
+ * Thrown by {@link net.ladenthin.bitcoinaddressfinder.Finder} during
+ * producer initialisation when two or more producers share the same
+ * {@code keyProducerId}. Each producer must be identified by a unique string
+ * so that hits can be attributed to the correct producer.
+ */
 public class KeyProducerIdIsNotUniqueException extends RuntimeException {
-    
+
+    private final String id;
+
     public KeyProducerIdIsNotUniqueException(String id) {
         super("Key producer id must be unique: " + id);
+        this.id = id;
+    }
+
+    public String getId() {
+        return id;
     }
 }

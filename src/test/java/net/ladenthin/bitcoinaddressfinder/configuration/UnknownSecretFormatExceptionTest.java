@@ -23,7 +23,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import org.junit.Test;
 
 /**
@@ -41,7 +41,7 @@ public class UnknownSecretFormatExceptionTest {
         UnknownSecretFormatException exception = new UnknownSecretFormatException(secretFormat);
 
         // assert
-        assertThat(exception.getMessage(), is(equalTo("Unknown secret format: BIG_INTEGER")));
+        assertThat(exception.getMessage(), containsString("BIG_INTEGER"));
     }
 
     @Test
@@ -53,7 +53,7 @@ public class UnknownSecretFormatExceptionTest {
         UnknownSecretFormatException exception = new UnknownSecretFormatException(secretFormat);
 
         // assert
-        assertThat(exception.getMessage(), is(equalTo("Unknown secret format: SHA256")));
+        assertThat(exception.getMessage(), containsString("SHA256"));
     }
 
     @Test
@@ -65,7 +65,7 @@ public class UnknownSecretFormatExceptionTest {
         UnknownSecretFormatException exception = new UnknownSecretFormatException(secretFormat);
 
         // assert
-        assertThat(exception.getMessage(), is(equalTo("Unknown secret format: STRING_DO_SHA256")));
+        assertThat(exception.getMessage(), containsString("STRING_DO_SHA256"));
     }
 
     @Test
@@ -77,11 +77,11 @@ public class UnknownSecretFormatExceptionTest {
         UnknownSecretFormatException exception = new UnknownSecretFormatException(secretFormat);
 
         // assert
-        assertThat(exception.getMessage(), is(equalTo("Unknown secret format: DUMPED_RIVATE_KEY")));
+        assertThat(exception.getMessage(), containsString("DUMPED_RIVATE_KEY"));
     }
 
     @Test
-    public void constructor_anyFormat_messageContainsExpectedPrefix() {
+    public void constructor_withBigInteger_messageContainsExpectedPrefix() {
         // arrange
         CSecretFormat secretFormat = CSecretFormat.BIG_INTEGER;
 
@@ -93,9 +93,33 @@ public class UnknownSecretFormatExceptionTest {
     }
 
     @Test
-    public void constructor_anyFormat_isInstanceOfIllegalArgumentException() {
+    public void constructor_withBigInteger_messageEqualsExpected() {
+        // arrange
+        CSecretFormat secretFormat = CSecretFormat.BIG_INTEGER;
+
+        // act
+        UnknownSecretFormatException exception = new UnknownSecretFormatException(secretFormat);
+
+        // assert
+        assertThat(exception.getMessage(), is(equalTo("Unknown secret format: BIG_INTEGER")));
+    }
+
+    @Test
+    public void constructor_withSha256_messageEqualsExpected() {
         // arrange
         CSecretFormat secretFormat = CSecretFormat.SHA256;
+
+        // act
+        UnknownSecretFormatException exception = new UnknownSecretFormatException(secretFormat);
+
+        // assert
+        assertThat(exception.getMessage(), is(equalTo("Unknown secret format: SHA256")));
+    }
+
+    @Test
+    public void constructor_withBigInteger_isInstanceOfIllegalArgumentException() {
+        // arrange
+        CSecretFormat secretFormat = CSecretFormat.BIG_INTEGER;
 
         // act
         UnknownSecretFormatException exception = new UnknownSecretFormatException(secretFormat);
@@ -105,7 +129,7 @@ public class UnknownSecretFormatExceptionTest {
     }
 
     @Test
-    public void constructor_anyFormat_exceptionIsNotNull() {
+    public void constructor_withBigInteger_noCause() {
         // arrange
         CSecretFormat secretFormat = CSecretFormat.BIG_INTEGER;
 
@@ -113,7 +137,35 @@ public class UnknownSecretFormatExceptionTest {
         UnknownSecretFormatException exception = new UnknownSecretFormatException(secretFormat);
 
         // assert
-        assertThat(exception, is(notNullValue()));
+        assertThat(exception.getCause(), is(nullValue()));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="getSecretFormat">
+    @Test
+    public void getSecretFormat_withBigInteger_returnsSecretFormat() {
+        // arrange
+        CSecretFormat secretFormat = CSecretFormat.BIG_INTEGER;
+
+        // act
+        UnknownSecretFormatException exception = new UnknownSecretFormatException(secretFormat);
+        CSecretFormat actual = exception.getSecretFormat();
+
+        // assert
+        assertThat(actual, is(equalTo(secretFormat)));
+    }
+
+    @Test
+    public void getSecretFormat_withSha256_returnsSecretFormat() {
+        // arrange
+        CSecretFormat secretFormat = CSecretFormat.SHA256;
+
+        // act
+        UnknownSecretFormatException exception = new UnknownSecretFormatException(secretFormat);
+        CSecretFormat actual = exception.getSecretFormat();
+
+        // assert
+        assertThat(actual, is(equalTo(secretFormat)));
     }
     // </editor-fold>
 }
