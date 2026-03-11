@@ -260,6 +260,282 @@ public class PublicKeyBytesTest {
     }
     // </editor-fold>
     
+    // <editor-fold defaultstate="collapsed" desc="fromPrivate">
+    @Test
+    public void fromPrivate_validSecretKey_returnsPublicKeyBytesWithCorrectKey() {
+        // arrange
+        BigInteger secretKey = new BigInteger("1337");
+
+        // act
+        PublicKeyBytes result = PublicKeyBytes.fromPrivate(secretKey);
+
+        // assert
+        assertThat(result.getSecretKey(), is(equalTo(secretKey)));
+    }
+
+    @Test
+    public void fromPrivate_validSecretKey_returnsMatchingUncompressedPubKey() {
+        // arrange
+        BigInteger secretKey = new BigInteger("1337");
+        ECKey ecKey = ECKey.fromPrivate(secretKey, false);
+
+        // act
+        PublicKeyBytes result = PublicKeyBytes.fromPrivate(secretKey);
+
+        // assert
+        assertThat(result.getUncompressed(), is(equalTo(ecKey.getPubKey())));
+    }
+
+    @Test
+    public void fromPrivate_validSecretKey_returnsMatchingCompressedPubKey() {
+        // arrange
+        BigInteger secretKey = new BigInteger("1337");
+        ECKey ecKeyCompressed = ECKey.fromPrivate(secretKey, true);
+
+        // act
+        PublicKeyBytes result = PublicKeyBytes.fromPrivate(secretKey);
+
+        // assert
+        assertThat(result.getCompressed(), is(equalTo(ecKeyCompressed.getPubKey())));
+    }
+
+    @Test
+    public void fromPrivate_maxPrivateKey_noExceptionThrown() {
+        // arrange
+        BigInteger secretKey = PublicKeyBytes.MAX_PRIVATE_KEY;
+
+        // act
+        PublicKeyBytes result = PublicKeyBytes.fromPrivate(secretKey);
+
+        // assert
+        assertThat(result.getSecretKey(), is(equalTo(secretKey)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="getSecretKey">
+    @Test
+    public void getSecretKey_constructedWithKnownKey_returnsCorrectKey() {
+        // arrange
+        BigInteger secretKey = new BigInteger("42");
+        ECKey ecKey = ECKey.fromPrivate(secretKey, false);
+        PublicKeyBytes sut = new PublicKeyBytes(secretKey, ecKey.getPubKey());
+
+        // act
+        BigInteger result = sut.getSecretKey();
+
+        // assert
+        assertThat(result, is(equalTo(secretKey)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="getCompressed">
+    @Test
+    public void getCompressed_constructedFromUncompressed_returnsValidCompressedKey() {
+        // arrange
+        BigInteger secretKey = new BigInteger("1337");
+        ECKey ecKeyUncompressed = ECKey.fromPrivate(secretKey, false);
+        ECKey ecKeyCompressed = ECKey.fromPrivate(secretKey, true);
+        PublicKeyBytes sut = new PublicKeyBytes(secretKey, ecKeyUncompressed.getPubKey());
+
+        // act
+        byte[] result = sut.getCompressed();
+
+        // assert
+        assertThat(result, is(equalTo(ecKeyCompressed.getPubKey())));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="getUncompressed">
+    @Test
+    public void getUncompressed_constructedWithUncompressed_returnsSameArray() {
+        // arrange
+        BigInteger secretKey = new BigInteger("1337");
+        ECKey ecKey = ECKey.fromPrivate(secretKey, false);
+        byte[] uncompressed = ecKey.getPubKey();
+        PublicKeyBytes sut = new PublicKeyBytes(secretKey, uncompressed);
+
+        // act
+        byte[] result = sut.getUncompressed();
+
+        // assert
+        assertThat(result, is(equalTo(uncompressed)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="isOutsidePrivateKeyRange">
+    @Test
+    public void isOutsidePrivateKeyRange_validKey_returnsFalse() {
+        // arrange
+        BigInteger secretKey = new BigInteger("1337");
+        ECKey ecKey = ECKey.fromPrivate(secretKey, false);
+        PublicKeyBytes sut = new PublicKeyBytes(secretKey, ecKey.getPubKey());
+
+        // act
+        boolean result = sut.isOutsidePrivateKeyRange();
+
+        // assert
+        assertThat(result, is(false));
+    }
+
+    @Test
+    public void isOutsidePrivateKeyRange_keyAboveMax_returnsTrue() {
+        // arrange
+        BigInteger secretKey = PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE);
+        byte[] dummyUncompressed = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
+        PublicKeyBytes sut = new PublicKeyBytes(secretKey, dummyUncompressed);
+
+        // act
+        boolean result = sut.isOutsidePrivateKeyRange();
+
+        // assert
+        assertThat(result, is(true));
+    }
+
+    @Test
+    public void isOutsidePrivateKeyRange_keyBelowMin_returnsTrue() {
+        // arrange
+        BigInteger secretKey = BigInteger.ZERO;
+        byte[] dummyUncompressed = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
+        PublicKeyBytes sut = new PublicKeyBytes(secretKey, dummyUncompressed);
+
+        // act
+        boolean result = sut.isOutsidePrivateKeyRange();
+
+        // assert
+        assertThat(result, is(true));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="sha256hash160Fast">
+    @Test
+    public void sha256hash160Fast_knownInput_matchesCryptoUtilsResult() {
+        // arrange
+        BigInteger secretKey = new BigInteger("1337");
+        ECKey ecKey = ECKey.fromPrivate(secretKey, false);
+        byte[] pubKey = ecKey.getPubKey();
+
+        // act
+        byte[] fastResult = PublicKeyBytes.sha256hash160Fast(pubKey);
+
+        // assert
+        byte[] expected = CryptoUtils.sha256hash160(pubKey);
+        assertThat(fastResult, is(equalTo(expected)));
+    }
+
+    @Test
+    public void sha256hash160Fast_compressedKey_matchesCryptoUtilsResult() {
+        // arrange
+        BigInteger secretKey = new BigInteger("1337");
+        ECKey ecKey = ECKey.fromPrivate(secretKey, true);
+        byte[] pubKey = ecKey.getPubKey();
+
+        // act
+        byte[] fastResult = PublicKeyBytes.sha256hash160Fast(pubKey);
+
+        // assert
+        byte[] expected = CryptoUtils.sha256hash160(pubKey);
+        assertThat(fastResult, is(equalTo(expected)));
+    }
+
+    @Test
+    public void sha256hash160Fast_resultLength_isRipemd160HashLength() {
+        // arrange
+        byte[] input = new byte[] {0x01, 0x02, 0x03};
+
+        // act
+        byte[] result = PublicKeyBytes.sha256hash160Fast(input);
+
+        // assert
+        assertThat(result.length, is(equalTo(PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="createCompressedBytes">
+    @Test
+    public void createCompressedBytes_evenYCoordinate_prefixIs02() {
+        // arrange
+        BigInteger secretKey = new BigInteger("1337");
+        ECKey ecKey = ECKey.fromPrivate(secretKey, false);
+        byte[] uncompressed = ecKey.getPubKey();
+
+        // pre-assert
+        boolean lastByteIsEven = uncompressed[PublicKeyBytes.LAST_Y_COORDINATE_BYTE_INDEX] % 2 == 0;
+
+        // act
+        byte[] compressed = PublicKeyBytes.createCompressedBytes(uncompressed);
+
+        // assert
+        if (lastByteIsEven) {
+            assertThat(compressed[0], is((byte) PublicKeyBytes.SEC_PREFIX_COMPRESSED_ECDSA_POINT_EVEN_Y));
+        } else {
+            assertThat(compressed[0], is((byte) PublicKeyBytes.SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y));
+        }
+    }
+
+    @Test
+    public void createCompressedBytes_knownKey_matchesECKeyCompressed() {
+        // arrange
+        BigInteger secretKey = new BigInteger("1337");
+        ECKey ecKeyUncompressed = ECKey.fromPrivate(secretKey, false);
+        ECKey ecKeyCompressed = ECKey.fromPrivate(secretKey, true);
+
+        // act
+        byte[] compressed = PublicKeyBytes.createCompressedBytes(ecKeyUncompressed.getPubKey());
+
+        // assert
+        assertThat(compressed, is(equalTo(ecKeyCompressed.getPubKey())));
+    }
+
+    @Test
+    public void createCompressedBytes_resultLength_isCompressedKeyLength() {
+        // arrange
+        BigInteger secretKey = new BigInteger("42");
+        ECKey ecKey = ECKey.fromPrivate(secretKey, false);
+
+        // act
+        byte[] compressed = PublicKeyBytes.createCompressedBytes(ecKey.getPubKey());
+
+        // assert
+        assertThat(compressed.length, is(equalTo(PublicKeyBytes.PUBLIC_KEY_COMPRESSED_BYTES)));
+    }
+
+    @Test
+    public void createCompressedBytes_xCoordinate_matchesUncompressedXCoordinate() {
+        // arrange
+        BigInteger secretKey = new BigInteger("1337");
+        ECKey ecKey = ECKey.fromPrivate(secretKey, false);
+        byte[] uncompressed = ecKey.getPubKey();
+
+        // act
+        byte[] compressed = PublicKeyBytes.createCompressedBytes(uncompressed);
+
+        // assert
+        byte[] xFromUncompressed = Arrays.copyOfRange(uncompressed, PublicKeyBytes.SEC_PREFIX_NUM_BYTES, PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        byte[] xFromCompressed = Arrays.copyOfRange(compressed, PublicKeyBytes.SEC_PREFIX_NUM_BYTES, PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        assertThat(xFromCompressed, is(equalTo(xFromUncompressed)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="four-arg constructor">
+    @Test
+    public void constructor_fourArgs_setsAllFields() {
+        // arrange
+        BigInteger secretKey = new BigInteger("1337");
+        ECKey ecKeyUncompressed = ECKey.fromPrivate(secretKey, false);
+        ECKey ecKeyCompressed = ECKey.fromPrivate(secretKey, true);
+        byte[] uncompressedKeyHash = CryptoUtils.sha256hash160(ecKeyUncompressed.getPubKey());
+        byte[] compressedKeyHash = CryptoUtils.sha256hash160(ecKeyCompressed.getPubKey());
+
+        // act
+        PublicKeyBytes sut = new PublicKeyBytes(secretKey, ecKeyUncompressed.getPubKey(), uncompressedKeyHash, compressedKeyHash);
+
+        // assert
+        assertThat(sut.getSecretKey(), is(equalTo(secretKey)));
+        assertThat(sut.getUncompressedKeyHash(), is(equalTo(uncompressedKeyHash)));
+        assertThat(sut.getCompressedKeyHash(), is(equalTo(compressedKeyHash)));
+    }
+    // </editor-fold>
+
     // <editor-fold defaultstate="collapsed" desc="isAllCoordinateBytesZero">
     @Test
     public void isAllCoordinateBytesZero_validKey_returnsFalse() {
