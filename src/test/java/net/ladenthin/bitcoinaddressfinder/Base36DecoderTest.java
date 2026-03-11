@@ -138,15 +138,18 @@ public class Base36DecoderTest {
         byte[] longBytes = new byte[25];
         Arrays.fill(longBytes, (byte) 0x7F);
         String base36Encoded = new BigInteger(1, longBytes).toString(36);
-        int expectedLength = 20;
+        final int targetLength = 20;
 
         // act
-        byte[] result = decoder.decodeBase36ToFixedLengthBytes(base36Encoded, expectedLength);
+        byte[] result = decoder.decodeBase36ToFixedLengthBytes(base36Encoded, targetLength);
 
         // assert
-        assertThat(result.length, is(equalTo(expectedLength)));
+        assertThat(result.length, is(equalTo(targetLength)));
         // When input is longer, the least-significant bytes are kept
-        // The result should be 20 bytes from the 25-byte input
+        // Verify that result contains expected byte values
+        byte[] expectedContent = new byte[targetLength];
+        Arrays.fill(expectedContent, (byte) 0x7F);
+        assertThat(result, is(expectedContent));
     }
 
     @Test
@@ -155,12 +158,16 @@ public class Base36DecoderTest {
         byte[] longBytes = new byte[50];
         Arrays.fill(longBytes, (byte) 0xFF);
         String base36Encoded = new BigInteger(1, longBytes).toString(36);
+        final int targetLength = 10;
 
         // act
-        byte[] result = decoder.decodeBase36ToFixedLengthBytes(base36Encoded, 10);
+        byte[] result = decoder.decodeBase36ToFixedLengthBytes(base36Encoded, targetLength);
 
         // assert
-        assertThat(result.length, is(equalTo(10)));
+        // Verify both length and that result contains expected values
+        byte[] expectedContent = new byte[targetLength];
+        Arrays.fill(expectedContent, (byte) 0xFF);
+        assertThat(result, is(expectedContent));
     }
     // </editor-fold>
 
