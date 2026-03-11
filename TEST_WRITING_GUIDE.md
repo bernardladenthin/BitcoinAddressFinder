@@ -654,6 +654,33 @@ public void decodeBytes_resultsAllZeros() {
 }
 ```
 
+### Exception: iterating over all enum values is allowed and encouraged
+
+When a test must verify behaviour for **every value of an enum**, iterating via `EnumType.values()` is the **preferred** pattern. It ensures new enum constants are automatically covered without requiring manual test updates.
+
+```java
+// ✅ GOOD — enum .values() loop is explicitly allowed
+@Test
+public void createMnemonics_validPrivateKeyBytes_containsAllWordLists() {
+    // arrange
+    KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+    StaticKey staticKey = new StaticKey();
+
+    // act
+    String result = keyUtility.createMnemonics(staticKey.privateKeyBytes);
+
+    // assert
+    for (BIP39Wordlist wordList : BIP39Wordlist.values()) {
+        assertThat(result, containsString(wordList.name()));
+    }
+}
+```
+
+Rules:
+- The loop variable must come directly from `EnumType.values()` — not from an index or an unrelated collection.
+- Each loop iteration asserts **one condition per enum constant** using `assertThat`.
+- This pattern is appropriate when adding a new enum value should automatically add test coverage without changing the test.
+
 ### Pattern for zero-padded arrays
 
 When testing that an array is padded with zeros, use `Arrays.copyOfRange()` to compare sections:
@@ -784,7 +811,7 @@ public void decodeBase36_shorterInput_leftPaddedWithZeros() {
 | Non-conforming test name like `testme()` | Rename to `methodName_condition_expectation()` |
 | Empty `@Before` method | Remove it |
 | `@RunWith(DataProviderRunner.class)` without `@UseDataProvider` | Remove the `@RunWith` |
-| For-loop iteration in assertions like `for (int i = ...) assertThat(...)` | Compare entire array at once: `assertThat(result, is(expected))` |
+| For-loop iteration in assertions like `for (int i = ...) assertThat(...)` | Compare entire array at once: `assertThat(result, is(expected))` — **exception:** `for (MyEnum v : MyEnum.values())` loops are allowed and encouraged |
 | Magic numbers like `result[9]` or `result.length - 1` | Use `final int` constants: `result[targetLength - 1]` |
 | Removing or rewriting existing correct inline comments during a fix | Preserve existing comments; only remove comments that are factually wrong or misleading |
 

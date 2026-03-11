@@ -18,7 +18,6 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
-import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -26,33 +25,27 @@ import java.util.Arrays;
 import java.util.Random;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
 import org.bitcoinj.base.LegacyAddress;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
-import org.junit.Before;
-import org.junit.Test;
 import org.bitcoinj.crypto.MnemonicException;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.*;
 import org.junit.Ignore;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.*;
 
 @RunWith(DataProviderRunner.class)
 public class KeyUtilityTest {
 
     private final StaticKey staticKey = new StaticKey();
     private final Network network = new NetworkParameterFactory().getNetwork();
-    
-    @Before
-    public void init() throws IOException {
-    }
 
     // <editor-fold defaultstate="collapsed" desc="createECKey">
     @Test
-    public void createECKey_TestUncompressed() throws IOException {
+    public void createECKey_uncompressedKey_returnsCorrectPublicKeyHash() throws IOException {
         // arrange
         BigInteger bigIntegerFromHex = new BigInteger(staticKey.privateKeyHex, 16);
 
@@ -67,7 +60,7 @@ public class KeyUtilityTest {
     }
 
     @Test
-    public void createECKey_TestCompressed() throws IOException {
+    public void createECKey_compressedKey_returnsCorrectPublicKeyHash() throws IOException {
         // arrange
         BigInteger bigIntegerFromHex = new BigInteger(staticKey.privateKeyHex, 16);
 
@@ -84,7 +77,7 @@ public class KeyUtilityTest {
 
     // <editor-fold defaultstate="collapsed" desc="getHash160ByteBufferFromBase58String">
     @Test
-    public void getHash160ByteBufferFromBase58String_TestUncompressed() throws IOException {
+    public void getHash160ByteBufferFromBase58String_uncompressedPublicKeyAddress_returnsExpectedByteBuffer() throws IOException {
         // act
         ByteBuffer byteBufferPublicKeyUncompressed = new KeyUtility(network, new ByteBufferUtility(false)).getHash160ByteBufferFromBase58String(staticKey.publicKeyUncompressed);
 
@@ -93,14 +86,14 @@ public class KeyUtilityTest {
     }
 
     @Test
-    public void getHash160ByteBufferFromBase58String_TestCompressed() throws IOException {
+    public void getHash160ByteBufferFromBase58String_compressedPublicKeyAddress_returnsExpectedByteBuffer() throws IOException {
         // act
         ByteBuffer byteBufferPublicKeyCompressed = new KeyUtility(network, new ByteBufferUtility(false)).getHash160ByteBufferFromBase58String(staticKey.publicKeyCompressed);
 
         // assert
         assertThat(byteBufferPublicKeyCompressed, is(equalTo(staticKey.byteBufferPublicKeyCompressed)));
     }
-    
+
     @Test
     public void byteBufferToAddress_isInverseOf_getHash160ByteBufferFromBase58String() {
         // arrange
@@ -118,7 +111,7 @@ public class KeyUtilityTest {
 
     // <editor-fold defaultstate="collapsed" desc="getHexFromByteBuffer">
     @Test
-    public void getHexFromByteBuffer_TestUncompressed() throws IOException {
+    public void getHexFromByteBuffer_uncompressedPublicKeyHash_returnsExpectedHex() throws IOException {
         // act
         String hexPublicKeyUncompressed = new ByteBufferUtility(false).getHexFromByteBuffer(staticKey.byteBufferPublicKeyUncompressed);
 
@@ -127,7 +120,7 @@ public class KeyUtilityTest {
     }
 
     @Test
-    public void getHexFromByteBuffer_TestCompressed() throws IOException {
+    public void getHexFromByteBuffer_compressedPublicKeyHash_returnsExpectedHex() throws IOException {
         // act
         String hexPublicKeyCompressed = new ByteBufferUtility(false).getHexFromByteBuffer(staticKey.byteBufferPublicKeyCompressed);
 
@@ -138,7 +131,7 @@ public class KeyUtilityTest {
 
     // <editor-fold defaultstate="collapsed" desc="getByteBufferFromHex">
     @Test
-    public void getByteBufferFromHex_TestUncompressed() throws IOException {
+    public void getByteBufferFromHex_uncompressedPublicKeyHashHex_returnsExpectedByteBuffer() throws IOException {
         // act
         ByteBuffer byteBufferPublicKeyUncompressed = new ByteBufferUtility(false).getByteBufferFromHex(staticKey.publicKeyUncompressedHash160Hex);
 
@@ -147,7 +140,7 @@ public class KeyUtilityTest {
     }
 
     @Test
-    public void getByteBufferFromHex_TestCompressed() throws IOException {
+    public void getByteBufferFromHex_compressedPublicKeyHashHex_returnsExpectedByteBuffer() throws IOException {
         // act
         ByteBuffer byteBufferPublicKeyCompressed = new ByteBufferUtility(false).getByteBufferFromHex(staticKey.publicKeyCompressedHash160Hex);
 
@@ -158,24 +151,27 @@ public class KeyUtilityTest {
 
     // <editor-fold defaultstate="collapsed" desc="createSecret">
     @Test
-    public void createSecret() throws IOException {
+    public void createSecret_maxBitLength_returnsNonEmptySecret() throws IOException {
         // act
         BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false)).createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, new Random(42));
 
         // assert
         assertThat(secret.toString(), is(not(equalTo(""))));
     }
-    
+
     @Test
     public void createSecret_zeroBits_returnsZero() {
+        // act
         BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false)).createSecret(0, new Random(123));
+
+        // assert
         assertThat(secret, is(equalTo(BigInteger.ZERO)));
     }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="createKeyDetails">
     @Test
-    public void createKeyDetails_Uncompressed() throws IOException, MnemonicException.MnemonicLengthException {
+    public void createKeyDetails_uncompressedKey_returnsExpectedDetails() throws IOException, MnemonicException.MnemonicLengthException {
         // arrange
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
@@ -192,7 +188,7 @@ public class KeyUtilityTest {
     }
 
     @Test
-    public void createKeyDetails_Compressed() throws IOException, MnemonicException.MnemonicLengthException {
+    public void createKeyDetails_compressedKey_returnsExpectedDetails() throws IOException, MnemonicException.MnemonicLengthException {
         // arrange
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
@@ -208,7 +204,7 @@ public class KeyUtilityTest {
         assertThat(keyDetails, is(equalTo("privateKeyBigInteger: [" + staticKey.privateKeyBigInteger + "] privateKeyBytes: [" + Arrays.toString(staticKey.privateKeyBytes) + "] privateKeyHex: [" + staticKey.privateKeyHex + "] WiF: [" + staticKey.privateKeyWiFCompressed + "] publicKeyAsHex: [" + staticKey.publicKeyCompressedHex + "] publicKeyHash160Hex: [" + staticKey.publicKeyCompressedHash160Hex + "] publicKeyHash160Base58: [" + staticKey.publicKeyCompressed + "] Compressed: [true] " + mnemonics)));
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="killBits">
     @Test
     public void killBits_valueWithAllBitsSetGiven_bitsKilled() throws IOException {
@@ -218,7 +214,7 @@ public class KeyUtilityTest {
         // assert
         assertThat(secret, is(equalTo(BigInteger.valueOf(58))));
     }
-    
+
     @Test
     public void killBits_valueWithNotAllBitsSetGiven_bitsKilled() throws IOException {
         // act
@@ -228,7 +224,7 @@ public class KeyUtilityTest {
         assertThat(secret, is(equalTo(BigInteger.valueOf(58))));
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="getMaxPrivateKeyForBatchSize">
     @Test
     public void getMaxPrivateKeyForBatchSize_batchSize0_returnsMaxPrivateKey() {
@@ -279,7 +275,7 @@ public class KeyUtilityTest {
         // act
         KeyUtility.getMaxPrivateKeyForBatchSize(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS + 1);
     }
-    
+
     @Test(expected = IllegalStateException.class)
     public void getMaxPrivateKeyForBatchSize_tooLarge_throwsException() {
         // arrange
@@ -289,7 +285,7 @@ public class KeyUtilityTest {
         KeyUtility.getMaxPrivateKeyForBatchSize(batchSizeInBits);
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="isInvalidWithBatchSize">
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE, location = CommonDataProvider.class)
@@ -322,8 +318,13 @@ public class KeyUtilityTest {
     // <editor-fold defaultstate="collapsed" desc="ECKey.fromPrivate: boundaries">
     @Test
     public void ecKey_fromPrivate_randomValidInRange_succeeds() {
+        // arrange
         BigInteger randomValidKey = PublicKeyBytes.MIN_VALID_PRIVATE_KEY.add(BigInteger.valueOf(123456));
+
+        // act
         ECKey ecKey = ECKey.fromPrivate(randomValidKey, false);
+
+        // assert
         assertThat(ecKey.getPrivKey(), is(equalTo(randomValidKey)));
     }
 
@@ -332,7 +333,7 @@ public class KeyUtilityTest {
         // act
         ECKey.fromPrivate(PublicKeyBytes.MIN_PRIVATE_KEY, false);
     }
-    
+
     @Ignore("bitcoinj.ECKey.fromPrivate(...) accepts values > MAX_PRIVATE_KEY without throwing an exception. " +
        "Test ignored because the library does not enforce the upper bound.")
     @Test(expected = IllegalArgumentException.class)
@@ -369,7 +370,7 @@ public class KeyUtilityTest {
         // assert
         assertThat(result, is(true));
     }
-    
+
     @Test
     public void isOutsidePrivateKeyRange_minValidPrivateKey_returnsFalse() {
         // act
@@ -421,94 +422,325 @@ public class KeyUtilityTest {
         assertThat(result, is(true));
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="returnValidPrivateKey">
     @Test
     public void returnValidPrivateKey_validKey_returnsSameKey() {
+        // arrange
         BigInteger valid = PublicKeyBytes.MIN_PRIVATE_KEY.add(BigInteger.ONE);
-        assertThat(KeyUtility.returnValidPrivateKey(valid), is(equalTo(valid)));
+
+        // act
+        BigInteger result = KeyUtility.returnValidPrivateKey(valid);
+
+        // assert
+        assertThat(result, is(equalTo(valid)));
     }
 
     @Test
     public void returnValidPrivateKey_tooSmall_returnsReplacement() {
+        // arrange
         BigInteger tooSmall = PublicKeyBytes.MIN_PRIVATE_KEY.subtract(BigInteger.ONE);
-        assertThat(KeyUtility.returnValidPrivateKey(tooSmall), is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
+
+        // act
+        BigInteger result = KeyUtility.returnValidPrivateKey(tooSmall);
+
+        // assert
+        assertThat(result, is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
     }
 
     @Test
     public void returnValidPrivateKey_tooLarge_returnsReplacement() {
+        // arrange
         BigInteger tooLarge = PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE);
-        assertThat(KeyUtility.returnValidPrivateKey(tooLarge), is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
+
+        // act
+        BigInteger result = KeyUtility.returnValidPrivateKey(tooLarge);
+
+        // assert
+        assertThat(result, is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
     }
     // </editor-fold>
-    
-    // <editor-fold defaultstate="collapsed" desc="convertIntToBytesAndBack">
+
+    // <editor-fold defaultstate="collapsed" desc="replaceInvalidPrivateKeys">
     @Test
     public void replaceInvalidPrivateKeys_mixedArray_replacesInvalids() {
+        // arrange
         BigInteger[] secrets = new BigInteger[]{
             PublicKeyBytes.MIN_VALID_PRIVATE_KEY,                      // valid
             PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE),        // invalid
-            BigInteger.ZERO                                            // valid
+            BigInteger.ZERO                                            // invalid
         };
 
+        // act
         KeyUtility.replaceInvalidPrivateKeys(secrets);
 
+        // assert
         assertThat(secrets[0], is(equalTo(PublicKeyBytes.MIN_VALID_PRIVATE_KEY)));
         assertThat(secrets[1], is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
         assertThat(secrets[2], is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
     }
-
     // </editor-fold>
-    
-    // <editor-fold defaultstate="collapsed" desc="byteToIntAndViceVersa">
-        @Test
-    public void byteToIntAndViceVersa_roundTripConversion_successful() {
-        // Test a range of values including edge cases
-        int[] testValues = {
-            0,
-            1,
-            -1,
-            Integer.MAX_VALUE,
-            Integer.MIN_VALUE,
-            0x12345678,
-            0x87654321
-        };
 
-        for (int original : testValues) {
-            byte[] bytes = KeyUtility.intToByteArray(original);
-            int result = KeyUtility.byteArrayToInt(bytes);
+    // <editor-fold defaultstate="collapsed" desc="intToByteArray">
+    @Test
+    public void intToByteArray_zero_returnsFourZeroBytes() {
+        // arrange
+        byte[] expected = new byte[4];
 
-            assertThat("Failed round-trip for value: " + original, result, is(equalTo(original)));
-        }
+        // act
+        byte[] result = KeyUtility.intToByteArray(0);
+
+        // assert
+        assertThat(result, is(expected));
     }
 
     @Test
-    public void byteToIntAndViceVersa_offsetRoundTripConversion_successful() {
-        int original = 0xCAFEBABE;
-        byte[] buffer = new byte[8];
-        int offset = 2;
+    public void intToByteArray_knownValue_returnsExpectedBigEndianBytes() {
+        // arrange
+        byte[] expected = {0x12, 0x34, 0x56, 0x78};
 
-        // Write to buffer with offset
+        // act
+        byte[] result = KeyUtility.intToByteArray(0x12345678);
+
+        // assert
+        assertThat(result, is(expected));
+    }
+
+    @Test
+    public void intToByteArray_minusOne_returnsAllFfBytes() {
+        // arrange
+        byte[] expected = {(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF};
+
+        // act
+        byte[] result = KeyUtility.intToByteArray(-1);
+
+        // assert
+        assertThat(result, is(expected));
+    }
+
+    @Test
+    public void intToByteArray_intMaxValue_returnsExpectedBytes() {
+        // arrange
+        byte[] expected = {0x7F, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF};
+
+        // act
+        byte[] result = KeyUtility.intToByteArray(Integer.MAX_VALUE);
+
+        // assert
+        assertThat(result, is(expected));
+    }
+
+    @Test
+    public void intToByteArray_intMinValue_returnsExpectedBytes() {
+        // arrange
+        byte[] expected = {(byte) 0x80, 0x00, 0x00, 0x00};
+
+        // act
+        byte[] result = KeyUtility.intToByteArray(Integer.MIN_VALUE);
+
+        // assert
+        assertThat(result, is(expected));
+    }
+
+    @Test
+    public void intToByteArray_withOffset_writesExpectedBytesAtCorrectPosition() {
+        // arrange
+        final int value = 0xCAFEBABE;
+        final int bufferLength = 8;
+        final int offset = 2;
+        final int intByteLength = 4;
+        byte[] buffer = new byte[bufferLength];
+        byte[] expectedWritten = {(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE};
+
+        // act
+        KeyUtility.intToByteArray(value, buffer, offset);
+
+        // assert
+        assertThat(Arrays.copyOfRange(buffer, offset, offset + intByteLength), is(expectedWritten));
+        assertThat(Arrays.copyOfRange(buffer, 0, offset), is(new byte[offset]));
+        assertThat(Arrays.copyOfRange(buffer, offset + intByteLength, bufferLength), is(new byte[bufferLength - offset - intByteLength]));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="byteArrayToInt">
+    @Test
+    public void byteArrayToInt_allZeroBytes_returnsZero() {
+        // arrange
+        byte[] input = new byte[4];
+
+        // act
+        int result = KeyUtility.byteArrayToInt(input);
+
+        // assert
+        assertThat(result, is(equalTo(0)));
+    }
+
+    @Test
+    public void byteArrayToInt_knownBytes_returnsExpectedInt() {
+        // arrange
+        byte[] input = {0x12, 0x34, 0x56, 0x78};
+
+        // act
+        int result = KeyUtility.byteArrayToInt(input);
+
+        // assert
+        assertThat(result, is(equalTo(0x12345678)));
+    }
+
+    @Test
+    public void byteArrayToInt_allFfBytes_returnsMinusOne() {
+        // arrange
+        byte[] input = {(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF};
+
+        // act
+        int result = KeyUtility.byteArrayToInt(input);
+
+        // assert
+        assertThat(result, is(equalTo(-1)));
+    }
+
+    @Test
+    public void byteArrayToInt_maxIntBytes_returnsMaxInt() {
+        // arrange
+        byte[] input = {0x7F, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF};
+
+        // act
+        int result = KeyUtility.byteArrayToInt(input);
+
+        // assert
+        assertThat(result, is(equalTo(Integer.MAX_VALUE)));
+    }
+
+    @Test
+    public void byteArrayToInt_withOffset_readsExpectedInt() {
+        // arrange
+        final int original = 0xCAFEBABE;
+        final int offset = 2;
+        byte[] buffer = new byte[8];
         KeyUtility.intToByteArray(original, buffer, offset);
 
-        // Read from same offset
+        // act
         int result = KeyUtility.byteArrayToInt(buffer, offset);
 
+        // assert
         assertThat(result, is(equalTo(original)));
     }
 
     @Test
-    public void byteArrayToIntArray_roundTrip_successful() {
-        int original = 0x0A0B0C0D;
+    public void intToByteArray_byteArrayToInt_roundTrip_zero_preservesValue() {
+        // arrange
+        final int original = 0;
+
+        // act
+        byte[] bytes = KeyUtility.intToByteArray(original);
+        int result = KeyUtility.byteArrayToInt(bytes);
+
+        // assert
+        assertThat(result, is(equalTo(original)));
+    }
+
+    @Test
+    public void intToByteArray_byteArrayToInt_roundTrip_intMaxValue_preservesValue() {
+        // arrange
+        final int original = Integer.MAX_VALUE;
+
+        // act
+        byte[] bytes = KeyUtility.intToByteArray(original);
+        int result = KeyUtility.byteArrayToInt(bytes);
+
+        // assert
+        assertThat(result, is(equalTo(original)));
+    }
+
+    @Test
+    public void intToByteArray_byteArrayToInt_roundTrip_intMinValue_preservesValue() {
+        // arrange
+        final int original = Integer.MIN_VALUE;
+
+        // act
+        byte[] bytes = KeyUtility.intToByteArray(original);
+        int result = KeyUtility.byteArrayToInt(bytes);
+
+        // assert
+        assertThat(result, is(equalTo(original)));
+    }
+
+    @Test
+    public void intToByteArray_byteArrayToInt_roundTrip_minusOne_preservesValue() {
+        // arrange
+        final int original = -1;
+
+        // act
+        byte[] bytes = KeyUtility.intToByteArray(original);
+        int result = KeyUtility.byteArrayToInt(bytes);
+
+        // assert
+        assertThat(result, is(equalTo(original)));
+    }
+
+    @Test
+    public void intToByteArray_byteArrayToInt_roundTrip_knownValue_preservesValue() {
+        // arrange
+        final int original = 0x12345678;
+
+        // act
+        byte[] bytes = KeyUtility.intToByteArray(original);
+        int result = KeyUtility.byteArrayToInt(bytes);
+
+        // assert
+        assertThat(result, is(equalTo(original)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="byteArrayToIntArray">
+    @Test
+    public void byteArrayToIntArray_knownBytes_populatesIntAtOffset() {
+        // arrange
+        final int original = 0x0A0B0C0D;
         byte[] bytes = KeyUtility.intToByteArray(original);
         int[] result = new int[1];
 
+        // act
         KeyUtility.byteArrayToIntArray(bytes, 0, result, 0);
 
+        // assert
+        assertThat(result[0], is(equalTo(original)));
+    }
+
+    @Test
+    public void byteArrayToIntArray_withNonZeroIntArrayOffset_populatesCorrectSlot() {
+        // arrange
+        final int original = 0x0A0B0C0D;
+        byte[] bytes = KeyUtility.intToByteArray(original);
+        int[] result = new int[3];
+        final int intOffset = 2;
+
+        // act
+        KeyUtility.byteArrayToIntArray(bytes, 0, result, intOffset);
+
+        // assert
+        assertThat(result[intOffset], is(equalTo(original)));
+        assertThat(result[0], is(equalTo(0)));
+        assertThat(result[1], is(equalTo(0)));
+    }
+
+    @Test
+    public void byteArrayToIntArray_withNonZeroByteArrayOffset_readsFromCorrectPosition() {
+        // arrange
+        final int original = 0x0A0B0C0D;
+        final int byteOffset = 4;
+        byte[] bytes = new byte[8];
+        KeyUtility.intToByteArray(original, bytes, byteOffset);
+        int[] result = new int[1];
+
+        // act
+        KeyUtility.byteArrayToIntArray(bytes, byteOffset, result, 0);
+
+        // assert
         assertThat(result[0], is(equalTo(original)));
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="createSecrets">
     @Test
     public void createSecrets_returnStartSecretOnlyTrue_returnsOneSecret() throws NoMoreSecretsAvailableException {
@@ -543,9 +775,7 @@ public class KeyUtilityTest {
 
         // assert
         assertThat(secrets.length, is(overallWorkSize));
-        for (BigInteger secret : secrets) {
-            assertThat(secret, is(notNullValue()));
-        }
+        assertThat(Arrays.asList(secrets), everyItem(is(notNullValue())));
     }
 
     @Test(expected = NoMoreSecretsAvailableException.class)
@@ -567,7 +797,7 @@ public class KeyUtilityTest {
         keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, randomSupplier);
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="bigIntegerToFixedLengthHex">
     @Test
     @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_LARGE_SECRETS_AS_HEX, location = CommonDataProvider.class)
@@ -583,17 +813,15 @@ public class KeyUtilityTest {
         assertThat(result, is(equalTo(largeSecretsAsHex)));
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="bigIntegerFromUnsignedByteArray">
     @Test
     public void bigIntegerFromUnsignedByteArray_exact32Bytes_constructsCorrectly() {
-        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
         // arrange
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
         byte[] buffer = new byte[32];
         buffer[30] = 0x12;
         buffer[31] = 0x34;
-
-        // expected value is 0x000000...001234 = 0x1234
         BigInteger expected = new BigInteger("1234", 16);
 
         // act
@@ -605,9 +833,11 @@ public class KeyUtilityTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void bigIntegerFromUnsignedByteArray_wrongLength_throwsException() {
+        // arrange
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
-        // too short
         byte[] invalid = new byte[31];
+
+        // act
         keyUtility.bigIntegerFromUnsignedByteArray(invalid);
     }
     // </editor-fold>
@@ -617,28 +847,28 @@ public class KeyUtilityTest {
     public void toBase58_knownHash160_returnsExpectedBase58Address() {
         // arrange
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
-        StaticKey staticKey = new StaticKey();
-        byte[] hash160 = new ByteBufferUtility(false).byteBufferToBytes(staticKey.byteBufferPublicKeyUncompressed);
+        StaticKey key = new StaticKey();
+        byte[] hash160 = new ByteBufferUtility(false).byteBufferToBytes(key.byteBufferPublicKeyUncompressed);
 
         // act
         String result = keyUtility.toBase58(hash160);
 
         // assert
-        assertThat(result, is(equalTo(staticKey.publicKeyUncompressed)));
+        assertThat(result, is(equalTo(key.publicKeyUncompressed)));
     }
 
     @Test
     public void toBase58_compressedHash160_returnsExpectedBase58Address() {
         // arrange
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
-        StaticKey staticKey = new StaticKey();
-        byte[] hash160 = new ByteBufferUtility(false).byteBufferToBytes(staticKey.byteBufferPublicKeyCompressed);
+        StaticKey key = new StaticKey();
+        byte[] hash160 = new ByteBufferUtility(false).byteBufferToBytes(key.byteBufferPublicKeyCompressed);
 
         // act
         String result = keyUtility.toBase58(hash160);
 
         // assert
-        assertThat(result, is(equalTo(staticKey.publicKeyCompressed)));
+        assertThat(result, is(equalTo(key.publicKeyCompressed)));
     }
     // </editor-fold>
 
@@ -647,22 +877,22 @@ public class KeyUtilityTest {
     public void addressToByteBuffer_validAddress_returnsCorrectByteBuffer() {
         // arrange
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
-        StaticKey staticKey = new StaticKey();
-        LegacyAddress address = LegacyAddress.fromBase58(staticKey.publicKeyUncompressed, network);
+        StaticKey key = new StaticKey();
+        LegacyAddress address = LegacyAddress.fromBase58(key.publicKeyUncompressed, network);
 
         // act
         ByteBuffer result = keyUtility.addressToByteBuffer(address);
 
         // assert
-        assertThat(result, is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
+        assertThat(result, is(equalTo(key.byteBufferPublicKeyUncompressed)));
     }
 
     @Test
     public void addressToByteBuffer_roundTripWithByteBufferToAddress_returnsOriginalAddress() {
         // arrange
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
-        StaticKey staticKey = new StaticKey();
-        LegacyAddress originalAddress = LegacyAddress.fromBase58(staticKey.publicKeyCompressed, network);
+        StaticKey key = new StaticKey();
+        LegacyAddress originalAddress = LegacyAddress.fromBase58(key.publicKeyCompressed, network);
 
         // act
         ByteBuffer buffer = keyUtility.addressToByteBuffer(originalAddress);
@@ -678,13 +908,13 @@ public class KeyUtilityTest {
     public void byteBufferToAddress_validBuffer_returnsCorrectAddress() {
         // arrange
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
-        StaticKey staticKey = new StaticKey();
+        StaticKey key = new StaticKey();
 
         // act
-        LegacyAddress result = keyUtility.byteBufferToAddress(staticKey.byteBufferPublicKeyCompressed);
+        LegacyAddress result = keyUtility.byteBufferToAddress(key.byteBufferPublicKeyCompressed);
 
         // assert
-        assertThat(result.toBase58(), is(equalTo(staticKey.publicKeyCompressed)));
+        assertThat(result.toBase58(), is(equalTo(key.publicKeyCompressed)));
     }
     // </editor-fold>
 
@@ -693,10 +923,10 @@ public class KeyUtilityTest {
     public void createMnemonics_validPrivateKeyBytes_returnsNonEmptyMnemonicString() {
         // arrange
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
-        StaticKey staticKey = new StaticKey();
+        StaticKey key = new StaticKey();
 
         // act
-        String result = keyUtility.createMnemonics(staticKey.privateKeyBytes);
+        String result = keyUtility.createMnemonics(key.privateKeyBytes);
 
         // assert
         assertThat(result, not(emptyOrNullString()));
@@ -707,10 +937,10 @@ public class KeyUtilityTest {
     public void createMnemonics_validPrivateKeyBytes_containsAllWordLists() {
         // arrange
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
-        StaticKey staticKey = new StaticKey();
+        StaticKey key = new StaticKey();
 
         // act
-        String result = keyUtility.createMnemonics(staticKey.privateKeyBytes);
+        String result = keyUtility.createMnemonics(key.privateKeyBytes);
 
         // assert
         for (BIP39Wordlist wordList : BIP39Wordlist.values()) {
