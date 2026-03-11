@@ -342,7 +342,7 @@ public class AddressTxtLineTest {
         P2PKH address = P2PKH.BitcoinCash;
 
         // act
-        byte[] hash160 = AddressTxtLine.extractPKHFromBitcoinCashAddress(address.getPublicAddress());
+        byte[] hash160 = new Bech32Helper().extractPKHFromBitcoinCashAddress(address.getPublicAddress());
 
         // assert
         ByteBuffer buffer = keyUtility.byteBufferUtility().byteArrayToByteBuffer(hash160);
@@ -359,7 +359,7 @@ public class AddressTxtLineTest {
         assertThat(address.getPublicAddress(), startsWith(AddressTxtLine.BITCOIN_CASH_PREFIX));
 
         // act
-        byte[] hash160 = AddressTxtLine.extractPKHFromBitcoinCashAddress(address.getPublicAddress());
+        byte[] hash160 = new Bech32Helper().extractPKHFromBitcoinCashAddress(address.getPublicAddress());
 
         // assert
         ByteBuffer buffer = keyUtility.byteBufferUtility().byteArrayToByteBuffer(hash160);
