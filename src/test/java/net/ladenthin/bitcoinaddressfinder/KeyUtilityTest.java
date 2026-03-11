@@ -943,20 +943,9 @@ public class KeyUtilityTest {
         String result = keyUtility.createMnemonics(key.privateKeyBytes);
 
         // assert
-        assertThat(result, allOf(
-            containsString(BIP39Wordlist.CHINESE_SIMPLIFIED.name()),
-            containsString(BIP39Wordlist.CHINESE_TRADITIONAL.name()),
-            containsString(BIP39Wordlist.CZECH.name()),
-            containsString(BIP39Wordlist.ENGLISH.name()),
-            containsString(BIP39Wordlist.FRENCH.name()),
-            containsString(BIP39Wordlist.ITALIAN.name()),
-            containsString(BIP39Wordlist.JAPANESE.name()),
-            containsString(BIP39Wordlist.KOREAN.name()),
-            containsString(BIP39Wordlist.PORTUGUESE.name()),
-            containsString(BIP39Wordlist.RUSSIAN.name()),
-            containsString(BIP39Wordlist.SPANISH.name()),
-            containsString(BIP39Wordlist.TURKISH.name())
-        ));
+        for (BIP39Wordlist wordList : BIP39Wordlist.values()) {
+            assertThat(result, containsString(wordList.name()));
+        }
     }
     // </editor-fold>
 }
