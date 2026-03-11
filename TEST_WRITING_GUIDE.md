@@ -786,10 +786,43 @@ public void decodeBase36_shorterInput_leftPaddedWithZeros() {
 | `@RunWith(DataProviderRunner.class)` without `@UseDataProvider` | Remove the `@RunWith` |
 | For-loop iteration in assertions like `for (int i = ...) assertThat(...)` | Compare entire array at once: `assertThat(result, is(expected))` |
 | Magic numbers like `result[9]` or `result.length - 1` | Use `final int` constants: `result[targetLength - 1]` |
+| Removing or rewriting existing correct inline comments during a fix | Preserve existing comments; only remove comments that are factually wrong or misleading |
 
 ---
 
-## 23. Test Anatomy — Complete Reference Example
+## 23. Preserving Existing Comments
+
+When modifying existing test code (e.g. fixing a bug, adding synchronization, applying guide compliance):
+
+- **Keep all existing inline comments** that are correct and descriptive. Do not strip them just because you are rewriting or reformatting the code.
+- **Only remove a comment** if it is factually wrong, misleading, or describes code that no longer exists.
+- **Add new comments** where the added code is not self-explanatory (e.g. latches, synchronization points, sleep rationale).
+- When adding AAA section comments (`// arrange`, `// act`, `// assert`), place them **around** existing inline comments — do not replace the inline comments with the section markers.
+
+Example — correct preservation:
+```java
+// arrange
+String address = findFreeZmqAddress();
+
+// Server socket (push) binds          ← existing comment preserved
+ZMQ.Socket sender = context.createSocket(SocketType.PUSH);
+sender.bind(address);
+
+// Client config connects to that address  ← existing comment preserved
+CKeyProducerJavaZmq config = createConnectConfig(address);
+
+// act
+BigInteger[] secrets = keyProducer.createSecrets(1, true);
+
+// assert
+assertThat(secrets.length, is(1));
+```
+
+The goal is to **minimize the diff** to only the lines that actually need changing. Cosmetic-only changes (rewording comments, reordering unchanged lines, removing blank lines) should be avoided unless explicitly requested.
+
+---
+
+## 24. Test Anatomy — Complete Reference Example
 
 ```java
 // @formatter:off
