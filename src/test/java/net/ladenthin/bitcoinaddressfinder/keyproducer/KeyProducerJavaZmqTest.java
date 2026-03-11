@@ -93,18 +93,22 @@ public class KeyProducerJavaZmqTest {
         try (ZContext context = new ZContext()) {
             String address = findFreeZmqAddress();
 
+            // Server socket (push) binds
             ZMQ.Socket sender = context.createSocket(SocketType.PUSH);
             sender.bind(address);
 
+            // Client config connects to that address
             CKeyProducerJavaZmq config = createConnectConfig(address);
             KeyProducerJavaZmq keyProducer = createKeyProducerJavaZmq(config);
 
+            // Create dummy key
             byte[] secretBytes = new KeyProducerTestUtility().createZeroedSecret();
             for (int i = 0; i < secretBytes.length; i++) {
                 secretBytes[i] = (byte) (i + 1);
             }
             BigInteger expected = new BigInteger(1, secretBytes);
 
+            // Send secret
             sender.send(secretBytes, 0);
 
             // act
@@ -127,23 +131,27 @@ public class KeyProducerJavaZmqTest {
         byte[] secretBytes = new KeyProducerTestUtility().createZeroedSecret();
         BigInteger expected = new BigInteger(1, secretBytes);
 
+        // Create the BIND receiver first (so it's ready to accept)
         CKeyProducerJavaZmq config = createBindConfig(address);
         config.timeout = TestTimeProvider.DEFAULT_SOCKET_TIMEOUT;
         KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
 
+        // Latch to ensure sender has connected before consuming
         final CountDownLatch senderReady = new CountDownLatch(1);
 
+        // Now spawn the sender thread
         Future<Void> senderFuture = executorService.submit(() -> {
             try (ZContext context = new ZContext(); ZMQ.Socket socket = context.createSocket(ZMQ.PUSH)) {
                 socket.connect(address);
-                Thread.sleep(TestTimeProvider.DEFAULT_ESTABLISH_DELAY);
+                Thread.sleep(TestTimeProvider.DEFAULT_ESTABLISH_DELAY); // let connection establish
                 senderReady.countDown();
                 socket.send(secretBytes);
             }
             return null;
         });
 
-        senderReady.await(TestTimeProvider.LONG_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
+        // Wait for sender to be connected before consuming
+        senderReady.await(TestTimeProvider.LONG_SOCKET_TIMEOUT, TestTimeProvider.TIME_UNIT);
 
         // act
         BigInteger[] secrets = producer.createSecrets(1, true);
@@ -153,7 +161,7 @@ public class KeyProducerJavaZmqTest {
         assertThat(secrets[0], is(equalTo(expected)));
 
         producer.interrupt();
-        senderFuture.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
+        senderFuture.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TestTimeProvider.TIME_UNIT);
     }
 
     @Test(expected = NoMoreSecretsAvailableException.class)
@@ -176,16 +184,21 @@ public class KeyProducerJavaZmqTest {
         String address = findFreeZmqAddress();
         final int numberOfSecrets = 3;
 
+        // Bind receiver first (small but important ordering)
         CKeyProducerJavaZmq config = createBindConfig(address);
         config.timeout = TestTimeProvider.DEFAULT_SOCKET_TIMEOUT;
         KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
 
+        // Latch to ensure sender has connected before consuming
         final CountDownLatch senderReady = new CountDownLatch(1);
+        // Latch to ensure all sends actually happened
         final CountDownLatch sentLatch = new CountDownLatch(numberOfSecrets);
 
         Future<Void> senderFuture = executorService.submit(() -> {
             try (ZContext context = new ZContext(); ZMQ.Socket socket = context.createSocket(ZMQ.PUSH)) {
                 socket.connect(address);
+
+                // Let the ZMQ connection fully establish before the first send:
                 Thread.sleep(TestTimeProvider.DEFAULT_ESTABLISH_DELAY);
                 senderReady.countDown();
 
@@ -199,7 +212,8 @@ public class KeyProducerJavaZmqTest {
             return null;
         });
 
-        senderReady.await(TestTimeProvider.LONG_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
+        // Wait for sender to be connected before consuming
+        senderReady.await(TestTimeProvider.LONG_SOCKET_TIMEOUT, TestTimeProvider.TIME_UNIT);
 
         // act
         BigInteger[] secrets = producer.createSecrets(numberOfSecrets, false);
@@ -208,13 +222,14 @@ public class KeyProducerJavaZmqTest {
         assertThat(secrets.length, is(numberOfSecrets));
         new KeyProducerTestUtility().assertIncrementedSecrets(secrets);
 
+        // Wait until the sender really pushed all messages
         boolean allSent = sentLatch.await(
-            (long) numberOfSecrets * TestTimeProvider.DEFAULT_SEND_DELAY + TestTimeProvider.DEFAULT_DELAY, TimeUnit.MILLISECONDS
+            (long) numberOfSecrets * TestTimeProvider.DEFAULT_SEND_DELAY + TestTimeProvider.DEFAULT_DELAY, TestTimeProvider.TIME_UNIT
         );
         assertThat("Sender did not send all secrets in time", allSent, is(true));
 
         producer.interrupt();
-        senderFuture.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
+        senderFuture.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TestTimeProvider.TIME_UNIT);
     }
 
     @Test
@@ -223,21 +238,27 @@ public class KeyProducerJavaZmqTest {
         try (ZContext context = new ZContext()) {
             String address = findFreeZmqAddress();
 
+            // Server socket (push) binds
             ZMQ.Socket sender = context.createSocket(SocketType.PUSH);
             sender.bind(address);
 
+            // Client config connects to that address
             CKeyProducerJavaZmq config = createConnectConfig(address);
             KeyProducerJavaZmq keyProducer = createKeyProducerJavaZmq(config);
 
+            // Create invalid secret with wrong length (e.g., 16 bytes instead of 32)
             byte[] invalidSecretBytes = new byte[16];
             for (int i = 0; i < invalidSecretBytes.length; i++) {
                 invalidSecretBytes[i] = (byte) (i + 1);
             }
 
+            // Send invalid secret
             sender.send(invalidSecretBytes, 0);
 
+            // Wait a bit to ensure the receiver thread processes the message
             Thread.sleep(TestTimeProvider.DEFAULT_SEND_WAIT);
 
+            // Now send a valid secret so createSecrets can return
             byte[] validSecretBytes = new KeyProducerTestUtility().createZeroedSecret();
             sender.send(validSecretBytes, 0);
 
@@ -246,6 +267,8 @@ public class KeyProducerJavaZmqTest {
 
             // assert
             assertThat(secrets.length, is(1));
+
+            // Verify logger was called with error message for invalid length
             verify(mockLogger).error("Received invalid secret length: 16");
 
             keyProducer.interrupt();
@@ -260,10 +283,12 @@ public class KeyProducerJavaZmqTest {
         // arrange
         String address = findFreeZmqAddress();
 
+        // Setup ZMQ PULL socket that will wait for messages
         CKeyProducerJavaZmq config = createBindConfig(address);
-        config.timeout = -1;
+        config.timeout = -1; // block indefinitely
         KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
 
+        // Start a thread that will block on createSecrets
         Future<BigInteger[]> future = executorService.submit(() -> {
             try {
                 return producer.createSecrets(1, true);
@@ -272,14 +297,19 @@ public class KeyProducerJavaZmqTest {
             }
         });
 
+        // Let it enter the blocking receive
         Thread.sleep(TestTimeProvider.DEFAULT_SEND_WAIT);
 
         // act
+        // Now interrupt from another thread (will close socket/context)
         producer.interrupt();
 
         // assert
+        // Assert the future exits cleanly within timeout
         BigInteger[] result = future.get(2, TimeUnit.SECONDS);
         assertThat(result, is(nullValue()));
+
+        // Verify no unexpected ZMQ errors were logged
         verify(mockLogger, never()).error(eq("ZMQ error"), any(ZMQException.class));
     }
     // </editor-fold>
