@@ -20,50 +20,110 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 import org.junit.Test;
 
+/**
+ * Unit tests for {@link KeyProducerIdUnknownException}.
+ */
 public class KeyProducerIdUnknownExceptionTest {
 
-    // <editor-fold defaultstate="collapsed" desc="KeyProducerIdUnknownException">
+    // <editor-fold defaultstate="collapsed" desc="constructor">
     @Test
-    public void keyProducerIdUnknownException_idGiven_messageContainsId() {
+    public void constructor_withId_messageContainsId() {
         // arrange
         String id = "unknownProducer";
 
         // act
-        KeyProducerIdUnknownException ex = new KeyProducerIdUnknownException(id);
+        KeyProducerIdUnknownException exception = new KeyProducerIdUnknownException(id);
 
         // assert
-        assertThat(ex.getMessage(), containsString(id));
+        assertThat(exception.getMessage(), containsString(id));
     }
 
     @Test
-    public void keyProducerIdUnknownException_idGiven_messageIndicatesUnknown() {
-        // arrange, act
-        KeyProducerIdUnknownException ex = new KeyProducerIdUnknownException("anyId");
+    public void constructor_withId_messageContainsExpectedPrefix() {
+        // arrange
+        String id = "anyId";
+
+        // act
+        KeyProducerIdUnknownException exception = new KeyProducerIdUnknownException(id);
 
         // assert
-        assertThat(ex.getMessage(), containsString("unknown"));
+        assertThat(exception.getMessage(), containsString("unknown"));
     }
 
     @Test
-    public void keyProducerIdUnknownException_isRuntimeException() {
-        // arrange, act
-        KeyProducerIdUnknownException ex = new KeyProducerIdUnknownException("anyId");
+    public void constructor_withId_messageEqualsExpected() {
+        // arrange
+        String id = "unknownProducer";
+
+        // act
+        KeyProducerIdUnknownException exception = new KeyProducerIdUnknownException(id);
 
         // assert
-        assertThat(ex, is(instanceOf(RuntimeException.class)));
+        assertThat(exception.getMessage(), is(equalTo("Key producer id is unknown: " + id)));
     }
 
     @Test
-    public void keyProducerIdUnknownException_nullId_messageContainsNull() {
-        // arrange, act
-        KeyProducerIdUnknownException ex = new KeyProducerIdUnknownException(null);
+    public void constructor_withId_isInstanceOfRuntimeException() {
+        // arrange
+        String id = "anyId";
+
+        // act
+        KeyProducerIdUnknownException exception = new KeyProducerIdUnknownException(id);
 
         // assert
-        assertThat(ex.getMessage(), containsString("null"));
+        assertThat(exception, is(instanceOf(RuntimeException.class)));
+    }
+
+    @Test
+    public void constructor_withId_noCause() {
+        // arrange
+        String id = "anyId";
+
+        // act
+        KeyProducerIdUnknownException exception = new KeyProducerIdUnknownException(id);
+
+        // assert
+        assertThat(exception.getCause(), is(nullValue()));
+    }
+
+    @Test
+    public void constructor_withNullId_messageContainsNull() {
+        // act
+        KeyProducerIdUnknownException exception = new KeyProducerIdUnknownException(null);
+
+        // assert
+        assertThat(exception.getMessage(), containsString("null"));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="getId">
+    @Test
+    public void getId_withId_returnsId() {
+        // arrange
+        String id = "unknownProducer";
+
+        // act
+        KeyProducerIdUnknownException exception = new KeyProducerIdUnknownException(id);
+        String actual = exception.getId();
+
+        // assert
+        assertThat(actual, is(equalTo(id)));
+    }
+
+    @Test
+    public void getId_withNullId_returnsNull() {
+        // act
+        KeyProducerIdUnknownException exception = new KeyProducerIdUnknownException(null);
+        String actual = exception.getId();
+
+        // assert
+        assertThat(actual, is(nullValue()));
     }
     // </editor-fold>
 }
