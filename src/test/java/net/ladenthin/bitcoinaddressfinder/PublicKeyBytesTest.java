@@ -300,9 +300,9 @@ public class PublicKeyBytesTest {
     }
 
     @Test
-    public void fromPrivate_maxPrivateKey_noExceptionThrown() {
+    public void fromPrivate_minValidPrivateKey_noExceptionThrown() {
         // arrange
-        BigInteger secretKey = PublicKeyBytes.MAX_PRIVATE_KEY;
+        BigInteger secretKey = PublicKeyBytes.MIN_VALID_PRIVATE_KEY;
 
         // act
         PublicKeyBytes result = PublicKeyBytes.fromPrivate(secretKey);
