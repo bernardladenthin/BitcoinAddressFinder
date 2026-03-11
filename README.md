@@ -266,6 +266,7 @@ The importer supports reading multiple `.txt` or `.text` files, each containing 
 
 * **P2TR** – Pay to Taproot
   Native SegWit v1 (Taproot) address, encoded using **Bech32m**.
+  > ⚠️ **Not Supported:** P2TR requires key tweaking based on an optional script. Without knowing the script, you cannot generate matching P2TR addresses from a private key. One private key can create infinite different P2TR addresses. This breaks the tool's design, which maps private keys to deterministic addresses.
 
 > **Note:**
 > Bech32 was introduced in [BIP-173](https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki) for SegWit v0 (P2WPKH, P2WSH).
