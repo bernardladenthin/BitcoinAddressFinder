@@ -621,7 +621,149 @@ import static org.hamcrest.Matchers.*;
 
 ---
 
-## 20. What NOT To Do
+## 20. Array & Collection Assertions — Avoiding Iteration
+
+### Do NOT use for-loops in assertions
+
+**Problem:** For-loop iteration in assertions reduces readability and makes tests harder to maintain.
+
+```java
+// ❌ BAD — uses for-loop to iterate assertions
+@Test
+public void decodeBytes_resultsAllZeros() {
+    byte[] result = decoder.decodeBytes(input, 10);
+    for (int i = 0; i < 10; i++) {
+        assertThat(result[i], is(equalTo((byte) 0)));
+    }
+}
+```
+
+**Solution:** Compare entire arrays directly using `Arrays.equals()` or array comparison matchers.
+
+```java
+// ✅ GOOD — compare entire arrays at once
+@Test
+public void decodeBytes_resultsAllZeros() {
+    byte[] result = decoder.decodeBytes(input, 10);
+    byte[] expected = new byte[10];  // automatically all zeros
+    assertThat(result, is(expected));
+}
+```
+
+### Pattern for zero-padded arrays
+
+When testing that an array is padded with zeros, use `Arrays.copyOfRange()` to compare sections:
+
+```java
+@Test
+public void decodeBytes_shorterInput_leftPaddedWithZeros() {
+    // arrange
+    byte[] original = {0x01, 0x02, 0x03};
+    final int targetLength = 20;
+    final int paddingLength = targetLength - original.length;
+    byte[] expectedPadding = new byte[paddingLength];
+
+    // act
+    byte[] result = decoder.decodeBytes(original, targetLength);
+
+    // assert
+    assertThat(Arrays.copyOfRange(result, 0, paddingLength), is(expectedPadding));
+    assertThat(Arrays.copyOfRange(result, paddingLength, targetLength), is(original));
+}
+```
+
+### Avoid magic numbers — use array.length
+
+**Problem:** Hard-coded array lengths make tests fragile and difficult to understand.
+
+```java
+// ❌ BAD — magic numbers scattered throughout
+byte[] result = decoder.decode(input, 10);
+assertThat(result[9], is(equalTo((byte) 0xFF)));  // Why index 9? Why 10?
+for (int i = 0; i < 9; i++) {
+    assertThat(result[i], is(equalTo((byte) 0)));
+}
+```
+
+**Solution:** Use variables with intent-revealing names and derive indices from array properties.
+
+```java
+// ✅ GOOD — clear naming and derived values
+final int targetLength = 10;
+byte[] result = decoder.decode(input, targetLength);
+assertThat(result[targetLength - 1], is(equalTo((byte) 0xFF)));  // Last element
+byte[] expectedPadding = new byte[targetLength - 1];
+assertThat(Arrays.copyOfRange(result, 0, targetLength - 1), is(expectedPadding));
+```
+
+### Use array.length over hardcoded constants
+
+When creating expected arrays or ranges, always reference `.length`:
+
+```java
+// ❌ BAD
+byte[] original = {0x12, 0x34};
+// ... later in test ...
+assertThat(Arrays.copyOfRange(result, 3, 5), is(original));
+
+// ✅ GOOD — derives from actual array length
+byte[] original = {0x12, 0x34};
+final int targetLength = 5;
+final int paddingLength = targetLength - original.length;
+// ... later in test ...
+assertThat(Arrays.copyOfRange(result, paddingLength, targetLength), is(original));
+```
+
+### Reference example: Array comparison
+
+```java
+@Test
+public void decodeBase36_exactLength_decodesCorrectly() {
+    // arrange
+    byte[] original = {0x01, 0x02, 0x03, 0x04, 0x05};
+    String encoded = new BigInteger(1, original).toString(36);
+
+    // act
+    byte[] result = decoder.decodeBase36ToFixedLengthBytes(encoded, original.length);
+
+    // assert — entire array comparison, no loop
+    assertThat(result, is(original));
+}
+
+@Test
+public void decodeBase36_zeroBytes_producesAllZeros() {
+    // arrange
+    final int targetLength = 20;
+    byte[] expected = new byte[targetLength];  // All zeros by default
+
+    // act
+    byte[] result = decoder.decodeBase36ToFixedLengthBytes("0", targetLength);
+
+    // assert — compare whole array
+    assertThat(result, is(expected));
+}
+
+@Test
+public void decodeBase36_shorterInput_leftPaddedWithZeros() {
+    // arrange
+    byte[] original = {0x01, 0x02, 0x03};
+    String encoded = new BigInteger(1, original).toString(36);
+    final int targetLength = 20;
+    final int paddingLength = targetLength - original.length;
+    byte[] expectedPadding = new byte[paddingLength];
+
+    // act
+    byte[] result = decoder.decodeBase36ToFixedLengthBytes(encoded, targetLength);
+
+    // assert — compare sections without loops
+    assertThat(Arrays.copyOfRange(result, 0, paddingLength), is(expectedPadding));
+    assertThat(Arrays.copyOfRange(result, paddingLength, targetLength), is(original));
+}
+```
+
+---
+
+## 22. What NOT To Do
 
 | Anti-pattern | Correct alternative |
 |---|---|
@@ -638,10 +780,12 @@ import static org.hamcrest.Matchers.*;
 | Non-conforming test name like `testme()` | Rename to `methodName_condition_expectation()` |
 | Empty `@Before` method | Remove it |
 | `@RunWith(DataProviderRunner.class)` without `@UseDataProvider` | Remove the `@RunWith` |
+| For-loop iteration in assertions like `for (int i = ...) assertThat(...)` | Compare entire array at once: `assertThat(result, is(expected))` |
+| Magic numbers like `result[9]` or `result.length - 1` | Use `final int` constants: `result[targetLength - 1]` |
 
 ---
 
-## 21. Test Anatomy — Complete Reference Example
+## 23. Test Anatomy — Complete Reference Example
 
 ```java
 // @formatter:off
