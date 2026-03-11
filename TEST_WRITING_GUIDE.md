@@ -767,6 +767,47 @@ public void decodeBase36_shorterInput_leftPaddedWithZeros() {
 
 ---
 
+## 21. Constants — Avoiding Inline Literals
+
+When a literal value (string, number, etc.) appears in **more than one test** within the same fold, extract it into a `private static final` constant at the top of the class.
+
+### Rules
+
+- Define constants **per fold** — do **not** share one constant across multiple folds. Each fold owns its own constants, even when the underlying value happens to be identical.
+- Name constants to reflect their **role in the test**, not their raw value (e.g., `START_ADDRESS_CUSTOM_HEX` rather than `HEX_FF`).
+- Derive related values from the constant rather than repeating the literal:
+
+```java
+// ✅ GOOD — single constant, both case variants derived from it
+private static final String START_ADDRESS_CUSTOM_HEX = "FF";
+
+sut.startAddress = START_ADDRESS_CUSTOM_HEX.toUpperCase(); // "FF"
+sut.startAddress = START_ADDRESS_CUSTOM_HEX.toLowerCase(); // "ff"
+assertThat(result, is(equalTo(new BigInteger(START_ADDRESS_CUSTOM_HEX, BitHelper.RADIX_HEX))));
+```
+
+```java
+// ❌ BAD — same literal repeated across tests, no shared constant
+sut.startAddress = "FF";
+assertThat(result, is(equalTo(BigInteger.valueOf(255))));
+
+sut.startAddress = "ff";
+assertThat(result, is(equalTo(BigInteger.valueOf(255))));
+```
+
+- Do **not** share a constant between two different folds even when the value is the same:
+
+```java
+// ❌ BAD — one constant shared between getStartAddress and getEndAddress folds
+private static final String CUSTOM_HEX = "FF";
+
+// ✅ GOOD — each fold has its own constant
+private static final String START_ADDRESS_CUSTOM_HEX = "FF";
+private static final String END_ADDRESS_CUSTOM_HEX = "FF";
+```
+
+---
+
 ## 22. What NOT To Do
 
 | Anti-pattern | Correct alternative |

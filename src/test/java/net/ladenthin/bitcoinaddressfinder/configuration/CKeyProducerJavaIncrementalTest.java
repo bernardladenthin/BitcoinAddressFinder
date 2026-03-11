@@ -19,13 +19,17 @@
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import java.math.BigInteger;
+import org.junit.Test;
+import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import org.junit.Test;
 
 public class CKeyProducerJavaIncrementalTest {
+
+    private static final String START_ADDRESS_CUSTOM_HEX = "FF";
+    private static final String END_ADDRESS_CUSTOM_HEX = "FF";
 
     // <editor-fold defaultstate="collapsed" desc="getStartAddress">
     @Test
@@ -44,26 +48,26 @@ public class CKeyProducerJavaIncrementalTest {
     public void getStartAddress_customUppercaseHexStartAddress_returnsExpectedBigInteger() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
-        sut.startAddress = "FF";
+        sut.startAddress = START_ADDRESS_CUSTOM_HEX.toUpperCase();
 
         // act
         BigInteger result = sut.getStartAddress();
 
         // assert
-        assertThat(result, is(equalTo(BigInteger.valueOf(255))));
+        assertThat(result, is(equalTo(new BigInteger(START_ADDRESS_CUSTOM_HEX, BitHelper.RADIX_HEX))));
     }
 
     @Test
     public void getStartAddress_customLowercaseHexStartAddress_returnsExpectedBigInteger() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
-        sut.startAddress = "ff";
+        sut.startAddress = START_ADDRESS_CUSTOM_HEX.toLowerCase();
 
         // act
         BigInteger result = sut.getStartAddress();
 
         // assert
-        assertThat(result, is(equalTo(BigInteger.valueOf(255))));
+        assertThat(result, is(equalTo(new BigInteger(START_ADDRESS_CUSTOM_HEX, BitHelper.RADIX_HEX))));
     }
 
     @Test
@@ -97,26 +101,26 @@ public class CKeyProducerJavaIncrementalTest {
     public void getEndAddress_customUppercaseHexEndAddress_returnsExpectedBigInteger() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
-        sut.endAddress = "FF";
+        sut.endAddress = END_ADDRESS_CUSTOM_HEX.toUpperCase();
 
         // act
         BigInteger result = sut.getEndAddress();
 
         // assert
-        assertThat(result, is(equalTo(BigInteger.valueOf(255))));
+        assertThat(result, is(equalTo(new BigInteger(END_ADDRESS_CUSTOM_HEX, BitHelper.RADIX_HEX))));
     }
 
     @Test
     public void getEndAddress_customLowercaseHexEndAddress_returnsExpectedBigInteger() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
-        sut.endAddress = "ff";
+        sut.endAddress = END_ADDRESS_CUSTOM_HEX.toLowerCase();
 
         // act
         BigInteger result = sut.getEndAddress();
 
         // assert
-        assertThat(result, is(equalTo(BigInteger.valueOf(255))));
+        assertThat(result, is(equalTo(new BigInteger(END_ADDRESS_CUSTOM_HEX, BitHelper.RADIX_HEX))));
     }
 
     @Test
