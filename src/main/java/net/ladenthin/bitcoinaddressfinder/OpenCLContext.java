@@ -18,6 +18,7 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.Resources;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -60,6 +61,11 @@ public class OpenCLContext implements ReleaseCLObject {
 
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
     
+    @VisibleForTesting
+    void setLogger(Logger logger) {
+        this.logger = logger;
+    }
+
     public String[] getOpenCLPrograms() throws IOException {
         List<String> resourceNamesContent = getResourceNamesContent(getResourceNames());
         List<String> resourceNamesContentWithReplacements = new ArrayList<>();
@@ -130,6 +136,7 @@ public class OpenCLContext implements ReleaseCLObject {
         );
         
         device = selection.device();
+        logger.info("Selected OpenCL device:\n{}", device.toStringPretty());
         cl_context_properties contextProperties = selection.contextProperties();
         cl_device_id[] cl_device_ids = new cl_device_id[]{device.device()};
         
