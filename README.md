@@ -1063,6 +1063,86 @@ For technical details, see:
 | AMD Radeon 8060S            | AMD AI MAX+ 395     | 256              | 16               |  9,200,000 keys/s      |
 | AMD Radeon 8060S            | AMD AI MAX+ 395     | 160              | 16               | 11,000,000 keys/s      |
 
+## Monitoring Hits and Understanding Output
+
+When BitcoinAddressFinder discovers a private key that corresponds to an address with a known balance, it **logs the hit immediately** at the **INFO log level**.
+
+### Log Output Format
+
+When a hit is found, you will see log messages with the following prefixes in your console or log file:
+
+```
+2025-02-14T10:30:45,123 [pool-1-thread-1] INFO net.ladenthin.bitcoinaddressfinder.ConsumerJava - hit: Found the address: Address: 1A1z7agoat...
+2025-02-14T10:30:45,124 [pool-1-thread-1] INFO net.ladenthin.bitcoinaddressfinder.ConsumerJava - hit: safe log: publicKeyBytes.getSecretKey(): 87654321...
+2025-02-14T10:30:45,125 [pool-1-thread-1] INFO net.ladenthin.bitcoinaddressfinder.ConsumerJava - hit: safe log: publicKeyBytes.getUncompressed(): abcd1234...
+2025-02-14T10:30:45,126 [pool-1-thread-1] INFO net.ladenthin.bitcoinaddressfinder.ConsumerJava - hit: safe log: publicKeyBytes.getCompressed(): abcd...
+2025-02-14T10:30:45,127 [pool-1-thread-1] INFO net.ladenthin.bitcoinaddressfinder.ConsumerJava - hit: safe log: hash160Uncompressed: 1234abcd...
+2025-02-14T10:30:45,128 [pool-1-thread-1] INFO net.ladenthin.bitcoinaddressfinder.ConsumerJava - hit: safe log: hash160Compressed: 5678efgh...
+```
+
+### Log Message Details
+
+| Prefix | Purpose | Content |
+|--------|---------|---------|
+| `hit: Found the address:` | Main hit notification | Full address details (address, private key in hex and decimal) |
+| `hit: safe log:` | Detailed key information | Individual components: private key, uncompressed pubkey, compressed pubkey, address hashes |
+
+### Statistics Output
+
+Every `printStatisticsEveryNSeconds` (default: 10 seconds), you will see a statistics line at INFO level:
+
+```
+2025-02-14T10:30:55,000 [scheduler-1] INFO net.ladenthin.bitcoinaddressfinder.ConsumerJava - uptime: 65s, checked: 65,536 keys, keys/s: 1,008,000, queue-size: 2, hits: 1
+```
+
+This line shows:
+- **uptime**: How long the application has been running
+- **checked**: Total number of private keys tested so far
+- **keys/s**: Keys tested per second (throughput)
+- **queue-size**: Current size of the key queue (should stay relatively low)
+- **hits**: Total number of addresses found with balances
+
+### Ensuring Logging is Visible
+
+Hits are logged at the **INFO level**. To ensure they appear in your output:
+
+1. **Use the provided `logbackConfiguration.xml`** from the examples directory — it's configured to show INFO level logs
+2. **Or set your logging configuration to INFO level** if you have a custom configuration:
+   ```xml
+   <root level="info">
+     <appender-ref ref="STDOUT" />
+   </root>
+   ```
+
+### Testing with Puzzle Transactions (Verification)
+
+If you want to **verify the tool is working correctly** without waiting for actual collisions (which are extremely rare), follow the maintainer's suggestion:
+
+1. Change the configuration parameter `privateKeyMaxNumBits` from `256` to a smaller value like `32`
+2. This will generate private keys in a much smaller range
+3. The application contains "puzzle transaction" addresses in the LMDB database that fall within these smaller ranges
+4. Example configuration change:
+   ```json
+   {
+     "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+     "privateKeyMaxNumBits": 32
+   }
+   ```
+5. Run the tool — it should find multiple hits within seconds/minutes as a proof-of-concept
+
+> **Note:** This is purely for testing and understanding the output. Real-world address discovery in the full 256-bit keyspace is extraordinarily unlikely but not impossible.
+
+### Searching for Hits in Your Logs
+
+To quickly find all hits in your log output or file, search for the prefix `hit:`:
+
+```bash
+# Linux/macOS: search in console output or file
+grep "hit:" bitcoinaddressfinder.log
+
+# Windows: use findstr
+findstr "hit:" bitcoinaddressfinder.log
+```
 
 ## Collision Probability and Security Considerations
 
