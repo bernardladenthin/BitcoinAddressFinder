@@ -121,15 +121,16 @@ public class OpenCLContext implements ReleaseCLObject {
     }
     
     public void init() throws IOException {
-        
+
         // #################### general ####################
-        
+
         // Enable exceptions and subsequently omit error checks in this sample
         CL.setExceptionsEnabled(EXCEPTIONS_ENABLED);
-        
+
         List<OpenCLPlatform> platforms = new OpenCLBuilder().build();
 
-        OpenCLDeviceSelection selection = OpenCLPlatformSelector.select(
+        OpenCLPlatformSelector platformSelector = new OpenCLPlatformSelector();
+        OpenCLDeviceSelection selection = platformSelector.select(
             platforms,
             producerOpenCL.platformIndex,
             producerOpenCL.deviceType,

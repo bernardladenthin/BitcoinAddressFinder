@@ -39,6 +39,8 @@ public class OpenCLPlatformSelectorTest {
     private static final long DEVICE_TYPE_CPU = 2L;
     private static final long DEVICE_TYPE_GPU = 4L;
 
+    private final OpenCLPlatformSelector platformSelector = new OpenCLPlatformSelector();
+
     // <editor-fold defaultstate="collapsed" desc="select">
     @Test
     public void select_validPlatformAndDeviceIndex_returnsExpectedSelection() {
@@ -48,7 +50,7 @@ public class OpenCLPlatformSelectorTest {
         List<OpenCLPlatform> platforms = List.of(platform);
 
         // act
-        OpenCLDeviceSelection result = OpenCLPlatformSelector.select(platforms, 0, DEVICE_TYPE_GPU, 0);
+        OpenCLDeviceSelection result = platformSelector.select(platforms, 0, DEVICE_TYPE_GPU, 0);
 
         // assert
         assertThat(result, is(notNullValue()));
@@ -65,7 +67,7 @@ public class OpenCLPlatformSelectorTest {
         List<OpenCLPlatform> platforms = List.of(platform);
 
         // act
-        OpenCLDeviceSelection result = OpenCLPlatformSelector.select(platforms, 0, DEVICE_TYPE_GPU, 0);
+        OpenCLDeviceSelection result = platformSelector.select(platforms, 0, DEVICE_TYPE_GPU, 0);
 
         // assert
         assertThat(result.device(), is(equalTo(gpuDevice)));
@@ -81,7 +83,7 @@ public class OpenCLPlatformSelectorTest {
         List<OpenCLPlatform> platforms = List.of(firstPlatform, secondPlatform);
 
         // act
-        OpenCLDeviceSelection result = OpenCLPlatformSelector.select(platforms, 1, DEVICE_TYPE_GPU, 0);
+        OpenCLDeviceSelection result = platformSelector.select(platforms, 1, DEVICE_TYPE_GPU, 0);
 
         // assert
         assertThat(result.platform(), is(equalTo(secondPlatform)));
@@ -95,7 +97,7 @@ public class OpenCLPlatformSelectorTest {
         List<OpenCLPlatform> platforms = List.of(platform);
 
         // act
-        OpenCLPlatformSelector.select(platforms, -1, DEVICE_TYPE_GPU, 0);
+        platformSelector.select(platforms, -1, DEVICE_TYPE_GPU, 0);
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -105,7 +107,7 @@ public class OpenCLPlatformSelectorTest {
         List<OpenCLPlatform> platforms = List.of(platform);
 
         // act
-        OpenCLPlatformSelector.select(platforms, 1, DEVICE_TYPE_GPU, 0);
+        platformSelector.select(platforms, 1, DEVICE_TYPE_GPU, 0);
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -114,7 +116,7 @@ public class OpenCLPlatformSelectorTest {
         List<OpenCLPlatform> platforms = Collections.emptyList();
 
         // act
-        OpenCLPlatformSelector.select(platforms, 0, DEVICE_TYPE_GPU, 0);
+        platformSelector.select(platforms, 0, DEVICE_TYPE_GPU, 0);
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -125,7 +127,7 @@ public class OpenCLPlatformSelectorTest {
         List<OpenCLPlatform> platforms = List.of(platform);
 
         // act
-        OpenCLPlatformSelector.select(platforms, 0, DEVICE_TYPE_GPU, -1);
+        platformSelector.select(platforms, 0, DEVICE_TYPE_GPU, -1);
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -136,7 +138,7 @@ public class OpenCLPlatformSelectorTest {
         List<OpenCLPlatform> platforms = List.of(platform);
 
         // act
-        OpenCLPlatformSelector.select(platforms, 0, DEVICE_TYPE_GPU, 1);
+        platformSelector.select(platforms, 0, DEVICE_TYPE_GPU, 1);
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -147,7 +149,7 @@ public class OpenCLPlatformSelectorTest {
         List<OpenCLPlatform> platforms = List.of(platform);
 
         // act
-        OpenCLPlatformSelector.select(platforms, 0, DEVICE_TYPE_GPU, 0);
+        platformSelector.select(platforms, 0, DEVICE_TYPE_GPU, 0);
     }
     // </editor-fold>
 
