@@ -706,7 +706,8 @@ Minimal:
 "keyProducerJavaBip39": [
     {
       "keyProducerId": "exampleKeyProducerId",
-      "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+      "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+      "passphrase": ""
     }
 ],
 ...
