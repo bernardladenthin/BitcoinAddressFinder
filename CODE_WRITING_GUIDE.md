@@ -99,3 +99,58 @@ public void init_validConfig_logsExpectedMessage() {
     verify(mockLogger).info(eq("Initialized."));
 }
 ```
+
+---
+
+## 3. Constructor Limits — Keeping Dependencies Shallow
+
+### Motivation
+
+Classes should have **shallow constructor parameters** (3–8 parameters). If a constructor exceeds 8 parameters, it signals over-complicated responsibility. Before adding parameters, consider:
+
+1. **Refactor into smaller classes** — Split the class into two or more focused classes, each with fewer dependencies.
+2. **Extract a helper class** — Wrap groups of related parameters into a single helper object.
+3. **Use a builder pattern** — For complex objects with many optional dependencies, a builder is more readable than a long constructor.
+
+### Rules
+
+- **Constructors with 3–5 parameters** are normal and acceptable.
+- **Constructors with 6–7 parameters** warrant a review — do the dependencies form a coherent unit, or should the class be split?
+- **Constructors with 8+ parameters** are a code smell. Do not add external DI frameworks to hide the complexity; instead, refactor.
+- **Never introduce a DI framework (Spring, Guice, Dagger)** to reduce constructor parameter counts. This trades one problem (long constructors) for another (framework overhead, startup cost, hidden configuration). See `DEPENDENCY_INJECTION_ANALYSIS.md`.
+
+### Example: Splitting Responsibilities
+
+```java
+// ❌ BAD — 10 parameters indicate over-coupled concerns
+public MyService(
+    Config config,
+    KeyUtility keyUtility,
+    Logger logger,
+    Database db,
+    Cache cache,
+    MetricsCollector metrics,
+    ThreadPool threadPool,
+    LoadBalancer lb,
+    SecurityManager secMgr,
+    Auditor auditor
+) { ... }
+
+// ✅ GOOD — split into focused classes
+public class KeyProducerService {
+    public KeyProducerService(KeyUtility keyUtility, Logger logger) { ... }
+}
+
+public class StorageService {
+    public StorageService(Database db, Cache cache, MetricsCollector metrics) { ... }
+}
+
+public class OrchestratorService {
+    public OrchestratorService(KeyProducerService kp, StorageService storage) { ... }
+}
+```
+
+In the split design:
+- Each class has 2–3 dependencies (shallow).
+- Relationships are explicit and easy to test.
+- No DI framework needed.

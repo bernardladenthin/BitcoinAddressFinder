@@ -118,3 +118,105 @@ public class Bech32HelperTest {
     // </editor-fold>
 }
 ```
+
+---
+
+## 3. Constructor Injection in Tests — Lightweight Mocking
+
+### Motivation
+
+Tests should **inject dependencies directly through constructors**, without external test frameworks or DI containers. This approach:
+
+- Keeps tests fast — no container initialization overhead.
+- Makes dependencies explicit — the test code clearly shows what the unit under test depends on.
+- Enables fine-grained control — tests can create custom objects, mocks, or test doubles for specific scenarios.
+- Avoids test coupling — tests don't depend on framework infrastructure (Spring `@SpringBootTest`, etc.).
+
+### Pattern
+
+When testing a class with dependencies, create the object with mocks or test doubles directly:
+
+```java
+// ✅ GOOD — lightweight, explicit constructor injection
+
+@Test
+public void processKey_validKey_logsAndStores() {
+    // arrange
+    Logger mockLogger = mock(Logger.class);
+    Persistence mockPersistence = mock(Persistence.class);
+    KeyUtility realKeyUtility = new KeyUtility(...);  // can be real or mock
+
+    MyService service = new MyService(mockLogger, mockPersistence, realKeyUtility);
+
+    // act
+    service.processKey(testKey);
+
+    // assert
+    verify(mockLogger).info(contains("processed"));
+    verify(mockPersistence).store(any());
+}
+```
+
+### What NOT to Do
+
+**Do not use test frameworks that hide constructor injection:**
+
+```java
+// ❌ BAD — uses Spring @SpringBootTest (overkill for unit tests)
+@RunWith(SpringRunner.class)
+@SpringBootTest
+public class MyServiceTest {
+
+    @MockBean
+    private Logger logger;
+
+    @Autowired
+    private MyService service;  // Spring wires it; you can't see the dependencies
+
+    @Test
+    public void processKey_validKey_logsAndStores() {
+        // test body
+    }
+}
+```
+
+**Costs of the framework approach:**
+- Slow test startup (Spring container initialization: 1–2 seconds per test class)
+- Opaque — you can't see what dependencies are injected
+- Harder to control edge cases (e.g., pass a `Random` with a fixed seed for reproducibility)
+- Test coupling — tests depend on Spring infrastructure, making them brittle
+
+### When Constructor Injection Isn't Enough
+
+If a class has **8+ parameters**, the test still becomes unwieldy:
+
+```java
+// Hard to read even with constructor injection
+MyService service = new MyService(mock1, mock2, mock3, mock4, mock5, mock6, mock7, mock8);
+```
+
+**Solution:** Refactor the class (split into smaller classes) rather than introducing a test framework. See `CODE_WRITING_GUIDE.md`, Section 3.
+
+---
+
+## 3. DI Frameworks — When to Avoid
+
+**Never introduce an external DI framework (Spring, Guice, Dagger) to solve construction complexity.**
+
+The codebase intentionally avoids DI frameworks for these reasons:
+
+1. **Startup cost** — BitcoinAddressFinder is a CLI tool; framework initialization overhead (1–3 seconds) is unacceptable.
+2. **Configuration bloat** — A DI framework would require parallel configuration (annotations/XML) alongside the existing JSON config.
+3. **Testing overhead** — Test frameworks (e.g., `@SpringBootTest`) are slower and less transparent than direct injection.
+4. **Null safety** — Error Prone / NullAway compile-time checks are more powerful than framework-managed injection.
+
+**Recommended alternatives:**
+
+| Problem | Solution |
+|---|---|
+| Shallow construction (3–5 params) | Use constructor injection (current approach) |
+| Deeper construction (6–8 params) | Refactor into smaller classes |
+| Very deep construction (9+ params) | Use a builder pattern (not a DI framework) |
+| Pluggable strategies | Use lightweight `Function<Config, Instance>` factories (see `Finder.processKeyProducers`) |
+
+For a detailed analysis, see `DEPENDENCY_INJECTION_ANALYSIS.md`.

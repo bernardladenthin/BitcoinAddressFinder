@@ -439,3 +439,4 @@ Once all checks pass, summarise what was fixed and why. If a failure **cannot** 
 4. **Graceful shutdown** — always implement `Interruptable`; propagate interrupts from `Main` → `Finder` → all producers/consumers.
 5. **Null safety is required** — NullAway is error-level; annotate all nullable return types and parameters.
 6. **Configuration-driven** — behaviour changes belong in config, not in code conditionals.
+7. **Lightweight dependency injection** — use constructor-based injection without external DI frameworks (Spring, Guice, etc.). Keep constructors to 5–8 parameters. The startup time cost and configuration complexity of a DI framework are not justified for this CLI tool. See `DEPENDENCY_INJECTION_ANALYSIS.md` for a detailed analysis.
