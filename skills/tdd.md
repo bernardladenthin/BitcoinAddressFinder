@@ -118,3 +118,41 @@ public class Bech32HelperTest {
     // </editor-fold>
 }
 ```
+
+---
+
+## 3. Real-World Example: PrivateKeyValidator
+
+The `PrivateKeyValidator` helper class is a concrete implementation of the refactoring pattern described above.
+
+### Extraction Details
+
+**Original State:** Five related static methods in `KeyUtility`:
+- `getMaxPrivateKeyForBatchSize(int batchSizeInBits)`
+- `isInvalidWithBatchSize(BigInteger, BigInteger)`
+- `isOutsidePrivateKeyRange(BigInteger)`
+- `returnValidPrivateKey(BigInteger)`
+- `replaceInvalidPrivateKeys(BigInteger[])`
+
+**Refactored:** Extracted to `PrivateKeyValidator` as non-static instance methods.
+
+**Injection Locations:**
+- `AbstractProducer` — instantiates in constructor, inherited by `ProducerJava` and `ProducerOpenCL`
+- `OpenClTask` — instantiates in constructor for batch validation
+- `PublicKeyBytes` — instantiates for key state validation
+
+### Test Coverage
+
+`PrivateKeyValidatorTest` provides comprehensive coverage:
+- **Batch size validation**: boundary tests for 0 bits, max bits, overflow cases
+- **Range validation**: tests for MIN/MAX boundaries and out-of-range keys
+- **Key correction**: tests for valid, too-small, and too-large keys
+- **Array correction**: tests for mixed valid/invalid arrays
+- **Data-provider tests**: uses `CommonDataProvider` for batch size edge cases
+
+### Benefits Realized
+
+1. **Isolated Testing**: Each validation method can be tested directly without instantiating higher-level classes.
+2. **Clear Dependencies**: Callers explicitly pass or store the validator, making dependencies visible.
+3. **Future Extension**: If validation rules change (e.g., support for alternative curves), subclassing becomes possible.
+4. **Code Reuse**: Multiple call sites (`OpenClTask`, `AbstractProducer`, `PublicKeyBytes`) share the same validation logic without static coupling.
