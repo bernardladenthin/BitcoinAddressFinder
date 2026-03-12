@@ -59,7 +59,7 @@ public class ProducerJava extends AbstractProducer {
         for (int i = 0; i < publicKeyBytesArray.length; i++) {
             // create uncompressed
             BigInteger gridSecret = calculateSecretKey(secretBase, i);
-            if (KeyUtility.isOutsidePrivateKeyRange(gridSecret)) {
+            if (privateKeyValidator.isOutsidePrivateKeyRange(gridSecret)) {
                 publicKeyBytesArray[i] = PublicKeyBytes.INVALID_KEY_ONE;
                 continue;
             }
