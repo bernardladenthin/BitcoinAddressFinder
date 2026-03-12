@@ -1,3 +1,8 @@
+---
+name: tdd
+description: Test-Driven Development workflow for BitcoinAddressFinder with Red → Green → Refactor cycle and project-specific test conventions
+---
+
 # TDD — Test-Driven Development for BitcoinAddressFinder
 
 You are working on **BitcoinAddressFinder** (group `net.ladenthin`, Java 21, Maven).
