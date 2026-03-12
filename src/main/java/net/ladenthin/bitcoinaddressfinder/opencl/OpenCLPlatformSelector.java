@@ -31,7 +31,7 @@ public class OpenCLPlatformSelector {
      * @param deviceIndex The index of the device within the platform
      * @return A selected OpenCLDeviceSelection containing platform, device, and context properties
      */
-    public static OpenCLDeviceSelection select(List<OpenCLPlatform> platforms, int platformIndex, long deviceType, int deviceIndex) {
+    public OpenCLDeviceSelection select(List<OpenCLPlatform> platforms, int platformIndex, long deviceType, int deviceIndex) {
         if (platformIndex < 0 || platformIndex >= platforms.size()) {
             throw new IllegalArgumentException("Invalid platform index: " + platformIndex);
         }
