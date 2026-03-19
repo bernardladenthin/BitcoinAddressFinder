@@ -157,6 +157,32 @@ All configuration POJOs are prefixed with `C`:
 - `LMDBPersistence` implements high-performance O(1) address lookups using LMDB.
 - `PersistenceUtils` provides helper methods.
 
+### Helper Classes (Validation & Utilities)
+
+Helper classes encapsulate single-responsibility validation and utility logic, improving testability and separation of concerns:
+
+| Class | Purpose | Injection Pattern |
+|---|---|---|
+| `PrivateKeyValidator` | Non-static validation of private keys against secp256k1 constraints | Created in constructors where needed; no external dependencies |
+| `KeyUtility` (record) | Cryptographic utilities requiring network/buffer context | Injected as dependency into producers/consumers |
+| `ByteBufferUtility` | ByteBuffer conversion utilities | Passed as constructor parameter |
+
+**Design Pattern: Static to Helper Migration**
+
+Certain utility methods that were previously static (e.g., key range validation) have been refactored into dedicated helper classes as non-static instance methods. This improves:
+- **Testability**: Instances are easier to mock in tests
+- **Clarity**: Dependencies are explicit
+- **Extensibility**: Future subclasses can override behavior
+
+Example: `PrivateKeyValidator` contains the following methods (formerly static in `KeyUtility`):
+- `getMaxPrivateKeyForBatchSize(int batchSizeInBits)`
+- `isInvalidWithBatchSize(BigInteger, BigInteger)`
+- `isOutsidePrivateKeyRange(BigInteger)`
+- `returnValidPrivateKey(BigInteger)`
+- `replaceInvalidPrivateKeys(BigInteger[])`
+
+Callers instantiate `PrivateKeyValidator` directly (stateless) or receive it via dependency injection where appropriate.
+
 ---
 
 ## Configuration Format

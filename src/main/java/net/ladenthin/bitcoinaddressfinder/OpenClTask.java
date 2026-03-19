@@ -59,7 +59,8 @@ public class OpenClTask implements ReleaseCLObject {
     private final BitHelper bitHelper;
     private final ByteBufferUtility byteBufferUtility;
     private final BigInteger maxPrivateKeyForBatchSize;
-    
+    private final PrivateKeyValidator privateKeyValidator;
+
     private boolean closed = false;
 
     public abstract static class CLByteBufferPointerArgument implements ReleaseCLObject {
@@ -172,7 +173,8 @@ public class OpenClTask implements ReleaseCLObject {
         this.cProducer = cProducer;
         this.bitHelper = bitHelper;
         this.byteBufferUtility = byteBufferUtility;
-        this.maxPrivateKeyForBatchSize = KeyUtility.getMaxPrivateKeyForBatchSize(cProducer.batchSizeInBits);
+        this.privateKeyValidator = new PrivateKeyValidator();
+        this.maxPrivateKeyForBatchSize = privateKeyValidator.getMaxPrivateKeyForBatchSize(cProducer.batchSizeInBits);
         this.privateKeySourceArgument = SourceArgument.create(context, PRIVATE_KEY_SOURCE_SIZE_IN_BYTES);
     }
 
@@ -199,7 +201,7 @@ public class OpenClTask implements ReleaseCLObject {
     * @throws PrivateKeyTooLargeException if the key is too large for the current batch size
     */
     public void setSrcPrivateKeyChunk(BigInteger privateKeyBase) {
-        if (KeyUtility.isInvalidWithBatchSize(privateKeyBase, maxPrivateKeyForBatchSize)) {
+        if (privateKeyValidator.isInvalidWithBatchSize(privateKeyBase, maxPrivateKeyForBatchSize)) {
             throw new PrivateKeyTooLargeException(privateKeyBase, maxPrivateKeyForBatchSize, cProducer.batchSizeInBits);
         }
 

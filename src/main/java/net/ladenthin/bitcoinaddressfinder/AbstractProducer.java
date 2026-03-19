@@ -41,9 +41,10 @@ public abstract class AbstractProducer implements Producer {
     protected final KeyUtility keyUtility;
     protected final KeyProducer keyProducer;
     protected final BitHelper bitHelper;
-    
+    protected final PrivateKeyValidator privateKeyValidator;
+
     protected volatile ProducerState state = ProducerState.UNINITIALIZED;
-    
+
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
     public AbstractProducer(CProducer cProducer, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer, BitHelper bitHelper) {
@@ -52,6 +53,7 @@ public abstract class AbstractProducer implements Producer {
         this.keyUtility = keyUtility;
         this.keyProducer = keyProducer;
         this.bitHelper = bitHelper;
+        this.privateKeyValidator = new PrivateKeyValidator();
     }
 
     @Override
@@ -104,7 +106,7 @@ public abstract class AbstractProducer implements Producer {
                     throw new RuntimeException("secrets.length != bitHelper.convertBitsToSize(cProducer.batchSizeInBits)");
                 }
             }
-            KeyUtility.replaceInvalidPrivateKeys(secrets);
+            privateKeyValidator.replaceInvalidPrivateKeys(secrets);
             
             consumeSecrets(secrets);
          } catch (RuntimeException e) {

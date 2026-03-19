@@ -205,28 +205,29 @@ public class PublicKeyBytes {
 
     private final byte @NonNull [] uncompressed;
     private final byte @NonNull [] compressed;
-    
+
     /**
      * Lazy initialization.
      */
     private byte @Nullable [] uncompressedKeyHash;
-    
+
     /**
      * Lazy initialization.
      */
     private byte @Nullable [] compressedKeyHash;
-    
+
     /**
      * Lazy initialization.
      */
     private @Nullable String uncompressedKeyHashBase58;
-    
+
     /**
      * Lazy initialization.
      */
     private @Nullable String compressedKeyHashBase58;
-    
+
     private final BigInteger secretKey;
+    private final PrivateKeyValidator privateKeyValidator;
     
     // [4, 121, -66, 102, 126, -7, -36, -69, -84, 85, -96, 98, -107, -50, -121, 11, 7, 2, -101, -4, -37, 45, -50, 40, -39, 89, -14, -127, 91, 22, -8, 23, -104, 72, 58, -38, 119, 38, -93, -60, 101, 93, -92, -5, -4, 14, 17, 8, -88, -3, 23, -76, 72, -90, -123, 84, 25, -100, 71, -48, -113, -5, 16, -44, -72]
     // Hex.decodeHex("0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8")
@@ -245,7 +246,7 @@ public class PublicKeyBytes {
     }
     
     public boolean isOutsidePrivateKeyRange() {
-        return KeyUtility.isOutsidePrivateKeyRange(secretKey);
+        return privateKeyValidator.isOutsidePrivateKeyRange(secretKey);
     }
     
     public PublicKeyBytes(BigInteger secretKey, byte[] uncompressed) {
@@ -260,14 +261,16 @@ public class PublicKeyBytes {
         this.secretKey = secretKey;
         this.uncompressed = uncompressed;
         this.compressed = compressed;
+        this.privateKeyValidator = new PrivateKeyValidator();
     }
-    
+
     public PublicKeyBytes(BigInteger secretKey, byte @NonNull [] uncompressed, byte @NonNull [] compressed, byte @Nullable [] uncompressedKeyHash, byte @Nullable [] compressedKeyHash) {
         this.secretKey = secretKey;
         this.uncompressed = uncompressed;
         this.compressed = compressed;
         this.uncompressedKeyHash = uncompressedKeyHash;
         this.compressedKeyHash = compressedKeyHash;
+        this.privateKeyValidator = new PrivateKeyValidator();
     }
     
     public static PublicKeyBytes fromPrivate(BigInteger secretKey) {
