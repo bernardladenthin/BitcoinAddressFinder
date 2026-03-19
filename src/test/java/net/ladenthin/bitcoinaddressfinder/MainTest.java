@@ -19,18 +19,24 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import ch.qos.logback.classic.Level;
+import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.cli.Main;
+import net.ladenthin.bitcoinaddressfinder.configuration.CCommand;
+import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
 
 import static net.ladenthin.bitcoinaddressfinder.cli.Main.printAllStackTracesWithDelay;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -57,7 +63,15 @@ public class MainTest {
     private final Path config_Find_1OpenCLDevice_json = testRoundtripDirectory.resolve("config_Find_1OpenCLDevice.json");
     
     private final Path config_OpenCLInfo_json = testOpenCLInfoDirectory.resolve("config_OpenCLInfo.json");
-    
+    private final Path config_OpenCLInfo_yaml = testOpenCLInfoDirectory.resolve("config_OpenCLInfo.yaml");
+    private final Path config_OpenCLInfo_yml = testOpenCLInfoDirectory.resolve("config_OpenCLInfo.yml");
+    private final Path config_OpenCLInfo_js = testOpenCLInfoDirectory.resolve("config_OpenCLInfo.js");
+
+    /** Minimal JSON string representing an OpenCLInfo configuration for unit tests. */
+    private static final String OPEN_CL_INFO_JSON_STRING = "{\"command\":\"OpenCLInfo\"}";
+    /** Minimal YAML string representing an OpenCLInfo configuration for unit tests. */
+    private static final String OPEN_CL_INFO_YAML_STRING = "command: OpenCLInfo\n";
+
     private static final long DEFAULT_INTERRUPT_DELAY_SECONDS = 10;
     
     private void interruptAfterDelay(Main main, long delaySeconds) {
@@ -142,6 +156,78 @@ public class MainTest {
     public void printAllStackTracesWithDelay_includeDaemonsFalse_noExceptionThrown() {
         // act
         printAllStackTracesWithDelay(0, false);
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="fromJson">
+    @Test
+    public void fromJson_validJsonString_returnsExpectedConfiguration() {
+        // act
+        CConfiguration configuration = Main.fromJson(OPEN_CL_INFO_JSON_STRING);
+
+        // pre-assert
+        assertThat(configuration, is(notNullValue()));
+
+        // assert
+        assertThat(configuration.command, is(equalTo(CCommand.OpenCLInfo)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="fromYaml">
+    @Test
+    public void fromYaml_validYamlString_returnsExpectedConfiguration() {
+        // act
+        CConfiguration configuration = Main.fromYaml(OPEN_CL_INFO_YAML_STRING);
+
+        // pre-assert
+        assertThat(configuration, is(notNullValue()));
+
+        // assert
+        assertThat(configuration.command, is(equalTo(CCommand.OpenCLInfo)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="main format detection">
+    @Test
+    @OpenCLTest
+    public void main_jsonExtensionPath_parsesAndRunsConfiguration() {
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        // act
+        Main.main(new String[]{config_OpenCLInfo_json.toAbsolutePath().toString()});
+    }
+
+    @Test
+    @OpenCLTest
+    public void main_jsExtensionPath_parsesAndRunsConfiguration() {
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        // act
+        Main.main(new String[]{config_OpenCLInfo_js.toAbsolutePath().toString()});
+    }
+
+    @Test
+    @OpenCLTest
+    public void main_yamlExtensionPath_parsesAndRunsConfiguration() {
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        // act
+        Main.main(new String[]{config_OpenCLInfo_yaml.toAbsolutePath().toString()});
+    }
+
+    @Test
+    @OpenCLTest
+    public void main_ymlExtensionPath_parsesAndRunsConfiguration() {
+        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        // act
+        Main.main(new String[]{config_OpenCLInfo_yml.toAbsolutePath().toString()});
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void main_unknownExtensionPath_throwsIllegalArgumentException() throws IOException {
+        // arrange
+        File tempFile = folder.newFile("config.txt");
+        Files.writeString(tempFile.toPath(), OPEN_CL_INFO_JSON_STRING, StandardCharsets.UTF_8);
+
+        // act
+        Main.main(new String[]{tempFile.getAbsolutePath()});
     }
     // </editor-fold>
 }
