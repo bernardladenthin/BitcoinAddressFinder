@@ -18,9 +18,10 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder.cli;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -40,11 +41,37 @@ import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.Yaml;
 
 // VM option: -Dorg.slf4j.simpleLogger.defaultLogLevel=trace
 public class Main implements Runnable, Interruptable {
+
+    /**
+     * File extension for JavaScript configuration files; treated identically to {@link #FILE_EXTENSION_JSON}.
+     */
+    @VisibleForTesting
+    static final String FILE_EXTENSION_JS = ".js";
+
+    /**
+     * Standard file extension for JSON configuration files.
+     *
+     * @see #FILE_EXTENSION_JS
+     */
+    @VisibleForTesting
+    static final String FILE_EXTENSION_JSON = ".json";
+
+    /**
+     * Standard long-form file extension for YAML configuration files.
+     *
+     * @see #FILE_EXTENSION_YML
+     */
+    @VisibleForTesting
+    static final String FILE_EXTENSION_YAML = ".yaml";
+
+    /**
+     * Short-form file extension for YAML configuration files; treated identically to {@link #FILE_EXTENSION_YAML}.
+     */
+    @VisibleForTesting
+    static final String FILE_EXTENSION_YML = ".yml";
 
     @VisibleForTesting
     public static Logger logger = LoggerFactory.getLogger(Main.class);
@@ -69,30 +96,40 @@ public class Main implements Runnable, Interruptable {
     }
     
     public static CConfiguration fromJson(String configurationString) {
-        Gson gson = new Gson();
-        CConfiguration configuration = gson.fromJson(configurationString, CConfiguration.class);
-        return configuration;
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.readValue(configurationString, CConfiguration.class);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
-    
+
     public static CConfiguration fromYaml(String configurationString) {
-        Yaml yaml = new Yaml();
-        CConfiguration configuration = yaml.loadAs(configurationString, CConfiguration.class);
-        return configuration;
+        try {
+            YAMLMapper mapper = new YAMLMapper();
+            return mapper.readValue(configurationString, CConfiguration.class);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
-    
+
     public static String configurationToJson(CConfiguration configuration) {
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        String json = gson.toJson(configuration);
-        return json;
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.enable(SerializationFeature.INDENT_OUTPUT);
+            return mapper.writeValueAsString(configuration);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
-    
+
     public static String configurationToYAML(CConfiguration configuration) {
-        final DumperOptions options = new DumperOptions();
-        options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-        options.setPrettyFlow(true);
-        final Yaml yaml = new Yaml(options);
-        String yamlDump = yaml.dump(configuration);
-        return yamlDump;
+        try {
+            YAMLMapper mapper = new YAMLMapper();
+            return mapper.writeValueAsString(configuration);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public static void main(String[] args) {
@@ -103,9 +140,10 @@ public class Main implements Runnable, Interruptable {
         final Path configurationPath = Path.of(args[0]);
         String configurationAsString = readString(configurationPath);
         final CConfiguration configuration;
-        if (configurationPath.toString().toLowerCase().endsWith(".js") || configurationPath.toString().toLowerCase().endsWith(".json")) {
+        String lowerPath = configurationPath.toString().toLowerCase();
+        if (lowerPath.endsWith(FILE_EXTENSION_JS) || lowerPath.endsWith(FILE_EXTENSION_JSON)) {
             configuration = fromJson(configurationAsString);
-        } else if(configurationPath.toString().toLowerCase().endsWith(".yaml")) {
+        } else if (lowerPath.endsWith(FILE_EXTENSION_YAML) || lowerPath.endsWith(FILE_EXTENSION_YML)) {
             configuration = fromYaml(configurationAsString);
         } else {
             throw new IllegalArgumentException("Unknown file ending for: " + configurationPath);

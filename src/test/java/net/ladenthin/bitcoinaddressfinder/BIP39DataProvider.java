@@ -18,14 +18,11 @@
 // @formatter:on
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tngtech.java.junit.dataprovider.DataProvider;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
 import java.util.Map;
 
 public class BIP39DataProvider {
@@ -48,26 +45,27 @@ public class BIP39DataProvider {
             throw new IllegalStateException(FILENAME + " not found in classpath");
         }
 
-        Gson gson = new Gson();
-        JsonObject jsonObject = gson.fromJson(new InputStreamReader(inputStream, StandardCharsets.UTF_8), JsonObject.class);
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode root = mapper.readTree(inputStream);
         int totalVectors = 0;
-        for (Map.Entry<String, JsonElement> entry : jsonObject.entrySet()) {
-            totalVectors += entry.getValue().getAsJsonArray().size();
+        for (Iterator<Map.Entry<String, JsonNode>> fields = root.fields(); fields.hasNext();) {
+            Map.Entry<String, JsonNode> entry = fields.next();
+            totalVectors += entry.getValue().size();
         }
-        
+
         Object[][] result = new Object[totalVectors][];
         int index = 0;
-        
-        for (Map.Entry<String, JsonElement> entry : jsonObject.entrySet()) {
-            String language = entry.getKey();
-            JsonArray vectors = entry.getValue().getAsJsonArray();
 
-            for (JsonElement vectorElement : vectors) {
-                JsonArray vector = vectorElement.getAsJsonArray();
-                String entropy = vector.get(0).getAsString();
-                String mnemonic = vector.get(1).getAsString();
-                String seed = vector.get(2).getAsString();
-                String xprv = vector.get(3).getAsString();
+        for (Iterator<Map.Entry<String, JsonNode>> fields = root.fields(); fields.hasNext();) {
+            Map.Entry<String, JsonNode> entry = fields.next();
+            String language = entry.getKey();
+            JsonNode vectors = entry.getValue();
+
+            for (JsonNode vectorElement : vectors) {
+                String entropy = vectorElement.get(0).asText();
+                String mnemonic = vectorElement.get(1).asText();
+                String seed = vectorElement.get(2).asText();
+                String xprv = vectorElement.get(3).asText();
                 result[index++] = new Object[]{language, entropy, mnemonic, PASSPHRASE, seed, xprv};
             }
         }
