@@ -1,6 +1,6 @@
 // @formatter:off
 /**
- * Copyright 2020 Bernard Ladenthin bernard.ladenthin@gmail.com
+ * Copyright 2026 Bernard Ladenthin bernard.ladenthin@gmail.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,8 +39,13 @@ import static org.hamcrest.Matchers.*;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+/**
+ * Direct unit tests for {@link AddressFilesToLMDB}.
+ *
+ * Tests the run() and interrupt() methods with parameterized test data from existing test providers.
+ */
 @RunWith(DataProviderRunner.class)
-public class AddressFileToLMDBTest extends LMDBBase {
+public class AddressFilesToLMDBTest extends LMDBBase {
 
     @Before
     public void init() throws IOException {
@@ -157,4 +162,20 @@ public class AddressFileToLMDBTest extends LMDBBase {
             assertThat("containsAddress() must return false for a known non-existing address used for negative testing.", contains, is(false));
         }
     }
+
+    // <editor-fold defaultstate="collapsed" desc="interrupt() edge cases">
+
+    @Test
+    public void interrupt_withNoCurrentFile_doesNotThrow() {
+        // arrange
+        CAddressFilesToLMDB config = new CAddressFilesToLMDB();
+        AddressFilesToLMDB importer = new AddressFilesToLMDB(config);
+
+        // act - should not throw exception
+        importer.interrupt();
+
+        // assert - method completed without exception
+    }
+
+    // </editor-fold>
 }
