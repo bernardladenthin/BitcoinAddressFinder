@@ -69,6 +69,14 @@ public abstract class AbstractProducer implements Producer {
 
     @Override
     public void run() {
+        if (!shouldRun.get()) {
+            logger.info("Producer was interrupted before it started running.");
+            state = ProducerState.NOT_RUNNING;
+            return;
+        }
+        if (state != ProducerState.INITIALIZED) {
+            throw new IllegalStateException("Producer not initialized. Current state: " + state);
+        }
         state = ProducerState.RUNNING;
         while (shouldRun.get()) {
             try {
