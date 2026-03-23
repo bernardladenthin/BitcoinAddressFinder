@@ -236,6 +236,45 @@ public class AbstractProducerTest {
     }
 
     // <editor-fold defaultstate="collapsed" desc="run">
+    @Test(expected = IllegalStateException.class)
+    public void run_notInitialized_illegalStateExceptionThrown() throws IOException, InterruptedException {
+        // arrange
+        CProducer cProducer = new CProducer();
+        MockConsumer mockConsumer = new MockConsumer();
+        Random random = new Random(1);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+
+        // act
+        abstractProducerTestImpl.run();
+    }
+
+    @Test
+    public void run_interruptedBeforeStarted_stateSetToNotRunning() throws IOException, InterruptedException {
+        // arrange
+        CProducer cProducer = new CProducer();
+        MockConsumer mockConsumer = new MockConsumer();
+        Random random = new Random(1);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+
+        Logger logger = mock(Logger.class);
+        abstractProducerTestImpl.setLogger(logger);
+        abstractProducerTestImpl.initProducer();
+        abstractProducerTestImpl.interrupt();
+
+        // act
+        abstractProducerTestImpl.run();
+
+        // assert
+        assertThat(abstractProducerTestImpl.state, is(equalTo(ProducerState.NOT_RUNNING)));
+
+        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
+        verify(logger, times(2)).info(logCaptor.capture());
+        List<String> arguments = logCaptor.getAllValues();
+        assertThat(arguments.get(1), is(equalTo("Producer was interrupted before it started running.")));
+    }
+
     @Test
     public void run_exceptionInProduceKeys_exceptionCaughtAndLoggedToError() throws IOException, InterruptedException {
         // arrange
