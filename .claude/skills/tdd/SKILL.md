@@ -9,7 +9,7 @@ You are working on **BitcoinAddressFinder** (group `net.ladenthin`, Java 21, Mav
 
 ## Generic Java TDD Guide
 
-Follow all conventions from the generic Java TDD skill (`.claude/skills/java-tdd-guide.md`). That guide covers:
+Follow all conventions from the generic Java TDD skill (`.claude/skills/java-tdd-guide/SKILL.md`). That guide covers:
 
 - Red → Green → Refactor workflow
 - File headers (Apache 2.0 license)
