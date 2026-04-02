@@ -144,13 +144,14 @@ public class KeyProducerJavaZmqTest {
             try (ZContext context = new ZContext(); ZMQ.Socket socket = context.createSocket(ZMQ.PUSH)) {
                 socket.connect(address);
                 Thread.sleep(TestTimeProvider.DEFAULT_ESTABLISH_DELAY); // let connection establish
-                senderReady.countDown();
                 socket.send(secretBytes);
+                Thread.sleep(TestTimeProvider.DEFAULT_ESTABLISH_DELAY); // let message be delivered
+                senderReady.countDown();
             }
             return null;
         });
 
-        // Wait for sender to be connected before consuming
+        // Wait for sender to have sent the message before consuming
         senderReady.await(TestTimeProvider.LONG_SOCKET_TIMEOUT, TestTimeProvider.TIME_UNIT);
 
         // act
