@@ -359,13 +359,13 @@ Pre-built run scripts exist in `examples/` for each operation mode (`run_*.bat` 
 
 ## Test Writing Compliance
 
-After modifying or creating any `*Test.java` file, automatically verify that all rules from `TEST_WRITING_GUIDE.md` are applied to the modified test class. Apply all fixable violations on your own without asking. Only report violations that cannot be resolved without a large refactoring. Consider the task complete only after all auto-fixable rules are satisfied.
+After modifying or creating any `*Test.java` file, automatically verify that all rules from the generic Java TDD skill (`.claude/skills/java-tdd-guide/SKILL.md`) **and** the project-specific supplement (`TEST_WRITING_GUIDE.md`) are applied to the modified test class. Apply all fixable violations on your own without asking. Only report violations that cannot be resolved without a large refactoring. Consider the task complete only after all auto-fixable rules are satisfied.
 
 ---
 
 ## Code Writing Compliance
 
-After modifying or creating any production `.java` file, automatically verify that all rules from `CODE_WRITING_GUIDE.md` are applied to the modified class. Apply all fixable violations on your own without asking. Only report violations that cannot be resolved without a large refactoring. Consider the task complete only after all auto-fixable rules are satisfied.
+After modifying or creating any production `.java` file, automatically verify that all rules from the generic Java TDD skill (`.claude/skills/java-tdd-guide/SKILL.md`) **and** the project-specific supplement (`CODE_WRITING_GUIDE.md`) are applied to the modified class. Apply all fixable violations on your own without asking. Only report violations that cannot be resolved without a large refactoring. Consider the task complete only after all auto-fixable rules are satisfied.
 
 ---
 
