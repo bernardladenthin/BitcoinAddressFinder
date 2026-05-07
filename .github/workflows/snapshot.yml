@@ -2,7 +2,7 @@ name: Build, Test and Publish Snapshot
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
   workflow_dispatch:
 
@@ -36,7 +36,7 @@ jobs:
           path: target/*.jar
 
   # ---------------------------------------------------------------------------
-  # Publish snapshot — only on push to master
+  # Publish snapshot — only on push to main
   # ---------------------------------------------------------------------------
 
   publish-snapshot:
@@ -69,6 +69,13 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '21'
+      - name: Delete old snapshot versions from GitHub Packages
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: 'net.ladenthin.bitcoinaddressfinder'
+          package-type: 'maven'
+          min-versions-to-keep: 0
+        continue-on-error: true
       - name: Publish to GitHub Packages
         run: |
           mvn --batch-mode deploy -s .mvn/settings.xml -Dmaven.test.skip=true
