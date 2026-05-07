@@ -69,13 +69,10 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '21'
-      - name: Delete old snapshot versions from GitHub Packages
-        uses: actions/delete-package-versions@v5
-        with:
-          package-name: 'net.ladenthin.bitcoinaddressfinder'
-          package-type: 'maven'
-          min-versions-to-keep: 0
-        continue-on-error: true
+      - name: Delete snapshot package from GitHub Packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh api --method DELETE /user/packages/maven/net.ladenthin.bitcoinaddressfinder || true
       - name: Publish to GitHub Packages
         run: |
           mvn --batch-mode deploy -s .mvn/settings.xml -Dmaven.test.skip=true
