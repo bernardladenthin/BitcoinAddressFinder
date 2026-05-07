@@ -2,7 +2,7 @@ name: Build, Test and Publish Snapshot
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
   workflow_dispatch:
 
@@ -34,7 +34,7 @@ jobs:
           path: target/*.jar
 
   # ---------------------------------------------------------------------------
-  # Publish snapshot — only on push to master
+  # Publish snapshot — only on push to main
   # ---------------------------------------------------------------------------
 
   publish-snapshot:
