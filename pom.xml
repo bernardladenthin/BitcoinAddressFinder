@@ -15,8 +15,15 @@
         <logback.version>1.5.32</logback.version>
         <argLine>-Xmx2g -Xms1g --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED</argLine>
     </properties>
-    
-    
+
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/bernardladenthin/bitcoinaddressfinder</url>
+        </repository>
+    </distributionManagement>
+
     <repositories>
         <repository>
           <id>jitpack.io</id>
