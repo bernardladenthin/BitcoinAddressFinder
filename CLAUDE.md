@@ -465,3 +465,21 @@ Once all checks pass, summarise what was fixed and why. If a failure **cannot** 
 4. **Graceful shutdown** — always implement `Interruptable`; propagate interrupts from `Main` → `Finder` → all producers/consumers.
 5. **Null safety is required** — NullAway is error-level; annotate all nullable return types and parameters.
 6. **Configuration-driven** — behaviour changes belong in config, not in code conditionals.
+
+## Javadoc Conventions
+
+### HTML Entities
+
+In Javadoc comments, never use bare Unicode characters for operators and symbols. Use HTML entities instead:
+
+| Symbol | HTML entity |
+|---|---|
+| `<` | `&lt;` |
+| `>` | `&gt;` |
+| `≤` | `&#x2264;` |
+| `≥` | `&#x2265;` |
+| `→` | `&#x2192;` |
+| `←` | `&#x2190;` |
+| `≠` | `&#x2260;` |
+
+Use numeric hex entities (`&#xNNNN;`) for any Unicode symbol outside ASCII. Named entities (`&lt;`, `&gt;`) are acceptable for `<` and `>`.
