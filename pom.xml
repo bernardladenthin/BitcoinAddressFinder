@@ -203,7 +203,13 @@
                     <source>21</source>
                     <doclint>none</doclint>
                     <additionalJOptions>
+                        <additionalJOption>--add-exports=java.base/java.lang=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=java.base/java.io=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=java.base/java.nio=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED</additionalJOption>
                         <additionalJOption>--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=java.base/sun.nio.ch=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.management/com.sun.management.internal=ALL-UNNAMED</additionalJOption>
                     </additionalJOptions>
                 </configuration>
                 <executions>
