@@ -34,7 +34,7 @@ public class BitHelper {
     
     public void assertBatchSizeInBitsIsInRange(int batchSizeInBits) {
         if (batchSizeInBits < 0) {
-            throw new IllegalArgumentException("batchSizeInBits must higher or equal to 0.");
+            throw new IllegalArgumentException("batchSizeInBits must be higher or equal to 0.");
         }
         if (batchSizeInBits > PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY) {
             throw new IllegalArgumentException("batchSizeInBits must be lower or equal than " + PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY + ".");
