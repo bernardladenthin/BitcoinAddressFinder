@@ -21,17 +21,17 @@ package net.ladenthin.bitcoinaddressfinder;
 import java.math.BigInteger;
 
 public class BitHelper {
-    
+
     public static final int RADIX_HEX = 16;
-    
+
     public int convertBitsToSize(int bits) {
         return 1 << bits;
     }
-    
+
     public BigInteger getKillBits(int bits) {
         return BigInteger.valueOf(2).pow(bits).subtract(BigInteger.ONE);
     }
-    
+
     public void assertBatchSizeInBitsIsInRange(int batchSizeInBits) {
         if (batchSizeInBits < 0) {
             throw new IllegalArgumentException("batchSizeInBits must be greater than or equal to 0.");
