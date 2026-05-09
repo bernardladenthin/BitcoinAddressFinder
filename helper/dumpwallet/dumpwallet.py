@@ -4,6 +4,7 @@
 # License.....: MIT
 #
 import sys
+import os
 import struct
 from bsddb3.db import *
 from bitcoinaddress import Wallet
@@ -26,8 +27,14 @@ if not len(sys.argv) == 2:
     print("Usage: %s <wallet_file>" % sys.argv[0])
     sys.exit(1)
 
+wallet_path = os.path.realpath(sys.argv[1])
+
+if not os.path.isfile(wallet_path):
+    print("Error: not a regular file: %s" % wallet_path)
+    sys.exit(1)
+
 db = DB()
-db.open(sys.argv[1], "main", DB_BTREE, DB_RDONLY)
+db.open(wallet_path, "main", DB_BTREE, DB_RDONLY)
 
 items = db.items()
 
