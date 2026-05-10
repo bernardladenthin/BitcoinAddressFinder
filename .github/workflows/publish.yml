@@ -133,7 +133,7 @@ jobs:
       - uses: actions/download-artifact@v8
         with: { name: jacoco-report, path: target/site/jacoco/ }
         continue-on-error: true
-      - uses: advanced-security/maven-dependency-submission-action@v4
+      - uses: advanced-security/maven-dependency-submission-action@v5
       - name: Coveralls
         uses: coverallsapp/github-action@v2
         with:
