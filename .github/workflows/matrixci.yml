@@ -43,7 +43,7 @@ jobs:
       run: mvn -B --no-transfer-progress "-Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=false" test --file pom.xml
     - name: Upload Surefire Reports and JVM Crash Logs
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: surefire-reports-${{ matrix.os }}-${{ matrix.javadistribution }}-java${{ matrix.javaversion }}
         path: |
