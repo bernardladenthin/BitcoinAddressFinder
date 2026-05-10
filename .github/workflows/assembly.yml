@@ -18,7 +18,7 @@ jobs:
 
     runs-on: 'ubuntu-latest'
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Set up JDK ${{ env.javaversion }} ${{ env.javadistribution }}
       uses: actions/setup-java@v5
       with:
@@ -29,13 +29,13 @@ jobs:
       run: mvn -B "-Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=false" --update-snapshots test package assembly:single --file pom.xml
 
     - name: Archive binary
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: jar binaries
         path: target/*.jar
     - name: Upload Surefire Reports and JVM Crash Logs
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: surefire-and-crash-logs
         path: |

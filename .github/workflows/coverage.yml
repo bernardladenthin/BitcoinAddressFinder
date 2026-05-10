@@ -18,7 +18,7 @@ jobs:
 
     runs-on: 'ubuntu-latest'
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Set up JDK ${{ env.javaversion }} ${{ env.javadistribution }}
       uses: actions/setup-java@v5
       with:
@@ -29,7 +29,7 @@ jobs:
       run: mvn -B "-Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true" --update-snapshots test package jacoco:report --file pom.xml
     - name: Upload Surefire Reports and JVM Crash Logs
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: surefire-and-crash-logs
         path: |
@@ -49,6 +49,6 @@ jobs:
 
     # https://github.com/codecov/codecov-action
     - name: Codecov GitHub Action
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@v6
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
