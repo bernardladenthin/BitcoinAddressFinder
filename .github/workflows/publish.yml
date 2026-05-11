@@ -56,6 +56,7 @@ jobs:
           distribution: temurin
           cache: maven
       - name: Test
+        shell: bash
         run: mvn --batch-mode -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=${{ matrix.disable-lmdb }} --update-snapshots test jacoco:report
       - uses: actions/upload-artifact@v7
         if: always()
@@ -71,9 +72,39 @@ jobs:
           path: target/site/jacoco/jacoco.xml
           if-no-files-found: ignore
 
+  report:
+    name: Report
+    needs: [test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+      - uses: actions/download-artifact@v8
+        with: { name: jacoco-report, path: target/site/jacoco/ }
+        continue-on-error: true
+      - uses: advanced-security/maven-dependency-submission-action@v5
+      - name: Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: target/site/jacoco/jacoco.xml
+          format: jacoco
+        continue-on-error: true
+      - name: Codecov
+        uses: codecov/codecov-action@v6
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: target/site/jacoco/jacoco.xml
+        continue-on-error: true
+
   publish-snapshot:
     name: Publish Snapshot to Central
-    needs: [test]
+    needs: [report]
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       github.event_name == 'workflow_dispatch'
@@ -97,7 +128,7 @@ jobs:
 
   publish-release:
     name: Publish Release to Central
-    needs: [test]
+    needs: [report]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     environment: maven-central
@@ -136,38 +167,3 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: release-assets/*
-
-  post-publish:
-    name: Post-Publish
-    needs: [test, publish-snapshot, publish-release]
-    if: >-
-      always() &&
-      needs.test.result == 'success' &&
-      (needs.publish-snapshot.result == 'success' ||
-       needs.publish-release.result == 'success')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-java@v5
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: temurin
-      - uses: actions/download-artifact@v8
-        with: { name: jacoco-report, path: target/site/jacoco/ }
-        continue-on-error: true
-      - uses: advanced-security/maven-dependency-submission-action@v5
-      - name: Coveralls
-        uses: coverallsapp/github-action@v2
-        with:
-          github-token: ${{ secrets.COVERALLS_TOKEN }}
-          file: target/site/jacoco/jacoco.xml
-          format: jacoco
-        continue-on-error: true
-      - name: Codecov
-        uses: codecov/codecov-action@v6
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: target/site/jacoco/jacoco.xml
-        continue-on-error: true
