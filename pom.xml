@@ -41,11 +41,10 @@
     </properties>
 
     <distributionManagement>
-        <repository>
-            <id>github</id>
-            <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/bernardladenthin/bitcoinaddressfinder</url>
-        </repository>
+        <snapshotRepository>
+            <id>central</id>
+            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
+        </snapshotRepository>
     </distributionManagement>
 
     <repositories>
