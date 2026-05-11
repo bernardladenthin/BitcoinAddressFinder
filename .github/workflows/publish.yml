@@ -134,7 +134,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
-        with: { java-version: ${{ env.JAVA_VERSION }}, distribution: temurin }
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
       - uses: actions/download-artifact@v8
         with: { name: jacoco-report, path: target/site/jacoco/ }
         continue-on-error: true
