@@ -102,12 +102,30 @@ jobs:
           files: target/site/jacoco/jacoco.xml
         continue-on-error: true
 
-  github-snapshot:
-    name: Update Snapshot Pre-release on GitHub
+  check-snapshot:
+    name: Check: main branch / SNAPSHOT
     needs: [report]
+    runs-on: ubuntu-latest
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      github.event_name == 'workflow_dispatch'
+      (github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v'))
+    steps:
+      - name: Confirm snapshot ref
+        run: echo "Confirmed on snapshot ref ${{ github.ref }}"
+
+  check-tag:
+    name: Check: v* tag
+    needs: [report]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Confirm tag ref
+        run: echo "Confirmed on tag ${{ github.ref }}"
+
+  github-snapshot:
+    name: Update Snapshot Pre-release on GitHub
+    needs: [check-snapshot]
+    if: needs.check-snapshot.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -132,10 +150,8 @@ jobs:
 
   publish-snapshot:
     name: Publish Snapshot to Central
-    needs: [github-snapshot]
-    if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      github.event_name == 'workflow_dispatch'
+    needs: [github-snapshot, check-snapshot]
+    if: needs.check-snapshot.result == 'success'
     runs-on: ubuntu-latest
     environment: maven-central
     steps:
@@ -156,8 +172,8 @@ jobs:
 
   github-release:
     name: Attach Binaries to GitHub Release
-    needs: [report]
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [check-tag]
+    if: needs.check-tag.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -167,14 +183,14 @@ jobs:
           name: jars
           path: release-assets/
       - name: Upload release assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: release-assets/*
 
   publish-release:
     name: Publish Release to Central
-    needs: [github-release]
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [github-release, check-tag]
+    if: needs.check-tag.result == 'success'
     runs-on: ubuntu-latest
     environment: maven-central
     steps:
