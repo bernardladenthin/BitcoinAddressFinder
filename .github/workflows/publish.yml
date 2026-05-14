@@ -103,7 +103,7 @@ jobs:
         continue-on-error: true
 
   check-snapshot:
-    name: Check: main branch / SNAPSHOT
+    name: "Check: main branch / SNAPSHOT"
     needs: [report]
     runs-on: ubuntu-latest
     if: >-
@@ -114,7 +114,7 @@ jobs:
         run: echo "Confirmed on snapshot ref ${{ github.ref }}"
 
   check-tag:
-    name: Check: v* tag
+    name: "Check: v* tag"
     needs: [report]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
