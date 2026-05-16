@@ -13,8 +13,21 @@ env:
   JAVA_VERSION: '21'
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Start gate — single cancellable abort window before the pipeline starts.
+  # The wait duration lives in the `startgate` GitHub Environment (Settings →
+  # Environments → startgate → Wait timer).
+  # ---------------------------------------------------------------------------
+  startgate:
+    name: Start gate (abort window)
+    runs-on: ubuntu-latest
+    environment: startgate
+    steps:
+      - run: echo "Start gate elapsed — proceeding with pipeline."
+
   build:
     name: Build
+    needs: startgate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
