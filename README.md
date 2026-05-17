@@ -7,6 +7,12 @@
 **Coverage:**  
 [![Coverage Status](https://coveralls.io/repos/github/bernardladenthin/BitcoinAddressFinder/badge.svg?branch=main)](https://coveralls.io/github/bernardladenthin/BitcoinAddressFinder?branch=main)  
 [![codecov](https://codecov.io/gh/bernardladenthin/BitcoinAddressFinder/graph/badge.svg?token=RRCR4ZC28T)](https://codecov.io/gh/bernardladenthin/BitcoinAddressFinder)  
+[![JaCoCo](https://img.shields.io/codecov/c/github/bernardladenthin/BitcoinAddressFinder?label=JaCoCo&logo=java)](https://codecov.io/gh/bernardladenthin/BitcoinAddressFinder)  
+<!--
+PIT mutation testing is not configured for this repository.
+Only `streambuffer` runs PIT (with a 100% mutation-coverage gate).
+Do not add a PIT badge here unless PIT is wired into pom.xml + CI.
+-->
 
 **Quality:**  
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=bernardladenthin_BitcoinAddressFinder&metric=alert_status)](https://sonarcloud.io/dashboard?id=bernardladenthin_BitcoinAddressFinder)  
@@ -17,6 +23,7 @@
 [![Known Vulnerabilities](https://snyk.io/test/github/bernardladenthin/BitcoinAddressFinder/badge.svg?targetFile=pom.xml)](https://snyk.io/test/github/bernardladenthin/BitcoinAddressFinder?targetFile=pom.xml)  
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder?ref=badge_shield)  
 [![Dependencies](https://img.shields.io/librariesio/github/bernardladenthin/BitcoinAddressFinder)](https://libraries.io/github/bernardladenthin/BitcoinAddressFinder)  
+[![OSV-Scanner](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/osv-scanner.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/osv-scanner.yml)  
 
 **Package:**  
 [![Maven Central](https://img.shields.io/maven-central/v/net.ladenthin/bitcoinaddressfinder.svg)](https://central.sonatype.com/artifact/net.ladenthin/bitcoinaddressfinder)  
@@ -36,6 +43,10 @@
 [![Keep a Changelog](https://img.shields.io/badge/changelog-Keep%20a%20Changelog-blue)](https://keepachangelog.com/en/1.1.0/)  
 [![SemVer](https://img.shields.io/badge/SemVer-2.0.0-blue)](https://semver.org/spec/v2.0.0.html)  
 [![REUSE](https://api.reuse.software/badge/github.com/bernardladenthin/BitcoinAddressFinder)](https://api.reuse.software/info/github.com/bernardladenthin/BitcoinAddressFinder)  
+[![Maintained?](https://isitmaintained.com/badge/resolution/bernardladenthin/BitcoinAddressFinder.svg)](https://isitmaintained.com/project/bernardladenthin/BitcoinAddressFinder)  
+[![Issues](https://img.shields.io/github/issues/bernardladenthin/BitcoinAddressFinder)](https://github.com/bernardladenthin/BitcoinAddressFinder/issues)  
+[![Pull Requests](https://img.shields.io/github/issues-pr/bernardladenthin/BitcoinAddressFinder)](https://github.com/bernardladenthin/BitcoinAddressFinder/pulls)  
+[![GitHub Stars](https://img.shields.io/github/stars/bernardladenthin/BitcoinAddressFinder?style=social)](https://github.com/bernardladenthin/BitcoinAddressFinder/stargazers)  
 [![Treeware](https://img.shields.io/badge/dynamic/json?color=brightgreen&label=Treeware&query=%24.total&url=https%3A%2F%2Fpublic.offset.earth%2Fusers%2Ftreeware%2Ftrees)](https://treeware.earth)  
 [![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/badges/StandWithUkraine.svg)](https://stand-with-ukraine.pp.ua)
 
