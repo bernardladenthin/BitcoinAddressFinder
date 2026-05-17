@@ -66,6 +66,10 @@ SPDX-License-Identifier = "Apache-2.0"
 
 # ---------------------------------------------------------------------------
 # Third-party: hashcat project files (MIT)
+# Copied verbatim (byte-exact) from hashcat commit
+# 6716447dfce969ddde42a9abe0681500bee0df48 (Apr 20, 2024).
+# Source: https://github.com/hashcat/hashcat
+# Files carry "License.....: MIT" in their own header comments.
 # ---------------------------------------------------------------------------
 
 [[annotations]]
