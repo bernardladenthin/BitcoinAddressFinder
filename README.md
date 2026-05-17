@@ -1,11 +1,7 @@
-# BitcoinAddressFinder
-> 🚀 Fast address finder for Bitcoin and altcoins using OpenCL & Java – includes vanity address generation, balance checking, and offline support.
 **Build:**  
-[![OpenJDK](https://img.shields.io/badge/OpenJDK-21-blue)]()  
-[![JUnit](https://img.shields.io/badge/tested%20with-JUnit4-yellow)]()  
-[![Assembly](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/assembly.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/assembly.yml)  
-[![Coverage](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/coverage.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/coverage.yml)  
-[![Matrix CI](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/matrixci.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/matrixci.yml)  
+![Java 21+](https://img.shields.io/badge/Java-21%2B-informational)  
+![JUnit](https://img.shields.io/badge/tested%20with-JUnit4-yellow)  
+[![Publish](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/publish.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/publish.yml)  
 [![CodeQL](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/codeql.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/codeql.yml)  
 
 **Coverage:**  
@@ -23,9 +19,10 @@
 [![Dependencies](https://img.shields.io/librariesio/github/bernardladenthin/BitcoinAddressFinder)](https://libraries.io/github/bernardladenthin/BitcoinAddressFinder)  
 
 **Package:**  
-[![Maven Central](https://img.shields.io/maven-central/v/net.ladenthin/bitcoinaddressfinder.svg)](https://search.maven.org/artifact/net.ladenthin/bitcoinaddressfinder)  
-[![Release Date](https://img.shields.io/github/release-date/bernardladenthin/BitcoinAddressFinder)]()  
-[![Last Commit](https://img.shields.io/github/last-commit/bernardladenthin/BitcoinAddressFinder)]()  
+[![Maven Central](https://img.shields.io/maven-central/v/net.ladenthin/bitcoinaddressfinder.svg)](https://central.sonatype.com/artifact/net.ladenthin/bitcoinaddressfinder)  
+[![Snapshot](https://img.shields.io/badge/snapshot-latest-informational)](https://central.sonatype.com/repository/maven-snapshots/net/ladenthin/bitcoinaddressfinder/)  
+![Release Date](https://img.shields.io/github/release-date/bernardladenthin/BitcoinAddressFinder)  
+![Last Commit](https://img.shields.io/github/last-commit/bernardladenthin/BitcoinAddressFinder)  
 
 **License:**  
 [![Apache 2.0 License](https://img.shields.io/badge/License-Apache%202.0-orange)](./LICENSE)  
@@ -35,6 +32,9 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10413/badge)](https://www.bestpractices.dev/projects/10413)  
 [![Treeware](https://img.shields.io/badge/dynamic/json?color=brightgreen&label=Treeware&query=%24.total&url=https%3A%2F%2Fpublic.offset.earth%2Fusers%2Ftreeware%2Ftrees)](https://treeware.earth)  
 [![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/badges/StandWithUkraine.svg)](https://stand-with-ukraine.pp.ua)
+
+# BitcoinAddressFinder
+> 🚀 Fast address finder for Bitcoin and altcoins using OpenCL & Java – includes vanity address generation, balance checking, and offline support.
 
 ---
 
