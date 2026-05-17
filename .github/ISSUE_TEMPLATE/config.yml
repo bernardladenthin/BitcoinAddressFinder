@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/bernardladenthin/BitcoinAddressFinder/security/advisories/new
+    about: Report a security issue privately via GitHub's vulnerability reporting.
+  - name: Question or general discussion
+    url: https://github.com/bernardladenthin/BitcoinAddressFinder/discussions
+    about: Ask questions and discuss with the community. If Discussions are not enabled, open an issue with the 'question' label.
