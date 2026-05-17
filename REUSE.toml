@@ -1,0 +1,119 @@
+version = 1
+
+# ---------------------------------------------------------------------------
+# Project default: Apache-2.0, Bernard Ladenthin
+# ---------------------------------------------------------------------------
+
+[[annotations]]
+path = [
+    # Markdown documentation (no standard comment syntax)
+    "**.md",
+    "CITATION.cff",
+    # JSON files (no comment syntax)
+    "examples/config_AddressFilesToLMDB.json",
+    "examples/config_Find_1OpenCLDevice.json",
+    "examples/config_Find_1OpenCLDeviceAnd2CPUProducer.json",
+    "examples/config_Find_8CPUProducer.json",
+    "examples/config_Find_SecretsFile.json",
+    "examples/config_LMDBToAddressFile.json",
+    "examples/config_OpenCLInfo.json",
+    "src/test/resources/testOpenCLInfo/config_OpenCLInfo.json",
+    "src/test/resources/testRoundtrip/config_AddressFilesToLMDB.json",
+    "src/test/resources/testRoundtrip/config_Find_1OpenCLDevice.json",
+    "src/test/resources/testRoundtrip/config_Find_SecretsFile.json",
+    "src/test/resources/testRoundtrip/config_LMDBToAddressFile.json",
+    "src/test/resources/vectors.json",
+    # Text/data files (no comment syntax)
+    "examples/addresses/fileContainingAddresses0.txt",
+    "examples/addresses/fileContainingAddresses1.tsv",
+    "examples/addresses/fileContainingAddresses2.csv",
+    "examples/secrets/fileContainingSecrets_BIG_INTEGER.txt",
+    "examples/secrets/fileContainingSecrets_DUMPED_RIVATE_KEY.txt",
+    "examples/secrets/fileContainingSecrets_SHA256.txt",
+    "examples/secrets/fileContainingSecrets_STRING_DO_SHA256.txt",
+    "src/test/resources/testRoundtrip/addresses/fileContainingAddresses0.txt",
+    "src/test/resources/testRoundtrip/addresses/fileContainingAddresses1.tsv",
+    "src/test/resources/testRoundtrip/addresses/fileContainingAddresses2.csv",
+    "src/test/resources/testRoundtrip/secrets/fileContainingSecrets_BIG_INTEGER.txt",
+    "src/test/resources/testRoundtrip/secrets/fileContainingSecrets_DUMPED_RIVATE_KEY.txt",
+    "src/test/resources/testRoundtrip/secrets/fileContainingSecrets_SHA256.txt",
+    "src/test/resources/testRoundtrip/secrets/fileContainingSecrets_STRING_DO_SHA256.txt",
+    # BIP39 wordlists are plain text data files
+    "src/main/resources/mnemonic/wordlist/chinese_simplified.txt",
+    "src/main/resources/mnemonic/wordlist/chinese_traditional.txt",
+    "src/main/resources/mnemonic/wordlist/czech.txt",
+    "src/main/resources/mnemonic/wordlist/english.txt",
+    "src/main/resources/mnemonic/wordlist/french.txt",
+    "src/main/resources/mnemonic/wordlist/italian.txt",
+    "src/main/resources/mnemonic/wordlist/japanese.txt",
+    "src/main/resources/mnemonic/wordlist/korean.txt",
+    "src/main/resources/mnemonic/wordlist/portuguese.txt",
+    "src/main/resources/mnemonic/wordlist/russian.txt",
+    "src/main/resources/mnemonic/wordlist/spanish.txt",
+    "src/main/resources/mnemonic/wordlist/turkish.txt",
+    # YAML/YAML-like config files not recognized for inline headers
+    "src/test/resources/testOpenCLInfo/config_OpenCLInfo.yaml",
+    "src/test/resources/testOpenCLInfo/config_OpenCLInfo.yml",
+    # JS test resource (no inline SPDX appropriate)
+    "src/test/resources/testOpenCLInfo/config_OpenCLInfo.js",
+    # JVM config (plain flags file, no comment syntax)
+    ".mvn/jvm.config",
+    # simplelogger.properties uses Java properties syntax (# comments supported but tool may not recognize)
+    "src/main/resources/simplelogger.properties",
+]
+SPDX-FileCopyrightText = "2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>"
+SPDX-License-Identifier = "Apache-2.0"
+
+# ---------------------------------------------------------------------------
+# Third-party: hashcat project files (MIT)
+# ---------------------------------------------------------------------------
+
+[[annotations]]
+path = [
+    "src/main/resources/copyfromhashcat/inc_common.cl",
+    "src/main/resources/copyfromhashcat/inc_common.h",
+    "src/main/resources/copyfromhashcat/inc_ecc_secp256k1.cl",
+    "src/main/resources/copyfromhashcat/inc_ecc_secp256k1.h",
+    "src/main/resources/copyfromhashcat/inc_hash_ripemd160.cl",
+    "src/main/resources/copyfromhashcat/inc_hash_ripemd160.h",
+    "src/main/resources/copyfromhashcat/inc_hash_sha256.cl",
+    "src/main/resources/copyfromhashcat/inc_hash_sha256.h",
+    "src/main/resources/copyfromhashcat/inc_platform.cl",
+    "src/main/resources/copyfromhashcat/inc_platform.h",
+    "src/main/resources/copyfromhashcat/inc_types.h",
+    "src/main/resources/copyfromhashcat/inc_vendor.h",
+]
+SPDX-FileCopyrightText = "hashcat contributors"
+SPDX-License-Identifier = "MIT"
+
+# ---------------------------------------------------------------------------
+# Third-party: Bernard Ladenthin custom OpenCL kernel (MIT)
+# ---------------------------------------------------------------------------
+
+[[annotations]]
+path = [
+    "src/main/resources/inc_defines.h",
+    "src/main/resources/inc_ecc_secp256k1custom.cl",
+]
+SPDX-FileCopyrightText = "2020 Bernard Ladenthin <bernard.ladenthin@gmail.com>"
+SPDX-License-Identifier = "MIT"
+
+# ---------------------------------------------------------------------------
+# Third-party: vanitygen / OCLExplorer unused OpenCL kernels (AGPL-3.0-or-later)
+# ---------------------------------------------------------------------------
+
+[[annotations]]
+path = [
+    "src/main/resources/unused/calc_addrs.cl",
+    "src/main/resources/unused/calc_addrs_fix_zero.cl",
+]
+SPDX-FileCopyrightText = "2011 <samr7@cs.washington.edu>"
+SPDX-License-Identifier = "AGPL-3.0-or-later"
+
+[[annotations]]
+path = "src/main/resources/unused/gpu.cl"
+SPDX-FileCopyrightText = [
+    "2011 <samr7@cs.washington.edu>",
+    "2017 Stanislav V. Tretyakov <svtrostov@yandex.ru>",
+]
+SPDX-License-Identifier = "AGPL-3.0-or-later"
