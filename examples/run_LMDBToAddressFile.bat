@@ -1,3 +1,7 @@
+REM SPDX-FileCopyrightText: 2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+REM
+REM SPDX-License-Identifier: Apache-2.0
+
 rem start /low java ^
 java ^
 --add-opens java.base/java.lang=ALL-UNNAMED ^
