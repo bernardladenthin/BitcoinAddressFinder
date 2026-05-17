@@ -303,16 +303,10 @@ GPU code is bound through JOCL (`jocl` 2.0.6). `OpenCLBuilder` constructs the pl
 
 | Workflow | Trigger | Purpose |
 |---|---|---|
-| `assembly.yml` | Push to `main`/`releases/*`, all PRs | Compile, test, build fat JAR, upload artifacts |
-| `matrixci.yml` | Push/PR | Matrix test across 8 JVM distributions × 3 OS |
-| `coverage.yml` | Push/PR | JaCoCo coverage + Coveralls upload |
+| `publish.yml` | Push, PR, manual dispatch | Unified build/test/coverage/package pipeline; publishes snapshots and Maven Central releases |
 | `codeql.yml` | Schedule/Push | GitHub CodeQL security scanning |
 | `claude-code-review.yml` | PR | AI-powered code review |
 | `claude.yml` | Issue/PR comment with `@claude` | Claude Code interactive assistant |
-
-The matrix CI tests Java 21 on:
-- **Distributions:** adopt, adopt-openj9, corretto, dragonwell, liberica, microsoft, temurin, zulu
-- **OS:** Ubuntu, Windows, macOS (some combos excluded for incompatibility)
 
 ---
 
