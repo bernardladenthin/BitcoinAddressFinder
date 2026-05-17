@@ -10,7 +10,6 @@
 [![JaCoCo](https://img.shields.io/codecov/c/github/bernardladenthin/BitcoinAddressFinder?label=JaCoCo&logo=java)](https://codecov.io/gh/bernardladenthin/BitcoinAddressFinder)  
 <!--
 PIT mutation testing is not configured for this repository.
-Only `streambuffer` runs PIT (with a 100% mutation-coverage gate).
 Do not add a PIT badge here unless PIT is wired into pom.xml + CI.
 -->
 
@@ -22,9 +21,9 @@ Do not add a PIT badge here unless PIT is wired into pom.xml + CI.
 **Security:**  
 <!--
 Coverity Scan is not configured for this repository.
-Only `streambuffer` is registered (project 5453). To enable here, register
-the project at https://scan.coverity.com/ and add a badge using the assigned
-ID: [![Coverity Scan Build Status](https://scan.coverity.com/projects/<ID>/badge.svg)](https://scan.coverity.com/projects/<ID>)
+To enable, register the project at https://scan.coverity.com/ and add a badge
+using the assigned ID:
+[![Coverity Scan Build Status](https://scan.coverity.com/projects/<ID>/badge.svg)](https://scan.coverity.com/projects/<ID>)
 -->
 [![Known Vulnerabilities](https://snyk.io/test/github/bernardladenthin/BitcoinAddressFinder/badge.svg?targetFile=pom.xml)](https://snyk.io/test/github/bernardladenthin/BitcoinAddressFinder?targetFile=pom.xml)  
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder?ref=badge_shield)  
