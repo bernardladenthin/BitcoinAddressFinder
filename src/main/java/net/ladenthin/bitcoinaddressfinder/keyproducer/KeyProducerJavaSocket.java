@@ -98,7 +98,7 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
 
     @Override
     public void interrupt() {
-        shouldStop = true;
+        signalShutdown(); // wakes any caller blocked in createSecrets()
         if (readerFuture != null) {
             readerFuture.cancel(true);
         }

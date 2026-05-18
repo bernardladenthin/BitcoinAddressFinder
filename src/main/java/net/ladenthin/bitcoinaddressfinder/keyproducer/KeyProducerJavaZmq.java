@@ -64,7 +64,7 @@ public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyPro
 
     @Override
     public void interrupt() {
-        shouldStop = true;
+        signalShutdown(); // wakes any caller blocked in createSecrets()
         receiverThread.interrupt(); // allow thread to exit if blocked
         try {
             receiverThread.join(500);

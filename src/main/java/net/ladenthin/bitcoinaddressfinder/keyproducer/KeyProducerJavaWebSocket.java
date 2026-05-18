@@ -75,7 +75,7 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
 
     @Override
     public void interrupt() {
-        shouldStop = true;
+        signalShutdown(); // wakes any caller blocked in createSecrets()
         if (webSocketServer != null) {
             try {
                 webSocketServer.stop();

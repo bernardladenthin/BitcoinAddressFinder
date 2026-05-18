@@ -12,13 +12,22 @@ import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
 import org.bitcoinj.base.Network;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
+import org.junit.After;
 import org.slf4j.Logger;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaReceiver;
 import static org.mockito.Mockito.mock;
@@ -32,13 +41,22 @@ public class AbstractKeyProducerQueueBufferedTest {
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
     private Logger mockLogger;
-    
+    private ExecutorService executorService;
+
     @Before
     public void setUp() {
         mockLogger = mock(Logger.class);
+        executorService = Executors.newCachedThreadPool();
+    }
+
+    @After
+    public void tearDown() {
+        executorService.shutdownNow();
     }
     
     static class TestKeyProducer extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaReceiver> {
+        private int readTimeoutMs = TestTimeProvider.DEFAULT_SOCKET_TIMEOUT;
+
         public TestKeyProducer(CKeyProducerJavaReceiver config, KeyUtility keyUtility, Logger logger) {
             super(config, keyUtility, logger);
         }
@@ -46,14 +64,18 @@ public class AbstractKeyProducerQueueBufferedTest {
             super(config, keyUtility, logger, queue);
         }
 
+        public void setReadTimeoutMs(int readTimeoutMs) {
+            this.readTimeoutMs = readTimeoutMs;
+        }
+
         @Override
         protected int getReadTimeout() {
-            return TestTimeProvider.DEFAULT_SOCKET_TIMEOUT;
+            return readTimeoutMs;
         }
 
         @Override
         public void interrupt() {
-            shouldStop = true;
+            signalShutdown();
         }
     }
 
@@ -159,5 +181,92 @@ public class AbstractKeyProducerQueueBufferedTest {
                 eq("Secret queue is full, ignore secret: {}"),
                 eq(secret)
         );
+    }
+
+    @Test
+    public void createSecrets_negativeTimeout_blocksUntilAddSecret() throws Exception {
+        // arrange
+        CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
+        TestKeyProducer producer = createTestKeyProducer(config);
+        producer.setReadTimeoutMs(-1);
+
+        byte[] secret = new KeyProducerTestUtility().createFilledSecret((byte) 0xAB);
+        BigInteger expectedSecret = new BigInteger(1, secret);
+
+        // act
+        Future<BigInteger[]> future = executorService.submit(() -> producer.createSecrets(1, true));
+
+        Thread.sleep(TestTimeProvider.DEFAULT_DELAY);
+        assertThat("createSecrets must block on an empty queue when timeout < 0",
+                future.isDone(), is(false));
+
+        producer.addSecret(secret);
+
+        BigInteger[] secrets = future.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
+
+        // assert
+        assertThat(secrets.length, is(1));
+        assertThat(secrets[0], is(equalTo(expectedSecret)));
+    }
+
+    @Test
+    public void interrupt_unblocksBlockedConsumer_negativeTimeout() throws Exception {
+        // arrange
+        CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
+        TestKeyProducer producer = createTestKeyProducer(config);
+        producer.setReadTimeoutMs(-1);
+
+        // act
+        Future<BigInteger[]> future = executorService.submit(() -> {
+            try {
+                return producer.createSecrets(1, true);
+            } catch (NoMoreSecretsAvailableException e) {
+                return null;
+            }
+        });
+
+        Thread.sleep(TestTimeProvider.DEFAULT_DELAY);
+        assertThat("createSecrets must be blocked before interrupt()",
+                future.isDone(), is(false));
+
+        producer.interrupt();
+
+        // assert
+        BigInteger[] result = future.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
+        assertThat("createSecrets must return after interrupt", result, is((BigInteger[]) null));
+    }
+
+    @Test
+    public void interrupt_unblocksBlockedConsumer_positiveTimeout() throws Exception {
+        // arrange
+        // With a positive but long timeout, interrupt() should still wake the
+        // consumer immediately rather than making it wait out the full timeout.
+        CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
+        TestKeyProducer producer = createTestKeyProducer(config);
+        final int longTimeoutMs = 60_000;
+        producer.setReadTimeoutMs(longTimeoutMs);
+
+        // act
+        long start = System.currentTimeMillis();
+        Future<BigInteger[]> future = executorService.submit(() -> {
+            try {
+                return producer.createSecrets(1, true);
+            } catch (NoMoreSecretsAvailableException e) {
+                return null;
+            }
+        });
+
+        Thread.sleep(TestTimeProvider.DEFAULT_DELAY);
+        producer.interrupt();
+
+        BigInteger[] result = future.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
+        long elapsedMs = System.currentTimeMillis() - start;
+
+        // assert
+        assertThat(result, is((BigInteger[]) null));
+        if (elapsedMs >= longTimeoutMs) {
+            fail("interrupt() did not wake the blocked consumer; createSecrets waited "
+                    + elapsedMs + " ms (timeout was " + longTimeoutMs + " ms)");
+        }
     }
 }

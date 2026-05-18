@@ -60,7 +60,11 @@ public class KeyProducerJavaZmqTest {
         CKeyProducerJavaZmq config = new CKeyProducerJavaZmq();
         config.address = address;
         config.mode = CKeyProducerJavaZmq.Mode.BIND;
-        config.timeout = TestTimeProvider.RECEIVER_THREAD_TIMEOUT;
+        // Block until a message arrives (or signalShutdown via interrupt() wakes us).
+        // The JUnit per-test timeout (60s) is the upper bound when something is
+        // genuinely wrong — far more reliable than racing against a fixed receiver
+        // timeout under loaded CI conditions.
+        config.timeout = -1;
         return config;
     }
 
@@ -68,7 +72,7 @@ public class KeyProducerJavaZmqTest {
         CKeyProducerJavaZmq config = new CKeyProducerJavaZmq();
         config.address = address;
         config.mode = CKeyProducerJavaZmq.Mode.CONNECT;
-        config.timeout = TestTimeProvider.RECEIVER_THREAD_TIMEOUT;
+        config.timeout = -1;
         return config;
     }
 
@@ -153,6 +157,44 @@ public class KeyProducerJavaZmqTest {
 
         // act
         producer.createSecrets(1, true);
+    }
+
+    @Test
+    public void createSecrets_negativeTimeout_blocksUntilMessageArrives() throws Exception {
+        // arrange
+        String address = findFreeZmqAddress();
+        byte[] secretBytes = new KeyProducerTestUtility().createZeroedSecret();
+        BigInteger expected = new BigInteger(1, secretBytes);
+
+        CKeyProducerJavaZmq config = createBindConfig(address);
+        config.timeout = -1; // explicit: block indefinitely
+        KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
+
+        // act
+        // Start createSecrets in a background thread; it must block (no message yet).
+        Future<BigInteger[]> future = executorService.submit(() -> producer.createSecrets(1, true));
+
+        // Give the consumer time to actually park in take(); a quick spin would
+        // not exercise the blocking path.
+        Thread.sleep(TestTimeProvider.DEFAULT_DELAY);
+        assertThat("createSecrets must block when timeout < 0 and queue is empty",
+                future.isDone(), is(false));
+
+        // Now publish a message; the consumer should wake and return it.
+        try (ZContext context = new ZContext();
+             ZMQ.Socket socket = context.createSocket(SocketType.PUSH)) {
+            socket.connect(address);
+            boolean sent = socket.send(secretBytes);
+            assertThat("ZMQ send returned false", sent, is(true));
+
+            BigInteger[] secrets = future.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TestTimeProvider.TIME_UNIT);
+
+            // assert
+            assertThat(secrets.length, is(1));
+            assertThat(secrets[0], is(equalTo(expected)));
+        }
+
+        producer.interrupt();
     }
 
     @Test
@@ -255,6 +297,10 @@ public class KeyProducerJavaZmqTest {
 
         // Let it enter the blocking receive
         Thread.sleep(TestTimeProvider.DEFAULT_SEND_WAIT);
+
+        // Sanity check: with timeout=-1 the consumer must still be parked, otherwise
+        // the test is exercising a different code path than its name claims.
+        assertThat("createSecrets must be blocked before interrupt()", future.isDone(), is(false));
 
         // act
         // Now interrupt from another thread (will close socket/context)
