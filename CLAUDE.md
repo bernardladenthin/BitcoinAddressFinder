@@ -318,6 +318,7 @@ GPU code is bound through JOCL (`jocl` 2.0.6). `OpenCLBuilder` constructs the pl
 | Dependency | Version | Purpose |
 |---|---|---|
 | `bitcoinj-core` | 0.17.1 | Bitcoin crypto, address derivation |
+| `bcprov-jdk15to18` | 1.84 | Bouncy Castle crypto provider (transitive of bitcoinj; pinned to fix GHSA-c3fc-8qff-9hwx, GHSA-p93r-85wp-75v3) |
 | `lmdbjava` | 0.9.3 | LMDB database bindings |
 | `jocl` | 2.0.6 | Java OpenCL bindings |
 | `jackson-databind` | 2.21.3 | JSON config parsing |
