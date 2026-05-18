@@ -335,10 +335,31 @@ SPDX-License-Identifier: Apache-2.0
             <artifactId>bitcoinj-core</artifactId>
             <version>0.17.1</version>
         </dependency>
+        <!-- Required by bitcoinj-core (transitive). Pinned here to keep on the latest secure version. -->
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk15to18</artifactId>
             <version>1.84</version>
+        </dependency>
+        <!-- Required by bitcoinj-core (transitive). Pinned here to keep on the latest secure version. -->
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-javalite</artifactId>
+            <version>4.34.1</version>
+        </dependency>
+        <!-- Required by bitcoinj-core (transitive, runtime). Pinned here to keep on the latest version. -->
+        <dependency>
+            <groupId>com.google.code.findbugs</groupId>
+            <artifactId>jsr305</artifactId>
+            <version>3.0.2</version>
+            <scope>runtime</scope>
+        </dependency>
+        <!-- Required by bitcoinj-core (transitive, runtime). Pinned here to keep on the latest version. -->
+        <dependency>
+            <groupId>net.jcip</groupId>
+            <artifactId>jcip-annotations</artifactId>
+            <version>1.0</version>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
