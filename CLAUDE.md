@@ -220,7 +220,7 @@ See `examples/config_*.json` for all configuration variants.
 - **JUnit 4** (4.13.2) — test runner
 - **Hamcrest** (3.0) — matchers
 - **Mockito** (5.22.0) — mocking
-- **junit-dataprovider** (1.13.1) — data-driven tests
+- **junit4-dataprovider** (2.12) — data-driven tests
 
 ### Conventions
 
@@ -335,7 +335,7 @@ Test-only:
 | `junit` | 4.13.2 | Test runner |
 | `hamcrest` | 3.0 | Assertion matchers |
 | `mockito-core` | 5.23.0 | Mocking |
-| `junit-dataprovider` | 1.13.1 | Data-driven tests |
+| `junit4-dataprovider` | 2.12 | Data-driven tests |
 
 ---
 
