@@ -13,8 +13,7 @@ on:
     - cron: "12 1 * * 0"
 
 env:
-  javaversion: '21'
-  javadistribution: 'temurin'
+  JAVA_VERSION: '21'
 
 jobs:
   analyze:
@@ -34,11 +33,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up JDK ${{ env.javaversion }} ${{ env.javadistribution }}
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v5
         with:
-          java-version: ${{ env.javaversion }}
-          distribution: ${{ env.javadistribution }}
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4

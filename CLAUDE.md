@@ -10,7 +10,7 @@ This document provides guidance for AI assistants working on the BitcoinAddressF
 
 - **Group ID:** `net.ladenthin`
 - **Artifact ID:** `bitcoinaddressfinder`
-- **Version:** 1.5.0
+- **Version:** 1.6.0-SNAPSHOT
 - **Java:** 21
 - **License:** Apache 2.0
 - **Author:** Bernard Ladenthin (Copyright 2017–2025)
@@ -317,24 +317,24 @@ GPU code is bound through JOCL (`jocl` 2.0.6). `OpenCLBuilder` constructs the pl
 
 | Dependency | Version | Purpose |
 |---|---|---|
-| `bitcoinj-core` | 0.17 | Bitcoin crypto, address derivation |
+| `bitcoinj-core` | 0.17.1 | Bitcoin crypto, address derivation |
 | `lmdbjava` | 0.9.3 | LMDB database bindings |
 | `jocl` | 2.0.6 | Java OpenCL bindings |
-| `gson` | 2.13.2 | JSON config parsing |
-| `snakeyaml` | 2.6 | YAML config parsing |
-| `guava` | 33.5.0-jre | Google core utilities |
-| `commons-codec` | 1.21.0 | Base58, hex encoding |
-| `commons-io` | 2.21.0 | I/O utilities |
+| `jackson-databind` | 2.21.3 | JSON config parsing |
+| `jackson-dataformat-yaml` | 2.21.3 | YAML config parsing |
+| `guava` | 33.6.0-jre | Google core utilities |
+| `commons-codec` | 1.22.0 | Base58, hex encoding |
+| `commons-io` | 2.22.0 | I/O utilities |
 | `Java-WebSocket` | 1.6.0 | WebSocket producer |
 | `jeromq` | 0.6.0 | ZeroMQ producer |
 | `jspecify` | 1.0.0 | Nullness annotations |
-| `slf4j-api` | 2.0.17 | Logging facade |
+| `slf4j-api` | 2.0.18 | Logging facade |
 | `logback-classic` | 1.5.32 | SLF4J implementation |
 
 Test-only:
 | `junit` | 4.13.2 | Test runner |
 | `hamcrest` | 3.0 | Assertion matchers |
-| `mockito-core` | 5.22.0 | Mocking |
+| `mockito-core` | 5.23.0 | Mocking |
 | `junit-dataprovider` | 1.13.1 | Data-driven tests |
 
 ---
