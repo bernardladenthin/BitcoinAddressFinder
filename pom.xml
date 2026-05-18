@@ -108,10 +108,6 @@ SPDX-License-Identifier: Apache-2.0
             </executions>
           </plugin>
             <plugin>
-                <groupId>org.eluder.coveralls</groupId>
-                <artifactId>coveralls-maven-plugin</artifactId>
-            </plugin>
-            <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <executions>
@@ -303,19 +299,7 @@ SPDX-License-Identifier: Apache-2.0
                 <plugin>
                   <groupId>org.jacoco</groupId>
                   <artifactId>jacoco-maven-plugin</artifactId>
-                  <version>0.8.14</version>
-                </plugin>
-                <plugin>
-                    <groupId>org.eluder.coveralls</groupId>
-                    <artifactId>coveralls-maven-plugin</artifactId>
-                    <version>4.3.0</version>
-                    <dependencies>
-                        <dependency>
-                            <groupId>javax.xml.bind</groupId>
-                            <artifactId>jaxb-api</artifactId>
-                            <version>2.3.1</version>
-                        </dependency>
-                    </dependencies>
+                  <version>0.8.15</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -422,9 +406,9 @@ SPDX-License-Identifier: Apache-2.0
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.tngtech.java</groupId>
-            <artifactId>junit-dataprovider</artifactId>
-            <version>1.13.1</version>
+            <groupId>com.tngtech.junit.dataprovider</groupId>
+            <artifactId>junit4-dataprovider</artifactId>
+            <version>2.12</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
