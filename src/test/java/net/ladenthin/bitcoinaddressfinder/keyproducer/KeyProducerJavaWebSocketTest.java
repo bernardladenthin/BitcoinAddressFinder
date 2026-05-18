@@ -50,7 +50,11 @@ public class KeyProducerJavaWebSocketTest {
     private CKeyProducerJavaWebSocket createConfig() {
         CKeyProducerJavaWebSocket config = new CKeyProducerJavaWebSocket();
         config.port = KeyProducerJavaSocketTest.findFreePort();
-        config.timeout = TestTimeProvider.DEFAULT_SOCKET_TIMEOUT;
+        // Block until a message arrives (or signalShutdown via interrupt() wakes us).
+        // The JUnit per-test timeout (60s) is the upper bound when something is
+        // genuinely wrong &#x2014; far more reliable than racing against a fixed receiver
+        // timeout under loaded CI conditions.
+        config.timeout = -1;
         return config;
     }
 
@@ -95,7 +99,53 @@ public class KeyProducerJavaWebSocketTest {
     }
 
     @Test
+    public void createSecrets_negativeTimeout_blocksUntilMessageArrives() throws Exception {
+        // arrange
+        CKeyProducerJavaWebSocket config = createConfig();
+        config.timeout = -1; // explicit: block indefinitely
+        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
+
+        byte[] secret = new KeyProducerTestUtility().createZeroedSecret();
+        BigInteger expected = new BigInteger(1, secret);
+
+        ConnectionUtils.waitUntilTcpPortOpen("localhost", config.port, TestTimeProvider.DEFAULT_SOCKET_TIMEOUT);
+
+        // act
+        // Start createSecrets in a background thread; it must block (no message yet).
+        Future<BigInteger[]> future = executorService.submit(() -> producer.createSecrets(1, true));
+
+        // Give the consumer time to actually park in take(); a quick spin would
+        // not exercise the blocking path.
+        Thread.sleep(TestTimeProvider.DEFAULT_DELAY);
+        assertThat("createSecrets must block when timeout < 0 and queue is empty",
+                future.isDone(), is(false));
+
+        // Now publish a message; the consumer should wake and return it.
+        CountDownLatch connected = new CountDownLatch(1);
+        WebSocketClient client = new WebSocketClient(new URI("ws://localhost:" + config.port)) {
+            @Override public void onOpen(ServerHandshake handshakedata) { connected.countDown(); }
+            @Override public void onMessage(String message) {}
+            @Override public void onClose(int code, String reason, boolean remote) {}
+            @Override public void onError(Exception ex) { ex.printStackTrace(); }
+        };
+        client.connectBlocking();
+        waitForConnectionOrFail(client, connected, TestTimeProvider.DEFAULT_SOCKET_TIMEOUT);
+
+        client.send(secret);
+
+        BigInteger[] secrets = future.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
+
+        // assert
+        assertThat(secrets.length, is(1));
+        assertThat(secrets[0], is(expected));
+
+        producer.interrupt();
+        client.close();
+    }
+
+    @Test
     public void interrupt_stopsReceiverAndCausesNoMoreSecretsAvailableException() throws Exception {
+        // arrange
         CKeyProducerJavaWebSocket config = createConfig();
         KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
 
@@ -108,22 +158,32 @@ public class KeyProducerJavaWebSocketTest {
         });
 
         Thread.sleep(TestTimeProvider.DEFAULT_DELAY);
+
+        // Sanity check: with timeout=-1 the consumer must still be parked, otherwise
+        // the test is exercising a different code path than its name claims.
+        assertThat("createSecrets must be blocked before interrupt()", future.isDone(), is(false));
+
+        // act
         producer.interrupt();
 
+        // assert
         BigInteger[] result = future.get(2, TimeUnit.SECONDS);
         assertThat("Receiver thread should have exited due to interrupt", result, is(nullValue()));
     }
 
     @Test
     public void createSecrets_invalidMessageLength_ignoredByServer() throws Exception {
+        // arrange
         CKeyProducerJavaWebSocket config = createConfig();
         KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
-        
+
         ConnectionUtils.waitUntilTcpPortOpen("localhost", config.port, TestTimeProvider.DEFAULT_SOCKET_TIMEOUT);
 
         byte[] invalidSecret = new KeyProducerTestUtility().createInvalidSecret();
-        CountDownLatch connected = new CountDownLatch(1);
+        byte[] validSecret = new KeyProducerTestUtility().createZeroedSecret();
+        BigInteger expected = new BigInteger(1, validSecret);
 
+        CountDownLatch connected = new CountDownLatch(1);
         WebSocketClient client = new WebSocketClient(new URI("ws://localhost:" + config.port)) {
             @Override public void onOpen(ServerHandshake handshakedata) { connected.countDown(); }
             @Override public void onMessage(String message) {}
@@ -131,21 +191,27 @@ public class KeyProducerJavaWebSocketTest {
             @Override public void onError(Exception ex) { ex.printStackTrace(); }
         };
 
-        client.connectBlocking(); // blocks at socket level
+        client.connectBlocking();
         waitForConnectionOrFail(client, connected, TestTimeProvider.DEFAULT_SOCKET_TIMEOUT);
 
+        // act
+        // Send invalid then valid; only the valid one should reach the queue.
+        // If the invalid had not been ignored, createSecrets would either return it
+        // (length check would fail with NoMoreSecretsAvailable "Invalid secret length")
+        // or block forever waiting for a second message.
         client.send(invalidSecret);
+        client.send(validSecret);
 
-        try {
-            producer.createSecrets(1, true);
-        } catch (NoMoreSecretsAvailableException e) {
-            assertThat(e.getMessage(), containsString("Timeout while waiting for secret"));
-        }
+        BigInteger[] secrets = producer.createSecrets(1, true);
+
+        // assert
+        assertThat(secrets.length, is(1));
+        assertThat(secrets[0], is(expected));
 
         producer.interrupt();
         client.close();
     }
-    
+
     public static void waitForConnectionOrFail(WebSocketClient client, CountDownLatch latch, int timeoutMillis) throws InterruptedException {
         boolean opened = latch.await(timeoutMillis, TimeUnit.MILLISECONDS);
         if (!opened || !client.isOpen()) {

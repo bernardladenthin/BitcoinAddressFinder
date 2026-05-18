@@ -290,6 +290,66 @@ public class KeyProducerJavaSocketTest {
     }
 
     @Test
+    public void interrupt_wakesBlockedCreateSecretsImmediately() throws Exception {
+        // arrange
+        // A server that accepts the connection but never sends any bytes, so the
+        // client's reader thread sits in inputStream.read() and the secret queue
+        // stays empty. createSecrets() will block in queue.poll() with a long
+        // positive timeout (Socket producer cannot use -1 because the same value
+        // is passed to SO_TIMEOUT, which rejects negatives).
+        //
+        // Without signalShutdown(), createSecrets would only return when the
+        // socket-close ripple eventually wakes the reader and the poll times out
+        // &#x2014; up to clientSocketTimeout ms later. With signalShutdown(),
+        // interrupt() should wake the consumer in milliseconds.
+        int port = findFreePort();
+
+        final int serverHoldTime = TestTimeProvider.LONG_SOCKET_TIMEOUT * 4;
+        final int clientSocketTimeout = TestTimeProvider.LONG_SOCKET_TIMEOUT * 4; // 12s
+        final int clientSettleTime = TestTimeProvider.DEFAULT_SETTLE_DELAY;
+        final int interruptWakeBudgetMs = 1_500; // generous; the actual wake should be << this
+
+        ServerSocket serverSocket = new ServerSocket(port);
+        Future<Void> serverFuture = executorService.submit(() -> {
+            try (Socket accepted = serverSocket.accept()) {
+                Thread.sleep(serverHoldTime);
+            }
+            return null;
+        });
+
+        CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
+        clientConfig.timeout = clientSocketTimeout;
+        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+
+        Future<BigInteger[]> future = executorService.submit(() -> {
+            try {
+                return client.createSecrets(1, true);
+            } catch (NoMoreSecretsAvailableException e) {
+                return null;
+            }
+        });
+
+        Thread.sleep(clientSettleTime);
+        assertThat("createSecrets must be blocked before interrupt()", future.isDone(), is(false));
+
+        // act
+        long beforeInterruptMs = System.currentTimeMillis();
+        client.interrupt();
+        BigInteger[] result = future.get(clientSocketTimeout, TimeUnit.MILLISECONDS);
+        long elapsedSinceInterruptMs = System.currentTimeMillis() - beforeInterruptMs;
+
+        // assert
+        assertThat(result, nullValue());
+        if (elapsedSinceInterruptMs >= interruptWakeBudgetMs) {
+            fail("interrupt() did not wake the blocked consumer promptly: "
+                    + elapsedSinceInterruptMs + " ms (budget was " + interruptWakeBudgetMs
+                    + " ms; socket timeout was " + clientSocketTimeout + " ms)");
+        }
+
+        cleanup(client, serverFuture, serverSocket, clientSocketTimeout, TimeUnit.MILLISECONDS);
+    }
+
+    @Test
     public void createSecrets_afterClose_reconnectsAndReadsSuccessfully() throws Exception {
         int port = findFreePort();
 
