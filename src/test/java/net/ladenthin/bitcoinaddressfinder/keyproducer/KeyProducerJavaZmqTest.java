@@ -4,7 +4,6 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import java.math.BigInteger;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -61,6 +60,11 @@ public class KeyProducerJavaZmqTest {
         CKeyProducerJavaZmq config = new CKeyProducerJavaZmq();
         config.address = address;
         config.mode = CKeyProducerJavaZmq.Mode.BIND;
+        // Block until a message arrives (or signalShutdown via interrupt() wakes us).
+        // The JUnit per-test timeout (60s) is the upper bound when something is
+        // genuinely wrong — far more reliable than racing against a fixed receiver
+        // timeout under loaded CI conditions.
+        config.timeout = -1;
         return config;
     }
 
@@ -68,6 +72,7 @@ public class KeyProducerJavaZmqTest {
         CKeyProducerJavaZmq config = new CKeyProducerJavaZmq();
         config.address = address;
         config.mode = CKeyProducerJavaZmq.Mode.CONNECT;
+        config.timeout = -1;
         return config;
     }
 
@@ -116,38 +121,28 @@ public class KeyProducerJavaZmqTest {
         byte[] secretBytes = new KeyProducerTestUtility().createZeroedSecret();
         BigInteger expected = new BigInteger(1, secretBytes);
 
-        // Create the BIND receiver first (so it's ready to accept)
+        // Producer BINDs first (so it's ready to accept incoming connections).
         CKeyProducerJavaZmq config = createBindConfig(address);
-        config.timeout = TestTimeProvider.DEFAULT_SOCKET_TIMEOUT;
         KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
 
-        // Latch to ensure sender has connected before consuming
-        final CountDownLatch senderReady = new CountDownLatch(1);
+        // Sender CONNECTs from the main thread. Keeping the sender's ZContext alive for the entire
+        // duration of createSecrets() avoids the jeromq default LINGER=0 which would otherwise drop
+        // any message still buffered in the PUSH socket's outbound queue when the context is closed.
+        try (ZContext context = new ZContext();
+             ZMQ.Socket socket = context.createSocket(SocketType.PUSH)) {
+            socket.connect(address);
+            boolean sent = socket.send(secretBytes);
+            assertThat("ZMQ send returned false", sent, is(true));
 
-        // Now spawn the sender thread
-        Future<Void> senderFuture = executorService.submit(() -> {
-            try (ZContext context = new ZContext(); ZMQ.Socket socket = context.createSocket(ZMQ.PUSH)) {
-                socket.connect(address);
-                Thread.sleep(TestTimeProvider.DEFAULT_ESTABLISH_DELAY); // let connection establish
-                socket.send(secretBytes);
-                Thread.sleep(TestTimeProvider.DEFAULT_ESTABLISH_DELAY); // let message be delivered
-                senderReady.countDown();
-            }
-            return null;
-        });
+            // act
+            BigInteger[] secrets = producer.createSecrets(1, true);
 
-        // Wait for sender to have sent the message before consuming
-        senderReady.await(TestTimeProvider.LONG_SOCKET_TIMEOUT, TestTimeProvider.TIME_UNIT);
-
-        // act
-        BigInteger[] secrets = producer.createSecrets(1, true);
-
-        // assert
-        assertThat(secrets.length, is(1));
-        assertThat(secrets[0], is(equalTo(expected)));
+            // assert
+            assertThat(secrets.length, is(1));
+            assertThat(secrets[0], is(equalTo(expected)));
+        }
 
         producer.interrupt();
-        senderFuture.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TestTimeProvider.TIME_UNIT);
     }
 
     @Test(expected = NoMoreSecretsAvailableException.class)
@@ -165,57 +160,74 @@ public class KeyProducerJavaZmqTest {
     }
 
     @Test
+    public void createSecrets_negativeTimeout_blocksUntilMessageArrives() throws Exception {
+        // arrange
+        String address = findFreeZmqAddress();
+        byte[] secretBytes = new KeyProducerTestUtility().createZeroedSecret();
+        BigInteger expected = new BigInteger(1, secretBytes);
+
+        CKeyProducerJavaZmq config = createBindConfig(address);
+        config.timeout = -1; // explicit: block indefinitely
+        KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
+
+        // act
+        // Start createSecrets in a background thread; it must block (no message yet).
+        Future<BigInteger[]> future = executorService.submit(() -> producer.createSecrets(1, true));
+
+        // Give the consumer time to actually park in take(); a quick spin would
+        // not exercise the blocking path.
+        Thread.sleep(TestTimeProvider.DEFAULT_DELAY);
+        assertThat("createSecrets must block when timeout < 0 and queue is empty",
+                future.isDone(), is(false));
+
+        // Now publish a message; the consumer should wake and return it.
+        try (ZContext context = new ZContext();
+             ZMQ.Socket socket = context.createSocket(SocketType.PUSH)) {
+            socket.connect(address);
+            boolean sent = socket.send(secretBytes);
+            assertThat("ZMQ send returned false", sent, is(true));
+
+            BigInteger[] secrets = future.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TestTimeProvider.TIME_UNIT);
+
+            // assert
+            assertThat(secrets.length, is(1));
+            assertThat(secrets[0], is(equalTo(expected)));
+        }
+
+        producer.interrupt();
+    }
+
+    @Test
     public void createSecrets_multipleKeys_success() throws Exception {
         // arrange
         String address = findFreeZmqAddress();
         final int numberOfSecrets = 3;
 
-        // Bind receiver first (small but important ordering)
+        // Producer BINDs first (so it's ready to accept incoming connections).
         CKeyProducerJavaZmq config = createBindConfig(address);
-        config.timeout = TestTimeProvider.DEFAULT_SOCKET_TIMEOUT;
         KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
 
-        // Latch to ensure sender has connected before consuming
-        final CountDownLatch senderReady = new CountDownLatch(1);
-        // Latch to ensure all sends actually happened
-        final CountDownLatch sentLatch = new CountDownLatch(numberOfSecrets);
-
-        Future<Void> senderFuture = executorService.submit(() -> {
-            try (ZContext context = new ZContext(); ZMQ.Socket socket = context.createSocket(ZMQ.PUSH)) {
-                socket.connect(address);
-
-                // Let the ZMQ connection fully establish before the first send:
-                Thread.sleep(TestTimeProvider.DEFAULT_ESTABLISH_DELAY);
-                senderReady.countDown();
-
-                for (int i = 0; i < numberOfSecrets; i++) {
-                    byte[] secretBytes = new KeyProducerTestUtility().createIncrementedSecret((byte) i);
-                    socket.send(secretBytes);
-                    sentLatch.countDown();
-                    Thread.sleep(TestTimeProvider.DEFAULT_SEND_DELAY);
-                }
+        // Sender CONNECTs from the main thread. Keeping the sender's ZContext alive for the entire
+        // duration of createSecrets() avoids the jeromq default LINGER=0 which would otherwise drop
+        // any message still buffered in the PUSH socket's outbound queue when the context is closed.
+        try (ZContext context = new ZContext();
+             ZMQ.Socket socket = context.createSocket(SocketType.PUSH)) {
+            socket.connect(address);
+            for (int i = 0; i < numberOfSecrets; i++) {
+                byte[] secretBytes = new KeyProducerTestUtility().createIncrementedSecret((byte) i);
+                boolean sent = socket.send(secretBytes);
+                assertThat("ZMQ send for secret " + i + " returned false", sent, is(true));
             }
-            return null;
-        });
 
-        // Wait for sender to be connected before consuming
-        senderReady.await(TestTimeProvider.LONG_SOCKET_TIMEOUT, TestTimeProvider.TIME_UNIT);
+            // act
+            BigInteger[] secrets = producer.createSecrets(numberOfSecrets, false);
 
-        // act
-        BigInteger[] secrets = producer.createSecrets(numberOfSecrets, false);
-
-        // assert
-        assertThat(secrets.length, is(numberOfSecrets));
-        new KeyProducerTestUtility().assertIncrementedSecrets(secrets);
-
-        // Wait until the sender really pushed all messages
-        boolean allSent = sentLatch.await(
-            (long) numberOfSecrets * TestTimeProvider.DEFAULT_SEND_DELAY + TestTimeProvider.DEFAULT_DELAY, TestTimeProvider.TIME_UNIT
-        );
-        assertThat("Sender did not send all secrets in time", allSent, is(true));
+            // assert
+            assertThat(secrets.length, is(numberOfSecrets));
+            new KeyProducerTestUtility().assertIncrementedSecrets(secrets);
+        }
 
         producer.interrupt();
-        senderFuture.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TestTimeProvider.TIME_UNIT);
     }
 
     @Test
@@ -285,6 +297,10 @@ public class KeyProducerJavaZmqTest {
 
         // Let it enter the blocking receive
         Thread.sleep(TestTimeProvider.DEFAULT_SEND_WAIT);
+
+        // Sanity check: with timeout=-1 the consumer must still be parked, otherwise
+        // the test is exercising a different code path than its name claims.
+        assertThat("createSecrets must be blocked before interrupt()", future.isDone(), is(false));
 
         // act
         // Now interrupt from another thread (will close socket/context)

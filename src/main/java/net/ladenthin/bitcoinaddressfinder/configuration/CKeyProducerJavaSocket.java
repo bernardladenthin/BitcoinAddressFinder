@@ -19,7 +19,24 @@ public class CKeyProducerJavaSocket extends CKeyProducerJavaReceiver {
     /** Operating mode: client or server */
     public Mode mode = Mode.SERVER;
 
-    /** Socket read and connection timeout in milliseconds */
+    /**
+     * Socket-level timeout in milliseconds. This field is overloaded and applied
+     * to multiple operations:
+     * <ul>
+     *   <li>{@code ServerSocket.setSoTimeout} &#x2014; accept timeout (server mode)</li>
+     *   <li>{@code Socket.connect(addr, timeout)} &#x2014; connect timeout (client mode)</li>
+     *   <li>{@code Socket.setSoTimeout} &#x2014; per-read timeout on the connected stream</li>
+     *   <li>The internal secret queue polling inside {@code createSecrets()}</li>
+     * </ul>
+     *
+     * <p>Must be a non-negative value. Unlike
+     * {@code CKeyProducerJavaZmq.timeout} and {@code CKeyProducerJavaWebSocket.timeout},
+     * negative values (e.g. {@code -1} for &quot;block forever&quot;) are NOT
+     * supported here: the underlying {@code java.net} APIs throw
+     * {@code IllegalArgumentException} on negative SO_TIMEOUT, so any negative
+     * value would prevent the producer from initialising. Use a large positive
+     * value if you need a near-unbounded wait.
+     */
     public int timeout = 3000;
 
     /** Number of attempts to reconnect if connection fails */

@@ -21,21 +21,22 @@ public class CKeyProducerJavaZmq extends CKeyProducerJavaReceiver {
      *
      * <p>This timeout is applied consistently to:
      * <ul>
-     *   <li>the underlying ZMQ socket receive operation (RCVTIMEO)</li>
-     *   <li>the internal secret queue polling</li>
+     *   <li>the underlying ZMQ socket receive operation ({@code RCVTIMEO})</li>
+     *   <li>the internal secret queue polling inside {@code createSecrets()}</li>
      * </ul>
      *
      * <p>Semantics:
      * <ul>
-     *   <li>Must be a strictly positive value (&gt; 0)</li>
-     *   <li>Specifies the maximum time to wait for each receive operation</li>
-     * </ul>
-     *
-     * <p>Notes:
-     * <ul>
-     *   <li>Infinite blocking is intentionally not supported</li>
-     *   <li>Values less than or equal to zero are invalid and may lead to undefined behavior</li>
-     *   <li>Timeouts are enforced to guarantee responsive shutdown and deterministic behavior</li>
+     *   <li>A positive value: the maximum time (in ms) to wait for each receive
+     *       operation. A timed-out wait causes
+     *       {@code createSecrets()} to throw
+     *       {@code NoMoreSecretsAvailableException}.</li>
+     *   <li>A negative value (typically {@code -1}): block indefinitely until a
+     *       message arrives or the producer is interrupted via
+     *       {@code interrupt()}. Matches ZMQ's "infinite wait"
+     *       {@code RCVTIMEO} semantics.</li>
+     *   <li>{@code 0}: return immediately if no message is queued (primarily useful
+     *       for testing).</li>
      * </ul>
      *
      * <p>This value maps directly to the ZMQ socket option {@code RCVTIMEO}.
