@@ -130,7 +130,9 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
      */
     protected void signalShutdown() {
         shouldStop = true;
-        secretQueue.offer(SHUTDOWN_SENTINEL);
+        if (!secretQueue.offer(SHUTDOWN_SENTINEL)) {
+            logger.trace("Shutdown sentinel not enqueued (queue full); consumer will observe shouldStop after drain.");
+        }
     }
 
     /**
