@@ -617,6 +617,8 @@ public class KeyProducerJavaSocketTest {
                 Socket client = serverSocket.accept();
                 // Do nothing, just hang the connection
                 Thread.sleep(Long.MAX_VALUE);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             } catch (Exception ignored) {}
         }).start();
         return serverSocket;
