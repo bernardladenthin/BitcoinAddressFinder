@@ -345,7 +345,7 @@ SPDX-License-Identifier: Apache-2.0
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-javalite</artifactId>
-            <version>4.34.1</version>
+            <version>4.35.0</version>
         </dependency>
         <!-- Required by bitcoinj-core (transitive, runtime). Pinned here to keep on the latest version. -->
         <dependency>
