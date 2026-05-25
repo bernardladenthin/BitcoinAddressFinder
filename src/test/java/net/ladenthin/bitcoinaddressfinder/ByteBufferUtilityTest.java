@@ -208,6 +208,17 @@ public class ByteBufferUtilityTest {
     }
     // </editor-fold>
     
+    private long getAddressFromDirectBuffer(DirectBuffer directBuffer) throws IllegalArgumentException, NoSuchFieldException, SecurityException, IllegalAccessException {
+        Cleaner cleaner = directBuffer.cleaner();
+        Field thunkField = cleaner.getClass().getDeclaredField("thunk");
+        thunkField.setAccessible(true);
+        Object deallocator = thunkField.get(cleaner);
+
+        Field addressField = deallocator.getClass().getDeclaredField("address");
+        addressField.setAccessible(true);
+        return addressField.getLong(deallocator);
+    }
+
     private boolean isDirectBufferFreed(DirectBuffer directBuffer) throws IllegalArgumentException, NoSuchFieldException, SecurityException, IllegalAccessException {
         // In Java 21, a fresh Cleaner has next=null and prev=null.
         // After invocation, the Cleaner sets next=this and prev=this (self-reference).
