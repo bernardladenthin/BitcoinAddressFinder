@@ -54,28 +54,29 @@ public class LMDBPersistenceTest {
     public void putNewAmount_putNewAmount_correctAmountStored(boolean useStaticAmount, long staticAmount, long amount, long expectedAmount) throws IOException {
         // arrange
         File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
-        
+
         CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
         cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
         cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
         cLMDBConfigurationWrite.useStaticAmount = useStaticAmount;
         cLMDBConfigurationWrite.staticAmount = staticAmount;
-        
-        LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils);
-        lmdbPersistence.init();
-        
-        // create key
-        BigInteger secret = keyUtility.createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, random);
-        ECKey ecKey = keyUtility.createECKey(secret, true);
-        byte[] hash160 = ecKey.getPubKeyHash();
-        ByteBuffer hash160ByteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160);
-        
-        // act
-        lmdbPersistence.putNewAmount(hash160ByteBuffer, Coin.valueOf(amount));
-        
-        // assert
-        Coin amountInLmdb = lmdbPersistence.getAmount(hash160ByteBuffer);
-        assertThat(amountInLmdb.getValue(), is(equalTo(expectedAmount)));
+
+        try (LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils)) {
+            lmdbPersistence.init();
+
+            // create key
+            BigInteger secret = keyUtility.createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, random);
+            ECKey ecKey = keyUtility.createECKey(secret, true);
+            byte[] hash160 = ecKey.getPubKeyHash();
+            ByteBuffer hash160ByteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160);
+
+            // act
+            lmdbPersistence.putNewAmount(hash160ByteBuffer, Coin.valueOf(amount));
+
+            // assert
+            Coin amountInLmdb = lmdbPersistence.getAmount(hash160ByteBuffer);
+            assertThat(amountInLmdb.getValue(), is(equalTo(expectedAmount)));
+        }
     }
     // </editor-fold>
 
@@ -84,19 +85,20 @@ public class LMDBPersistenceTest {
     public void getDatabaseSize_initialLMDBSetTo1MiB_returnInitialDatabaseSize() throws IOException {
         // arrange
         File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
-        
+
         CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
         cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
         cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
-        
-        LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils);
-        lmdbPersistence.init();
-        
-        // act
-        long databaseSize = lmdbPersistence.getDatabaseSize();
-        
-        // assert
-        assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L))));
+
+        try (LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils)) {
+            lmdbPersistence.init();
+
+            // act
+            long databaseSize = lmdbPersistence.getDatabaseSize();
+
+            // assert
+            assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L))));
+        }
     }
     
     @Test
@@ -104,21 +106,22 @@ public class LMDBPersistenceTest {
         // arrange
         int keysToAdd = 1024*16;
         File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
-        
+
         CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
         cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
         cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
-        
-        LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils);
-        lmdbPersistence.init();
-        
-        fillWithRandomKeys(keysToAdd, lmdbPersistence);
-        
-        // act
-        long databaseSize = lmdbPersistence.getDatabaseSize();
-        
-        // assert
-        assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L))));
+
+        try (LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils)) {
+            lmdbPersistence.init();
+
+            fillWithRandomKeys(keysToAdd, lmdbPersistence);
+
+            // act
+            long databaseSize = lmdbPersistence.getDatabaseSize();
+
+            // assert
+            assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L))));
+        }
     }
     // </editor-fold>
 
@@ -128,20 +131,21 @@ public class LMDBPersistenceTest {
     public void getDatabaseSize_initialLMDBSetTo1MiB_increaseDatabaseSize_returnResizedDatabaseSize(long increaseSize) throws IOException {
         // arrange
         File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
-        
+
         CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
         cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
         cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
-        
-        LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils);
-        lmdbPersistence.init();
-        
-        // act
-        lmdbPersistence.increaseDatabaseSize(increaseSize);
-        
-        // assert
-        long databaseSize = lmdbPersistence.getDatabaseSize();
-        assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L)+increaseSize)));
+
+        try (LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils)) {
+            lmdbPersistence.init();
+
+            // act
+            lmdbPersistence.increaseDatabaseSize(increaseSize);
+
+            // assert
+            long databaseSize = lmdbPersistence.getDatabaseSize();
+            assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L)+increaseSize)));
+        }
     }
     
     @ParameterizedTest
@@ -150,22 +154,23 @@ public class LMDBPersistenceTest {
         // arrange
         int keysToAdd = 1024*16;
         File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
-        
+
         CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
         cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
         cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
-        
-        LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils);
-        lmdbPersistence.init();
-        
-        fillWithRandomKeys(keysToAdd, lmdbPersistence);
-        
-        // act
-        lmdbPersistence.increaseDatabaseSize(increaseSize);
-        
-        // assert
-        long databaseSize = lmdbPersistence.getDatabaseSize();
-        assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L)+increaseSize)));
+
+        try (LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils)) {
+            lmdbPersistence.init();
+
+            fillWithRandomKeys(keysToAdd, lmdbPersistence);
+
+            // act
+            lmdbPersistence.increaseDatabaseSize(increaseSize);
+
+            // assert
+            long databaseSize = lmdbPersistence.getDatabaseSize();
+            assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L)+increaseSize)));
+        }
     }
     // </editor-fold>
     
@@ -174,23 +179,24 @@ public class LMDBPersistenceTest {
     public void putNewAmount_initialLMDBSetTo1MiB_fillWithTooMuchValues_exceptionThrown() throws IOException {
         // arrange
         File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
-        
+
         CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
         cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
         cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
         cLMDBConfigurationWrite.increaseMapAutomatically = false;
         cLMDBConfigurationWrite.increaseSizeInMiB = 1;
-        
-        LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils);
-        lmdbPersistence.init();
-        
-        // pre assert
-        assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(new ByteConversion().mibToBytes(1L))));
-        assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo(new ByteConversion().mibToBytes(0L))));
-        assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(new ByteConversion().mibToBytes(0L))));
-        
-        // act, assert
-        assertThrows(org.lmdbjava.Env.MapFullException.class, () -> fillWithRandomKeys(TOO_MUCH_KEYS_FOR_1MiB, lmdbPersistence));
+
+        try (LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils)) {
+            lmdbPersistence.init();
+
+            // pre assert
+            assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(new ByteConversion().mibToBytes(1L))));
+            assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo(new ByteConversion().mibToBytes(0L))));
+            assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(new ByteConversion().mibToBytes(0L))));
+
+            // act, assert
+            assertThrows(org.lmdbjava.Env.MapFullException.class, () -> fillWithRandomKeys(TOO_MUCH_KEYS_FOR_1MiB, lmdbPersistence));
+        }
     }
 
     @Test
@@ -204,21 +210,22 @@ public class LMDBPersistenceTest {
         cLMDBConfigurationWrite.increaseMapAutomatically = true;
         cLMDBConfigurationWrite.increaseSizeInMiB = 1;
 
-        LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils);
-        lmdbPersistence.init();
+        try (LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils)) {
+            lmdbPersistence.init();
 
-        // pre assert
-        assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(new ByteConversion().mibToBytes(1L))));
-        assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo(new ByteConversion().mibToBytes(0L))));
-        assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(new ByteConversion().mibToBytes(0L))));
+            // pre assert
+            assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(new ByteConversion().mibToBytes(1L))));
+            assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo(new ByteConversion().mibToBytes(0L))));
+            assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(new ByteConversion().mibToBytes(0L))));
 
-        // act
-        fillWithRandomKeys(TOO_MUCH_KEYS_FOR_1MiB, lmdbPersistence);
+            // act
+            fillWithRandomKeys(TOO_MUCH_KEYS_FOR_1MiB, lmdbPersistence);
 
-        // post assert
-        assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(new ByteConversion().mibToBytes(1L) + (new ByteConversion().mibToBytes(cLMDBConfigurationWrite.increaseSizeInMiB)) * TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES)));
-        assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo((long) TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES)));
-        assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(new ByteConversion().mibToBytes(cLMDBConfigurationWrite.increaseSizeInMiB * TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES))));
+            // post assert
+            assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(new ByteConversion().mibToBytes(1L) + (new ByteConversion().mibToBytes(cLMDBConfigurationWrite.increaseSizeInMiB)) * TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES)));
+            assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo((long) TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES)));
+            assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(new ByteConversion().mibToBytes(cLMDBConfigurationWrite.increaseSizeInMiB * TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES))));
+        }
     }
     // </editor-fold>
     
