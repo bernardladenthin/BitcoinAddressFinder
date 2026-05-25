@@ -87,7 +87,7 @@ using the assigned ID:
 - [Future Improvements](#future-improvements)
   - [KeyProvider](#keyprovider)
 - [Legal](#legal)
-  - [Permitted Use Cases](#️-permitted-use-cases)
+  - [Permitted Use Cases](#%EF%B8%8F-permitted-use-cases)
   - [Prohibited Use Cases](#-prohibited-use-cases)
   - [Legal References by Jurisdiction](#legal-references-by-jurisdiction)
 - [License](#license)
@@ -150,7 +150,7 @@ Copyright (c) 2017-2025 Bernard Ladenthin
 * ⚡ Checks a high-performance database of known addresses to detect already used ones
 * 📦 Portable, platform-independent, runs on the JVM
 * 🔁 Generates both uncompressed and compressed keys simultaneously
-* 🧮 EC key generation via:
+* 🧢 EC key generation via:
   * 🧵 Multiple CPU threads
   * 🖥️ Multiple OpenCL devices (optional)
 
@@ -170,7 +170,7 @@ To accelerate **elliptic curve scalar multiplication** (`k·G`, i.e. private key
 
 - **Left-to-Right Scalar Multiplication**:  
   The multiplication loop scans the wNAF digits from most to least significant:  
-  - Each iteration **always doubles** the current point.  
+  - Each iteration **always doubles** the current point.
   - If the current digit is non-zero, it **adds the matching precomputed point**.
 
 - **Optimized for GPGPU (not constant-time)**:  
@@ -239,7 +239,7 @@ The expected false positive probability (FPP) can be configured:
 |-------|-------------|
 | `0.01` | ✅ Only ~1% false positives – high accuracy, more memory |
 | `0.05` | ⚖️ Balanced tradeoff between memory and performance |
-| `0.1`–`0.2` | 🪶 Very memory-efficient – suitable if some false positives are acceptable |
+| `0.1`–`0.2` | �udeb6 Very memory-efficient – suitable if some false positives are acceptable |
 
 ```json
 "useBloomFilter": true,
@@ -625,7 +625,7 @@ For generated vanity addresses or private keys, consider storing them safely usi
 | `SECURE_RANDOM` | ✅ Cryptographically secure system CSPRNG (`/dev/urandom`, Windows CNG). **Recommended for real wallet generation.** |
 | `RANDOM_CURRENT_TIME_MILLIS_SEED` | ⚠️ `java.util.Random` seeded with the current timestamp. **Insecure**; handy for replaying time-window RNG flaws. |
 | `RANDOM_CUSTOM_SEED` | ⚠️ `java.util.Random` with user-supplied seed. Fully deterministic; useful for reproducible fuzzing or fixed keyspaces. |
-| `SHA1_PRNG` | ⚠️ Legacy “SHA1PRNG” engine (Android pre-2013). Lets you reproduce the historic SecureRandom bug. |
+| `SHA1_PRNG` | ⚠️ Legacy "SHA1PRNG" engine (Android pre-2013). Lets you reproduce the historic SecureRandom bug. |
 
 #### Examples
 ##### 🔐 `SECURE_RANDOM`  
@@ -718,10 +718,10 @@ HD-wallet-style derivation: mnemonic + passphrase → BIP32/BIP44 keys.
 Hierarchical deterministic key generator using a BIP39 mnemonic and optional passphrase. Allows full BIP32/BIP44 path derivation and reproducible HD wallets.
 
 | JSON field | Type | Default | Purpose |
-|------------|------|---------|---------|
+|------------|------|---------|----------|
 | `mnemonic` | string | — | 12/24-word BIP39 sentence |
-| `passphrase` | string | `""` | Optional BIP39 salt (“wallet password”) |
-| `hardened` | boolean | `false` | 	Whether to use hardened key derivation (adds 0x80000000 to indices) |
+| `passphrase` | string | `""` | Optional BIP39 salt ("wallet password") |
+| `hardened` | boolean | `false` | 	 Whether to use hardened key derivation (adds 0x80000000 to indices) |
 | `bip32Path` | string | `"M/44H/0H/0H/0"` (constant `DEFAULT_BIP32_PATH`) | Base derivation path; must start with `M/` |
 | `creationTimeSeconds` | number | `0` | Epoch-seconds creation timestamp; fed to `DeterministicSeed.ofMnemonic` |
 
@@ -816,7 +816,7 @@ Read raw private keys from a TCP socket stream (client or server mode).
 Useful for piping externally generated secrets (e.g., from Python, Go, etc.) directly into the finder.
 
 | JSON Field                    | Type                             | Default       | Description                                                                         |
-|-------------------------------|----------------------------------|---------------|-------------------------------------------------------------------------------------|
+|-------------------------------|----------------------------------|---------------|----------------------------------------------------------------------------------|
 | `keyProducerId`               | string                           | —             | Unique identifier for this key producer                                             |
 | `mode`                        | string enum (`CLIENT`, `SERVER`) | `"SERVER"`    | Whether to connect to a remote socket (`CLIENT`) or wait for connections (`SERVER`) |
 | `host`                        | string                           | `"localhost"` | Remote host to connect to (used only in `CLIENT` mode)                              |
@@ -1005,7 +1005,7 @@ For example:
 - Search for personalized (vanity) addresses using custom patterns **and**
 - Simultaneously check if the generated addresses already **exist in the LMDB** database
 
-This hybrid mode allows you to find rare or meaningful addresses while ensuring they haven’t been used before.
+This hybrid mode allows you to find rare or meaningful addresses while ensuring they haven't been used before.
 
 ### Key Range
 
@@ -1106,7 +1106,7 @@ For more in-depth information on collision resistance, address reuse risks, and 
 - [New Records in Collision Attacks on RIPEMD-160 and SHA-256 (ePrint 2023/285)](https://eprint.iacr.org/2023/285) – Li et al. present new records in collision attacks: 40-step RIPEMD-160 and 39-step semi-free-start SHA-256. Both hash functions are fundamental to Bitcoin address generation.
 
 ### ⚠️ Security Advisory: Android RNG Vulnerability (2013) and Simulation via BitcoinAddressFinder
-In 2013, a serious vulnerability was discovered in Android’s `SecureRandom` implementation. It caused Bitcoin private keys to be exposed due to reused or predictable random values during ECDSA signature creation. This problem affected many wallet apps that generated keys directly on Android devices.
+In 2013, a serious vulnerability was discovered in Android's `SecureRandom` implementation. It caused Bitcoin private keys to be exposed due to reused or predictable random values during ECDSA signature creation. This problem affected many wallet apps that generated keys directly on Android devices.
 
 BitcoinAddressFinder can be used to simulate and analyze this type of attack. With small changes, it can reproduce faulty random number generators by:
 * using fixed or repeating `k` values
@@ -1153,7 +1153,7 @@ In this implementation, the wallet uses `TinyMT32` as its PRNG and seeds it only
 
 ```tinymt32_init(&tinymt, (uint32_t)micros());```
 
-TinyMT32 is *not* a cryptographically secure RNG, and seeding it with a 32-bit timestamp collapses the effective key space from 2²⁵⁶ to only 2³² possible seeds. An attacker who can approximate the device’s boot time can brute-force all feasible seeds, reproduce the PRNG stream, and reconstruct the wallet’s private keys.
+TinyMT32 is *not* a cryptographically secure RNG, and seeding it with a 32-bit timestamp collapses the effective key space from 2²⁵⁶ to only 2³² possible seeds. An attacker who can approximate the device's boot time can brute-force all feasible seeds, reproduce the PRNG stream, and reconstruct the wallet's private keys.
 
 This resembles the historic Android `SecureRandom` vulnerability: the elliptic-curve cryptography itself is secure, but the **randomness used to create keys is not**.
 
@@ -1289,17 +1289,17 @@ Below is a non-exhaustive collection of legal frameworks that **may** apply depe
 
 #### Germany
 
-- **§ 202c StGB** – *Vorbereiten des Ausspähens und Abfangens von Daten*  
+- **§ 202c StGB** – *Vorbereiten des Auspähens und Abfangens von Daten*  
   (Preparation of spying or intercepting data)
 - **OLG Braunschweig, Beschluss vom 18.09.2024 – 1 Ws 185/24**  
-  In einem aufsehenerregenden Fall entschied das OLG, dass der Zugriff auf eine Wallet mittels eines bekannten (nicht rechtswidrig erlangten) Seeds **nicht** als Straftat im Sinne der §§ 202a, 263a oder 303a StGB gewertet werden kann.  
-  Der Angeklagte hatte eine Wallet für einen Dritten erstellt und sich später mittels der Seed-Phrase Zugriff auf Token im Wert von rund 2,5 Mio. € verschafft.  
+  In einem aufsehenerregenden Fall entschied das OLG, dass der Zugriff auf eine Wallet mittels eines bekannten (nicht rechtswidrig erlangten) Seeds **nicht** als Straftat im Sinne der §§ 202a, 263a oder 303a StGB gewertet werden kann.  
+  Der Angeklagte hatte eine Wallet für einen Dritten erstellt und sich später mittels der Seed-Phrase Zugriff auf Token im Wert von rund 2,5 Mio. € verschafft.  
   Das Gericht urteilte jedoch:
 
-  - **Kein Diebstahl**: Kryptowährungen sind keine „Sachen“ im Sinne des § 242 StGB.  
-  - **Kein Ausspähen von Daten (§ 202a StGB)**: Der Zugriff mittels bekannter Passwörter ist kein *Überwinden* einer Zugangssicherung.  
-  - **Kein Computerbetrug (§ 263a StGB)**: Eine Krypto-Transaktion impliziert keine „Täuschung“ oder „Miterklärung einer Berechtigung“.  
-  - **Keine Datenveränderung (§ 303a StGB)**: Die eigentliche Änderung erfolgt durch die Blockchain-Netzwerkbetreiber – nicht durch den User selbst.
+  - **Kein Diebstahl**: Kryptowährungen sind keine „Sachen“ im Sinne des § 242 StGB.  
+  - **Kein Auspähen von Daten (§ 202a StGB)**: Der Zugriff mittels bekannter Passwörter ist kein *Überwinden* einer Zugangssicherung.  
+  - **Kein Computerbetrug (§ 263a StGB)**: Eine Krypto-Transaktion impliziert keine „Täuschung“ oder „Mitererklärung einer Berechtigung“.  
+  - **Keine Datenänderung (§ 303a StGB)**: Die eigentliche Änderung erfolgt durch die Blockchain-Netzwerkbetreiber – nicht durch den User selbst.
 
   > 🔍 Fazit: Der *„Kryptodiebstahl“* per bekanntem Seed ist unter Umständen **nicht strafbar** – bleibt aber **zivilrechtlich angreifbar**.  
   > Quelle: [OLG Braunschweig Beschluss 1 Ws 185/24 (juris.de)](https://www.juris.de/static/infodienst/autoren/D_NJRE001604034.htm)  
@@ -1339,6 +1339,6 @@ If in doubt, consult with a legal professional before using this software for an
 It is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full license text.
 Some subprojects have a different license.
 
-This package is [Treeware](https://treeware.earth). If you use it in production, then we ask that you [**buy the world a tree**](https://plant.treeware.earth/bernardladenthin/BitcoinAddressFinder) to thank us for our work. By contributing to the Treeware forest you’ll be creating employment for local families and restoring wildlife habitats.
+This package is [Treeware](https://treeware.earth). If you use it in production, then we ask that you [**buy the world a tree**](https://plant.treeware.earth/bernardladenthin/BitcoinAddressFinder) to thank us for our work. By contributing to the Treeware forest you'll be creating employment for local families and restoring wildlife habitats.
 
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbernardladenthin%2FBitcoinAddressFinder?ref=badge_large)
