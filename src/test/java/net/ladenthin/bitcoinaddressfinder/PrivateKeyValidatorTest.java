@@ -4,14 +4,12 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
-@RunWith(DataProviderRunner.class)
 public class PrivateKeyValidatorTest {
 
     private final PrivateKeyValidator validator = new PrivateKeyValidator();
@@ -55,19 +53,19 @@ public class PrivateKeyValidatorTest {
         assertThat(result, is(equalTo(expected)));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void getMaxPrivateKeyForBatchSize_bitSizeNegative_throwsException() {
         // act
         validator.getMaxPrivateKeyForBatchSize(-1);
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void getMaxPrivateKeyForBatchSize_bitSizeTooLarge_throwsException() {
         // act
         validator.getMaxPrivateKeyForBatchSize(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS + 1);
     }
 
-    @Test(expected = IllegalStateException.class)
+    @Test
     public void getMaxPrivateKeyForBatchSize_tooLarge_throwsException() {
         // arrange
         int batchSizeInBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
@@ -78,8 +76,8 @@ public class PrivateKeyValidatorTest {
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="isInvalidWithBatchSize">
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE)
     public void isInvalidWithBatchSize_keyTooLarge_returnsTrue(BigInteger privateKey, int batchSizeInBits) {
         // arrange
         BigInteger maxAllowed = validator.getMaxPrivateKeyForBatchSize(batchSizeInBits);

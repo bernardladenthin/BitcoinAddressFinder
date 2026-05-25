@@ -17,9 +17,10 @@ import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import java.nio.file.Path;
+import java.nio.file.Files;
 
 /**
  * Unit tests for {@link SecretsFile}.
@@ -29,14 +30,14 @@ public class SecretsFileTest {
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final StaticKey staticKey = new StaticKey();
 
-    @Rule
-    public TemporaryFolder folder = new TemporaryFolder();
+    @TempDir
+    public Path folder;
 
     // <editor-fold defaultstate="collapsed" desc="processLine">
     @Test
     public void processLine_bigIntegerFormat_consumerReceivesExpectedSecret() throws Exception {
         // arrange
-        File file = folder.newFile("secrets.txt");
+        File file = Files.createFile(folder.resolve("secrets.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
         SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.BIG_INTEGER, readStatistic, captured::add);
@@ -52,7 +53,7 @@ public class SecretsFileTest {
     @Test
     public void processLine_sha256Format_consumerReceivesExpectedSecret() throws Exception {
         // arrange
-        File file = folder.newFile("secrets.txt");
+        File file = Files.createFile(folder.resolve("secrets.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
         SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.SHA256, readStatistic, captured::add);
@@ -68,7 +69,7 @@ public class SecretsFileTest {
     @Test
     public void processLine_sha256Format_singleByteValue_consumerReceivesExpected() throws Exception {
         // arrange
-        File file = folder.newFile("secrets.txt");
+        File file = Files.createFile(folder.resolve("secrets.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
         SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.SHA256, readStatistic, captured::add);
@@ -84,7 +85,7 @@ public class SecretsFileTest {
     @Test
     public void processLine_stringDoSha256Format_consumerReceivesHashOfInput() throws Exception {
         // arrange
-        File file = folder.newFile("secrets.txt");
+        File file = Files.createFile(folder.resolve("secrets.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
         SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.STRING_DO_SHA256, readStatistic, captured::add);
@@ -102,7 +103,7 @@ public class SecretsFileTest {
     @Test
     public void processLine_dumpedPrivateKeyFormat_consumerReceivesNonNullPositiveSecret() throws Exception {
         // arrange
-        File file = folder.newFile("secrets.txt");
+        File file = Files.createFile(folder.resolve("secrets.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
         SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.DUMPED_RIVATE_KEY, readStatistic, captured::add);
@@ -119,7 +120,7 @@ public class SecretsFileTest {
     @Test
     public void processLine_dumpedPrivateKeyFormat_consumerReceivesExpectedPrivateKey() throws Exception {
         // arrange
-        File file = folder.newFile("secrets.txt");
+        File file = Files.createFile(folder.resolve("secrets.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
         SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.DUMPED_RIVATE_KEY, readStatistic, captured::add);
@@ -134,7 +135,7 @@ public class SecretsFileTest {
     @Test
     public void processLine_bigIntegerFormat_calledTwice_consumerCalledTwice() throws Exception {
         // arrange
-        File file = folder.newFile("secrets.txt");
+        File file = Files.createFile(folder.resolve("secrets.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
         SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.BIG_INTEGER, readStatistic, captured::add);
@@ -154,7 +155,7 @@ public class SecretsFileTest {
     @Test
     public void readFile_fileWithTwoLines_consumerCalledTwice() throws Exception {
         // arrange
-        File file = folder.newFile("secrets.txt");
+        File file = Files.createFile(folder.resolve("secrets.txt")).toFile();
         FileUtils.writeStringToFile(file, "1\n2\n", StandardCharsets.UTF_8.name());
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
@@ -172,7 +173,7 @@ public class SecretsFileTest {
     @Test
     public void readFile_emptyFile_consumerNeverCalled() throws Exception {
         // arrange
-        File file = folder.newFile("secrets.txt");
+        File file = Files.createFile(folder.resolve("secrets.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
         SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.BIG_INTEGER, readStatistic, captured::add);
@@ -189,7 +190,7 @@ public class SecretsFileTest {
     @Test
     public void interrupt_calledBeforeReadFile_noLinesProcessed() throws Exception {
         // arrange
-        File file = folder.newFile("secrets.txt");
+        File file = Files.createFile(folder.resolve("secrets.txt")).toFile();
         FileUtils.writeStringToFile(file, "1\n2\n3\n", StandardCharsets.UTF_8.name());
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();

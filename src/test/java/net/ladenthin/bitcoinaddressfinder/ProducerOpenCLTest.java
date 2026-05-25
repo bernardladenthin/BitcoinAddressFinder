@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import java.nio.file.Path;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -21,8 +21,8 @@ import static org.hamcrest.Matchers.is;
 
 public class ProducerOpenCLTest {
 
-    @Rule
-    public TemporaryFolder folder = new TemporaryFolder();
+    @TempDir
+    public Path folder;
 
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
@@ -232,7 +232,7 @@ public class ProducerOpenCLTest {
     // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc="produceKeys">
-    @Test(expected = IllegalStateException.class)
+    @Test
     public void produceKeys_notInitialized_illegalStateExceptionThrown() throws Exception {
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 

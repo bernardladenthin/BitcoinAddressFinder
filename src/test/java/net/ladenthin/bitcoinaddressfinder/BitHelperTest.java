@@ -3,22 +3,20 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
 import java.math.BigInteger;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
-@RunWith(DataProviderRunner.class)
 public class BitHelperTest {
     
     // <editor-fold defaultstate="collapsed" desc="getKillBits">
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_KILL_BITS, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_KILL_BITS)
     public void getKillBits_bitsGiven_killBitsEqualsExpectation(int bits, BigInteger killBits) throws IOException {
         // arrange
         BitHelper bitHelper = new BitHelper();
@@ -29,8 +27,8 @@ public class BitHelperTest {
     // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc="convertBitsToSize">
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BITS_TO_SIZE, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_BITS_TO_SIZE)
     public void convertBitsToSize_bitsGiven_sizeEqualsExpectation(int bits, int size) throws IOException {
         // arrange
         BitHelper bitHelper = new BitHelper();
@@ -41,7 +39,7 @@ public class BitHelperTest {
     // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc="assertBatchSizeInBitsIsInRange">
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void assertBatchSizeInBitsIsInRange_bitsGivenBelowMinimum_exceptionThrown() throws IOException {
         // arrange
         BitHelper bitHelper = new BitHelper();
@@ -50,7 +48,7 @@ public class BitHelperTest {
         bitHelper.assertBatchSizeInBitsIsInRange(-1);
     }
     
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void assertBatchSizeInBitsCorrect_bitsGivenOverMaximum_exceptionThrown() throws IOException {
         // arrange
         BitHelper bitHelper = new BitHelper();
@@ -59,8 +57,8 @@ public class BitHelperTest {
         bitHelper.assertBatchSizeInBitsIsInRange(PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY + 1);
     }
     
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX)
     public void assertBatchSizeInBitsIsInRange_bitsGivenInRange_exceptionThrown(int bits) throws IOException {
         // arrange
         BitHelper bitHelper = new BitHelper();

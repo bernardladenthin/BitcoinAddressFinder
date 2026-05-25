@@ -12,11 +12,12 @@ import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.*;
 
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import org.bitcoinj.base.Network;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import static org.mockito.Mockito.mock;
 import org.slf4j.Logger;
 
@@ -132,7 +133,7 @@ public class KeyProducerJavaIncrementalTest {
     
     private Logger mockLogger;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         keyUtility = new KeyUtility(network, byteBufferUtility);
         bitHelper = new BitHelper();
@@ -183,26 +184,26 @@ public class KeyProducerJavaIncrementalTest {
      * the method immediately throws NoMoreSecretsAvailableException.
      * This prevents invalid key ranges.
      */
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_startExceedsEnd_throwsException() throws Exception {
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
                 "0000000000000000000000000000000000000000000000000000000000000010",
                 "0000000000000000000000000000000000000000000000000000000000000005"
         );
-        producer.createSecrets(1, true);
+        assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(1, true));
     }
 
     /**
      * Tests that requesting a batch larger than the available keys before the end address
      * causes a NoMoreSecretsAvailableException to be thrown.
      */
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_batchExceedsEnd_throwsException() throws Exception {
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
                 startHex,
                 "0000000000000000000000000000000000000000000000000000000000000003"
         );
-        producer.createSecrets(5, false);
+        assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(5, false));
     }
 
     /**
@@ -260,7 +261,7 @@ public class KeyProducerJavaIncrementalTest {
      * Tests that if a batch would partially exceed the end address, an exception is thrown.
      * This test confirms partial batches are not allowed when returnStartSecretOnly is false.
      */
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_threeBatches_twoElementsEach_thirdThrowsException() throws Exception {
         // Setup: start = 1, end = 5 (allowed keys: 1, 2, 3, 4, 5)
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
@@ -273,7 +274,7 @@ public class KeyProducerJavaIncrementalTest {
 
         // 3rd batch: should throw NoMoreSecretsAvailableException because
         // the next values would be 5 and 6, but 6 exceeds the end address
-        producer.createSecrets(batchSize, false);
+        assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(batchSize, false));
     }
     
     /**
@@ -281,7 +282,7 @@ public class KeyProducerJavaIncrementalTest {
      * Demonstrates that partial batches beyond the end are disallowed and cause an exception,
      * even if the end address itself is technically within the allowed range.
      */
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_endAddressInclusive_butPartialBatchNotAllowed_throwsException() throws Exception {
         // Setup: start=1, end=5 (allowed keys: 1, 2, 3, 4, 5)
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
@@ -293,7 +294,7 @@ public class KeyProducerJavaIncrementalTest {
         assertTwoBatchedOk(producer, batchSize);
 
         // 3rd batch: tries [5, 6], but 6 > end (5), so exception thrown
-        producer.createSecrets(batchSize, false);
+        assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(batchSize, false));
     }
     
     /**

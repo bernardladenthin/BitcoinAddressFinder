@@ -3,14 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import org.apache.commons.codec.DecoderException;
 import org.bitcoinj.base.Base58;
 import org.bitcoinj.base.Coin;
 import org.bouncycastle.util.encoders.Hex;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
@@ -21,9 +20,8 @@ import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.StaticUnsupporte
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 
-@RunWith(DataProviderRunner.class)
 public class AddressTxtLineTest {
 
     private final TestAddresses42 testAddresses = new TestAddresses42(0, false);
@@ -98,8 +96,8 @@ public class AddressTxtLineTest {
         assertThatDefaultCoinIsSet(addressToCoin);
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ADDRESS_SEPARATOR, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ADDRESS_SEPARATOR)
     public void fromLine_uncompressedBitcoinAddressGivenWithValidAmount_returnHash160AndSpecifiedCoin(String addressSeparator) throws AddressFormatNotAcceptedException {
         // arrange
         long coin = 123987L;
@@ -115,8 +113,8 @@ public class AddressTxtLineTest {
         assertThat(addressToCoin.coin(), is(equalTo(Coin.valueOf(coin))));
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ADDRESS_SEPARATOR, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ADDRESS_SEPARATOR)
     public void fromLine_uncompressedBitcoinAddressGivenWithInvalidAmount_returnHash160AndDefaultCoin(String addressSeparator) throws AddressFormatNotAcceptedException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(staticKey.publicKeyUncompressed + addressSeparator + "XYZ", keyUtility);
@@ -141,8 +139,8 @@ public class AddressTxtLineTest {
         }
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_STATIC_UNSUPPORTED_ADDRESSES, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_STATIC_UNSUPPORTED_ADDRESSES)
     public void fromLine_staticUnsupportedAddress_throwsAddressFormatNotAcceptedException(StaticUnsupportedAddress address) {
         // act
         try {
@@ -155,8 +153,8 @@ public class AddressTxtLineTest {
     }
 
     // <editor-fold defaultstate="collapsed" desc="staticaddresses.enums">
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_STATIC_P2PKH_ADDRESSES, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_STATIC_P2PKH_ADDRESSES)
     public void fromLine_staticP2PKHAddress_returnPublicKeyHash(P2PKH address) throws AddressFormatNotAcceptedException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(address.getPublicAddress(), keyUtility);
@@ -171,8 +169,8 @@ public class AddressTxtLineTest {
         assertThatDefaultCoinIsSet(addressToCoin);
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_STATIC_P2SH_ADDRESSES, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_STATIC_P2SH_ADDRESSES)
     public void fromLine_staticP2SHAddress_returnScriptHash(P2SH address) throws AddressFormatNotAcceptedException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(address.getPublicAddress(), keyUtility);
@@ -187,8 +185,8 @@ public class AddressTxtLineTest {
         assertThatDefaultCoinIsSet(addressToCoin);
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_STATIC_P2WPKH_ADDRESSES, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_STATIC_P2WPKH_ADDRESSES)
     public void fromLine_staticP2WPKHAddress_returnWitnessProgram(P2WPKH address) throws AddressFormatNotAcceptedException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(address.getPublicAddress(), keyUtility);
@@ -203,8 +201,8 @@ public class AddressTxtLineTest {
         assertThatDefaultCoinIsSet(addressToCoin);
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_INVALID_P2WPKH_ADDRESSES_VALID_BASE58, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_INVALID_P2WPKH_ADDRESSES_VALID_BASE58)
     public void fromLine_invalidP2WPKHAddressWithValidBase58Given_parseAnyway(String base58, String hash) throws AddressFormatNotAcceptedException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
@@ -218,8 +216,8 @@ public class AddressTxtLineTest {
     }
     // </editor-fold>
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_INVALID_BECH32_WITNESS_VERSION_2, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_INVALID_BECH32_WITNESS_VERSION_2)
     public void fromLine_invalidBech32WitnessVersion2_throwsAddressFormatNotAcceptedException(String base58) {
         // act
         try {
@@ -231,8 +229,8 @@ public class AddressTxtLineTest {
         }
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_INVALID_BASE58, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_INVALID_BASE58)
     public void fromLine_invalidP2WPKHAddressWithInvalidBase58Given_throwsAddressFormatNotAcceptedException(String base58) {
         // act
         try {
@@ -244,8 +242,8 @@ public class AddressTxtLineTest {
         }
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_CHECKSUM_INVALID, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_CHECKSUM_INVALID)
     public void fromLine_bitcoinCashAddressChecksumInvalid_parseAnyway(String base58, String expectedHash160) throws AddressFormatNotAcceptedException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
@@ -258,8 +256,8 @@ public class AddressTxtLineTest {
         assertThat(hash160AsHex, is(equalTo(expectedHash160)));
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_INTERNAL_PURPOSE, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_INTERNAL_PURPOSE)
     public void fromLine_bitcoinCashAddressInternalPurpose_throwsAddressFormatNotAcceptedException(String base58) {
         // act
         try {
@@ -271,8 +269,8 @@ public class AddressTxtLineTest {
         }
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BITCOIN_ADDRESSES_CORRECT_BASE_58, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_BITCOIN_ADDRESSES_CORRECT_BASE_58)
     public void fromLine_bitcoinAddressChecksumInvalid_parseAnyway(String base58, String expectedHash160) throws AddressFormatNotAcceptedException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
@@ -285,8 +283,8 @@ public class AddressTxtLineTest {
         assertThat(hash160AsHex, is(equalTo(expectedHash160)));
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_CORRECT_BASE_58, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_CORRECT_BASE_58)
     public void fromLine_correctBase58_hash160equals(String base58, String expectedHash160) throws AddressFormatNotAcceptedException, DecoderException {
         // act
         AddressToCoin addressToCoin = new AddressTxtLine().fromLine(base58, keyUtility);
@@ -301,8 +299,8 @@ public class AddressTxtLineTest {
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="parseBase58Address">
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_SRC_POS, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_SRC_POS)
     public void parseBase58Address_correctBase58UseHigherSrcPos_copiedPartial(int versionBytes) throws DecoderException {
         // arrange
         String encoded = Base58.encode(Hex.decode("1f" + "ffffffffffffffffffffffffffffffffffffffff"));

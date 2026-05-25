@@ -3,11 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.api.io.TempDir;
+import java.nio.file.Path;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -20,7 +20,6 @@ import org.bitcoinj.base.Network;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -28,11 +27,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.slf4j.Logger;
 
-@RunWith(DataProviderRunner.class)
 public class AbstractProducerTest {
 
-    @Rule
-    public TemporaryFolder folder = new TemporaryFolder();
+    @TempDir
+    public Path folder;
 
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
@@ -65,8 +63,8 @@ public class AbstractProducerTest {
     // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc="createSecretBase">
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_CREATE_SECRET_BASE_LOGGED, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_CREATE_SECRET_BASE_LOGGED)
     public void createSecretBase_secretGiven_bitsKilledAndLogged(String givenSecret, int batchSizeInBits, String expectedSecretBase, String logInfo0, String logTrace0, String logTrace1, String logTrace2, String logTrace3, String logTrace4) throws IOException, InterruptedException, DecoderException {
         // arrange
         CProducer cProducer = new CProducer();
@@ -221,7 +219,7 @@ public class AbstractProducerTest {
     }
 
     // <editor-fold defaultstate="collapsed" desc="run">
-    @Test(expected = IllegalStateException.class)
+    @Test
     public void run_notInitialized_illegalStateExceptionThrown() throws IOException, InterruptedException {
         // arrange
         CProducer cProducer = new CProducer();

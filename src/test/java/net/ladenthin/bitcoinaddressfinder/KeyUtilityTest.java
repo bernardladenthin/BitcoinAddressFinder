@@ -8,21 +8,19 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Random;
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
 import org.bitcoinj.base.LegacyAddress;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.MnemonicException;
-import org.junit.Ignore;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
-@RunWith(DataProviderRunner.class)
 public class KeyUtilityTest {
 
     private final StaticKey staticKey = new StaticKey();
@@ -224,15 +222,15 @@ public class KeyUtilityTest {
         assertThat(ecKey.getPrivKey(), is(equalTo(randomValidKey)));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void ecKey_fromPrivate_minPrivateKey_throwsException() {
         // act
         ECKey.fromPrivate(PublicKeyBytes.MIN_PRIVATE_KEY, false);
     }
 
-    @Ignore("bitcoinj.ECKey.fromPrivate(...) accepts values > MAX_PRIVATE_KEY without throwing an exception. " +
+    @Disabled("bitcoinj.ECKey.fromPrivate(...) accepts values > MAX_PRIVATE_KEY without throwing an exception. " +
        "Test ignored because the library does not enforce the upper bound.")
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void ecKey_fromPrivate_maxPrivateKeyPlusOne_throwsException() {
         // act
         ECKey.fromPrivate(PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE), false);
@@ -555,7 +553,7 @@ public class KeyUtilityTest {
         assertThat(Arrays.asList(secrets), everyItem(is(notNullValue())));
     }
 
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_zeroLength_throwsException() throws NoMoreSecretsAvailableException {
         // arrange
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
@@ -576,8 +574,8 @@ public class KeyUtilityTest {
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="bigIntegerToFixedLengthHex">
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_LARGE_SECRETS_AS_HEX, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_LARGE_SECRETS_AS_HEX)
     public void bigIntegerToFixedLengthHex_knownBigInteger_correctHex(String largeSecretsAsHex) {
         // arrange
         BigInteger input = new BigInteger(largeSecretsAsHex, 16);
@@ -608,7 +606,7 @@ public class KeyUtilityTest {
         assertThat(result, is(equalTo(expected)));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void bigIntegerFromUnsignedByteArray_wrongLength_throwsException() {
         // arrange
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));

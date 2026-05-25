@@ -10,8 +10,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.nio.file.Path;
 import org.bitcoinj.base.Coin;
-import org.junit.rules.TemporaryFolder;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.*;
 
 public class StaticAddressesFiles implements AddressesFiles {
@@ -24,8 +24,8 @@ public class StaticAddressesFiles implements AddressesFiles {
     }
 
     @Override
-    public List<String> createAddressesFiles(TemporaryFolder folder, boolean addInvalidAddresses) throws IOException {
-        File one = folder.newFile(ADDRESS_FILE_ONE);
+    public List<String> createAddressesFiles(Path folder, boolean addInvalidAddresses) throws IOException {
+        File one = Files.createFile(folder.resolve(ADDRESS_FILE_ONE)).toFile();
 
         Files.write(one.toPath(), getAllAddresses());
         List<String> addresses = new ArrayList<>();

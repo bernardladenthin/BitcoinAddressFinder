@@ -4,8 +4,6 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import com.google.common.hash.Hashing;
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -28,16 +26,17 @@ import org.bitcoinj.crypto.ECKey;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import java.nio.file.Path;
+import java.nio.file.Files;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
-@RunWith(DataProviderRunner.class)
 public class ProducerJavaSecretsFilesTest {
     
-    @Rule
-    public TemporaryFolder folder = new TemporaryFolder();
+    @TempDir
+    public Path folder;
     
     private static final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
@@ -122,8 +121,8 @@ public class ProducerJavaSecretsFilesTest {
         assertThat(mockConsumer.publicKeyBytesArrayList.size(), is(equalTo(0)));
     }
     
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_CSECRET_FORMAT, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_CSECRET_FORMAT)
     public void produceKeys_filesConfigured_keysCreated(CSecretFormat cSecretFormat) throws IOException, InterruptedException {
         CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
         List<File> secretsFiles = createSecretsFiles(cSecretFormat);
@@ -162,7 +161,7 @@ public class ProducerJavaSecretsFilesTest {
     private List<File> createSecretsFiles(CSecretFormat secretFormat) throws IOException {
         List<File> fileList = new ArrayList<>();
         {
-            File secretsFile = folder.newFile("secretsFile0.txt");
+            File secretsFile = Files.createFile(folder.resolve("secretsFile0.txt")).toFile();
             fileList.add(secretsFile);
             PrivateKey[] secretsAsArray = new PrivateKey[] {
                 PrivateKey.TEST,
@@ -173,7 +172,7 @@ public class ProducerJavaSecretsFilesTest {
             fillSecretsFile(secretsFile, secretsAsList, secretFormat);
         }
         {
-            File secretsFile = folder.newFile("secretsFile1.txt");
+            File secretsFile = Files.createFile(folder.resolve("secretsFile1.txt")).toFile();
             fileList.add(secretsFile);
             PrivateKey[] secretsAsArray = new PrivateKey[] {
                 PrivateKey.NUMBER_73,

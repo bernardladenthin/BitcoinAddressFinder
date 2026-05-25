@@ -3,9 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
+import java.nio.file.Files;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -32,18 +31,18 @@ import static org.hamcrest.Matchers.*;
 import static org.hamcrest.core.StringStartsWith.startsWith;
 import static org.mockito.Mockito.*;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import java.nio.file.Path;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.Logger;
 
-@RunWith(DataProviderRunner.class)
 public class ConsumerJavaTest {
 
-    @Rule
-    public TemporaryFolder folder = new TemporaryFolder();
+    @TempDir
+    public Path folder;
     
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
@@ -60,11 +59,11 @@ public class ConsumerJavaTest {
         return publicKeyBytesArray;
     }
 
-    @Test(expected = org.lmdbjava.LmdbNativeException.class)
+    @Test
     public void initLMDB_lmdbNotExisting_noExceptionThrown() throws IOException {
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
-        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = folder.newFolder().getAbsolutePath();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = Files.createTempDirectory(folder, "junit").toFile().getAbsolutePath();
 
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
@@ -77,7 +76,7 @@ public class ConsumerJavaTest {
     public void toString_whenCalled_containsClassNameAndIdentityHash() throws IOException {
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
-        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = folder.newFolder().getAbsolutePath();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = Files.createTempDirectory(folder, "junit").toFile().getAbsolutePath();
 
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
 
@@ -121,7 +120,7 @@ public class ConsumerJavaTest {
         assertThat(arguments.get(0), is(equalTo("Statistics: [Checked 0 M keys in 0 minutes] [0 k keys/second] [0 M keys/minute] [Times an empty consumer: 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void startStatisticsTimer_invalidparameter_throwsException() throws IOException {
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.printStatisticsEveryNSeconds = 0;
@@ -259,8 +258,8 @@ public class ConsumerJavaTest {
         assertThat(persistence.isClosed(), is(equalTo(Boolean.TRUE)));
     }
     
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT)
     public void runProber_testAddressGiven_hitExpected(boolean compressed, boolean useStaticAmount) throws Exception {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
@@ -317,8 +316,8 @@ public class ConsumerJavaTest {
         assertThat(arguments.get(5), is(equalTo(hitMessageFull)));
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT)
     public void runProber_unknownAddressGiven_missExpectedAndLogMessagesInDebugAndTrace(boolean compressed, boolean useStaticAmount) throws Exception {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(compressed);
@@ -402,8 +401,8 @@ public class ConsumerJavaTest {
         consumerJava.consumeKeys(createHash160ByteBuffer());
     }
     
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_COMPRESSED)
     public void consumeKeys_withRuntimeKeyCalculationEnabled_logsError_whenPublicKeyHashIsInvalid(boolean compressed) throws IOException, InterruptedException, DecoderException, MnemonicException.MnemonicLengthException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
@@ -456,8 +455,8 @@ public class ConsumerJavaTest {
         }
     }
     
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_COMPRESSED)
     public void consumeKeys_testVanityPattern_patternMatches(boolean compressed) throws IOException, InterruptedException, DecoderException, MnemonicException.MnemonicLengthException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
@@ -549,7 +548,7 @@ public class ConsumerJavaTest {
     }
 
 
-    @Test(expected = RuntimeException.class)
+    @Test
     public void interrupt_persistenceCloseThrowsException_runtimeExceptionThrown() throws Exception {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);

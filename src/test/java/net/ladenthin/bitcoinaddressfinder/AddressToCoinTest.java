@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -14,6 +14,7 @@ import org.bitcoinj.crypto.ECKey;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class AddressToCoinTest {
 
@@ -40,12 +41,12 @@ public class AddressToCoinTest {
         assertThat(addressToCoinCompressed.toString(), is(equalTo("AddressToCoin{hash160=6970dea35c48e1c78e931117fab833354cddf9b4, coin=100000000, type=P2PKH_OR_P2SH}")));
     }
     
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void createAddressToCoin_invalidAddressSizeGiven_ToStringAndEqualsAndHashCode() throws IOException, InterruptedException {
         // arrange
         ByteBuffer byteBuffer32bytes = keyUtility.byteBufferUtility().getByteBufferFromHex("0000000000000000000000000000000000000000000000000000000000000000");
         // act
-        new AddressToCoin(byteBuffer32bytes, Coin.COIN, AddressType.P2PKH_OR_P2SH);
+        assertThrows(IllegalArgumentException.class, () -> new AddressToCoin(byteBuffer32bytes, Coin.COIN, AddressType.P2PKH_OR_P2SH));
         // assert
     }
     

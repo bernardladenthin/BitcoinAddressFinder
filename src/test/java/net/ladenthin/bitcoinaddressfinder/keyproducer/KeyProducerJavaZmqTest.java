@@ -14,9 +14,9 @@ import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
 import org.bitcoinj.base.Network;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.zeromq.SocketType;
 import org.zeromq.ZContext;
@@ -25,6 +25,7 @@ import org.zeromq.ZMQException;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -37,13 +38,13 @@ public class KeyProducerJavaZmqTest {
     private ExecutorService executorService;
     private Logger mockLogger;
 
-    @Before
+    @BeforeEach
     public void setup() {
         executorService = Executors.newCachedThreadPool();
         mockLogger = mock(Logger.class);
     }
 
-    @After
+    @AfterEach
     public void teardown() {
         executorService.shutdownNow();
     }
@@ -145,7 +146,7 @@ public class KeyProducerJavaZmqTest {
         producer.interrupt();
     }
 
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_timeout_throwsException() throws Exception {
         // arrange
         String address = findFreeZmqAddress();
@@ -156,7 +157,7 @@ public class KeyProducerJavaZmqTest {
         KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
 
         // act
-        producer.createSecrets(1, true);
+        assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(1, true));
     }
 
     @Test

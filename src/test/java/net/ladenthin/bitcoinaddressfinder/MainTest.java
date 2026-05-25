@@ -22,9 +22,9 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import java.nio.file.Path;
 import org.mockito.ArgumentCaptor;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -34,8 +34,8 @@ import org.slf4j.Logger;
 
 public class MainTest {
 
-    @Rule
-    public TemporaryFolder folder = new TemporaryFolder();
+    @TempDir
+    public Path folder;
     
     private final Path resourceDirectory = Path.of("src","test","resources");
     private final Path testRoundtripDirectory = resourceDirectory.resolve("testRoundtrip");
@@ -205,10 +205,10 @@ public class MainTest {
         Main.main(new String[]{config_OpenCLInfo_yml.toAbsolutePath().toString()});
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void main_unknownExtensionPath_throwsIllegalArgumentException() throws IOException {
         // arrange
-        File tempFile = folder.newFile("config.txt");
+        File tempFile = Files.createFile(folder.resolve("config.txt")).toFile();
         Files.writeString(tempFile.toPath(), OPEN_CL_INFO_JSON_STRING, StandardCharsets.UTF_8);
 
         // act

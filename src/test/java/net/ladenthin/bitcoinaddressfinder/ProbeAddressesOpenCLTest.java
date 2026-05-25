@@ -4,9 +4,8 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import com.google.common.io.Resources;
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
+import java.nio.file.Files;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URL;
@@ -14,10 +13,12 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.FileUtils;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import java.nio.file.Path;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.jocl.CL.*;
 
@@ -38,11 +39,9 @@ import static org.hamcrest.Matchers.everyItem;
 import static org.mockito.Mockito.mock;
 
 import org.jocl.*;
-import org.junit.Ignore;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Disabled;
 import org.slf4j.Logger;
 
-@RunWith(DataProviderRunner.class)
 public class ProbeAddressesOpenCLTest {
 
     public static final String ADDRESSES_CSV = "addresses.csv";
@@ -62,10 +61,10 @@ public class ProbeAddressesOpenCLTest {
     
     private final BitHelper bitHelper = new BitHelper();
 
-    @Rule
-    public TemporaryFolder tempFolder = new TemporaryFolder();
+    @TempDir
+    public Path tempFolder;
 
-    @Before
+    @BeforeEach
     public void init() throws IOException {
         createTemporaryAddressesFile();
     }
@@ -75,7 +74,7 @@ public class ProbeAddressesOpenCLTest {
     }
 
     public void createTemporaryAddressesFile() throws IOException {
-        File tempAddressesFile = tempFolder.newFile(ADDRESSES_CSV);
+        File tempAddressesFile = Files.createFile(tempFolder.resolve(ADDRESSES_CSV)).toFile();
         fillAddressesFiles(tempAddressesFile);
     }
 
@@ -227,7 +226,7 @@ public class ProbeAddressesOpenCLTest {
     public static int ACCESS_STRIDE = (ACCESS_BUNDLE/BN_NWORDS);
     
     @Test
-    @Ignore
+    @Disabled
     public void reverseEngineering_startPoints() {
         int GLOBAL_SIZE = 1024;
         for (int j = 0; j < 1024; j++) {
@@ -264,7 +263,7 @@ public class ProbeAddressesOpenCLTest {
     }
 
     @Test
-    @Ignore
+    @Disabled
     public void calcAddrsFixZeroCl_loadWithoutErrors() throws IOException {
         // ATTENTION: BLDEBUG
         
@@ -383,9 +382,9 @@ public class ProbeAddressesOpenCLTest {
                 global_work_size, null, 0, null, null);
     }
 
-    @Test
+    @ParameterizedTest
     @OpenCLTest
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX, location = CommonDataProvider.class)
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX)
     public void createKeys_bitsLowerThan25_use32BitNevertheless(int bitSize) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
@@ -459,8 +458,8 @@ public class ProbeAddressesOpenCLTest {
    }
    
     @OpenCLTest
-    @Test(expected = PrivateKeyTooLargeException.class)
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE)
     public void setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException(BigInteger privateKey, int chunkSize) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         
@@ -475,9 +474,9 @@ public class ProbeAddressesOpenCLTest {
        }
     }
 
-    @Test
+    @ParameterizedTest
     @OpenCLTest
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_32_BYTE_REQUIRING_STRIP, location = CommonDataProvider.class)
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_32_BYTE_REQUIRING_STRIP)
     public void setSrcPrivateKeyChunk_handlesLeadingZero_correctlySerializesTo32Bytes(BigInteger privateKey) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
@@ -520,9 +519,9 @@ public class ProbeAddressesOpenCLTest {
        }
     }
     
-    @Test
+    @ParameterizedTest
     @OpenCLTest
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_LARGE_PRIVATE_KEYS, location = CommonDataProvider.class)
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_LARGE_PRIVATE_KEYS)
     public void createKeys_fromLargePrivateKey_generatesValidPublicKeys(BigInteger privateKey) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         

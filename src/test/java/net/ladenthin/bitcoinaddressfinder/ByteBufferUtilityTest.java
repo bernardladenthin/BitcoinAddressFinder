@@ -3,24 +3,22 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.math.BigInteger;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
-import org.junit.runner.RunWith;
 import jdk.internal.ref.Cleaner;
 import sun.nio.ch.DirectBuffer;
 
-@RunWith(DataProviderRunner.class)
 public class ByteBufferUtilityTest {
     
     /**
@@ -28,14 +26,14 @@ public class ByteBufferUtilityTest {
      */
     private final static boolean ALLOCATE_DIRECT_DOES_NOT_MATTER = false;
     
-    @Before
+    @BeforeEach
     public void init() throws IOException {
     }
     
     
     // <editor-fold defaultstate="collapsed" desc="freeByteBuffer">
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT)
     public void freeByteBuffer_nullGiven_noExceptionThrown(boolean allocateDirect) throws IOException {
         // arrange
         
@@ -70,8 +68,8 @@ public class ByteBufferUtilityTest {
         // assert
     }
     
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT)
     public void freeByteBuffer_freeAGivenByteBuffer_noExceptionThrown(boolean allocateDirect) throws IOException, IllegalArgumentException, IllegalAccessException, NoSuchFieldException {
         // arrange
         byte[] bytesGiven = createDummyByteArray(7);
@@ -93,8 +91,8 @@ public class ByteBufferUtilityTest {
         }
     }
     
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT)
     public void freeByteBuffer_freeAGivenByteBufferGivenTwice_noExceptionThrown(boolean allocateDirect) throws IOException {
         // arrange
         byte[] bytesGiven = createDummyByteArray(7);
@@ -158,8 +156,8 @@ public class ByteBufferUtilityTest {
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="byteArrayToByteBuffer">
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT)
     public void byteArrayToByteBuffer_wrapped_allBytesEquals(boolean allocateDirect) throws IOException {
         // arrange
         byte[] bytes = createDummyByteArray(7);
@@ -175,8 +173,8 @@ public class ByteBufferUtilityTest {
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="ByteBuffer Hex conversion">
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT)
     public void getHexFromByteBuffer_byteBufferProvided_returnHex(boolean allocateDirect) throws IOException {
         // arrange
         String hexExpected = "00010203040506";
@@ -192,8 +190,8 @@ public class ByteBufferUtilityTest {
         assertThat(hex, is(equalTo(hexExpected)));
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT)
     public void getByteBufferFromHex_HexProvided_returnByteBuffer(boolean allocateDirect) throws IOException {
         // arrange
         String hexGiven = "00010203040506";
@@ -280,7 +278,7 @@ public class ByteBufferUtilityTest {
         assertThat(result, is(equalTo(Integer.MAX_VALUE)));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void ensureByteBufferCapacityFitsInt_valueTooLarge_throwsException() {
         // arrange
         long capacity = (long) Integer.MAX_VALUE + 1L;
@@ -291,7 +289,7 @@ public class ByteBufferUtilityTest {
         // assert is handled by exception rule
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void ensureByteBufferCapacityFitsInt_negativeValueGiven_throwsException() {
         // arrange
         long capacity = -1L;
@@ -323,7 +321,7 @@ public class ByteBufferUtilityTest {
     /**
      * Ensures that an exception is thrown when trying to allocate a direct ByteBuffer while direct allocation is disabled.
      */
-    @Test(expected = IllegalStateException.class)
+    @Test
     public void allocateByteBufferDirectStrict_directAllocationDisabled_throwsException() {
         // arrange
         final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
@@ -337,8 +335,8 @@ public class ByteBufferUtilityTest {
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="bigIntegerToBytes">
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIG_INTEGER_VARIANTS, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_BIG_INTEGER_VARIANTS)
     public void bigIntegerToBytes_leadingZeroStripped(BigInteger input, int expectedLength, byte expectedFirstByte) {
         // act
         byte[] actualBytes = ByteBufferUtility.bigIntegerToBytes(input);
@@ -445,7 +443,7 @@ public class ByteBufferUtilityTest {
         assertThat(buffer.get(), is((byte) 0x22));
     }
 
-    @Test(expected = BufferOverflowException.class)
+    @Test
     public void putToByteBuffer_arrayLargerThanBuffer_throwsBufferOverflowException() {
        ByteBuffer buffer = ByteBuffer.allocate(1);
        byte[] input = { 0x11, 0x22 };

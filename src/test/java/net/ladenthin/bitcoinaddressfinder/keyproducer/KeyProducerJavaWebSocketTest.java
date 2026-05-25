@@ -11,9 +11,9 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocke
 import org.bitcoinj.base.Network;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 
 import java.math.BigInteger;
@@ -23,6 +23,7 @@ import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
 public class KeyProducerJavaWebSocketTest {
@@ -33,7 +34,7 @@ public class KeyProducerJavaWebSocketTest {
 
     private ExecutorService executorService;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         Network network = new NetworkParameterFactory().getNetwork();
         keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
@@ -42,7 +43,7 @@ public class KeyProducerJavaWebSocketTest {
         executorService = Executors.newCachedThreadPool();
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         executorService.shutdownNow();
     }
@@ -89,13 +90,13 @@ public class KeyProducerJavaWebSocketTest {
         client.close();
     }
 
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_timeoutWithoutMessage_throwsException() throws Exception {
         CKeyProducerJavaWebSocket config = createConfig();
         config.timeout = TestTimeProvider.DEFAULT_TIMEOUT;
         KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
 
-        producer.createSecrets(1, true);
+        assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(1, true));
     }
 
     @Test

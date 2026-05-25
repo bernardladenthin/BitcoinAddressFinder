@@ -3,25 +3,23 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import static org.mockito.Mockito.*;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
 import java.nio.ByteOrder;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
-@RunWith(DataProviderRunner.class)
 public class EndiannessConverterTest {
 
     private final ByteBufferUtility byteBufferUtility = mock(ByteBufferUtility.class);
 
     // <editor-fold defaultstate="collapsed" desc="mustConvert">
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ENDIANNESS, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ENDIANNESS)
     public void mustConvertTest(ByteOrder sourceOrder, ByteOrder targetOrder, boolean expectedMustConvert) {
         // arrange
         EndiannessConverter converter = new EndiannessConverter(sourceOrder, targetOrder, byteBufferUtility);
@@ -35,8 +33,8 @@ public class EndiannessConverterTest {
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="convertEndian">
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ENDIANNESS, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ENDIANNESS)
     public void convertEndianTest(ByteOrder sourceOrder, ByteOrder targetOrder, boolean mustConvert) {
         // arrange
         EndiannessConverter converter = new EndiannessConverter(sourceOrder, targetOrder, byteBufferUtility);

@@ -3,26 +3,27 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.net.ServerSocket;
 import java.util.concurrent.*;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class ConnectionUtilsTest {
 
     private ExecutorService executorService;
 
-    @Before
+    @BeforeEach
     public void setup() {
         executorService = Executors.newCachedThreadPool();
     }
 
-    @After
+    @AfterEach
     public void teardown() {
         executorService.shutdownNow();
     }
@@ -71,11 +72,11 @@ public class ConnectionUtilsTest {
         assertThat(duration, lessThan(2500L)); // with some margin
     }
 
-    @Test(expected = IllegalStateException.class)
+    @Test
     public void waitUntilTcpPortOpen_whenPortNeverOpens_throwsException() throws Exception {
         int unusedPort = findFreePort();
         // Do not bind anything to this port
 
-        ConnectionUtils.waitUntilTcpPortOpen("localhost", unusedPort, 1000);
+        assertThrows(IllegalStateException.class, () -> ConnectionUtils.waitUntilTcpPortOpen("localhost", unusedPort, 1000));
     }
 }
