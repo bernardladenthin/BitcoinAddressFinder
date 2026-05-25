@@ -12,7 +12,7 @@ import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatformSelector;
 import org.jocl.cl_context_properties;
 import org.jocl.cl_device_id;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -75,66 +75,78 @@ public class OpenCLPlatformSelectorTest {
         assertThat(result.device(), is(equalTo(secondDevice)));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void select_negativePlatformIndex_throwsIllegalArgumentException() {
-        // arrange
-        OpenCLPlatform platform = createTestPlatform("Platform0", createTestDevice(DEVICE_TYPE_GPU));
-        List<OpenCLPlatform> platforms = List.of(platform);
-
-        // act
-        platformSelector.select(platforms, -1, DEVICE_TYPE_GPU, 0);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            // arrange
+            OpenCLPlatform platform = createTestPlatform("Platform0", createTestDevice(DEVICE_TYPE_GPU));
+            List<OpenCLPlatform> platforms = List.of(platform);
+    
+            // act
+            platformSelector.select(platforms, -1, DEVICE_TYPE_GPU, 0);
+        });
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void select_platformIndexTooLarge_throwsIllegalArgumentException() {
-        // arrange
-        OpenCLPlatform platform = createTestPlatform("Platform0", createTestDevice(DEVICE_TYPE_GPU));
-        List<OpenCLPlatform> platforms = List.of(platform);
-
-        // act
-        platformSelector.select(platforms, 1, DEVICE_TYPE_GPU, 0);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            // arrange
+            OpenCLPlatform platform = createTestPlatform("Platform0", createTestDevice(DEVICE_TYPE_GPU));
+            List<OpenCLPlatform> platforms = List.of(platform);
+    
+            // act
+            platformSelector.select(platforms, 1, DEVICE_TYPE_GPU, 0);
+        });
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void select_emptyPlatformList_throwsIllegalArgumentException() {
-        // arrange
-        List<OpenCLPlatform> platforms = Collections.emptyList();
-
-        // act
-        platformSelector.select(platforms, 0, DEVICE_TYPE_GPU, 0);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            // arrange
+            List<OpenCLPlatform> platforms = Collections.emptyList();
+    
+            // act
+            platformSelector.select(platforms, 0, DEVICE_TYPE_GPU, 0);
+        });
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void select_negativeDeviceIndex_throwsIllegalArgumentException() {
-        // arrange
-        OpenCLDevice gpuDevice = createTestDevice(DEVICE_TYPE_GPU);
-        OpenCLPlatform platform = createTestPlatform("Platform0", gpuDevice);
-        List<OpenCLPlatform> platforms = List.of(platform);
-
-        // act
-        platformSelector.select(platforms, 0, DEVICE_TYPE_GPU, -1);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            // arrange
+            OpenCLDevice gpuDevice = createTestDevice(DEVICE_TYPE_GPU);
+            OpenCLPlatform platform = createTestPlatform("Platform0", gpuDevice);
+            List<OpenCLPlatform> platforms = List.of(platform);
+    
+            // act
+            platformSelector.select(platforms, 0, DEVICE_TYPE_GPU, -1);
+        });
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void select_deviceIndexTooLarge_throwsIllegalArgumentException() {
-        // arrange
-        OpenCLDevice gpuDevice = createTestDevice(DEVICE_TYPE_GPU);
-        OpenCLPlatform platform = createTestPlatform("Platform0", gpuDevice);
-        List<OpenCLPlatform> platforms = List.of(platform);
-
-        // act
-        platformSelector.select(platforms, 0, DEVICE_TYPE_GPU, 1);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            // arrange
+            OpenCLDevice gpuDevice = createTestDevice(DEVICE_TYPE_GPU);
+            OpenCLPlatform platform = createTestPlatform("Platform0", gpuDevice);
+            List<OpenCLPlatform> platforms = List.of(platform);
+    
+            // act
+            platformSelector.select(platforms, 0, DEVICE_TYPE_GPU, 1);
+        });
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void select_noDeviceMatchingType_throwsIllegalArgumentException() {
-        // arrange
-        OpenCLDevice cpuDevice = createTestDevice(DEVICE_TYPE_CPU);
-        OpenCLPlatform platform = createTestPlatform("Platform0", cpuDevice);
-        List<OpenCLPlatform> platforms = List.of(platform);
-
-        // act
-        platformSelector.select(platforms, 0, DEVICE_TYPE_GPU, 0);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            // arrange
+            OpenCLDevice cpuDevice = createTestDevice(DEVICE_TYPE_CPU);
+            OpenCLPlatform platform = createTestPlatform("Platform0", cpuDevice);
+            List<OpenCLPlatform> platforms = List.of(platform);
+    
+            // act
+            platformSelector.select(platforms, 0, DEVICE_TYPE_GPU, 0);
+        });
     }
     // </editor-fold>
 

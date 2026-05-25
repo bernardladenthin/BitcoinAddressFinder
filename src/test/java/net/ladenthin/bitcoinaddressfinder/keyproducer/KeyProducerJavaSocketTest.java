@@ -3,13 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import java.io.DataInputStream;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import org.jspecify.annotations.Nullable;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -28,15 +27,13 @@ import org.bitcoinj.base.Network;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
-import org.junit.runner.RunWith;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.mockito.Mockito.*;
 import org.slf4j.Logger;
 
-@RunWith(DataProviderRunner.class)
 public class KeyProducerJavaSocketTest {
     
     private final Network network = new NetworkParameterFactory().getNetwork();
@@ -54,13 +51,13 @@ public class KeyProducerJavaSocketTest {
         }
     }
 
-    @Before
+    @BeforeEach
     public void setup() {
         executorService = Executors.newCachedThreadPool();
         mockLogger = mock(Logger.class);
     }
 
-    @After
+    @AfterEach
     public void teardown() {
         executorService.shutdownNow();
     }
@@ -220,30 +217,32 @@ public class KeyProducerJavaSocketTest {
         cleanup(client, serverFuture, serverSocket);
     }
 
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_prematureStreamClose_throwsException() throws Exception {
-        int port = findFreePort();
-
-        // Server sends fewer bytes than required (e.g. 10 bytes instead of 32)
-        ServerSocket serverSocket = new ServerSocket(port);
-        Future<Void> serverFuture = executorService.submit(() -> {
-            try (Socket clientSocket = serverSocket.accept();
-                 DataOutputStream dos = new DataOutputStream(clientSocket.getOutputStream())) {
-                dos.write(new byte[10]); // insufficient bytes
-                dos.flush();
-                // Close immediately
+        org.junit.jupiter.api.Assertions.assertThrows(NoMoreSecretsAvailableException.class, () -> {
+            int port = findFreePort();
+    
+            // Server sends fewer bytes than required (e.g. 10 bytes instead of 32)
+            ServerSocket serverSocket = new ServerSocket(port);
+            Future<Void> serverFuture = executorService.submit(() -> {
+                try (Socket clientSocket = serverSocket.accept();
+                     DataOutputStream dos = new DataOutputStream(clientSocket.getOutputStream())) {
+                    dos.write(new byte[10]); // insufficient bytes
+                    dos.flush();
+                    // Close immediately
+                }
+                return null;
+            });
+    
+            CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
+            KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+    
+            try {
+                client.createSecrets(1, true);
+            } finally {
+                cleanup(client, serverFuture, serverSocket);
             }
-            return null;
         });
-
-        CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
-
-        try {
-            client.createSecrets(1, true);
-        } finally {
-            cleanup(client, serverFuture, serverSocket);
-        }
     }
     
     @Test
@@ -460,55 +459,59 @@ public class KeyProducerJavaSocketTest {
         cleanup(client, serverFuture, null, 3, TimeUnit.SECONDS);
     }
 
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_socketClosedMidRead_throwsException() throws Exception {
-        int port = findFreePort();
-
-        ServerSocket serverSocket = new ServerSocket(port);
-        Future<Void> serverFuture = executorService.submit(() -> {
-            try (Socket s = serverSocket.accept();
-                 DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
-                // Write partial bytes, then close abruptly
-                dos.write(new byte[10]); // Less than 32 bytes
-                dos.flush();
-                s.close();
+        org.junit.jupiter.api.Assertions.assertThrows(NoMoreSecretsAvailableException.class, () -> {
+            int port = findFreePort();
+    
+            ServerSocket serverSocket = new ServerSocket(port);
+            Future<Void> serverFuture = executorService.submit(() -> {
+                try (Socket s = serverSocket.accept();
+                     DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
+                    // Write partial bytes, then close abruptly
+                    dos.write(new byte[10]); // Less than 32 bytes
+                    dos.flush();
+                    s.close();
+                }
+                return null;
+            });
+    
+            CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
+            KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+    
+            try {
+                client.createSecrets(1, true);
+            } finally {
+                cleanup(client, serverFuture, serverSocket);
             }
-            return null;
         });
-
-        CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
-
-        try {
-            client.createSecrets(1, true);
-        } finally {
-            cleanup(client, serverFuture, serverSocket);
-        }
     }
     
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_serverDisconnectsMidTransfer_throwsException() throws Exception {
-        int port = findFreePort();
-
-        ServerSocket serverSocket = new ServerSocket(port);
-        Future<Void> serverFuture = executorService.submit(() -> {
-            try (Socket s = serverSocket.accept();
-                 DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
-                dos.write(new byte[16]); // only half of a secret (32 bytes)
-                dos.flush();
-                s.close();
+        org.junit.jupiter.api.Assertions.assertThrows(NoMoreSecretsAvailableException.class, () -> {
+            int port = findFreePort();
+    
+            ServerSocket serverSocket = new ServerSocket(port);
+            Future<Void> serverFuture = executorService.submit(() -> {
+                try (Socket s = serverSocket.accept();
+                     DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
+                    dos.write(new byte[16]); // only half of a secret (32 bytes)
+                    dos.flush();
+                    s.close();
+                }
+                return null;
+            });
+    
+            CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
+            KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+    
+            try {
+                client.createSecrets(1, true);
+            } finally {
+                cleanup(client, serverFuture, serverSocket);
             }
-            return null;
         });
-
-        CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
-
-        try {
-            client.createSecrets(1, true);
-        } finally {
-            cleanup(client, serverFuture, serverSocket);
-        }
     }
 
     @Test
@@ -538,29 +541,31 @@ public class KeyProducerJavaSocketTest {
         cleanup(client, serverFuture, serverSocket);
     }
 
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_malformedSecretStream_throwsException() throws Exception {
-        int port = findFreePort();
-
-        ServerSocket serverSocket = new ServerSocket(port);
-        Future<Void> serverFuture = executorService.submit(() -> {
-            try (Socket s = serverSocket.accept();
-                 DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
-                // Send 40 bytes which cannot be split into two full 32-byte secrets
-                dos.write(new byte[40]);
-                dos.flush();
+        org.junit.jupiter.api.Assertions.assertThrows(NoMoreSecretsAvailableException.class, () -> {
+            int port = findFreePort();
+    
+            ServerSocket serverSocket = new ServerSocket(port);
+            Future<Void> serverFuture = executorService.submit(() -> {
+                try (Socket s = serverSocket.accept();
+                     DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
+                    // Send 40 bytes which cannot be split into two full 32-byte secrets
+                    dos.write(new byte[40]);
+                    dos.flush();
+                }
+                return null;
+            });
+    
+            CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
+            KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+    
+            try {
+                client.createSecrets(2, false);
+            } finally {
+                cleanup(client, serverFuture, serverSocket);
             }
-            return null;
         });
-
-        CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
-
-        try {
-            client.createSecrets(2, false);
-        } finally {
-            cleanup(client, serverFuture, serverSocket);
-        }
     }
     
     @Test

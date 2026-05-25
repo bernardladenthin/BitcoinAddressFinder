@@ -7,7 +7,7 @@ import java.nio.ByteBuffer;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2PKH;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2WPKH;
 import org.bitcoinj.base.Bech32;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -31,14 +31,16 @@ public class Bech32HelperTest {
         assertThat(result, is(expected));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void decodeBech32CharsetToValues_invalidCharacter_throwsException() {
-        // arrange
-        Bech32Helper sut = new Bech32Helper();
-
-        // act
-        // 'i' is not part of the Bech32 character set (excluded to avoid visual ambiguity with '1')
-        sut.decodeBech32CharsetToValues("i");
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            // arrange
+            Bech32Helper sut = new Bech32Helper();
+    
+            // act
+            // 'i' is not part of the Bech32 character set (excluded to avoid visual ambiguity with '1')
+            sut.decodeBech32CharsetToValues("i");
+        });
     }
     // </editor-fold>
 

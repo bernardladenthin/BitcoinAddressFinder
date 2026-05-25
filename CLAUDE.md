@@ -73,7 +73,7 @@ BitcoinAddressFinder/
 │   │       └── simplelogger.properties
 │   └── test/
 │       └── java/net/ladenthin/bitcoinaddressfinder/
-│           └── *.java                # JUnit 4 tests (run via JUnit 5 vintage engine)
+│           └── *.java                # JUnit 5 tests
 ├── examples/                         # Sample JSON configs and run scripts
 │   ├── config_*.json
 │   ├── run_*.bat
@@ -217,11 +217,9 @@ See `examples/config_*.json` for all configuration variants.
 
 ### Frameworks
 
-- **JUnit 4** (4.13.2) — existing tests (run unchanged via JUnit 5 vintage engine)
-- **JUnit 5** (5.12.0) — `junit-vintage-engine` runs all JUnit 4 tests on the JUnit Platform; `junit-jupiter` available for new tests
+- **JUnit 5** (5.12.0) — `junit-jupiter` for all tests
 - **Hamcrest** (3.0) — matchers
 - **Mockito** (5.22.0) — mocking
-- **junit4-dataprovider** (2.12) — data-driven tests
 
 ### Conventions
 
@@ -337,12 +335,9 @@ GPU code is bound through JOCL (`jocl` 2.0.6). `OpenCLBuilder` constructs the pl
 | `logback-classic` | 1.5.32 | SLF4J implementation |
 
 Test-only:
-| `junit` | 4.13.2 | Existing JUnit 4 tests (compile + run via vintage engine) |
-| `junit-vintage-engine` | 5.12.0 | Runs JUnit 4 tests on JUnit Platform |
-| `junit-jupiter` | 5.12.0 | JUnit 5 support for new tests |
+| `junit-jupiter` | 5.12.0 | JUnit 5 test framework |
 | `hamcrest` | 3.0 | Assertion matchers |
 | `mockito-core` | 5.23.0 | Mocking |
-| `junit4-dataprovider` | 2.12 | Data-driven tests |
 
 ---
 

@@ -13,7 +13,7 @@ Follow all conventions from the generic Java TDD skill (`.claude/skills/java-tdd
 
 - Red → Green → Refactor workflow
 - File headers (Apache 2.0 license)
-- Test framework stack (JUnit 4, DataProviderRunner, Hamcrest, Mockito)
+- Test framework stack (JUnit 5 Jupiter, @ParameterizedTest/@MethodSource, Hamcrest, Mockito)
 - Test naming, AAA structure, editor folds
 - Assertions (Hamcrest only), exception testing
 - Data providers, named constants, DRY

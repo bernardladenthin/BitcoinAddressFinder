@@ -5,7 +5,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.IOException;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;

@@ -5,14 +5,14 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import java.io.IOException;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 public class CProducerTest {
     
     private final BitHelper bitHelper = new BitHelper();
     
-    @Before
+    @BeforeEach
     public void init() throws IOException {
     }
     

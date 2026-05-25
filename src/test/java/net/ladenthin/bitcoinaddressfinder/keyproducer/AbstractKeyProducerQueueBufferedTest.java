@@ -4,8 +4,8 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
@@ -15,8 +15,8 @@ import org.bitcoinj.base.Network;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.slf4j.Logger;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaReceiver;
 import static org.mockito.Mockito.mock;
@@ -43,13 +43,13 @@ public class AbstractKeyProducerQueueBufferedTest {
     private Logger mockLogger;
     private ExecutorService executorService;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         mockLogger = mock(Logger.class);
         executorService = Executors.newCachedThreadPool();
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         executorService.shutdownNow();
     }
@@ -117,33 +117,39 @@ public class AbstractKeyProducerQueueBufferedTest {
         }
     }
     
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_throwsException_onInvalidLength() throws Exception {
-        CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
-        TestKeyProducer producer = createTestKeyProducer(config);
-
-        byte[] invalidSecret = new KeyProducerTestUtility().createInvalidSecret();
-        producer.addSecret(invalidSecret);
-
-        producer.createSecrets(1, true); // should throw
+        org.junit.jupiter.api.Assertions.assertThrows(NoMoreSecretsAvailableException.class, () -> {
+            CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
+            TestKeyProducer producer = createTestKeyProducer(config);
+    
+            byte[] invalidSecret = new KeyProducerTestUtility().createInvalidSecret();
+            producer.addSecret(invalidSecret);
+    
+            producer.createSecrets(1, true); // should throw
+        });
     }
     
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_throwsException_onTimeout() throws Exception {
-        CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
-        TestKeyProducer producer = createTestKeyProducer(config);
-
-        // Do not add anything to queue
-        producer.createSecrets(1, true); // should timeout
+        org.junit.jupiter.api.Assertions.assertThrows(NoMoreSecretsAvailableException.class, () -> {
+            CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
+            TestKeyProducer producer = createTestKeyProducer(config);
+    
+            // Do not add anything to queue
+            producer.createSecrets(1, true); // should timeout
+        });
     }
     
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_throwsException_whenShouldStopSet() throws Exception {
-        CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
-        TestKeyProducer producer = createTestKeyProducer(config);
-
-        producer.shouldStop = true;
-        producer.createSecrets(1, true); // should throw immediately
+        org.junit.jupiter.api.Assertions.assertThrows(NoMoreSecretsAvailableException.class, () -> {
+            CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
+            TestKeyProducer producer = createTestKeyProducer(config);
+    
+            producer.shouldStop = true;
+            producer.createSecrets(1, true); // should throw immediately
+        });
     }
     
     @Test

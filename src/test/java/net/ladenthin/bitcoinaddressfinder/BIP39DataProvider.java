@@ -5,10 +5,11 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tngtech.java.junit.dataprovider.DataProvider;
 import java.io.InputStream;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.stream.Stream;
+import org.junit.jupiter.params.provider.Arguments;
 
 public class BIP39DataProvider {
 
@@ -16,15 +17,14 @@ public class BIP39DataProvider {
      * For {@link net.ladenthin.bitcoinaddressfinder.BIP39KeyProducerTest}.
      */
     public final static String DATA_PROVIDER_BIP39_TEST_VECTORS = "bip39TestVectors";
-    
+
     public final static String FILENAME = "vectors.json";
     public final static String PASSPHRASE = "TREZOR";
 
-    @DataProvider
     /**
      * from https://github.com/trezor/python-mnemonic/blob/master/vectors.json
      */
-    public static Object[][] bip39TestVectors() throws Exception {
+    public static Stream<Arguments> bip39TestVectors() throws Exception {
         InputStream inputStream = BIP39DataProvider.class.getResourceAsStream("/" + FILENAME);
         if (inputStream == null) {
             throw new IllegalStateException(FILENAME + " not found in classpath");
@@ -55,6 +55,6 @@ public class BIP39DataProvider {
             }
         }
 
-        return result;
+        return java.util.Arrays.stream(result).map(row -> Arguments.of(row));
     }
 }

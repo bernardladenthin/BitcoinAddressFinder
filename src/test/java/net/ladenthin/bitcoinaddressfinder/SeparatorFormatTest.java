@@ -3,29 +3,27 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import java.util.Arrays;
 import java.util.List;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Unit tests for {@link SeparatorFormat}.
  */
-@RunWith(DataProviderRunner.class)
 public class SeparatorFormatTest {
 
     /**
      * Tests that the input is correctly split into two parts using a valid
      * separator between them.
      */
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ADDRESS_SEPARATOR, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#addressSeperator")
     public void split_separatorBetweenTwoParts_returnsSplitParts(String addressSeparator) {
         // arrange
         String expectedLeft = "leftPart";
@@ -45,8 +43,8 @@ public class SeparatorFormatTest {
      * Tests that an input string consisting only of a separator returns two
      * empty strings after splitting.
      */
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ADDRESS_SEPARATOR, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#addressSeperator")
     public void split_inputEqualsSeparator_returnsEmptyStrings(String separator) {
         // arrange
         String input = separator;
@@ -119,8 +117,8 @@ public class SeparatorFormatTest {
      * Tests that if the input starts and ends with a separator, the result
      * contains empty prefix and suffix parts.
      */
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ADDRESS_SEPARATOR, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#addressSeperator")
     public void split_inputStartsAndEndsWithSeparator_returnsEmptyAndMiddleAndEmpty(String separator) {
         // arrange
         String input = separator + "middle" + separator;
@@ -155,8 +153,8 @@ public class SeparatorFormatTest {
      * Tests that when the separator appears at the end of the input, the last
      * part is returned as an empty string.
      */
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ADDRESS_SEPARATOR, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#addressSeperator")
     public void split_trailingSeparator_returnsEmptyLastPart(String separator) {
         // arrange
         String input = "value" + separator;
@@ -174,8 +172,8 @@ public class SeparatorFormatTest {
      * Tests that when the separator appears at the beginning of the input, the
      * first part is returned as an empty string.
      */
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_ADDRESS_SEPARATOR, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#addressSeperator")
     public void split_leadingSeparator_returnsEmptyFirstPart(String separator) {
         // arrange
         String input = separator + "value";

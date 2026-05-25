@@ -3,9 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.tngtech.java.junit.dataprovider.DataProvider;
 import java.math.BigInteger;
 import java.util.Arrays;
+import java.util.stream.Stream;
+import org.junit.jupiter.params.provider.Arguments;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,9 +36,8 @@ public class CommonDataProvider {
     *
     * These test cases help detect and avoid those pitfalls.
     */
-    @DataProvider
-    public static Object[][] largeSecretsAsHex() {
-        return new Object[][] {
+    public static Stream<Arguments> largeSecretsAsHex() {
+        Object[][] _data = new Object[][] {
             {"0000000000000000000000000000000000000000000000000000000000000000"},
             {"0000000000000000000000000000000000000000000000000000000000000001"},
             {"0000000000000000000000000000000000000000000000400000000000000000"},
@@ -46,6 +46,7 @@ public class CommonDataProvider {
             {"a6eaa2a8fa07686f3ef73736ea4668f5dbcc1f7c178b99afcacdadb64f0ce8bf"}, // must remain 64 hex chars; don't truncate/pad during conversion
             {PublicKeyBytes.MAX_PRIVATE_KEY_HEX.toLowerCase()},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
 
     /**
@@ -53,9 +54,9 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_CSECRET_FORMAT = "cSecretFormat";
 
-    @DataProvider
-    public static Object[][] cSecretFormat() {
-        return transformFlatToObjectArrayArray(CSecretFormat.values());
+    public static Stream<Arguments> cSecretFormat() {
+        Object[][] _data = transformFlatToObjectArrayArray(CSecretFormat.values());
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -63,14 +64,14 @@ public class CommonDataProvider {
      */
     public static final String DATA_PROVIDER_ENDIANNESS = "endiannessScenarios";
 
-    @DataProvider
-    public static Object[][] endiannessScenarios() {
-        return new Object[][] {
+    public static Stream<Arguments> endiannessScenarios() {
+        Object[][] _data = new Object[][] {
             {ByteOrder.LITTLE_ENDIAN, ByteOrder.LITTLE_ENDIAN, false},
             {ByteOrder.BIG_ENDIAN, ByteOrder.BIG_ENDIAN, false},
             {ByteOrder.LITTLE_ENDIAN, ByteOrder.BIG_ENDIAN, true},
             {ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN, true},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     public enum KeyProducerTypesLocal {
@@ -87,26 +88,29 @@ public class CommonDataProvider {
      */
     public static final String DATA_PROVIDER_KEY_PRODUCER_TYPES = "keyProducerTypes";
 
-    @DataProvider
-    public static Object[][] keyProducerTypes() {
+    public static Stream<Arguments> keyProducerTypes() {
+        return java.util.Arrays.stream(keyProducerTypesData()).map(row -> Arguments.of(row));
+    }
+
+    private static Object[][] keyProducerTypesData() {
         return Arrays.stream(KeyProducerTypesLocal.values())
             .map(type -> new Object[]{type})
             .toArray(Object[][]::new);
     }
-    
+
     /**
     * For tests validating combinations of key producer types and bit sizes.
     */
    public static final String DATA_PROVIDER_JAVA_KEY_PRODUCER_AND_BIT_SIZE = "keyProducerTypeAndBitSize";
 
-    @DataProvider
-    public static Object[][] keyProducerTypeAndBitSize() {
-        return mergeMany(
-            keyProducerTypes(),    // e.g., Socket, ZMQ, etc.
-            bitSizesAtMostMax()     // e.g., 0 – PublicKeyBytes#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY
+    public static Stream<Arguments> keyProducerTypeAndBitSize() {
+        Object[][] _data = mergeMany(
+            keyProducerTypesData(),    // e.g., Socket, ZMQ, etc.
+            bitSizesAtMostMaxData()     // e.g., 0 – PublicKeyBytes#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY
         );
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
-   
+
     /**
      * Merges multiple Object[][] data providers into a cartesian product.
      * Each Object[][] must be a 2D array, where each row is a test case argument set.
@@ -138,15 +142,15 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_BITS_TO_SIZE = "bitsToSize";
 
-    @DataProvider
-    public static Object[][] bitsToSize() {
-        return new Object[][]{
+    public static Stream<Arguments> bitsToSize() {
+        Object[][] _data = new Object[][]{
             {0, 1},
             {1, 2},
             {2, 4},
             {3, 8},
             {8, 256},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
 
     /**
@@ -154,15 +158,15 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_KILL_BITS = "killBits";
 
-    @DataProvider
-    public static Object[][] killBits() {
-        return new Object[][]{
+    public static Stream<Arguments> killBits() {
+        Object[][] _data = new Object[][]{
             {0, BigInteger.valueOf(0L)},
             {1, BigInteger.valueOf(1L)},
             {2, BigInteger.valueOf(3L)},
             {3, BigInteger.valueOf(7L)},
             {8, BigInteger.valueOf(255L)},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
 
     /**
@@ -170,14 +174,14 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_BYTES_TO_MIB = "bytesToMib";
 
-    @DataProvider
-    public static Object[][] bytesToMib() {
-        return new Object[][]{
+    public static Stream<Arguments> bytesToMib() {
+        Object[][] _data = new Object[][]{
             {1L, 0.00000095367431640625d},
             {1024L * 1024L, 1.0d},
             {1024L * 1024L, 1.0d},
             {1024L * 1024L * 10, 10.0d},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -185,13 +189,13 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_MIB_TO_BYTES = "mibToBytes";
 
-    @DataProvider
-    public static Object[][] mibToBytes() {
-        return new Object[][]{
+    public static Stream<Arguments> mibToBytes() {
+        Object[][] _data = new Object[][]{
             {1L, 1024L*1024L},
             {2L, 1024L*1024L *2L},
             {1024L, 1024L*1024L * 1024L},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -199,10 +203,9 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_LMDB_AMOUNTS = "lmdbAmounts";
 
-    @DataProvider
-    public static Object[][] lmdbAmounts() {
+    public static Stream<Arguments> lmdbAmounts() {
         long randomAmount = 13371337L;
-        return new Object[][]{
+        Object[][] _data = new Object[][]{
             // use static amount
             {true, -1337L, randomAmount, -1337L},
             {true, -7L,    randomAmount, -7L},
@@ -240,6 +243,7 @@ public class CommonDataProvider {
             {false, 7L,     randomAmount, randomAmount},
             {false, 1337L,  randomAmount, randomAmount},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
 
     /**
@@ -247,13 +251,13 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_LMDB_INCREASE_SIZE = "lmdbIncreaseSize";
 
-    @DataProvider
-    public static Object[][] lmdbIncreaseSize() {
-        return new Object[][]{
+    public static Stream<Arguments> lmdbIncreaseSize() {
+        Object[][] _data = new Object[][]{
             {1024L},
             {2048L},
             {4096L}
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
 
     /**
@@ -261,8 +265,11 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX = "bitSizesAtMostMax";
 
-    @DataProvider
-    public static Object[][] bitSizesAtMostMax() {
+    public static Stream<Arguments> bitSizesAtMostMax() {
+        return java.util.Arrays.stream(bitSizesAtMostMaxData()).map(row -> Arguments.of(row));
+    }
+
+    private static Object[][] bitSizesAtMostMaxData() {
         final int max = PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY;
 
         Object[][] data = new Object[max + 1][1];
@@ -278,14 +285,14 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT = "compressedAndStaticAmount";
 
-    @DataProvider
-    public static Object[][] compressedAndStaticAmount() {
-        return new Object[][]{
+    public static Stream<Arguments> compressedAndStaticAmount() {
+        Object[][] _data = new Object[][]{
             {true, true},
             {false, true},
             {true, false},
             {false, false}
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -293,12 +300,12 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_STATIC_AMOUNT = "staticAmount";
 
-    @DataProvider
-    public static Object[][] staticAmount() {
-        return new Object[][]{
+    public static Stream<Arguments> staticAmount() {
+        Object[][] _data = new Object[][]{
             {true},
             {false},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -306,12 +313,12 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_COMPRESSED = "compressed";
 
-    @DataProvider
-    public static Object[][] compressed() {
-        return new Object[][]{
+    public static Stream<Arguments> compressed() {
+        Object[][] _data = new Object[][]{
             {true},
             {false},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -319,11 +326,11 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_ADDRESS_SEPARATOR = "addressSeperator";
 
-    @DataProvider
-    public static Object[][] addressSeperator() {
-            return Arrays.stream(SeparatorFormat.values())
+    public static Stream<Arguments> addressSeperator() {
+            Object[][] _data = Arrays.stream(SeparatorFormat.values())
                  .map(format -> new Object[]{format.getSymbol()})
                  .toArray(Object[][]::new);
+            return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -331,15 +338,15 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_INVALID_P2WPKH_ADDRESSES_VALID_BASE58 = "invalidP2WPKHAddressesValidBase58";
 
-    @DataProvider
-    public static Object[][] invalidP2WPKHAddressesValidBase58() {
-        return new Object[][]{
+    public static Stream<Arguments> invalidP2WPKHAddressesValidBase58() {
+        Object[][] _data = new Object[][]{
             {"bc1zqyqsywvzqeeeeeee", "5347dec05b6f03de6cc004c1ec33000000000000"},  // bitcoin
             {"bc1zqyqsywvzqeeeeeeeee", "183a5c6b17b17eced6cd0b3e8443d6b300000000"},  // bitcoin
             {"bc1zqyqsywvzqeeeeeeeeeeeeee1", "b3d1231a68d6dbb47594deac07a0a9fe8352188e"},  // bitcoin
             {"vtc1zqyqsywvzqe", "51b9d9757bfedb535b3100000000000000000000"}, // vertcoin
             {"dgb1zqyqsywvzqe", "edaa0ede31d01c768b3100000000000000000000"}, // digibyte
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -347,12 +354,12 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_INVALID_BECH32_WITNESS_VERSION_2 = "invalidBech32WitnessVersion2";
 
-    @DataProvider
-    public static Object[][] invalidBech32WitnessVersion2() {
-        return new Object[][]{
+    public static Stream<Arguments> invalidBech32WitnessVersion2() {
+        Object[][] _data = new Object[][]{
             // Not sure where this address comes from, but it has a witness version of 2 and a witness program length of 2
             {"bc1zqyqsywvzqe"},  // bitcoin
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -360,9 +367,8 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_INVALID_BASE58 = "invalidBase58";
 
-    @DataProvider
-    public static Object[][] invalidBase58() {
-        return new Object[][]{
+    public static Stream<Arguments> invalidBase58() {
+        Object[][] _data = new Object[][]{
             // P2PKH
             {"1Wr0ngAddressFormat"},
             {"1WrongAddressFormat0"},
@@ -374,6 +380,7 @@ public class CommonDataProvider {
             {"vtc1zqyqsywvzqel"}, // vertcoin
             {"dgb1zqyqsywvzqel"}, // digibyte
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -382,13 +389,13 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_BITCOIN_ADDRESSES_CORRECT_BASE_58 = "bitcoinAddressesCorrectBase58";
 
-    @DataProvider
-    public static Object[][] bitcoinAddressesCorrectBase58() {
-        return new Object[][]{
+    public static Stream<Arguments> bitcoinAddressesCorrectBase58() {
+        Object[][] _data = new Object[][]{
             {"1WrongAddressFormat","01667b78604490800f88b15c77a5000000000000"},
             {"1WrongAddressFormat2","5137f945cf88bd0384f82ef31b63000000000000"},
             {"1Wrong1Address2Format3","042b438790b52de2b8235712dbd6e2e400000000"},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -397,15 +404,15 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_CORRECT_BASE_58 = "correctBase58";
 
-    @DataProvider
-    public static Object[][] correctBase58() {
-        return new Object[][]{
+    public static Stream<Arguments> correctBase58() {
+        Object[][] _data = new Object[][]{
             {"1","0000000000000000000000000000000000000000"},
             {"15T","0102000000000000000000000000000000000000"},
             {"Ldp","0203000000000000000000000000000000000000"},
             {"7bWpTW","0203040500000000000000000000000000000000"},
             {"t3JZcvsuaXE6ygokL4XUiZSTrQBUoLyYfwu","0000000000000000000000000000000000000000"},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -413,9 +420,8 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_SRC_POS = "srcPos";
 
-    @DataProvider
-    public static Object[][] srcPos() {
-        return new Object[][]{
+    public static Stream<Arguments> srcPos() {
+        Object[][] _data = new Object[][]{
             {1},
             {2},
             {3},
@@ -437,6 +443,7 @@ public class CommonDataProvider {
             {19},
             {20},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -446,9 +453,8 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_CHECKSUM_INVALID = "bitcoinCashAddressesChecksumInvalid";
 
-    @DataProvider
-    public static Object[][] bitcoinCashAddressesChecksumInvalid() {
-        return new Object[][]{
+    public static Stream<Arguments> bitcoinCashAddressesChecksumInvalid() {
+        Object[][] _data = new Object[][]{
             {"dSn3treXZQfJRktvoApJKM","27225957c54a53b10e4f4e00b2562af400000000"},
             {"bq2ZTwe8pt3hyCuy5MudVG","1a0b606a1f1de7a130aae81dc66c665700000000"},
             {"W6xvVjvtRobnz9dDdjEugV","ae340f03861fd08558312b97e7926a0000000000"},
@@ -460,6 +466,7 @@ public class CommonDataProvider {
             {"rWMr7gq4bDKs3T1TgWpTrg","90e9360283cee7ba62e81fe2ef67dcf100000000"},
             {"d6qya271t3cYzW8qEEui4E","2459e48a008f3c73c00f9f6e9b24ff0f00000000"},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -469,15 +476,15 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_INTERNAL_PURPOSE = "bitcoinCashAddressesInternalPurpose";
 
-    @DataProvider
-    public static Object[][] bitcoinCashAddressesInternalPurpose() {
-        return new Object[][]{
+    public static Stream<Arguments> bitcoinCashAddressesInternalPurpose() {
+        Object[][] _data = new Object[][]{
             {"d-32551cbc0d16a34c5995b4057c3f027c"},
             {"d-29a0bd5b4cfbb05b493a11e0b69cedcc"},
             {"d-732cbc077831c75aba49f95eb629bc32"},
             {"d-f92fe84dd1620a12daea311393b37549"},
             {"d-ca0cf82e6bd2261f3a648a06090dc815"},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -485,9 +492,8 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_CREATE_SECRET_BASE_LOGGED = "createSecretBaseLogged";
 
-    @DataProvider
-    public static Object[][] createSecretBaseLogged() {
-        return new Object[][]{
+    public static Stream<Arguments> createSecretBaseLogged() {
+        Object[][] _data = new Object[][]{
             // small key, batchSizeInBits: 2
             {"ABCDEF", 2, "0000000000000000000000000000000000000000000000000000000000abcdec", "secretBase: 0000000000000000000000000000000000000000000000000000000000abcdec/2", "secret BigInteger: 11259375", "secret as byte array: 0000000000000000000000000000000000000000000000000000000000abcdef", "killBits: 03", "secretBase: 11259372", "secretBase as byte array: 0000000000000000000000000000000000000000000000000000000000abcdec"},
             {"FEDCBA", 2, "0000000000000000000000000000000000000000000000000000000000fedcb8", "secretBase: 0000000000000000000000000000000000000000000000000000000000fedcb8/2", "secret BigInteger: 16702650", "secret as byte array: 0000000000000000000000000000000000000000000000000000000000fedcba", "killBits: 03", "secretBase: 16702648", "secretBase as byte array: 0000000000000000000000000000000000000000000000000000000000fedcb8"},
@@ -500,6 +506,7 @@ public class CommonDataProvider {
             {"00d456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff", 21, "00d456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000", "secretBase: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000/21", "secret BigInteger: 375168379408231402782670922269509069226925318059052594399906494889018056447", "secret as byte array: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff", "killBits: 1fffff", "secretBase: 375168379408231402782670922269509069226925318059052594399906494889016164352", "secretBase as byte array: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000"},
             {PublicKeyBytes.MAX_PRIVATE_KEY_HEX.toLowerCase(), 2, "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140", "secretBase: fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140/2", "secret BigInteger: 115792089237316195423570985008687907852837564279074904382605163141518161494337", "secret as byte array: fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", "killBits: 03", "secretBase: 115792089237316195423570985008687907852837564279074904382605163141518161494336", "secretBase as byte array: fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140"},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -507,9 +514,9 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_STATIC_P2PKH_ADDRESSES = "staticP2PKHAddresses";
 
-    @DataProvider
-    public static Object[][] staticP2PKHAddresses() {
-        return transformFlatToObjectArrayArray(P2PKH.values());
+    public static Stream<Arguments> staticP2PKHAddresses() {
+        Object[][] _data = transformFlatToObjectArrayArray(P2PKH.values());
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -517,9 +524,9 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_STATIC_P2SH_ADDRESSES = "staticP2SHAddresses";
 
-    @DataProvider
-    public static Object[][] staticP2SHAddresses() {
-        return transformFlatToObjectArrayArray(P2SH.values());
+    public static Stream<Arguments> staticP2SHAddresses() {
+        Object[][] _data = transformFlatToObjectArrayArray(P2SH.values());
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -527,9 +534,9 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_STATIC_P2WPKH_ADDRESSES = "staticP2WPKHAddresses";
 
-    @DataProvider
-    public static Object[][] staticP2WPKHAddresses() {
-        return transformFlatToObjectArrayArray(P2WPKH.values());
+    public static Stream<Arguments> staticP2WPKHAddresses() {
+        Object[][] _data = transformFlatToObjectArrayArray(P2WPKH.values());
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -537,9 +544,9 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_STATIC_UNSUPPORTED_ADDRESSES = "staticUnsupportedAddresses";
 
-    @DataProvider
-    public static Object[][] staticUnsupportedAddresses() {
-        return transformFlatToObjectArrayArray(StaticUnsupportedAddress.values());
+    public static Stream<Arguments> staticUnsupportedAddresses() {
+        Object[][] _data = transformFlatToObjectArrayArray(StaticUnsupportedAddress.values());
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     private static Object[][] transformFlatToObjectArrayArray(Object[] object) {
@@ -556,12 +563,12 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_ALLOCATE_DIRECT = "allocateDirect";
 
-    @DataProvider
-    public static Object[][] allocateDirect() {
-        return new Object[][]{
+    public static Stream<Arguments> allocateDirect() {
+        Object[][] _data = new Object[][]{
             {true},
             {false},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -572,12 +579,12 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_BLOOM_FILTER_ENABLED = "bloomFilterEnabled";
 
-    @DataProvider
-    public static Object[][] bloomFilterEnabled() {
-        return new Object[][]{
+    public static Stream<Arguments> bloomFilterEnabled() {
+        Object[][] _data = new Object[][]{
             {true},
             {false},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -585,9 +592,8 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_LARGE_PRIVATE_KEYS = "largePrivateKeys";
 
-    @DataProvider
-    public static Object[][] largePrivateKeys() {
-        return new Object[][]{
+    public static Stream<Arguments> largePrivateKeys() {
+        Object[][] _data = new Object[][]{
             // ⚠️ Important: Do not include keys that are near or equal to the maximum valid private key (e.g., MAX_PRIVATE_KEY + offset).
             // Since we use grid-based key derivation (e.g., k + i), these values can overflow the valid secp256k1 range and cause failures.
             // {PublicKeyBytes.MAX_PRIVATE_KEY},
@@ -674,6 +680,7 @@ public class CommonDataProvider {
             {new BigInteger("80000000000000000000000000000000", 16)}, // 128-bit with MSB set
             {new BigInteger("FF000000000000000000000000000000", 16)}, // 128-bit, top byte set
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -681,12 +688,12 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE = "privateKeysTooLargeWithChunkSize";
 
-    @DataProvider
-    public static Object[][] privateKeysTooLargeWithChunkSize() {
-        return new Object[][]{
+    public static Stream<Arguments> privateKeysTooLargeWithChunkSize() {
+        Object[][] _data = new Object[][]{
             {PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY, PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
             {PublicKeyBytes.MAX_PRIVATE_KEY, PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -694,15 +701,15 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_PRIVATE_KEYS_32_BYTE_REQUIRING_STRIP = "privateKeys32ByteRequiringStrip";
 
-    @DataProvider
-    public static Object[][] privateKeys32ByteRequiringStrip() {
-        return new Object[][]{
+    public static Stream<Arguments> privateKeys32ByteRequiringStrip() {
+        Object[][] _data = new Object[][]{
             // Custom crafted BigIntegers with MSB set (highest bit in first byte = 1)
             // These will be encoded with a leading zero byte (i.e., total of 33 bytes)
             {new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8C00000000", 16)},
             {new BigInteger("F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0", 16)},
             {new BigInteger("F000000000000000000000000000000000000000000000000000000000000000", 16)},
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
@@ -710,9 +717,8 @@ public class CommonDataProvider {
      */
     public final static String DATA_PROVIDER_BIG_INTEGER_VARIANTS = "bigIntegerVariants";
     
-    @DataProvider
-    public static Object[][] bigIntegerVariants() {
-        return new Object[][] {
+    public static Stream<Arguments> bigIntegerVariants() {
+        Object[][] _data = new Object[][] {
             { new BigInteger("00", 16), 0, (byte) 0x00 }, // 0-value, empty result
             { new BigInteger("01", 16), 1, (byte) 0x01 },
             { new BigInteger("7F", 16), 1, (byte) 0x7F },
@@ -724,5 +730,6 @@ public class CommonDataProvider {
             // Max technically private key (leading 0x00 byte expected)
             { PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY, 32, (byte) 0xFF }
         };
+        return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
 }

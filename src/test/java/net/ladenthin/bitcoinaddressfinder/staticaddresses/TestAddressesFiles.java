@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -16,7 +17,6 @@ import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.SEMICOLON;
 import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.TAB_SPLIT;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2WPKH;
 import org.bitcoinj.base.Coin;
-import org.junit.rules.TemporaryFolder;
 
 public class TestAddressesFiles implements AddressesFiles {
 
@@ -202,10 +202,10 @@ public class TestAddressesFiles implements AddressesFiles {
     }
 
     @Override
-    public List<String> createAddressesFiles(TemporaryFolder folder, boolean addInvalidAddresses) throws IOException {
-        File one = folder.newFile(ADDRESS_FILE_ONE);
-        File two = folder.newFile(ADDRESS_FILE_TWO);
-        File three = folder.newFile(ADDRESS_FILE_THREE);
+    public List<String> createAddressesFiles(Path folder, boolean addInvalidAddresses) throws IOException {
+        File one = Files.createFile(folder.resolve(ADDRESS_FILE_ONE)).toFile();
+        File two = Files.createFile(folder.resolve(ADDRESS_FILE_TWO)).toFile();
+        File three = Files.createFile(folder.resolve(ADDRESS_FILE_THREE)).toFile();
 
         Files.write(one.toPath(), Arrays.asList(
                 testAddresses.getIndexAsBase58String(0) + COMMA.getSymbol() + amountFirstAddress,

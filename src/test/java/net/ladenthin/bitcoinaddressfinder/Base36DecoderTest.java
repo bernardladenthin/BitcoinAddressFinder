@@ -9,7 +9,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 public class Base36DecoderTest {
 
@@ -187,31 +187,37 @@ public class Base36DecoderTest {
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="decodeBase36ToFixedLengthBytes - invalid input">
-    @Test(expected = NumberFormatException.class)
+    @Test
     public void decodeBase36ToFixedLengthBytes_invalidCharacters_throwsException() {
-        // arrange
-        String invalidBase36 = "O0I1L$%"; // invalid characters for BigInteger(36)
-
-        // act
-        decoder.decodeBase36ToFixedLengthBytes(invalidBase36, 20);
+        org.junit.jupiter.api.Assertions.assertThrows(NumberFormatException.class, () -> {
+            // arrange
+            String invalidBase36 = "O0I1L$%"; // invalid characters for BigInteger(36)
+    
+            // act
+            decoder.decodeBase36ToFixedLengthBytes(invalidBase36, 20);
+        });
     }
 
-    @Test(expected = NumberFormatException.class)
+    @Test
     public void decodeBase36ToFixedLengthBytes_emptyString_throwsException() {
-        // arrange
-        String emptyString = "";
-
-        // act
-        decoder.decodeBase36ToFixedLengthBytes(emptyString, 20);
+        org.junit.jupiter.api.Assertions.assertThrows(NumberFormatException.class, () -> {
+            // arrange
+            String emptyString = "";
+    
+            // act
+            decoder.decodeBase36ToFixedLengthBytes(emptyString, 20);
+        });
     }
 
-    @Test(expected = NumberFormatException.class)
+    @Test
     public void decodeBase36ToFixedLengthBytes_invalidCharacterSpace_throwsException() {
-        // arrange
-        String invalidBase36 = "123 456"; // space is invalid in base36
-
-        // act
-        decoder.decodeBase36ToFixedLengthBytes(invalidBase36, 20);
+        org.junit.jupiter.api.Assertions.assertThrows(NumberFormatException.class, () -> {
+            // arrange
+            String invalidBase36 = "123 456"; // space is invalid in base36
+    
+            // act
+            decoder.decodeBase36ToFixedLengthBytes(invalidBase36, 20);
+        });
     }
     // </editor-fold>
 

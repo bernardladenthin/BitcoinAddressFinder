@@ -3,9 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -18,11 +16,12 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
+import org.junit.jupiter.api.io.TempDir;
 
 public class ProducerOpenCLTest {
 
-    @Rule
-    public TemporaryFolder folder = new TemporaryFolder();
+    @TempDir
+    public java.nio.file.Path folder;
 
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
@@ -232,19 +231,21 @@ public class ProducerOpenCLTest {
     // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc="produceKeys">
-    @Test(expected = IllegalStateException.class)
+    @Test
     public void produceKeys_notInitialized_illegalStateExceptionThrown() throws Exception {
-        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
-
-        MockConsumer mockConsumer = new MockConsumer();
-        Random random = new Random(1);
-        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
-        
-        // act
-        producerOpenCL.produceKeys();
-        
-        // assert
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> {
+            CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+    
+            MockConsumer mockConsumer = new MockConsumer();
+            Random random = new Random(1);
+            MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+            ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+            
+            // act
+            producerOpenCL.produceKeys();
+            
+            // assert
+        });
     }
     
     @Test

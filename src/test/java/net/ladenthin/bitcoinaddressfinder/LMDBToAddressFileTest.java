@@ -3,11 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -19,26 +18,26 @@ import org.apache.commons.io.FileUtils;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
-@RunWith(DataProviderRunner.class)
 public class LMDBToAddressFileTest extends LMDBBase {
 
-    @Before
+    @BeforeEach
     public void init() throws IOException {
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#compressedAndStaticAmount")
     public void writeAllAmountsToAddressFileAsDynamicWidthBase58BitcoinAddressWithAmount(boolean compressed, boolean useStaticAmount) throws Exception {
         // arrange
         AtomicBoolean shouldRun = new AtomicBoolean(true);
         TestAddressesFiles testAddressesFiles = new TestAddressesFiles(compressed);
         try (Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false, false)) {
             // act
-            File file = folder.newFile();
+            File file = Files.createTempFile(folder, "", "").toFile();
             persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.DynamicWidthBase58BitcoinAddressWithAmount, shouldRun);
 
             // assert
@@ -63,8 +62,8 @@ public class LMDBToAddressFileTest extends LMDBBase {
         }
     }
     
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#compressedAndStaticAmount")
     public void writeAllAmountsToAddressFileAsFixedWidthBase58BitcoinAddress(boolean compressed, boolean useStaticAmount) throws Exception {
         // arrange
         AtomicBoolean shouldRun = new AtomicBoolean(true);
@@ -72,7 +71,7 @@ public class LMDBToAddressFileTest extends LMDBBase {
         try (Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false, false)) {
 
             // act
-            File file = folder.newFile();
+            File file = Files.createTempFile(folder, "", "").toFile();
             persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.FixedWidthBase58BitcoinAddress, shouldRun);
 
             // assert
@@ -96,15 +95,15 @@ public class LMDBToAddressFileTest extends LMDBBase {
         }
     }
     
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#compressedAndStaticAmount")
     public void writeAllAmountsToAddressFileAsHexHash(boolean compressed, boolean useStaticAmount) throws Exception {
         // arrange
         AtomicBoolean shouldRun = new AtomicBoolean(true);
         TestAddressesFiles testAddressesFiles = new TestAddressesFiles(compressed);
         try (Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false, false)) {
             // act
-            File file = folder.newFile();
+            File file = Files.createTempFile(folder, "", "").toFile();
             persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.HexHash, shouldRun);
 
             // assert

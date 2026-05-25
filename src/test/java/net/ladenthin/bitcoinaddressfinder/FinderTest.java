@@ -3,14 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
 
 import org.jspecify.annotations.Nullable;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
 import static org.hamcrest.Matchers.*;
 import static org.hamcrest.MatcherAssert.assertThat;
 
@@ -38,14 +34,15 @@ import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocketTest;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaZmqTest;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
-import org.junit.runner.RunWith;
 import org.slf4j.Logger;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.api.io.TempDir;
 
-@RunWith(DataProviderRunner.class)
 public class FinderTest {
 
-    @Rule
-    public TemporaryFolder folder = new TemporaryFolder();
+    @TempDir
+    public java.nio.file.Path folder;
 
     // <editor-fold defaultstate="collapsed" desc="interrupt">
     @Test
@@ -189,59 +186,65 @@ public class FinderTest {
     // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc="startKeyProducer">
-    @Test(expected = KeyProducerIdNullException.class)
+    @Test
     public void startKeyProducer_keyProducerIdIsNull_ExceptionThrown() throws IOException, InterruptedException {
-        // arrange
-        CFinder cFinder = new CFinder();
-        configureKeyProducerJavaRandom(null, cFinder);
-        
-        configureConsumerJava(cFinder);
-        Finder finder = new Finder(cFinder);
-        // act
-        finder.startKeyProducer();
+        org.junit.jupiter.api.Assertions.assertThrows(KeyProducerIdNullException.class, () -> {
+            // arrange
+            CFinder cFinder = new CFinder();
+            configureKeyProducerJavaRandom(null, cFinder);
+            
+            configureConsumerJava(cFinder);
+            Finder finder = new Finder(cFinder);
+            // act
+            finder.startKeyProducer();
+        });
     }
     
-    @Test(expected = KeyProducerIdIsNotUniqueException.class)
+    @Test
     public void startKeyProducer_keyProducerIdIsNotUnique_ExceptionThrown() throws IOException, InterruptedException {
-        // arrange
-        CFinder cFinder = new CFinder();
-        String sameIdTwice = "123";
-        configureKeyProducerJavaRandom(sameIdTwice, cFinder);
-        configureKeyProducerJavaRandom(sameIdTwice, cFinder);
-        
-        configureConsumerJava(cFinder);
-        Finder finder = new Finder(cFinder);
-        // act
-        finder.startKeyProducer();
+        org.junit.jupiter.api.Assertions.assertThrows(KeyProducerIdIsNotUniqueException.class, () -> {
+            // arrange
+            CFinder cFinder = new CFinder();
+            String sameIdTwice = "123";
+            configureKeyProducerJavaRandom(sameIdTwice, cFinder);
+            configureKeyProducerJavaRandom(sameIdTwice, cFinder);
+            
+            configureConsumerJava(cFinder);
+            Finder finder = new Finder(cFinder);
+            // act
+            finder.startKeyProducer();
+        });
     }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="configureProducer">
-    @Test(expected = KeyProducerIdUnknownException.class)
+    @Test
     public void configureProducer_keyProducerIdIsUnknown_ExceptionThrown() throws IOException, InterruptedException {
-        // arrange
-        CFinder cFinder = new CFinder();
-        final CProducerJava cProducerJava = new CProducerJava();
-        cProducerJava.runOnce = false;
-        // null is not valid or will find any other id
-        cProducerJava.keyProducerId = null;
-        cFinder.producerJava.add(cProducerJava);
-        configureKeyProducerJavaRandom("unknownId", cFinder);
-        configureConsumerJava(cFinder);
-
-        Finder finder = new Finder(cFinder);
-
-        finder.startConsumer();
-        finder.startKeyProducer();
-        
-        // act
-        finder.configureProducer();
+        org.junit.jupiter.api.Assertions.assertThrows(KeyProducerIdUnknownException.class, () -> {
+            // arrange
+            CFinder cFinder = new CFinder();
+            final CProducerJava cProducerJava = new CProducerJava();
+            cProducerJava.runOnce = false;
+            // null is not valid or will find any other id
+            cProducerJava.keyProducerId = null;
+            cFinder.producerJava.add(cProducerJava);
+            configureKeyProducerJavaRandom("unknownId", cFinder);
+            configureConsumerJava(cFinder);
+    
+            Finder finder = new Finder(cFinder);
+    
+            finder.startConsumer();
+            finder.startKeyProducer();
+            
+            // act
+            finder.configureProducer();
+        });
     }
     // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc="testFullCycle">
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_KEY_PRODUCER_TYPES, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#keyProducerTypes")
     public void testFullCycle_keyProducerJavaSetAndInitialized_statesCorrect(CommonDataProvider.KeyProducerTypesLocal keyProducerType) throws IOException, InterruptedException {
         // arrange
         CFinder cFinder = new CFinder();

@@ -4,8 +4,6 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import ch.qos.logback.classic.Level;
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -18,20 +16,19 @@ import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import org.bitcoinj.base.Network;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.api.io.TempDir;
 
-@RunWith(DataProviderRunner.class)
 public class LMDBPersistencePerformanceTest {
     
-    @Rule
-    public TemporaryFolder folder = new TemporaryFolder();
+    @TempDir
+    public java.nio.file.Path folder;
     
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
@@ -45,8 +42,8 @@ public class LMDBPersistencePerformanceTest {
     private final static int KEYS_QUEUE_SIZE = CONSUMER_THREADS*2;
     private final static int PRODUCER_THREADS = KEYS_QUEUE_SIZE;
     
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BLOOM_FILTER_ENABLED, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bloomFilterEnabled")
     public void runProber_performanceTest(boolean useBloomFilter) throws IOException, InterruptedException, IllegalArgumentException, NoSuchFieldException, IllegalAccessException {
         new LMDBPlatformAssume().assumeLMDBExecution();
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();

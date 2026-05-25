@@ -4,12 +4,12 @@
 package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
-import org.junit.rules.TemporaryFolder;
 
 public interface AddressesFiles {
 
-    List<String> createAddressesFiles(TemporaryFolder folder, boolean addInvalidAddresses) throws IOException;
+    List<String> createAddressesFiles(Path folder, boolean addInvalidAddresses) throws IOException;
 
     TestAddresses getTestAddresses();
 }

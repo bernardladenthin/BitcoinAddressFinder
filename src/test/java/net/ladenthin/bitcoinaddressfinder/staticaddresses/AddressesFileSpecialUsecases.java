@@ -6,9 +6,9 @@ package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import org.junit.rules.TemporaryFolder;
 
 import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.COMMA;
 import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.SEMICOLON;
@@ -17,18 +17,18 @@ import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.TAB_SPLIT;
 public class AddressesFileSpecialUsecases implements AddressesFiles {
 
     private final static String ADDRESS_FILE_ONE = "staticAddressesFile.txt";
-    
+
     public final static int NUMBER_OF_ADRESSES = 3;
-    
+
     private final TestAddresses42 testAddresses;
-    
+
     public AddressesFileSpecialUsecases() {
         testAddresses = new TestAddresses42(NUMBER_OF_ADRESSES, false);
     }
-    
+
     @Override
-    public List<String> createAddressesFiles(TemporaryFolder folder, boolean addInvalidAddresses) throws IOException {
-        File one = folder.newFile(ADDRESS_FILE_ONE);
+    public List<String> createAddressesFiles(Path folder, boolean addInvalidAddresses) throws IOException {
+        File one = Files.createFile(folder.resolve(ADDRESS_FILE_ONE)).toFile();
 
         Files.write(one.toPath(), getAllAddresses());
         List<String> addresses = new ArrayList<>();

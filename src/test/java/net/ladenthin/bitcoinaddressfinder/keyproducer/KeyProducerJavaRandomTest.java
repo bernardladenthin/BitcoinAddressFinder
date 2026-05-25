@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
@@ -20,13 +18,13 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
 import org.jspecify.annotations.Nullable;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import static org.mockito.Mockito.mock;
 import org.slf4j.Logger;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
-@RunWith(DataProviderRunner.class)
 public class KeyProducerJavaRandomTest {
     
     private final Network network = new NetworkParameterFactory().getNetwork();
@@ -36,7 +34,7 @@ public class KeyProducerJavaRandomTest {
     
     String keyProducerId = "exampleId";
     
-    @Before
+    @BeforeEach
     public void setUp() {
         mockLogger = mock(Logger.class);
     }
@@ -66,8 +64,8 @@ public class KeyProducerJavaRandomTest {
         assertThat(result.length, is(equalTo(1)));
     }
     
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bitSizesAtMostMax")
     public void createSecrets_parameterBatchSizeInBitsFromDataProviderAndReturnStartSecretOnlyTrue_returnExpectedSecrets(int batchSizeInBits) throws NoMoreSecretsAvailableException {
         // arrange
         CKeyProducerJavaRandom cKeyProducerJavaRandom = new CKeyProducerJavaRandom();
@@ -87,8 +85,8 @@ public class KeyProducerJavaRandomTest {
         assertThat(result.length, is(equalTo(1)));
     }
     
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bitSizesAtMostMax")
     public void createSecrets_parameterBatchSizeInBitsFromDataProviderAndReturnStartSecretOnlyFalse_returnExpectedSecrets(int batchSizeInBits) throws NoMoreSecretsAvailableException {
         // arrange
         CKeyProducerJavaRandom cKeyProducerJavaRandom = new CKeyProducerJavaRandom();

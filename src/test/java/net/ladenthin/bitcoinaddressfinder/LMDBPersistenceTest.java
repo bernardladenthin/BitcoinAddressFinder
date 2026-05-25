@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -16,19 +14,18 @@ import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.api.io.TempDir;
 
-@RunWith(DataProviderRunner.class)
 public class LMDBPersistenceTest {
     
-    @Rule
-    public TemporaryFolder folder = new TemporaryFolder();
+    @TempDir
+    public java.nio.file.Path folder;
     
     private final Random random = new Random(1337);
     
@@ -49,11 +46,11 @@ public class LMDBPersistenceTest {
     
     
     // <editor-fold defaultstate="collapsed" desc="use static amount">
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_LMDB_AMOUNTS, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#lmdbAmounts")
     public void putNewAmount_putNewAmount_correctAmountStored(boolean useStaticAmount, long staticAmount, long amount, long expectedAmount) throws IOException {
         // arrange
-        File lmdbFolder = folder.newFolder("lmdb");
+        File lmdbFolder = java.nio.file.Files.createDirectory(folder.resolve("lmdb")).toFile();
         
         CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
         cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
@@ -83,7 +80,7 @@ public class LMDBPersistenceTest {
     @Test
     public void getDatabaseSize_initialLMDBSetTo1MiB_returnInitialDatabaseSize() throws IOException {
         // arrange
-        File lmdbFolder = folder.newFolder("lmdb");
+        File lmdbFolder = java.nio.file.Files.createDirectory(folder.resolve("lmdb")).toFile();
         
         CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
         cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
@@ -103,7 +100,7 @@ public class LMDBPersistenceTest {
     public void getDatabaseSize_valuesAdded_returnInitialDatabaseSize() throws IOException {
         // arrange
         int keysToAdd = 1024*16;
-        File lmdbFolder = folder.newFolder("lmdb");
+        File lmdbFolder = java.nio.file.Files.createDirectory(folder.resolve("lmdb")).toFile();
         
         CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
         cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
@@ -123,11 +120,11 @@ public class LMDBPersistenceTest {
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="getDatabaseSize increaseDatabaseSize and filled">
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_LMDB_INCREASE_SIZE, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#lmdbIncreaseSize")
     public void getDatabaseSize_initialLMDBSetTo1MiB_increaseDatabaseSize_returnResizedDatabaseSize(long increaseSize) throws IOException {
         // arrange
-        File lmdbFolder = folder.newFolder("lmdb");
+        File lmdbFolder = java.nio.file.Files.createDirectory(folder.resolve("lmdb")).toFile();
         
         CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
         cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
@@ -144,12 +141,12 @@ public class LMDBPersistenceTest {
         assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L)+increaseSize)));
     }
     
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_LMDB_INCREASE_SIZE, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#lmdbIncreaseSize")
     public void getDatabaseSize_valuesAdded_increaseDatabaseSize_returnResizedDatabaseSize(long increaseSize) throws IOException {
         // arrange
         int keysToAdd = 1024*16;
-        File lmdbFolder = folder.newFolder("lmdb");
+        File lmdbFolder = java.nio.file.Files.createDirectory(folder.resolve("lmdb")).toFile();
         
         CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
         cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
@@ -170,33 +167,35 @@ public class LMDBPersistenceTest {
     // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc="increaseDatabaseSize">
-    @Test(expected = org.lmdbjava.Env.MapFullException.class)
+    @Test
     public void putNewAmount_initialLMDBSetTo1MiB_fillWithTooMuchValues_exceptionThrown() throws IOException {
-        // arrange
-        File lmdbFolder = folder.newFolder("lmdb");
-        
-        CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
-        cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
-        cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
-        cLMDBConfigurationWrite.increaseMapAutomatically = false;
-        cLMDBConfigurationWrite.increaseSizeInMiB = 1;
-        
-        LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils);
-        lmdbPersistence.init();
-        
-        // pre assert
-        assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(new ByteConversion().mibToBytes(1L))));
-        assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo(new ByteConversion().mibToBytes(0L))));
-        assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(new ByteConversion().mibToBytes(0L))));
-        
-        // act, assert
-        fillWithRandomKeys(TOO_MUCH_KEYS_FOR_1MiB, lmdbPersistence);
+        org.junit.jupiter.api.Assertions.assertThrows(org.lmdbjava.Env.MapFullException.class, () -> {
+            // arrange
+            File lmdbFolder = java.nio.file.Files.createDirectory(folder.resolve("lmdb")).toFile();
+            
+            CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
+            cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
+            cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
+            cLMDBConfigurationWrite.increaseMapAutomatically = false;
+            cLMDBConfigurationWrite.increaseSizeInMiB = 1;
+            
+            LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils);
+            lmdbPersistence.init();
+            
+            // pre assert
+            assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(new ByteConversion().mibToBytes(1L))));
+            assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo(new ByteConversion().mibToBytes(0L))));
+            assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(new ByteConversion().mibToBytes(0L))));
+            
+            // act, assert
+            fillWithRandomKeys(TOO_MUCH_KEYS_FOR_1MiB, lmdbPersistence);
+        });
     }
 
     @Test
     public void putNewAmount_initialLMDBSetTo1MiB_fillWithTooMuchValues_increaseDatabaseSizeAndNoExceptionThrown() throws IOException {
         // arrange
-        File lmdbFolder = folder.newFolder("lmdb");
+        File lmdbFolder = java.nio.file.Files.createDirectory(folder.resolve("lmdb")).toFile();
 
         CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
         cLMDBConfigurationWrite.initialMapSizeInMiB = 1;

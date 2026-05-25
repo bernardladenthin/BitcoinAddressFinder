@@ -6,26 +6,26 @@ package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.bitcoinj.base.Coin;
-import org.junit.rules.TemporaryFolder;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.*;
 
 public class StaticAddressesFiles implements AddressesFiles {
 
     private final static String ADDRESS_FILE_ONE = "staticAddressesFile.txt";
-    
+
     public static final Coin amountOtherAddresses = Coin.SATOSHI;
 
     public StaticAddressesFiles() {
     }
 
     @Override
-    public List<String> createAddressesFiles(TemporaryFolder folder, boolean addInvalidAddresses) throws IOException {
-        File one = folder.newFile(ADDRESS_FILE_ONE);
+    public List<String> createAddressesFiles(Path folder, boolean addInvalidAddresses) throws IOException {
+        File one = Files.createFile(folder.resolve(ADDRESS_FILE_ONE)).toFile();
 
         Files.write(one.toPath(), getAllAddresses());
         List<String> addresses = new ArrayList<>();

@@ -4,8 +4,6 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import com.google.common.io.Resources;
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -14,10 +12,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.FileUtils;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import static org.jocl.CL.*;
 
@@ -38,11 +34,13 @@ import static org.hamcrest.Matchers.everyItem;
 import static org.mockito.Mockito.mock;
 
 import org.jocl.*;
-import org.junit.Ignore;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Disabled;
 import org.slf4j.Logger;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.api.io.TempDir;
 
-@RunWith(DataProviderRunner.class)
 public class ProbeAddressesOpenCLTest {
 
     public static final String ADDRESSES_CSV = "addresses.csv";
@@ -62,10 +60,10 @@ public class ProbeAddressesOpenCLTest {
     
     private final BitHelper bitHelper = new BitHelper();
 
-    @Rule
-    public TemporaryFolder tempFolder = new TemporaryFolder();
+    @TempDir
+    public java.nio.file.Path tempFolder;
 
-    @Before
+    @BeforeEach
     public void init() throws IOException {
         createTemporaryAddressesFile();
     }
@@ -227,7 +225,7 @@ public class ProbeAddressesOpenCLTest {
     public static int ACCESS_STRIDE = (ACCESS_BUNDLE/BN_NWORDS);
     
     @Test
-    @Ignore
+    @Disabled
     public void reverseEngineering_startPoints() {
         int GLOBAL_SIZE = 1024;
         for (int j = 0; j < 1024; j++) {
@@ -264,7 +262,7 @@ public class ProbeAddressesOpenCLTest {
     }
 
     @Test
-    @Ignore
+    @Disabled
     public void calcAddrsFixZeroCl_loadWithoutErrors() throws IOException {
         // ATTENTION: BLDEBUG
         
@@ -385,7 +383,7 @@ public class ProbeAddressesOpenCLTest {
 
     @Test
     @OpenCLTest
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX, location = CommonDataProvider.class)
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bitSizesAtMostMax")
     public void createKeys_bitsLowerThan25_use32BitNevertheless(int bitSize) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
@@ -430,8 +428,8 @@ public class ProbeAddressesOpenCLTest {
     */
     @Test
     public void dataProvider_largePrivateKeys_containsAtLeastOneEncodingWithLeadingZeroByte() {
-        List<Integer> lengths = Arrays.stream(CommonDataProvider.largePrivateKeys())
-            .map(data -> ((BigInteger) data[0]).toByteArray().length)
+        List<Integer> lengths = CommonDataProvider.largePrivateKeys()
+            .map(args -> ((BigInteger) args.get()[0]).toByteArray().length)
             .collect(Collectors.toList());
 
         assertThat(
@@ -447,8 +445,8 @@ public class ProbeAddressesOpenCLTest {
     */
    @Test
    public void dataProvider_largePrivateKeys_allHaveLeadingZeroEncoding() {
-       List<Integer> lengths = Arrays.stream(CommonDataProvider.privateKeys32ByteRequiringStrip())
-           .map(data -> ((BigInteger) data[0]).toByteArray().length)
+       List<Integer> lengths = CommonDataProvider.privateKeys32ByteRequiringStrip()
+           .map(args -> ((BigInteger) args.get()[0]).toByteArray().length)
            .collect(Collectors.toList());
 
        assertThat(
@@ -459,25 +457,27 @@ public class ProbeAddressesOpenCLTest {
    }
    
     @OpenCLTest
-    @Test(expected = PrivateKeyTooLargeException.class)
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE, location = CommonDataProvider.class)
+    @Test
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#privateKeysTooLargeWithChunkSize")
     public void setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException(BigInteger privateKey, int chunkSize) throws IOException {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
-        
-        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
-        producerOpenCL.batchSizeInBits = chunkSize;
-        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
-            openCLContext.init();
-            OpenClTask openClTask = Objects.requireNonNull(openCLContext.getOpenClTask());
-
-            // Force a key that exceeds the limit
-            openClTask.setSrcPrivateKeyChunk(privateKey);
-       }
+        org.junit.jupiter.api.Assertions.assertThrows(PrivateKeyTooLargeException.class, () -> {
+            new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+            
+            CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+            producerOpenCL.batchSizeInBits = chunkSize;
+            try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+                openCLContext.init();
+                OpenClTask openClTask = Objects.requireNonNull(openCLContext.getOpenClTask());
+    
+                // Force a key that exceeds the limit
+                openClTask.setSrcPrivateKeyChunk(privateKey);
+           }
+        });
     }
 
     @Test
     @OpenCLTest
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_32_BYTE_REQUIRING_STRIP, location = CommonDataProvider.class)
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#privateKeys32ByteRequiringStrip")
     public void setSrcPrivateKeyChunk_handlesLeadingZero_correctlySerializesTo32Bytes(BigInteger privateKey) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
@@ -522,7 +522,7 @@ public class ProbeAddressesOpenCLTest {
     
     @Test
     @OpenCLTest
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_LARGE_PRIVATE_KEYS, location = CommonDataProvider.class)
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#largePrivateKeys")
     public void createKeys_fromLargePrivateKey_generatesValidPublicKeys(BigInteger privateKey) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         

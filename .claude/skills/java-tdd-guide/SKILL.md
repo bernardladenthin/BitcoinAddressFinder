@@ -66,39 +66,38 @@ package com.example.foo;
 
 | Concern | Mandatory choice |
 |---|---|
-| Runner | JUnit 4 (`@Test`, `@Before`, `@Rule`) |
-| Parameterized | `@RunWith(DataProviderRunner.class)` + `@UseDataProvider` (only when the class has at least one `@UseDataProvider` method) |
+| Runner | JUnit 5 Jupiter (`@Test`, `@BeforeEach`, `@TempDir`) |
+| Parameterized | `@ParameterizedTest` + `@MethodSource` pointing to `Stream<Arguments>` methods |
 | Assertions | Hamcrest only — `assertThat(actual, is(equalTo(expected)))` |
 | Mocking | Mockito — `mock()`, `when()`, `verify()`, `ArgumentCaptor` |
-| Temp files | `@Rule public TemporaryFolder folder = new TemporaryFolder()` |
+| Temp files | `@TempDir public java.nio.file.Path folder` |
 
 **Never use:**
 - `assertEquals`, `assertTrue`, `assertFalse`, `assertNotNull` from `org.junit.Assert`
-- TestNG or JUnit 5
+- TestNG or JUnit 4
 
 ---
 
 ## Class Layout
 
 ```java
-@RunWith(DataProviderRunner.class)   // only when @UseDataProvider is present
 public class FooTest {
 
     // shared, constructed-once immutable fields
     private final Bar bar = new Bar();
     private final BazHelper helper = new BazHelper();
 
-    // mocks that must be fresh per test — declare field here, initialize in @Before
+    // mocks that must be fresh per test — declare field here, initialize in @BeforeEach
     private Logger mockLogger;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         mockLogger = mock(Logger.class);
     }
-    // Omit @Before entirely when it does no meaningful work.
+    // Omit @BeforeEach entirely when it does no meaningful work.
 ```
 
-Omit `@RunWith` if no data providers are used. Omit empty `@Before` methods.
+Omit empty `@BeforeEach` methods.
 
 ---
 
@@ -279,7 +278,7 @@ public void foo_invalidInput_throwsException() {
 
 Import for `fail()`:
 ```java
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 ```
 
 ---
@@ -291,28 +290,27 @@ import static org.junit.Assert.fail;
 All data providers belong in a centralized `CommonDataProvider` class. Each provider follows this pattern:
 
 ```java
-// 1. Constant for the provider name
+// 1. Constant for the provider name (used in @MethodSource references)
 public final static String DATA_PROVIDER_MY_CASES = "myCases";
 
 // 2. Javadoc linking to which test it serves
 /** For {@link FooTest}. */
-@DataProvider
-public static Object[][] myCases() {
-    return new Object[][] {
+public static Stream<Arguments> myCases() {
+    Object[][] _data = new Object[][] {
         { inputA, expectedA },
         { inputB, expectedB },
     };
+    return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
 }
 ```
 
 ### Consuming a data provider
 
 ```java
-@RunWith(DataProviderRunner.class)
 public class FooTest {
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_MY_CASES, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("com.example.foo.CommonDataProvider#myCases")
     public void foo_inputGiven_returnsExpected(String input, String expected) {
         // arrange
         Foo sut = new Foo();
@@ -329,18 +327,20 @@ public class FooTest {
 ### Enum-based providers
 
 ```java
-@DataProvider
-public static Object[][] allEnumValues() {
-    return transformFlatToObjectArrayArray(MyEnum.values());
+public static Stream<Arguments> allEnumValues() {
+    Object[][] _data = Arrays.stream(MyEnum.values())
+        .map(v -> new Object[]{v})
+        .toArray(Object[][]::new);
+    return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
 }
 ```
 
 ### Cartesian product providers
 
 ```java
-@DataProvider
-public static Object[][] typeAndSize() {
-    return mergeMany(types(), sizes());
+public static Stream<Arguments> typeAndSize() {
+    Object[][] _data = mergeMany(typesData(), sizesData());
+    return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
 }
 ```
 
@@ -804,7 +804,7 @@ assertThat(result, not(emptyString()));
 | Missing editor fold | Wrap each method group in `<editor-fold>` |
 | Non-conforming test name like `testme()` | Rename to `methodName_condition_expectation()` |
 | Empty `@Before` method | Remove it entirely |
-| `@RunWith(DataProviderRunner.class)` without `@UseDataProvider` | Remove the `@RunWith` |
+| `@ParameterizedTest` without `@MethodSource` | Add the `@MethodSource` annotation |
 | For-loop iteration in assertions | Compare entire array at once — **exception:** `for (MyEnum v : MyEnum.values())` is allowed |
 | Magic numbers like `result[9]` | Use `final int` constants: `result[targetLength - 1]` |
 | Removing existing correct comments during fixes | Preserve comments; only remove factually wrong ones |
@@ -834,29 +834,26 @@ assertThat(result, not(emptyString()));
 package com.example.foo;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
-@RunWith(DataProviderRunner.class)
 public class FooTest {
 
-    @Rule
-    public TemporaryFolder folder = new TemporaryFolder();
+    @TempDir
+    public Path folder;
 
     private Bar bar;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         bar = new Bar();
     }
@@ -874,17 +871,19 @@ public class FooTest {
         assertThat(result, is(equalTo("expectedResult")));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void someMethod_nullGiven_throwsException() {
         // arrange
         Foo sut = new Foo();
 
-        // act
-        sut.someMethod(null);
+        // act + assert
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            sut.someMethod(null);
+        });
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_MY_CASES, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("com.example.foo.CommonDataProvider#myCases")
     public void someMethod_parameterizedInput_returnsExpected(String input, String expected) {
         // arrange
         Foo sut = new Foo();
@@ -932,8 +931,8 @@ Before submitting code:
 - [ ] Exception tests with message assertions use `try { ...; fail(...); } catch`.
 - [ ] All `Random` instances use a fixed seed.
 - [ ] Data providers are added to `CommonDataProvider` (or project equivalent), not inlined in test classes.
-- [ ] `@RunWith(DataProviderRunner.class)` is present **only** when `@UseDataProvider` is used.
-- [ ] Empty `@Before` methods are removed.
+- [ ] `@ParameterizedTest` is always paired with `@MethodSource`.
+- [ ] Empty `@BeforeEach` methods are removed.
 - [ ] All nullable fields/returns in new production code are annotated with `@Nullable`.
 - [ ] Array nullable annotations follow the `byte @Nullable []` placement convention.
 - [ ] Logger in new production classes is `private final` with constructor injection (or setter as last resort).

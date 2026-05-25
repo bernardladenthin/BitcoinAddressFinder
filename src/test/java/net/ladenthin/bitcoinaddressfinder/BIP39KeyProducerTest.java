@@ -4,8 +4,6 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.time.Instant;
 import java.util.List;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -15,17 +13,17 @@ import java.text.Normalizer.Form;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
 import static org.hamcrest.Matchers.*;
 import org.apache.commons.codec.binary.Hex;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.bitcoinj.crypto.DeterministicKey;
 import org.bitcoinj.crypto.HDKeyDerivation;
 import org.bitcoinj.crypto.MnemonicCode;
 import org.bitcoinj.params.MainNetParams;
 import org.bitcoinj.wallet.DeterministicSeed;
-import static org.junit.Assert.fail;
-import org.junit.runner.RunWith;
+import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
-@RunWith(DataProviderRunner.class)
 public class BIP39KeyProducerTest {
 
     @Test
@@ -111,8 +109,8 @@ public class BIP39KeyProducerTest {
         assertThat(masterKey.serializePrivB58(MainNetParams.get().network()), is(expectedXprv));
     }
     
-    @Test
-    @UseDataProvider(value = BIP39DataProvider.DATA_PROVIDER_BIP39_TEST_VECTORS, location = BIP39DataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.BIP39DataProvider#bip39TestVectors")
     public void bip39Vector_givenTestVector_returnsExpectedSeedAndXprvForLanguage(String language, String entropyHex, String mnemonicStr, String passphrase, String expectedSeedHex, String expectedXprv) throws Exception {
         // Arrange
         byte[] entropy = Hex.decodeHex(entropyHex);
@@ -145,27 +143,29 @@ public class BIP39KeyProducerTest {
         assertThat("Language: " + language, masterKey.serializePrivB58(MainNetParams.get().network()), is(expectedXprv));
     }
     
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void nextKey_counterOverflow_throwsException() {
-        // arrange
-        String mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-        String passphrase = "";
-        String bip32Path = "M/44H/0H/0H/0";
-        boolean hardened = false;
-
-        BIP39KeyProducer producer = new BIP39KeyProducer(mnemonic, passphrase, bip32Path, Instant.ofEpochSecond(0), hardened);
-
-        producer.counter.set(Integer.MAX_VALUE);
-
-        try {
-            // act
+        org.junit.jupiter.api.Assertions.assertThrows(NoMoreSecretsAvailableException.class, () -> {
+            // arrange
+            String mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+            String passphrase = "";
+            String bip32Path = "M/44H/0H/0H/0";
+            boolean hardened = false;
+    
+            BIP39KeyProducer producer = new BIP39KeyProducer(mnemonic, passphrase, bip32Path, Instant.ofEpochSecond(0), hardened);
+    
+            producer.counter.set(Integer.MAX_VALUE);
+    
+            try {
+                // act
+                producer.nextKey();
+            } catch (NoMoreSecretsAvailableException e) {
+                fail("Exception thrown too early: " + e.getMessage());
+            }
+    
+            // This call should overflow and throw NoMoreSecretsAvailableException
             producer.nextKey();
-        } catch (NoMoreSecretsAvailableException e) {
-            fail("Exception thrown too early: " + e.getMessage());
-        }
-
-        // This call should overflow and throw NoMoreSecretsAvailableException
-        producer.nextKey();
+        });
     }
     
     @Test

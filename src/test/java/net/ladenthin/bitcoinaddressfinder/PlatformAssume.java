@@ -11,7 +11,7 @@ package net.ladenthin.bitcoinaddressfinder;
  * (e.g., required native libraries or hardware support).
  * </p>
  *
- * @see org.junit.Assume
+ * @see org.junit.jupiter.api.Assumptions
  */
 public interface PlatformAssume {
     

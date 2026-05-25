@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import org.junit.Assert;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -69,12 +69,12 @@ public class EqualHashCodeToStringTestHelper {
     }
 
     private void assertDifferenceReference() {
-        Assert.assertNotSame(instanceA, instanceADifferentReference);
-        Assert.assertNotSame(instanceA, instanceB);
-        Assert.assertNotSame(instanceA, instanceBDifferentReference);
+        assertNotSame(instanceA, instanceADifferentReference);
+        assertNotSame(instanceA, instanceB);
+        assertNotSame(instanceA, instanceBDifferentReference);
 
-        Assert.assertNotSame(instanceB, instanceBDifferentReference);
-        Assert.assertNotSame(instanceB, instanceA);
-        Assert.assertNotSame(instanceB, instanceADifferentReference);
+        assertNotSame(instanceB, instanceBDifferentReference);
+        assertNotSame(instanceB, instanceA);
+        assertNotSame(instanceB, instanceADifferentReference);
     }
 }

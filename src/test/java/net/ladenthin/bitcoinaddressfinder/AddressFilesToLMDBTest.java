@@ -3,11 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
@@ -17,41 +16,43 @@ import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2PKH;
 import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.LegacyAddress;
-import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Direct unit tests for {@link AddressFilesToLMDB}.
  *
  * Tests the run() and interrupt() methods with parameterized test data from existing test providers.
  */
-@RunWith(DataProviderRunner.class)
 public class AddressFilesToLMDBTest extends LMDBBase {
 
-    @Before
+    @BeforeEach
     public void init() throws IOException {
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void addressFilesToLMDB_addressFileDoesNotExists_throwsIllegalArgumentException() throws IOException {
-        // arrange, act
-        CAddressFilesToLMDB addressFilesToLMDBConfigurationWrite = new CAddressFilesToLMDB();
-        
-        addressFilesToLMDBConfigurationWrite.addressesFiles.add("thisFileDoesNotExists.txt");
-        addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite = new CLMDBConfigurationWrite();
-        File lmdbFolder = folder.newFolder("lmdb");
-        String lmdbFolderPath = lmdbFolder.getAbsolutePath();
-        addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.lmdbDirectory = lmdbFolderPath;
-        AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(addressFilesToLMDBConfigurationWrite);
-        addressFilesToLMDB.run();
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            // arrange, act
+            CAddressFilesToLMDB addressFilesToLMDBConfigurationWrite = new CAddressFilesToLMDB();
+            
+            addressFilesToLMDBConfigurationWrite.addressesFiles.add("thisFileDoesNotExists.txt");
+            addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite = new CLMDBConfigurationWrite();
+            File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
+            String lmdbFolderPath = lmdbFolder.getAbsolutePath();
+            addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.lmdbDirectory = lmdbFolderPath;
+            AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(addressFilesToLMDBConfigurationWrite);
+            addressFilesToLMDB.run();
+        });
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#compressedAndStaticAmount")
     public void addressFilesToLMDB_createLMDB_containingTestAddressesHashesWithCorrectAmount(boolean compressed, boolean useStaticAmount) throws Exception {
         // arrange, act
         AddressesFiles addressesFiles = new TestAddressesFiles(compressed);
@@ -76,8 +77,8 @@ public class AddressFilesToLMDBTest extends LMDBBase {
         }
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_STATIC_AMOUNT, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#staticAmount")
     public void addressFilesToLMDB_createLMDBWithStaticAddresses_containingStaticHashes(boolean useStaticAmount) throws Exception {
         // arrange, act
         StaticAddressesFiles staticAddressesFiles = new StaticAddressesFiles();
@@ -94,8 +95,8 @@ public class AddressFilesToLMDBTest extends LMDBBase {
         }
     }
     
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BLOOM_FILTER_ENABLED, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bloomFilterEnabled")
     public void containsAddress_behavesCorrectly_withOrWithoutBloomFilter(boolean useBloomFilter) throws Exception {
         AddressesFiles addressesFiles = new TestAddressesFiles(true);
 
@@ -135,8 +136,8 @@ public class AddressFilesToLMDBTest extends LMDBBase {
         }
     }
 
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_BLOOM_FILTER_ENABLED, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bloomFilterEnabled")
     public void containsAddress_returnsFalseForUnknownAddress(boolean useBloomFilter) throws Exception {
         AddressesFiles addressesFiles = new TestAddressesFiles(true);
 

@@ -5,24 +5,25 @@ package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
-import org.junit.rules.TemporaryFolder;
 
 public class TestAddressesLMDB {
-    
-    
-    public File createTestLMDB(TemporaryFolder folder, AddressesFiles addressesFiles, boolean useStaticAmount, boolean addInvalidAddresses) throws IOException {
+
+
+    public File createTestLMDB(Path folder, AddressesFiles addressesFiles, boolean useStaticAmount, boolean addInvalidAddresses) throws IOException {
         CAddressFilesToLMDB addressFilesToLMDBConfigurationWrite = new CAddressFilesToLMDB();
-        
+
         List<String> files = addressesFiles.createAddressesFiles(folder, addInvalidAddresses);
         addressFilesToLMDBConfigurationWrite.addressesFiles.addAll(files);
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite = new CLMDBConfigurationWrite();
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.useStaticAmount = useStaticAmount;
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.staticAmount = 0L;
-        File lmdbFolder = folder.newFolder("lmdb");
+        File lmdbFolder = Files.createDirectories(folder.resolve("lmdb")).toFile();
         String lmdbFolderPath = lmdbFolder.getAbsolutePath();
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.lmdbDirectory = lmdbFolderPath;
         AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(addressFilesToLMDBConfigurationWrite);

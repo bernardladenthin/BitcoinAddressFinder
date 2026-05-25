@@ -14,8 +14,8 @@ import org.bitcoinj.base.Network;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import static org.mockito.Mockito.mock;
 import org.slf4j.Logger;
 
@@ -28,7 +28,7 @@ public class KeyProducerJavaBip39Test {
     
     String keyProducerId = "exampleId";
     
-    @Before
+    @BeforeEach
     public void setUp() {
         mockLogger = mock(Logger.class);
     }
