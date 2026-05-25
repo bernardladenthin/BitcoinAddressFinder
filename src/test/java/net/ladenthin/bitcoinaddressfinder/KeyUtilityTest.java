@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.*;
 
 public class KeyUtilityTest {
@@ -225,7 +226,7 @@ public class KeyUtilityTest {
     @Test
     public void ecKey_fromPrivate_minPrivateKey_throwsException() {
         // act
-        ECKey.fromPrivate(PublicKeyBytes.MIN_PRIVATE_KEY, false);
+        assertThrows(IllegalArgumentException.class, () -> ECKey.fromPrivate(PublicKeyBytes.MIN_PRIVATE_KEY, false));
     }
 
     @Disabled("bitcoinj.ECKey.fromPrivate(...) accepts values > MAX_PRIVATE_KEY without throwing an exception. " +
@@ -569,7 +570,7 @@ public class KeyUtilityTest {
         boolean returnStartSecretOnly = false;
 
         // act
-        keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, randomSupplier);
+        assertThrows(NoMoreSecretsAvailableException.class, () -> keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, randomSupplier));
     }
     // </editor-fold>
 
@@ -613,7 +614,7 @@ public class KeyUtilityTest {
         byte[] invalid = new byte[31];
 
         // act
-        keyUtility.bigIntegerFromUnsignedByteArray(invalid);
+        assertThrows(IllegalArgumentException.class, () -> keyUtility.bigIntegerFromUnsignedByteArray(invalid));
     }
     // </editor-fold>
 

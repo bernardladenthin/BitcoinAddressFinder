@@ -27,6 +27,7 @@ import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.MnemonicException;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.*;
 import static org.hamcrest.core.StringStartsWith.startsWith;
 import static org.mockito.Mockito.*;
@@ -66,10 +67,10 @@ public class ConsumerJavaTest {
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = Files.createTempDirectory(folder, "junit").toFile().getAbsolutePath();
 
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
-        consumerJava.initLMDB();
+        assertThrows(org.lmdbjava.LmdbNativeException.class, () -> consumerJava.initLMDB());
     }
-    
-    
+
+
     // <editor-fold defaultstate="collapsed" desc="toString">
     @ToStringTest
     @Test
@@ -126,9 +127,9 @@ public class ConsumerJavaTest {
         cConsumerJava.printStatisticsEveryNSeconds = 0;
 
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
-        consumerJava.startStatisticsTimer();
+        assertThrows(IllegalArgumentException.class, () -> consumerJava.startStatisticsTimer());
     }
-    
+
     @AwaitTimeTest
     @Test
     public void interrupt_keysQueueNotEmpty_consumerNotRunningWaitedInternallyForTheDuration() throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
@@ -568,7 +569,7 @@ public class ConsumerJavaTest {
         consumerJava.persistence = mockPersistence;
 
         // act - should throw RuntimeException
-        consumerJava.interrupt();
+        assertThrows(RuntimeException.class, () -> consumerJava.interrupt());
     }
 
     private ByteBuffer createHash160ByteBuffer() {

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import org.lmdbjava.LmdbException;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
@@ -102,7 +103,7 @@ public class AbstractPlaintextFileTest {
         ThrowingPlaintextFile sut = new ThrowingPlaintextFile(file, readStatistic, mockLmdbException);
 
         // act
-        sut.readFile();
+        assertThrows(LmdbException.class, () -> sut.readFile());
     }
 
     @Test

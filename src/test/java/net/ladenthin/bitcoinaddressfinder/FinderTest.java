@@ -14,6 +14,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import static org.hamcrest.Matchers.*;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -197,9 +198,9 @@ public class FinderTest {
         configureConsumerJava(cFinder);
         Finder finder = new Finder(cFinder);
         // act
-        finder.startKeyProducer();
+        assertThrows(KeyProducerIdNullException.class, () -> finder.startKeyProducer());
     }
-    
+
     @Test
     public void startKeyProducer_keyProducerIdIsNotUnique_ExceptionThrown() throws IOException, InterruptedException {
         // arrange
@@ -207,11 +208,11 @@ public class FinderTest {
         String sameIdTwice = "123";
         configureKeyProducerJavaRandom(sameIdTwice, cFinder);
         configureKeyProducerJavaRandom(sameIdTwice, cFinder);
-        
+
         configureConsumerJava(cFinder);
         Finder finder = new Finder(cFinder);
         // act
-        finder.startKeyProducer();
+        assertThrows(KeyProducerIdIsNotUniqueException.class, () -> finder.startKeyProducer());
     }
     // </editor-fold>
 
@@ -232,9 +233,9 @@ public class FinderTest {
 
         finder.startConsumer();
         finder.startKeyProducer();
-        
+
         // act
-        finder.configureProducer();
+        assertThrows(KeyProducerIdUnknownException.class, () -> finder.configureProducer());
     }
     // </editor-fold>
     

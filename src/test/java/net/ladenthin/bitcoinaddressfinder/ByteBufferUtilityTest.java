@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
 import jdk.internal.ref.Cleaner;
@@ -284,7 +285,7 @@ public class ByteBufferUtilityTest {
         long capacity = (long) Integer.MAX_VALUE + 1L;
 
         // act
-        ByteBufferUtility.ensureByteBufferCapacityFitsInt(capacity);
+        assertThrows(IllegalArgumentException.class, () -> ByteBufferUtility.ensureByteBufferCapacityFitsInt(capacity));
 
         // assert is handled by exception rule
     }
@@ -295,7 +296,7 @@ public class ByteBufferUtilityTest {
         long capacity = -1L;
 
         // act
-        ByteBufferUtility.ensureByteBufferCapacityFitsInt(capacity);
+        assertThrows(IllegalArgumentException.class, () -> ByteBufferUtility.ensureByteBufferCapacityFitsInt(capacity));
 
         // assert is handled by exception rule
     }
@@ -327,7 +328,7 @@ public class ByteBufferUtilityTest {
         final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
 
         // act
-        byteBufferUtility.allocateByteBufferDirectStrict(16);
+        assertThrows(IllegalStateException.class, () -> byteBufferUtility.allocateByteBufferDirectStrict(16));
 
         // assert handled by exception
     }
@@ -448,7 +449,7 @@ public class ByteBufferUtilityTest {
        ByteBuffer buffer = ByteBuffer.allocate(1);
        byte[] input = { 0x11, 0x22 };
 
-       ByteBufferUtility.putToByteBuffer(buffer, input);
+       assertThrows(BufferOverflowException.class, () -> ByteBufferUtility.putToByteBuffer(buffer, input));
     }
     // </editor-fold>
 }

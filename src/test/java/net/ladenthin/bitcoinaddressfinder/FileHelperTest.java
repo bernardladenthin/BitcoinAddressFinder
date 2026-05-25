@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
@@ -104,7 +105,7 @@ public class FileHelperTest {
         File nonExistentFile = new File("/this/path/does/not/exist/file.txt");
 
         // act
-        fileHelper.assertFilesExists(Collections.singletonList(nonExistentFile));
+        assertThrows(IllegalArgumentException.class, () -> fileHelper.assertFilesExists(Collections.singletonList(nonExistentFile)));
     }
 
     @Test

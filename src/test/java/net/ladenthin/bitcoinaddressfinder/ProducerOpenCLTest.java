@@ -15,6 +15,7 @@ import org.bitcoinj.base.Network;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
@@ -242,8 +243,8 @@ public class ProducerOpenCLTest {
         ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
         
         // act
-        producerOpenCL.produceKeys();
-        
+        assertThrows(IllegalStateException.class, () -> producerOpenCL.produceKeys());
+
         // assert
     }
     

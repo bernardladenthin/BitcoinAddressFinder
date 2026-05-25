@@ -19,6 +19,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
 
 import static net.ladenthin.bitcoinaddressfinder.cli.Main.printAllStackTracesWithDelay;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
@@ -212,7 +213,7 @@ public class MainTest {
         Files.writeString(tempFile.toPath(), OPEN_CL_INFO_JSON_STRING, StandardCharsets.UTF_8);
 
         // act
-        Main.main(new String[]{tempFile.getAbsolutePath()});
+        assertThrows(IllegalArgumentException.class, () -> Main.main(new String[]{tempFile.getAbsolutePath()}));
     }
     // </editor-fold>
 }

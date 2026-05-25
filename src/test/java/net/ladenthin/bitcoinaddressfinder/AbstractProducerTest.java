@@ -18,6 +18,7 @@ import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.base.Network;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import org.mockito.ArgumentCaptor;
@@ -229,7 +230,7 @@ public class AbstractProducerTest {
         AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         // act
-        abstractProducerTestImpl.run();
+        assertThrows(IllegalStateException.class, () -> abstractProducerTestImpl.run());
     }
 
     @Test

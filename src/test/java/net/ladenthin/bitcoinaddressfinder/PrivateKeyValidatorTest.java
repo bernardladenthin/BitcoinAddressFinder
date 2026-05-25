@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.*;
 
 public class PrivateKeyValidatorTest {
@@ -56,13 +57,13 @@ public class PrivateKeyValidatorTest {
     @Test
     public void getMaxPrivateKeyForBatchSize_bitSizeNegative_throwsException() {
         // act
-        validator.getMaxPrivateKeyForBatchSize(-1);
+        assertThrows(IllegalArgumentException.class, () -> validator.getMaxPrivateKeyForBatchSize(-1));
     }
 
     @Test
     public void getMaxPrivateKeyForBatchSize_bitSizeTooLarge_throwsException() {
         // act
-        validator.getMaxPrivateKeyForBatchSize(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS + 1);
+        assertThrows(IllegalArgumentException.class, () -> validator.getMaxPrivateKeyForBatchSize(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS + 1));
     }
 
     @Test
@@ -71,7 +72,7 @@ public class PrivateKeyValidatorTest {
         int batchSizeInBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
 
         // act
-        validator.getMaxPrivateKeyForBatchSize(batchSizeInBits);
+        assertThrows(IllegalStateException.class, () -> validator.getMaxPrivateKeyForBatchSize(batchSizeInBits));
     }
     // </editor-fold>
 

@@ -7,6 +7,7 @@ import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableExce
 import java.time.Instant;
 import java.util.List;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.equalTo;
 import java.text.Normalizer;
 import java.text.Normalizer.Form;
@@ -163,7 +164,7 @@ public class BIP39KeyProducerTest {
         }
 
         // This call should overflow and throw NoMoreSecretsAvailableException
-        producer.nextKey();
+        assertThrows(NoMoreSecretsAvailableException.class, () -> producer.nextKey());
     }
     
     @Test

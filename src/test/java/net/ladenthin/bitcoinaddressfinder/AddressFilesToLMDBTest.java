@@ -18,6 +18,7 @@ import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.LegacyAddress;
 import org.junit.jupiter.api.BeforeEach;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
 import org.junit.jupiter.api.Test;
@@ -46,7 +47,7 @@ public class AddressFilesToLMDBTest extends LMDBBase {
         String lmdbFolderPath = lmdbFolder.getAbsolutePath();
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.lmdbDirectory = lmdbFolderPath;
         AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(addressFilesToLMDBConfigurationWrite);
-        addressFilesToLMDB.run();
+        assertThrows(IllegalArgumentException.class, () -> addressFilesToLMDB.run());
     }
 
     @ParameterizedTest

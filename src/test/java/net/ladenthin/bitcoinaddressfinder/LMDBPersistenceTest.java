@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.*;
 
@@ -189,7 +190,7 @@ public class LMDBPersistenceTest {
         assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(new ByteConversion().mibToBytes(0L))));
         
         // act, assert
-        fillWithRandomKeys(TOO_MUCH_KEYS_FOR_1MiB, lmdbPersistence);
+        assertThrows(org.lmdbjava.Env.MapFullException.class, () -> fillWithRandomKeys(TOO_MUCH_KEYS_FOR_1MiB, lmdbPersistence));
     }
 
     @Test

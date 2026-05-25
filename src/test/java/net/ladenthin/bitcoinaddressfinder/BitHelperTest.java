@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder;
 import java.io.IOException;
 import java.math.BigInteger;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import org.junit.jupiter.api.Test;
@@ -45,16 +46,16 @@ public class BitHelperTest {
         BitHelper bitHelper = new BitHelper();
 
         // act, assert
-        bitHelper.assertBatchSizeInBitsIsInRange(-1);
+        assertThrows(IllegalArgumentException.class, () -> bitHelper.assertBatchSizeInBitsIsInRange(-1));
     }
-    
+
     @Test
     public void assertBatchSizeInBitsCorrect_bitsGivenOverMaximum_exceptionThrown() throws IOException {
         // arrange
         BitHelper bitHelper = new BitHelper();
 
         // act, assert
-        bitHelper.assertBatchSizeInBitsIsInRange(PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY + 1);
+        assertThrows(IllegalArgumentException.class, () -> bitHelper.assertBatchSizeInBitsIsInRange(PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY + 1));
     }
     
     @ParameterizedTest
