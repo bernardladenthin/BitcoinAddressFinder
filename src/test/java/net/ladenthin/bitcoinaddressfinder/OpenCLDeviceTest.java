@@ -132,8 +132,7 @@ public class OpenCLDeviceTest {
             CL_DEVICE_PROFILE:                     FULL_PROFILE
             CL_DEVICE_VERSION:                     OpenCL 3.0 CUDA
             CL_DEVICE_EXTENSIONS:                  cl_khr_global_int32_base_atomics cl_khr_global_int32_extended_atomics cl_khr_local_int32_base_atomics cl_khr_local_int32_extended_atomics cl_khr_fp64 cl_khr_3d_image_writes cl_khr_byte_addressable_store cl_khr_icd cl_khr_gl_sharing cl_nv_compiler_options cl_nv_device_attribute_query cl_nv_pragma_unroll cl_nv_d3d10_sharing cl_khr_d3d10_sharing cl_nv_d3d11_sharing cl_nv_copy_opts cl_nv_create_buffer cl_khr_int64_base_atomics cl_khr_int64_extended_atomics cl_khr_device_uuid cl_khr_pci_bus_info cl_khr_external_semaphore cl_khr_external_memory cl_khr_external_semaphore_win32 cl_khr_external_memory_win32
-            CL_DEVICE_TYPE:                        CL_DEVICE_TYPE_GPU 
-            CL_DEVICE_ENDIAN_LITTLE:               true
+            CL_DEVICE_TYPE:                        CL_DEVICE_TYPE_GPU \n            CL_DEVICE_ENDIAN_LITTLE:               true
             CL_DEVICE_MAX_COMPUTE_UNITS:           40
             CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS:    3
             CL_DEVICE_MAX_WORK_ITEM_SIZES:         1024 / 1024 / 64
@@ -146,12 +145,10 @@ public class OpenCLDeviceTest {
             CL_DEVICE_LOCAL_MEM_TYPE:              CL_LOCAL
             CL_DEVICE_LOCAL_MEM_SIZE:              48 KByte
             CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE:    64 KByte
-            CL_DEVICE_QUEUE_PROPERTIES:            CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE CL_QUEUE_PROFILING_ENABLE 
-            CL_DEVICE_IMAGE_SUPPORT:               1
+            CL_DEVICE_QUEUE_PROPERTIES:            CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE CL_QUEUE_PROFILING_ENABLE \n            CL_DEVICE_IMAGE_SUPPORT:               1
             CL_DEVICE_MAX_READ_IMAGE_ARGS:         256
             CL_DEVICE_MAX_WRITE_IMAGE_ARGS:        32
-            CL_DEVICE_SINGLE_FP_CONFIG:            CL_FP_DENORM CL_FP_INF_NAN CL_FP_ROUND_TO_NEAREST CL_FP_ROUND_TO_ZERO CL_FP_ROUND_TO_INF CL_FP_FMA CL_FP_CORRECTLY_ROUNDED_DIVIDE_SQRT 
-            CL_DEVICE_IMAGE2D_MAX_WIDTH:           32768
+            CL_DEVICE_SINGLE_FP_CONFIG:            CL_FP_DENORM CL_FP_INF_NAN CL_FP_ROUND_TO_NEAREST CL_FP_ROUND_TO_ZERO CL_FP_ROUND_TO_INF CL_FP_FMA CL_FP_CORRECTLY_ROUNDED_DIVIDE_SQRT \n            CL_DEVICE_IMAGE2D_MAX_WIDTH:           32768
             CL_DEVICE_IMAGE2D_MAX_HEIGHT:          32768
             CL_DEVICE_IMAGE3D_MAX_WIDTH:           16384
             CL_DEVICE_IMAGE3D_MAX_HEIGHT:          16384
