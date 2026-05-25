@@ -422,34 +422,14 @@ public class CommonDataProvider {
 
     public static Stream<Arguments> srcPos() {
         Object[][] _data = new Object[][]{
-            {1},
-            {2},
-            {3},
-            {4},
-            {5},
-            {6},
-            {7},
-            {8},
-            {9},
-            {10},
-            {11},
-            {12},
-            {13},
-            {14},
-            {15},
-            {16},
-            {17},
-            {18},
-            {19},
-            {20},
+            {1},{2},{3},{4},{5},{6},{7},{8},{9},{10},
+            {11},{12},{13},{14},{15},{16},{17},{18},{19},{20},
         };
         return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
     
     /**
      * For {@link #bitcoinCashAddressesChecksumInvalid()}.
-     * TODO: I don't know if this is right. It seems like it's a base58 format.
-     * I've asked Blockchair and they've answered: "The addresses you listed are for internal purposes.".
      */
     public final static String DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_CHECKSUM_INVALID = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bitcoinCashAddressesChecksumInvalid";
 
@@ -471,8 +451,6 @@ public class CommonDataProvider {
     
     /**
      * For {@link #bitcoinCashAddressesInternalPurpose()}.
-     * TODO: I don't know if this is right. It seems like it's a hex format.
-     * I've asked Blockchair and they've answered: "The addresses you listed are for internal purposes.".
      */
     public final static String DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_INTERNAL_PURPOSE = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bitcoinCashAddressesInternalPurpose";
 
@@ -494,15 +472,11 @@ public class CommonDataProvider {
 
     public static Stream<Arguments> createSecretBaseLogged() {
         Object[][] _data = new Object[][]{
-            // small key, batchSizeInBits: 2
             {"ABCDEF", 2, "0000000000000000000000000000000000000000000000000000000000abcdec", "secretBase: 0000000000000000000000000000000000000000000000000000000000abcdec/2", "secret BigInteger: 11259375", "secret as byte array: 0000000000000000000000000000000000000000000000000000000000abcdef", "killBits: 03", "secretBase: 11259372", "secretBase as byte array: 0000000000000000000000000000000000000000000000000000000000abcdec"},
             {"FEDCBA", 2, "0000000000000000000000000000000000000000000000000000000000fedcb8", "secretBase: 0000000000000000000000000000000000000000000000000000000000fedcb8/2", "secret BigInteger: 16702650", "secret as byte array: 0000000000000000000000000000000000000000000000000000000000fedcba", "killBits: 03", "secretBase: 16702648", "secretBase as byte array: 0000000000000000000000000000000000000000000000000000000000fedcb8"},
-            // small key, batchSizeInBits: 21
             {"ABCDEF", 21, "0000000000000000000000000000000000000000000000000000000000a00000", "secretBase: 0000000000000000000000000000000000000000000000000000000000a00000/21", "secret BigInteger: 11259375", "secret as byte array: 0000000000000000000000000000000000000000000000000000000000abcdef", "killBits: 1fffff", "secretBase: 10485760", "secretBase as byte array: 0000000000000000000000000000000000000000000000000000000000a00000"},
             {"FEDCBA", 21, "0000000000000000000000000000000000000000000000000000000000e00000", "secretBase: 0000000000000000000000000000000000000000000000000000000000e00000/21", "secret BigInteger: 16702650", "secret as byte array: 0000000000000000000000000000000000000000000000000000000000fedcba", "killBits: 1fffff", "secretBase: 14680064", "secretBase as byte array: 0000000000000000000000000000000000000000000000000000000000e00000"},
-            // large key, batchSizeInBits: 21
             {"123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff", 21, "123456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000", "secretBase: 123456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000/21", "secret BigInteger: 8234104123542484900769178205574010627627573691361805720124810878238590820095", "secret as byte array: 123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff", "killBits: 1fffff", "secretBase: 8234104123542484900769178205574010627627573691361805720124810878238588928000", "secretBase as byte array: 123456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000"},
-            // large key with odd number, batchSizeInBits: 21
             {"00d456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff", 21, "00d456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000", "secretBase: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000/21", "secret BigInteger: 375168379408231402782670922269509069226925318059052594399906494889018056447", "secret as byte array: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff", "killBits: 1fffff", "secretBase: 375168379408231402782670922269509069226925318059052594399906494889016164352", "secretBase as byte array: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000"},
             {PublicKeyBytes.MAX_PRIVATE_KEY_HEX.toLowerCase(), 2, "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140", "secretBase: fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140/2", "secret BigInteger: 115792089237316195423570985008687907852837564279074904382605163141518161494337", "secret as byte array: fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", "killBits: 03", "secretBase: 115792089237316195423570985008687907852837564279074904382605163141518161494336", "secretBase as byte array: fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140"},
         };
@@ -573,9 +547,6 @@ public class CommonDataProvider {
     
     /**
      * Data provider for testing with Bloom filter enabled and disabled.
-     * <p>
-     * Supplies {@code true} (Bloom filter active) and {@code false} (Bloom filter inactive),
-     * to verify correctness and performance behavior in both configurations.
      */
     public final static String DATA_PROVIDER_BLOOM_FILTER_ENABLED = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bloomFilterEnabled";
 
@@ -594,27 +565,15 @@ public class CommonDataProvider {
 
     public static Stream<Arguments> largePrivateKeys() {
         Object[][] _data = new Object[][]{
-            // ⚠️ Important: Do not include keys that are near or equal to the maximum valid private key (e.g., MAX_PRIVATE_KEY + offset).
-            // Since we use grid-based key derivation (e.g., k + i), these values can overflow the valid secp256k1 range and cause failures.
-            // {PublicKeyBytes.MAX_PRIVATE_KEY},
-            //
-            // Custom crafted BigIntegers with MSB set (highest bit in first byte = 1)
-            // These will be encoded with a leading zero byte (i.e., total of 33 bytes)
             {new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8C00000000", 16)},
             {new BigInteger("F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0", 16)},
             {new BigInteger("F000000000000000000000000000000000000000000000000000000000000000", 16)},
-
-            // Additional examples that force 33-byte encoding due to high bit in first byte
             {new BigInteger("F000000000000000000000000000000000000000000000000000000000000000", 16)},
-            {new BigInteger("8000000000000000000000000000000000000000000000000000000000000000", 16)}, // Only MSB set
-            {new BigInteger("C000000000000000000000000000000000000000000000000000000000000000", 16)}, // First 2 bits set
-
-            // Variants with slight length differences, still 256-bit aligned or close
+            {new BigInteger("8000000000000000000000000000000000000000000000000000000000000000", 16)},
+            {new BigInteger("C000000000000000000000000000000000000000000000000000000000000000", 16)},
             {new BigInteger("F000000000000000000000000000000000000000000000000000000000000000", 16)},
             {new BigInteger( "F00000000000000000000000000000000000000000000000000000000000000", 16)},
             {new BigInteger(  "F0000000000000000000000000000000000000000000000000000000000000", 16)},
-            
-            //
             {new BigInteger("1000000000000000000000000000000000000000000000000000000000000000", 16)},
             {new BigInteger( "100000000000000000000000000000000000000000000000000000000000000", 16)},
             {new BigInteger(  "10000000000000000000000000000000000000000000000000000000000000", 16)},
@@ -672,13 +631,11 @@ public class CommonDataProvider {
             {new BigInteger(                                                      "1000000000", 16)},
             {new BigInteger(                                                       "100000000", 16)},
             {new BigInteger(                                                        "10000000", 16)},
-            
-            // Smallest values that still result in 33-byte encoding due to high bit
-            {new BigInteger("8000000000000000", 16)},     // 64-bit with MSB set
-            {new BigInteger("C000000000000000", 16)},     // 64-bit with top two bits set
-            {new BigInteger("FF00000000000000", 16)},     // 64-bit with top byte fully set
-            {new BigInteger("80000000000000000000000000000000", 16)}, // 128-bit with MSB set
-            {new BigInteger("FF000000000000000000000000000000", 16)}, // 128-bit, top byte set
+            {new BigInteger("8000000000000000", 16)},
+            {new BigInteger("C000000000000000", 16)},
+            {new BigInteger("FF00000000000000", 16)},
+            {new BigInteger("80000000000000000000000000000000", 16)},
+            {new BigInteger("FF000000000000000000000000000000", 16)},
         };
         return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
     }
@@ -703,8 +660,6 @@ public class CommonDataProvider {
 
     public static Stream<Arguments> privateKeys32ByteRequiringStrip() {
         Object[][] _data = new Object[][]{
-            // Custom crafted BigIntegers with MSB set (highest bit in first byte = 1)
-            // These will be encoded with a leading zero byte (i.e., total of 33 bytes)
             {new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8C00000000", 16)},
             {new BigInteger("F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0", 16)},
             {new BigInteger("F000000000000000000000000000000000000000000000000000000000000000", 16)},
@@ -719,15 +674,14 @@ public class CommonDataProvider {
     
     public static Stream<Arguments> bigIntegerVariants() {
         Object[][] _data = new Object[][] {
-            { new BigInteger("00", 16), 0, (byte) 0x00 }, // 0-value, empty result
+            { new BigInteger("00", 16), 0, (byte) 0x00 },
             { new BigInteger("01", 16), 1, (byte) 0x01 },
             { new BigInteger("7F", 16), 1, (byte) 0x7F },
-            { new BigInteger("FF", 16), 1, (byte) 0xFF }, // highest byte without sign extension
-            { new BigInteger(1, new byte[]{0x00, 0x01}), 1, (byte) 0x01 }, // explicit leading zero
-            { new BigInteger(1, new byte[]{0x00, (byte)0x80}), 1, (byte) 0x80 }, // zero removed, keep sign
-            { new BigInteger(1, new byte[]{(byte) 0x00, (byte) 0xFF}), 1, (byte) 0xFF }, // zero removed
+            { new BigInteger("FF", 16), 1, (byte) 0xFF },
+            { new BigInteger(1, new byte[]{0x00, 0x01}), 1, (byte) 0x01 },
+            { new BigInteger(1, new byte[]{0x00, (byte)0x80}), 1, (byte) 0x80 },
+            { new BigInteger(1, new byte[]{(byte) 0x00, (byte) 0xFF}), 1, (byte) 0xFF },
             { new BigInteger("FFFFFFFF", 16), 4, (byte) 0xFF },
-            // Max technically private key (leading 0x00 byte expected)
             { PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY, 32, (byte) 0xFF }
         };
         return java.util.Arrays.stream(_data).map(row -> Arguments.of(row));
