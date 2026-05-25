@@ -47,17 +47,13 @@ public class FinderTest {
     // <editor-fold defaultstate="collapsed" desc="interrupt">
     @Test
     public void interrupt_noProducersSet_noExceptionThrown() throws IOException {
-        // arrange
         CFinder cFinder = new CFinder();
         Finder finder = new Finder(cFinder);
-        // act
         finder.interrupt();
-        // assert
     }
     
     @Test
     public void interrupt_producersSetAndNotInitialized_noExceptionThrown() throws IOException {
-        // arrange
         CFinder cFinder = new CFinder();
         configureProducerWithExamples(cFinder);
         configureConsumerJava(cFinder);
@@ -65,45 +61,32 @@ public class FinderTest {
         finder.startKeyProducer();
         finder.startConsumer();
         finder.configureProducer();
-        // act
         finder.interrupt();
-        // assert
     }
     
     @Test
     public void interrupt_consumerStarted_consumerNotStopped() throws IOException {
-        // arrange
         CFinder cFinder = new CFinder();
         configureProducerWithExamples(cFinder);
-        
-        // consumer java configuration
         configureConsumerJava(cFinder);
-        
         Finder finder = new Finder(cFinder);
         finder.startConsumer();
-        // act
         finder.interrupt();
-        // assert
     }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="shutdownAndAwaitTermination">
     @Test
     public void shutdownAndAwaitTermination_noProducersSet_shutdownCalled() throws IOException {
-        // arrange
         CFinder cFinder = new CFinder();
         Finder finder = new Finder(cFinder);
-        // pre-assert
         assertThat(finder.producerExecutorService.isTerminated(), is(equalTo(Boolean.FALSE)));
-        // act
         finder.shutdownAndAwaitTermination();
-        // assert
         assertThat(finder.producerExecutorService.isTerminated(), is(equalTo(Boolean.TRUE)));
     }
     
     @Test
     public void shutdownAndAwaitTermination_producersSetAndNotInitialized_shutdownCalled() throws IOException {
-        // arrange
         CFinder cFinder = new CFinder();
         configureProducerWithExamples(cFinder);
         configureConsumerJava(cFinder);
@@ -111,22 +94,16 @@ public class FinderTest {
         finder.startKeyProducer();
         finder.startConsumer();
         finder.configureProducer();
-        // act
         finder.shutdownAndAwaitTermination();
-        // assert
         assertThat(finder.producerExecutorService.isTerminated(), is(equalTo(Boolean.TRUE)));
     }
     
     @AwaitTimeTest
     @Test
     public void shutdownAndAwaitTermination_producersSetAndInitialized_shutdownCalledAndAwaitTermination() throws IOException {
-        // Change await duration
         Finder.AWAIT_DURATION_TERMINATE = AwaitTimeTests.AWAIT_DURATION;
-        
-        // Attention: During the long duration, this test produce a lot of debug and warn output, prevent it by set the log details
         new LogLevelChange().turnOff();
         
-        // arrange
         CFinder cFinder = new CFinder();
         String keyProducerId = "exampleId";
         final CProducerJava cProducerJava = new CProducerJava();
@@ -143,15 +120,12 @@ public class FinderTest {
         finder.initProducer();
         finder.startProducer();
 
-        // act
         long beforeAct = System.currentTimeMillis();
         finder.shutdownAndAwaitTermination();
         
-        // assert
         long afterAct = System.currentTimeMillis();
         Duration waitTime = Duration.ofMillis(afterAct-beforeAct);
         
-        // assert the waiting time is over, substract imprecision
         assertThat(waitTime, is(greaterThan(Finder.AWAIT_DURATION_TERMINATE.minus(AwaitTimeTests.IMPRECISION))));
     }
     // </editor-fold>
@@ -159,18 +133,14 @@ public class FinderTest {
     // <editor-fold defaultstate="collapsed" desc="getAllProducers">
     @Test
     public void getAllProducers_noProducersSet_returnEmptyList() throws IOException {
-        // arrange
         CFinder cFinder = new CFinder();
         Finder finder = new Finder(cFinder);
-        // act
         List<Producer> allProducers = finder.getAllProducers();
-        // assert
         assertThat(allProducers, is(empty()));
     }
     
     @Test
     public void getAllProducers_producersSetAndNotInitialized_returnList() throws IOException {
-        // arrange
         CFinder cFinder = new CFinder();
         configureProducerWithExamples(cFinder);
         configureConsumerJava(cFinder);
@@ -178,9 +148,7 @@ public class FinderTest {
         finder.startKeyProducer();
         finder.startConsumer();
         finder.configureProducer();
-        // act
         List<Producer> allProducers = finder.getAllProducers();
-        // assert
         assertThat(allProducers, hasSize(3));
     }
     // </editor-fold>
@@ -189,13 +157,10 @@ public class FinderTest {
     @Test
     public void startKeyProducer_keyProducerIdIsNull_ExceptionThrown() throws IOException, InterruptedException {
         org.junit.jupiter.api.Assertions.assertThrows(KeyProducerIdNullException.class, () -> {
-            // arrange
             CFinder cFinder = new CFinder();
             configureKeyProducerJavaRandom(null, cFinder);
-            
             configureConsumerJava(cFinder);
             Finder finder = new Finder(cFinder);
-            // act
             finder.startKeyProducer();
         });
     }
@@ -203,15 +168,12 @@ public class FinderTest {
     @Test
     public void startKeyProducer_keyProducerIdIsNotUnique_ExceptionThrown() throws IOException, InterruptedException {
         org.junit.jupiter.api.Assertions.assertThrows(KeyProducerIdIsNotUniqueException.class, () -> {
-            // arrange
             CFinder cFinder = new CFinder();
             String sameIdTwice = "123";
             configureKeyProducerJavaRandom(sameIdTwice, cFinder);
             configureKeyProducerJavaRandom(sameIdTwice, cFinder);
-            
             configureConsumerJava(cFinder);
             Finder finder = new Finder(cFinder);
-            // act
             finder.startKeyProducer();
         });
     }
@@ -221,11 +183,9 @@ public class FinderTest {
     @Test
     public void configureProducer_keyProducerIdIsUnknown_ExceptionThrown() throws IOException, InterruptedException {
         org.junit.jupiter.api.Assertions.assertThrows(KeyProducerIdUnknownException.class, () -> {
-            // arrange
             CFinder cFinder = new CFinder();
             final CProducerJava cProducerJava = new CProducerJava();
             cProducerJava.runOnce = false;
-            // null is not valid or will find any other id
             cProducerJava.keyProducerId = null;
             cFinder.producerJava.add(cProducerJava);
             configureKeyProducerJavaRandom("unknownId", cFinder);
@@ -235,8 +195,6 @@ public class FinderTest {
     
             finder.startConsumer();
             finder.startKeyProducer();
-            
-            // act
             finder.configureProducer();
         });
     }
@@ -246,7 +204,6 @@ public class FinderTest {
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_KEY_PRODUCER_TYPES)
     public void testFullCycle_keyProducerJavaSetAndInitialized_statesCorrect(CommonDataProvider.KeyProducerTypesLocal keyProducerType) throws IOException, InterruptedException {
-        // arrange
         CFinder cFinder = new CFinder();
         String keyProducerId = "exampleId";
         final CProducerJava cProducerJava = new CProducerJava();
@@ -285,73 +242,48 @@ public class FinderTest {
         
         configureConsumerJava(cFinder);
         Finder finder = new Finder(cFinder);
-        // act and assert the full cycle
         {
-            // pre-assert
             assertThat(finder.getKeyProducers().keySet(), hasSize(0));
-            // act
             finder.startKeyProducer();
-            // assert
             assertThat(finder.getKeyProducers().keySet(), hasSize(1));
         }
-        // assert logger is correctly bound to the concrete class
         {
             KeyProducer keyProducer = Objects.requireNonNull(finder.getKeyProducers().get(keyProducerId));
             Logger logger = keyProducer.getLogger();
-
-            // Verify logger name matches the fully qualified class name
             assertThat(logger.getName(), is(keyProducerClass.getCanonicalName()));
         }
         {
-            // pre-assert
             assertThat(finder.getAllConsumers(), hasSize(0));
-            // act
             finder.startConsumer();
-            // assert
             assertThat(finder.getAllConsumers(), hasSize(1));
         }
         
         {
-            // pre-assert
             assertThat(finder.getAllProducers(), hasSize(0));
-            // act
             finder.configureProducer();
-            // assert
             assertThat(finder.getAllProducers(), hasSize(1));
             assertProducerState(finder.getAllProducers(), ProducerState.UNINITIALIZED);
         }
         
         {
-            // act
             finder.initProducer();
-            // assert
             assertProducerState(finder.getAllProducers(), ProducerState.INITIALIZED);
         }
-        // catch the reference, it is not possible to get the reference afterwards the interrupt
         final List<Producer> allProducers = finder.getAllProducers();
         {
-            // act
             finder.startProducer();
-            // wait
             Thread.sleep(Duration.ofSeconds(1L));
-        
-            // assert
             assertProducerState(allProducers, ProducerState.RUNNING);
         }
         {
-            // act
             finder.interrupt();
-            // assert
             assertThat(finder.getAllProducers(), hasSize(0));
             assertProducerState(allProducers, ProducerState.NOT_RUNNING);
         }
         
         {
-            // pre-assert
             assertThat(finder.getAllConsumers(), hasSize(1));
-            // act
             finder.shutdownAndAwaitTermination();
-            // assert
             assertThat(finder.getAllConsumers(), hasSize(0));
         }
     }
@@ -359,55 +291,43 @@ public class FinderTest {
     
     @Test
     public void startKeyProducer_allConfiguredKeyProducerTypes_haveInstances() throws IOException {
-        // Arrange
         CFinder cFinder = new CFinder();
 
-        // Configure one instance for each KeyProducer type
-        // 1. JavaRandom
         CKeyProducerJavaRandom javaRandom = new CKeyProducerJavaRandom();
         javaRandom.keyProducerId = "randomId";
         javaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
         javaRandom.customSeed = 123L;
         cFinder.keyProducerJavaRandom.add(javaRandom);
 
-        // 2. JavaBip39
         CKeyProducerJavaBip39 bip39 = new CKeyProducerJavaBip39();
         bip39.keyProducerId = "bip39Id";
         bip39.mnemonic = CKeyProducerJavaBip39.DEFAULT_MNEMONIC;
         cFinder.keyProducerJavaBip39.add(bip39);
 
-        // 3. JavaIncremental
         CKeyProducerJavaIncremental incremental = new CKeyProducerJavaIncremental();
         incremental.keyProducerId = "incrementalId";
         cFinder.keyProducerJavaIncremental.add(incremental);
 
-        // 4. JavaSocket
         CKeyProducerJavaSocket socket = new CKeyProducerJavaSocket();
         socket.keyProducerId = "socketId";
         socket.port = KeyProducerJavaSocketTest.findFreePort();
         cFinder.keyProducerJavaSocket.add(socket);
 
-        // 5. JavaWebSocket
         CKeyProducerJavaWebSocket webSocket = new CKeyProducerJavaWebSocket();
         webSocket.keyProducerId = "webSocketId";
         webSocket.port = KeyProducerJavaSocketTest.findFreePort();
         cFinder.keyProducerJavaWebSocket.add(webSocket);
 
-        // 6. JavaZmq
         CKeyProducerJavaZmq zmq = new CKeyProducerJavaZmq();
         zmq.keyProducerId = "zmqId";
         zmq.address = KeyProducerJavaZmqTest.findFreeZmqAddress();
         cFinder.keyProducerJavaZmq.add(zmq);
 
         Finder finder = new Finder(cFinder);
-
-        // Act
         finder.startKeyProducer();
 
-        // Assert
         assertThat(finder.getKeyProducers().keySet(), hasItems("randomId", "bip39Id", "incrementalId", "socketId", "webSocketId", "zmqId"));
 
-        // Additionally assert each instance is of expected class type
         assertThat(finder.getKeyProducers().get("randomId"), instanceOf(KeyProducerJavaRandom.class));
         assertThat(finder.getKeyProducers().get("bip39Id"), instanceOf(KeyProducerJavaBip39.class));
         assertThat(finder.getKeyProducers().get("incrementalId"), instanceOf(KeyProducerJavaIncremental.class));
@@ -415,10 +335,7 @@ public class FinderTest {
         assertThat(finder.getKeyProducers().get("webSocketId"), instanceOf(KeyProducerJavaWebSocket.class));
         assertThat(finder.getKeyProducers().get("zmqId"), instanceOf(KeyProducerJavaZmq.class));
         
-        // Interrupt and free producers
         finder.interrupt();
-
-        // Assert keyProducers map is empty after interrupt
         assertThat(finder.getKeyProducers().keySet(), is(empty()));
     }
     
