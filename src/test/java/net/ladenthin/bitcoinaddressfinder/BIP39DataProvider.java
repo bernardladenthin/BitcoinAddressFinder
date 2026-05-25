@@ -11,10 +11,13 @@ import java.util.Map;
 
 public class BIP39DataProvider {
 
+    /** Must remain a string literal — annotation values require compile-time constants. */
+    private static final String CLASS_NAME = "net.ladenthin.bitcoinaddressfinder.BIP39DataProvider";
+
     /**
      * For {@link net.ladenthin.bitcoinaddressfinder.BIP39KeyProducerTest}.
      */
-    public final static String DATA_PROVIDER_BIP39_TEST_VECTORS = "net.ladenthin.bitcoinaddressfinder.BIP39DataProvider#bip39TestVectors";
+    public final static String DATA_PROVIDER_BIP39_TEST_VECTORS = CLASS_NAME + "#bip39TestVectors";
     
     public final static String FILENAME = "vectors.json";
     public final static String PASSPHRASE = "TREZOR";
