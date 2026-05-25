@@ -19,7 +19,7 @@ public class BIP39WordlistTest {
     @Test
     public void ideographicSpace_constant_hasCorrectUnicodeValue() {
         // arrange
-        String expected = "\u3000";
+        String expected = "　";
 
         // act
         String actual = BIP39Wordlist.IDEOGRAPHIC_SPACE;
