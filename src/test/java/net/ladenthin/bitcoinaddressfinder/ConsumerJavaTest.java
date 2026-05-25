@@ -233,6 +233,7 @@ public class ConsumerJavaTest {
         // assert
         Persistence persistence = Objects.requireNonNull(consumerJava.persistence);
         assertThat(persistence.isClosed(), is(equalTo(Boolean.FALSE)));
+        consumerJava.interrupt();
     }
     
     @Test
@@ -315,6 +316,7 @@ public class ConsumerJavaTest {
         
         String hitMessageFull = ConsumerJava.HIT_PREFIX + keyUtility.createKeyDetails(key);
         assertThat(arguments.get(5), is(equalTo(hitMessageFull)));
+        consumerJava.interrupt();
     }
 
     @ParameterizedTest
@@ -377,6 +379,7 @@ public class ConsumerJavaTest {
         // assert for expected miss messages
         assertThat(argumentsTrace.get(7), is(equalTo(missMessageUncompressed)));
         assertThat(argumentsTrace.get(8), is(equalTo(missMessageCompressed)));
+        consumerJava.interrupt();
     }
 
     @Test
@@ -400,8 +403,9 @@ public class ConsumerJavaTest {
         PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[]{invalidPublicKeyBytes};
         consumerJava.consumeKeys(publicKeyBytesArray);
         consumerJava.consumeKeys(createHash160ByteBuffer());
+        consumerJava.interrupt();
     }
-    
+
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_COMPRESSED)
     public void consumeKeys_withRuntimeKeyCalculationEnabled_logsError_whenPublicKeyHashIsInvalid(boolean compressed) throws IOException, InterruptedException, DecoderException, MnemonicException.MnemonicLengthException {
@@ -454,8 +458,9 @@ public class ConsumerJavaTest {
             assertThat(arguments.get(4), is(equalTo("hash160Uncompressed: 1a69285cb42032d77801a15a30357d510b247100")));
             assertThat(arguments.get(5), is(equalTo("hash160UncompressedFromEcKey: e02e1cae178d3a2f84a5d897ee8b7ed6c0e2bbc4")));
         }
+        consumerJava.interrupt();
     }
-    
+
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_COMPRESSED)
     public void consumeKeys_testVanityPattern_patternMatches(boolean compressed) throws IOException, InterruptedException, DecoderException, MnemonicException.MnemonicLengthException {
@@ -546,6 +551,7 @@ public class ConsumerJavaTest {
         
         String expectedMessage = "vanity pattern match: privateKeyBigInteger: [73] privateKeyBytes: ["+privateKeyBytes+"] privateKeyHex: ["+privateKeyHex+"] WiF: [" + wif +"] publicKeyAsHex: ["+publicKeyAsHex+"] publicKeyHash160Hex: ["+publicKeyHash160Hex+"] publicKeyHash160Base58: ["+publicKeyHash160Base58+"] Compressed: ["+compressed+"] "+ mnemonics;
         assertThat(arguments.get(5), is(equalTo(expectedMessage)));
+        consumerJava.interrupt();
     }
 
 
@@ -563,13 +569,18 @@ public class ConsumerJavaTest {
         consumerJava.initLMDB();
 
         // Mock the persistence to throw an exception on close
+        Persistence realPersistence = Objects.requireNonNull(consumerJava.persistence);
         Persistence mockPersistence = mock(Persistence.class);
         when(mockPersistence.isClosed()).thenReturn(false);
         doThrow(new RuntimeException("Simulated close failure")).when(mockPersistence).close();
         consumerJava.persistence = mockPersistence;
 
         // act - should throw RuntimeException
-        assertThrows(RuntimeException.class, () -> consumerJava.interrupt());
+        try {
+            assertThrows(RuntimeException.class, () -> consumerJava.interrupt());
+        } finally {
+            realPersistence.close();
+        }
     }
 
     private ByteBuffer createHash160ByteBuffer() {

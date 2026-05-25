@@ -70,9 +70,10 @@ public class FinderTest {
         finder.configureProducer();
         // act
         finder.interrupt();
+        finder.shutdownAndAwaitTermination();
         // assert
     }
-    
+
     @Test
     public void interrupt_consumerStarted_consumerNotStopped() throws IOException {
         // arrange
@@ -86,6 +87,7 @@ public class FinderTest {
         finder.startConsumer();
         // act
         finder.interrupt();
+        finder.shutdownAndAwaitTermination();
         // assert
     }
     // </editor-fold>
@@ -185,6 +187,8 @@ public class FinderTest {
         List<Producer> allProducers = finder.getAllProducers();
         // assert
         assertThat(allProducers, hasSize(3));
+        finder.interrupt();
+        finder.shutdownAndAwaitTermination();
     }
     // </editor-fold>
     
@@ -236,6 +240,7 @@ public class FinderTest {
 
         // act
         assertThrows(KeyProducerIdUnknownException.class, () -> finder.configureProducer());
+        finder.shutdownAndAwaitTermination();
     }
     // </editor-fold>
     
