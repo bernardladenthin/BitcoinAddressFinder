@@ -20,56 +20,44 @@ public class MockKeyProducerTest {
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
-    /**
-     * This random is fine to produce with lower private key bits: 1; 0; 1; 0
-     */
     private final Random random = new Random(1);
     
     // <editor-fold defaultstate="collapsed" desc="createSecrets ReturnStartSecretOnlyIsTrue">
     @Test
     public void createSecrets_maximumBitLengthIs1BatchSizeIs0ReturnStartSecretOnlyIsTrue_returnMinPrivateKey() throws IOException, NoMoreSecretsAvailableException {
-        // arrange
         int maximumBitLength = 1;
         int batchSizeInBits = 0;
         int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         
-        // act
         BigInteger[] createSecrets = mockKeyProducer.createSecrets(overallWorkSize, true);
         
-        // assert
         assertThat(createSecrets.length, is(equalTo(1)));
         assertThat(createSecrets[0], is(equalTo(PublicKeyBytes.MIN_PRIVATE_KEY)));
     }
     
     @Test
     public void createSecrets_maximumBitLengthIs1BatchSizeIs1ReturnStartSecretOnlyIsTrue_returnMinPrivateKey() throws IOException, NoMoreSecretsAvailableException {
-        // arrange
         int maximumBitLength = 1;
         int batchSizeInBits = 1;
         int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         
-        // act
         BigInteger[] createSecrets = mockKeyProducer.createSecrets(overallWorkSize, true);
         
-        // assert
         assertThat(createSecrets.length, is(equalTo(1)));
         assertThat(createSecrets[0], is(equalTo(PublicKeyBytes.MIN_PRIVATE_KEY)));
     }
     
     @Test
     public void createSecrets_maximumBitLengthIs1BatchSizeIs2ReturnStartSecretOnlyIsTrue_returnMinPrivateKey() throws IOException, NoMoreSecretsAvailableException {
-        // arrange
         int maximumBitLength = 1;
         int batchSizeInBits = 2;
         int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         
-        // act
         BigInteger[] createSecrets = mockKeyProducer.createSecrets(overallWorkSize, true);
         
-        // assert
         assertThat(createSecrets.length, is(equalTo(1)));
         assertThat(createSecrets[0], is(equalTo(PublicKeyBytes.MIN_PRIVATE_KEY)));
     }
@@ -78,32 +66,26 @@ public class MockKeyProducerTest {
     // <editor-fold defaultstate="collapsed" desc="createSecrets ReturnStartSecretOnlyIsFalse">
     @Test
     public void createSecrets_maximumBitLengthIs1BatchSizeIs0ReturnStartSecretOnlyIsFalse_returnMinPrivateKey() throws IOException, NoMoreSecretsAvailableException {
-        // arrange
         int maximumBitLength = 1;
         int batchSizeInBits = 0;
         int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         
-        // act
         BigInteger[] createSecrets = mockKeyProducer.createSecrets(overallWorkSize, false);
         
-        // assert
         assertThat(createSecrets.length, is(equalTo(overallWorkSize)));
         assertThat(createSecrets[0], is(equalTo(PublicKeyBytes.MIN_PRIVATE_KEY)));
     }
     
     @Test
     public void createSecrets_maximumBitLengthIs1BatchSizeIs1ReturnStartSecretOnlyIsFalse_returnMinPrivateKey() throws IOException, NoMoreSecretsAvailableException {
-        // arrange
         int maximumBitLength = 1;
         int batchSizeInBits = 1;
         int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         
-        // act
         BigInteger[] createSecrets = mockKeyProducer.createSecrets(overallWorkSize, false);
         
-        // assert
         assertThat(createSecrets.length, is(equalTo(overallWorkSize)));
         assertThat(createSecrets[0], is(equalTo(BigInteger.ONE)));
         assertThat(createSecrets[1], is(equalTo(BigInteger.ZERO)));
@@ -111,16 +93,13 @@ public class MockKeyProducerTest {
     
     @Test
     public void createSecrets_maximumBitLengthIs1BatchSizeIs2ReturnStartSecretOnlyIsFalse_returnMinPrivateKey() throws IOException, NoMoreSecretsAvailableException {
-        // arrange
         int maximumBitLength = 1;
         int batchSizeInBits = 2;
         int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         
-        // act
         BigInteger[] createSecrets = mockKeyProducer.createSecrets(overallWorkSize, false);
         
-        // assert
         assertThat(createSecrets.length, is(equalTo(overallWorkSize)));
         assertThat(createSecrets[0], is(equalTo(BigInteger.ONE)));
         assertThat(createSecrets[1], is(equalTo(BigInteger.ZERO)));
@@ -133,30 +112,24 @@ public class MockKeyProducerTest {
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX)
     public void createSecrets_parameterBatchSizeInBitsFromDataProviderAndReturnStartSecretOnlyTrue_returnExpectedSecrets(int maximumBitLength) throws NoMoreSecretsAvailableException {
-        // arrange
         int batchSizeInBits = 2;
         int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         
-        // act
         BigInteger[] createSecrets = mockKeyProducer.createSecrets(overallWorkSize, true);
         
-        // assert
         assertThat(createSecrets.length, is(equalTo(1)));
     }
     
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX)
     public void createSecrets_parameterBatchSizeInBitsFromDataProviderAndReturnStartSecretOnlyFalse_returnExpectedSecrets(int maximumBitLength) throws NoMoreSecretsAvailableException {
-        // arrange
         int batchSizeInBits = 2;
         int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         
-        // act
         BigInteger[] createSecrets = mockKeyProducer.createSecrets(overallWorkSize, false);
         
-        // assert
         assertThat(createSecrets.length, is(equalTo(overallWorkSize)));
     }
     // </editor-fold>

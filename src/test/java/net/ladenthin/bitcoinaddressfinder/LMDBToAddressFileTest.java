@@ -32,18 +32,13 @@ public class LMDBToAddressFileTest extends LMDBBase {
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT)
     public void writeAllAmountsToAddressFileAsDynamicWidthBase58BitcoinAddressWithAmount(boolean compressed, boolean useStaticAmount) throws Exception {
-        // arrange
         AtomicBoolean shouldRun = new AtomicBoolean(true);
         TestAddressesFiles testAddressesFiles = new TestAddressesFiles(compressed);
         try (Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false, false)) {
-            // act
             File file = Files.createTempFile(folder, "", "").toFile();
             persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.DynamicWidthBase58BitcoinAddressWithAmount, shouldRun);
 
-            // assert
             List<String> contents = FileUtils.readLines(file, StandardCharsets.UTF_8);
-
-            // set/sort the result because the list might not have the same order for different test executions
             Set<String> contentsAsSet = new HashSet<>(contents);
 
             final Set<String> expected;
@@ -58,26 +53,19 @@ public class LMDBToAddressFileTest extends LMDBBase {
             }
 
             assertThat(contentsAsSet, is(equalTo(expected)));
-            
         }
     }
     
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT)
     public void writeAllAmountsToAddressFileAsFixedWidthBase58BitcoinAddress(boolean compressed, boolean useStaticAmount) throws Exception {
-        // arrange
         AtomicBoolean shouldRun = new AtomicBoolean(true);
         TestAddressesFiles testAddressesFiles = new TestAddressesFiles(compressed);
         try (Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false, false)) {
-
-            // act
             File file = Files.createTempFile(folder, "", "").toFile();
             persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.FixedWidthBase58BitcoinAddress, shouldRun);
 
-            // assert
             List<String> contents = FileUtils.readLines(file, StandardCharsets.UTF_8);
-
-            // set/sort the result because the list might not have the same order for different test executions
             Set<String> contentsAsSet = new HashSet<>(contents);
 
             final Set<String> expected;
@@ -98,18 +86,13 @@ public class LMDBToAddressFileTest extends LMDBBase {
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT)
     public void writeAllAmountsToAddressFileAsHexHash(boolean compressed, boolean useStaticAmount) throws Exception {
-        // arrange
         AtomicBoolean shouldRun = new AtomicBoolean(true);
         TestAddressesFiles testAddressesFiles = new TestAddressesFiles(compressed);
         try (Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false, false)) {
-            // act
             File file = Files.createTempFile(folder, "", "").toFile();
             persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.HexHash, shouldRun);
 
-            // assert
             List<String> contents = FileUtils.readLines(file, StandardCharsets.UTF_8);
-
-            // set/sort the result because the list might not have the same order for different test executions
             Set<String> contentsAsSet = new HashSet<>(contents);
 
             final Set<String> expected;

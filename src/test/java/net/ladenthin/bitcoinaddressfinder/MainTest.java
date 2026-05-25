@@ -51,9 +51,7 @@ public class MainTest {
     private final Path config_OpenCLInfo_yml = testOpenCLInfoDirectory.resolve("config_OpenCLInfo.yml");
     private final Path config_OpenCLInfo_js = testOpenCLInfoDirectory.resolve("config_OpenCLInfo.js");
 
-    /** Minimal JSON string representing an OpenCLInfo configuration for unit tests. */
     private static final String OPEN_CL_INFO_JSON_STRING = "{\"command\":\"OpenCLInfo\"}";
-    /** Minimal YAML string representing an OpenCLInfo configuration for unit tests. */
     private static final String OPEN_CL_INFO_YAML_STRING = "command: OpenCLInfo\n";
 
     private static final long DEFAULT_INTERRUPT_DELAY_SECONDS = 10;
@@ -68,7 +66,6 @@ public class MainTest {
     // <editor-fold defaultstate="collapsed" desc="testRoundtrip">
     @Test
     public void testRoundtrip_configurationsGiven_lmdbCreatedExportedAndRunFindSecretsFile() throws IOException, InterruptedException {
-        // arrange, act, assert
         Main.main(new String[]{config_AddressFilesToLMDB_json.toAbsolutePath().toString()});
         Main.main(new String[]{config_LMDBToAddressFile_json.toAbsolutePath().toString()});
         Main.main(new String[]{config_Find_SecretsFile_json.toAbsolutePath().toString()});
@@ -80,7 +77,6 @@ public class MainTest {
     @OpenCLTest
     public void testRoundtripOpenCLProducer_configurationsGiven_lmdbCreatedAndRunFindOpenCLDevice() throws IOException, InterruptedException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
-        // arrange
         Main mainAddressFilesToLMDB = new Main(Main.fromJson(Main.readString(config_AddressFilesToLMDB_json)));
         mainAddressFilesToLMDB.logConfigurationTransformation();
         mainAddressFilesToLMDB.run();
@@ -88,11 +84,7 @@ public class MainTest {
         new LogLevelChange().setLevel(Level.DEBUG);
         
         Main mainFind_1OpenCLDevice = new Main(Main.fromJson(Main.readString(config_Find_1OpenCLDevice_json)));
-        
-        // interrupt the act after 10 seconds
         interruptAfterDelay(mainFind_1OpenCLDevice, DEFAULT_INTERRUPT_DELAY_SECONDS);
-        
-        // act
         mainFind_1OpenCLDevice.logConfigurationTransformation();
         mainFind_1OpenCLDevice.run();
     }
@@ -103,7 +95,6 @@ public class MainTest {
     @OpenCLTest
     public void testOpenCLInfo_configurationGiven_noExceptionThrown() throws IOException, InterruptedException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
-        // arrange
         Main mainFind_SecretsFile = new Main(Main.fromJson(Main.readString(config_OpenCLInfo_json)));
         mainFind_SecretsFile.logConfigurationTransformation();
         mainFind_SecretsFile.run();
@@ -113,15 +104,12 @@ public class MainTest {
     // <editor-fold defaultstate="collapsed" desc="invalidArgument">
     @Test
     public void main_noArgumentGiven_errorLogged() throws IOException, InterruptedException {
-        // arrange
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
         Main.logger = logger;
         
-        // act
         Main.main(new String[0]);
         
-        // assert
         ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
         verify(logger, times(1)).error(logCaptor.capture());
         List<String> arguments = logCaptor.getAllValues();
@@ -132,13 +120,11 @@ public class MainTest {
     // <editor-fold defaultstate="collapsed" desc="printAllStackTracesWithDelay">
     @Test
     public void printAllStackTracesWithDelay_includeDaemonsTrue_noExceptionThrown() {
-        // act
         printAllStackTracesWithDelay(0, true);
     }
 
     @Test
     public void printAllStackTracesWithDelay_includeDaemonsFalse_noExceptionThrown() {
-        // act
         printAllStackTracesWithDelay(0, false);
     }
     // </editor-fold>
@@ -146,13 +132,8 @@ public class MainTest {
     // <editor-fold defaultstate="collapsed" desc="fromJson">
     @Test
     public void fromJson_validJsonString_returnsExpectedConfiguration() {
-        // act
         CConfiguration configuration = Main.fromJson(OPEN_CL_INFO_JSON_STRING);
-
-        // pre-assert
         assertThat(configuration, is(notNullValue()));
-
-        // assert
         assertThat(configuration.command, is(equalTo(CCommand.OpenCLInfo)));
     }
     // </editor-fold>
@@ -160,13 +141,8 @@ public class MainTest {
     // <editor-fold defaultstate="collapsed" desc="fromYaml">
     @Test
     public void fromYaml_validYamlString_returnsExpectedConfiguration() {
-        // act
         CConfiguration configuration = Main.fromYaml(OPEN_CL_INFO_YAML_STRING);
-
-        // pre-assert
         assertThat(configuration, is(notNullValue()));
-
-        // assert
         assertThat(configuration.command, is(equalTo(CCommand.OpenCLInfo)));
     }
     // </editor-fold>
@@ -176,7 +152,6 @@ public class MainTest {
     @OpenCLTest
     public void main_jsonExtensionPath_parsesAndRunsConfiguration() {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
-        // act
         Main.main(new String[]{config_OpenCLInfo_json.toAbsolutePath().toString()});
     }
 
@@ -184,7 +159,6 @@ public class MainTest {
     @OpenCLTest
     public void main_jsExtensionPath_parsesAndRunsConfiguration() {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
-        // act
         Main.main(new String[]{config_OpenCLInfo_js.toAbsolutePath().toString()});
     }
 
@@ -192,7 +166,6 @@ public class MainTest {
     @OpenCLTest
     public void main_yamlExtensionPath_parsesAndRunsConfiguration() {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
-        // act
         Main.main(new String[]{config_OpenCLInfo_yaml.toAbsolutePath().toString()});
     }
 
@@ -200,18 +173,14 @@ public class MainTest {
     @OpenCLTest
     public void main_ymlExtensionPath_parsesAndRunsConfiguration() {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
-        // act
         Main.main(new String[]{config_OpenCLInfo_yml.toAbsolutePath().toString()});
     }
 
     @Test
     public void main_unknownExtensionPath_throwsIllegalArgumentException() throws IOException {
         org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
-            // arrange
             File tempFile = java.nio.file.Files.createFile(folder.resolve("config.txt")).toFile();
             Files.writeString(tempFile.toPath(), OPEN_CL_INFO_JSON_STRING, StandardCharsets.UTF_8);
-    
-            // act
             Main.main(new String[]{tempFile.getAbsolutePath()});
         });
     }

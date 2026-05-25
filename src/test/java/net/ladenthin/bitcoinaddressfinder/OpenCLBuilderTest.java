@@ -21,14 +21,11 @@ public class OpenCLBuilderTest {
     @OpenCLTest
     public void build_openCLDeviceExisting_platformsAndDevicesReturned() throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadable();
-        // arrange
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         OpenCLBuilder openCLBuilder = new OpenCLBuilder();
         
-        // act
         List<OpenCLPlatform> openCLPlatforms = openCLBuilder.build();
         
-        // assert
         assertThat(openCLPlatforms.size(),is(greaterThan(Integer.valueOf(0))));
         assertThat(openCLPlatforms.getFirst().openCLDevices().size(),is(greaterThan(Integer.valueOf(0))));
         System.out.println(openCLPlatforms);

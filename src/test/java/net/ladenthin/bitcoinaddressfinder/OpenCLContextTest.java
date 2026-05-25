@@ -18,26 +18,16 @@ public class OpenCLContextTest {
     // <editor-fold defaultstate="collapsed" desc="constructor">
     @Test
     public void constructor_defaultConstructor_noExceptionThrown() {
-        // arrange
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
-
-        // act
         OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
-
-        // assert
         assertThat(openCLContext, is(notNullValue()));
     }
 
     @Test
     public void constructor_mockLoggerGiven_noExceptionThrown() {
-        // arrange
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         Logger mockLogger = mock(Logger.class);
-
-        // act
         OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper, mockLogger);
-
-        // assert
         assertThat(openCLContext, is(notNullValue()));
     }
     // </editor-fold>
@@ -47,16 +37,12 @@ public class OpenCLContextTest {
     @Test
     public void init_defaultConfiguration_logsSelectedDeviceInfo() throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
-        // arrange
         Logger mockLogger = mock(Logger.class);
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper, mockLogger);
 
         try {
-            // act
             openCLContext.init();
-
-            // assert
             verify(mockLogger, times(1)).info(eq("Selected OpenCL device:\n{}"), argThat(
                 (String s) -> s.contains("--- Info for OpenCL device:")
             ));
