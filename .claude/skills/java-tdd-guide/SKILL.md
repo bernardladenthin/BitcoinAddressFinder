@@ -507,28 +507,29 @@ private final Random random = new Random(1);
 
 ## TemporaryFolder / File System Tests
 
-Use `TemporaryFolder` for tests that create files and directories:
+Use `@TempDir` for tests that create files and directories:
 
 ```java
-@Rule
-public TemporaryFolder folder = new TemporaryFolder();
+@TempDir
+public java.nio.file.Path folder;
 
 @Test
 public void testFileHandling() throws IOException {
     // arrange
-    File tempFile = folder.newFile("data.txt");
-    File subdir = folder.newFolder("output");
-    
+    java.nio.file.Path tempFile = folder.resolve("data.txt");
+    java.nio.file.Path subdir = folder.resolve("output");
+    java.nio.file.Files.createDirectories(subdir);
+
     // use Files NIO for writing
-    Files.writeString(tempFile.toPath(), "content");
-    
+    java.nio.file.Files.writeString(tempFile, "content");
+
     // act / assert
     // ...
 }
 ```
 
 **Rules:**
-- Always use `folder.newFile(...)` and `folder.newFolder(...)` — never create manually.
+- Use `folder.resolve(...)` and `Files.createDirectories(...)` — never create paths manually outside the temp dir.
 - Cleanup is automatic when the test completes.
 
 ---
@@ -666,7 +667,7 @@ Group imports in this order (no blank lines within groups, blank line between gr
 import java.io.IOException;
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
 import com.example.foo.Foo;
