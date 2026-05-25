@@ -23,7 +23,7 @@ public class SeparatorFormatTest {
      * separator between them.
      */
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#addressSeperator")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ADDRESS_SEPARATOR)
     public void split_separatorBetweenTwoParts_returnsSplitParts(String addressSeparator) {
         // arrange
         String expectedLeft = "leftPart";
@@ -44,7 +44,7 @@ public class SeparatorFormatTest {
      * empty strings after splitting.
      */
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#addressSeperator")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ADDRESS_SEPARATOR)
     public void split_inputEqualsSeparator_returnsEmptyStrings(String separator) {
         // arrange
         String input = separator;
@@ -118,7 +118,7 @@ public class SeparatorFormatTest {
      * contains empty prefix and suffix parts.
      */
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#addressSeperator")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ADDRESS_SEPARATOR)
     public void split_inputStartsAndEndsWithSeparator_returnsEmptyAndMiddleAndEmpty(String separator) {
         // arrange
         String input = separator + "middle" + separator;
@@ -154,7 +154,7 @@ public class SeparatorFormatTest {
      * part is returned as an empty string.
      */
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#addressSeperator")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ADDRESS_SEPARATOR)
     public void split_trailingSeparator_returnsEmptyLastPart(String separator) {
         // arrange
         String input = "value" + separator;
@@ -173,7 +173,7 @@ public class SeparatorFormatTest {
      * first part is returned as an empty string.
      */
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#addressSeperator")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ADDRESS_SEPARATOR)
     public void split_leadingSeparator_returnsEmptyFirstPart(String separator) {
         // arrange
         String input = separator + "value";

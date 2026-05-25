@@ -63,7 +63,7 @@ public class AbstractProducerTest {
     
     // <editor-fold defaultstate="collapsed" desc="createSecretBase">
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#createSecretBaseLogged")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_CREATE_SECRET_BASE_LOGGED)
     public void createSecretBase_secretGiven_bitsKilledAndLogged(String givenSecret, int batchSizeInBits, String expectedSecretBase, String logInfo0, String logTrace0, String logTrace1, String logTrace2, String logTrace3, String logTrace4) throws IOException, InterruptedException, DecoderException {
         // arrange
         CProducer cProducer = new CProducer();

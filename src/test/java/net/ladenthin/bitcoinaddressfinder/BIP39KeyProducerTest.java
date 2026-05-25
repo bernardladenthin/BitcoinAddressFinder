@@ -110,7 +110,7 @@ public class BIP39KeyProducerTest {
     }
     
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.BIP39DataProvider#bip39TestVectors")
+    @MethodSource(BIP39DataProvider.DATA_PROVIDER_BIP39_TEST_VECTORS)
     public void bip39Vector_givenTestVector_returnsExpectedSeedAndXprvForLanguage(String language, String entropyHex, String mnemonicStr, String passphrase, String expectedSeedHex, String expectedXprv) throws Exception {
         // Arrange
         byte[] entropy = Hex.decodeHex(entropyHex);

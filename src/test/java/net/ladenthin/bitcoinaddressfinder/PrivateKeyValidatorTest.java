@@ -83,7 +83,7 @@ public class PrivateKeyValidatorTest {
 
     // <editor-fold defaultstate="collapsed" desc="isInvalidWithBatchSize">
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#privateKeysTooLargeWithChunkSize")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE)
     public void isInvalidWithBatchSize_keyTooLarge_returnsTrue(BigInteger privateKey, int batchSizeInBits) {
         // arrange
         BigInteger maxAllowed = validator.getMaxPrivateKeyForBatchSize(batchSizeInBits);

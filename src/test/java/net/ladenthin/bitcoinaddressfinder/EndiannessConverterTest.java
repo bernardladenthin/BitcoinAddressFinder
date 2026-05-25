@@ -19,7 +19,7 @@ public class EndiannessConverterTest {
 
     // <editor-fold defaultstate="collapsed" desc="mustConvert">
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#endiannessScenarios")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ENDIANNESS)
     public void mustConvertTest(ByteOrder sourceOrder, ByteOrder targetOrder, boolean expectedMustConvert) {
         // arrange
         EndiannessConverter converter = new EndiannessConverter(sourceOrder, targetOrder, byteBufferUtility);
@@ -34,7 +34,7 @@ public class EndiannessConverterTest {
 
     // <editor-fold defaultstate="collapsed" desc="convertEndian">
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#endiannessScenarios")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ENDIANNESS)
     public void convertEndianTest(ByteOrder sourceOrder, ByteOrder targetOrder, boolean mustConvert) {
         // arrange
         EndiannessConverter converter = new EndiannessConverter(sourceOrder, targetOrder, byteBufferUtility);

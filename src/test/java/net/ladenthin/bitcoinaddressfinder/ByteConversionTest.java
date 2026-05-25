@@ -18,7 +18,7 @@ public class ByteConversionTest {
 
     // <editor-fold defaultstate="collapsed" desc="bytesToMib">
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bytesToMib")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_BYTES_TO_MIB)
     public void bytesToMib_bytesGiven_returnExpectedMib(long bytes, double expectedMib) throws IOException, InterruptedException, DecoderException {
         // act
         double result = byteConversion.bytesToMib(bytes);
@@ -94,7 +94,7 @@ public class ByteConversionTest {
 
     // <editor-fold defaultstate="collapsed" desc="mibToBytes">
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#mibToBytes")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_MIB_TO_BYTES)
     public void mibToBytes_mibGiven_returnExpectedBytes(long mib, long expectedBytes) throws IOException, InterruptedException, DecoderException {
         // act
         long result = byteConversion.mibToBytes(mib);

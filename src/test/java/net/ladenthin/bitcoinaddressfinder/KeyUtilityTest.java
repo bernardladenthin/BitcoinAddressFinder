@@ -581,7 +581,7 @@ public class KeyUtilityTest {
 
     // <editor-fold defaultstate="collapsed" desc="bigIntegerToFixedLengthHex">
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#largeSecretsAsHex")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_LARGE_SECRETS_AS_HEX)
     public void bigIntegerToFixedLengthHex_knownBigInteger_correctHex(String largeSecretsAsHex) {
         // arrange
         BigInteger input = new BigInteger(largeSecretsAsHex, 16);

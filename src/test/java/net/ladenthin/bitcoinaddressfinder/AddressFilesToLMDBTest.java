@@ -52,7 +52,7 @@ public class AddressFilesToLMDBTest extends LMDBBase {
     }
 
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#compressedAndStaticAmount")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT)
     public void addressFilesToLMDB_createLMDB_containingTestAddressesHashesWithCorrectAmount(boolean compressed, boolean useStaticAmount) throws Exception {
         // arrange, act
         AddressesFiles addressesFiles = new TestAddressesFiles(compressed);
@@ -78,7 +78,7 @@ public class AddressFilesToLMDBTest extends LMDBBase {
     }
 
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#staticAmount")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_STATIC_AMOUNT)
     public void addressFilesToLMDB_createLMDBWithStaticAddresses_containingStaticHashes(boolean useStaticAmount) throws Exception {
         // arrange, act
         StaticAddressesFiles staticAddressesFiles = new StaticAddressesFiles();
@@ -96,7 +96,7 @@ public class AddressFilesToLMDBTest extends LMDBBase {
     }
     
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bloomFilterEnabled")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_BLOOM_FILTER_ENABLED)
     public void containsAddress_behavesCorrectly_withOrWithoutBloomFilter(boolean useBloomFilter) throws Exception {
         AddressesFiles addressesFiles = new TestAddressesFiles(true);
 
@@ -137,7 +137,7 @@ public class AddressFilesToLMDBTest extends LMDBBase {
     }
 
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bloomFilterEnabled")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_BLOOM_FILTER_ENABLED)
     public void containsAddress_returnsFalseForUnknownAddress(boolean useBloomFilter) throws Exception {
         AddressesFiles addressesFiles = new TestAddressesFiles(true);
 

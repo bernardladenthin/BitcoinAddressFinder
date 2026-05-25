@@ -16,7 +16,7 @@ public class BitHelperTest {
     
     // <editor-fold defaultstate="collapsed" desc="getKillBits">
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#killBits")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_KILL_BITS)
     public void getKillBits_bitsGiven_killBitsEqualsExpectation(int bits, BigInteger killBits) throws IOException {
         // arrange
         BitHelper bitHelper = new BitHelper();
@@ -28,7 +28,7 @@ public class BitHelperTest {
     
     // <editor-fold defaultstate="collapsed" desc="convertBitsToSize">
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bitsToSize")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_BITS_TO_SIZE)
     public void convertBitsToSize_bitsGiven_sizeEqualsExpectation(int bits, int size) throws IOException {
         // arrange
         BitHelper bitHelper = new BitHelper();
@@ -62,7 +62,7 @@ public class BitHelperTest {
     }
     
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bitSizesAtMostMax")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX)
     public void assertBatchSizeInBitsIsInRange_bitsGivenInRange_exceptionThrown(int bits) throws IOException {
         // arrange
         BitHelper bitHelper = new BitHelper();

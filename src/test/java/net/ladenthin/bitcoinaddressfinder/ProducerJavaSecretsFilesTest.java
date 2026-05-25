@@ -120,7 +120,7 @@ public class ProducerJavaSecretsFilesTest {
     }
     
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#cSecretFormat")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_CSECRET_FORMAT)
     public void produceKeys_filesConfigured_keysCreated(CSecretFormat cSecretFormat) throws IOException, InterruptedException {
         CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
         List<File> secretsFiles = createSecretsFiles(cSecretFormat);

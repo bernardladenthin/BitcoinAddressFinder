@@ -20,7 +20,7 @@ public class CommonDataProvider {
     /**
      * For {@link #cSecretFormat()}.
      */
-    public final static String DATA_PROVIDER_LARGE_SECRETS_AS_HEX = "largeSecretsAsHex";
+    public final static String DATA_PROVIDER_LARGE_SECRETS_AS_HEX = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#largeSecretsAsHex";
 
     /**
     * Provides valid 64-character (32-byte) hex strings representing large unsigned secrets.
@@ -52,7 +52,7 @@ public class CommonDataProvider {
     /**
      * For {@link #cSecretFormat()}.
      */
-    public final static String DATA_PROVIDER_CSECRET_FORMAT = "cSecretFormat";
+    public final static String DATA_PROVIDER_CSECRET_FORMAT = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#cSecretFormat";
 
     public static Stream<Arguments> cSecretFormat() {
         Object[][] _data = transformFlatToObjectArrayArray(CSecretFormat.values());
@@ -62,7 +62,7 @@ public class CommonDataProvider {
     /**
      * For {@link EndiannessConverterTest}.
      */
-    public static final String DATA_PROVIDER_ENDIANNESS = "endiannessScenarios";
+    public static final String DATA_PROVIDER_ENDIANNESS = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#endiannessScenarios";
 
     public static Stream<Arguments> endiannessScenarios() {
         Object[][] _data = new Object[][] {
@@ -86,7 +86,7 @@ public class CommonDataProvider {
     /**
      * For {@link FinderTest}.
      */
-    public static final String DATA_PROVIDER_KEY_PRODUCER_TYPES = "keyProducerTypes";
+    public static final String DATA_PROVIDER_KEY_PRODUCER_TYPES = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#keyProducerTypes";
 
     public static Stream<Arguments> keyProducerTypes() {
         return java.util.Arrays.stream(keyProducerTypesData()).map(row -> Arguments.of(row));
@@ -101,7 +101,7 @@ public class CommonDataProvider {
     /**
     * For tests validating combinations of key producer types and bit sizes.
     */
-   public static final String DATA_PROVIDER_JAVA_KEY_PRODUCER_AND_BIT_SIZE = "keyProducerTypeAndBitSize";
+   public static final String DATA_PROVIDER_JAVA_KEY_PRODUCER_AND_BIT_SIZE = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#keyProducerTypeAndBitSize";
 
     public static Stream<Arguments> keyProducerTypeAndBitSize() {
         Object[][] _data = mergeMany(
@@ -140,7 +140,7 @@ public class CommonDataProvider {
     /**
      * For {@link #bitsToSize()}.
      */
-    public final static String DATA_PROVIDER_BITS_TO_SIZE = "bitsToSize";
+    public final static String DATA_PROVIDER_BITS_TO_SIZE = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bitsToSize";
 
     public static Stream<Arguments> bitsToSize() {
         Object[][] _data = new Object[][]{
@@ -156,7 +156,7 @@ public class CommonDataProvider {
     /**
      * For {@link #killBits()}.
      */
-    public final static String DATA_PROVIDER_KILL_BITS = "killBits";
+    public final static String DATA_PROVIDER_KILL_BITS = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#killBits";
 
     public static Stream<Arguments> killBits() {
         Object[][] _data = new Object[][]{
@@ -172,7 +172,7 @@ public class CommonDataProvider {
     /**
      * For {@link #bytesToMib()}.
      */
-    public final static String DATA_PROVIDER_BYTES_TO_MIB = "bytesToMib";
+    public final static String DATA_PROVIDER_BYTES_TO_MIB = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bytesToMib";
 
     public static Stream<Arguments> bytesToMib() {
         Object[][] _data = new Object[][]{
@@ -187,7 +187,7 @@ public class CommonDataProvider {
     /**
      * For {@link #mibToBytes()}.
      */
-    public final static String DATA_PROVIDER_MIB_TO_BYTES = "mibToBytes";
+    public final static String DATA_PROVIDER_MIB_TO_BYTES = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#mibToBytes";
 
     public static Stream<Arguments> mibToBytes() {
         Object[][] _data = new Object[][]{
@@ -201,7 +201,7 @@ public class CommonDataProvider {
     /**
      * For {@link #lmdbAmounts()}.
      */
-    public final static String DATA_PROVIDER_LMDB_AMOUNTS = "lmdbAmounts";
+    public final static String DATA_PROVIDER_LMDB_AMOUNTS = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#lmdbAmounts";
 
     public static Stream<Arguments> lmdbAmounts() {
         long randomAmount = 13371337L;
@@ -249,7 +249,7 @@ public class CommonDataProvider {
     /**
      * For {@link #lmdbIncreaseSize()}.
      */
-    public final static String DATA_PROVIDER_LMDB_INCREASE_SIZE = "lmdbIncreaseSize";
+    public final static String DATA_PROVIDER_LMDB_INCREASE_SIZE = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#lmdbIncreaseSize";
 
     public static Stream<Arguments> lmdbIncreaseSize() {
         Object[][] _data = new Object[][]{
@@ -263,7 +263,7 @@ public class CommonDataProvider {
     /**
      * For {@link #bitSizesAtMostMax()}.
      */
-    public final static String DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX = "bitSizesAtMostMax";
+    public final static String DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bitSizesAtMostMax";
 
     public static Stream<Arguments> bitSizesAtMostMax() {
         return java.util.Arrays.stream(bitSizesAtMostMaxData()).map(row -> Arguments.of(row));
@@ -283,7 +283,7 @@ public class CommonDataProvider {
     /**
      * For {@link #compressedAndStaticAmount()}.
      */
-    public final static String DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT = "compressedAndStaticAmount";
+    public final static String DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#compressedAndStaticAmount";
 
     public static Stream<Arguments> compressedAndStaticAmount() {
         Object[][] _data = new Object[][]{
@@ -298,7 +298,7 @@ public class CommonDataProvider {
     /**
      * For {@link #staticAmount()}.
      */
-    public final static String DATA_PROVIDER_STATIC_AMOUNT = "staticAmount";
+    public final static String DATA_PROVIDER_STATIC_AMOUNT = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#staticAmount";
 
     public static Stream<Arguments> staticAmount() {
         Object[][] _data = new Object[][]{
@@ -311,7 +311,7 @@ public class CommonDataProvider {
     /**
      * For {@link #compressed()}.
      */
-    public final static String DATA_PROVIDER_COMPRESSED = "compressed";
+    public final static String DATA_PROVIDER_COMPRESSED = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#compressed";
 
     public static Stream<Arguments> compressed() {
         Object[][] _data = new Object[][]{
@@ -324,7 +324,7 @@ public class CommonDataProvider {
     /**
      * For {@link #addressSeperator()}.
      */
-    public final static String DATA_PROVIDER_ADDRESS_SEPARATOR = "addressSeperator";
+    public final static String DATA_PROVIDER_ADDRESS_SEPARATOR = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#addressSeperator";
 
     public static Stream<Arguments> addressSeperator() {
             Object[][] _data = Arrays.stream(SeparatorFormat.values())
@@ -336,7 +336,7 @@ public class CommonDataProvider {
     /**
      * For {@link #invalidP2WPKHAddressesValidBase58()}.
      */
-    public final static String DATA_PROVIDER_INVALID_P2WPKH_ADDRESSES_VALID_BASE58 = "invalidP2WPKHAddressesValidBase58";
+    public final static String DATA_PROVIDER_INVALID_P2WPKH_ADDRESSES_VALID_BASE58 = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#invalidP2WPKHAddressesValidBase58";
 
     public static Stream<Arguments> invalidP2WPKHAddressesValidBase58() {
         Object[][] _data = new Object[][]{
@@ -352,7 +352,7 @@ public class CommonDataProvider {
     /**
      * For {@link #invalidBech32WitnessVersion2()}.
      */
-    public final static String DATA_PROVIDER_INVALID_BECH32_WITNESS_VERSION_2 = "invalidBech32WitnessVersion2";
+    public final static String DATA_PROVIDER_INVALID_BECH32_WITNESS_VERSION_2 = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#invalidBech32WitnessVersion2";
 
     public static Stream<Arguments> invalidBech32WitnessVersion2() {
         Object[][] _data = new Object[][]{
@@ -365,7 +365,7 @@ public class CommonDataProvider {
     /**
      * For {@link #invalidBase58()}.
      */
-    public final static String DATA_PROVIDER_INVALID_BASE58 = "invalidBase58";
+    public final static String DATA_PROVIDER_INVALID_BASE58 = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#invalidBase58";
 
     public static Stream<Arguments> invalidBase58() {
         Object[][] _data = new Object[][]{
@@ -387,7 +387,7 @@ public class CommonDataProvider {
      * For {@link #bitcoinAddressesCorrectBase58()}.
      * A correct base58 format should be parsed anyway.
      */
-    public final static String DATA_PROVIDER_BITCOIN_ADDRESSES_CORRECT_BASE_58 = "bitcoinAddressesCorrectBase58";
+    public final static String DATA_PROVIDER_BITCOIN_ADDRESSES_CORRECT_BASE_58 = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bitcoinAddressesCorrectBase58";
 
     public static Stream<Arguments> bitcoinAddressesCorrectBase58() {
         Object[][] _data = new Object[][]{
@@ -402,7 +402,7 @@ public class CommonDataProvider {
      * For {@link #correctBase58()}.
      * A correct base58 format should be parsed anyway.
      */
-    public final static String DATA_PROVIDER_CORRECT_BASE_58 = "correctBase58";
+    public final static String DATA_PROVIDER_CORRECT_BASE_58 = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#correctBase58";
 
     public static Stream<Arguments> correctBase58() {
         Object[][] _data = new Object[][]{
@@ -418,7 +418,7 @@ public class CommonDataProvider {
     /**
      * For {@link #srcPos()}.
      */
-    public final static String DATA_PROVIDER_SRC_POS = "srcPos";
+    public final static String DATA_PROVIDER_SRC_POS = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#srcPos";
 
     public static Stream<Arguments> srcPos() {
         Object[][] _data = new Object[][]{
@@ -451,7 +451,7 @@ public class CommonDataProvider {
      * TODO: I don't know if this is right. It seems like it's a base58 format.
      * I've asked Blockchair and they've answered: "The addresses you listed are for internal purposes.".
      */
-    public final static String DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_CHECKSUM_INVALID = "bitcoinCashAddressesChecksumInvalid";
+    public final static String DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_CHECKSUM_INVALID = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bitcoinCashAddressesChecksumInvalid";
 
     public static Stream<Arguments> bitcoinCashAddressesChecksumInvalid() {
         Object[][] _data = new Object[][]{
@@ -474,7 +474,7 @@ public class CommonDataProvider {
      * TODO: I don't know if this is right. It seems like it's a hex format.
      * I've asked Blockchair and they've answered: "The addresses you listed are for internal purposes.".
      */
-    public final static String DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_INTERNAL_PURPOSE = "bitcoinCashAddressesInternalPurpose";
+    public final static String DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_INTERNAL_PURPOSE = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bitcoinCashAddressesInternalPurpose";
 
     public static Stream<Arguments> bitcoinCashAddressesInternalPurpose() {
         Object[][] _data = new Object[][]{
@@ -490,7 +490,7 @@ public class CommonDataProvider {
     /**
      * For {@link #createSecretBaseLogged()}.
      */
-    public final static String DATA_PROVIDER_CREATE_SECRET_BASE_LOGGED = "createSecretBaseLogged";
+    public final static String DATA_PROVIDER_CREATE_SECRET_BASE_LOGGED = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#createSecretBaseLogged";
 
     public static Stream<Arguments> createSecretBaseLogged() {
         Object[][] _data = new Object[][]{
@@ -512,7 +512,7 @@ public class CommonDataProvider {
     /**
      * For {@link #staticP2PKHAddresses()}.
      */
-    public final static String DATA_PROVIDER_STATIC_P2PKH_ADDRESSES = "staticP2PKHAddresses";
+    public final static String DATA_PROVIDER_STATIC_P2PKH_ADDRESSES = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#staticP2PKHAddresses";
 
     public static Stream<Arguments> staticP2PKHAddresses() {
         Object[][] _data = transformFlatToObjectArrayArray(P2PKH.values());
@@ -522,7 +522,7 @@ public class CommonDataProvider {
     /**
      * For {@link #staticP2SHAddresses()}.
      */
-    public final static String DATA_PROVIDER_STATIC_P2SH_ADDRESSES = "staticP2SHAddresses";
+    public final static String DATA_PROVIDER_STATIC_P2SH_ADDRESSES = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#staticP2SHAddresses";
 
     public static Stream<Arguments> staticP2SHAddresses() {
         Object[][] _data = transformFlatToObjectArrayArray(P2SH.values());
@@ -532,7 +532,7 @@ public class CommonDataProvider {
     /**
      * For {@link #staticP2SHAddresses()}.
      */
-    public final static String DATA_PROVIDER_STATIC_P2WPKH_ADDRESSES = "staticP2WPKHAddresses";
+    public final static String DATA_PROVIDER_STATIC_P2WPKH_ADDRESSES = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#staticP2WPKHAddresses";
 
     public static Stream<Arguments> staticP2WPKHAddresses() {
         Object[][] _data = transformFlatToObjectArrayArray(P2WPKH.values());
@@ -542,7 +542,7 @@ public class CommonDataProvider {
     /**
      * For {@link #staticUnsupportedAddresses()}.
      */
-    public final static String DATA_PROVIDER_STATIC_UNSUPPORTED_ADDRESSES = "staticUnsupportedAddresses";
+    public final static String DATA_PROVIDER_STATIC_UNSUPPORTED_ADDRESSES = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#staticUnsupportedAddresses";
 
     public static Stream<Arguments> staticUnsupportedAddresses() {
         Object[][] _data = transformFlatToObjectArrayArray(StaticUnsupportedAddress.values());
@@ -561,7 +561,7 @@ public class CommonDataProvider {
      * For {@link ByteBufferUtility}.
      * Use allocate direct.
      */
-    public final static String DATA_PROVIDER_ALLOCATE_DIRECT = "allocateDirect";
+    public final static String DATA_PROVIDER_ALLOCATE_DIRECT = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#allocateDirect";
 
     public static Stream<Arguments> allocateDirect() {
         Object[][] _data = new Object[][]{
@@ -577,7 +577,7 @@ public class CommonDataProvider {
      * Supplies {@code true} (Bloom filter active) and {@code false} (Bloom filter inactive),
      * to verify correctness and performance behavior in both configurations.
      */
-    public final static String DATA_PROVIDER_BLOOM_FILTER_ENABLED = "bloomFilterEnabled";
+    public final static String DATA_PROVIDER_BLOOM_FILTER_ENABLED = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bloomFilterEnabled";
 
     public static Stream<Arguments> bloomFilterEnabled() {
         Object[][] _data = new Object[][]{
@@ -590,7 +590,7 @@ public class CommonDataProvider {
     /**
      * For {@link #largePrivateKeys()}.
      */
-    public final static String DATA_PROVIDER_LARGE_PRIVATE_KEYS = "largePrivateKeys";
+    public final static String DATA_PROVIDER_LARGE_PRIVATE_KEYS = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#largePrivateKeys";
 
     public static Stream<Arguments> largePrivateKeys() {
         Object[][] _data = new Object[][]{
@@ -686,7 +686,7 @@ public class CommonDataProvider {
     /**
      * For {@link #privateKeysTooLargeWithChunkSize()}.
      */
-    public final static String DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE = "privateKeysTooLargeWithChunkSize";
+    public final static String DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#privateKeysTooLargeWithChunkSize";
 
     public static Stream<Arguments> privateKeysTooLargeWithChunkSize() {
         Object[][] _data = new Object[][]{
@@ -699,7 +699,7 @@ public class CommonDataProvider {
     /**
      * For {@link #privateKeys32ByteRequiringStrip()}.
      */
-    public final static String DATA_PROVIDER_PRIVATE_KEYS_32_BYTE_REQUIRING_STRIP = "privateKeys32ByteRequiringStrip";
+    public final static String DATA_PROVIDER_PRIVATE_KEYS_32_BYTE_REQUIRING_STRIP = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#privateKeys32ByteRequiringStrip";
 
     public static Stream<Arguments> privateKeys32ByteRequiringStrip() {
         Object[][] _data = new Object[][]{
@@ -715,7 +715,7 @@ public class CommonDataProvider {
     /**
      * For {@link #bigIntegerVariants()}.
      */
-    public final static String DATA_PROVIDER_BIG_INTEGER_VARIANTS = "bigIntegerVariants";
+    public final static String DATA_PROVIDER_BIG_INTEGER_VARIANTS = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bigIntegerVariants";
     
     public static Stream<Arguments> bigIntegerVariants() {
         Object[][] _data = new Object[][] {

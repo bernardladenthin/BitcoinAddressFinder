@@ -383,7 +383,7 @@ public class ProbeAddressesOpenCLTest {
 
     @Test
     @OpenCLTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bitSizesAtMostMax")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX)
     public void createKeys_bitsLowerThan25_use32BitNevertheless(int bitSize) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
@@ -458,7 +458,7 @@ public class ProbeAddressesOpenCLTest {
    
     @OpenCLTest
     @Test
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#privateKeysTooLargeWithChunkSize")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE)
     public void setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException(BigInteger privateKey, int chunkSize) throws IOException {
         org.junit.jupiter.api.Assertions.assertThrows(PrivateKeyTooLargeException.class, () -> {
             new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
@@ -477,7 +477,7 @@ public class ProbeAddressesOpenCLTest {
 
     @Test
     @OpenCLTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#privateKeys32ByteRequiringStrip")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_32_BYTE_REQUIRING_STRIP)
     public void setSrcPrivateKeyChunk_handlesLeadingZero_correctlySerializesTo32Bytes(BigInteger privateKey) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
@@ -522,7 +522,7 @@ public class ProbeAddressesOpenCLTest {
     
     @Test
     @OpenCLTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#largePrivateKeys")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_LARGE_PRIVATE_KEYS)
     public void createKeys_fromLargePrivateKey_generatesValidPublicKeys(BigInteger privateKey) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         

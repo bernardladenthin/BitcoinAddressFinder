@@ -47,7 +47,7 @@ public class KeyProducerJavaTest {
     }
     
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#keyProducerTypeAndBitSize")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_JAVA_KEY_PRODUCER_AND_BIT_SIZE)
     public void createSecrets_throwsException_whenWorkSizeExceedsMax(CommonDataProvider.KeyProducerTypesLocal keyProducerType, int bits) throws IOException, InterruptedException {
         // arrange
         final int maxWorkSize = 1 << bits; // 2^bits
@@ -58,7 +58,7 @@ public class KeyProducerJavaTest {
     }
     
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#keyProducerTypes")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_KEY_PRODUCER_TYPES)
     public void createSecrets_throwsException_whenWorkSizeTooLess(CommonDataProvider.KeyProducerTypesLocal keyProducerType) throws IOException, InterruptedException {
         // arrange
         KeyProducerJava keyProducer = createKeyProducer(keyProducerType, 1);

@@ -33,7 +33,7 @@ public class ByteBufferUtilityTest {
     
     // <editor-fold defaultstate="collapsed" desc="freeByteBuffer">
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#allocateDirect")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT)
     public void freeByteBuffer_nullGiven_noExceptionThrown(boolean allocateDirect) throws IOException {
         // arrange
         
@@ -69,7 +69,7 @@ public class ByteBufferUtilityTest {
     }
     
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#allocateDirect")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT)
     public void freeByteBuffer_freeAGivenByteBuffer_noExceptionThrown(boolean allocateDirect) throws IOException, IllegalArgumentException, IllegalAccessException, NoSuchFieldException {
         // arrange
         byte[] bytesGiven = createDummyByteArray(7);
@@ -92,7 +92,7 @@ public class ByteBufferUtilityTest {
     }
     
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#allocateDirect")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT)
     public void freeByteBuffer_freeAGivenByteBufferGivenTwice_noExceptionThrown(boolean allocateDirect) throws IOException {
         // arrange
         byte[] bytesGiven = createDummyByteArray(7);
@@ -157,7 +157,7 @@ public class ByteBufferUtilityTest {
 
     // <editor-fold defaultstate="collapsed" desc="byteArrayToByteBuffer">
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#allocateDirect")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT)
     public void byteArrayToByteBuffer_wrapped_allBytesEquals(boolean allocateDirect) throws IOException {
         // arrange
         byte[] bytes = createDummyByteArray(7);
@@ -174,7 +174,7 @@ public class ByteBufferUtilityTest {
 
     // <editor-fold defaultstate="collapsed" desc="ByteBuffer Hex conversion">
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#allocateDirect")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT)
     public void getHexFromByteBuffer_byteBufferProvided_returnHex(boolean allocateDirect) throws IOException {
         // arrange
         String hexExpected = "00010203040506";
@@ -191,7 +191,7 @@ public class ByteBufferUtilityTest {
     }
 
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#allocateDirect")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_ALLOCATE_DIRECT)
     public void getByteBufferFromHex_HexProvided_returnByteBuffer(boolean allocateDirect) throws IOException {
         // arrange
         String hexGiven = "00010203040506";
@@ -342,7 +342,7 @@ public class ByteBufferUtilityTest {
 
     // <editor-fold defaultstate="collapsed" desc="bigIntegerToBytes">
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bigIntegerVariants")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_BIG_INTEGER_VARIANTS)
     public void bigIntegerToBytes_leadingZeroStripped(BigInteger input, int expectedLength, byte expectedFirstByte) {
         // act
         byte[] actualBytes = ByteBufferUtility.bigIntegerToBytes(input);

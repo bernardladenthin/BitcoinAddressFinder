@@ -244,7 +244,7 @@ public class FinderTest {
     
     // <editor-fold defaultstate="collapsed" desc="testFullCycle">
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#keyProducerTypes")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_KEY_PRODUCER_TYPES)
     public void testFullCycle_keyProducerJavaSetAndInitialized_statesCorrect(CommonDataProvider.KeyProducerTypesLocal keyProducerType) throws IOException, InterruptedException {
         // arrange
         CFinder cFinder = new CFinder();

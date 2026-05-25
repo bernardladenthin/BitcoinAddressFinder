@@ -47,7 +47,7 @@ public class LMDBPersistenceTest {
     
     // <editor-fold defaultstate="collapsed" desc="use static amount">
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#lmdbAmounts")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_LMDB_AMOUNTS)
     public void putNewAmount_putNewAmount_correctAmountStored(boolean useStaticAmount, long staticAmount, long amount, long expectedAmount) throws IOException {
         // arrange
         File lmdbFolder = java.nio.file.Files.createDirectory(folder.resolve("lmdb")).toFile();
@@ -121,7 +121,7 @@ public class LMDBPersistenceTest {
 
     // <editor-fold defaultstate="collapsed" desc="getDatabaseSize increaseDatabaseSize and filled">
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#lmdbIncreaseSize")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_LMDB_INCREASE_SIZE)
     public void getDatabaseSize_initialLMDBSetTo1MiB_increaseDatabaseSize_returnResizedDatabaseSize(long increaseSize) throws IOException {
         // arrange
         File lmdbFolder = java.nio.file.Files.createDirectory(folder.resolve("lmdb")).toFile();
@@ -142,7 +142,7 @@ public class LMDBPersistenceTest {
     }
     
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#lmdbIncreaseSize")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_LMDB_INCREASE_SIZE)
     public void getDatabaseSize_valuesAdded_increaseDatabaseSize_returnResizedDatabaseSize(long increaseSize) throws IOException {
         // arrange
         int keysToAdd = 1024*16;

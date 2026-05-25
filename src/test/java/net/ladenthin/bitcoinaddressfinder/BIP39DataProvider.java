@@ -16,7 +16,7 @@ public class BIP39DataProvider {
     /**
      * For {@link net.ladenthin.bitcoinaddressfinder.BIP39KeyProducerTest}.
      */
-    public final static String DATA_PROVIDER_BIP39_TEST_VECTORS = "bip39TestVectors";
+    public final static String DATA_PROVIDER_BIP39_TEST_VECTORS = "net.ladenthin.bitcoinaddressfinder.BIP39DataProvider#bip39TestVectors";
 
     public final static String FILENAME = "vectors.json";
     public final static String PASSPHRASE = "TREZOR";

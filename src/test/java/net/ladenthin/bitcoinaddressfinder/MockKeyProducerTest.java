@@ -131,7 +131,7 @@ public class MockKeyProducerTest {
     
     // <editor-fold defaultstate="collapsed" desc="createStatisticsMessage">
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bitSizesAtMostMax")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX)
     public void createSecrets_parameterBatchSizeInBitsFromDataProviderAndReturnStartSecretOnlyTrue_returnExpectedSecrets(int maximumBitLength) throws NoMoreSecretsAvailableException {
         // arrange
         int batchSizeInBits = 2;
@@ -146,7 +146,7 @@ public class MockKeyProducerTest {
     }
     
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bitSizesAtMostMax")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX)
     public void createSecrets_parameterBatchSizeInBitsFromDataProviderAndReturnStartSecretOnlyFalse_returnExpectedSecrets(int maximumBitLength) throws NoMoreSecretsAvailableException {
         // arrange
         int batchSizeInBits = 2;

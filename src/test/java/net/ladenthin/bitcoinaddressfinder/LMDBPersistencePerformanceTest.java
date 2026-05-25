@@ -43,7 +43,7 @@ public class LMDBPersistencePerformanceTest {
     private final static int PRODUCER_THREADS = KEYS_QUEUE_SIZE;
     
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#bloomFilterEnabled")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_BLOOM_FILTER_ENABLED)
     public void runProber_performanceTest(boolean useBloomFilter) throws IOException, InterruptedException, IllegalArgumentException, NoSuchFieldException, IllegalAccessException {
         new LMDBPlatformAssume().assumeLMDBExecution();
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();

@@ -30,7 +30,7 @@ public class LMDBToAddressFileTest extends LMDBBase {
     }
 
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#compressedAndStaticAmount")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT)
     public void writeAllAmountsToAddressFileAsDynamicWidthBase58BitcoinAddressWithAmount(boolean compressed, boolean useStaticAmount) throws Exception {
         // arrange
         AtomicBoolean shouldRun = new AtomicBoolean(true);
@@ -63,7 +63,7 @@ public class LMDBToAddressFileTest extends LMDBBase {
     }
     
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#compressedAndStaticAmount")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT)
     public void writeAllAmountsToAddressFileAsFixedWidthBase58BitcoinAddress(boolean compressed, boolean useStaticAmount) throws Exception {
         // arrange
         AtomicBoolean shouldRun = new AtomicBoolean(true);
@@ -96,7 +96,7 @@ public class LMDBToAddressFileTest extends LMDBBase {
     }
     
     @ParameterizedTest
-    @MethodSource("net.ladenthin.bitcoinaddressfinder.CommonDataProvider#compressedAndStaticAmount")
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT)
     public void writeAllAmountsToAddressFileAsHexHash(boolean compressed, boolean useStaticAmount) throws Exception {
         // arrange
         AtomicBoolean shouldRun = new AtomicBoolean(true);
