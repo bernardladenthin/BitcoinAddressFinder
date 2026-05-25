@@ -5,22 +5,23 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tngtech.java.junit.dataprovider.DataProvider;
 import java.io.InputStream;
 import java.util.Iterator;
 import java.util.Map;
 
 public class BIP39DataProvider {
 
+    /** Must remain a string literal — annotation values require compile-time constants. */
+    private static final String CLASS_NAME = "net.ladenthin.bitcoinaddressfinder.BIP39DataProvider";
+
     /**
      * For {@link net.ladenthin.bitcoinaddressfinder.BIP39KeyProducerTest}.
      */
-    public final static String DATA_PROVIDER_BIP39_TEST_VECTORS = "bip39TestVectors";
+    public final static String DATA_PROVIDER_BIP39_TEST_VECTORS = CLASS_NAME + "#bip39TestVectors";
     
     public final static String FILENAME = "vectors.json";
     public final static String PASSPHRASE = "TREZOR";
 
-    @DataProvider
     /**
      * from https://github.com/trezor/python-mnemonic/blob/master/vectors.json
      */

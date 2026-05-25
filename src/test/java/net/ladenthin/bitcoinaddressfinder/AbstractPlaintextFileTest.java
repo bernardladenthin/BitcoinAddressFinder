@@ -10,11 +10,12 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import java.nio.file.Path;
 import org.lmdbjava.LmdbException;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
@@ -24,14 +25,14 @@ import static org.mockito.Mockito.mock;
 
 public class AbstractPlaintextFileTest {
 
-    @Rule
-    public TemporaryFolder folder = new TemporaryFolder();
+    @TempDir
+    public Path folder;
 
     // <editor-fold defaultstate="collapsed" desc="readFile">
     @Test
     public void readFile_emptyFile_processLineNeverCalled() throws IOException {
         // arrange
-        File emptyFile = folder.newFile("empty.txt");
+        File emptyFile = Files.createFile(folder.resolve("empty.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         RecordingPlaintextFile sut = new RecordingPlaintextFile(emptyFile, readStatistic);
 
@@ -45,7 +46,7 @@ public class AbstractPlaintextFileTest {
     @Test
     public void readFile_singleLine_processLineCalledOnceWithCorrectContent() throws IOException {
         // arrange
-        File file = folder.newFile("single.txt");
+        File file = Files.createFile(folder.resolve("single.txt")).toFile();
         Files.writeString(file.toPath(), "hello world");
         ReadStatistic readStatistic = new ReadStatistic();
         RecordingPlaintextFile sut = new RecordingPlaintextFile(file, readStatistic);
@@ -61,7 +62,7 @@ public class AbstractPlaintextFileTest {
     @Test
     public void readFile_multipleLines_processLineCalledForEachLine() throws IOException {
         // arrange
-        File file = folder.newFile("multi.txt");
+        File file = Files.createFile(folder.resolve("multi.txt")).toFile();
         Files.writeString(file.toPath(), "line1\nline2\nline3");
         ReadStatistic readStatistic = new ReadStatistic();
         RecordingPlaintextFile sut = new RecordingPlaintextFile(file, readStatistic);
@@ -79,7 +80,7 @@ public class AbstractPlaintextFileTest {
     @Test
     public void readFile_processLineThrowsRuntimeException_errorAddedToReadStatistic() throws IOException {
         // arrange
-        File file = folder.newFile("error.txt");
+        File file = Files.createFile(folder.resolve("error.txt")).toFile();
         Files.writeString(file.toPath(), "bad line");
         ReadStatistic readStatistic = new ReadStatistic();
         ThrowingPlaintextFile sut = new ThrowingPlaintextFile(file, readStatistic, new RuntimeException("parse error"));
@@ -92,23 +93,23 @@ public class AbstractPlaintextFileTest {
         assertThat(readStatistic.errors.get(0), is(equalTo("bad line")));
     }
 
-    @Test(expected = LmdbException.class)
+    @org.junit.jupiter.api.Test
     public void readFile_processLineThrowsLmdbException_exceptionPropagated() throws IOException {
         // arrange
-        File file = folder.newFile("lmdb.txt");
+        File file = Files.createFile(folder.resolve("lmdb.txt")).toFile();
         Files.writeString(file.toPath(), "some line");
         ReadStatistic readStatistic = new ReadStatistic();
         LmdbException mockLmdbException = mock(LmdbException.class);
         ThrowingPlaintextFile sut = new ThrowingPlaintextFile(file, readStatistic, mockLmdbException);
 
         // act
-        sut.readFile();
+        assertThrows(LmdbException.class, () -> sut.readFile());
     }
 
     @Test
     public void readFile_multipleExceptionLines_allErrorsAddedToReadStatistic() throws IOException {
         // arrange
-        File file = folder.newFile("multierror.txt");
+        File file = Files.createFile(folder.resolve("multierror.txt")).toFile();
         Files.writeString(file.toPath(), "bad1\nbad2\nbad3");
         ReadStatistic readStatistic = new ReadStatistic();
         ThrowingPlaintextFile sut = new ThrowingPlaintextFile(file, readStatistic, new RuntimeException("error"));
@@ -125,7 +126,7 @@ public class AbstractPlaintextFileTest {
     @Test
     public void interrupt_calledBeforeReadFile_readFileProcessesNoLines() throws IOException {
         // arrange
-        File file = folder.newFile("lines.txt");
+        File file = Files.createFile(folder.resolve("lines.txt")).toFile();
         Files.writeString(file.toPath(), "line1\nline2\nline3");
         ReadStatistic readStatistic = new ReadStatistic();
         RecordingPlaintextFile sut = new RecordingPlaintextFile(file, readStatistic);
@@ -143,7 +144,7 @@ public class AbstractPlaintextFileTest {
     @Test
     public void readFile_singleLineFile_fileProgressIsSetToNonZero() throws IOException {
         // arrange
-        File file = folder.newFile("progress.txt");
+        File file = Files.createFile(folder.resolve("progress.txt")).toFile();
         Files.writeString(file.toPath(), "content");
         ReadStatistic readStatistic = new ReadStatistic();
         RecordingPlaintextFile sut = new RecordingPlaintextFile(file, readStatistic);
@@ -158,7 +159,7 @@ public class AbstractPlaintextFileTest {
     @Test
     public void readFile_fileWithContent_fileProgressReachesHundredPercent() throws IOException {
         // arrange
-        File file = folder.newFile("full.txt");
+        File file = Files.createFile(folder.resolve("full.txt")).toFile();
         Files.writeString(file.toPath(), "line1\nline2");
         ReadStatistic readStatistic = new ReadStatistic();
         RecordingPlaintextFile sut = new RecordingPlaintextFile(file, readStatistic);
@@ -175,7 +176,7 @@ public class AbstractPlaintextFileTest {
     @Test
     public void readFile_asciiContent_contentPreserved() throws IOException {
         // arrange
-        File file = folder.newFile("ascii.txt");
+        File file = Files.createFile(folder.resolve("ascii.txt")).toFile();
         Files.write(file.toPath(), "simple ascii".getBytes(StandardCharsets.ISO_8859_1));
         ReadStatistic readStatistic = new ReadStatistic();
         RecordingPlaintextFile sut = new RecordingPlaintextFile(file, readStatistic);

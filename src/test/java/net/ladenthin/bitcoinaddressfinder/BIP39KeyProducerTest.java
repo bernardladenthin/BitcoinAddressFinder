@@ -4,28 +4,27 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.time.Instant;
 import java.util.List;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.equalTo;
 import java.text.Normalizer;
 import java.text.Normalizer.Form;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
 import static org.hamcrest.Matchers.*;
 import org.apache.commons.codec.binary.Hex;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import org.bitcoinj.crypto.DeterministicKey;
 import org.bitcoinj.crypto.HDKeyDerivation;
 import org.bitcoinj.crypto.MnemonicCode;
 import org.bitcoinj.params.MainNetParams;
 import org.bitcoinj.wallet.DeterministicSeed;
-import static org.junit.Assert.fail;
-import org.junit.runner.RunWith;
+import static org.junit.jupiter.api.Assertions.fail;
 
-@RunWith(DataProviderRunner.class)
 public class BIP39KeyProducerTest {
 
     @Test
@@ -111,8 +110,8 @@ public class BIP39KeyProducerTest {
         assertThat(masterKey.serializePrivB58(MainNetParams.get().network()), is(expectedXprv));
     }
     
-    @Test
-    @UseDataProvider(value = BIP39DataProvider.DATA_PROVIDER_BIP39_TEST_VECTORS, location = BIP39DataProvider.class)
+    @ParameterizedTest
+    @MethodSource(BIP39DataProvider.DATA_PROVIDER_BIP39_TEST_VECTORS)
     public void bip39Vector_givenTestVector_returnsExpectedSeedAndXprvForLanguage(String language, String entropyHex, String mnemonicStr, String passphrase, String expectedSeedHex, String expectedXprv) throws Exception {
         // Arrange
         byte[] entropy = Hex.decodeHex(entropyHex);
@@ -145,7 +144,7 @@ public class BIP39KeyProducerTest {
         assertThat("Language: " + language, masterKey.serializePrivB58(MainNetParams.get().network()), is(expectedXprv));
     }
     
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void nextKey_counterOverflow_throwsException() {
         // arrange
         String mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
@@ -165,7 +164,7 @@ public class BIP39KeyProducerTest {
         }
 
         // This call should overflow and throw NoMoreSecretsAvailableException
-        producer.nextKey();
+        assertThrows(NoMoreSecretsAvailableException.class, () -> producer.nextKey());
     }
     
     @Test

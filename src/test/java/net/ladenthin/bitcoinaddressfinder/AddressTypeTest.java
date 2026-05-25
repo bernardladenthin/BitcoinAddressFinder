@@ -7,7 +7,8 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for {@link AddressType}.
@@ -70,10 +71,10 @@ public class AddressTypeTest {
         assertThat(actual, is(equalTo(AddressType.P2WPKH)));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void valueOf_unknownConstantName_throwsIllegalArgumentException() {
         // act
-        AddressType.valueOf("UNKNOWN_TYPE");
+        assertThrows(IllegalArgumentException.class, () -> AddressType.valueOf("UNKNOWN_TYPE"));
     }
     // </editor-fold>
 

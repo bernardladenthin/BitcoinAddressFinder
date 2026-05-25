@@ -8,7 +8,8 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for {@link BIP39Wordlist}.
@@ -255,10 +256,10 @@ public class BIP39WordlistTest {
         assertThat(result, is(equalTo(BIP39Wordlist.CHINESE_SIMPLIFIED)));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void fromLanguageName_unknownLanguage_throwsException() {
         // act
-        BIP39Wordlist.fromLanguageName("klingon");
+        assertThrows(IllegalArgumentException.class, () -> BIP39Wordlist.fromLanguageName("klingon"));
     }
 
     @Test

@@ -15,9 +15,10 @@ import org.bitcoinj.base.Network;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import java.nio.file.Path;
+import java.nio.file.Files;
 
 /**
  * Unit tests for {@link AddressFile}.
@@ -26,14 +27,14 @@ public class AddressFileTest {
 
     private final Network network = new NetworkParameterFactory().getNetwork();
 
-    @Rule
-    public TemporaryFolder folder = new TemporaryFolder();
+    @TempDir
+    public Path folder;
 
     // <editor-fold defaultstate="collapsed" desc="processLine">
     @Test
     public void processLine_validBitcoinAddress_addressConsumerCalledOnce() throws IOException {
         // arrange
-        File file = folder.newFile("addresses.txt");
+        File file = Files.createFile(folder.resolve("addresses.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<AddressToCoin> addressCapture = new ArrayList<>();
         AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, line -> {});
@@ -49,7 +50,7 @@ public class AddressFileTest {
     @Test
     public void processLine_validBitcoinAddress_readStatisticSuccessfulIncrements() throws IOException {
         // arrange
-        File file = folder.newFile("addresses.txt");
+        File file = Files.createFile(folder.resolve("addresses.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         AddressFile addressFile = new AddressFile(file, readStatistic, network, addressToCoin -> {}, line -> {});
 
@@ -63,7 +64,7 @@ public class AddressFileTest {
     @Test
     public void processLine_validSegwitAddress_addressConsumerCalledOnce() throws IOException {
         // arrange
-        File file = folder.newFile("addresses.txt");
+        File file = Files.createFile(folder.resolve("addresses.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<AddressToCoin> addressCapture = new ArrayList<>();
         AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, line -> {});
@@ -79,7 +80,7 @@ public class AddressFileTest {
     @Test
     public void processLine_emptyLine_unsupportedConsumerReceivesEmptyString() throws IOException {
         // arrange
-        File file = folder.newFile("addresses.txt");
+        File file = Files.createFile(folder.resolve("addresses.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<String> unsupportedCapture = new ArrayList<>();
         AddressFile addressFile = new AddressFile(file, readStatistic, network, addressToCoin -> {}, unsupportedCapture::add);
@@ -95,7 +96,7 @@ public class AddressFileTest {
     @Test
     public void processLine_emptyLine_readStatisticUnsupportedIncrements() throws IOException {
         // arrange
-        File file = folder.newFile("addresses.txt");
+        File file = Files.createFile(folder.resolve("addresses.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         AddressFile addressFile = new AddressFile(file, readStatistic, network, addressToCoin -> {}, line -> {});
 
@@ -109,7 +110,7 @@ public class AddressFileTest {
     @Test
     public void processLine_commentLine_unsupportedConsumerReceivesCommentString() throws IOException {
         // arrange
-        File file = folder.newFile("addresses.txt");
+        File file = Files.createFile(folder.resolve("addresses.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<String> unsupportedCapture = new ArrayList<>();
         AddressFile addressFile = new AddressFile(file, readStatistic, network, addressToCoin -> {}, unsupportedCapture::add);
@@ -125,7 +126,7 @@ public class AddressFileTest {
     @Test
     public void processLine_addressHeaderLine_unsupportedConsumerReceivesHeaderString() throws IOException {
         // arrange
-        File file = folder.newFile("addresses.txt");
+        File file = Files.createFile(folder.resolve("addresses.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<String> unsupportedCapture = new ArrayList<>();
         AddressFile addressFile = new AddressFile(file, readStatistic, network, addressToCoin -> {}, unsupportedCapture::add);
@@ -141,7 +142,7 @@ public class AddressFileTest {
     @Test
     public void processLine_calledTwiceWithValidAddresses_successfulCountIsTwo() throws IOException {
         // arrange
-        File file = folder.newFile("addresses.txt");
+        File file = Files.createFile(folder.resolve("addresses.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<AddressToCoin> addressCapture = new ArrayList<>();
         AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, line -> {});
@@ -162,7 +163,7 @@ public class AddressFileTest {
     @Test
     public void readFile_fileWithOneBitcoinAddress_addressConsumerCalledOnce() throws IOException {
         // arrange
-        File file = folder.newFile("addresses.txt");
+        File file = Files.createFile(folder.resolve("addresses.txt")).toFile();
         FileUtils.writeStringToFile(file, P2PKH.Bitcoin.getPublicAddress() + "\n", StandardCharsets.UTF_8.name());
         ReadStatistic readStatistic = new ReadStatistic();
         List<AddressToCoin> addressCapture = new ArrayList<>();
@@ -180,7 +181,7 @@ public class AddressFileTest {
     @Test
     public void readFile_emptyFile_consumersNeverCalled() throws IOException {
         // arrange
-        File file = folder.newFile("addresses.txt");
+        File file = Files.createFile(folder.resolve("addresses.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         AddressFile addressFile = new AddressFile(file, readStatistic, network, addressToCoin -> {}, line -> {});
 
@@ -195,7 +196,7 @@ public class AddressFileTest {
     @Test
     public void readFile_mixedValidAndCommentLines_correctCountsUpdated() throws IOException {
         // arrange
-        File file = folder.newFile("addresses.txt");
+        File file = Files.createFile(folder.resolve("addresses.txt")).toFile();
         String content = P2PKH.Bitcoin.getPublicAddress() + "\n"
                 + "# comment line\n"
                 + P2PKH.Litecoin.getPublicAddress() + "\n";

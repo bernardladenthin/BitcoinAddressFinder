@@ -3,13 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import java.io.DataInputStream;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import org.jspecify.annotations.Nullable;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import java.util.concurrent.TimeUnit;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -28,15 +29,14 @@ import org.bitcoinj.base.Network;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
-import org.junit.runner.RunWith;
-import static org.junit.Assert.fail;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.Mockito.*;
 import org.slf4j.Logger;
 
-@RunWith(DataProviderRunner.class)
 public class KeyProducerJavaSocketTest {
     
     private final Network network = new NetworkParameterFactory().getNetwork();
@@ -54,13 +54,13 @@ public class KeyProducerJavaSocketTest {
         }
     }
 
-    @Before
+    @BeforeEach
     public void setup() {
         executorService = Executors.newCachedThreadPool();
         mockLogger = mock(Logger.class);
     }
 
-    @After
+    @AfterEach
     public void teardown() {
         executorService.shutdownNow();
     }
@@ -220,7 +220,7 @@ public class KeyProducerJavaSocketTest {
         cleanup(client, serverFuture, serverSocket);
     }
 
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_prematureStreamClose_throwsException() throws Exception {
         int port = findFreePort();
 
@@ -240,12 +240,12 @@ public class KeyProducerJavaSocketTest {
         KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
 
         try {
-            client.createSecrets(1, true);
+            assertThrows(NoMoreSecretsAvailableException.class, () -> client.createSecrets(1, true));
         } finally {
             cleanup(client, serverFuture, serverSocket);
         }
     }
-    
+
     @Test
     public void interrupt_closesConnectionAndNoExceptionThrown() throws Exception {
         int port = findFreePort();
@@ -460,7 +460,7 @@ public class KeyProducerJavaSocketTest {
         cleanup(client, serverFuture, null, 3, TimeUnit.SECONDS);
     }
 
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_socketClosedMidRead_throwsException() throws Exception {
         int port = findFreePort();
 
@@ -480,13 +480,13 @@ public class KeyProducerJavaSocketTest {
         KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
 
         try {
-            client.createSecrets(1, true);
+            assertThrows(NoMoreSecretsAvailableException.class, () -> client.createSecrets(1, true));
         } finally {
             cleanup(client, serverFuture, serverSocket);
         }
     }
     
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_serverDisconnectsMidTransfer_throwsException() throws Exception {
         int port = findFreePort();
 
@@ -505,7 +505,7 @@ public class KeyProducerJavaSocketTest {
         KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
 
         try {
-            client.createSecrets(1, true);
+            assertThrows(NoMoreSecretsAvailableException.class, () -> client.createSecrets(1, true));
         } finally {
             cleanup(client, serverFuture, serverSocket);
         }
@@ -538,7 +538,7 @@ public class KeyProducerJavaSocketTest {
         cleanup(client, serverFuture, serverSocket);
     }
 
-    @Test(expected = NoMoreSecretsAvailableException.class)
+    @Test
     public void createSecrets_malformedSecretStream_throwsException() throws Exception {
         int port = findFreePort();
 
@@ -557,7 +557,7 @@ public class KeyProducerJavaSocketTest {
         KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
 
         try {
-            client.createSecrets(2, false);
+            assertThrows(NoMoreSecretsAvailableException.class, () -> client.createSecrets(2, false));
         } finally {
             cleanup(client, serverFuture, serverSocket);
         }
@@ -624,7 +624,8 @@ public class KeyProducerJavaSocketTest {
         return serverSocket;
     }
     
-    @Test(timeout = 5000)
+    @Test
+    @Timeout(value = 5000, unit = TimeUnit.MILLISECONDS)
     public void testInterruptCausesShutdownDuringConnectionAttemptOnly() throws Exception {
         final int STATE_UNEXPECTED_SUCCESS = -1;
         final int STATE_UNKNOWN = 0;
@@ -668,11 +669,12 @@ public class KeyProducerJavaSocketTest {
         future.get(3, TimeUnit.SECONDS);
         executor.shutdownNow();
         
-        assertNotEquals("Thread exited without triggering interrupt", STATE_UNEXPECTED_SUCCESS, state.get());
-        assertEquals("Expected interrupt to cause shutdown", STATE_INTERRUPTED_EXIT, state.get());
+        assertNotEquals(STATE_UNEXPECTED_SUCCESS, state.get(), "Thread exited without triggering interrupt");
+        assertEquals(STATE_INTERRUPTED_EXIT, state.get(), "Expected interrupt to cause shutdown");
     }
     
-    @Test(timeout = 5000)
+    @Test
+    @Timeout(value = 5000, unit = TimeUnit.MILLISECONDS)
     public void serverAcceptTimesOut_whenNoClientConnects() throws Exception {
         int port = findFreePort();
 
@@ -691,7 +693,7 @@ public class KeyProducerJavaSocketTest {
         } catch (NoMoreSecretsAvailableException e) {
             long duration = System.currentTimeMillis() - start;
             // Timeout must be honored within reasonable margin (±200ms)
-            assertTrue("Timeout did not occur as expected", duration >= TestTimeProvider.SOCKET_ACCEPT_TIMEOUT && duration <= TestTimeProvider.SOCKET_ACCEPT_TIMEOUT + 200);
+            assertTrue(duration >= TestTimeProvider.SOCKET_ACCEPT_TIMEOUT && duration <= TestTimeProvider.SOCKET_ACCEPT_TIMEOUT + 200, "Timeout did not occur as expected");
             assertThat(e.getMessage(), containsString("Timeout while waiting for secret"));
         } finally {
             server.interrupt();

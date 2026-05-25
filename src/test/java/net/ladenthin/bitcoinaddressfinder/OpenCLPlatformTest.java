@@ -7,7 +7,7 @@ import com.google.common.collect.ImmutableList;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import org.jspecify.annotations.NonNull;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import java.util.Collections;
 import java.util.List;
 import static org.hamcrest.MatcherAssert.assertThat;

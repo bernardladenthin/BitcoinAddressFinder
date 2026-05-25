@@ -3,16 +3,18 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.File;
+import java.nio.file.Files;
 
 import org.jspecify.annotations.Nullable;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import java.nio.file.Path;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import static org.hamcrest.Matchers.*;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -38,14 +40,12 @@ import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocketTest;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaZmqTest;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
-import org.junit.runner.RunWith;
 import org.slf4j.Logger;
 
-@RunWith(DataProviderRunner.class)
 public class FinderTest {
 
-    @Rule
-    public TemporaryFolder folder = new TemporaryFolder();
+    @TempDir
+    public Path folder;
 
     // <editor-fold defaultstate="collapsed" desc="interrupt">
     @Test
@@ -70,9 +70,10 @@ public class FinderTest {
         finder.configureProducer();
         // act
         finder.interrupt();
+        finder.shutdownAndAwaitTermination();
         // assert
     }
-    
+
     @Test
     public void interrupt_consumerStarted_consumerNotStopped() throws IOException {
         // arrange
@@ -86,6 +87,7 @@ public class FinderTest {
         finder.startConsumer();
         // act
         finder.interrupt();
+        finder.shutdownAndAwaitTermination();
         // assert
     }
     // </editor-fold>
@@ -185,11 +187,13 @@ public class FinderTest {
         List<Producer> allProducers = finder.getAllProducers();
         // assert
         assertThat(allProducers, hasSize(3));
+        finder.interrupt();
+        finder.shutdownAndAwaitTermination();
     }
     // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc="startKeyProducer">
-    @Test(expected = KeyProducerIdNullException.class)
+    @Test
     public void startKeyProducer_keyProducerIdIsNull_ExceptionThrown() throws IOException, InterruptedException {
         // arrange
         CFinder cFinder = new CFinder();
@@ -198,26 +202,26 @@ public class FinderTest {
         configureConsumerJava(cFinder);
         Finder finder = new Finder(cFinder);
         // act
-        finder.startKeyProducer();
+        assertThrows(KeyProducerIdNullException.class, () -> finder.startKeyProducer());
     }
-    
-    @Test(expected = KeyProducerIdIsNotUniqueException.class)
+
+    @Test
     public void startKeyProducer_keyProducerIdIsNotUnique_ExceptionThrown() throws IOException, InterruptedException {
         // arrange
         CFinder cFinder = new CFinder();
         String sameIdTwice = "123";
         configureKeyProducerJavaRandom(sameIdTwice, cFinder);
         configureKeyProducerJavaRandom(sameIdTwice, cFinder);
-        
+
         configureConsumerJava(cFinder);
         Finder finder = new Finder(cFinder);
         // act
-        finder.startKeyProducer();
+        assertThrows(KeyProducerIdIsNotUniqueException.class, () -> finder.startKeyProducer());
     }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="configureProducer">
-    @Test(expected = KeyProducerIdUnknownException.class)
+    @Test
     public void configureProducer_keyProducerIdIsUnknown_ExceptionThrown() throws IOException, InterruptedException {
         // arrange
         CFinder cFinder = new CFinder();
@@ -233,15 +237,16 @@ public class FinderTest {
 
         finder.startConsumer();
         finder.startKeyProducer();
-        
+
         // act
-        finder.configureProducer();
+        assertThrows(KeyProducerIdUnknownException.class, () -> finder.configureProducer());
+        finder.shutdownAndAwaitTermination();
     }
     // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc="testFullCycle">
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_KEY_PRODUCER_TYPES, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_KEY_PRODUCER_TYPES)
     public void testFullCycle_keyProducerJavaSetAndInitialized_statesCorrect(CommonDataProvider.KeyProducerTypesLocal keyProducerType) throws IOException, InterruptedException {
         // arrange
         CFinder cFinder = new CFinder();

@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.io.IOException;
 
 import net.ladenthin.bitcoinaddressfinder.*;
@@ -17,16 +15,16 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomIn
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import org.bitcoinj.base.Network;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import static org.mockito.Mockito.mock;
 import org.slf4j.Logger;
 
-@RunWith(DataProviderRunner.class)
 public class KeyProducerJavaTest {
     
     /**
@@ -41,15 +39,15 @@ public class KeyProducerJavaTest {
 
     private final Network network = new NetworkParameterFactory().getNetwork();
     
-    @Before
+    @BeforeEach
     public void setUp() {
         keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
         bitHelper = new BitHelper();
         mockLogger = mock(Logger.class);
     }
     
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_JAVA_KEY_PRODUCER_AND_BIT_SIZE, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_JAVA_KEY_PRODUCER_AND_BIT_SIZE)
     public void createSecrets_throwsException_whenWorkSizeExceedsMax(CommonDataProvider.KeyProducerTypesLocal keyProducerType, int bits) throws IOException, InterruptedException {
         // arrange
         final int maxWorkSize = 1 << bits; // 2^bits
@@ -59,8 +57,8 @@ public class KeyProducerJavaTest {
         assertWorkSizeTooLargeThrows(keyProducer, maxWorkSize + 1);
     }
     
-    @Test
-    @UseDataProvider(value = CommonDataProvider.DATA_PROVIDER_KEY_PRODUCER_TYPES, location = CommonDataProvider.class)
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_KEY_PRODUCER_TYPES)
     public void createSecrets_throwsException_whenWorkSizeTooLess(CommonDataProvider.KeyProducerTypesLocal keyProducerType) throws IOException, InterruptedException {
         // arrange
         KeyProducerJava keyProducer = createKeyProducer(keyProducerType, 1);

@@ -6,7 +6,8 @@ package net.ladenthin.bitcoinaddressfinder;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.Test;
 
 public class ProducerStateTest {
 
@@ -96,10 +97,10 @@ public class ProducerStateTest {
         assertThat(ProducerState.valueOf("NOT_RUNNING"), is(equalTo(ProducerState.NOT_RUNNING)));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void valueOf_unknownString_throwsIllegalArgumentException() {
         // arrange, act, assert
-        ProducerState.valueOf("UNKNOWN_STATE");
+        assertThrows(IllegalArgumentException.class, () -> ProducerState.valueOf("UNKNOWN_STATE"));
     }
     // </editor-fold>
 }

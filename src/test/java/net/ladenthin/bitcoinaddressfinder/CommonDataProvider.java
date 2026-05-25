@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.tngtech.java.junit.dataprovider.DataProvider;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.nio.ByteOrder;
@@ -15,15 +14,18 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.*;
 
 public class CommonDataProvider {
-    
+
+    /** Must remain a string literal — annotation values require compile-time constants. */
+    private static final String CLASS_NAME = "net.ladenthin.bitcoinaddressfinder.CommonDataProvider";
+
     /**
      * For {@link #cSecretFormat()}.
      */
-    public final static String DATA_PROVIDER_LARGE_SECRETS_AS_HEX = "largeSecretsAsHex";
+    public final static String DATA_PROVIDER_LARGE_SECRETS_AS_HEX = CLASS_NAME + "#largeSecretsAsHex";
 
     /**
     * Provides valid 64-character (32-byte) hex strings representing large unsigned secrets.
-    * 
+    *
     * These values are used to verify correct conversion from hex to BigInteger and back to hex,
     * without losing leading zero bytes — a common issue with BigInteger.toByteArray().
     *
@@ -35,7 +37,6 @@ public class CommonDataProvider {
     *
     * These test cases help detect and avoid those pitfalls.
     */
-    @DataProvider
     public static Object[][] largeSecretsAsHex() {
         return new Object[][] {
             {"0000000000000000000000000000000000000000000000000000000000000000"},
@@ -51,9 +52,8 @@ public class CommonDataProvider {
     /**
      * For {@link #cSecretFormat()}.
      */
-    public final static String DATA_PROVIDER_CSECRET_FORMAT = "cSecretFormat";
+    public final static String DATA_PROVIDER_CSECRET_FORMAT = CLASS_NAME + "#cSecretFormat";
 
-    @DataProvider
     public static Object[][] cSecretFormat() {
         return transformFlatToObjectArrayArray(CSecretFormat.values());
     }
@@ -61,9 +61,8 @@ public class CommonDataProvider {
     /**
      * For {@link EndiannessConverterTest}.
      */
-    public static final String DATA_PROVIDER_ENDIANNESS = "endiannessScenarios";
+    public static final String DATA_PROVIDER_ENDIANNESS = CLASS_NAME + "#endiannessScenarios";
 
-    @DataProvider
     public static Object[][] endiannessScenarios() {
         return new Object[][] {
             {ByteOrder.LITTLE_ENDIAN, ByteOrder.LITTLE_ENDIAN, false},
@@ -85,9 +84,8 @@ public class CommonDataProvider {
     /**
      * For {@link FinderTest}.
      */
-    public static final String DATA_PROVIDER_KEY_PRODUCER_TYPES = "keyProducerTypes";
+    public static final String DATA_PROVIDER_KEY_PRODUCER_TYPES = CLASS_NAME + "#keyProducerTypes";
 
-    @DataProvider
     public static Object[][] keyProducerTypes() {
         return Arrays.stream(KeyProducerTypesLocal.values())
             .map(type -> new Object[]{type})
@@ -97,9 +95,8 @@ public class CommonDataProvider {
     /**
     * For tests validating combinations of key producer types and bit sizes.
     */
-   public static final String DATA_PROVIDER_JAVA_KEY_PRODUCER_AND_BIT_SIZE = "keyProducerTypeAndBitSize";
+   public static final String DATA_PROVIDER_JAVA_KEY_PRODUCER_AND_BIT_SIZE = CLASS_NAME + "#keyProducerTypeAndBitSize";
 
-    @DataProvider
     public static Object[][] keyProducerTypeAndBitSize() {
         return mergeMany(
             keyProducerTypes(),    // e.g., Socket, ZMQ, etc.
@@ -136,9 +133,8 @@ public class CommonDataProvider {
     /**
      * For {@link #bitsToSize()}.
      */
-    public final static String DATA_PROVIDER_BITS_TO_SIZE = "bitsToSize";
+    public final static String DATA_PROVIDER_BITS_TO_SIZE = CLASS_NAME + "#bitsToSize";
 
-    @DataProvider
     public static Object[][] bitsToSize() {
         return new Object[][]{
             {0, 1},
@@ -152,9 +148,8 @@ public class CommonDataProvider {
     /**
      * For {@link #killBits()}.
      */
-    public final static String DATA_PROVIDER_KILL_BITS = "killBits";
+    public final static String DATA_PROVIDER_KILL_BITS = CLASS_NAME + "#killBits";
 
-    @DataProvider
     public static Object[][] killBits() {
         return new Object[][]{
             {0, BigInteger.valueOf(0L)},
@@ -168,9 +163,8 @@ public class CommonDataProvider {
     /**
      * For {@link #bytesToMib()}.
      */
-    public final static String DATA_PROVIDER_BYTES_TO_MIB = "bytesToMib";
+    public final static String DATA_PROVIDER_BYTES_TO_MIB = CLASS_NAME + "#bytesToMib";
 
-    @DataProvider
     public static Object[][] bytesToMib() {
         return new Object[][]{
             {1L, 0.00000095367431640625d},
@@ -183,9 +177,8 @@ public class CommonDataProvider {
     /**
      * For {@link #mibToBytes()}.
      */
-    public final static String DATA_PROVIDER_MIB_TO_BYTES = "mibToBytes";
+    public final static String DATA_PROVIDER_MIB_TO_BYTES = CLASS_NAME + "#mibToBytes";
 
-    @DataProvider
     public static Object[][] mibToBytes() {
         return new Object[][]{
             {1L, 1024L*1024L},
@@ -197,9 +190,8 @@ public class CommonDataProvider {
     /**
      * For {@link #lmdbAmounts()}.
      */
-    public final static String DATA_PROVIDER_LMDB_AMOUNTS = "lmdbAmounts";
+    public final static String DATA_PROVIDER_LMDB_AMOUNTS = CLASS_NAME + "#lmdbAmounts";
 
-    @DataProvider
     public static Object[][] lmdbAmounts() {
         long randomAmount = 13371337L;
         return new Object[][]{
@@ -245,9 +237,8 @@ public class CommonDataProvider {
     /**
      * For {@link #lmdbIncreaseSize()}.
      */
-    public final static String DATA_PROVIDER_LMDB_INCREASE_SIZE = "lmdbIncreaseSize";
+    public final static String DATA_PROVIDER_LMDB_INCREASE_SIZE = CLASS_NAME + "#lmdbIncreaseSize";
 
-    @DataProvider
     public static Object[][] lmdbIncreaseSize() {
         return new Object[][]{
             {1024L},
@@ -259,9 +250,8 @@ public class CommonDataProvider {
     /**
      * For {@link #bitSizesAtMostMax()}.
      */
-    public final static String DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX = "bitSizesAtMostMax";
+    public final static String DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX = CLASS_NAME + "#bitSizesAtMostMax";
 
-    @DataProvider
     public static Object[][] bitSizesAtMostMax() {
         final int max = PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY;
 
@@ -276,9 +266,8 @@ public class CommonDataProvider {
     /**
      * For {@link #compressedAndStaticAmount()}.
      */
-    public final static String DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT = "compressedAndStaticAmount";
+    public final static String DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT = CLASS_NAME + "#compressedAndStaticAmount";
 
-    @DataProvider
     public static Object[][] compressedAndStaticAmount() {
         return new Object[][]{
             {true, true},
@@ -291,9 +280,8 @@ public class CommonDataProvider {
     /**
      * For {@link #staticAmount()}.
      */
-    public final static String DATA_PROVIDER_STATIC_AMOUNT = "staticAmount";
+    public final static String DATA_PROVIDER_STATIC_AMOUNT = CLASS_NAME + "#staticAmount";
 
-    @DataProvider
     public static Object[][] staticAmount() {
         return new Object[][]{
             {true},
@@ -304,9 +292,8 @@ public class CommonDataProvider {
     /**
      * For {@link #compressed()}.
      */
-    public final static String DATA_PROVIDER_COMPRESSED = "compressed";
+    public final static String DATA_PROVIDER_COMPRESSED = CLASS_NAME + "#compressed";
 
-    @DataProvider
     public static Object[][] compressed() {
         return new Object[][]{
             {true},
@@ -317,9 +304,8 @@ public class CommonDataProvider {
     /**
      * For {@link #addressSeperator()}.
      */
-    public final static String DATA_PROVIDER_ADDRESS_SEPARATOR = "addressSeperator";
+    public final static String DATA_PROVIDER_ADDRESS_SEPARATOR = CLASS_NAME + "#addressSeperator";
 
-    @DataProvider
     public static Object[][] addressSeperator() {
             return Arrays.stream(SeparatorFormat.values())
                  .map(format -> new Object[]{format.getSymbol()})
@@ -329,9 +315,8 @@ public class CommonDataProvider {
     /**
      * For {@link #invalidP2WPKHAddressesValidBase58()}.
      */
-    public final static String DATA_PROVIDER_INVALID_P2WPKH_ADDRESSES_VALID_BASE58 = "invalidP2WPKHAddressesValidBase58";
+    public final static String DATA_PROVIDER_INVALID_P2WPKH_ADDRESSES_VALID_BASE58 = CLASS_NAME + "#invalidP2WPKHAddressesValidBase58";
 
-    @DataProvider
     public static Object[][] invalidP2WPKHAddressesValidBase58() {
         return new Object[][]{
             {"bc1zqyqsywvzqeeeeeee", "5347dec05b6f03de6cc004c1ec33000000000000"},  // bitcoin
@@ -345,9 +330,8 @@ public class CommonDataProvider {
     /**
      * For {@link #invalidBech32WitnessVersion2()}.
      */
-    public final static String DATA_PROVIDER_INVALID_BECH32_WITNESS_VERSION_2 = "invalidBech32WitnessVersion2";
+    public final static String DATA_PROVIDER_INVALID_BECH32_WITNESS_VERSION_2 = CLASS_NAME + "#invalidBech32WitnessVersion2";
 
-    @DataProvider
     public static Object[][] invalidBech32WitnessVersion2() {
         return new Object[][]{
             // Not sure where this address comes from, but it has a witness version of 2 and a witness program length of 2
@@ -358,9 +342,8 @@ public class CommonDataProvider {
     /**
      * For {@link #invalidBase58()}.
      */
-    public final static String DATA_PROVIDER_INVALID_BASE58 = "invalidBase58";
+    public final static String DATA_PROVIDER_INVALID_BASE58 = CLASS_NAME + "#invalidBase58";
 
-    @DataProvider
     public static Object[][] invalidBase58() {
         return new Object[][]{
             // P2PKH
@@ -380,9 +363,8 @@ public class CommonDataProvider {
      * For {@link #bitcoinAddressesCorrectBase58()}.
      * A correct base58 format should be parsed anyway.
      */
-    public final static String DATA_PROVIDER_BITCOIN_ADDRESSES_CORRECT_BASE_58 = "bitcoinAddressesCorrectBase58";
+    public final static String DATA_PROVIDER_BITCOIN_ADDRESSES_CORRECT_BASE_58 = CLASS_NAME + "#bitcoinAddressesCorrectBase58";
 
-    @DataProvider
     public static Object[][] bitcoinAddressesCorrectBase58() {
         return new Object[][]{
             {"1WrongAddressFormat","01667b78604490800f88b15c77a5000000000000"},
@@ -395,9 +377,8 @@ public class CommonDataProvider {
      * For {@link #correctBase58()}.
      * A correct base58 format should be parsed anyway.
      */
-    public final static String DATA_PROVIDER_CORRECT_BASE_58 = "correctBase58";
+    public final static String DATA_PROVIDER_CORRECT_BASE_58 = CLASS_NAME + "#correctBase58";
 
-    @DataProvider
     public static Object[][] correctBase58() {
         return new Object[][]{
             {"1","0000000000000000000000000000000000000000"},
@@ -411,9 +392,8 @@ public class CommonDataProvider {
     /**
      * For {@link #srcPos()}.
      */
-    public final static String DATA_PROVIDER_SRC_POS = "srcPos";
+    public final static String DATA_PROVIDER_SRC_POS = CLASS_NAME + "#srcPos";
 
-    @DataProvider
     public static Object[][] srcPos() {
         return new Object[][]{
             {1},
@@ -444,9 +424,8 @@ public class CommonDataProvider {
      * TODO: I don't know if this is right. It seems like it's a base58 format.
      * I've asked Blockchair and they've answered: "The addresses you listed are for internal purposes.".
      */
-    public final static String DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_CHECKSUM_INVALID = "bitcoinCashAddressesChecksumInvalid";
+    public final static String DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_CHECKSUM_INVALID = CLASS_NAME + "#bitcoinCashAddressesChecksumInvalid";
 
-    @DataProvider
     public static Object[][] bitcoinCashAddressesChecksumInvalid() {
         return new Object[][]{
             {"dSn3treXZQfJRktvoApJKM","27225957c54a53b10e4f4e00b2562af400000000"},
@@ -467,9 +446,8 @@ public class CommonDataProvider {
      * TODO: I don't know if this is right. It seems like it's a hex format.
      * I've asked Blockchair and they've answered: "The addresses you listed are for internal purposes.".
      */
-    public final static String DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_INTERNAL_PURPOSE = "bitcoinCashAddressesInternalPurpose";
+    public final static String DATA_PROVIDER_BITCOIN_CASH_ADDRESSES_INTERNAL_PURPOSE = CLASS_NAME + "#bitcoinCashAddressesInternalPurpose";
 
-    @DataProvider
     public static Object[][] bitcoinCashAddressesInternalPurpose() {
         return new Object[][]{
             {"d-32551cbc0d16a34c5995b4057c3f027c"},
@@ -483,9 +461,8 @@ public class CommonDataProvider {
     /**
      * For {@link #createSecretBaseLogged()}.
      */
-    public final static String DATA_PROVIDER_CREATE_SECRET_BASE_LOGGED = "createSecretBaseLogged";
+    public final static String DATA_PROVIDER_CREATE_SECRET_BASE_LOGGED = CLASS_NAME + "#createSecretBaseLogged";
 
-    @DataProvider
     public static Object[][] createSecretBaseLogged() {
         return new Object[][]{
             // small key, batchSizeInBits: 2
@@ -505,9 +482,8 @@ public class CommonDataProvider {
     /**
      * For {@link #staticP2PKHAddresses()}.
      */
-    public final static String DATA_PROVIDER_STATIC_P2PKH_ADDRESSES = "staticP2PKHAddresses";
+    public final static String DATA_PROVIDER_STATIC_P2PKH_ADDRESSES = CLASS_NAME + "#staticP2PKHAddresses";
 
-    @DataProvider
     public static Object[][] staticP2PKHAddresses() {
         return transformFlatToObjectArrayArray(P2PKH.values());
     }
@@ -515,9 +491,8 @@ public class CommonDataProvider {
     /**
      * For {@link #staticP2SHAddresses()}.
      */
-    public final static String DATA_PROVIDER_STATIC_P2SH_ADDRESSES = "staticP2SHAddresses";
+    public final static String DATA_PROVIDER_STATIC_P2SH_ADDRESSES = CLASS_NAME + "#staticP2SHAddresses";
 
-    @DataProvider
     public static Object[][] staticP2SHAddresses() {
         return transformFlatToObjectArrayArray(P2SH.values());
     }
@@ -525,9 +500,8 @@ public class CommonDataProvider {
     /**
      * For {@link #staticP2SHAddresses()}.
      */
-    public final static String DATA_PROVIDER_STATIC_P2WPKH_ADDRESSES = "staticP2WPKHAddresses";
+    public final static String DATA_PROVIDER_STATIC_P2WPKH_ADDRESSES = CLASS_NAME + "#staticP2WPKHAddresses";
 
-    @DataProvider
     public static Object[][] staticP2WPKHAddresses() {
         return transformFlatToObjectArrayArray(P2WPKH.values());
     }
@@ -535,9 +509,8 @@ public class CommonDataProvider {
     /**
      * For {@link #staticUnsupportedAddresses()}.
      */
-    public final static String DATA_PROVIDER_STATIC_UNSUPPORTED_ADDRESSES = "staticUnsupportedAddresses";
+    public final static String DATA_PROVIDER_STATIC_UNSUPPORTED_ADDRESSES = CLASS_NAME + "#staticUnsupportedAddresses";
 
-    @DataProvider
     public static Object[][] staticUnsupportedAddresses() {
         return transformFlatToObjectArrayArray(StaticUnsupportedAddress.values());
     }
@@ -554,9 +527,8 @@ public class CommonDataProvider {
      * For {@link ByteBufferUtility}.
      * Use allocate direct.
      */
-    public final static String DATA_PROVIDER_ALLOCATE_DIRECT = "allocateDirect";
+    public final static String DATA_PROVIDER_ALLOCATE_DIRECT = CLASS_NAME + "#allocateDirect";
 
-    @DataProvider
     public static Object[][] allocateDirect() {
         return new Object[][]{
             {true},
@@ -570,9 +542,8 @@ public class CommonDataProvider {
      * Supplies {@code true} (Bloom filter active) and {@code false} (Bloom filter inactive),
      * to verify correctness and performance behavior in both configurations.
      */
-    public final static String DATA_PROVIDER_BLOOM_FILTER_ENABLED = "bloomFilterEnabled";
+    public final static String DATA_PROVIDER_BLOOM_FILTER_ENABLED = CLASS_NAME + "#bloomFilterEnabled";
 
-    @DataProvider
     public static Object[][] bloomFilterEnabled() {
         return new Object[][]{
             {true},
@@ -583,9 +554,8 @@ public class CommonDataProvider {
     /**
      * For {@link #largePrivateKeys()}.
      */
-    public final static String DATA_PROVIDER_LARGE_PRIVATE_KEYS = "largePrivateKeys";
+    public final static String DATA_PROVIDER_LARGE_PRIVATE_KEYS = CLASS_NAME + "#largePrivateKeys";
 
-    @DataProvider
     public static Object[][] largePrivateKeys() {
         return new Object[][]{
             // ⚠️ Important: Do not include keys that are near or equal to the maximum valid private key (e.g., MAX_PRIVATE_KEY + offset).
@@ -679,9 +649,8 @@ public class CommonDataProvider {
     /**
      * For {@link #privateKeysTooLargeWithChunkSize()}.
      */
-    public final static String DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE = "privateKeysTooLargeWithChunkSize";
+    public final static String DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE = CLASS_NAME + "#privateKeysTooLargeWithChunkSize";
 
-    @DataProvider
     public static Object[][] privateKeysTooLargeWithChunkSize() {
         return new Object[][]{
             {PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY, PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
@@ -692,9 +661,8 @@ public class CommonDataProvider {
     /**
      * For {@link #privateKeys32ByteRequiringStrip()}.
      */
-    public final static String DATA_PROVIDER_PRIVATE_KEYS_32_BYTE_REQUIRING_STRIP = "privateKeys32ByteRequiringStrip";
+    public final static String DATA_PROVIDER_PRIVATE_KEYS_32_BYTE_REQUIRING_STRIP = CLASS_NAME + "#privateKeys32ByteRequiringStrip";
 
-    @DataProvider
     public static Object[][] privateKeys32ByteRequiringStrip() {
         return new Object[][]{
             // Custom crafted BigIntegers with MSB set (highest bit in first byte = 1)
@@ -708,9 +676,8 @@ public class CommonDataProvider {
     /**
      * For {@link #bigIntegerVariants()}.
      */
-    public final static String DATA_PROVIDER_BIG_INTEGER_VARIANTS = "bigIntegerVariants";
-    
-    @DataProvider
+    public final static String DATA_PROVIDER_BIG_INTEGER_VARIANTS = CLASS_NAME + "#bigIntegerVariants";
+
     public static Object[][] bigIntegerVariants() {
         return new Object[][] {
             { new BigInteger("00", 16), 0, (byte) 0x00 }, // 0-value, empty result
