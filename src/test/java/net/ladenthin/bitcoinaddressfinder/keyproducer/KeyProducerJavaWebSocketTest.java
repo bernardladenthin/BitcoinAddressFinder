@@ -52,7 +52,7 @@ public class KeyProducerJavaWebSocketTest {
         config.port = KeyProducerJavaSocketTest.findFreePort();
         // Block until a message arrives (or signalShutdown via interrupt() wakes us).
         // The JUnit per-test timeout (60s) is the upper bound when something is
-        // genuinely wrong &#x2014; far more reliable than racing against a fixed receiver
+        // genuinely wrong - far more reliable than racing against a fixed receiver
         // timeout under loaded CI conditions.
         config.timeout = -1;
         return config;

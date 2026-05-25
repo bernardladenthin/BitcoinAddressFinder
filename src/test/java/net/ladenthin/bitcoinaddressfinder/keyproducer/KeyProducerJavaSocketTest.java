@@ -290,17 +290,6 @@ public class KeyProducerJavaSocketTest {
 
     @Test
     public void interrupt_wakesBlockedCreateSecretsImmediately() throws Exception {
-        // arrange
-        // A server that accepts the connection but never sends any bytes, so the
-        // client's reader thread sits in inputStream.read() and the secret queue
-        // stays empty. createSecrets() will block in queue.poll() with a long
-        // positive timeout (Socket producer cannot use -1 because the same value
-        // is passed to SO_TIMEOUT, which rejects negatives).
-        //
-        // Without signalShutdown(), createSecrets would only return when the
-        // socket-close ripple eventually wakes the reader and the poll times out
-        // &#x2014; up to clientSocketTimeout ms later. With signalShutdown(),
-        // interrupt() should wake the consumer in milliseconds.
         int port = findFreePort();
 
         final int serverHoldTime = TestTimeProvider.LONG_SOCKET_TIMEOUT * 4;
@@ -695,7 +684,7 @@ public class KeyProducerJavaSocketTest {
             fail("Expected NoMoreSecretsAvailableException due to accept timeout");
         } catch (NoMoreSecretsAvailableException e) {
             long duration = System.currentTimeMillis() - start;
-            // Timeout must be honored within reasonable margin (±200ms)
+            // Timeout must be honored within reasonable margin (+-200ms)
             assertTrue("Timeout did not occur as expected", duration >= TestTimeProvider.SOCKET_ACCEPT_TIMEOUT && duration <= TestTimeProvider.SOCKET_ACCEPT_TIMEOUT + 200);
             assertThat(e.getMessage(), containsString("Timeout while waiting for secret"));
         } finally {

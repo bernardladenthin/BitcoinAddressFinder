@@ -57,7 +57,7 @@ public class KeyProducerTestUtility {
      * {@code (fillByte + 1)}.
      * <p>
      * Note that this implementation currently applies the same incremented value to all bytes
-     * in the array — it does not perform cumulative iteration.
+     * in the array - it does not perform cumulative iteration.
      *
      * @param startByte the base byte value used as the starting point for incrementing.
      * @return a new byte array of size {@link PublicKeyBytes#PRIVATE_KEY_MAX_NUM_BYTES},

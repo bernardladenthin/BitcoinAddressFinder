@@ -37,7 +37,7 @@ import org.slf4j.Logger;
  *   <tr>
  *     <td>1. Start of range, batch fits</td>
  *     <td>At startAddress (min)</td>
- *     <td>≤ keys remaining</td>
+ *     <td>&#x2264; keys remaining</td>
  *     <td>Yes</td>
  *     <td>Returns full batch sequential keys</td>
  *     <td>No</td>
@@ -46,7 +46,7 @@ import org.slf4j.Logger;
  *   <tr>
  *     <td>2. Inside range, batch fits</td>
  *     <td>Inside range (between start and end)</td>
- *     <td>≤ keys remaining</td>
+ *     <td>&#x2264; keys remaining</td>
  *     <td>Yes</td>
  *     <td>Returns full batch sequential keys</td>
  *     <td>No</td>
@@ -328,13 +328,13 @@ public class KeyProducerJavaIncrementalTest {
 
     private void assertTwoBatchedOk(KeyProducerJavaIncremental producer, int batchSize) {
         try {
-            // 1st batch: [1, 2] – OK
+            // 1st batch: [1, 2] - OK
             BigInteger[] batch1 = producer.createSecrets(batchSize, false);
             assertThat(batch1.length, is(equalTo(batchSize)));
             assertThat(batch1[0], is(equalTo(BigInteger.ONE)));
             assertThat(batch1[1], is(equalTo(BigInteger.TWO)));
 
-            // 2nd batch: [3, 4] – OK
+            // 2nd batch: [3, 4] - OK
             BigInteger[] batch2 = producer.createSecrets(batchSize, false);
             assertThat(batch2.length, is(equalTo(batchSize)));
             assertThat(batch2[0], is(equalTo(BigInteger.valueOf(3))));
