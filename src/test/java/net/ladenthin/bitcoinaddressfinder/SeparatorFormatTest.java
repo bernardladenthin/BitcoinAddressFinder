@@ -226,13 +226,6 @@ public class SeparatorFormatTest {
             + SeparatorFormat.PIPE.getSymbol() 
             + "fourth";
 
-        // Expected splitting order:
-        // 1. DOUBLE_COLON splits "first" and "second:third|fourth"
-        // 2. COLON splits "second" and "third|fourth"
-        // 3. PIPE splits "third" and "fourth"
-        //
-        // Expected output: ["first", "second", "third", "fourth"]
-
         // act
         String[] result = SeparatorFormat.split(input);
 

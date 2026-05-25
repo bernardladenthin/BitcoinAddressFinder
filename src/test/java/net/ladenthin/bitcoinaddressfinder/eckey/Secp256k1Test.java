@@ -42,9 +42,6 @@ public class Secp256k1Test {
 
         // regeneration of ECPublicKey with java native starts here
         System.out.println("\nGenerate PublicKey from PrivateKey with Java native routines");
-        // the preset "303E.." only works for elliptic curve secp256k1
-        // see answer by user dave_thompson_085
-        // https://stackoverflow.com/questions/48832170/generate-ec-public-key-from-byte-array-private-key-in-native-java-7
         String privateKeyFull = "303E020100301006072A8648CE3D020106052B8104000A042730250201010420"
                 + privateKey;
         byte[] privateKeyFullByte = hexStringToByteArray(privateKeyFull);
