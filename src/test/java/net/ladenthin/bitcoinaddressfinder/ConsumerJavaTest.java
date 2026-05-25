@@ -47,10 +47,6 @@ public class ConsumerJavaTest {
     private final PersistenceUtils persistenceUtils = new PersistenceUtils(network);
     private final BitHelper bitHelper = new BitHelper();
     
-    /**
-     * Returns an example key. <a href="https://privatekeys.pw/key/0000000000000000000000000000000000000000000000000000000000000049">Example key</a>
-     * @return an example key.
-     */
     public static PublicKeyBytes[] createExamplePublicKeyBytesfromPrivateKey73() {
         PublicKeyBytes publicKeyBytes = PublicKeyBytes.fromPrivate(BigInteger.valueOf(73));
         PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[]{publicKeyBytes};
@@ -134,7 +130,6 @@ public class ConsumerJavaTest {
     @AwaitTimeTest
     @Test
     public void interrupt_keysQueueNotEmpty_consumerNotRunningWaitedInternallyForTheDuration() throws IOException, InterruptedException, MnemonicException.MnemonicLengthException {
-        // Change await duration
         ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY = AwaitTimeTests.AWAIT_DURATION;
         
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
@@ -149,14 +144,11 @@ public class ConsumerJavaTest {
         consumerJava.setLogger(logger);
         consumerJava.initLMDB();
         
-        // add keys
         consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
 
-        // pre-assert, assert the keys queue is not empty
         assertThat(consumerJava.keysQueueSize(), is(equalTo(1)));
         assertThat(consumerJava.shouldRun.get(), is(equalTo(Boolean.TRUE)));
         
-        // add a pseudo thread to the executor to test its eecution duration
         consumerJava.consumeKeysExecutorService.submit(() -> {
             try {
                 Thread.sleep(ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY);
@@ -164,18 +156,14 @@ public class ConsumerJavaTest {
                 throw new RuntimeException(e);
             }
         });
-        // act
         long beforeAct = System.currentTimeMillis();
-        // the consume is not running and the interrupt must wait and release nevertheless
         consumerJava.interrupt();
         
-        // assert
         assertThat(consumerJava.shouldRun.get(), is(equalTo(Boolean.FALSE)));
         
         long afterAct = System.currentTimeMillis();
         Duration waitTime = Duration.ofMillis(afterAct-beforeAct);
         
-        // assert the waiting time is over, substract imprecision
         assertThat(waitTime, is(greaterThan(ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY.minus(AwaitTimeTests.IMPRECISION))));
     }
     
@@ -194,21 +182,16 @@ public class ConsumerJavaTest {
         Logger logger = mock(Logger.class);
         consumerJava.setLogger(logger);
         consumerJava.initLMDB();
-        // pre-assert
         assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(equalTo(Boolean.FALSE)));
         
         consumerJava.startStatisticsTimer();
-        // wait till the scheduled TimerTask is completed
         Thread.sleep(Duration.ofSeconds(1L));
         
-        // pre-assert
         assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(equalTo(Boolean.FALSE)));
         assertThat(consumerJava.consumeKeysExecutorService.isShutdown(), is(equalTo(Boolean.FALSE)));
 
-        // act
         consumerJava.interrupt();
 
-        // assert
         assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(equalTo(Boolean.TRUE)));
         assertThat(consumerJava.consumeKeysExecutorService.isShutdown(), is(equalTo(Boolean.TRUE)));
     }
@@ -225,13 +208,10 @@ public class ConsumerJavaTest {
 
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         
-        // pre-assert
         assertThat(consumerJava.persistence, is(nullValue()));
         
-        // act
         consumerJava.initLMDB();
         
-        // assert
         Persistence persistence = Objects.requireNonNull(consumerJava.persistence);
         assertThat(persistence.isClosed(), is(equalTo(Boolean.FALSE)));
     }
@@ -250,13 +230,10 @@ public class ConsumerJavaTest {
         consumerJava.initLMDB();
         Persistence persistence = Objects.requireNonNull(consumerJava.persistence);
 
-        // pre-assert
         assertThat(persistence.isClosed(), is(equalTo(Boolean.FALSE)));
         
-        // act
         consumerJava.interrupt();
         
-        // assert
         assertThat(persistence.isClosed(), is(equalTo(Boolean.TRUE)));
     }
     
@@ -286,7 +263,6 @@ public class ConsumerJavaTest {
         producerJava.produceKeys();
         consumerJava.consumeKeys(createHash160ByteBuffer());
 
-        // assert
         assertThat(consumerJava.hits.get(), is(equalTo(1L)));
         assertThat(consumerJava.vanityHits.get(), is(equalTo(0L)));
         ArgumentCaptor<String> logCaptorInfo = ArgumentCaptor.forClass(String.class);
@@ -295,10 +271,8 @@ public class ConsumerJavaTest {
         List<String> arguments = logCaptorInfo.getAllValues();
 
         ECKey key = new TestAddresses42(1, compressed).getECKeys().get(0);
-        
         PublicKeyBytes publicKeyBytes = PublicKeyBytes.fromPrivate(key.getPrivKey());
         
-        // to prevent any exception in further hit message creation and a possible missing hit message, log the secret alone first that a recovery is possible
         String hitMessageSecretKey = ConsumerJava.HIT_SAFE_PREFIX + "publicKeyBytes.getSecretKey(): " + key.getPrivKey();
         assertThat(arguments.get(0), is(equalTo(hitMessageSecretKey)));
         
@@ -348,7 +322,6 @@ public class ConsumerJavaTest {
         
         consumerJava.consumeKeys(createHash160ByteBuffer());
 
-        // assert
         assertThat(consumerJava.hits.get(), is(equalTo(0L)));
         assertThat(consumerJava.vanityHits.get(), is(equalTo(0L)));
         ArgumentCaptor<String> logCaptorDebug = ArgumentCaptor.forClass(String.class);
@@ -375,7 +348,6 @@ public class ConsumerJavaTest {
         assertThat(argumentsTrace.get(5), startsWith("Time after persistence.containsAddress: "));
         assertThat(argumentsTrace.get(6), startsWith("Time delta: "));
         
-        // assert for expected miss messages
         assertThat(argumentsTrace.get(7), is(equalTo(missMessageUncompressed)));
         assertThat(argumentsTrace.get(8), is(equalTo(missMessageCompressed)));
     }
@@ -422,7 +394,6 @@ public class ConsumerJavaTest {
         consumerJava.setLogger(logger);
 
         PublicKeyBytes invalidPublicKeyBytes = PublicKeyBytes.fromPrivate(BigInteger.valueOf(1337));
-        // invalidate compressed or uncompressed
         if (compressed) {
             invalidPublicKeyBytes.getCompressed()[7] = 0;
         } else {
@@ -432,7 +403,6 @@ public class ConsumerJavaTest {
         consumerJava.consumeKeys(publicKeyBytesArray);
         consumerJava.consumeKeys(createHash160ByteBuffer());
         
-        // assert
         assertThat(consumerJava.hits.get(), is(equalTo(0L)));
         assertThat(consumerJava.vanityHits.get(), is(equalTo(0L)));
         ArgumentCaptor<String> logCaptorError = ArgumentCaptor.forClass(String.class);
@@ -469,10 +439,8 @@ public class ConsumerJavaTest {
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         cConsumerJava.enableVanity = true;
         if (compressed) {
-            // 1JYHzX3ndZEcnjrWSQ9VC7324TJ9BAoGy4
             cConsumerJava.vanityPattern = "1JYH.*";
         } else {
-            // 14sNbmEhgiGX6BZe9Q5PCgTQT3576mniZt
             cConsumerJava.vanityPattern = "14sN.*";
         }
 
@@ -485,7 +453,6 @@ public class ConsumerJavaTest {
         consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
         consumerJava.consumeKeys(createHash160ByteBuffer());
         
-        // assert
         assertThat(consumerJava.hits.get(), is(equalTo(0L)));
         assertThat(consumerJava.vanityHits.get(), is(equalTo(1L)));
         ArgumentCaptor<String> logCaptorInfo = ArgumentCaptor.forClass(String.class);
@@ -504,13 +471,12 @@ public class ConsumerJavaTest {
         map.put(BIP39Wordlist.ENGLISH, "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abuse differ");
         map.put(BIP39Wordlist.FRENCH, "abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abreuver cylindre");
         map.put(BIP39Wordlist.ITALIAN, "abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco accenno disposto");
-        // attention: japanese has a special separator
         map.put(BIP39Wordlist.JAPANESE, "あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あさい　くなん");
-        map.put(BIP39Wordlist.KOREAN, "가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가슴 목걸이");
+        map.put(BIP39Wordlist.KOREAN, "가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가슴 목걸이");
         map.put(BIP39Wordlist.PORTUGUESE, "abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abranger conectar");
         map.put(BIP39Wordlist.RUSSIAN, "абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац агитация завтра");
-        map.put(BIP39Wordlist.SPANISH, "ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco abuelo cuota");
-        map.put(BIP39Wordlist.TURKISH, "abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur absürt fason");
+        map.put(BIP39Wordlist.SPANISH, "ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco abuelo cuota");
+        map.put(BIP39Wordlist.TURKISH, "abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur absürt fason");
         
         assertThat(map.size(), is(BIP39Wordlist.values().length));
        
@@ -564,13 +530,11 @@ public class ConsumerJavaTest {
             ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
             consumerJava.initLMDB();
     
-            // Mock the persistence to throw an exception on close
             Persistence mockPersistence = mock(Persistence.class);
             when(mockPersistence.isClosed()).thenReturn(false);
             doThrow(new RuntimeException("Simulated close failure")).when(mockPersistence).close();
             consumerJava.persistence = mockPersistence;
     
-            // act - should throw RuntimeException
             consumerJava.interrupt();
         });
     }

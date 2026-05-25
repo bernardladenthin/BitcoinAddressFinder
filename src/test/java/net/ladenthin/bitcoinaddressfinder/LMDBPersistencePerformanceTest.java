@@ -67,30 +67,24 @@ public class LMDBPersistencePerformanceTest {
         
         consumerJava.initLMDB();
         
-        // create producer
         PublicKeyBytes[] publicKeyByteses = createPublicKeyBytesArray();
         ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(PRODUCER_THREADS);
         AtomicBoolean producerShouldRun = new AtomicBoolean(true);
         createProducerThreads(threadPoolExecutor, consumerJava, publicKeyByteses, producerShouldRun);
         
-        // act
         consumerJava.startConsumer();
         consumerJava.startStatisticsTimer();
         
         Thread.sleep(TEST_TIME_IN_SECONDS * Statistics.ONE_SECOND_IN_MILLISECONDS);
-        // Signal all producer threads to stop by setting the shared flag to false.
-        // Each producer thread will check this flag in its loop and exit cleanly.
         producerShouldRun.set(false);
-        // Gracefully stop consumer threads and release all resources
         consumerJava.interrupt();
 
         assertThat(consumerJava.persistence, is(nullValue()));
-        assertThat(consumerJava.shouldRun.get(), is(false ));
+        assertThat(consumerJava.shouldRun.get(), is(false));
         assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(true));
         assertThat(consumerJava.scheduledExecutorService.isTerminated(), is(true));
         assertThat(consumerJava.consumeKeysExecutorService.isShutdown(), is(true));
         assertThat(consumerJava.consumeKeysExecutorService.isTerminated(), is(true));
-
     }
 
     private void createProducerThreads(ThreadPoolExecutor threadPoolExecutor, ConsumerJava consumerJava, PublicKeyBytes[] publicKeyByteses, AtomicBoolean producerShouldRun) {
