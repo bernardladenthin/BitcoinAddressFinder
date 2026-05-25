@@ -27,10 +27,11 @@ import org.bitcoinj.base.Network;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.Assert.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.api.Timeout;
 import static org.mockito.Mockito.*;
 import org.slf4j.Logger;
 
@@ -618,7 +619,8 @@ public class KeyProducerJavaSocketTest {
         return serverSocket;
     }
     
-    @Test(timeout = 5000)
+    @Test
+    @Timeout(5)
     public void testInterruptCausesShutdownDuringConnectionAttemptOnly() throws Exception {
         final int STATE_UNEXPECTED_SUCCESS = -1;
         final int STATE_UNKNOWN = 0;
@@ -662,11 +664,12 @@ public class KeyProducerJavaSocketTest {
         future.get(3, TimeUnit.SECONDS);
         executor.shutdownNow();
         
-        assertNotEquals("Thread exited without triggering interrupt", STATE_UNEXPECTED_SUCCESS, state.get());
-        assertEquals("Expected interrupt to cause shutdown", STATE_INTERRUPTED_EXIT, state.get());
+        assertNotEquals(STATE_UNEXPECTED_SUCCESS, state.get(), "Thread exited without triggering interrupt");
+        assertEquals(STATE_INTERRUPTED_EXIT, state.get(), "Expected interrupt to cause shutdown");
     }
     
-    @Test(timeout = 5000)
+    @Test
+    @Timeout(5)
     public void serverAcceptTimesOut_whenNoClientConnects() throws Exception {
         int port = findFreePort();
 
@@ -685,7 +688,7 @@ public class KeyProducerJavaSocketTest {
         } catch (NoMoreSecretsAvailableException e) {
             long duration = System.currentTimeMillis() - start;
             // Timeout must be honored within reasonable margin (+-200ms)
-            assertTrue("Timeout did not occur as expected", duration >= TestTimeProvider.SOCKET_ACCEPT_TIMEOUT && duration <= TestTimeProvider.SOCKET_ACCEPT_TIMEOUT + 200);
+            assertTrue(duration >= TestTimeProvider.SOCKET_ACCEPT_TIMEOUT && duration <= TestTimeProvider.SOCKET_ACCEPT_TIMEOUT + 200, "Timeout did not occur as expected");
             assertThat(e.getMessage(), containsString("Timeout while waiting for secret"));
         } finally {
             server.interrupt();

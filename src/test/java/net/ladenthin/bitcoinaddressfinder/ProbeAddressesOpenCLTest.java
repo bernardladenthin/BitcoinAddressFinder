@@ -73,7 +73,7 @@ public class ProbeAddressesOpenCLTest {
     }
 
     public void createTemporaryAddressesFile() throws IOException {
-        File tempAddressesFile = tempFolder.newFile(ADDRESSES_CSV);
+        File tempAddressesFile = tempFolder.resolve(ADDRESSES_CSV).toFile();
         fillAddressesFiles(tempAddressesFile);
     }
 
