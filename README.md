@@ -1,6 +1,9 @@
 **Build:**  
 ![Java 21+](https://img.shields.io/badge/Java-21%2B-informational)  
 ![JUnit](https://img.shields.io/badge/tested%20with-JUnit4-yellow)  
+[![jqwik](https://img.shields.io/badge/tested%20with-jqwik-1f6feb)](https://jqwik.net)  
+[![ArchUnit](https://img.shields.io/badge/tested%20with-ArchUnit-c71a36)](https://www.archunit.org)  
+[![SpotBugs](https://img.shields.io/badge/analyzed%20with-SpotBugs-3b5998)](https://spotbugs.github.io)  
 [![Publish](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/publish.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/publish.yml)  
 [![CodeQL](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/codeql.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/codeql.yml)  
 
