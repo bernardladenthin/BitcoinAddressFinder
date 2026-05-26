@@ -274,7 +274,7 @@ SPDX-License-Identifier: Apache-2.0
                 <configuration>
                     <effort>Default</effort>
                     <threshold>Default</threshold>
-                    <failOnError>false</failOnError>
+                    <failOnError>true</failOnError>
                     <includeTests>false</includeTests>
                     <excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
                     <plugins>
