@@ -18,8 +18,20 @@ public class ByteBufferUtility {
      */
     private final boolean allocateDirect;
 
+    /**
+     * Selects the byte-array reversal algorithm used by {@link #reverse(byte[])}.
+     * {@code true} uses XOR swap (no temporary variable);
+     * {@code false} uses a temporary-variable swap.
+     */
+    private final boolean useXorSwap;
+
     public ByteBufferUtility(boolean allocateDirect) {
+        this(allocateDirect, false);
+    }
+
+    public ByteBufferUtility(boolean allocateDirect, boolean useXorSwap) {
         this.allocateDirect = allocateDirect;
+        this.useXorSwap = useXorSwap;
     }
     
     /**
@@ -159,13 +171,11 @@ public class ByteBufferUtility {
         return bytes;
     }
     
-    private final static boolean USE_XOR_SWAP = false;
-    
     /**
      * https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java
      */
     public void reverse(byte @NonNull [] array) {
-        if (USE_XOR_SWAP) {
+        if (useXorSwap) {
             int len = array.length;
             for (int i = 0; i < len / 2; i++) {
                 array[i] ^= array[len - i - 1];

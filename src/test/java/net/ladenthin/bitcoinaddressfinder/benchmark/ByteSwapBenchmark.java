@@ -6,6 +6,7 @@
 package net.ladenthin.bitcoinaddressfinder.benchmark;
 
 import java.util.concurrent.TimeUnit;
+import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -22,9 +23,10 @@ import org.openjdk.jmh.infra.Blackhole;
 
 /**
  * Throughput benchmark for the two byte-array reversal strategies controlled
- * by the private constant {@code ByteBufferUtility.USE_XOR_SWAP}.
+ * by the {@code useXorSwap} constructor parameter of {@link ByteBufferUtility}.
  *
- * <p>The constant selects between two in-place reversal algorithms:</p>
+ * <p>The parameter selects between two in-place reversal algorithms in
+ * {@link ByteBufferUtility#reverse(byte[])}:</p>
  * <ul>
  *   <li>{@code useXorSwap = true} &#x2192; XOR swap (no temporary variable,
  *       3 XOR operations per element pair)</li>
@@ -57,11 +59,8 @@ import org.openjdk.jmh.infra.Blackhole;
 public class ByteSwapBenchmark {
 
     /**
-     * Selects the reversal algorithm:
-     * {@code true} &#x2192; XOR swap (no temp variable),
-     * {@code false} &#x2192; temporary-variable swap.
-     *
-     * <p>Corresponds directly to {@code ByteBufferUtility.USE_XOR_SWAP}.</p>
+     * Selects the reversal algorithm passed to the {@link ByteBufferUtility} constructor:
+     * {@code true} &#x2192; XOR swap, {@code false} &#x2192; temporary-variable swap.
      */
     @Param({"false", "true"})
     public boolean useXorSwap;
@@ -75,12 +74,13 @@ public class ByteSwapBenchmark {
     @Param({"20", "32", "65"})
     public int arraySize;
 
-    /** Working copy repopulated each iteration to keep input non-trivially ordered. */
-    private byte[] array;
+    private ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
+    private byte[] array = new byte[0];
 
-    /** Initializes the array with sequential bytes so both implementations see the same input. */
+    /** Creates a {@link ByteBufferUtility} configured with the selected swap strategy. */
     @Setup
     public void setUp() {
+        byteBufferUtility = new ByteBufferUtility(false, useXorSwap);
         array = new byte[arraySize];
         for (int i = 0; i < arraySize; i++) {
             array[i] = (byte) i;
@@ -88,36 +88,16 @@ public class ByteSwapBenchmark {
     }
 
     /**
-     * Reverses the byte array in-place using the selected swap strategy.
+     * Reverses the byte array in-place via {@link ByteBufferUtility#reverse(byte[])}.
      *
-     * <p>Directly mirrors {@code ByteBufferUtility.reverse()}: when
-     * {@code useXorSwap = true} the loop uses three XOR operations per pair
-     * (no heap allocation, no {@code tmp} variable); when {@code false} it
-     * uses a local {@code byte tmp} — the strategy the constant defaults to.</p>
+     * <p>The {@link ByteBufferUtility} instance was constructed with {@code useXorSwap}
+     * so the call exercises the selected algorithm inside the real production method.</p>
      *
      * @param bh JMH blackhole to prevent dead-code elimination
      */
     @Benchmark
     public void reverse(Blackhole bh) {
-        if (useXorSwap) {
-            final int len = array.length;
-            for (int i = 0; i < len / 2; i++) {
-                array[i] ^= array[len - i - 1];
-                array[len - i - 1] ^= array[i];
-                array[i] ^= array[len - i - 1];
-            }
-        } else {
-            int i = 0;
-            int j = array.length - 1;
-            byte tmp;
-            while (j > i) {
-                tmp = array[j];
-                array[j] = array[i];
-                array[i] = tmp;
-                j--;
-                i++;
-            }
-        }
+        byteBufferUtility.reverse(array);
         bh.consume(array);
     }
 }

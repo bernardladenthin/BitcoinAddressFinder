@@ -63,16 +63,16 @@ public class PublicKeyHashBenchmark {
     public boolean useFast;
 
     /** Fixed 65-byte uncompressed public key ({@code 04 || X || Y}) used as hash input. */
-    private byte[] uncompressedKey;
+    private byte[] uncompressedKey = new byte[0];
 
     /** Fixed 33-byte compressed public key ({@code 02/03 || X}) used as hash input. */
-    private byte[] compressedKey;
+    private byte[] compressedKey = new byte[0];
 
     /** Initializes fixed-content key byte arrays so every iteration hashes the same input. */
     @Setup
     public void setUp() {
         uncompressedKey = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
-        uncompressedKey[0] = PublicKeyBytes.UNCOMPRESSED_PREFIX;
+        uncompressedKey[0] = (byte) PublicKeyBytes.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT;
         for (int i = 1; i < uncompressedKey.length; i++) {
             uncompressedKey[i] = (byte) i;
         }
