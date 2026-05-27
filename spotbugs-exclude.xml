@@ -78,4 +78,45 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="UNSAFE_HASH_EQUALS"/>
     </Match>
 
+    <!--
+        Logger is treated as an injected dependency in this codebase:
+        all KeyProducerJava subclasses, AbstractKeyProducerQueueBuffered,
+        and OpenCLContext take Logger as a constructor parameter so
+        tests can inject Mockito mock loggers and verify log output via
+        verify(mockLogger).error(...) assertions. Ten test classes
+        (KeyProducerJavaRandomTest, KeyProducerJavaBip39Test,
+        KeyProducerJavaIncrementalTest, KeyProducerJavaSocketTest,
+        KeyProducerJavaWebSocketTest, KeyProducerJavaTest,
+        AbstractKeyProducerQueueBufferedTest, OpenCLContextTest,
+        MockKeyProducer test util, etc.) exploit this channel. The
+        Finder factory constructs each producer's Logger with
+        LoggerFactory.getLogger(KeyProducerJavaXxx.class), so every
+        runtime logger is correctly named after the class it serves.
+
+        Spotbugs LO_SUSPECT_LOG_PARAMETER flags the constructor
+        parameter as a textbook anti-pattern ("loggers should be
+        private static finals"). LO_SUSPECT_LOG_CLASS flags the Finder
+        factory lambdas for allocating loggers tagged with a different
+        class name. Both findings are consequences of the same
+        intentional DI design; the runtime semantics are correct (right
+        class name on every emitted log) and the test-injection point
+        is actively used.
+
+        A longer-term cleanup would migrate tests to a log-capture
+        library (logback ListAppender or LogCaptor) and adopt static
+        final loggers; until then both suppressions are documented as
+        design intent.
+    -->
+    <Match>
+        <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.OpenCLContext"/>
+            <Class name="~net\.ladenthin\.bitcoinaddressfinder\.keyproducer\..*"/>
+        </Or>
+        <Bug pattern="LO_SUSPECT_LOG_PARAMETER"/>
+    </Match>
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.Finder"/>
+        <Bug pattern="LO_SUSPECT_LOG_CLASS"/>
+    </Match>
+
 </FindBugsFilter>
