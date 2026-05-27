@@ -401,7 +401,7 @@ public class PublicKeyBytesTest {
         byte[] pubKey = ecKey.getPubKey();
 
         // act
-        byte[] fastResult = new Hash160(true).hash(pubKey);
+        byte[] fastResult = new Hash160().hash(pubKey);
 
         // assert
         byte[] expected = CryptoUtils.sha256hash160(pubKey);
@@ -416,7 +416,7 @@ public class PublicKeyBytesTest {
         byte[] pubKey = ecKey.getPubKey();
 
         // act
-        byte[] fastResult = new Hash160(true).hash(pubKey);
+        byte[] fastResult = new Hash160().hash(pubKey);
 
         // assert
         byte[] expected = CryptoUtils.sha256hash160(pubKey);
@@ -429,7 +429,7 @@ public class PublicKeyBytesTest {
         byte[] input = new byte[] {0x01, 0x02, 0x03};
 
         // act
-        byte[] result = new Hash160(true).hash(input);
+        byte[] result = new Hash160().hash(input);
 
         // assert
         assertThat(result.length, is(equalTo(PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES)));
