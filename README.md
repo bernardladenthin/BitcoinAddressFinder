@@ -4,7 +4,10 @@
 [![jqwik](https://img.shields.io/badge/tested%20with-jqwik-1f6feb)](https://jqwik.net)  
 [![ArchUnit](https://img.shields.io/badge/tested%20with-ArchUnit-c71a36)](https://www.archunit.org)  
 [![SpotBugs](https://img.shields.io/badge/analyzed%20with-SpotBugs-3b5998)](https://spotbugs.github.io)  
-[![JMH](https://img.shields.io/badge/benchmarked%20with-JMH-brightgreen)](https://github.com/openjdk/jmh)  
+[![jcstress](https://img.shields.io/badge/tested%20with-jcstress-007396)](https://openjdk.org/projects/code-tools/jcstress/)  
+[![Lincheck](https://img.shields.io/badge/tested%20with-Lincheck-7F52FF)](https://github.com/JetBrains/lincheck)  
+[![vmlens](https://img.shields.io/badge/tested%20with-vmlens-ff6f00)](https://vmlens.com)  
+[![JMH](https://img.shields.io/badge/benchmarked%20with-JMH-25A162)](https://openjdk.org/projects/code-tools/jmh/)  
 [![Publish](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/publish.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/publish.yml)  
 [![CodeQL](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/codeql.yml/badge.svg)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/codeql.yml)  
 
