@@ -54,4 +54,28 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="HARD_CODE_KEY"/>
     </Match>
 
+    <!--
+        PublicKeyBytes.runtimePublicKeyCalculationCheck is a developer-
+        facing self-consistency probe: it recomputes the public-key
+        hashes via bitcoinj from the same secret key and compares them
+        against the hashes produced by the GPU/CPU pipeline. Both sides
+        of the Arrays.equals comparison are derived locally from the
+        SAME secret key, which the method itself logs at ERROR level
+        when a mismatch occurs. There is no attacker boundary: a
+        process able to measure timing here is already running inside
+        the JVM with full access to the secret key being checked.
+
+        findsecbugs UNSAFE_HASH_EQUALS targets attacker-vs-secret MAC
+        or token comparisons where Arrays.equals leaks the secret byte
+        by byte. That threat model does not apply here: the "hash" is
+        a Bitcoin address (public derivation), and the comparison
+        exists only to validate the GPU-derivation pipeline against
+        bitcoinj.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.PublicKeyBytes"/>
+        <Method name="runtimePublicKeyCalculationCheck"/>
+        <Bug pattern="UNSAFE_HASH_EQUALS"/>
+    </Match>
+
 </FindBugsFilter>
