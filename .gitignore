@@ -29,6 +29,9 @@ hs_err_pid*
 /target/
 /bin/
 
+# jcstress / jqwik test outputs (generated in repo root)
+/.jqwik-database
+
 # IDEA files
 /.idea/
 *.iml
