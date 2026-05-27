@@ -35,4 +35,23 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="PREDICTABLE_RANDOM"/>
     </Match>
 
+    <!--
+        PublicKeyBytes.MAX_PRIVATE_KEY_HEX is the secp256k1 group order
+        n, a public mathematical constant published in SEC 2 v2 section
+        2.4.1 (Recommended Parameters secp256k1). It is the same value
+        in every secp256k1 implementation worldwide (bitcoinj,
+        libsecp256k1, openssl, ...). The constant defines the upper
+        bound of the valid private-key range for BigInteger.compareTo
+        validation; it is never used as a key, signing material, or
+        secret. See also the field's Javadoc which links to SEC 2 v2.
+
+        findsecbugs HARD_CODE_KEY flags long hex literals as "possible
+        hardcoded cryptographic key" syntactically; it cannot
+        distinguish a curve parameter from a credential.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.PublicKeyBytes"/>
+        <Bug pattern="HARD_CODE_KEY"/>
+    </Match>
+
 </FindBugsFilter>

@@ -46,7 +46,17 @@ public class PublicKeyBytes {
     public static final String MIN_VALID_PRIVATE_KEY_HEX =
             MIN_VALID_PRIVATE_KEY.toString(BitHelper.RADIX_HEX).toUpperCase();
 
-    /** Uppercase hexadecimal representation of the secp256k1 group order (the maximum valid private key). */
+    /**
+     * Uppercase hexadecimal representation of the secp256k1 group order
+     * (the maximum valid private key).
+     * <p>
+     * This is the public curve parameter {@code n} from
+     * <a href="https://www.secg.org/sec2-v2.pdf">SEC 2 v2</a>, &sect;2.4.1
+     * ("Recommended Parameters secp256k1"). It is the same value in every
+     * secp256k1 implementation (bitcoinj, libsecp256k1, openssl, &hellip;)
+     * and is used as the upper bound for valid-private-key range checks
+     * &mdash; it is not a key, signing material, or secret.
+     */
     public static final String MAX_PRIVATE_KEY_HEX = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141";
 
     /**
