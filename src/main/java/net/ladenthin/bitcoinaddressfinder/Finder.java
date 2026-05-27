@@ -32,6 +32,10 @@ import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocket;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaZmq;
 
+/**
+ * Orchestrator: wires up key producers, producers and the consumer based on the configuration and
+ * manages their life cycle.
+ */
 public class Finder implements Interruptable {
 
     /**
@@ -40,6 +44,7 @@ public class Finder implements Interruptable {
     @VisibleForTesting
     static Duration AWAIT_DURATION_TERMINATE = Duration.ofDays(365L * 1000L);
     
+    /** SLF4J logger for the {@link Finder}. */
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
     
     private final CFinder finder;
@@ -61,10 +66,18 @@ public class Finder implements Interruptable {
     private final PersistenceUtils persistenceUtils = new PersistenceUtils(network);
     private final BitHelper bitHelper = new BitHelper();
     
+    /**
+     * Creates a new finder.
+     *
+     * @param finder the finder configuration
+     */
     public Finder(CFinder finder) {
         this.finder = finder;
     }
-    
+
+    /**
+     * Instantiates and registers every configured key producer.
+     */
     public void startKeyProducer() {
         logger.info("startKeyProducer");
         processKeyProducers(
@@ -131,6 +144,9 @@ public class Finder implements Interruptable {
         }
     }
 
+    /**
+     * Initialises and starts the {@link ConsumerJava}.
+     */
     public void startConsumer() {
         logger.info("startConsumer");
         CConsumerJava localCConsumerJava = Objects.requireNonNull(finder.consumerJava);
@@ -141,6 +157,9 @@ public class Finder implements Interruptable {
         consumerJava.startStatisticsTimer();
     }
 
+    /**
+     * Builds the configured producers and binds them to their key producer and consumer.
+     */
     public void configureProducer() {
         logger.info("configureProducer");
         var localConsumerJava = Objects.requireNonNull(consumerJava);
@@ -186,6 +205,13 @@ public class Finder implements Interruptable {
         }
     }
 
+    /**
+     * Resolves the {@link KeyProducer} configured for the given producer.
+     *
+     * @param cProducer the producer configuration
+     * @return the resolved {@link KeyProducer}
+     * @throws RuntimeException if the referenced id is unknown
+     */
     public KeyProducer getKeyProducer(CProducer cProducer) throws RuntimeException {
         KeyProducer keyProducer = keyProducers.get(cProducer.keyProducerId);
         if(keyProducer == null) {
@@ -194,20 +220,29 @@ public class Finder implements Interruptable {
         return keyProducer;
     }
     
+    /**
+     * Calls {@code initProducer()} on every configured producer.
+     */
     public void initProducer() {
         logger.info("initProducer");
         for (Producer producer : getAllProducers()) {
             producer.initProducer();
         }
     }
-    
+
+    /**
+     * Submits every configured producer to the producer executor service.
+     */
     public void startProducer() {
         logger.info("startProducer");
         for (Producer producer : getAllProducers()) {
             producerExecutorService.submit(producer);
         }
     }
-    
+
+    /**
+     * Shuts down the producer executor and interrupts the consumer once producers have stopped.
+     */
     public void shutdownAndAwaitTermination() {
         logger.info("shutdownAndAwaitTermination");
         try {
@@ -250,10 +285,20 @@ public class Finder implements Interruptable {
         logger.info("All producers released and freed.");
     }
     
+    /**
+     * Returns a snapshot of all configured key producers.
+     *
+     * @return an immutable snapshot of all configured key producers keyed by id
+     */
     public Map<String, KeyProducer> getKeyProducers() {
         return ImmutableMap.copyOf(keyProducers);
     }
-    
+
+    /**
+     * Returns a list containing every configured producer.
+     *
+     * @return a new list containing every configured producer
+     */
     public List<Producer> getAllProducers() {
         List<Producer> producers = new ArrayList<>();
         producers.addAll(javaProducers);
@@ -261,17 +306,28 @@ public class Finder implements Interruptable {
         producers.addAll(openCLProducers);
         return producers;
     }
-    
+
+    /**
+     * Removes every registered producer instance.
+     */
     public void freeAllProducers() {
         javaProducers.clear();
         javaProducersSecretsFiles.clear();
         openCLProducers.clear();
     }
-    
+
+    /**
+     * Removes every registered key-producer instance.
+     */
     public void freeAllKeyProducers() {
         keyProducers.clear();
     }
-    
+
+    /**
+     * Returns a list containing every configured consumer.
+     *
+     * @return a new list containing every configured consumer (currently zero or one)
+     */
     public List<Consumer> getAllConsumers() {
         List<Consumer> consumers = new ArrayList<>();
         if (consumerJava != null) {

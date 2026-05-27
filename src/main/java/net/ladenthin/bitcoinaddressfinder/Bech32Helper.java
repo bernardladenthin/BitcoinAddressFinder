@@ -11,7 +11,15 @@ import java.util.Arrays;
 
 import static net.ladenthin.bitcoinaddressfinder.AddressTxtLine.BITCOIN_CASH_PREFIX;
 
+/**
+ * Bech32 / CashAddr decoding helpers including SegWit witness program extraction
+ * and access to selected protected bitcoinj API via reflection.
+ */
 public class Bech32Helper {
+
+    /** Creates a new {@link Bech32Helper}. */
+    public Bech32Helper() {
+    }
 
     /**
      * Bech32 character set as defined in BIP-0173.

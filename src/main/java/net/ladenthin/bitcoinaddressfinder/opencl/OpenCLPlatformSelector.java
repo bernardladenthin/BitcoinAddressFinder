@@ -5,7 +5,15 @@ package net.ladenthin.bitcoinaddressfinder.opencl;
 
 import java.util.List;
 
+/**
+ * Selects an OpenCL device within a list of platforms based on the configured indices and device type mask.
+ */
 public class OpenCLPlatformSelector {
+
+    /** Creates a new {@link OpenCLPlatformSelector}. */
+    public OpenCLPlatformSelector() {
+    }
+
 
     /**
      * Selects an OpenCLDevice based on the platform index and device type from the given list of platforms.

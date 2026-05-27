@@ -12,18 +12,35 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
  */
 public class NoMoreSecretsAvailableException extends RuntimeException {
     
+    /** Creates a new exception with no message or cause. */
     public NoMoreSecretsAvailableException() {
         super();
     }
 
+    /**
+     * Creates a new exception with the given message.
+     *
+     * @param message detail message
+     */
     public NoMoreSecretsAvailableException(String message) {
         super(message);
     }
 
+    /**
+     * Creates a new exception with the given message and cause.
+     *
+     * @param message detail message
+     * @param cause   the underlying cause
+     */
     public NoMoreSecretsAvailableException(String message, Throwable cause) {
         super(message, cause);
     }
 
+    /**
+     * Creates a new exception with the given cause.
+     *
+     * @param cause the underlying cause
+     */
     public NoMoreSecretsAvailableException(Throwable cause) {
         super(cause);
     }

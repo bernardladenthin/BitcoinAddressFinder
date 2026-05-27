@@ -5,19 +5,34 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.InputStream;
 
+/**
+ * Enumerates the official BIP39 wordlists shipped with the project.
+ */
 public enum BIP39Wordlist {
-    
+
+    /** Simplified Chinese BIP39 wordlist. */
     CHINESE_SIMPLIFIED("chinese_simplified.txt"),
+    /** Traditional Chinese BIP39 wordlist. */
     CHINESE_TRADITIONAL("chinese_traditional.txt"),
+    /** Czech BIP39 wordlist. */
     CZECH("czech.txt"),
+    /** English BIP39 wordlist. */
     ENGLISH("english.txt"),
+    /** French BIP39 wordlist. */
     FRENCH("french.txt"),
+    /** Italian BIP39 wordlist. */
     ITALIAN("italian.txt"),
+    /** Japanese BIP39 wordlist. */
     JAPANESE("japanese.txt"),
+    /** Korean BIP39 wordlist. */
     KOREAN("korean.txt"),
+    /** Portuguese BIP39 wordlist. */
     PORTUGUESE("portuguese.txt"),
+    /** Russian BIP39 wordlist. */
     RUSSIAN("russian.txt"),
+    /** Spanish BIP39 wordlist. */
     SPANISH("spanish.txt"),
+    /** Turkish BIP39 wordlist. */
     TURKISH("turkish.txt");
     
     /**

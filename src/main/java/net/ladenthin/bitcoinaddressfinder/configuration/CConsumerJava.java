@@ -6,14 +6,26 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+/**
+ * Configuration for the Java-based consumer that queries the LMDB database.
+ */
 public class CConsumerJava {
+
+    /** Creates a new {@link CConsumerJava}. */
+    public CConsumerJava() {
+    }
+
+    /** LMDB read-only configuration used to look up addresses. */
     public @NonNull CLMDBConfigurationReadOnly lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+    /** Interval, in seconds, at which throughput statistics are printed. */
     public int printStatisticsEveryNSeconds = 60;
+    /** Number of consumer worker threads. */
     public int threads = 4;
     /**
-     * in ms.
+     * Delay in milliseconds when the queue is empty before polling again.
      */
     public long delayEmptyConsumer = 100;
+    /** Maximum number of pending key batches the consumer queue may hold. */
     public int queueSize = 10;
     
     /**
@@ -38,8 +50,10 @@ public class CConsumerJava {
      * <p>Do not enable in production or performance benchmarking environments.</p>
      */
     public boolean runtimePublicKeyCalculationCheck;
-    
+
+    /** Whether to enable vanity-address pattern matching. */
     public boolean enableVanity = false;
-    
+
+    /** Optional vanity pattern (regex) used when {@link #enableVanity} is {@code true}. */
     public @Nullable String vanityPattern;
 }

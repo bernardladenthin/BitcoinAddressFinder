@@ -7,8 +7,20 @@ import org.bitcoinj.base.Network;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.params.MainNetParams;
 
+/**
+ * Factory returning the {@link Network} used by the application.
+ */
 public class NetworkParameterFactory {
-    
+
+    /** Creates a new {@link NetworkParameterFactory}. */
+    public NetworkParameterFactory() {
+    }
+
+    /**
+     * Returns the configured {@link Network}.
+     *
+     * @return the Bitcoin main-net {@link Network} instance
+     */
     public Network getNetwork() {
         return getNetworkParameters().network();
     }

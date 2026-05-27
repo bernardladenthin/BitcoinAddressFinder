@@ -9,10 +9,23 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Helpers for converting between path strings and {@link File} objects and validating their existence.
+ */
 public class FileHelper {
-    
+
+    /** Creates a new {@link FileHelper}. */
+    public FileHelper() {
+    }
+
     private final Logger logger = LoggerFactory.getLogger(FileHelper.class);
-    
+
+    /**
+     * Converts a list of path strings to {@link File} objects.
+     *
+     * @param strings the list of path strings
+     * @return the corresponding list of {@link File} instances (same order)
+     */
     public List<File> stringsToFiles(List<String> strings) {
         List<File> files = new ArrayList<>();
         for (String string : strings) {
@@ -21,6 +34,12 @@ public class FileHelper {
         return files;
     }
 
+    /**
+     * Asserts that every file in {@code files} exists on disk.
+     *
+     * @param files the files to verify
+     * @throws IllegalArgumentException if any file is missing
+     */
     public void assertFilesExists(List<File> files) throws IllegalArgumentException {
         logger.info("Validating that all input files exist...");
         for (File file : files) {

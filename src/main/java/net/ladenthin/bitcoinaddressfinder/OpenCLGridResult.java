@@ -8,6 +8,10 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 
+/**
+ * Holds the raw OpenCL grid result for a single secret-key base together with helpers to convert
+ * it into {@link PublicKeyBytes} objects.
+ */
 public class OpenCLGridResult {
     
     /**
@@ -33,14 +37,29 @@ public class OpenCLGridResult {
         this.result = result;
     }
 
+    /**
+     * Returns the base secret used by the kernel for this batch.
+     *
+     * @return the base secret used by the kernel for this batch
+     */
     public BigInteger getSecretKeyBase() {
         return secretKeyBase;
     }
 
+    /**
+     * Returns the number of keys in this batch.
+     *
+     * @return the number of keys in this batch
+     */
     public int getWorkSize() {
         return workSize;
     }
 
+    /**
+     * Returns the raw OpenCL result buffer.
+     *
+     * @return the raw OpenCL result buffer
+     */
     public ByteBuffer getResult() {
         return result;
     }
@@ -76,6 +95,12 @@ public class OpenCLGridResult {
         return publicKeys;
     }
     
+    /**
+     * Trims the leading {@code u32} prefix bytes written by the OpenCL kernel.
+     *
+     * @param fullArray the raw array with prefix bytes
+     * @return a new array with the leading prefix bytes removed
+     */
     public static byte[] trimU32PrefixBytes(byte[] fullArray) {
         final int PREFIX_BYTES_TO_SKIP = 3;
         return Arrays.copyOfRange(fullArray, PREFIX_BYTES_TO_SKIP, fullArray.length);

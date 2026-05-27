@@ -45,6 +45,9 @@ import org.lmdbjava.EnvInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * LMDB-backed implementation of {@link Persistence} with optional Bloom-filter acceleration.
+ */
 public class LMDBPersistence implements Persistence {
 
     private static final String DB_NAME_HASH160_TO_COINT = "hash160toCoin";
@@ -63,6 +66,12 @@ public class LMDBPersistence implements Persistence {
     private @Nullable BloomFilter<byte[]> addressBloomFilter = null;
 
 
+    /**
+     * Creates a new writable LMDB-backed persistence instance.
+     *
+     * @param lmdbConfigurationWrite the writable LMDB configuration
+     * @param persistenceUtils       persistence helper providing the network
+     */
     public LMDBPersistence(CLMDBConfigurationWrite lmdbConfigurationWrite, PersistenceUtils persistenceUtils) {
         this.lmdbConfigurationReadOnly = null;
         this.lmdbConfigurationWrite = lmdbConfigurationWrite;
@@ -70,6 +79,12 @@ public class LMDBPersistence implements Persistence {
         this.keyUtility = new KeyUtility(persistenceUtils.network, new ByteBufferUtility(true));
     }
 
+    /**
+     * Creates a new read-only LMDB-backed persistence instance.
+     *
+     * @param lmdbConfigurationReadOnly the read-only LMDB configuration
+     * @param persistenceUtils          persistence helper providing the network
+     */
     public LMDBPersistence(CLMDBConfigurationReadOnly lmdbConfigurationReadOnly, PersistenceUtils persistenceUtils) {
         this.lmdbConfigurationReadOnly = lmdbConfigurationReadOnly;
         lmdbConfigurationWrite = null;
@@ -91,6 +106,9 @@ public class LMDBPersistence implements Persistence {
         logStatsIfConfigured(true);
     }
     
+    /**
+     * Iterates the database once and builds the in-memory Bloom filter used to short-circuit lookups.
+     */
     public void buildAddressBloomFilter() {
         logger.info("##### BEGIN: buildAddressBloomFilter #####");
         CLMDBConfigurationReadOnly localLmdbConfigurationReadOnly = Objects.requireNonNull(lmdbConfigurationReadOnly);
@@ -122,6 +140,9 @@ public class LMDBPersistence implements Persistence {
         logger.info("##### END: buildAddressBloomFilter #####");
     }
 
+    /**
+     * Frees the in-memory Bloom filter (subsequent {@code containsAddress} calls hit LMDB directly).
+     */
     public void unloadBloomFilter() {
         addressBloomFilter = null;
     }
@@ -437,6 +458,12 @@ public class LMDBPersistence implements Persistence {
         logger.info("##### END: LMDB stats #####");
     }
 
+    /**
+     * Returns an approximate in-memory size of a Guava {@link BloomFilter} in bytes via reflection.
+     *
+     * @param bloomFilter the Bloom filter to measure
+     * @return the approximate in-memory size in bytes
+     */
     public static long getApproximateSizeBytes(BloomFilter<?> bloomFilter) {
         try {
             // Access private field: bits
@@ -455,6 +482,12 @@ public class LMDBPersistence implements Persistence {
         }
     }
 
+    /**
+     * Formats a byte size as a human-readable string (B / KB / MB).
+     *
+     * @param sizeInBytes the size in bytes
+     * @return the formatted string
+     */
     public static String formatSize(long sizeInBytes) {
         if (sizeInBytes >= 1024 * 1024) {
             return String.format("%.2f MB", sizeInBytes / 1024.0 / 1024.0);

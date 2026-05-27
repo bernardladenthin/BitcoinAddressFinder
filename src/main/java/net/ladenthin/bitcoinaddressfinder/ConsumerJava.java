@@ -30,6 +30,10 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Single-process consumer that pulls candidate public keys from a queue and matches them
+ * against the LMDB persistence layer.
+ */
 public class ConsumerJava implements Consumer {
 
     /**
@@ -39,31 +43,44 @@ public class ConsumerJava implements Consumer {
     @VisibleForTesting
     static Duration AWAIT_DURATION_QUEUE_EMPTY = Duration.ofMinutes(1);
     
+    /** Log prefix for misses in trace-level logging. */
     public static final String MISS_PREFIX = "miss: Could not find the address: ";
+    /** Log prefix for confirmed address hits. */
     public static final String HIT_PREFIX = "hit: Found the address: ";
+    /** Log prefix for vanity-pattern matches. */
     public static final String VANITY_HIT_PREFIX = "vanity pattern match: ";
+    /** Log prefix used by {@code safeLog} to record key details immediately on a hit. */
     public static final String HIT_SAFE_PREFIX = "hit: safe log: ";
 
     private Logger logger = LoggerFactory.getLogger(this.getClass());
 
     private final KeyUtility keyUtility;
+    /** Total number of address lookups performed. */
     protected final AtomicLong checkedKeys = new AtomicLong();
+    /** Cumulative time spent inside the persistence's {@code containsAddress} calls (ms). */
     protected final AtomicLong checkedKeysSumOfTimeToCheckContains = new AtomicLong();
+    /** Number of consumer iterations that found the queue empty. */
     protected final AtomicLong emptyConsumer = new AtomicLong();
+    /** Total number of address hits found so far. */
     protected final AtomicLong hits = new AtomicLong();
+    /** Wall-clock start time (epoch ms) of the consumer for statistics. */
     protected long startTime = 0;
 
+    /** Consumer configuration. */
     protected final CConsumerJava consumerJava;
     @VisibleForTesting
     ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 
+    /** The persistence implementation queried by the consumer; initialised in {@link #initLMDB()}. */
     protected @Nullable Persistence persistence;
     private final PersistenceUtils persistenceUtils;
-    
+
     private final List<Future<Void>> consumers = new ArrayList<>();
+    /** Queue of pending public-key batches; bounded by {@code consumerJava.queueSize}. */
     protected final LinkedBlockingQueue<PublicKeyBytes[]> keysQueue;
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
-    
+
+    /** Total number of vanity-pattern hits found so far. */
     protected final AtomicLong vanityHits = new AtomicLong();
     private final @Nullable Pattern vanityPattern;
     
@@ -73,6 +90,13 @@ public class ConsumerJava implements Consumer {
     @VisibleForTesting
     final ExecutorService consumeKeysExecutorService;
 
+    /**
+     * Creates a new consumer.
+     *
+     * @param consumerJava     consumer configuration
+     * @param keyUtility       cryptographic helper
+     * @param persistenceUtils persistence helper used to construct the LMDB layer
+     */
     protected ConsumerJava(CConsumerJava consumerJava, KeyUtility keyUtility, PersistenceUtils persistenceUtils) {
         this.consumerJava = consumerJava;
         this.keysQueue = new LinkedBlockingQueue<>(consumerJava.queueSize);
@@ -94,11 +118,17 @@ public class ConsumerJava implements Consumer {
         this.logger = logger;
     }
 
+    /**
+     * Initialises the LMDB persistence layer used to query addresses.
+     */
     protected void initLMDB() {
         persistence = new LMDBPersistence(consumerJava.lmdbConfigurationReadOnly, persistenceUtils);
         persistence.init();
     }
 
+    /**
+     * Starts the periodic statistics-printing scheduler.
+     */
     protected void startStatisticsTimer() {
         long period = consumerJava.printStatisticsEveryNSeconds;
         if (period <= 0) {
@@ -239,6 +269,13 @@ public class ConsumerJava implements Consumer {
         }
     }
 
+    /**
+     * Looks up the given hash160 in the persistence layer, reusing the supplied buffer.
+     *
+     * @param threadLocalReuseableByteBuffer a thread-local buffer to avoid allocation per lookup
+     * @param hash160                        the 20-byte address hash to look up
+     * @return {@code true} if the address is present in the database
+     */
     public boolean containsAddress(ByteBuffer threadLocalReuseableByteBuffer, byte[] hash160) {
         threadLocalReuseableByteBuffer.rewind();
         threadLocalReuseableByteBuffer.put(hash160);

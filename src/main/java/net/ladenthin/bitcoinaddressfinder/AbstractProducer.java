@@ -13,25 +13,47 @@ import org.slf4j.LoggerFactory;
 import java.math.BigInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * Base class for {@link Producer} implementations providing the common state machine,
+ * key consumption loop and shutdown handling.
+ */
 public abstract class AbstractProducer implements Producer {
-    
+
     private final static int SLEEP_WAIT_TILL_RUNNING = 10;
 
     private Logger logger = LoggerFactory.getLogger(this.getClass());
-    
+
+    /** Flag indicating whether the producer is currently running. */
     protected final AtomicBoolean running = new AtomicBoolean(false);
-    
+
+    /** Configuration backing this producer. */
     protected final CProducer cProducer;
+    /** Downstream consumer that receives generated keys. */
     protected final Consumer consumer;
+    /** Cryptographic helper used to encode/decode private keys. */
     protected final KeyUtility keyUtility;
+    /** Strategy that supplies the next secret batch. */
     protected final KeyProducer keyProducer;
+    /** Helper for bit-level batch size arithmetic. */
     protected final BitHelper bitHelper;
+    /** Validator that rejects or replaces invalid secp256k1 private keys. */
     protected final PrivateKeyValidator privateKeyValidator;
 
+    /** Current life-cycle state. */
     protected volatile ProducerState state = ProducerState.UNINITIALIZED;
 
+    /** Flag controlling the main {@link #run()} loop; cleared via {@link #interrupt()}. */
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
+    /**
+     * Creates a new producer with the given collaborators.
+     *
+     * @param cProducer   the producer configuration
+     * @param consumer    the downstream consumer
+     * @param keyUtility  the cryptographic helper
+     * @param keyProducer the secret supplying strategy
+     * @param bitHelper   the bit/batch-size helper
+     */
     public AbstractProducer(CProducer cProducer, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer, BitHelper bitHelper) {
         this.cProducer = cProducer;
         this.consumer = consumer;
@@ -121,16 +143,26 @@ public abstract class AbstractProducer implements Producer {
     /**
      * The method fromPrivate can throw an {@link IllegalArgumentException}.
      * The method {@link ByteBufferUtility#freeByteBuffer} can throw an {@link java.lang.IllegalAccessError}.
+     *
+     * @param e      the throwable describing the failure
      * @param secret the secret to be able to recover the issue
      */
     protected void logErrorInProduceKeys(Throwable e, BigInteger secret) {
         logger.error("Error in produceKey for secret " + secret + ".", e);
     }
-    
+
+    /**
+     * Logs an unexpected error caught while running {@link #produceKeys()}.
+     *
+     * @param e the exception to log
+     */
     protected void logErrorInProduceKeys(Exception e) {
         logger.error("Error in produceKey", e);
     }
-    
+
+    /**
+     * Logs that the underlying secret source has been exhausted.
+     */
     protected void logNoMoreSecretsInSecretFactory() {
         logger.error("No more keys in secret factory. Shutdown producer.");
     }
@@ -145,6 +177,13 @@ public abstract class AbstractProducer implements Producer {
         }
     }
 
+    /**
+     * Derives the per-batch secret base by masking off the lower bits of {@code secret}.
+     *
+     * @param secret        the candidate secret
+     * @param logSecretBase whether to log the resulting secret base
+     * @return the secret base used as the starting point of the next batch
+     */
     public BigInteger createSecretBase(BigInteger secret, boolean logSecretBase) {
         BigInteger killBits = bitHelper.getKillBits(cProducer.batchSizeInBits);
         BigInteger secretBase = keyUtility.killBits(secret, killBits);
@@ -164,6 +203,13 @@ public abstract class AbstractProducer implements Producer {
         return secretBase;
     }
     
+    /**
+     * Combines a secret base with the index of a key inside its batch.
+     *
+     * @param secretBase the masked secret base for the batch
+     * @param keyNumber  the zero-based index of the key inside the batch
+     * @return the concrete private-key candidate
+     */
     public static BigInteger calculateSecretKey(BigInteger secretBase, int keyNumber) {
         if (false) {
             // works also but a or might be faster

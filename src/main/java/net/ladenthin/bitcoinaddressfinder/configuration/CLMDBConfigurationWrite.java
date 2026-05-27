@@ -5,7 +5,15 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import org.bitcoinj.base.Coin;
 
+/**
+ * Configuration for opening the LMDB database in read-write mode.
+ */
 public class CLMDBConfigurationWrite extends CLMDBConfigurationReadOnly {
+
+    /** Creates a new {@link CLMDBConfigurationWrite}. */
+    public CLMDBConfigurationWrite() {
+    }
+
 
     /**
      * LMDB site in MiB (e.g. 1024).
@@ -30,7 +38,8 @@ public class CLMDBConfigurationWrite extends CLMDBConfigurationReadOnly {
      * to obscure amount and allow higher database compression.
      */
     public boolean useStaticAmount = true;
-    
+
+    /** Whether to grow the LMDB map size automatically when it becomes full. */
     public boolean increaseMapAutomatically = true;
     
     /**

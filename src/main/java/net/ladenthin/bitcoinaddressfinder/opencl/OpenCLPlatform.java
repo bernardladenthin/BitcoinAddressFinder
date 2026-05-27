@@ -25,6 +25,13 @@ public record OpenCLPlatform(
     @NonNull ImmutableList<@NonNull OpenCLDevice> openCLDevices
 ) implements Serializable {
 
+    /**
+     * Canonical constructor.
+     *
+     * @param platformName      the name of the OpenCL platform
+     * @param contextProperties the context properties of the OpenCL platform
+     * @param openCLDevices     the associated OpenCL devices
+     */
     public OpenCLPlatform(String platformName, cl_context_properties contextProperties, ImmutableList<@NonNull OpenCLDevice> openCLDevices) {
         this.platformName = platformName;
         this.contextProperties = contextProperties;

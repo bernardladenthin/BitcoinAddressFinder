@@ -15,6 +15,9 @@ import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Producer that reads secret values from one or more files and forwards them through the consumer.
+ */
 public class ProducerJavaSecretsFiles extends ProducerJava {
 
     private final Logger logger = LoggerFactory.getLogger(ProducerJavaSecretsFiles.class);
@@ -28,6 +31,15 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
     @NonNull
     AtomicReference<SecretsFile> currentSecretsFile = new AtomicReference<>();
 
+    /**
+     * Creates a new secrets-file producer.
+     *
+     * @param producerJavaSecretsFiles the producer configuration
+     * @param consumer                 the downstream consumer
+     * @param keyUtility               cryptographic helper
+     * @param keyProducer              the secret supplying strategy (unused in this producer)
+     * @param bitHelper                bit/batch-size helper
+     */
     public ProducerJavaSecretsFiles(CProducerJavaSecretsFiles producerJavaSecretsFiles, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer, BitHelper bitHelper) {
         super(producerJavaSecretsFiles, consumer, keyUtility, keyProducer, bitHelper);
         this.producerJavaSecretsFiles = producerJavaSecretsFiles;

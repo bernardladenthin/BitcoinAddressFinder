@@ -11,13 +11,24 @@ package net.ladenthin.bitcoinaddressfinder;
  */
 public class AddressFormatNotAcceptedException extends Exception {
 
+    /** The rejection reason supplied at construction time. */
     private final String reason;
 
+    /**
+     * Creates a new exception with a human-readable reason.
+     *
+     * @param reason a short description of why the format was rejected
+     */
     public AddressFormatNotAcceptedException(String reason) {
         super("Address format not accepted: " + reason);
         this.reason = reason;
     }
 
+    /**
+     * Returns the human-readable rejection reason.
+     *
+     * @return the human-readable rejection reason
+     */
     public String getReason() {
         return reason;
     }

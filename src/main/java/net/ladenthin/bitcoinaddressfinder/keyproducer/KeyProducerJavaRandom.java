@@ -14,6 +14,9 @@ import net.ladenthin.bitcoinaddressfinder.SecretSupplier;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 import org.slf4j.Logger;
 
+/**
+ * Key producer that draws secrets from a configurable random-number generator.
+ */
 public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRandom> {
 
     private final KeyUtility keyUtility;
@@ -25,6 +28,14 @@ public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRando
      */
     private final Random random;
 
+    /**
+     * Creates a new random key producer using the algorithm configured in the supplied {@link CKeyProducerJavaRandom}.
+     *
+     * @param cKeyProducerJavaRandom the random configuration
+     * @param keyUtility             cryptographic helper
+     * @param bitHelper              bit/batch-size helper
+     * @param logger                 SLF4J logger
+     */
     @SuppressWarnings({"squid:S2245"})
     public KeyProducerJavaRandom(CKeyProducerJavaRandom cKeyProducerJavaRandom, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
         super(cKeyProducerJavaRandom, logger);

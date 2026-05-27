@@ -21,20 +21,31 @@ import java.util.Arrays;
  */
 public class AddressTxtLine {
 
+    /** Creates a new {@link AddressTxtLine}. */
+    public AddressTxtLine() {
+    }
+
     /**
      * Should not be {@link Coin#ZERO} because it can't be written to LMDB.
      */
     public static final Coin DEFAULT_COIN = Coin.SATOSHI;
 
+    /** Lines starting with this prefix are ignored. */
     public static final String IGNORE_LINE_PREFIX = "#";
+    /** Header token marking a column header row that should be skipped. */
     public static final String ADDRESS_HEADER = "address";
+    /** Prefix used by Bitcoin Cash CashAddr representations. */
     public static final String BITCOIN_CASH_PREFIX = "bitcoincash:";
-    
-    
+
+
+    /** Number of version bytes used by regular Base58Check addresses. */
     public final static int VERSION_BYTES_REGULAR = 1;
+    /** Number of version bytes used by ZCash transparent addresses. */
     public final static int VERSION_BYTES_ZCASH = 2;
+    /** Number of checksum bytes appended to Base58Check addresses. */
     public final static int CHECKSUM_BYTES_REGULAR = 4;
 
+    /** Reason used when the address field is empty. */
     public static final String REASON_EMPTY = "address is empty";
 
     /**
@@ -46,12 +57,19 @@ public class AddressTxtLine {
      * with {@link #REASON_EMPTY} instead.
      */
     public static final String REASON_IGNORE_PREFIX = "address starts with ignore prefix";
+    /** Reason used when the line starts with the column header word. */
     public static final String REASON_ADDRESS_HEADER = "address starts with address header";
+    /** Reason used when the line is a Blockchair P2MS Multisig entry. */
     public static final String REASON_P2MS_NOT_SUPPORTED = "Blockchair Multisig (P2MS) format is not supported";
+    /** Reason used when the line is a P2WSH Bech32 address. */
     public static final String REASON_P2WSH_NOT_SUPPORTED = "P2WSH is not supported";
+    /** Reason used when the line is a P2TR Bech32m address. */
     public static final String REASON_P2TR_NOT_SUPPORTED = "P2TR is not supported";
+    /** Reason used when a Bech32 address has an unknown witness version. */
     public static final String REASON_UNSUPPORTED_WITNESS_VERSION = "unsupported witness version";
+    /** Reason used when a Bitcoin Cash {@code q} address could not be decoded. */
     public static final String REASON_BITCOIN_CASH_Q_ADDRESS_NOT_PARSABLE = "Bitcoin Cash address is not parsable";
+    /** Reason used when a Base58 fallback decoding failed. */
     public static final String REASON_INVALID_BASE58 = "invalid Base58 address";
     
     /**

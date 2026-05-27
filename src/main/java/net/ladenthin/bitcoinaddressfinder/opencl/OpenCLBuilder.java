@@ -63,10 +63,24 @@ import org.jocl.cl_device_id;
 import org.jocl.cl_platform_id;
 import org.jspecify.annotations.NonNull;
 
+/**
+ * Discovers available OpenCL platforms and devices via JOCL and wraps them in
+ * {@link OpenCLPlatform} / {@link OpenCLDevice} objects.
+ */
 public class OpenCLBuilder {
-    
+
+    /** Creates a new {@link OpenCLBuilder}. */
+    public OpenCLBuilder() {
+    }
+
+    /** Whether device-info conversions should be formatted for human consumption when querying device info. */
     public static boolean TRANSFORM_TO_PRINT = true;
-    
+
+    /**
+     * Discovers and returns every available OpenCL platform with its devices.
+     *
+     * @return the list of detected OpenCL platforms
+     */
     public List<OpenCLPlatform> build() {
         // Obtain the number of platforms
         int[] numPlatforms = new int[1];
@@ -197,6 +211,11 @@ public class OpenCLBuilder {
         return b.build();
     }
 
+    /**
+     * Detects whether the JOCL native OpenCL library could be loaded.
+     *
+     * @return {@code true} if the native library is loaded and usable
+     */
     public static boolean isOpenCLnativeLibraryLoadable() {
         try {
             Class.forName("org.jocl.CL");
@@ -213,6 +232,12 @@ public class OpenCLBuilder {
         }
     }
     
+    /**
+     * Checks whether at least one device with OpenCL 2.0 or newer is available.
+     *
+     * @param openCLPlatforms the platforms to inspect
+     * @return {@code true} if at least one OpenCL 2.0+ device exists
+     */
     public static boolean isOneOpenCL2_0OrGreaterDeviceAvailable(List<OpenCLPlatform> openCLPlatforms) {
         for (OpenCLPlatform openCLPlatform : openCLPlatforms) {
             List<OpenCLDevice> openCLDevices = openCLPlatform.openCLDevices();
@@ -225,6 +250,12 @@ public class OpenCLBuilder {
         return false;
     }
 
+    /**
+     * Checks whether the supplied OpenCL device version is at least 2.0.
+     *
+     * @param openCLDeviceVersion the parsed device version
+     * @return {@code true} if {@code openCLDeviceVersion &gt;= 2.0}
+     */
     public static boolean isOpenCL2_0OrGreater(ComparableVersion openCLDeviceVersion) {
         final ComparableVersion v2_0 = new ComparableVersion("2.0");
         return openCLDeviceVersion.compareTo(v2_0) >= 0;

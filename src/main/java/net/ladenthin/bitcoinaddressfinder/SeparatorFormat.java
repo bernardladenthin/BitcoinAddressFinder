@@ -9,6 +9,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Pattern;
 
+/**
+ * Enumerates the line-separator variants supported by the address-file parser.
+ */
 public enum SeparatorFormat {
     // <editor-fold desc="Common CSV-style separators">
 
@@ -102,6 +105,11 @@ public enum SeparatorFormat {
         this.symbol = symbol;
     }
 
+    /**
+     * Returns the literal separator symbol.
+     *
+     * @return the literal separator symbol
+     */
     public String getSymbol() {
         return symbol;
     }

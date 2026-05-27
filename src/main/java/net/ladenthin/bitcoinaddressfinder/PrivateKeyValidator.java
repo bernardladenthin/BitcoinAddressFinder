@@ -16,6 +16,11 @@ import org.jspecify.annotations.NonNull;
  */
 public class PrivateKeyValidator {
 
+    /** Creates a new {@link PrivateKeyValidator}. */
+    public PrivateKeyValidator() {
+    }
+
+
     /**
      * Calculates the maximum allowed private key value that can safely be used as a base
      * for grid-based key generation without exceeding the secp256k1 private key limit.

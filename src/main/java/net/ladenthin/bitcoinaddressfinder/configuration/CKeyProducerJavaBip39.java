@@ -7,10 +7,19 @@ import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 
+/**
+ * Configuration for the BIP39 mnemonic-based key producer.
+ */
 public class CKeyProducerJavaBip39 extends CKeyProducerJava {
 
+    /** Creates a new {@link CKeyProducerJavaBip39}. */
+    public CKeyProducerJavaBip39() {
+    }
+
+    /** Default BIP39 mnemonic used when none is configured. */
     public static final String DEFAULT_MNEMONIC = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-    
+
+
     /** Default BIP32 path used for external addresses (BIP44). */
     public static final String DEFAULT_BIP32_PATH = "M/44H/0H/0H/0";
     
@@ -62,6 +71,8 @@ public class CKeyProducerJavaBip39 extends CKeyProducerJava {
     /**
      * Returns the creation time as an Instant.
      * Defaults to Instant.ofEpochSecond(0) if not set.
+     *
+     * @return the creation time as an {@link Instant}
      */
     public Instant getCreationTimeInstant() {
         return Instant.ofEpochSecond(this.creationTimeSeconds != null ? this.creationTimeSeconds : 0L);

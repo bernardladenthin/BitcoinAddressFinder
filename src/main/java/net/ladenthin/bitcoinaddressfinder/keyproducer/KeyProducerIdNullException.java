@@ -11,6 +11,7 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
  */
 public class KeyProducerIdNullException extends RuntimeException {
 
+    /** Creates a new exception with a fixed message. */
     public KeyProducerIdNullException() {
         super("Key producer id must not be null.");
     }

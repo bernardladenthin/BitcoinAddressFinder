@@ -6,6 +6,9 @@ package net.ladenthin.bitcoinaddressfinder;
 import java.math.BigInteger;
 import java.util.Random;
 
+/**
+ * Generates candidate private keys and forwards them to the {@link Consumer} via the shared queue.
+ */
 public interface Producer extends Runnable, Interruptable, ProducerStateProvider {
     
     /**
@@ -24,6 +27,8 @@ public interface Producer extends Runnable, Interruptable, ProducerStateProvider
      * push them to the {@link Consumer}.
      * 
      * Specifically, any 256-bit number between {@code 0x1} and {@link PublicKeyBytes#MAX_PRIVATE_KEY} is a valid private key.
+     *
+     * @throws Exception if key production fails for any reason
      */
     void produceKeys() throws Exception;
     

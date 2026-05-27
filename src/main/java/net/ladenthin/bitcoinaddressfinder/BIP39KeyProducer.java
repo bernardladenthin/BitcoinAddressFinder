@@ -22,12 +22,25 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class BIP39KeyProducer extends java.util.Random {
 
+    /** Underlying deterministic key chain seeded from the mnemonic. */
     private final DeterministicKeyChain keyChain;
+    /** Parsed BIP44 base derivation path. */
     private final List<ChildNumber> basePath;
+    /** Whether derived child indices are hardened. */
     private final boolean hardened;
+    /** Monotonically increasing child-index counter (visible for testing). */
     @VisibleForTesting
     final AtomicInteger counter = new AtomicInteger(0);
 
+    /**
+     * Creates a new deterministic key producer.
+     *
+     * @param mnemonic       the BIP39 mnemonic phrase
+     * @param passphrase     the optional BIP39 passphrase
+     * @param bip44BasePath  the BIP44 base derivation path (e.g. {@code M/44H/0H/0H/0})
+     * @param creationTime   the seed creation time
+     * @param hardened       whether the derived child indices are hardened
+     */
     public BIP39KeyProducer(String mnemonic, String passphrase, String bip44BasePath, Instant creationTime, boolean hardened) {
         DeterministicSeed seed = DeterministicSeed.ofMnemonic(mnemonic, passphrase, creationTime);
         this.keyChain = DeterministicKeyChain.builder().seed(seed).build();
@@ -37,6 +50,9 @@ public class BIP39KeyProducer extends java.util.Random {
     
     /**
      * Returns the next derived key along the BIP44 path.
+     *
+     * @return the next {@link DeterministicKey}
+     * @throws NoMoreSecretsAvailableException if the internal child-index counter overflows
      */
     public DeterministicKey nextKey() throws NoMoreSecretsAvailableException {
         int index = counter.getAndIncrement();
@@ -47,6 +63,13 @@ public class BIP39KeyProducer extends java.util.Random {
         return keyChain.getKeyByPath(path, true);
     }
     
+    /**
+     * Returns a new list with {@code child} appended to {@code base}.
+     *
+     * @param base  the base path
+     * @param child the child number to append
+     * @return a new list containing all entries of {@code base} followed by {@code child}
+     */
     public static List<ChildNumber> append(List<ChildNumber> base, ChildNumber child) {
         List<ChildNumber> extended = new ArrayList<>(base);
         extended.add(child);

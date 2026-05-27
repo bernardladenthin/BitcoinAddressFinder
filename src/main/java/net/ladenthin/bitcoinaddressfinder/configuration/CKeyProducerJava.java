@@ -6,9 +6,19 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import org.jspecify.annotations.Nullable;
 
+/**
+ * Common configuration shared by all Java-based key producers.
+ */
 public class CKeyProducerJava {
+
+    /** Creates a new {@link CKeyProducerJava}. */
+    public CKeyProducerJava() {
+    }
+
+    /** Unique id by which producers reference this key producer. */
     public @Nullable String keyProducerId;
-    
+
+
     /**
      * (2<sup>{@code maxNumBits}</sup> - 1) can be set to a lower value to improve a search on specific ranges (e.g. the puzzle transaction <a href="https://privatekeys.pw/puzzles/bitcoin-puzzle-tx">bitcoin-puzzle-tx</a> ).
      * {@code 1} can't be tested because {@link org.bitcoinj.crypto.ECKey#fromPrivate} throws an {@link IllegalArgumentException}.

@@ -11,8 +11,11 @@ import org.bouncycastle.util.encoders.Hex;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+/**
+ * Helper for {@link ByteBuffer} allocation, byte-array conversion and reversal.
+ */
 public class ByteBufferUtility {
-    
+
     /**
      * Decide between {@link java.nio.DirectByteBuffer} and {@link java.nio.HeapByteBuffer}.
      */
@@ -31,10 +34,21 @@ public class ByteBufferUtility {
      */
     private final boolean useXorSwap;
 
+    /**
+     * Creates a new instance using the default swap algorithm.
+     *
+     * @param allocateDirect whether to allocate direct (off-heap) byte buffers
+     */
     public ByteBufferUtility(boolean allocateDirect) {
         this(allocateDirect, DEFAULT_USE_XOR_SWAP);
     }
 
+    /**
+     * Creates a new instance with full control over the swap algorithm.
+     *
+     * @param allocateDirect whether to allocate direct (off-heap) byte buffers
+     * @param useXorSwap     whether {@link #reverse(byte[])} uses the XOR swap algorithm
+     */
     public ByteBufferUtility(boolean allocateDirect, boolean useXorSwap) {
         this.allocateDirect = allocateDirect;
         this.useXorSwap = useXorSwap;
@@ -65,13 +79,26 @@ public class ByteBufferUtility {
     }
     
     // <editor-fold defaultstate="collapsed" desc="ByteBuffer byte array conversion">
+    /**
+     * Copies the remaining content of {@code byteBuffer} into a new byte array.
+     *
+     * @param byteBuffer the buffer to read; rewound on return
+     * @return a new byte array with the buffer's content
+     */
     public byte[] byteBufferToBytes(ByteBuffer byteBuffer) {
         byte[] bytes = new byte[byteBuffer.remaining()];
         byteBuffer.get(bytes);
         byteBuffer.rewind();
         return bytes;
     }
-    
+
+    /**
+     * Wraps or copies {@code bytes} into a new {@link ByteBuffer} depending on the
+     * {@code allocateDirect} flag configured for this instance.
+     *
+     * @param bytes the source byte array
+     * @return a ready-to-read {@link ByteBuffer}
+     */
     public ByteBuffer byteArrayToByteBuffer(byte[] bytes) {
         if (allocateDirect) { 
             return byteArrayToByteBufferAllocatedDirect(bytes);
@@ -106,12 +133,24 @@ public class ByteBufferUtility {
     // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc="ByteBuffer Hex conversion">
+    /**
+     * Encodes a {@link ByteBuffer} as a lower-case hex string.
+     *
+     * @param byteBuffer the buffer to encode
+     * @return the lower-case hex representation of the buffer's content
+     */
     public String getHexFromByteBuffer(ByteBuffer byteBuffer) {
         byte[] array = byteBufferToBytes(byteBuffer);
         String hexString = Hex.toHexString(array);
         return hexString;
     }
 
+    /**
+     * Decodes a hex string into a {@link ByteBuffer}.
+     *
+     * @param hex the hex-encoded input
+     * @return a buffer containing the decoded bytes
+     */
     public ByteBuffer getByteBufferFromHex(String hex) {
         byte[] decoded = Hex.decode(hex);
         // wrap() delivers a buffer which is already flipped
@@ -178,7 +217,10 @@ public class ByteBufferUtility {
     }
     
     /**
-     * https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java
+     * Reverses the given byte array in place.
+     * <p>See https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java.
+     *
+     * @param array the array to reverse in place
      */
     public void reverse(byte @NonNull [] array) {
         if (useXorSwap) {

@@ -16,12 +16,25 @@ import java.security.spec.ECPoint;
 import java.security.spec.ECPublicKeySpec;
 import java.security.spec.EllipticCurve;
 
-// https://stackoverflow.com/questions/19673962/codes-to-generate-a-public-key-in-an-elliptic-curve-algorithm-using-a-given-priv/42797410#42797410
+/**
+ * Pure-Java secp256k1 scalar-multiplication and serialisation helpers.
+ * <p>See https://stackoverflow.com/questions/19673962/codes-to-generate-a-public-key-in-an-elliptic-curve-algorithm-using-a-given-priv/42797410#42797410
+ */
 public class Secp256k1 {
+
+    /** Creates a new {@link Secp256k1}. */
+    public Secp256k1() {
+    }
 
     final static BigInteger FieldP_2 = BigInteger.valueOf(2); // constant for scalar operations
     final static BigInteger FieldP_3 = BigInteger.valueOf(3); // constant for scalar operations
 
+    /**
+     * Encodes a byte array as an uppercase hex string.
+     *
+     * @param a the byte array to encode
+     * @return the uppercase hex representation
+     */
     public static String byteArrayToHexString(byte[] a) {
         StringBuilder sb = new StringBuilder(a.length * 2);
         for (byte b : a) {
@@ -30,6 +43,12 @@ public class Secp256k1 {
         return sb.toString();
     }
 
+    /**
+     * Decodes a hex string into a byte array.
+     *
+     * @param s the hex string
+     * @return the decoded bytes
+     */
     public static byte[] hexStringToByteArray(String s) {
         int len = s.length();
         byte[] data = new byte[len / 2];
@@ -76,6 +95,14 @@ public class Secp256k1 {
         return new ECPoint(Xout, Yout);
     }
 
+    /**
+     * Computes {@code kin * g} on the curve described by {@code params}.
+     *
+     * @param params the elliptic-curve parameters
+     * @param g      the base point
+     * @param kin    the scalar
+     * @return the resulting curve point
+     */
     public static ECPoint scalmultNew(final ECParameterSpec params, final ECPoint g, final BigInteger kin) {
         EllipticCurve curve = params.getCurve();
         final ECField field = curve.getField();
@@ -106,6 +133,14 @@ public class Secp256k1 {
         return R;
     }
 
+    /**
+     * Legacy scalar multiplication accepting an {@link EllipticCurve} directly.
+     *
+     * @param curve the elliptic curve
+     * @param g     the base point
+     * @param kin   the scalar
+     * @return the resulting curve point
+     */
     public static ECPoint scalmultOrg(final EllipticCurve curve, final ECPoint g, final BigInteger kin) {
         final ECField field = curve.getField();
         if (!(field instanceof ECFieldFp)) {
@@ -138,6 +173,13 @@ public class Secp256k1 {
         return R;
     }
 
+    /**
+     * Derives the {@link ECPublicKey} matching the given private key on the same curve.
+     *
+     * @param pk the private key
+     * @return the derived public key
+     * @throws GeneralSecurityException if the public-key construction fails
+     */
     public static ECPublicKey getPublicKey(final ECPrivateKey pk) throws GeneralSecurityException {
         final ECParameterSpec params = pk.getParams();
         final ECPoint w = scalmultNew(params, pk.getParams().getGenerator(), pk.getS());

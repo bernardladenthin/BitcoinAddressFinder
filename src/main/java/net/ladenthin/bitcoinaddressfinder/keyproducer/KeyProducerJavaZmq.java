@@ -13,12 +13,23 @@ import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
 import org.zeromq.ZMQException;
 
+/**
+ * Key producer that receives secrets through a ZeroMQ PULL socket.
+ */
 public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaZmq> {
 
     private final ZContext context;
     private final ZMQ.Socket socket;
     private final Thread receiverThread;
-    
+
+    /**
+     * Creates a new ZMQ-based key producer and starts the background receiver thread.
+     *
+     * @param config      the ZMQ configuration
+     * @param keyUtility  cryptographic helper
+     * @param bitHelper   bit/batch-size helper (unused but kept for symmetry)
+     * @param logger      SLF4J logger
+     */
     public KeyProducerJavaZmq(CKeyProducerJavaZmq config, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
         super(config, keyUtility, logger);
 

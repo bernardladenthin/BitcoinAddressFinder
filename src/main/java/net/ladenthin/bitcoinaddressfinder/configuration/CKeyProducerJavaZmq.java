@@ -3,10 +3,22 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+/**
+ * Configuration for the ZeroMQ-based key producer.
+ */
 public class CKeyProducerJavaZmq extends CKeyProducerJavaReceiver {
 
+    /** Creates a new {@link CKeyProducerJavaZmq}. */
+    public CKeyProducerJavaZmq() {
+    }
+
+    /**
+     * Whether the ZMQ socket binds to or connects to the configured address.
+     */
     public enum Mode {
+        /** Connect to a remote ZMQ endpoint. */
         CONNECT,
+        /** Bind to the configured local address. */
         BIND
     }
 

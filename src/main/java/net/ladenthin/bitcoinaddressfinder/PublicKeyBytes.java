@@ -13,10 +13,16 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
+/**
+ * Container for the public-key bytes derived from a secp256k1 private key together with their
+ * RIPEMD-160 hashes (compressed and uncompressed).
+ */
 public class PublicKeyBytes {
-    
+
+    /** Maximum technically representable 256-bit private key value ({@code 2^256 - 1}). */
     public static final BigInteger MAX_TECHNICALLY_PRIVATE_KEY = BigInteger.valueOf(2).pow(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS).subtract(BigInteger.ONE);
 
+    /** Minimum private key value defined by the secp256k1 specification ({@code 1}). */
     public static final BigInteger MIN_PRIVATE_KEY = BigInteger.ONE;
     
     /**
@@ -37,8 +43,10 @@ public class PublicKeyBytes {
      * @see org.bitcoinj.crypto.ECKey#fromPrivate(BigInteger, boolean)
      */
     public static final BigInteger MIN_VALID_PRIVATE_KEY = BigInteger.TWO;
+    /** Uppercase hexadecimal representation of {@link #MIN_VALID_PRIVATE_KEY}. */
     public static final String MIN_VALID_PRIVATE_KEY_HEX = MIN_VALID_PRIVATE_KEY.toString(BitHelper.RADIX_HEX).toUpperCase();
-    
+
+    /** Uppercase hexadecimal representation of the secp256k1 group order (the maximum valid private key). */
     public static final String MAX_PRIVATE_KEY_HEX = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141";
 
     /**
@@ -65,84 +73,143 @@ public class PublicKeyBytes {
     public static final BigInteger INVALID_PRIVATE_KEY_REPLACEMENT = BigInteger.valueOf(2);
 
     // ==== BEGIN: SYNCHRONIZED WITH OpenCL CONSTANTS (Do not modify without updating OpenCL) ====
+    /** Number of bits in a byte. */
     public static final int BITS_PER_BYTE                                          = 8;
+    /** Number of {@code u32} values per kernel word. */
     public static final int U32_PER_WORD                                           = 1;
+    /** Number of bytes per {@code u32} word. */
     public static final int U32_NUM_BYTES                                          = 4;
+    /** Shift in bits to move a byte to the MSB of a {@code u32}. */
     public static final int BYTE_SHIFT_TO_U32_MSB                                  = 24;
-    
+
     // === private key ===
+    /** Maximum number of bits in a secp256k1 private key. */
     public static final int PRIVATE_KEY_MAX_NUM_BITS                               = 256;
+    /** Maximum number of bytes in a secp256k1 private key. */
     public static final int PRIVATE_KEY_MAX_NUM_BYTES                              = PRIVATE_KEY_MAX_NUM_BITS / BITS_PER_BYTE; // 32
+    /** Maximum number of {@code u32} words in a secp256k1 private key. */
     public static final int PRIVATE_KEY_MAX_NUM_WORDS                              = PRIVATE_KEY_MAX_NUM_BYTES / U32_NUM_BYTES; // 8
     
     // === SEC format prefixes ===
+    /** Number of bits in the SEC format prefix. */
     public static final int SEC_PREFIX_NUM_BITS                                    = BITS_PER_BYTE;
+    /** Number of bytes in the SEC format prefix. */
     public static final int SEC_PREFIX_NUM_BYTES                                   = 1;
+    /** Number of {@code u32} words in the SEC format prefix. */
     public static final int SEC_PREFIX_NUM_WORDS                                   = U32_PER_WORD;
+    /** SEC prefix byte identifying an uncompressed ECDSA point ({@code 0x04}). */
     public static final int SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT                    = 0x04;
+    /** SEC prefix byte identifying a compressed ECDSA point with even {@code y} ({@code 0x02}). */
     public static final int SEC_PREFIX_COMPRESSED_ECDSA_POINT_EVEN_Y               = 0x02;
+    /** SEC prefix byte identifying a compressed ECDSA point with odd {@code y} ({@code 0x03}). */
     public static final int SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y                = 0x03;
-    
+
     // ==== SEC format prefixes shifted versions (for use in u32[0] with MSB-first layout) ====
+    /** Number of bytes per SEC prefix when written as the MSB of a {@code u32}. */
     public static final int SEC_PREFIX_SHIFTED_NUM_BYTES                           = U32_NUM_BYTES;
+    /** {@link #SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT} shifted to the MSB of a {@code u32}. */
     public static final int SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT_SHIFTED            = (SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT           << BYTE_SHIFT_TO_U32_MSB);
+    /** {@link #SEC_PREFIX_COMPRESSED_ECDSA_POINT_EVEN_Y} shifted to the MSB of a {@code u32}. */
     public static final int SEC_PREFIX_COMPRESSED_ECDSA_POINT_EVEN_Y_SHIFTED       = (SEC_PREFIX_COMPRESSED_ECDSA_POINT_EVEN_Y << BYTE_SHIFT_TO_U32_MSB);
+    /** {@link #SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y} shifted to the MSB of a {@code u32}. */
     public static final int SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y_SHIFTED        = (SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y   << BYTE_SHIFT_TO_U32_MSB);
-    
+
     // ==== x, y coordinate length ====
+    /** Number of bits per ECDSA coordinate. */
     public static final int ONE_COORDINATE_NUM_BITS                                = 256;
+    /** Number of bytes per ECDSA coordinate. */
     public static final int ONE_COORDINATE_NUM_BYTES                               = ONE_COORDINATE_NUM_BITS / BITS_PER_BYTE; // 32
+    /** Total number of bits in the two coordinates of an uncompressed point. */
     public static final int TWO_COORDINATES_NUM_BITS                               = ONE_COORDINATE_NUM_BITS * 2; // 512
+    /** Total number of bytes in the two coordinates of an uncompressed point. */
     public static final int TWO_COORDINATES_NUM_BYTES                              = ONE_COORDINATE_NUM_BYTES * 2; // 64
+    /** Number of {@code u32} words per coordinate. */
     public static final int ONE_COORDINATE_NUM_WORDS                               = ONE_COORDINATE_NUM_BYTES / U32_NUM_BYTES; // 8
+    /** Number of {@code u32} words in the two coordinates of an uncompressed point. */
     public static final int TWO_COORDINATE_NUM_WORDS                               = ONE_COORDINATE_NUM_WORDS * 2; // 16
-    
+
     // ==== public key length ====
+    /** Number of bits in an uncompressed SEC public key. */
     public static final int SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BITS                   = SEC_PREFIX_NUM_BITS  + TWO_COORDINATES_NUM_BITS;  // 520
+    /** Number of bytes in an uncompressed SEC public key. */
     public static final int SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BYTES                  = SEC_PREFIX_NUM_BYTES + TWO_COORDINATES_NUM_BYTES; // 65
+    /** Number of {@code u32} words in an uncompressed SEC public key. */
     public static final int SEC_PUBLIC_KEY_UNCOMPRESSED_WORDS                      = SEC_PREFIX_NUM_WORDS + TWO_COORDINATE_NUM_WORDS;  // 17
+    /** Number of bits in a compressed SEC public key. */
     public static final int SEC_PUBLIC_KEY_COMPRESSED_NUM_BITS                     = SEC_PREFIX_NUM_BITS  + ONE_COORDINATE_NUM_BITS;   // 264
+    /** Number of bytes in a compressed SEC public key. */
     public static final int SEC_PUBLIC_KEY_COMPRESSED_NUM_BYTES                    = SEC_PREFIX_NUM_BYTES + ONE_COORDINATE_NUM_BYTES;  // 33
+    /** Number of {@code u32} words in a compressed SEC public key. */
     public static final int SEC_PUBLIC_KEY_COMPRESSED_WORDS                        = SEC_PREFIX_NUM_WORDS + ONE_COORDINATE_NUM_WORDS;  // 9
-    
+
     // === Hash sizes in bytes ===
+    /** SHA-256 input block size in bits. */
     public static final int SHA256_INPUT_BLOCK_SIZE_BITS                           = 512;
+    /** SHA-256 input block size in bytes. */
     public static final int SHA256_INPUT_BLOCK_SIZE_BYTES                          = SHA256_INPUT_BLOCK_SIZE_BITS /  BITS_PER_BYTE; // 64
+    /** SHA-256 input block size in {@code u32} words. */
     public static final int SHA256_INPUT_BLOCK_SIZE_WORDS                          = SHA256_INPUT_BLOCK_SIZE_BYTES / U32_NUM_BYTES; // 16
+    /** RIPEMD-160 input block size in bits. */
     public static final int RIPEMD160_INPUT_BLOCK_SIZE_BITS                        = 512;
+    /** RIPEMD-160 input block size in bytes. */
     public static final int RIPEMD160_INPUT_BLOCK_SIZE_BYTES                       = RIPEMD160_INPUT_BLOCK_SIZE_BITS /  BITS_PER_BYTE; // 64
+    /** RIPEMD-160 input block size in {@code u32} words. */
     public static final int RIPEMD160_INPUT_BLOCK_SIZE_WORDS                       = RIPEMD160_INPUT_BLOCK_SIZE_BYTES / U32_NUM_BYTES; // 16
+    /** SHA-256 output size in bits. */
     public static final int SHA256_HASH_NUM_BITS                                   = 256;
+    /** SHA-256 output size in bytes. */
     public static final int SHA256_HASH_NUM_BYTES                                  = SHA256_HASH_NUM_BITS /  BITS_PER_BYTE; // 32
+    /** SHA-256 output size in {@code u32} words. */
     public static final int SHA256_HASH_NUM_WORDS                                  = SHA256_HASH_NUM_BYTES / U32_NUM_BYTES; // 8
+    /** RIPEMD-160 output size in bits. */
     public static final int RIPEMD160_HASH_NUM_BITS                                = 160;
+    /** RIPEMD-160 output size in bytes. */
     public static final int RIPEMD160_HASH_NUM_BYTES                               = RIPEMD160_HASH_NUM_BITS /  BITS_PER_BYTE; // 20
+    /** RIPEMD-160 output size in {@code u32} words. */
     public static final int RIPEMD160_HASH_NUM_WORDS                               = RIPEMD160_HASH_NUM_BYTES / U32_NUM_BYTES; // 5
-    
+
+    /** Number of SHA-256 input blocks required for the uncompressed SEC public key. */
     public static final int SHA256_INPUT_BLOCKS_FOR_UNCOMPRESSED_SEC               = 2;
+    /** Total SHA-256 input bits for the uncompressed SEC public key. */
     public static final int SHA256_INPUT_TOTAL_BITS_UNCOMPRESSED                   = SHA256_INPUT_BLOCKS_FOR_UNCOMPRESSED_SEC * SHA256_INPUT_BLOCK_SIZE_BITS;  // 1024
+    /** Total SHA-256 input bytes for the uncompressed SEC public key. */
     public static final int SHA256_INPUT_TOTAL_BYTES_UNCOMPRESSED                  = SHA256_INPUT_BLOCKS_FOR_UNCOMPRESSED_SEC * SHA256_INPUT_BLOCK_SIZE_BYTES; // 128
+    /** Total SHA-256 input words for the uncompressed SEC public key. */
     public static final int SHA256_INPUT_TOTAL_WORDS_UNCOMPRESSED                  = SHA256_INPUT_BLOCKS_FOR_UNCOMPRESSED_SEC * SHA256_INPUT_BLOCK_SIZE_WORDS; // 32
-    
+
+    /** Number of SHA-256 input blocks required for the compressed SEC public key. */
     public static final int SHA256_INPUT_BLOCKS_FOR_COMPRESSED_SEC                 = 1;
+    /** Total SHA-256 input bits for the compressed SEC public key. */
     public static final int SHA256_INPUT_TOTAL_BITS_COMPRESSED                     = SHA256_INPUT_BLOCKS_FOR_COMPRESSED_SEC * SHA256_INPUT_BLOCK_SIZE_BITS;  // 512
+    /** Total SHA-256 input bytes for the compressed SEC public key. */
     public static final int SHA256_INPUT_TOTAL_BYTES_COMPRESSED                    = SHA256_INPUT_BLOCKS_FOR_COMPRESSED_SEC * SHA256_INPUT_BLOCK_SIZE_BYTES; // 64
+    /** Total SHA-256 input words for the compressed SEC public key. */
     public static final int SHA256_INPUT_TOTAL_WORDS_COMPRESSED                    = SHA256_INPUT_BLOCKS_FOR_COMPRESSED_SEC * SHA256_INPUT_BLOCK_SIZE_WORDS; // 16
-    
+
     // ==== Individual Chunk Sizes (Bytes in Java) ====
+    /** Size of the X-coordinate slot inside an OpenCL result chunk (in bytes). */
     public static final int CHUNK_SIZE_00_NUM_BYTES_BIG_ENDIAN_X                   = ONE_COORDINATE_NUM_BYTES;
+    /** Size of the Y-coordinate slot inside an OpenCL result chunk (in bytes). */
     public static final int CHUNK_SIZE_01_NUM_BYTES_BIG_ENDIAN_Y                   = ONE_COORDINATE_NUM_BYTES;
+    /** Size of the uncompressed-key RIPEMD-160 slot inside an OpenCL result chunk (in bytes). */
     public static final int CHUNK_SIZE_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED         = RIPEMD160_HASH_NUM_BYTES;
+    /** Size of the compressed-key RIPEMD-160 slot inside an OpenCL result chunk (in bytes). */
     public static final int CHUNK_SIZE_11_NUM_BYTES_RIPEMD160_COMPRESSED           = RIPEMD160_HASH_NUM_BYTES;
-    
+
     // ==== Offsets Within a Chunk ====
+    /** Byte offset of the X coordinate inside a chunk. */
     public static final int CHUNK_OFFSET_00_NUM_BYTES_BIG_ENDIAN_X                 = 0;
+    /** Byte offset of the Y coordinate inside a chunk. */
     public static final int CHUNK_OFFSET_01_NUM_BYTES_BIG_ENDIAN_Y                 = CHUNK_OFFSET_00_NUM_BYTES_BIG_ENDIAN_X                    + CHUNK_SIZE_00_NUM_BYTES_BIG_ENDIAN_X;
+    /** Byte offset of the uncompressed-key RIPEMD-160 inside a chunk. */
     public static final int CHUNK_OFFSET_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED       = CHUNK_OFFSET_01_NUM_BYTES_BIG_ENDIAN_Y                    + CHUNK_SIZE_01_NUM_BYTES_BIG_ENDIAN_Y;
+    /** Byte offset of the compressed-key RIPEMD-160 inside a chunk. */
     public static final int CHUNK_OFFSET_11_NUM_BYTES_RIPEMD160_COMPRESSED         = CHUNK_OFFSET_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED          + CHUNK_SIZE_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED;
+    /** Byte offset just past the end of a chunk (equals the chunk size). */
     public static final int CHUNK_OFFSET_99_NUM_BYTES_END_OF_CHUNK                 = CHUNK_OFFSET_11_NUM_BYTES_RIPEMD160_COMPRESSED            + CHUNK_SIZE_11_NUM_BYTES_RIPEMD160_COMPRESSED;
-    
+
     // ==== Total Chunk Size ====
+    /** Total size of one OpenCL result chunk in bytes. */
     public static final int CHUNK_SIZE_NUM_BYTES                                   = CHUNK_OFFSET_99_NUM_BYTES_END_OF_CHUNK;
     
     // ==== END: SYNCHRONIZED WITH OpenCL CONSTANTS ====
@@ -173,9 +240,12 @@ public class PublicKeyBytes {
      */
     public static final int BIT_COUNT_FOR_MAX_CHUNKS_ARRAY = MAXIMUM_CHUNK_ELEMENTS == 0 ? 0 : 32 - Integer.numberOfLeadingZeros(MAXIMUM_CHUNK_ELEMENTS - 1) - 1;
 
+    /** Byte index of the last byte of the Y coordinate in an uncompressed SEC key. */
     public static final int LAST_Y_COORDINATE_BYTE_INDEX = SEC_PREFIX_NUM_BYTES + TWO_COORDINATES_NUM_BYTES - 1;
-    
+
+    /** Total size of an uncompressed SEC public key in bytes (prefix + X + Y). */
     public final static int PUBLIC_KEY_UNCOMPRESSED_BYTES = SEC_PREFIX_NUM_BYTES + TWO_COORDINATES_NUM_BYTES;
+    /** Total size of a compressed SEC public key in bytes (prefix + X). */
     public final static int PUBLIC_KEY_COMPRESSED_BYTES   = SEC_PREFIX_NUM_BYTES + ONE_COORDINATE_NUM_BYTES;
 
     private final byte @NonNull [] uncompressed;
@@ -207,32 +277,74 @@ public class PublicKeyBytes {
     
     // [4, 121, -66, 102, 126, -7, -36, -69, -84, 85, -96, 98, -107, -50, -121, 11, 7, 2, -101, -4, -37, 45, -50, 40, -39, 89, -14, -127, 91, 22, -8, 23, -104, 72, 58, -38, 119, 38, -93, -60, 101, 93, -92, -5, -4, 14, 17, 8, -88, -3, 23, -76, 72, -90, -123, 84, 25, -100, 71, -48, -113, -5, 16, -44, -72]
     // Hex.decodeHex("0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8")
+    /** Replacement {@link PublicKeyBytes} used in place of the (technically valid but unsupported) secret {@code 1}. */
     public static final PublicKeyBytes INVALID_KEY_ONE = new PublicKeyBytes(BigInteger.ONE, new byte[] {4, 121, -66, 102, 126, -7, -36, -69, -84, 85, -96, 98, -107, -50, -121, 11, 7, 2, -101, -4, -37, 45, -50, 40, -39, 89, -14, -127, 91, 22, -8, 23, -104, 72, 58, -38, 119, 38, -93, -60, 101, 93, -92, -5, -4, 14, 17, 8, -88, -3, 23, -76, 72, -90, -123, 84, 25, -100, 71, -48, -113, -5, 16, -44, -72});
-    
+
+    /**
+     * Returns the private-key value backing this instance.
+     *
+     * @return the private-key value backing this instance
+     */
     public BigInteger getSecretKey() {
         return secretKey;
     }
 
+    /**
+     * Returns the compressed SEC public-key bytes.
+     *
+     * @return the compressed SEC public-key bytes
+     */
     public byte[] getCompressed() {
         return compressed;
     }
 
+    /**
+     * Returns the uncompressed SEC public-key bytes.
+     *
+     * @return the uncompressed SEC public-key bytes
+     */
     public byte[] getUncompressed() {
         return uncompressed;
     }
-    
+
+    /**
+     * Indicates whether the underlying secret is outside the valid secp256k1 private-key range.
+     *
+     * @return {@code true} if the underlying secret is outside the valid secp256k1 private-key range
+     */
     public boolean isOutsidePrivateKeyRange() {
         return privateKeyValidator.isOutsidePrivateKeyRange(secretKey);
     }
-    
+
+    /**
+     * Convenience constructor that derives the compressed key from {@code uncompressed}.
+     *
+     * @param secretKey    the underlying secret
+     * @param uncompressed the uncompressed SEC public-key bytes
+     */
     public PublicKeyBytes(BigInteger secretKey, byte[] uncompressed) {
         this(secretKey, uncompressed, createCompressedBytes(uncompressed));
     }
-    
+
+    /**
+     * Constructor accepting precomputed RIPEMD-160 hashes (typically from GPU output).
+     *
+     * @param secretKey            the underlying secret
+     * @param uncompressed         the uncompressed SEC public-key bytes
+     * @param uncompressedKeyHash  the RIPEMD-160 hash of the uncompressed key
+     * @param compressedKeyHash    the RIPEMD-160 hash of the compressed key
+     */
     public PublicKeyBytes(BigInteger secretKey, byte[] uncompressed, byte[] uncompressedKeyHash, byte[] compressedKeyHash) {
         this(secretKey, uncompressed, createCompressedBytes(uncompressed), uncompressedKeyHash, compressedKeyHash);
     }
-    
+
+    /**
+     * Canonical constructor.
+     *
+     * @param secretKey    the underlying secret
+     * @param uncompressed the uncompressed SEC public-key bytes
+     * @param compressed   the compressed SEC public-key bytes
+     */
     public PublicKeyBytes(BigInteger secretKey, byte @NonNull [] uncompressed, byte @NonNull [] compressed) {
         this.secretKey = secretKey;
         this.uncompressed = uncompressed;
@@ -240,6 +352,15 @@ public class PublicKeyBytes {
         this.privateKeyValidator = new PrivateKeyValidator();
     }
 
+    /**
+     * Canonical constructor with precomputed RIPEMD-160 hashes.
+     *
+     * @param secretKey            the underlying secret
+     * @param uncompressed         the uncompressed SEC public-key bytes
+     * @param compressed           the compressed SEC public-key bytes
+     * @param uncompressedKeyHash  the precomputed RIPEMD-160 hash of {@code uncompressed} (may be {@code null})
+     * @param compressedKeyHash    the precomputed RIPEMD-160 hash of {@code compressed} (may be {@code null})
+     */
     public PublicKeyBytes(BigInteger secretKey, byte @NonNull [] uncompressed, byte @NonNull [] compressed, byte @Nullable [] uncompressedKeyHash, byte @Nullable [] compressedKeyHash) {
         this.secretKey = secretKey;
         this.uncompressed = uncompressed;
@@ -249,6 +370,12 @@ public class PublicKeyBytes {
         this.privateKeyValidator = new PrivateKeyValidator();
     }
     
+    /**
+     * Derives a {@link PublicKeyBytes} instance from a private-key {@link BigInteger} using bitcoinj.
+     *
+     * @param secretKey the private-key value
+     * @return the derived {@link PublicKeyBytes}
+     */
     public static PublicKeyBytes fromPrivate(BigInteger secretKey) {
         ECKey ecKey = ECKey.fromPrivate(secretKey, false);
         return new PublicKeyBytes(ecKey.getPrivKey(), ecKey.getPubKey());
@@ -337,6 +464,11 @@ public class PublicKeyBytes {
        return true;
    }
    
+    /**
+     * Returns the (lazily computed) RIPEMD-160 hash of the uncompressed key.
+     *
+     * @return the (lazily computed) RIPEMD-160 hash of the uncompressed key
+     */
     public byte @NonNull [] getUncompressedKeyHash() {
         if (uncompressedKeyHash == null) {
             uncompressedKeyHash = hash160.hash(uncompressed);
@@ -344,6 +476,11 @@ public class PublicKeyBytes {
         return uncompressedKeyHash;
     }
 
+    /**
+     * Returns the (lazily computed) RIPEMD-160 hash of the compressed key.
+     *
+     * @return the (lazily computed) RIPEMD-160 hash of the compressed key
+     */
     public byte @NonNull [] getCompressedKeyHash() {
         if (compressedKeyHash == null) {
             compressedKeyHash = hash160.hash(compressed);
@@ -351,6 +488,12 @@ public class PublicKeyBytes {
         return compressedKeyHash;
     }
 
+    /**
+     * Returns the Base58 representation of the compressed-key hash.
+     *
+     * @param keyUtility the key utility used for the Base58 encoding
+     * @return the Base58 representation of the compressed-key hash
+     */
     public @NonNull String getCompressedKeyHashAsBase58(@NonNull KeyUtility keyUtility) {
         if (uncompressedKeyHashBase58 == null) {
             uncompressedKeyHashBase58 = keyUtility.toBase58(getCompressedKeyHash());
@@ -358,13 +501,25 @@ public class PublicKeyBytes {
         return uncompressedKeyHashBase58;
     }
 
+    /**
+     * Returns the Base58 representation of the uncompressed-key hash.
+     *
+     * @param keyUtility the key utility used for the Base58 encoding
+     * @return the Base58 representation of the uncompressed-key hash
+     */
     public @NonNull String getUncompressedKeyHashAsBase58(@NonNull KeyUtility keyUtility) {
         if (compressedKeyHashBase58 == null) {
             compressedKeyHashBase58 = keyUtility.toBase58(getUncompressedKeyHash());
         }
         return compressedKeyHashBase58;
     }
-    
+
+    /**
+     * Runs a self-consistency check by recomputing the public-key hashes via bitcoinj.
+     *
+     * @param logger the SLF4J logger used to report mismatches
+     * @return {@code true} if the precomputed hashes match the freshly computed ones
+     */
     public boolean runtimePublicKeyCalculationCheck(Logger logger) {
         byte[] hash160Uncompressed = getUncompressedKeyHash();
         byte[] hash160Compressed = getCompressedKeyHash();

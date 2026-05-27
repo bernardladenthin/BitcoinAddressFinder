@@ -15,12 +15,24 @@ import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.DumpedPrivateKey;
 import org.jspecify.annotations.NonNull;
 
+/**
+ * Reads a secrets file line by line, decoding each line according to {@link CSecretFormat}.
+ */
 public class SecretsFile extends AbstractPlaintextFile {
 
     private final CSecretFormat secretFormat;
     private final Consumer<BigInteger[]> secretConsumer;
     private final Network network;
 
+    /**
+     * Creates a new reader for the given secrets file.
+     *
+     * @param network         the network used to interpret WiF keys
+     * @param file            the file to read
+     * @param secretFormat    the format of each line
+     * @param readStatistic   statistic updated while reading
+     * @param secretConsumer  consumer that receives the decoded secrets
+     */
     public SecretsFile(@NonNull Network network, @NonNull File file, @NonNull CSecretFormat secretFormat, @NonNull ReadStatistic readStatistic, @NonNull Consumer<BigInteger[]> secretConsumer) {
         super(file, readStatistic);
         this.network = network;

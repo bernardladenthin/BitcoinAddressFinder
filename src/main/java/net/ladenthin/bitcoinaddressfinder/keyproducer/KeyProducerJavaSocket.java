@@ -18,6 +18,9 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import java.util.concurrent.*;
 
+/**
+ * Key producer that receives secrets from a TCP socket (client or server mode).
+ */
 public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaSocket> {
 
     private @Nullable ServerSocket serverSocket;
@@ -27,6 +30,14 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
 
     private final ExecutorService readerExecutor = Executors.newSingleThreadExecutor();
 
+    /**
+     * Creates a new socket-based key producer and starts the background reader thread.
+     *
+     * @param config      the socket configuration
+     * @param keyUtility  cryptographic helper
+     * @param bitHelper   bit/batch-size helper (unused but kept for symmetry)
+     * @param logger      SLF4J logger
+     */
     public KeyProducerJavaSocket(CKeyProducerJavaSocket config, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
         super(config, keyUtility, logger);
         setupSocket();

@@ -42,10 +42,19 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * OpenCL context and kernel lifecycle wrapper used by the GPU producer.
+ */
 public class OpenCLContext implements ReleaseCLObject {
 
     private final Logger logger;
 
+    /**
+     * Loads the OpenCL kernel sources from the classpath and strips {@code #include} directives.
+     *
+     * @return one source string per kernel source resource
+     * @throws IOException if a resource cannot be read
+     */
     public String[] getOpenCLPrograms() throws IOException {
         List<String> resourceNamesContent = getResourceNamesContent(getResourceNames());
         List<String> resourceNamesContentWithReplacements = new ArrayList<>();
@@ -94,6 +103,12 @@ public class OpenCLContext implements ReleaseCLObject {
     
     private boolean closed = false;
     
+    /**
+     * Creates a new context using the default logger.
+     *
+     * @param producerOpenCL the OpenCL producer configuration
+     * @param bitHelper      the bit/batch-size helper
+     */
     public OpenCLContext(CProducerOpenCL producerOpenCL, BitHelper bitHelper) {
         this(producerOpenCL, bitHelper, LoggerFactory.getLogger(OpenCLContext.class));
     }
@@ -105,6 +120,11 @@ public class OpenCLContext implements ReleaseCLObject {
         this.logger = logger;
     }
     
+    /**
+     * Initialises the OpenCL context, command queue, program and kernel.
+     *
+     * @throws IOException if loading the kernel sources fails
+     */
     public void init() throws IOException {
 
         // #################### general ####################
@@ -186,6 +206,12 @@ public class OpenCLContext implements ReleaseCLObject {
         }
     }
 
+    /**
+     * Runs the kernel for the given private-key base and returns the result grid.
+     *
+     * @param privateKeyBase the base private key for the batch
+     * @return the grid result containing the derived public-key bytes
+     */
     public OpenCLGridResult createKeys(BigInteger privateKeyBase) {
         OpenClTask localOpenClTask = Objects.requireNonNull(openClTask);
         cl_kernel localKernel = Objects.requireNonNull(kernel);

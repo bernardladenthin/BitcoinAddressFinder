@@ -3,10 +3,22 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+/**
+ * Configuration for the TCP socket-based key producer (client or server).
+ */
 public class CKeyProducerJavaSocket extends CKeyProducerJavaReceiver {
-    
+
+    /** Creates a new {@link CKeyProducerJavaSocket}. */
+    public CKeyProducerJavaSocket() {
+    }
+
+    /**
+     * Whether the socket producer acts as a client (connecting out) or as a server (accepting connections).
+     */
     public enum Mode {
+        /** Connect to a remote endpoint as a TCP client. */
         CLIENT,
+        /** Bind to a local port and accept TCP connections. */
         SERVER
     }
     
@@ -57,10 +69,20 @@ public class CKeyProducerJavaSocket extends CKeyProducerJavaReceiver {
     /** Delay in milliseconds between partial read retry attempts */
     public int readPartialRetryDelayMillis = 20;
 
+    /**
+     * Returns the configured host name.
+     *
+     * @return the configured host name
+     */
     public String getHost() {
         return host;
     }
 
+    /**
+     * Returns the configured port number.
+     *
+     * @return the configured port number
+     */
     public int getPort() {
         return port;
     }

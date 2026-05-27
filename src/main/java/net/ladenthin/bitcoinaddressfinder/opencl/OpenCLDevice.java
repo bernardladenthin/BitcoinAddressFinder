@@ -101,13 +101,23 @@ public record OpenCLDevice(
     int preferredVectorWidthDouble
 ) implements Serializable {
     
+    /**
+     * Returns the byte order this device uses.
+     *
+     * @return {@link ByteOrder#LITTLE_ENDIAN} or {@link ByteOrder#BIG_ENDIAN}
+     */
     public ByteOrder getByteOrder() {
         if(endianLittle) {
             return ByteOrder.LITTLE_ENDIAN;
         }
         return ByteOrder.BIG_ENDIAN;
     }
-    
+
+    /**
+     * Returns a human-readable, multi-line description of this device.
+     *
+     * @return a multi-line string describing this OpenCL device
+     */
     public String toStringPretty() {
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         final Charset charset = java.nio.charset.StandardCharsets.UTF_8;
@@ -154,6 +164,12 @@ public record OpenCLDevice(
         return baos.toString(charset);
     }
     
+    /**
+     * Formats a list of maximum work-item sizes as a slash-separated string.
+     *
+     * @param sizes the work-item sizes
+     * @return the formatted representation
+     */
     public static String formatWorkItemSizes(List<Long> sizes) {
         if (sizes.isEmpty()) return "(none)";
         StringBuilder sb = new StringBuilder();
@@ -164,10 +180,21 @@ public record OpenCLDevice(
         return sb.toString();
     }
     
+    /**
+     * Returns the device's OpenCL version as a {@link ComparableVersion}.
+     *
+     * @return the parsed device version
+     */
     public ComparableVersion getDeviceVersionAsComparableVersion() {
         return getComparableVersionFromDeviceVersion(deviceVersion());
     }
     
+    /**
+     * Parses a {@code CL_DEVICE_VERSION} string into a {@link ComparableVersion}, stripping the {@code OpenCL} and {@code CUDA} prefixes.
+     *
+     * @param deviceVersion the raw device version string
+     * @return the parsed comparable version
+     */
     public static ComparableVersion getComparableVersionFromDeviceVersion(String deviceVersion) {
         String s = deviceVersion;
         s = s.replace("OpenCL ", "");

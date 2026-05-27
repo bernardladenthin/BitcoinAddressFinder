@@ -12,13 +12,24 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
  */
 public class UnknownSecretFormatException extends IllegalArgumentException {
 
+    /** The offending secret format. */
     private final CSecretFormat secretFormat;
 
+    /**
+     * Creates a new exception for the unhandled secret format.
+     *
+     * @param secretFormat the offending secret format
+     */
     public UnknownSecretFormatException(CSecretFormat secretFormat) {
         super("Unknown secret format: " + secretFormat);
         this.secretFormat = secretFormat;
     }
 
+    /**
+     * Returns the offending secret format.
+     *
+     * @return the offending secret format
+     */
     public CSecretFormat getSecretFormat() {
         return secretFormat;
     }

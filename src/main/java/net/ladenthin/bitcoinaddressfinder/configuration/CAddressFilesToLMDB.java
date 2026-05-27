@@ -8,8 +8,16 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Configuration for the {@code AddressFilesToLMDB} command.
+ */
 public class CAddressFilesToLMDB {
-    
+
+    /** Creates a new {@link CAddressFilesToLMDB}. */
+    public CAddressFilesToLMDB() {
+    }
+
+
     /**
      * The list of addresses files which should be read.
      */

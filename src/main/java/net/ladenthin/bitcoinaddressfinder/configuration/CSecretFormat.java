@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+/**
+ * Supported on-disk formats of the secrets-file producer input.
+ */
 public enum CSecretFormat {
     
     /**

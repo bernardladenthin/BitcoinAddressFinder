@@ -15,6 +15,8 @@ import org.slf4j.Logger;
 /**
  * Base class to manage secret buffering using a blocking queue.
  * Intended for streaming protocols like WebSocket or ZMQ.
+ *
+ * @param <T> the configuration type for this receiver-based key producer
  */
 public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJavaReceiver> extends KeyProducerJava<T> {
 
@@ -26,16 +28,34 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
      */
     private static final byte[] SHUTDOWN_SENTINEL = new byte[0];
 
+    /** Shared {@link KeyUtility} for converting between byte arrays and {@link BigInteger}. */
     protected final KeyUtility keyUtility;
+    /** Queue of pending secrets received from the underlying transport. */
     protected final BlockingQueue<byte[]> secretQueue;
+    /** Flag set to {@code true} once shutdown has been signalled. */
     protected volatile boolean shouldStop = false;
 
+    /**
+     * Creates a new instance with an unbounded internal queue.
+     *
+     * @param config     the receiver configuration
+     * @param keyUtility the helper used to decode received byte arrays
+     * @param logger     the SLF4J logger
+     */
     public AbstractKeyProducerQueueBuffered(T config, KeyUtility keyUtility, Logger logger) {
         super(config, logger);
         this.keyUtility = keyUtility;
         this.secretQueue = new LinkedBlockingQueue<>();
     }
 
+    /**
+     * Creates a new instance backed by the given queue (mainly for tests).
+     *
+     * @param config     the receiver configuration
+     * @param keyUtility the helper used to decode received byte arrays
+     * @param logger     the SLF4J logger
+     * @param queue      the queue used to buffer received secrets
+     */
     protected AbstractKeyProducerQueueBuffered(
             T config,
             KeyUtility keyUtility,
@@ -96,6 +116,11 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
         return secrets;
     }
 
+    /**
+     * Sleeps for the given duration, restoring the interrupt flag on interruption.
+     *
+     * @param millis the duration in milliseconds
+     */
     protected void sleep(int millis) {
         try {
             Thread.sleep(millis);
@@ -106,6 +131,8 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
 
     /**
      * Add a raw secret (e.g. from socket, ZMQ, websocket).
+     *
+     * @param secret the raw secret bytes to enqueue
      */
     protected void addSecret(byte[] secret) {
         if (!shouldStop) {
@@ -141,6 +168,8 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
      * <p>A positive value is a per-receive timeout in milliseconds; a negative
      * value (typically {@code -1}) means &quot;block indefinitely&quot; until a
      * message arrives or {@link #signalShutdown()} is called.
+     *
+     * @return the read timeout in milliseconds, or a negative value to block indefinitely
      */
     protected abstract int getReadTimeout();
 }

@@ -15,6 +15,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBToAddressFile;
 import org.bitcoinj.base.Network;
 
+/**
+ * Exports the LMDB database to a plaintext address file in one of the supported formats.
+ */
 public class LMDBToAddressFile implements Runnable, Interruptable {
 
     private final Logger logger = LoggerFactory.getLogger(LMDBToAddressFile.class);
@@ -25,6 +28,11 @@ public class LMDBToAddressFile implements Runnable, Interruptable {
     
     private final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
+    /**
+     * Creates a new exporter.
+     *
+     * @param lmdbToAddressFile the export configuration
+     */
     public LMDBToAddressFile(CLMDBToAddressFile lmdbToAddressFile) {
         this.lmdbToAddressFile = lmdbToAddressFile;
     }

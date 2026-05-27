@@ -16,10 +16,21 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Executors;
 
+/**
+ * Key producer that receives secrets through a WebSocket server.
+ */
 public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaWebSocket> {
 
     private WebSocketServer webSocketServer;
 
+    /**
+     * Creates a new WebSocket-based key producer and starts the embedded server.
+     *
+     * @param config      the WebSocket configuration
+     * @param keyUtility  cryptographic helper
+     * @param bitHelper   bit/batch-size helper (unused but kept for symmetry)
+     * @param logger      SLF4J logger
+     */
     public KeyProducerJavaWebSocket(CKeyProducerJavaWebSocket config, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
         super(config, keyUtility, logger);
         initWebSocketServer();

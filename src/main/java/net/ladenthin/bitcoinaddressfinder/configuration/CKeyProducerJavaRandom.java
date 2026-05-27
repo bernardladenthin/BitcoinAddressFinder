@@ -5,7 +5,15 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import org.jspecify.annotations.Nullable;
 
+/**
+ * Configuration for the {@code SecureRandom}-based key producer.
+ */
 public class CKeyProducerJavaRandom extends CKeyProducerJava {
+
+    /** Creates a new {@link CKeyProducerJavaRandom}. */
+    public CKeyProducerJavaRandom() {
+    }
+
 
     /**
      * Selects the pseudo-random number generator (PRNG) used for private-key creation.

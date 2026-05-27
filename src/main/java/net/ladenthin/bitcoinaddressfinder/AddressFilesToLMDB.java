@@ -21,6 +21,9 @@ import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.NonNull;
 
+/**
+ * Imports one or more plaintext address files into an LMDB database.
+ */
 public class AddressFilesToLMDB implements Runnable, Interruptable {
     
     private final static long PROGRESS_LOG = 100_000;
@@ -35,9 +38,15 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     @NonNull
     AtomicReference<AddressFile> currentAddressFile = new AtomicReference<>();
-    
+
+    /** Flag controlling the main import loop; cleared via {@link #interrupt()}. */
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
-    
+
+    /**
+     * Creates a new importer.
+     *
+     * @param addressFilesToLMDB configuration with the LMDB target and source files
+     */
     public AddressFilesToLMDB( @NonNull CAddressFilesToLMDB addressFilesToLMDB) {
         this.addressFilesToLMDB = addressFilesToLMDB;
     }

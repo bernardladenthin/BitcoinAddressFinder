@@ -3,8 +3,16 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
+/**
+ * Builds the human-readable statistics line printed by the consumer.
+ */
 public class Statistics {
-    
+
+    /** Creates a new {@link Statistics}. */
+    public Statistics() {
+    }
+
+    /** Number of milliseconds per second. */
     @Deprecated
     public static final int ONE_SECOND_IN_MILLISECONDS = 1000;
     

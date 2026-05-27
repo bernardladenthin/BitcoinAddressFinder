@@ -27,7 +27,10 @@ import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-// VM option: -Dorg.slf4j.simpleLogger.defaultLogLevel=trace
+/**
+ * CLI entry point: loads the configuration file and dispatches to the configured command.
+ * <p>VM option: {@code -Dorg.slf4j.simpleLogger.defaultLogLevel=trace}
+ */
 public class Main implements Runnable, Interruptable {
 
     /**
@@ -58,6 +61,7 @@ public class Main implements Runnable, Interruptable {
     @VisibleForTesting
     static final String FILE_EXTENSION_YML = ".yml";
 
+    /** SLF4J logger for the CLI entry point. */
     @VisibleForTesting
     public static Logger logger = LoggerFactory.getLogger(Main.class);
 
@@ -67,10 +71,21 @@ public class Main implements Runnable, Interruptable {
     
     CountDownLatch runLatch = new CountDownLatch(1);
     
+    /**
+     * Creates a new main instance for the given configuration.
+     *
+     * @param configuration the loaded configuration
+     */
     public Main(CConfiguration configuration) {
         this.configuration = configuration;
     }
-    
+
+    /**
+     * Reads the entire contents of {@code path} as a string using the default charset.
+     *
+     * @param path the file to read
+     * @return the file contents
+     */
     public static String readString(Path path) {
         try {
             String content = Files.readString(path, Charset.defaultCharset());
@@ -80,6 +95,12 @@ public class Main implements Runnable, Interruptable {
         }
     }
     
+    /**
+     * Parses a JSON configuration string.
+     *
+     * @param configurationString the JSON document
+     * @return the parsed {@link CConfiguration}
+     */
     public static CConfiguration fromJson(String configurationString) {
         try {
             ObjectMapper mapper = new ObjectMapper();
@@ -89,6 +110,12 @@ public class Main implements Runnable, Interruptable {
         }
     }
 
+    /**
+     * Parses a YAML configuration string.
+     *
+     * @param configurationString the YAML document
+     * @return the parsed {@link CConfiguration}
+     */
     public static CConfiguration fromYaml(String configurationString) {
         try {
             YAMLMapper mapper = new YAMLMapper();
@@ -98,6 +125,12 @@ public class Main implements Runnable, Interruptable {
         }
     }
 
+    /**
+     * Serialises a {@link CConfiguration} as indented JSON.
+     *
+     * @param configuration the configuration to serialise
+     * @return the JSON representation
+     */
     public static String configurationToJson(CConfiguration configuration) {
         try {
             ObjectMapper mapper = new ObjectMapper();
@@ -108,6 +141,12 @@ public class Main implements Runnable, Interruptable {
         }
     }
 
+    /**
+     * Serialises a {@link CConfiguration} as YAML.
+     *
+     * @param configuration the configuration to serialise
+     * @return the YAML representation
+     */
     public static String configurationToYAML(CConfiguration configuration) {
         try {
             YAMLMapper mapper = new YAMLMapper();
@@ -117,6 +156,11 @@ public class Main implements Runnable, Interruptable {
         }
     }
 
+    /**
+     * Java entry point. Loads the configuration file passed as the first argument and runs the tool.
+     *
+     * @param args the program arguments; expects a single path to a JSON or YAML configuration file
+     */
     public static void main(String[] args) {
         if (args.length != 1) {
             logger.error("Invalid arguments. Pass path to configuration as first argument.");
@@ -138,6 +182,9 @@ public class Main implements Runnable, Interruptable {
         main.run();
     }
 
+    /**
+     * Logs the JSON and YAML representations of the loaded configuration for review.
+     */
     public void logConfigurationTransformation() {
         String json = configurationToJson(configuration);
         String yaml = configurationToYAML(configuration);
@@ -204,6 +251,12 @@ public class Main implements Runnable, Interruptable {
         }
     }
 
+    /**
+     * Prints all live thread stack traces after waiting for the given delay.
+     *
+     * @param delayMillis     how long to wait before sampling, in milliseconds
+     * @param includeDaemons  whether daemon threads should be included in the output
+     */
     public static void printAllStackTracesWithDelay(long delayMillis, boolean includeDaemons) {
         try { Thread.sleep(delayMillis); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
 

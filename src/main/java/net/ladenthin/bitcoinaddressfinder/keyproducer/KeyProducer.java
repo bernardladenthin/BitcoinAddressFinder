@@ -7,7 +7,24 @@ import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.Interruptable;
 import org.slf4j.Logger;
 
+/**
+ * Strategy for creating batches of secret scalars used as candidate private keys.
+ */
 public interface KeyProducer extends Interruptable {
+    /**
+     * Creates the next batch of secrets.
+     *
+     * @param overallWorkSize        the requested number of secrets in the batch
+     * @param returnStartSecretOnly  if {@code true} only the first secret of the batch is returned
+     * @return an array of generated secrets (length 1 if {@code returnStartSecretOnly})
+     * @throws NoMoreSecretsAvailableException if no more secrets can be produced
+     */
     BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException;
+
+    /**
+     * Returns the logger associated with this producer.
+     *
+     * @return the logger associated with this producer
+     */
     Logger getLogger();
 }

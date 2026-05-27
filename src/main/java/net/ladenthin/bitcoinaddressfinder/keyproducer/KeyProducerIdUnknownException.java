@@ -13,13 +13,24 @@ import org.jspecify.annotations.Nullable;
  */
 public class KeyProducerIdUnknownException extends RuntimeException {
 
+    /** The unresolvable key-producer id supplied at construction time. */
     private final @Nullable String id;
 
+    /**
+     * Creates a new exception for the unknown id.
+     *
+     * @param id the unknown key-producer id
+     */
     public KeyProducerIdUnknownException(@Nullable String id) {
         super("Key producer id is unknown: " + id);
         this.id = id;
     }
 
+    /**
+     * Returns the unresolvable id that caused the exception.
+     *
+     * @return the unresolvable id that caused the exception
+     */
     public @Nullable String getId() {
         return id;
     }

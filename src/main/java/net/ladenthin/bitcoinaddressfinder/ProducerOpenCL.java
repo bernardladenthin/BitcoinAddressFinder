@@ -14,6 +14,9 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * GPU-based producer using OpenCL kernels to derive public keys in batches.
+ */
 public class ProducerOpenCL extends AbstractProducer {
 
     private final CProducerOpenCL producerOpenCL;
@@ -24,6 +27,15 @@ public class ProducerOpenCL extends AbstractProducer {
     @Nullable
     OpenCLContext openCLContext;
 
+    /**
+     * Creates a new OpenCL producer.
+     *
+     * @param producerOpenCL the OpenCL producer configuration
+     * @param consumer       the downstream consumer
+     * @param keyUtility     cryptographic helper
+     * @param keyProducer    the secret supplying strategy
+     * @param bitHelper      bit/batch-size helper
+     */
     public ProducerOpenCL(CProducerOpenCL producerOpenCL, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer, BitHelper bitHelper) {
         super(producerOpenCL, consumer, keyUtility, keyProducer, bitHelper);
         this.producerOpenCL = producerOpenCL;
@@ -74,6 +86,9 @@ public class ProducerOpenCL extends AbstractProducer {
         throw new UnsupportedOperationException("Not supported yet.");
     }
     
+    /**
+     * Reads OpenCL kernel results back to the host and forwards them to the consumer.
+     */
     protected static class ResultReaderRunnable implements Runnable {
         
         private final Logger logger = LoggerFactory.getLogger(this.getClass());

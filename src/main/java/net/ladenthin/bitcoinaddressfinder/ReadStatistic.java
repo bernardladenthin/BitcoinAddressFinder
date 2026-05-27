@@ -8,15 +8,25 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Mutable statistic populated while reading address or secret files.
+ */
 public class ReadStatistic {
 
+    /** Creates a new {@link ReadStatistic}. */
+    public ReadStatistic() {
+    }
+
+    /** Number of successfully parsed entries. */
     public long successful = 0;
+    /** Counts of skipped lines grouped by rejection reason. */
     public final Map<String, Long> unsupportedReasons = new LinkedHashMap<>();
     /**
-     * In percent.
+     * Progress of the currently processed file, in percent.
      */
     public double currentFileProgress;
 
+    /** Lines that failed to parse with a logged error. */
     public final List<String> errors = new ArrayList<>();
 
     /**

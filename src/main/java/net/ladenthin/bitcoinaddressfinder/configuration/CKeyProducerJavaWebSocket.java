@@ -3,7 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+/**
+ * Configuration for the WebSocket-based key producer.
+ */
 public class CKeyProducerJavaWebSocket extends CKeyProducerJavaReceiver {
+
+    /** Creates a new {@link CKeyProducerJavaWebSocket}. */
+    public CKeyProducerJavaWebSocket() {
+    }
+
     /**
      * Timeout for receiving secrets from the internal queue, in milliseconds.
      *
@@ -25,8 +33,14 @@ public class CKeyProducerJavaWebSocket extends CKeyProducerJavaReceiver {
      * <p>Default: {@code 1000} ms
      */
     public int timeout = 1000;
+    /** TCP port the WebSocket server binds to. */
     public int port = 8080;
 
+    /**
+     * Returns the configured port number.
+     *
+     * @return the configured port number
+     */
     public int getPort() {
         return port;
     }

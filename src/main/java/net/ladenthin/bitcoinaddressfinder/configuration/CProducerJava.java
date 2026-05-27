@@ -3,5 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+/**
+ * Configuration for the Java (CPU) producer.
+ */
 public class CProducerJava extends CProducer {
+    /** Creates a new {@link CProducerJava}. */
+    public CProducerJava() {
+    }
 }
