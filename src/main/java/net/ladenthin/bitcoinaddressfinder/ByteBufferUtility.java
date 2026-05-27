@@ -19,6 +19,12 @@ public class ByteBufferUtility {
     private final boolean allocateDirect;
 
     /**
+     * Default value for {@link #useXorSwap}: temporary-variable swap.
+     * https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java
+     */
+    private static final boolean DEFAULT_USE_XOR_SWAP = false;
+
+    /**
      * Selects the byte-array reversal algorithm used by {@link #reverse(byte[])}.
      * {@code true} uses XOR swap (no temporary variable);
      * {@code false} uses a temporary-variable swap.
@@ -26,7 +32,7 @@ public class ByteBufferUtility {
     private final boolean useXorSwap;
 
     public ByteBufferUtility(boolean allocateDirect) {
-        this(allocateDirect, false);
+        this(allocateDirect, DEFAULT_USE_XOR_SWAP);
     }
 
     public ByteBufferUtility(boolean allocateDirect, boolean useXorSwap) {
