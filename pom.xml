@@ -471,11 +471,6 @@ SPDX-License-Identifier: Apache-2.0
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
-                <!--
-                    No <executions> binding on purpose: spotless is opt-in via
-                    `mvn spotless:check` (preview) or `mvn spotless:apply` (write).
-                    Enabling the verify-phase check is a follow-up step.
-                -->
                 <configuration>
                     <java>
                         <includes>
@@ -490,6 +485,15 @@ SPDX-License-Identifier: Apache-2.0
                         <endWithNewline/>
                     </java>
                 </configuration>
+                <executions>
+                    <execution>
+                        <id>spotless-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
