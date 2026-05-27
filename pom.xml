@@ -44,15 +44,36 @@ SPDX-License-Identifier: Apache-2.0
         <slf4j.version>2.0.18</slf4j.version>
         <logback.version>1.5.32</logback.version>
         <project.build.outputTimestamp>${git.commit.time}</project.build.outputTimestamp>
-        <argLine>-Xmx2g -Xms1g --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED</argLine>
+        <argLine>-Xmx2g -Xms1g --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED --add-exports=java.base/java.lang=ALL-UNNAMED --add-exports=java.base/java.io=ALL-UNNAMED --add-exports=java.base/java.nio=ALL-UNNAMED --add-exports=java.base/jdk.internal.ref=ALL-UNNAMED --add-exports=java.base/jdk.internal.misc=ALL-UNNAMED --add-exports=java.base/sun.nio.ch=ALL-UNNAMED --add-exports=jdk.management/com.sun.management.internal=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</argLine>
         <jcstress.version>0.16</jcstress.version>
         <lincheck.version>2.39</lincheck.version>
         <vmlens.version>1.2.28</vmlens.version>
-        <jqwik.version>1.9.2</jqwik.version>
-        <archunit.version>1.3.0</archunit.version>
-        <spotbugs.version>4.8.6.6</spotbugs.version>
+        <jqwik.version>1.10.0</jqwik.version>
+        <archunit.version>1.4.2</archunit.version>
+        <spotbugs.version>4.9.8.3</spotbugs.version>
         <fb-contrib.version>7.6.4</fb-contrib.version>
-        <findsecbugs.version>1.13.0</findsecbugs.version>
+        <findsecbugs.version>1.14.0</findsecbugs.version>
+        <errorprone.version>2.49.0</errorprone.version>
+        <nullaway.version>0.13.4</nullaway.version>
+        <java-websocket.version>1.6.0</java-websocket.version>
+        <jeromq.version>0.6.0</jeromq.version>
+        <jspecify.version>1.0.0</jspecify.version>
+        <bitcoinj.version>0.17.1</bitcoinj.version>
+        <bcprov.version>1.84</bcprov.version>
+        <protobuf.version>4.35.0</protobuf.version>
+        <jsr305.version>3.0.2</jsr305.version>
+        <jcip-annotations.version>1.0</jcip-annotations.version>
+        <guava.version>33.6.0-jre</guava.version>
+        <jackson.version>2.21.3</jackson.version>
+        <lmdbjava.version>0.9.3</lmdbjava.version>
+        <jocl.version>2.0.6</jocl.version>
+        <commons-io.version>2.22.0</commons-io.version>
+        <commons-codec.version>1.22.0</commons-codec.version>
+        <maven-artifact.version>3.9.16</maven-artifact.version>
+        <junit.version>6.1.0</junit.version>
+        <hamcrest.version>3.0</hamcrest.version>
+        <mockito.version>5.23.0</mockito.version>
+        <jmh.version>1.37</jmh.version>
     </properties>
 
     <distributionManagement>
@@ -148,15 +169,6 @@ SPDX-License-Identifier: Apache-2.0
                         <arg>--should-stop=ifError=FLOW</arg>
                         <arg>-Xplugin:ErrorProne -Xep:NullAway:ERROR -XepOpt:NullAway:AnnotatedPackages=net.ladenthin</arg>
 
-                        <!-- add-exports -->
-                        <arg>--add-exports</arg><arg>java.base/java.lang=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>java.base/java.io=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>java.base/java.nio=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>java.base/jdk.internal.ref=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>java.base/jdk.internal.misc=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>java.base/sun.nio.ch=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.management/com.sun.management.internal=ALL-UNNAMED</arg>
-
                         <!-- For ErrorProne, DO NOT TOUCH, documented here: https://errorprone.info/docs/installation#jdk-16 -->
                         <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
                         <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
@@ -169,6 +181,23 @@ SPDX-License-Identifier: Apache-2.0
                         <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
                         <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
 
+                        <!-- Master JVM-flag list: keep identical (same set + same order) across pom.xml, .mvn/jvm.config, and examples/*.bat -->
+                        <arg>--add-opens</arg><arg>java.base/java.lang=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg><arg>java.base/java.io=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg><arg>java.base/java.nio=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg><arg>java.base/jdk.internal.ref=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg><arg>java.base/jdk.internal.misc=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg><arg>java.base/sun.nio.ch=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg><arg>jdk.management/com.sun.management.internal=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg><arg>jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg><arg>jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+                        <arg>--add-exports</arg><arg>java.base/java.lang=ALL-UNNAMED</arg>
+                        <arg>--add-exports</arg><arg>java.base/java.io=ALL-UNNAMED</arg>
+                        <arg>--add-exports</arg><arg>java.base/java.nio=ALL-UNNAMED</arg>
+                        <arg>--add-exports</arg><arg>java.base/jdk.internal.ref=ALL-UNNAMED</arg>
+                        <arg>--add-exports</arg><arg>java.base/jdk.internal.misc=ALL-UNNAMED</arg>
+                        <arg>--add-exports</arg><arg>java.base/sun.nio.ch=ALL-UNNAMED</arg>
+                        <arg>--add-exports</arg><arg>jdk.management/com.sun.management.internal=ALL-UNNAMED</arg>
                         <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
                         <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
                         <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
@@ -177,20 +206,18 @@ SPDX-License-Identifier: Apache-2.0
                         <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
                         <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
                         <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
                     </compilerArgs>
 
                     <annotationProcessorPaths>
                         <path>
                             <groupId>com.google.errorprone</groupId>
                             <artifactId>error_prone_core</artifactId>
-                            <version>2.49.0</version>
+                            <version>${errorprone.version}</version>
                         </path>
                         <path>
                             <groupId>com.uber.nullaway</groupId>
                             <artifactId>nullaway</artifactId>
-                            <version>0.13.4</version>
+                            <version>${nullaway.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
@@ -209,13 +236,8 @@ SPDX-License-Identifier: Apache-2.0
                                 <arg>-XDcompilePolicy=simple</arg>
                                 <arg>--should-stop=ifError=FLOW</arg>
                                 <arg>-Xplugin:ErrorProne -Xep:NullAway:OFF -Xep:GuardedBy:OFF</arg>
-                                <arg>--add-exports</arg><arg>java.base/java.lang=ALL-UNNAMED</arg>
-                                <arg>--add-exports</arg><arg>java.base/java.io=ALL-UNNAMED</arg>
-                                <arg>--add-exports</arg><arg>java.base/java.nio=ALL-UNNAMED</arg>
-                                <arg>--add-exports</arg><arg>java.base/jdk.internal.ref=ALL-UNNAMED</arg>
-                                <arg>--add-exports</arg><arg>java.base/jdk.internal.misc=ALL-UNNAMED</arg>
-                                <arg>--add-exports</arg><arg>java.base/sun.nio.ch=ALL-UNNAMED</arg>
-                                <arg>--add-exports</arg><arg>jdk.management/com.sun.management.internal=ALL-UNNAMED</arg>
+
+                                <!-- For ErrorProne, DO NOT TOUCH, documented here: https://errorprone.info/docs/installation#jdk-16 -->
                                 <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
                                 <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
                                 <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
@@ -226,6 +248,24 @@ SPDX-License-Identifier: Apache-2.0
                                 <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
                                 <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
                                 <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+
+                                <!-- Master JVM-flag list: keep identical (same set + same order) across pom.xml, .mvn/jvm.config, and examples/*.bat -->
+                                <arg>--add-opens</arg><arg>java.base/java.lang=ALL-UNNAMED</arg>
+                                <arg>--add-opens</arg><arg>java.base/java.io=ALL-UNNAMED</arg>
+                                <arg>--add-opens</arg><arg>java.base/java.nio=ALL-UNNAMED</arg>
+                                <arg>--add-opens</arg><arg>java.base/jdk.internal.ref=ALL-UNNAMED</arg>
+                                <arg>--add-opens</arg><arg>java.base/jdk.internal.misc=ALL-UNNAMED</arg>
+                                <arg>--add-opens</arg><arg>java.base/sun.nio.ch=ALL-UNNAMED</arg>
+                                <arg>--add-opens</arg><arg>jdk.management/com.sun.management.internal=ALL-UNNAMED</arg>
+                                <arg>--add-opens</arg><arg>jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                                <arg>--add-opens</arg><arg>jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+                                <arg>--add-exports</arg><arg>java.base/java.lang=ALL-UNNAMED</arg>
+                                <arg>--add-exports</arg><arg>java.base/java.io=ALL-UNNAMED</arg>
+                                <arg>--add-exports</arg><arg>java.base/java.nio=ALL-UNNAMED</arg>
+                                <arg>--add-exports</arg><arg>java.base/jdk.internal.ref=ALL-UNNAMED</arg>
+                                <arg>--add-exports</arg><arg>java.base/jdk.internal.misc=ALL-UNNAMED</arg>
+                                <arg>--add-exports</arg><arg>java.base/sun.nio.ch=ALL-UNNAMED</arg>
+                                <arg>--add-exports</arg><arg>jdk.management/com.sun.management.internal=ALL-UNNAMED</arg>
                                 <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
                                 <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
                                 <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
@@ -234,8 +274,6 @@ SPDX-License-Identifier: Apache-2.0
                                 <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
                                 <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
                                 <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
-                                <arg>--add-opens</arg><arg>jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
-                                <arg>--add-opens</arg><arg>jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
                             </compilerArgs>
                             <annotationProcessorPaths combine.children="append">
                                 <path>
@@ -246,7 +284,7 @@ SPDX-License-Identifier: Apache-2.0
                                 <path>
                                     <groupId>org.openjdk.jmh</groupId>
                                     <artifactId>jmh-generator-annprocess</artifactId>
-                                    <version>1.37</version>
+                                    <version>${jmh.version}</version>
                                 </path>
                             </annotationProcessorPaths>
                         </configuration>
@@ -313,8 +351,19 @@ SPDX-License-Identifier: Apache-2.0
                 <version>3.12.0</version>
                 <configuration>
                     <source>21</source>
-                    <doclint>none</doclint>
+                    <failOnError>true</failOnError>
+                    <failOnWarnings>true</failOnWarnings>
+                    <doclint>all</doclint>
                     <additionalJOptions>
+                        <additionalJOption>--add-opens=java.base/java.lang=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-opens=java.base/java.io=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-opens=java.base/java.nio=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-opens=java.base/sun.nio.ch=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</additionalJOption>
                         <additionalJOption>--add-exports=java.base/java.lang=ALL-UNNAMED</additionalJOption>
                         <additionalJOption>--add-exports=java.base/java.io=ALL-UNNAMED</additionalJOption>
                         <additionalJOption>--add-exports=java.base/java.nio=ALL-UNNAMED</additionalJOption>
@@ -322,6 +371,14 @@ SPDX-License-Identifier: Apache-2.0
                         <additionalJOption>--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED</additionalJOption>
                         <additionalJOption>--add-exports=java.base/sun.nio.ch=ALL-UNNAMED</additionalJOption>
                         <additionalJOption>--add-exports=jdk.management/com.sun.management.internal=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</additionalJOption>
                     </additionalJOptions>
                 </configuration>
                 <executions>
@@ -446,63 +503,63 @@ SPDX-License-Identifier: Apache-2.0
         <dependency>
             <groupId>org.java-websocket</groupId>
             <artifactId>Java-WebSocket</artifactId>
-            <version>1.6.0</version>
+            <version>${java-websocket.version}</version>
           </dependency>
         <dependency>
             <groupId>org.zeromq</groupId>
             <artifactId>jeromq</artifactId>
-            <version>0.6.0</version>
+            <version>${jeromq.version}</version>
         </dependency>
         <dependency>
             <groupId>org.jspecify</groupId>
             <artifactId>jspecify</artifactId>
-            <version>1.0.0</version>
+            <version>${jspecify.version}</version>
         </dependency>
         <dependency>
             <groupId>org.bitcoinj</groupId>
             <artifactId>bitcoinj-core</artifactId>
-            <version>0.17.1</version>
+            <version>${bitcoinj.version}</version>
         </dependency>
         <!-- Required by bitcoinj-core (transitive). Pinned here to keep on the latest secure version. -->
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk15to18</artifactId>
-            <version>1.84</version>
+            <version>${bcprov.version}</version>
         </dependency>
         <!-- Required by bitcoinj-core (transitive). Pinned here to keep on the latest secure version. -->
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-javalite</artifactId>
-            <version>4.35.0</version>
+            <version>${protobuf.version}</version>
         </dependency>
         <!-- Required by bitcoinj-core (transitive, runtime). Pinned here to keep on the latest version. -->
         <dependency>
             <groupId>com.google.code.findbugs</groupId>
             <artifactId>jsr305</artifactId>
-            <version>3.0.2</version>
+            <version>${jsr305.version}</version>
             <scope>runtime</scope>
         </dependency>
         <!-- Required by bitcoinj-core (transitive, runtime). Pinned here to keep on the latest version. -->
         <dependency>
             <groupId>net.jcip</groupId>
             <artifactId>jcip-annotations</artifactId>
-            <version>1.0</version>
+            <version>${jcip-annotations.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>33.6.0-jre</version>
+            <version>${guava.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.21.3</version>
+            <version>${jackson.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-yaml</artifactId>
-            <version>2.21.3</version>
+            <version>${jackson.version}</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -518,45 +575,45 @@ SPDX-License-Identifier: Apache-2.0
         <dependency>
             <groupId>org.lmdbjava</groupId>
             <artifactId>lmdbjava</artifactId>
-            <version>0.9.3</version>
+            <version>${lmdbjava.version}</version>
         </dependency>
         <dependency>
             <groupId>org.jocl</groupId>
             <artifactId>jocl</artifactId>
-            <version>2.0.6</version>
+            <version>${jocl.version}</version>
         </dependency>
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
-            <version>2.22.0</version>
+            <version>${commons-io.version}</version>
         </dependency>
         <dependency>
             <groupId>commons-codec</groupId>
             <artifactId>commons-codec</artifactId>
-            <version>1.22.0</version>
+            <version>${commons-codec.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-artifact</artifactId>
-            <version>3.9.16</version>
+            <version>${maven-artifact.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>6.1.0</version>
+            <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.hamcrest</groupId>
             <artifactId>hamcrest</artifactId>
-            <version>3.0</version>
+            <version>${hamcrest.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>5.23.0</version>
+            <version>${mockito.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -574,13 +631,13 @@ SPDX-License-Identifier: Apache-2.0
         <dependency>
             <groupId>org.openjdk.jmh</groupId>
             <artifactId>jmh-core</artifactId>
-            <version>1.37</version>
+            <version>${jmh.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.openjdk.jmh</groupId>
             <artifactId>jmh-generator-annprocess</artifactId>
-            <version>1.37</version>
+            <version>${jmh.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
