@@ -22,15 +22,13 @@ import org.jspecify.annotations.NonNull;
  *       (the BitcoinJ built-in)</li>
  * </ul>
  *
- * <p>The default constructor uses {@link #DEFAULT_USE_FAST}, matching the
- * behaviour that was previously controlled by
- * {@link PublicKeyBytes#USE_SHA256_RIPEMD160_FAST}.</p>
+ * <p>The default constructor uses {@link #DEFAULT_USE_FAST}.</p>
  */
 public class Hash160 {
 
     /**
      * Default algorithm selection: {@code true} &#x2192; Guava + Bouncy Castle
-     * (fast path). Mirrors {@link PublicKeyBytes#USE_SHA256_RIPEMD160_FAST}.
+     * (fast path).
      */
     public static final boolean DEFAULT_USE_FAST = true;
 

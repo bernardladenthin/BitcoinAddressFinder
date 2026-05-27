@@ -15,14 +15,6 @@ import org.slf4j.Logger;
 
 public class PublicKeyBytes {
     
-    /**
-     * Selects the SHA-256 + RIPEMD-160 implementation used by this class.
-     * Delegates to {@link Hash160#DEFAULT_USE_FAST}.
-     *
-     * @see Hash160
-     */
-    public static final boolean USE_SHA256_RIPEMD160_FAST = Hash160.DEFAULT_USE_FAST;
-
     public static final BigInteger MAX_TECHNICALLY_PRIVATE_KEY = BigInteger.valueOf(2).pow(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS).subtract(BigInteger.ONE);
 
     public static final BigInteger MIN_PRIVATE_KEY = BigInteger.ONE;
