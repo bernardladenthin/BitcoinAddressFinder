@@ -3,16 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import java.net.ServerSocket;
-import java.util.concurrent.*;
-
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import java.net.ServerSocket;
+import java.util.concurrent.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 public class ConnectionUtilsTest {
 
@@ -68,7 +67,10 @@ public class ConnectionUtilsTest {
         long duration = System.currentTimeMillis() - start;
 
         // Should return after ~1 second
-        assertThat("waitUntilTcpPortOpen should return after port becomes available", duration, greaterThanOrEqualTo(900L));
+        assertThat(
+                "waitUntilTcpPortOpen should return after port becomes available",
+                duration,
+                greaterThanOrEqualTo(900L));
         assertThat(duration, lessThan(2500L)); // with some margin
     }
 
@@ -77,6 +79,7 @@ public class ConnectionUtilsTest {
         int unusedPort = findFreePort();
         // Do not bind anything to this port
 
-        assertThrows(IllegalStateException.class, () -> ConnectionUtils.waitUntilTcpPortOpen("localhost", unusedPort, 1000));
+        assertThrows(
+                IllegalStateException.class, () -> ConnectionUtils.waitUntilTcpPortOpen("localhost", unusedPort, 1000));
     }
 }

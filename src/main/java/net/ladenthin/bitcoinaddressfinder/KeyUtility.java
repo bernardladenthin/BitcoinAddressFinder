@@ -3,17 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
-import static net.ladenthin.bitcoinaddressfinder.PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import org.bitcoinj.base.LegacyAddress;
 import org.bitcoinj.base.Network;
-
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.MnemonicCode;
 import org.bitcoinj.crypto.MnemonicException;
@@ -45,7 +43,6 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
     public BigInteger killBits(BigInteger bigInteger, BigInteger killBits) {
         return bigInteger.andNot(killBits);
     }
-
 
     /**
      * Decodes a Base58 address and returns its hash160 as a {@link ByteBuffer}.
@@ -122,7 +119,23 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
         String logMnemonic = createMnemonics(privateKeyBytes);
 
         String space = " ";
-        return logprivateKeyBigInteger + space + logprivateKeyBytes + space + logprivateKeyHex + space + logWiF + space + logPublicKeyAsHex + space + logPublicKeyHash160 + space + logPublicKeyHash160Base58 + space + logCompressed + space + logMnemonic;
+        return logprivateKeyBigInteger
+                + space
+                + logprivateKeyBytes
+                + space
+                + logprivateKeyHex
+                + space
+                + logWiF
+                + space
+                + logPublicKeyAsHex
+                + space
+                + logPublicKeyHash160
+                + space
+                + logPublicKeyHash160Base58
+                + space
+                + logCompressed
+                + space
+                + logMnemonic;
     }
 
     /**
@@ -190,7 +203,9 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
      * @return the generated secrets
      * @throws NoMoreSecretsAvailableException if the supplier cannot satisfy the request
      */
-    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly, int privateKeyMaxNumBits, SecretSupplier supplier) throws NoMoreSecretsAvailableException {
+    public BigInteger[] createSecrets(
+            int overallWorkSize, boolean returnStartSecretOnly, int privateKeyMaxNumBits, SecretSupplier supplier)
+            throws NoMoreSecretsAvailableException {
         int length = returnStartSecretOnly ? 1 : overallWorkSize;
         BigInteger[] secrets = new BigInteger[length];
         for (int i = 0; i < secrets.length; i++) {

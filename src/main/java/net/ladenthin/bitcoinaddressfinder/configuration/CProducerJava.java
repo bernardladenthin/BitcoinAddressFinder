@@ -8,6 +8,5 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
  */
 public class CProducerJava extends CProducer {
     /** Creates a new {@link CProducerJava}. */
-    public CProducerJava() {
-    }
+    public CProducerJava() {}
 }

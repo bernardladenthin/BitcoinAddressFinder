@@ -53,7 +53,7 @@ public class ByteBufferUtility {
         this.allocateDirect = allocateDirect;
         this.useXorSwap = useXorSwap;
     }
-    
+
     /**
      * ATTENTION: The {@code jdk.internal.misc.Unsafe#getUnsafe()} can throw an {@link java.lang.IllegalAccessError}.
      * https://stackoverflow.com/questions/8462200/examples-of-forcing-freeing-of-native-memory-direct-bytebuffer-has-allocated-us
@@ -77,7 +77,7 @@ public class ByteBufferUtility {
         // https://stackoverflow.com/questions/3496508/deallocating-direct-buffer-native-memory-in-java-for-jogl/26777380
         u.invokeCleaner(byteBuffer);
     }
-    
+
     // <editor-fold defaultstate="collapsed" desc="ByteBuffer byte array conversion">
     /**
      * Copies the remaining content of {@code byteBuffer} into a new byte array.
@@ -100,7 +100,7 @@ public class ByteBufferUtility {
      * @return a ready-to-read {@link ByteBuffer}
      */
     public ByteBuffer byteArrayToByteBuffer(byte[] bytes) {
-        if (allocateDirect) { 
+        if (allocateDirect) {
             return byteArrayToByteBufferAllocatedDirect(bytes);
         } else {
             return byteArrayToByteBufferWrapped(bytes);
@@ -118,20 +118,20 @@ public class ByteBufferUtility {
         key.put(bytes).flip();
         return key;
     }
-    
+
     /**
-    * Writes a BigInteger into a ByteBuffer.
-    *
-    * @param buffer The ByteBuffer to write to.
-    * @param byteArray The byte array to write.
-    */
-   public static void putToByteBuffer(ByteBuffer buffer, byte[] byteArray) {
-       buffer.clear();
-       buffer.put(byteArray, 0, byteArray.length);
-       buffer.rewind();
-   }
+     * Writes a BigInteger into a ByteBuffer.
+     *
+     * @param buffer The ByteBuffer to write to.
+     * @param byteArray The byte array to write.
+     */
+    public static void putToByteBuffer(ByteBuffer buffer, byte[] byteArray) {
+        buffer.clear();
+        buffer.put(byteArray, 0, byteArray.length);
+        buffer.rewind();
+    }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="ByteBuffer Hex conversion">
     /**
      * Encodes a {@link ByteBuffer} as a lower-case hex string.
@@ -158,26 +158,26 @@ public class ByteBufferUtility {
         return byteBuffer;
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="ensureByteBufferCapacityFitsInt">
     /**
-    * Validates that the given capacity fits within Java's ByteBuffer limit.
-    * 
-    * @param capacity the desired buffer capacity in bytes
-    * @return the same value as an int, if within bounds
-    * @throws IllegalArgumentException if capacity exceeds Integer.MAX_VALUE or is negative
-    */
-   public static int ensureByteBufferCapacityFitsInt(long capacity) {
-       if (capacity < 0) {
-           throw new IllegalArgumentException("Capacity must not be negative: " + capacity);
-       }
-       if (capacity > Integer.MAX_VALUE) {
-           throw new IllegalArgumentException("Capacity exceeds maximum ByteBuffer limit: " + capacity);
-       }
-       return (int) capacity;
-   }
+     * Validates that the given capacity fits within Java's ByteBuffer limit.
+     *
+     * @param capacity the desired buffer capacity in bytes
+     * @return the same value as an int, if within bounds
+     * @throws IllegalArgumentException if capacity exceeds Integer.MAX_VALUE or is negative
+     */
+    public static int ensureByteBufferCapacityFitsInt(long capacity) {
+        if (capacity < 0) {
+            throw new IllegalArgumentException("Capacity must not be negative: " + capacity);
+        }
+        if (capacity > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("Capacity exceeds maximum ByteBuffer limit: " + capacity);
+        }
+        return (int) capacity;
+    }
     // </editor-fold>
-   
+
     // <editor-fold defaultstate="collapsed" desc="allocateByteBufferDirectStrict (enforce direct allocation)">
     /**
      * Allocates a {@link ByteBuffer} strictly using {@link ByteBuffer#allocateDirect(int)}.
@@ -197,7 +197,7 @@ public class ByteBufferUtility {
         return ByteBuffer.allocateDirect(capacity);
     }
     // </editor-fold>
-    
+
     /**
      * https://bitbucket.org/connect2id/nimbus-srp/pull-requests/6/remove-leading-zero-byte-when-converting/diff
      * Converts a BigInteger into a byte array ignoring the sign of the
@@ -215,7 +215,7 @@ public class ByteBufferUtility {
         }
         return bytes;
     }
-    
+
     /**
      * Reverses the given byte array in place.
      * <p>See https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java.
@@ -243,5 +243,4 @@ public class ByteBufferUtility {
             }
         }
     }
-
 }

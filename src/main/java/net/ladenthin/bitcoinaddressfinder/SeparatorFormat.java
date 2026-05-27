@@ -128,11 +128,11 @@ public enum SeparatorFormat {
     public static List<SeparatorFormat> getSortedSeparators() {
         return Arrays.stream(SeparatorFormat.values())
                 .sorted(Comparator.comparingInt(
-                        (SeparatorFormat s) -> s.getSymbol().length()
-                ).reversed())
+                                (SeparatorFormat s) -> s.getSymbol().length())
+                        .reversed())
                 .toList();
     }
-    
+
     /**
      * Recursively splits the given input string using all defined {@link SeparatorFormat} values,
      * in descending order of separator length.
@@ -158,33 +158,32 @@ public enum SeparatorFormat {
     }
 
     /**
-    * Helper method for recursively applying separators to the input.
-    * <p>
-    * Each separator is applied in turn, starting with the longest one. If the current
-    * separator splits the input, each resulting part is passed recursively to the next separator.
-    * If no split occurs at the current level, the method proceeds to the next separator.
-    *
-    * @param input       the string to split
-    * @param result      the list collecting all final split segments
-    * @param separators  the list of separators to apply
-    * @param index       the current separator index in the list
-    */
-   private static void splitRecursive(String input, List<String> result, List<SeparatorFormat> separators, int index) {
-       if (index >= separators.size()) {
-           result.add(input); // No more separators, store the remaining part
-           return;
-       }
+     * Helper method for recursively applying separators to the input.
+     * <p>
+     * Each separator is applied in turn, starting with the longest one. If the current
+     * separator splits the input, each resulting part is passed recursively to the next separator.
+     * If no split occurs at the current level, the method proceeds to the next separator.
+     *
+     * @param input       the string to split
+     * @param result      the list collecting all final split segments
+     * @param separators  the list of separators to apply
+     * @param index       the current separator index in the list
+     */
+    private static void splitRecursive(String input, List<String> result, List<SeparatorFormat> separators, int index) {
+        if (index >= separators.size()) {
+            result.add(input); // No more separators, store the remaining part
+            return;
+        }
 
-       SeparatorFormat separator = separators.get(index);
-       String[] parts = input.split(Pattern.quote(separator.getSymbol()), -1);
+        SeparatorFormat separator = separators.get(index);
+        String[] parts = input.split(Pattern.quote(separator.getSymbol()), -1);
 
-       if (parts.length > 1) {
-           for (String part : parts) {
-               splitRecursive(part, result, separators, index + 1);
-           }
-       } else {
-           splitRecursive(input, result, separators, index + 1);
-       }
-   }
-
+        if (parts.length > 1) {
+            for (String part : parts) {
+                splitRecursive(part, result, separators, index + 1);
+            }
+        } else {
+            splitRecursive(input, result, separators, index + 1);
+        }
+    }
 }

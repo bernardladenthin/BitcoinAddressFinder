@@ -21,9 +21,9 @@ import org.slf4j.LoggerFactory;
 public class ProducerJavaSecretsFiles extends ProducerJava {
 
     private final Logger logger = LoggerFactory.getLogger(ProducerJavaSecretsFiles.class);
-    
+
     private final Network network = new NetworkParameterFactory().getNetwork();
-    
+
     private final CProducerJavaSecretsFiles producerJavaSecretsFiles;
 
     private final ReadStatistic readStatistic = new ReadStatistic();
@@ -40,11 +40,16 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
      * @param keyProducer              the secret supplying strategy (unused in this producer)
      * @param bitHelper                bit/batch-size helper
      */
-    public ProducerJavaSecretsFiles(CProducerJavaSecretsFiles producerJavaSecretsFiles, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer, BitHelper bitHelper) {
+    public ProducerJavaSecretsFiles(
+            CProducerJavaSecretsFiles producerJavaSecretsFiles,
+            Consumer consumer,
+            KeyUtility keyUtility,
+            KeyProducer keyProducer,
+            BitHelper bitHelper) {
         super(producerJavaSecretsFiles, consumer, keyUtility, keyProducer, bitHelper);
         this.producerJavaSecretsFiles = producerJavaSecretsFiles;
     }
-    
+
     @Override
     public void produceKeys() {
         try {
@@ -59,12 +64,7 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
                     break;
                 }
                 SecretsFile secretsFile = new SecretsFile(
-                    network,
-                    file,
-                    producerJavaSecretsFiles.secretFormat,
-                    readStatistic,
-                    this::consumeSecrets
-                );
+                        network, file, producerJavaSecretsFiles.secretFormat, readStatistic, this::consumeSecrets);
 
                 logger.info("Processing secrets file: {}", file);
                 currentSecretsFile.set(secretsFile);
@@ -84,9 +84,11 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
     public void processSecrets(BigInteger[] secrets) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
-    
+
     private void logProgress() {
-        logger.info("Progress: Unsupported: " + readStatistic.getUnsupportedTotal() + ". Errors: " + readStatistic.errors.size() + ". Current File progress: " + String.format("%.2f", readStatistic.currentFileProgress) + "%.");
+        logger.info("Progress: Unsupported: " + readStatistic.getUnsupportedTotal() + ". Errors: "
+                + readStatistic.errors.size() + ". Current File progress: "
+                + String.format("%.2f", readStatistic.currentFileProgress) + "%.");
     }
 
     @Override
@@ -97,5 +99,4 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
             secretsFile.interrupt();
         }
     }
-    
 }

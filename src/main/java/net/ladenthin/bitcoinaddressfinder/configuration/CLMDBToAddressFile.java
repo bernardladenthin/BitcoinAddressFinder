@@ -9,8 +9,7 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 public class CLMDBToAddressFile {
 
     /** Creates a new {@link CLMDBToAddressFile}. */
-    public CLMDBToAddressFile() {
-    }
+    public CLMDBToAddressFile() {}
 
     /** LMDB read-only configuration used as the export source. */
     public CLMDBConfigurationReadOnly lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();

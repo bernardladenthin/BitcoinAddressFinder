@@ -11,14 +11,13 @@ import java.util.List;
  */
 public class CProducerJavaSecretsFiles extends CProducerJava {
     /** Creates a new {@link CProducerJavaSecretsFiles}. */
-    public CProducerJavaSecretsFiles() {
-    }
+    public CProducerJavaSecretsFiles() {}
 
     /**
      * The list of strings files which should be read.
      */
     public List<String> files = new ArrayList<>();
-    
+
     /**
      * The format of each line in the files.
      */

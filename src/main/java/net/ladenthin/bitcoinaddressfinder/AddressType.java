@@ -18,7 +18,7 @@ public enum AddressType {
      * P2PKH Script: OP_DUP OP_HASH160 &lt;pubKeyHash&gt; OP_EQUALVERIFY OP_CHECKSIG<br>
      * P2SH Script: OP_HASH160 &lt;scriptHash&gt; OP_EQUAL
      * </p>
-     * <p><b>Note:</b> P2PKH and P2SH addresses use the same Base58Check format and differ only by their version byte. 
+     * <p><b>Note:</b> P2PKH and P2SH addresses use the same Base58Check format and differ only by their version byte.
      * This makes it impossible to distinguish them without additional context (e.g., the coin type or expected script).
      * Address collisions or misclassification may occur when coins use the same address format with different version bytes.
      * </p>

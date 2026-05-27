@@ -14,8 +14,9 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 
 public class TestAddressesLMDB {
 
-
-    public File createTestLMDB(Path folder, AddressesFiles addressesFiles, boolean useStaticAmount, boolean addInvalidAddresses) throws IOException {
+    public File createTestLMDB(
+            Path folder, AddressesFiles addressesFiles, boolean useStaticAmount, boolean addInvalidAddresses)
+            throws IOException {
         CAddressFilesToLMDB addressFilesToLMDBConfigurationWrite = new CAddressFilesToLMDB();
 
         List<String> files = addressesFiles.createAddressesFiles(folder, addInvalidAddresses);

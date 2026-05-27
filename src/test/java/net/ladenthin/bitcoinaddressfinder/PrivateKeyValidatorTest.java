@@ -3,13 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import java.math.BigInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.hamcrest.Matchers.*;
 
 public class PrivateKeyValidatorTest {
 
@@ -63,7 +64,9 @@ public class PrivateKeyValidatorTest {
     @Test
     public void getMaxPrivateKeyForBatchSize_bitSizeTooLarge_throwsException() {
         // act
-        assertThrows(IllegalArgumentException.class, () -> validator.getMaxPrivateKeyForBatchSize(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS + 1));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> validator.getMaxPrivateKeyForBatchSize(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS + 1));
     }
 
     @Test
@@ -209,10 +212,10 @@ public class PrivateKeyValidatorTest {
     @Test
     public void replaceInvalidPrivateKeys_mixedArray_replacesInvalids() {
         // arrange
-        BigInteger[] secrets = new BigInteger[]{
-            PublicKeyBytes.MIN_VALID_PRIVATE_KEY,                      // valid
-            PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE),        // invalid
-            BigInteger.ZERO                                            // invalid
+        BigInteger[] secrets = new BigInteger[] {
+            PublicKeyBytes.MIN_VALID_PRIVATE_KEY, // valid
+            PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE), // invalid
+            BigInteger.ZERO // invalid
         };
 
         // act
@@ -227,7 +230,7 @@ public class PrivateKeyValidatorTest {
     @Test
     public void replaceInvalidPrivateKeys_allValidKeys_keepsOriginalValues() {
         // arrange
-        BigInteger[] secrets = new BigInteger[]{
+        BigInteger[] secrets = new BigInteger[] {
             PublicKeyBytes.MIN_VALID_PRIVATE_KEY,
             PublicKeyBytes.MAX_PRIVATE_KEY,
             PublicKeyBytes.MIN_VALID_PRIVATE_KEY.add(BigInteger.ONE)
@@ -244,10 +247,8 @@ public class PrivateKeyValidatorTest {
     @Test
     public void replaceInvalidPrivateKeys_allInvalidKeys_replacesAll() {
         // arrange
-        BigInteger[] secrets = new BigInteger[]{
-            BigInteger.ZERO,
-            BigInteger.ONE.negate(),
-            PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE)
+        BigInteger[] secrets = new BigInteger[] {
+            BigInteger.ZERO, BigInteger.ONE.negate(), PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE)
         };
 
         // act

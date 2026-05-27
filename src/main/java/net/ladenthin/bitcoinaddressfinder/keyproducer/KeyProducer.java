@@ -19,7 +19,8 @@ public interface KeyProducer extends Interruptable {
      * @return an array of generated secrets (length 1 if {@code returnStartSecretOnly})
      * @throws NoMoreSecretsAvailableException if no more secrets can be produced
      */
-    BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException;
+    BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly)
+            throws NoMoreSecretsAvailableException;
 
     /**
      * Returns the logger associated with this producer.

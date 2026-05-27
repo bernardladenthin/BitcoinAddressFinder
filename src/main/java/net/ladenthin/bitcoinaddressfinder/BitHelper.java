@@ -11,8 +11,7 @@ import java.math.BigInteger;
 public class BitHelper {
 
     /** Creates a new {@link BitHelper}. */
-    public BitHelper() {
-    }
+    public BitHelper() {}
 
     /** Radix used by hexadecimal {@link BigInteger} conversions. */
     public static final int RADIX_HEX = 16;
@@ -48,7 +47,8 @@ public class BitHelper {
             throw new IllegalArgumentException("batchSizeInBits must be greater than or equal to 0.");
         }
         if (batchSizeInBits > PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY) {
-            throw new IllegalArgumentException("batchSizeInBits must be less than or equal to " + PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY + ".");
+            throw new IllegalArgumentException("batchSizeInBits must be less than or equal to "
+                    + PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY + ".");
         }
     }
 }

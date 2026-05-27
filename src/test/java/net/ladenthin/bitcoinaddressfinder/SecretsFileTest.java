@@ -3,24 +3,25 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.io.File;
-import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
-import org.apache.commons.io.FileUtils;
-import org.bitcoinj.base.Network;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+
+import java.io.File;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
+import org.apache.commons.io.FileUtils;
+import org.bitcoinj.base.Network;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import java.nio.file.Path;
-import java.nio.file.Files;
 
 /**
  * Unit tests for {@link SecretsFile}.
@@ -40,7 +41,8 @@ public class SecretsFileTest {
         File file = Files.createFile(folder.resolve("secrets.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
-        SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.BIG_INTEGER, readStatistic, captured::add);
+        SecretsFile secretsFile =
+                new SecretsFile(network, file, CSecretFormat.BIG_INTEGER, readStatistic, captured::add);
 
         // act
         secretsFile.processLine("12345");
@@ -88,9 +90,11 @@ public class SecretsFileTest {
         File file = Files.createFile(folder.resolve("secrets.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
-        SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.STRING_DO_SHA256, readStatistic, captured::add);
+        SecretsFile secretsFile =
+                new SecretsFile(network, file, CSecretFormat.STRING_DO_SHA256, readStatistic, captured::add);
         // SHA256("test") = 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
-        BigInteger expectedSecret = new BigInteger("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", 16);
+        BigInteger expectedSecret =
+                new BigInteger("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", 16);
 
         // act
         secretsFile.processLine("test");
@@ -106,7 +110,8 @@ public class SecretsFileTest {
         File file = Files.createFile(folder.resolve("secrets.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
-        SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.DUMPED_RIVATE_KEY, readStatistic, captured::add);
+        SecretsFile secretsFile =
+                new SecretsFile(network, file, CSecretFormat.DUMPED_RIVATE_KEY, readStatistic, captured::add);
 
         // act
         secretsFile.processLine(staticKey.privateKeyWiFUncompressed);
@@ -123,7 +128,8 @@ public class SecretsFileTest {
         File file = Files.createFile(folder.resolve("secrets.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
-        SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.DUMPED_RIVATE_KEY, readStatistic, captured::add);
+        SecretsFile secretsFile =
+                new SecretsFile(network, file, CSecretFormat.DUMPED_RIVATE_KEY, readStatistic, captured::add);
 
         // act
         secretsFile.processLine(staticKey.privateKeyWiFUncompressed);
@@ -138,7 +144,8 @@ public class SecretsFileTest {
         File file = Files.createFile(folder.resolve("secrets.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
-        SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.BIG_INTEGER, readStatistic, captured::add);
+        SecretsFile secretsFile =
+                new SecretsFile(network, file, CSecretFormat.BIG_INTEGER, readStatistic, captured::add);
 
         // act
         secretsFile.processLine("1");
@@ -159,7 +166,8 @@ public class SecretsFileTest {
         FileUtils.writeStringToFile(file, "1\n2\n", StandardCharsets.UTF_8.name());
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
-        SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.BIG_INTEGER, readStatistic, captured::add);
+        SecretsFile secretsFile =
+                new SecretsFile(network, file, CSecretFormat.BIG_INTEGER, readStatistic, captured::add);
 
         // act
         secretsFile.readFile();
@@ -176,7 +184,8 @@ public class SecretsFileTest {
         File file = Files.createFile(folder.resolve("secrets.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
-        SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.BIG_INTEGER, readStatistic, captured::add);
+        SecretsFile secretsFile =
+                new SecretsFile(network, file, CSecretFormat.BIG_INTEGER, readStatistic, captured::add);
 
         // act
         secretsFile.readFile();
@@ -194,7 +203,8 @@ public class SecretsFileTest {
         FileUtils.writeStringToFile(file, "1\n2\n3\n", StandardCharsets.UTF_8.name());
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
-        SecretsFile secretsFile = new SecretsFile(network, file, CSecretFormat.BIG_INTEGER, readStatistic, captured::add);
+        SecretsFile secretsFile =
+                new SecretsFile(network, file, CSecretFormat.BIG_INTEGER, readStatistic, captured::add);
 
         // act
         secretsFile.interrupt();

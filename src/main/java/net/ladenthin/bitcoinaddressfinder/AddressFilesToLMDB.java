@@ -3,11 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
-import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -17,16 +12,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
+import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
+import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Imports one or more plaintext address files into an LMDB database.
  */
 public class AddressFilesToLMDB implements Runnable, Interruptable {
-    
-    private final static long PROGRESS_LOG = 100_000;
+
+    private static final long PROGRESS_LOG = 100_000;
 
     private final Logger logger = LoggerFactory.getLogger(AddressFilesToLMDB.class);
 
@@ -47,7 +46,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
      *
      * @param addressFilesToLMDB configuration with the LMDB target and source files
      */
-    public AddressFilesToLMDB( @NonNull CAddressFilesToLMDB addressFilesToLMDB) {
+    public AddressFilesToLMDB(@NonNull CAddressFilesToLMDB addressFilesToLMDB) {
         this.addressFilesToLMDB = addressFilesToLMDB;
     }
 
@@ -56,8 +55,9 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
         final Network network = new NetworkParameterFactory().getNetwork();
 
         PersistenceUtils persistenceUtils = new PersistenceUtils(network);
-        CLMDBConfigurationWrite lmdbConfigurationWrite = Objects.requireNonNull(addressFilesToLMDB.lmdbConfigurationWrite);
-        try(LMDBPersistence persistence = new LMDBPersistence(lmdbConfigurationWrite, persistenceUtils)) {
+        CLMDBConfigurationWrite lmdbConfigurationWrite =
+                Objects.requireNonNull(addressFilesToLMDB.lmdbConfigurationWrite);
+        try (LMDBPersistence persistence = new LMDBPersistence(lmdbConfigurationWrite, persistenceUtils)) {
             logger.info("Init LMDB ...");
             persistence.init();
             logger.info("... init LMDB done.");
@@ -68,50 +68,42 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
                 List<File> files = fileHelper.stringsToFiles(addressesFiles);
                 fileHelper.assertFilesExists(files);
 
-                java.util.function.Consumer<AddressToCoin> supported =
-                        addressToCoin -> {
-                            ByteBuffer hash160 = addressToCoin.hash160();
-                            persistence.putNewAmount(hash160, addressToCoin.coin());
-                            addressCounter.incrementAndGet();
+                java.util.function.Consumer<AddressToCoin> supported = addressToCoin -> {
+                    ByteBuffer hash160 = addressToCoin.hash160();
+                    persistence.putNewAmount(hash160, addressToCoin.coin());
+                    addressCounter.incrementAndGet();
 
-                            if (addressCounter.get() % PROGRESS_LOG == 0) {
-                                logProgress();
-                            }
-                        };
+                    if (addressCounter.get() % PROGRESS_LOG == 0) {
+                        logProgress();
+                    }
+                };
 
-                java.util.function.Consumer<String> unsupported =
-                        line -> {
-                            if (readStatistic.getUnsupportedTotal() % PROGRESS_LOG == 0) {
-                                logProgress();
-                            }
-                        };
+                java.util.function.Consumer<String> unsupported = line -> {
+                    if (readStatistic.getUnsupportedTotal() % PROGRESS_LOG == 0) {
+                        logProgress();
+                    }
+                };
 
                 logger.info("Iterate address files ...");
                 for (File file : files) {
                     if (!shouldRun.get()) {
                         break;
                     }
-                    AddressFile addressFile = new AddressFile(
-                            file,
-                            readStatistic,
-                            network,
-                            supported,
-                            unsupported
-                    );
+                    AddressFile addressFile = new AddressFile(file, readStatistic, network, supported, unsupported);
 
-                logger.info("process " + file.getAbsolutePath());
-                currentAddressFile.set(addressFile);
-                addressFile.readFile();
-                currentAddressFile.set(null);
-                logger.info("finished: " + file.getAbsolutePath());
-                
+                    logger.info("process " + file.getAbsolutePath());
+                    currentAddressFile.set(addressFile);
+                    addressFile.readFile();
+                    currentAddressFile.set(null);
+                    logger.info("finished: " + file.getAbsolutePath());
+
+                    logProgress();
+                }
                 logProgress();
-            }
-            logProgress();
-            logger.info("... iterate address files done.");
+                logger.info("... iterate address files done.");
 
-            for (String error : readStatistic.errors) {
-                logger.info("Error in line: " + error);
+                for (String error : readStatistic.errors) {
+                    logger.info("Error in line: " + error);
                 }
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -120,7 +112,9 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
     }
 
     private void logProgress() {
-        logger.info("Progress: " + addressCounter.get() + " addresses. Unsupported: " + readStatistic.getUnsupportedTotal() + ". Errors: " + readStatistic.errors.size() + ". Current File progress: " + String.format("%.2f", readStatistic.currentFileProgress) + "%.");
+        logger.info("Progress: " + addressCounter.get() + " addresses. Unsupported: "
+                + readStatistic.getUnsupportedTotal() + ". Errors: " + readStatistic.errors.size()
+                + ". Current File progress: " + String.format("%.2f", readStatistic.currentFileProgress) + "%.");
     }
 
     @Override

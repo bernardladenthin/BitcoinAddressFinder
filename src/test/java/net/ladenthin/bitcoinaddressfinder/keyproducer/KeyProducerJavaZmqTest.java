@@ -3,6 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
 import java.math.BigInteger;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -22,13 +29,6 @@ import org.zeromq.SocketType;
 import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
 import org.zeromq.ZMQException;
-
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.*;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
 
 public class KeyProducerJavaZmqTest {
 
@@ -130,7 +130,7 @@ public class KeyProducerJavaZmqTest {
         // duration of createSecrets() avoids the jeromq default LINGER=0 which would otherwise drop
         // any message still buffered in the PUSH socket's outbound queue when the context is closed.
         try (ZContext context = new ZContext();
-             ZMQ.Socket socket = context.createSocket(SocketType.PUSH)) {
+                ZMQ.Socket socket = context.createSocket(SocketType.PUSH)) {
             socket.connect(address);
             boolean sent = socket.send(secretBytes);
             assertThat("ZMQ send returned false", sent, is(true));
@@ -178,12 +178,11 @@ public class KeyProducerJavaZmqTest {
         // Give the consumer time to actually park in take(); a quick spin would
         // not exercise the blocking path.
         Thread.sleep(TestTimeProvider.DEFAULT_DELAY);
-        assertThat("createSecrets must block when timeout < 0 and queue is empty",
-                future.isDone(), is(false));
+        assertThat("createSecrets must block when timeout < 0 and queue is empty", future.isDone(), is(false));
 
         // Now publish a message; the consumer should wake and return it.
         try (ZContext context = new ZContext();
-             ZMQ.Socket socket = context.createSocket(SocketType.PUSH)) {
+                ZMQ.Socket socket = context.createSocket(SocketType.PUSH)) {
             socket.connect(address);
             boolean sent = socket.send(secretBytes);
             assertThat("ZMQ send returned false", sent, is(true));
@@ -212,7 +211,7 @@ public class KeyProducerJavaZmqTest {
         // duration of createSecrets() avoids the jeromq default LINGER=0 which would otherwise drop
         // any message still buffered in the PUSH socket's outbound queue when the context is closed.
         try (ZContext context = new ZContext();
-             ZMQ.Socket socket = context.createSocket(SocketType.PUSH)) {
+                ZMQ.Socket socket = context.createSocket(SocketType.PUSH)) {
             socket.connect(address);
             for (int i = 0; i < numberOfSecrets; i++) {
                 byte[] secretBytes = new KeyProducerTestUtility().createIncrementedSecret((byte) i);

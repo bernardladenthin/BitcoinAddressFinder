@@ -9,8 +9,7 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 public class CKeyProducerJavaZmq extends CKeyProducerJavaReceiver {
 
     /** Creates a new {@link CKeyProducerJavaZmq}. */
-    public CKeyProducerJavaZmq() {
-    }
+    public CKeyProducerJavaZmq() {}
 
     /**
      * Whether the ZMQ socket binds to or connects to the configured address.

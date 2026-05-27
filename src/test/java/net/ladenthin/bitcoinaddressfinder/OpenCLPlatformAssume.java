@@ -15,9 +15,11 @@ public class OpenCLPlatformAssume implements PlatformAssume {
     }
 
     public void assumeOneOpenCL2_0OrGreaterDeviceAvailable(List<OpenCLPlatform> openCLPlatforms) {
-        Assumptions.assumeTrue(OpenCLBuilder.isOneOpenCL2_0OrGreaterDeviceAvailable(openCLPlatforms), "One OpenCL 2.0 or greater device available");
+        Assumptions.assumeTrue(
+                OpenCLBuilder.isOneOpenCL2_0OrGreaterDeviceAvailable(openCLPlatforms),
+                "One OpenCL 2.0 or greater device available");
     }
-    
+
     public void assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable() {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadable();
         OpenCLBuilder openCLBuilder = new OpenCLBuilder();

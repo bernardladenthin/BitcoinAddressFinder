@@ -3,16 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.opencl;
 
-import java.lang.reflect.Field;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.LongStream;
-
-import com.google.common.collect.ImmutableList;
-import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
-import org.apache.maven.artifact.versioning.ComparableVersion;
 import static org.jocl.CL.CL_CONTEXT_PLATFORM;
 import static org.jocl.CL.CL_DEVICE_ADDRESS_BITS;
 import static org.jocl.CL.CL_DEVICE_ENDIAN_LITTLE;
@@ -56,6 +46,15 @@ import static org.jocl.CL.clGetDeviceIDs;
 import static org.jocl.CL.clGetDeviceInfo;
 import static org.jocl.CL.clGetPlatformIDs;
 import static org.jocl.CL.clGetPlatformInfo;
+
+import com.google.common.collect.ImmutableList;
+import java.lang.reflect.Field;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
+import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
+import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.jocl.Pointer;
 import org.jocl.Sizeof;
 import org.jocl.cl_context_properties;
@@ -70,8 +69,7 @@ import org.jspecify.annotations.NonNull;
 public class OpenCLBuilder {
 
     /** Creates a new {@link OpenCLBuilder}. */
-    public OpenCLBuilder() {
-    }
+    public OpenCLBuilder() {}
 
     /** Whether device-info conversions should be formatted for human consumption when querying device info. */
     public static boolean TRANSFORM_TO_PRINT = true;
@@ -91,21 +89,21 @@ public class OpenCLBuilder {
         cl_platform_id[] platforms = new cl_platform_id[numPlatforms[0]];
         clGetPlatformIDs(platforms.length, platforms, null);
 
-        for (int i=0; i<platforms.length; i++) {
+        for (int i = 0; i < platforms.length; i++) {
             // Collect all devices of all platforms
             final cl_platform_id platformId = platforms[i];
-            
+
             // Initialize the context properties
             cl_context_properties contextProperties = new cl_context_properties();
             contextProperties.addProperty(CL_CONTEXT_PLATFORM, platformId);
 
             String platformName = getString(platformId, CL_PLATFORM_NAME);
-            
+
             // Obtain the number of devices for the current platform
             int[] numDevicesArray = new int[1];
             clGetDeviceIDs(platformId, CL_DEVICE_TYPE_ALL, 0, null, numDevicesArray);
             int numDevices = numDevicesArray[0];
-            
+
             cl_device_id[] devicesArray = new cl_device_id[numDevices];
             clGetDeviceIDs(platformId, CL_DEVICE_TYPE_ALL, numDevices, devicesArray, null);
 
@@ -115,10 +113,11 @@ public class OpenCLBuilder {
                 openCLDevices.add(openCLDevice);
             }
 
-            OpenCLPlatform openCLPlatform = new OpenCLPlatform(platformName, contextProperties, ImmutableList.copyOf(openCLDevices));
+            OpenCLPlatform openCLPlatform =
+                    new OpenCLPlatform(platformName, contextProperties, ImmutableList.copyOf(openCLDevices));
             openCLPlatforms.add(openCLPlatform);
         }
-        
+
         return openCLPlatforms;
     }
 
@@ -159,7 +158,7 @@ public class OpenCLBuilder {
         int preferredVectorWidthLong = getInt(device, CL_DEVICE_PREFERRED_VECTOR_WIDTH_LONG);
         int preferredVectorWidthFloat = getInt(device, CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT);
         int preferredVectorWidthDouble = getInt(device, CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE);
-        
+
         OpenCLDevice openCLDevice = new OpenCLDevice(
                 device,
                 deviceName,
@@ -197,9 +196,8 @@ public class OpenCLBuilder {
                 preferredVectorWidthInt,
                 preferredVectorWidthLong,
                 preferredVectorWidthFloat,
-                preferredVectorWidthDouble
-        );
-        
+                preferredVectorWidthDouble);
+
         return openCLDevice;
     }
 
@@ -222,7 +220,7 @@ public class OpenCLBuilder {
             Field field = org.jocl.CL.class.getDeclaredField("nativeLibraryLoaded");
             field.setAccessible(true);
             return field.getBoolean(null);
-        } catch(java.lang.UnsatisfiedLinkError e) {
+        } catch (java.lang.UnsatisfiedLinkError e) {
             return false;
         } catch (java.lang.NoClassDefFoundError e) {
             return false;
@@ -231,7 +229,7 @@ public class OpenCLBuilder {
             return false;
         }
     }
-    
+
     /**
      * Checks whether at least one device with OpenCL 2.0 or newer is available.
      *
@@ -260,7 +258,7 @@ public class OpenCLBuilder {
         final ComparableVersion v2_0 = new ComparableVersion("2.0");
         return openCLDeviceVersion.compareTo(v2_0) >= 0;
     }
-    
+
     /**
      * Returns the value of the device info parameter with the given name
      *
@@ -268,8 +266,7 @@ public class OpenCLBuilder {
      * @param paramName The parameter name
      * @return The value
      */
-    private static int getInt(cl_device_id device, int paramName)
-    {
+    private static int getInt(cl_device_id device, int paramName) {
         return getInts(device, paramName, 1)[0];
     }
 
@@ -281,10 +278,9 @@ public class OpenCLBuilder {
      * @param numValues The number of values
      * @return The value
      */
-    private static int[] getInts(cl_device_id device, int paramName, int numValues)
-    {
+    private static int[] getInts(cl_device_id device, int paramName, int numValues) {
         int[] values = new int[numValues];
-        clGetDeviceInfo(device, paramName, (long)Sizeof.cl_int * numValues, Pointer.to(values), null);
+        clGetDeviceInfo(device, paramName, (long) Sizeof.cl_int * numValues, Pointer.to(values), null);
         return values;
     }
 
@@ -295,8 +291,7 @@ public class OpenCLBuilder {
      * @param paramName The parameter name
      * @return The value
      */
-    private static long getLong(cl_device_id device, int paramName)
-    {
+    private static long getLong(cl_device_id device, int paramName) {
         return getLongs(device, paramName, 1)[0];
     }
 
@@ -308,10 +303,9 @@ public class OpenCLBuilder {
      * @param numValues The number of values
      * @return The value
      */
-    private static long[] getLongs(cl_device_id device, int paramName, int numValues)
-    {
+    private static long[] getLongs(cl_device_id device, int paramName, int numValues) {
         long[] values = new long[numValues];
-        clGetDeviceInfo(device, paramName, (long)Sizeof.cl_long * numValues, Pointer.to(values), null);
+        clGetDeviceInfo(device, paramName, (long) Sizeof.cl_long * numValues, Pointer.to(values), null);
         return values;
     }
 
@@ -322,18 +316,17 @@ public class OpenCLBuilder {
      * @param paramName The parameter name
      * @return The value
      */
-    private static String getString(cl_device_id device, int paramName)
-    {
+    private static String getString(cl_device_id device, int paramName) {
         // Obtain the length of the string that will be queried
         long[] size = new long[1];
         clGetDeviceInfo(device, paramName, 0, null, size);
 
         // Create a buffer of the appropriate size and fill it with the info
-        byte[] buffer = new byte[(int)size[0]];
+        byte[] buffer = new byte[(int) size[0]];
         clGetDeviceInfo(device, paramName, buffer.length, Pointer.to(buffer), null);
 
         // Create a string from the buffer (excluding the trailing \0 byte)
-        return new String(buffer, 0, buffer.length-1);
+        return new String(buffer, 0, buffer.length - 1);
     }
 
     /**
@@ -343,20 +336,19 @@ public class OpenCLBuilder {
      * @param paramName The parameter name
      * @return The value
      */
-    private static String getString(cl_platform_id platform, int paramName)
-    {
+    private static String getString(cl_platform_id platform, int paramName) {
         // Obtain the length of the string that will be queried
         long[] size = new long[1];
         clGetPlatformInfo(platform, paramName, 0, null, size);
 
         // Create a buffer of the appropriate size and fill it with the info
-        byte[] buffer = new byte[(int)size[0]];
+        byte[] buffer = new byte[(int) size[0]];
         clGetPlatformInfo(platform, paramName, buffer.length, Pointer.to(buffer), null);
 
         // Create a string from the buffer (excluding the trailing \0 byte)
-        return new String(buffer, 0, buffer.length-1);
+        return new String(buffer, 0, buffer.length - 1);
     }
-    
+
     /**
      * Returns the value of the device info parameter with the given name
      *
@@ -364,11 +356,10 @@ public class OpenCLBuilder {
      * @param paramName The parameter name
      * @return The value
      */
-    private static long getSize(cl_device_id device, int paramName)
-    {
+    private static long getSize(cl_device_id device, int paramName) {
         return getSizes(device, paramName, 1)[0];
     }
-    
+
     /**
      * Returns the values of the device info parameter with the given name
      *
@@ -377,27 +368,20 @@ public class OpenCLBuilder {
      * @param numValues The number of values
      * @return The value
      */
-    static long[] getSizes(cl_device_id device, int paramName, int numValues)
-    {
-        // The size of the returned data has to depend on 
+    static long[] getSizes(cl_device_id device, int paramName, int numValues) {
+        // The size of the returned data has to depend on
         // the size of a size_t, which is handled here
-        long size = (long)numValues * Sizeof.size_t;
-        ByteBuffer buffer = ByteBuffer.allocate(
-            ByteBufferUtility.ensureByteBufferCapacityFitsInt(size)).order(ByteOrder.nativeOrder());
-        clGetDeviceInfo(device, paramName, size, 
-            Pointer.to(buffer), null);
+        long size = (long) numValues * Sizeof.size_t;
+        ByteBuffer buffer = ByteBuffer.allocate(ByteBufferUtility.ensureByteBufferCapacityFitsInt(size))
+                .order(ByteOrder.nativeOrder());
+        clGetDeviceInfo(device, paramName, size, Pointer.to(buffer), null);
         long[] values = new long[numValues];
-        if (Sizeof.size_t == 4)
-        {
-            for (int i=0; i<numValues; i++)
-            {
+        if (Sizeof.size_t == 4) {
+            for (int i = 0; i < numValues; i++) {
                 values[i] = buffer.getInt(i * Sizeof.size_t);
             }
-        }
-        else
-        {
-            for (int i=0; i<numValues; i++)
-            {
+        } else {
+            for (int i = 0; i < numValues; i++) {
                 values[i] = buffer.getLong(i * Sizeof.size_t);
             }
         }

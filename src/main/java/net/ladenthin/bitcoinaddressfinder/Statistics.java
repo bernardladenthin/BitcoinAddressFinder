@@ -9,14 +9,19 @@ package net.ladenthin.bitcoinaddressfinder;
 public class Statistics {
 
     /** Creates a new {@link Statistics}. */
-    public Statistics() {
-    }
+    public Statistics() {}
 
     /** Number of milliseconds per second. */
     @Deprecated
     public static final int ONE_SECOND_IN_MILLISECONDS = 1000;
-    
-    String createStatisticsMessage(long uptime, long keys, long keysSumOfTimeToCheckContains, long emptyConsumer, long keysQueueSize, long hits) {
+
+    String createStatisticsMessage(
+            long uptime,
+            long keys,
+            long keysSumOfTimeToCheckContains,
+            long emptyConsumer,
+            long keysQueueSize,
+            long hits) {
         // calculate uptime
         long uptimeInSeconds = uptime / (long) ONE_SECOND_IN_MILLISECONDS;
         long uptimeInMinutes = uptimeInSeconds / 60;
@@ -26,7 +31,10 @@ public class Statistics {
         // calculate average contains time
         long averageContainsTime = keysSumOfTimeToCheckContains / Math.max(keys, 1);
 
-        String message = "Statistics: [Checked " + (keys / 1_000_000L) + " M keys in " + uptimeInMinutes + " minutes] [" + (keysPerSecond/1_000L) + " k keys/second] [" + (keysPerMinute / 1_000_000L) + " M keys/minute] [Times an empty consumer: " + emptyConsumer + "] [Average contains time: " + averageContainsTime + " ms] [keys queue size: " + keysQueueSize + "] [Hits: " + hits + "]";
+        String message = "Statistics: [Checked " + (keys / 1_000_000L) + " M keys in " + uptimeInMinutes + " minutes] ["
+                + (keysPerSecond / 1_000L) + " k keys/second] [" + (keysPerMinute / 1_000_000L)
+                + " M keys/minute] [Times an empty consumer: " + emptyConsumer + "] [Average contains time: "
+                + averageContainsTime + " ms] [keys queue size: " + keysQueueSize + "] [Hits: " + hits + "]";
         return message;
     }
 }

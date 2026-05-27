@@ -23,6 +23,7 @@ public class ProducerOpenCL extends AbstractProducer {
 
     @VisibleForTesting
     final ThreadPoolExecutor resultReaderThreadPoolExecutor;
+
     @VisibleForTesting
     @Nullable
     OpenCLContext openCLContext;
@@ -36,10 +37,16 @@ public class ProducerOpenCL extends AbstractProducer {
      * @param keyProducer    the secret supplying strategy
      * @param bitHelper      bit/batch-size helper
      */
-    public ProducerOpenCL(CProducerOpenCL producerOpenCL, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer, BitHelper bitHelper) {
+    public ProducerOpenCL(
+            CProducerOpenCL producerOpenCL,
+            Consumer consumer,
+            KeyUtility keyUtility,
+            KeyProducer keyProducer,
+            BitHelper bitHelper) {
         super(producerOpenCL, consumer, keyUtility, keyProducer, bitHelper);
         this.producerOpenCL = producerOpenCL;
-        this.resultReaderThreadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads);
+        this.resultReaderThreadPoolExecutor =
+                (ThreadPoolExecutor) Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads);
         if (false) {
             int prestartedThreads = resultReaderThreadPoolExecutor.prestartAllCoreThreads();
             if (prestartedThreads != producerOpenCL.maxResultReaderThreads) {
@@ -66,13 +73,14 @@ public class ProducerOpenCL extends AbstractProducer {
         }
         try {
             waitTillFreeThreadsInPool();
-            if(getLogger().isDebugEnabled()) {
+            if (getLogger().isDebugEnabled()) {
                 getLogger().debug("openCLContext.createKeys for secretBase: " + secretBase);
             }
             OpenCLGridResult openCLGridResult = openCLContext.createKeys(secretBase);
-            ResultReaderRunnable resultReaderRunnable = new ResultReaderRunnable(openCLGridResult, consumer, secretBase, this);
+            ResultReaderRunnable resultReaderRunnable =
+                    new ResultReaderRunnable(openCLGridResult, consumer, secretBase, this);
 
-            if(getLogger().isDebugEnabled()) {
+            if (getLogger().isDebugEnabled()) {
                 getLogger().debug("submit resultReaderRunnable for secretBase: " + secretBase);
             }
             resultReaderThreadPoolExecutor.submit(resultReaderRunnable, openCLContext);
@@ -85,20 +93,24 @@ public class ProducerOpenCL extends AbstractProducer {
     public void processSecrets(BigInteger[] secrets) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
-    
+
     /**
      * Reads OpenCL kernel results back to the host and forwards them to the consumer.
      */
     protected static class ResultReaderRunnable implements Runnable {
-        
+
         private final Logger logger = LoggerFactory.getLogger(this.getClass());
-        
+
         private final OpenCLGridResult openCLGridResult;
         private final Consumer consumer;
         private final BigInteger secretBase;
         private final AbstractProducer abstractProducer;
-        
-        ResultReaderRunnable(OpenCLGridResult openCLGridResult, Consumer consumer, BigInteger secretBase, AbstractProducer abstractProducer) {
+
+        ResultReaderRunnable(
+                OpenCLGridResult openCLGridResult,
+                Consumer consumer,
+                BigInteger secretBase,
+                AbstractProducer abstractProducer) {
             this.openCLGridResult = openCLGridResult;
             this.consumer = consumer;
             this.secretBase = secretBase;
@@ -121,10 +133,10 @@ public class ProducerOpenCL extends AbstractProducer {
             logger.trace("ResultReaderRunnable finished");
         }
     }
-    
+
     @VisibleForTesting
     void waitTillFreeThreadsInPool() throws InterruptedException {
-        while(getFreeThreads() < 1) {
+        while (getFreeThreads() < 1) {
             Thread.sleep(producerOpenCL.delayBlockedReader);
             getLogger().trace("No possible free threads to read OpenCL results. May increase maxResultReaderThreads.");
         }
@@ -144,5 +156,4 @@ public class ProducerOpenCL extends AbstractProducer {
             openCLContext = null;
         }
     }
-
 }

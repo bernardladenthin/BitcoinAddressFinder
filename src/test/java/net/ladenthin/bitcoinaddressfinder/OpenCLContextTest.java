@@ -3,13 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
+import static org.mockito.Mockito.*;
+
 import java.io.IOException;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.*;
-import static org.mockito.Mockito.*;
 
 public class OpenCLContextTest {
 
@@ -57,9 +58,10 @@ public class OpenCLContextTest {
             openCLContext.init();
 
             // assert
-            verify(mockLogger, times(1)).info(eq("Selected OpenCL device:\n{}"), argThat(
-                (String s) -> s.contains("--- Info for OpenCL device:")
-            ));
+            verify(mockLogger, times(1))
+                    .info(
+                            eq("Selected OpenCL device:\n{}"),
+                            argThat((String s) -> s.contains("--- Info for OpenCL device:")));
         } finally {
             openCLContext.close();
         }

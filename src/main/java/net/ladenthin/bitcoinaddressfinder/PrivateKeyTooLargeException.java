@@ -36,11 +36,10 @@ public class PrivateKeyTooLargeException extends IllegalArgumentException {
     }
 
     private static String buildMessage(BigInteger providedKey, BigInteger maxAllowedKey, int batchSizeInBits) {
-        return "Private key exceeds maximum allowed range for chunked grid mode: " +
-               "\nProvided key:        0x" + providedKey.toString(16) +
-               "\nMaximum allowed key: 0x" + maxAllowedKey.toString(16) +
-               "\n(batchSizeInBits = " + batchSizeInBits + ")" +
-               "\nThe maximum private key is defined in: PublicKeyBytes.MAX_PRIVATE_KEY";
+        return "Private key exceeds maximum allowed range for chunked grid mode: " + "\nProvided key:        0x"
+                + providedKey.toString(16) + "\nMaximum allowed key: 0x"
+                + maxAllowedKey.toString(16) + "\n(batchSizeInBits = "
+                + batchSizeInBits + ")" + "\nThe maximum private key is defined in: PublicKeyBytes.MAX_PRIVATE_KEY";
     }
 
     /**

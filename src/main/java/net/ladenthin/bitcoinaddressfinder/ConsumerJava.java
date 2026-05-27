@@ -42,7 +42,7 @@ public class ConsumerJava implements Consumer {
      */
     @VisibleForTesting
     static Duration AWAIT_DURATION_QUEUE_EMPTY = Duration.ofMinutes(1);
-    
+
     /** Log prefix for misses in trace-level logging. */
     public static final String MISS_PREFIX = "miss: Could not find the address: ";
     /** Log prefix for confirmed address hits. */
@@ -68,25 +68,29 @@ public class ConsumerJava implements Consumer {
 
     /** Consumer configuration. */
     protected final CConsumerJava consumerJava;
+
     @VisibleForTesting
     ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 
     /** The persistence implementation queried by the consumer; initialised in {@link #initLMDB()}. */
     protected @Nullable Persistence persistence;
+
     private final PersistenceUtils persistenceUtils;
 
     private final List<Future<Void>> consumers = new ArrayList<>();
     /** Queue of pending public-key batches; bounded by {@code consumerJava.queueSize}. */
     protected final LinkedBlockingQueue<PublicKeyBytes[]> keysQueue;
+
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
 
     /** Total number of vanity-pattern hits found so far. */
     protected final AtomicLong vanityHits = new AtomicLong();
+
     private final @Nullable Pattern vanityPattern;
-    
+
     @VisibleForTesting
     final AtomicBoolean shouldRun = new AtomicBoolean(true);
-    
+
     @VisibleForTesting
     final ExecutorService consumeKeysExecutorService;
 
@@ -113,7 +117,7 @@ public class ConsumerJava implements Consumer {
     Logger getLogger() {
         return logger;
     }
-    
+
     void setLogger(Logger logger) {
         this.logger = logger;
     }
@@ -137,37 +141,48 @@ public class ConsumerJava implements Consumer {
 
         startTime = System.currentTimeMillis();
 
-        scheduledExecutorService.scheduleAtFixedRate(() -> {
-            // get transient information
-            long uptime = Math.max(System.currentTimeMillis() - startTime, 1);
+        scheduledExecutorService.scheduleAtFixedRate(
+                () -> {
+                    // get transient information
+                    long uptime = Math.max(System.currentTimeMillis() - startTime, 1);
 
-            String message = new Statistics().createStatisticsMessage(uptime, checkedKeys.get(), checkedKeysSumOfTimeToCheckContains.get(), emptyConsumer.get(), keysQueue.size(), hits.get());
+                    String message = new Statistics()
+                            .createStatisticsMessage(
+                                    uptime,
+                                    checkedKeys.get(),
+                                    checkedKeysSumOfTimeToCheckContains.get(),
+                                    emptyConsumer.get(),
+                                    keysQueue.size(),
+                                    hits.get());
 
-            // log the information
-            logger.info(message);
-        }, period, period, TimeUnit.SECONDS);
+                    // log the information
+                    logger.info(message);
+                },
+                period,
+                period,
+                TimeUnit.SECONDS);
     }
 
     @Override
     public void startConsumer() {
         logger.debug("Starting {} consumer threads...", consumerJava.threads);
         for (int i = 0; i < consumerJava.threads; i++) {
-            consumers.add(consumeKeysExecutorService.submit(
-                    () -> {
-                        consumeKeysRunner();
-                        return null;
-                    }));
+            consumers.add(consumeKeysExecutorService.submit(() -> {
+                consumeKeysRunner();
+                return null;
+            }));
         }
         logger.debug("Successfully started {} consumer threads.", consumers.size());
     }
-    
+
     /**
      * This method runs in multiple threads.
      */
     private void consumeKeysRunner() {
         logger.info("start consumeKeysRunner");
-        final ByteBuffer threadLocalReuseableByteBuffer = ByteBuffer.allocateDirect(PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES);
-        
+        final ByteBuffer threadLocalReuseableByteBuffer =
+                ByteBuffer.allocateDirect(PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES);
+
         while (shouldRun.get()) {
             if (keysQueue.size() >= consumerJava.queueSize) {
                 logger.warn("Attention, queue is full. Please increase queue size.");
@@ -182,7 +197,7 @@ public class ConsumerJava implements Consumer {
                 logger.error("Ignore InterruptedException during Thread.sleep.", e);
             } catch (Exception e) {
                 // log every Exception because it's hard to debug and we do not break down the thread loop
-                logger.error("Error in consumeKeysRunner()." , e);
+                logger.error("Error in consumeKeysRunner().", e);
             }
         }
 
@@ -190,7 +205,7 @@ public class ConsumerJava implements Consumer {
 
         logger.info("end consumeKeysRunner");
     }
-    
+
     void consumeKeys(ByteBuffer threadLocalReuseableByteBuffer) throws MnemonicException.MnemonicLengthException {
         logger.trace("consumeKeys");
         PublicKeyBytes[] publicKeyBytesArray = keysQueue.poll();
@@ -199,22 +214,24 @@ public class ConsumerJava implements Consumer {
                 if (publicKeyBytes.isOutsidePrivateKeyRange()) {
                     continue;
                 }
-                
+
                 byte[] hash160Uncompressed = publicKeyBytes.getUncompressedKeyHash();
-                boolean containsAddressUncompressed = containsAddress(threadLocalReuseableByteBuffer, hash160Uncompressed);
-                
+                boolean containsAddressUncompressed =
+                        containsAddress(threadLocalReuseableByteBuffer, hash160Uncompressed);
+
                 byte[] hash160Compressed = publicKeyBytes.getCompressedKeyHash();
                 boolean containsAddressCompressed = containsAddress(threadLocalReuseableByteBuffer, hash160Compressed);
-                
+
                 if (consumerJava.runtimePublicKeyCalculationCheck) {
                     publicKeyBytes.runtimePublicKeyCalculationCheck(logger);
                 }
-                
+
                 if (containsAddressUncompressed) {
                     // immediately log the secret
                     safeLog(publicKeyBytes, hash160Uncompressed, hash160Compressed);
                     hits.incrementAndGet();
-                    ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
+                    ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(
+                            publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
                     String hitMessageUncompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
                     logger.info(hitMessageUncompressed);
                 }
@@ -223,7 +240,8 @@ public class ConsumerJava implements Consumer {
                     // immediately log the secret
                     safeLog(publicKeyBytes, hash160Uncompressed, hash160Compressed);
                     hits.incrementAndGet();
-                    ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
+                    ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(
+                            publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
                     String hitMessageCompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
                     logger.info(hitMessageCompressed);
                 }
@@ -231,13 +249,16 @@ public class ConsumerJava implements Consumer {
                 if (consumerJava.enableVanity) {
                     var localVanityPattern = Objects.requireNonNull(vanityPattern);
                     String uncompressedKeyHashAsBase58 = publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility);
-                    Matcher uncompressedKeyHashAsBase58Matcher = localVanityPattern.matcher(uncompressedKeyHashAsBase58);
+                    Matcher uncompressedKeyHashAsBase58Matcher =
+                            localVanityPattern.matcher(uncompressedKeyHashAsBase58);
                     if (uncompressedKeyHashAsBase58Matcher.matches()) {
                         // immediately log the secret
                         safeLog(publicKeyBytes, hash160Uncompressed, hash160Compressed);
                         vanityHits.incrementAndGet();
-                        ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
-                        String vanityHitMessageUncompressed = VANITY_HIT_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
+                        ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(
+                                publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
+                        String vanityHitMessageUncompressed =
+                                VANITY_HIT_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
                         logger.info(vanityHitMessageUncompressed);
                     }
 
@@ -247,19 +268,23 @@ public class ConsumerJava implements Consumer {
                         // immediately log the secret
                         safeLog(publicKeyBytes, hash160Uncompressed, hash160Compressed);
                         vanityHits.incrementAndGet();
-                        ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
-                        String vanityHitMessageCompressed = VANITY_HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
+                        ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(
+                                publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
+                        String vanityHitMessageCompressed =
+                                VANITY_HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
                         logger.info(vanityHitMessageCompressed);
                     }
                 }
 
                 if (!containsAddressUncompressed && !containsAddressCompressed) {
                     if (logger.isTraceEnabled()) {
-                        ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
+                        ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(
+                                publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
                         String missMessageUncompressed = MISS_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
                         logger.trace(missMessageUncompressed);
 
-                        ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
+                        ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(
+                                publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
                         String missMessageCompressed = MISS_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
                         logger.trace(missMessageCompressed);
                     }
@@ -282,7 +307,7 @@ public class ConsumerJava implements Consumer {
         threadLocalReuseableByteBuffer.flip();
         return containsAddress(threadLocalReuseableByteBuffer);
     }
-    
+
     /**
      * Logs key information in a safe and robust way to avoid losing critical data
      * in case of a runtime exception.
@@ -303,11 +328,13 @@ public class ConsumerJava implements Consumer {
      * @param hash160Compressed      the hash160 of the compressed public key
      */
     private void safeLog(PublicKeyBytes publicKeyBytes, byte[] hash160Uncompressed, byte[] hash160Compressed) {
-        logger.info(HIT_SAFE_PREFIX +"publicKeyBytes.getSecretKey(): " + publicKeyBytes.getSecretKey());
-        logger.info(HIT_SAFE_PREFIX +"publicKeyBytes.getUncompressed(): " + Hex.encodeHexString(publicKeyBytes.getUncompressed()));
-        logger.info(HIT_SAFE_PREFIX +"publicKeyBytes.getCompressed(): " + Hex.encodeHexString(publicKeyBytes.getCompressed()));
-        logger.info(HIT_SAFE_PREFIX +"hash160Uncompressed: " + Hex.encodeHexString(hash160Uncompressed));
-        logger.info(HIT_SAFE_PREFIX +"hash160Compressed: " + Hex.encodeHexString(hash160Compressed));
+        logger.info(HIT_SAFE_PREFIX + "publicKeyBytes.getSecretKey(): " + publicKeyBytes.getSecretKey());
+        logger.info(HIT_SAFE_PREFIX + "publicKeyBytes.getUncompressed(): "
+                + Hex.encodeHexString(publicKeyBytes.getUncompressed()));
+        logger.info(HIT_SAFE_PREFIX + "publicKeyBytes.getCompressed(): "
+                + Hex.encodeHexString(publicKeyBytes.getCompressed()));
+        logger.info(HIT_SAFE_PREFIX + "hash160Uncompressed: " + Hex.encodeHexString(hash160Uncompressed));
+        logger.info(HIT_SAFE_PREFIX + "hash160Compressed: " + Hex.encodeHexString(hash160Compressed));
     }
 
     private boolean containsAddress(ByteBuffer hash160AsByteBuffer) {
@@ -330,38 +357,42 @@ public class ConsumerJava implements Consumer {
 
     @Override
     public void consumeKeys(PublicKeyBytes[] publicKeyBytes) throws InterruptedException {
-        if(logger.isDebugEnabled()){
+        if (logger.isDebugEnabled()) {
             logger.debug("keysQueue.put(publicKeyBytes) with length: " + publicKeyBytes.length);
         }
-        
+
         keysQueue.put(publicKeyBytes);
-        
-        if(logger.isDebugEnabled()){
+
+        if (logger.isDebugEnabled()) {
             logger.debug("keysQueue.size(): " + keysQueue.size());
         }
     }
-    
+
     /**
-    * Initiates a graceful shutdown of the consumer:
-    * <ul>
-    *   <li>Stops internal execution by setting the control flag</li>
-    *   <li>Shuts down scheduled tasks and consumer thread pool</li>
-    *   <li>Waits for all consumer threads to finish within a defined timeout</li>
-    *   <li>Logs any unclean terminations</li>
-    *   <li>Closes LMDB persistence and releases resources</li>
-    * </ul>
-    *
-    * This method ensures a clean and deterministic shutdown without relying on thread interruption signals.
-    */
+     * Initiates a graceful shutdown of the consumer:
+     * <ul>
+     *   <li>Stops internal execution by setting the control flag</li>
+     *   <li>Shuts down scheduled tasks and consumer thread pool</li>
+     *   <li>Waits for all consumer threads to finish within a defined timeout</li>
+     *   <li>Logs any unclean terminations</li>
+     *   <li>Closes LMDB persistence and releases resources</li>
+     * </ul>
+     *
+     * This method ensures a clean and deterministic shutdown without relying on thread interruption signals.
+     */
     @Override
     public void interrupt() {
         logger.info("Interrupt initiated: stopping consumer execution...");
         shouldRun.set(false);
         scheduledExecutorService.shutdown();
         consumeKeysExecutorService.shutdown();
-        logger.info("Waiting for termination of {} consumer threads (timeout: {} seconds)...", consumers.size(), AWAIT_DURATION_QUEUE_EMPTY.getSeconds());
+        logger.info(
+                "Waiting for termination of {} consumer threads (timeout: {} seconds)...",
+                consumers.size(),
+                AWAIT_DURATION_QUEUE_EMPTY.getSeconds());
         try {
-            boolean terminated = consumeKeysExecutorService.awaitTermination(AWAIT_DURATION_QUEUE_EMPTY.getSeconds(), TimeUnit.SECONDS);
+            boolean terminated = consumeKeysExecutorService.awaitTermination(
+                    AWAIT_DURATION_QUEUE_EMPTY.getSeconds(), TimeUnit.SECONDS);
             if (!terminated) {
                 logger.warn("Timeout reached. Some consumer threads may not have terminated cleanly.");
             }
@@ -370,7 +401,7 @@ public class ConsumerJava implements Consumer {
             throw new RuntimeException(e);
         }
         try {
-            if(persistence != null){
+            if (persistence != null) {
                 Persistence localPersistence = Objects.requireNonNull(persistence);
                 localPersistence.close();
                 persistence = null;
@@ -380,12 +411,12 @@ public class ConsumerJava implements Consumer {
         }
         logger.debug("Interrupt complete: resources released and persistence closed.");
     }
-    
+
     @VisibleForTesting
     int keysQueueSize() {
         return keysQueue.size();
     }
-    
+
     @Override
     public String toString() {
         return "ConsumerJava@" + Integer.toHexString(System.identityHashCode(this));

@@ -17,10 +17,10 @@ public class BIP39DataProvider {
     /**
      * For {@link net.ladenthin.bitcoinaddressfinder.BIP39KeyProducerTest}.
      */
-    public final static String DATA_PROVIDER_BIP39_TEST_VECTORS = CLASS_NAME + "#bip39TestVectors";
-    
-    public final static String FILENAME = "vectors.json";
-    public final static String PASSPHRASE = "TREZOR";
+    public static final String DATA_PROVIDER_BIP39_TEST_VECTORS = CLASS_NAME + "#bip39TestVectors";
+
+    public static final String FILENAME = "vectors.json";
+    public static final String PASSPHRASE = "TREZOR";
 
     /**
      * from https://github.com/trezor/python-mnemonic/blob/master/vectors.json
@@ -34,7 +34,7 @@ public class BIP39DataProvider {
         ObjectMapper mapper = new ObjectMapper();
         JsonNode root = mapper.readTree(inputStream);
         int totalVectors = 0;
-        for (Iterator<Map.Entry<String, JsonNode>> fields = root.fields(); fields.hasNext();) {
+        for (Iterator<Map.Entry<String, JsonNode>> fields = root.fields(); fields.hasNext(); ) {
             Map.Entry<String, JsonNode> entry = fields.next();
             totalVectors += entry.getValue().size();
         }
@@ -42,7 +42,7 @@ public class BIP39DataProvider {
         Object[][] result = new Object[totalVectors][];
         int index = 0;
 
-        for (Iterator<Map.Entry<String, JsonNode>> fields = root.fields(); fields.hasNext();) {
+        for (Iterator<Map.Entry<String, JsonNode>> fields = root.fields(); fields.hasNext(); ) {
             Map.Entry<String, JsonNode> entry = fields.next();
             String language = entry.getKey();
             JsonNode vectors = entry.getValue();
@@ -52,7 +52,7 @@ public class BIP39DataProvider {
                 String mnemonic = vectorElement.get(1).asText();
                 String seed = vectorElement.get(2).asText();
                 String xprv = vectorElement.get(3).asText();
-                result[index++] = new Object[]{language, entropy, mnemonic, PASSPHRASE, seed, xprv};
+                result[index++] = new Object[] {language, entropy, mnemonic, PASSPHRASE, seed, xprv};
             }
         }
 

@@ -57,18 +57,15 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
      * @param queue      the queue used to buffer received secrets
      */
     protected AbstractKeyProducerQueueBuffered(
-            T config,
-            KeyUtility keyUtility,
-            Logger logger,
-            BlockingQueue<byte[]> queue
-    ) {
+            T config, KeyUtility keyUtility, Logger logger, BlockingQueue<byte[]> queue) {
         super(config, logger);
         this.keyUtility = keyUtility;
         this.secretQueue = queue;
     }
 
     @Override
-    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
+    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly)
+            throws NoMoreSecretsAvailableException {
         verifyWorkSize(overallWorkSize, cKeyProducerJava.maxWorkSize);
 
         int length = returnStartSecretOnly ? 1 : overallWorkSize;

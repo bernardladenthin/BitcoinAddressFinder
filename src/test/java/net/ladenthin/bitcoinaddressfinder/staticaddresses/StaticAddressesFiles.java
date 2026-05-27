@@ -6,22 +6,21 @@ package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.nio.file.Path;
-import org.bitcoinj.base.Coin;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.*;
+import org.bitcoinj.base.Coin;
 
 public class StaticAddressesFiles implements AddressesFiles {
 
-    private final static String ADDRESS_FILE_ONE = "staticAddressesFile.txt";
-    
+    private static final String ADDRESS_FILE_ONE = "staticAddressesFile.txt";
+
     public static final Coin amountOtherAddresses = Coin.SATOSHI;
 
-    public StaticAddressesFiles() {
-    }
+    public StaticAddressesFiles() {}
 
     @Override
     public List<String> createAddressesFiles(Path folder, boolean addInvalidAddresses) throws IOException {
@@ -32,7 +31,7 @@ public class StaticAddressesFiles implements AddressesFiles {
         addresses.add(one.getAbsolutePath());
         return addresses;
     }
-    
+
     public List<String> getSupportedAddresses() {
         List<String> addresses = new ArrayList<>();
         addresses.addAll(extractAddresses(P2PKH.class));
@@ -40,27 +39,26 @@ public class StaticAddressesFiles implements AddressesFiles {
         addresses.addAll(extractAddresses(P2WPKH.class));
         return addresses;
     }
-    
+
     public List<String> getAllAddresses() {
         List<String> addresses = new ArrayList<>();
         addresses.addAll(getSupportedAddresses());
         addresses.addAll(getUnsupportedAddresses());
         return addresses;
     }
-    
+
     public List<String> getUnsupportedAddresses() {
         return extractAddresses(StaticUnsupportedAddress.class);
     }
-    
+
     private <T extends Enum<T> & PublicAddress> List<String> extractAddresses(Class<T> enumClass) {
         return Arrays.stream(enumClass.getEnumConstants())
-                     .map(PublicAddress::getPublicAddress)
-                     .collect(Collectors.toList());
+                .map(PublicAddress::getPublicAddress)
+                .collect(Collectors.toList());
     }
 
     @Override
     public TestAddresses getTestAddresses() {
         throw new UnsupportedOperationException("Not supported yet.");
     }
-
 }

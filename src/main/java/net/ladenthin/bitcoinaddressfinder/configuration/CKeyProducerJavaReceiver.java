@@ -9,10 +9,8 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 public class CKeyProducerJavaReceiver extends CKeyProducerJava {
 
     /** Creates a new {@link CKeyProducerJavaReceiver}. */
-    public CKeyProducerJavaReceiver() {
-    }
+    public CKeyProducerJavaReceiver() {}
 
-    
     /** Enable logging of each received secret as hex */
     public boolean logReceivedSecret = false;
 }

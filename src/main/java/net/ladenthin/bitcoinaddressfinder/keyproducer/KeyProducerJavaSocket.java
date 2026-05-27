@@ -3,20 +3,20 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Objects;
+import java.util.concurrent.*;
 import java.util.concurrent.ExecutorService;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
-import java.util.concurrent.*;
 
 /**
  * Key producer that receives secrets from a TCP socket (client or server mode).
@@ -38,7 +38,8 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
      * @param bitHelper   bit/batch-size helper (unused but kept for symmetry)
      * @param logger      SLF4J logger
      */
-    public KeyProducerJavaSocket(CKeyProducerJavaSocket config, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
+    public KeyProducerJavaSocket(
+            CKeyProducerJavaSocket config, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
         super(config, keyUtility, logger);
         setupSocket();
     }
@@ -59,8 +60,11 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
                         logger.info("Accepted client connection at port {}", cKeyProducerJava.getPort());
                     } else {
                         socket = new Socket();
-                        socket.connect(new InetSocketAddress(cKeyProducerJava.getHost(), cKeyProducerJava.getPort()), cKeyProducerJava.timeout);
-                        logger.info("Connected to server at {}:{}", cKeyProducerJava.getHost(), cKeyProducerJava.getPort());
+                        socket.connect(
+                                new InetSocketAddress(cKeyProducerJava.getHost(), cKeyProducerJava.getPort()),
+                                cKeyProducerJava.timeout);
+                        logger.info(
+                                "Connected to server at {}:{}", cKeyProducerJava.getHost(), cKeyProducerJava.getPort());
                     }
 
                     Socket localSocket = Objects.requireNonNull(socket);
@@ -94,9 +98,18 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
     }
 
     private void closeConnections() {
-        try { if (inputStream != null) inputStream.close(); } catch (IOException ignored) {}
-        try { if (socket != null) socket.close(); } catch (IOException ignored) {}
-        try { if (serverSocket != null) serverSocket.close(); } catch (IOException ignored) {}
+        try {
+            if (inputStream != null) inputStream.close();
+        } catch (IOException ignored) {
+        }
+        try {
+            if (socket != null) socket.close();
+        } catch (IOException ignored) {
+        }
+        try {
+            if (serverSocket != null) serverSocket.close();
+        } catch (IOException ignored) {
+        }
         inputStream = null;
         socket = null;
         serverSocket = null;

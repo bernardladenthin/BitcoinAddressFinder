@@ -25,7 +25,7 @@ package net.ladenthin.bitcoinaddressfinder;
  * }</pre>
  */
 public interface ReleaseCLObject extends AutoCloseable {
-    
+
     /**
      * Indicates whether the underlying OpenCL resource has already been released.
      *

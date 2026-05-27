@@ -3,12 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.math.BigInteger;
-import java.nio.ByteBuffer;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import org.junit.jupiter.api.Test;
 
 /**

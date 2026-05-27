@@ -9,8 +9,7 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 public class CKeyProducerJavaSocket extends CKeyProducerJavaReceiver {
 
     /** Creates a new {@link CKeyProducerJavaSocket}. */
-    public CKeyProducerJavaSocket() {
-    }
+    public CKeyProducerJavaSocket() {}
 
     /**
      * Whether the socket producer acts as a client (connecting out) or as a server (accepting connections).
@@ -21,7 +20,7 @@ public class CKeyProducerJavaSocket extends CKeyProducerJavaReceiver {
         /** Bind to a local port and accept TCP connections. */
         SERVER
     }
-    
+
     /** Hostname or IP address for client mode; ignored in server mode */
     public String host = "localhost";
 

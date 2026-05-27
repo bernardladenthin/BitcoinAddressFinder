@@ -13,7 +13,5 @@ import org.jocl.cl_context_properties;
  * @param device             the selected OpenCL device on that platform
  * @param contextProperties  the context properties referencing the platform
  */
-public record OpenCLDeviceSelection(OpenCLPlatform platform, OpenCLDevice device,
-                                    cl_context_properties contextProperties) {
-
-}
+public record OpenCLDeviceSelection(
+        OpenCLPlatform platform, OpenCLDevice device, cl_context_properties contextProperties) {}

@@ -3,23 +3,24 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import java.nio.file.Path;
-import java.nio.file.Files;
 
 public class FileHelperTest {
 
@@ -90,8 +91,10 @@ public class FileHelperTest {
     @Test
     public void assertFilesExists_multipleExistingFiles_noExceptionThrown() throws IOException {
         // arrange
-        File tempFile1 = Files.createFile(folder.resolve("filehelper_test_a.tmp")).toFile();
-        File tempFile2 = Files.createFile(folder.resolve("filehelper_test_b.tmp")).toFile();
+        File tempFile1 =
+                Files.createFile(folder.resolve("filehelper_test_a.tmp")).toFile();
+        File tempFile2 =
+                Files.createFile(folder.resolve("filehelper_test_b.tmp")).toFile();
 
         // act
         fileHelper.assertFilesExists(Arrays.asList(tempFile1, tempFile2));
@@ -105,7 +108,9 @@ public class FileHelperTest {
         File nonExistentFile = new File("/this/path/does/not/exist/file.txt");
 
         // act
-        assertThrows(IllegalArgumentException.class, () -> fileHelper.assertFilesExists(Collections.singletonList(nonExistentFile)));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> fileHelper.assertFilesExists(Collections.singletonList(nonExistentFile)));
     }
 
     @Test

@@ -11,8 +11,7 @@ import java.math.BigInteger;
 public class Base36Decoder {
 
     /** Creates a new {@link Base36Decoder}. */
-    public Base36Decoder() {
-    }
+    public Base36Decoder() {}
 
     /**
      * Decodes a Base36-encoded string (e.g., from a WKH address) into a fixed-length byte array.

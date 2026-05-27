@@ -68,9 +68,9 @@ public class Main implements Runnable, Interruptable {
     private final List<Interruptable> interruptables = new ArrayList<>();
 
     private final CConfiguration configuration;
-    
+
     CountDownLatch runLatch = new CountDownLatch(1);
-    
+
     /**
      * Creates a new main instance for the given configuration.
      *
@@ -94,7 +94,7 @@ public class Main implements Runnable, Interruptable {
             throw new RuntimeException(e);
         }
     }
-    
+
     /**
      * Parses a JSON configuration string.
      *
@@ -189,23 +189,22 @@ public class Main implements Runnable, Interruptable {
         String json = configurationToJson(configuration);
         String yaml = configurationToYAML(configuration);
         logger.info(
-                "Please review the transformed configuration to ensure it aligns with your expectations and requirements before proceeding.:\n" +
-                        "########## BEGIN transformed JSON configuration ##########\n" +
-                        json + "\n" +
-                        "########## END   transformed JSON configuration ##########\n" +
-                        "\n" + 
-                        "########## BEGIN transformed YAML configuration ##########\n" +
-                        yaml + "\n" +
-                        "########## END   transformed YAML configuration ##########\n"
-        );
+                "Please review the transformed configuration to ensure it aligns with your expectations and requirements before proceeding.:\n"
+                        + "########## BEGIN transformed JSON configuration ##########\n"
+                        + json
+                        + "\n" + "########## END   transformed JSON configuration ##########\n"
+                        + "\n"
+                        + "########## BEGIN transformed YAML configuration ##########\n"
+                        + yaml
+                        + "\n" + "########## END   transformed YAML configuration ##########\n");
     }
 
     @Override
     public void run() {
         logger.info(configuration.command.name());
-        
+
         addSchutdownHook();
-        
+
         switch (configuration.command) {
             case Find:
                 CFinder cFinder = Objects.requireNonNull(configuration.finder);
@@ -213,10 +212,10 @@ public class Main implements Runnable, Interruptable {
                 interruptables.add(finder);
                 // key producer first
                 finder.startKeyProducer();
-                
+
                 // consumer second
                 finder.startConsumer();
-                
+
                 // producer last
                 finder.configureProducer();
                 finder.initProducer();
@@ -241,11 +240,12 @@ public class Main implements Runnable, Interruptable {
                 System.out.println(openCLPlatforms);
                 break;
             default:
-                throw new UnsupportedOperationException("Command: " + configuration.command.name() + " currently not supported." );
+                throw new UnsupportedOperationException(
+                        "Command: " + configuration.command.name() + " currently not supported.");
         }
         logger.info("Main#run end.");
         runLatch.countDown();
-        
+
         if (false) {
             printAllStackTracesWithDelay(2_000L, true);
         }
@@ -258,13 +258,16 @@ public class Main implements Runnable, Interruptable {
      * @param includeDaemons  whether daemon threads should be included in the output
      */
     public static void printAllStackTracesWithDelay(long delayMillis, boolean includeDaemons) {
-        try { Thread.sleep(delayMillis); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+        try {
+            Thread.sleep(delayMillis);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
 
         Map<Thread, StackTraceElement[]> all = Thread.getAllStackTraces();
 
         List<Map.Entry<Thread, StackTraceElement[]>> entries = new ArrayList<>(all.entrySet());
-        entries.sort(Comparator
-                .comparing((Map.Entry<Thread, StackTraceElement[]> e) -> {
+        entries.sort(Comparator.comparing((Map.Entry<Thread, StackTraceElement[]> e) -> {
                     String n = e.getKey().getName();
                     return n == null ? "" : n;
                 })
@@ -282,12 +285,13 @@ public class Main implements Runnable, Interruptable {
         }
 
         if (!printedAny) {
-            System.out.println(includeDaemons
-                    ? "No threads to print."
-                    : "No non-daemon threads found. JVM should be able to exit normally.");
+            System.out.println(
+                    includeDaemons
+                            ? "No threads to print."
+                            : "No non-daemon threads found. JVM should be able to exit normally.");
         }
     }
-    
+
     private void addSchutdownHook() {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             logger.info("Shutdown received via hook.");
@@ -301,7 +305,7 @@ public class Main implements Runnable, Interruptable {
             logger.info("Finish shutdown hook.");
         }));
     }
-    
+
     @Override
     public void interrupt() {
         for (Interruptable interruptable : interruptables) {

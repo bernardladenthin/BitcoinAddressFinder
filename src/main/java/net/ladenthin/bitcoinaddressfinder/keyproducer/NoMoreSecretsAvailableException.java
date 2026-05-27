@@ -5,13 +5,13 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 /**
  * Exception thrown when no more secrets are available.
- * 
+ *
  * This class extends RuntimeException because it is used with methods such as
  * {@link java.util.Random#nextBytes(byte[])} and {@link java.math.BigInteger#BigInteger(int, java.util.Random)},
  * which require a {@code Random} instance that only throws unchecked exceptions.
  */
 public class NoMoreSecretsAvailableException extends RuntimeException {
-    
+
     /** Creates a new exception with no message or cause. */
     public NoMoreSecretsAvailableException() {
         super();

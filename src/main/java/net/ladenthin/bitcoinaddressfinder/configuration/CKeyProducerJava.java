@@ -12,12 +12,10 @@ import org.jspecify.annotations.Nullable;
 public class CKeyProducerJava {
 
     /** Creates a new {@link CKeyProducerJava}. */
-    public CKeyProducerJava() {
-    }
+    public CKeyProducerJava() {}
 
     /** Unique id by which producers reference this key producer. */
     public @Nullable String keyProducerId;
-
 
     /**
      * (2<sup>{@code maxNumBits}</sup> - 1) can be set to a lower value to improve a search on specific ranges (e.g. the puzzle transaction <a href="https://privatekeys.pw/puzzles/bitcoin-puzzle-tx">bitcoin-puzzle-tx</a> ).
@@ -25,7 +23,7 @@ public class CKeyProducerJava {
      * Range: {@code 2} (inclusive) to {@link PublicKeyBytes#PRIVATE_KEY_MAX_NUM_BITS} (inclusive).
      */
     public int privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
-    
+
     /** Maximum allowed work size (number of secrets to generate) — 2^24 = 16,777,216*/
     public int maxWorkSize = 1 << PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY;
 }

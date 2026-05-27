@@ -3,29 +3,29 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.api.io.TempDir;
-import java.nio.file.Path;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.base.Network;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.is;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import org.slf4j.Logger;
 
 public class AbstractProducerTest {
@@ -44,29 +44,42 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        AbstractProducerTestImpl abstractProducerTestImpl =
+                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         verifyInitProducer(abstractProducerTestImpl);
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="initProducer">
     @Test
-    public void releaseProducer_configurationGiven_stateInitializedAndLogged() throws IOException, InterruptedException {
+    public void releaseProducer_configurationGiven_stateInitializedAndLogged()
+            throws IOException, InterruptedException {
         CProducer cProducer = new CProducer();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        AbstractProducerTestImpl abstractProducerTestImpl =
+                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         verifyReleaseProducer(abstractProducerTestImpl);
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="createSecretBase">
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_CREATE_SECRET_BASE_LOGGED)
-    public void createSecretBase_secretGiven_bitsKilledAndLogged(String givenSecret, int batchSizeInBits, String expectedSecretBase, String logInfo0, String logTrace0, String logTrace1, String logTrace2, String logTrace3, String logTrace4) throws IOException, InterruptedException, DecoderException {
+    public void createSecretBase_secretGiven_bitsKilledAndLogged(
+            String givenSecret,
+            int batchSizeInBits,
+            String expectedSecretBase,
+            String logInfo0,
+            String logTrace0,
+            String logTrace1,
+            String logTrace2,
+            String logTrace3,
+            String logTrace4)
+            throws IOException, InterruptedException, DecoderException {
         // arrange
         CProducer cProducer = new CProducer();
         cProducer.batchSizeInBits = batchSizeInBits;
@@ -74,7 +87,8 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        AbstractProducerTestImpl abstractProducerTestImpl =
+                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
@@ -108,7 +122,8 @@ public class AbstractProducerTest {
     }
 
     @Test
-    public void createSecretBase_secretGivenAndLogSecretBaseDisabledTraceEnabled_bitsKilledAndLogged() throws IOException, InterruptedException, DecoderException {
+    public void createSecretBase_secretGivenAndLogSecretBaseDisabledTraceEnabled_bitsKilledAndLogged()
+            throws IOException, InterruptedException, DecoderException {
         // arrange
         CProducer cProducer = new CProducer();
         cProducer.batchSizeInBits = 2;
@@ -116,7 +131,8 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        AbstractProducerTestImpl abstractProducerTestImpl =
+                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
@@ -141,7 +157,8 @@ public class AbstractProducerTest {
     }
 
     @Test
-    public void createSecretBase_secretGivenAndLogSecretBaseEnabledTraceDisabled_bitsKilledAndLogged() throws IOException, InterruptedException, DecoderException {
+    public void createSecretBase_secretGivenAndLogSecretBaseEnabledTraceDisabled_bitsKilledAndLogged()
+            throws IOException, InterruptedException, DecoderException {
         // arrange
         CProducer cProducer = new CProducer();
         cProducer.batchSizeInBits = 2;
@@ -149,7 +166,8 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        AbstractProducerTestImpl abstractProducerTestImpl =
+                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(false);
@@ -178,15 +196,15 @@ public class AbstractProducerTest {
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
         abstractProducer.setLogger(logger);
-        
+
         abstractProducer.initProducer();
-        
+
         // act
         abstractProducer.releaseProducer();
 
         // assert
         assertThat(abstractProducer.state, is(equalTo(ProducerState.INITIALIZED)));
-        
+
         ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
         verify(logger, times(2)).info(logCaptor.capture());
         List<String> arguments = logCaptor.getAllValues();
@@ -200,16 +218,16 @@ public class AbstractProducerTest {
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
         abstractProducer.setLogger(logger);
-        
+
         // pre-assert
         assertThat(abstractProducer.state, is(equalTo(ProducerState.UNINITIALIZED)));
-        
+
         // act
         abstractProducer.initProducer();
 
         // assert
         assertThat(abstractProducer.state, is(equalTo(ProducerState.INITIALIZED)));
-        
+
         ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
         verify(logger, times(1)).info(logCaptor.capture());
         List<String> arguments = logCaptor.getAllValues();
@@ -227,7 +245,8 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        AbstractProducerTestImpl abstractProducerTestImpl =
+                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         // act
         assertThrows(IllegalStateException.class, () -> abstractProducerTestImpl.run());
@@ -240,7 +259,8 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        AbstractProducerTestImpl abstractProducerTestImpl =
+                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         Logger logger = mock(Logger.class);
         abstractProducerTestImpl.setLogger(logger);
@@ -267,12 +287,13 @@ public class AbstractProducerTest {
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
 
-        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper) {
-            @Override
-            public void produceKeys() {
-                throw new RuntimeException("Test exception");
-            }
-        };
+        AbstractProducerTestImpl abstractProducerTestImpl =
+                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper) {
+                    @Override
+                    public void produceKeys() {
+                        throw new RuntimeException("Test exception");
+                    }
+                };
 
         Logger logger = mock(Logger.class);
         abstractProducerTestImpl.setLogger(logger);

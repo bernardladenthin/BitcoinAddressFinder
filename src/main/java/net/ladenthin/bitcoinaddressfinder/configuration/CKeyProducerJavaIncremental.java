@@ -13,11 +13,11 @@ import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 public class CKeyProducerJavaIncremental extends CKeyProducerJava {
 
     /** Creates a new {@link CKeyProducerJavaIncremental}. */
-    public CKeyProducerJavaIncremental() {
-    }
+    public CKeyProducerJavaIncremental() {}
 
     /** Inclusive lower bound of the scanned private-key range as an uppercase hex string. */
-    public String startAddress = PublicKeyBytes.MIN_VALID_PRIVATE_KEY.toString(BitHelper.RADIX_HEX).toUpperCase();
+    public String startAddress =
+            PublicKeyBytes.MIN_VALID_PRIVATE_KEY.toString(BitHelper.RADIX_HEX).toUpperCase();
     /** Inclusive upper bound of the scanned private-key range as a hex string. */
     public String endAddress = PublicKeyBytes.MAX_PRIVATE_KEY_HEX;
 

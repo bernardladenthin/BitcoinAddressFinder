@@ -11,9 +11,7 @@ import org.bitcoinj.base.Coin;
 public class CLMDBConfigurationWrite extends CLMDBConfigurationReadOnly {
 
     /** Creates a new {@link CLMDBConfigurationWrite}. */
-    public CLMDBConfigurationWrite() {
-    }
-
+    public CLMDBConfigurationWrite() {}
 
     /**
      * LMDB site in MiB (e.g. 1024).
@@ -41,7 +39,7 @@ public class CLMDBConfigurationWrite extends CLMDBConfigurationReadOnly {
 
     /** Whether to grow the LMDB map size automatically when it becomes full. */
     public boolean increaseMapAutomatically = true;
-    
+
     /**
      * LMDB site increase in MiB (e.g. 1024). Attention: If the value is too low, the increase for a full db was not enough and a {@link org.lmdbjava.Env.MapFullException} will be thrown.
      */

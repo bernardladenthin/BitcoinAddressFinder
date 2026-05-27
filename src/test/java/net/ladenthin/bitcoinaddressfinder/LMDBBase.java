@@ -19,14 +19,17 @@ public class LMDBBase {
 
     @TempDir
     public Path folder;
-    
+
     protected final Network network = new NetworkParameterFactory().getNetwork();
     protected final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(true));
-    
-    protected Persistence createAndFillAndOpenLMDB(boolean useStaticAmount, AddressesFiles addressesFiles, boolean addInvalidAddresses, boolean useBloomFilter) throws IOException {
+
+    protected Persistence createAndFillAndOpenLMDB(
+            boolean useStaticAmount, AddressesFiles addressesFiles, boolean addInvalidAddresses, boolean useBloomFilter)
+            throws IOException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
-        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, addressesFiles, useStaticAmount, addInvalidAddresses);
+        File lmdbFolderPath =
+                testAddressesLMDB.createTestLMDB(folder, addressesFiles, useStaticAmount, addInvalidAddresses);
 
         CLMDBConfigurationReadOnly lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();

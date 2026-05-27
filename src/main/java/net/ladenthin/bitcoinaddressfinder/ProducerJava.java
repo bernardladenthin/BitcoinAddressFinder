@@ -24,7 +24,12 @@ public class ProducerJava extends AbstractProducer {
      * @param keyProducer  the secret supplying strategy
      * @param bitHelper    bit/batch-size helper
      */
-    public ProducerJava(CProducerJava producerJava, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer, BitHelper bitHelper) {
+    public ProducerJava(
+            CProducerJava producerJava,
+            Consumer consumer,
+            KeyUtility keyUtility,
+            KeyProducer keyProducer,
+            BitHelper bitHelper) {
         super(producerJava, consumer, keyUtility, keyProducer, bitHelper);
         this.producerJava = producerJava;
     }
@@ -71,7 +76,7 @@ public class ProducerJava extends AbstractProducer {
         }
         return publicKeyBytesArray;
     }
-    
+
     @Override
     public String toString() {
         return "ProducerJava@" + Integer.toHexString(System.identityHashCode(this));

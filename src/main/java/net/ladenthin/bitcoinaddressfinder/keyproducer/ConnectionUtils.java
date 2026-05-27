@@ -12,8 +12,7 @@ import java.net.Socket;
 public class ConnectionUtils {
 
     /** Creates a new {@link ConnectionUtils}. */
-    public ConnectionUtils() {
-    }
+    public ConnectionUtils() {}
 
     /**
      * Waits until the given TCP port accepts connections.

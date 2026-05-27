@@ -3,18 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import com.google.common.annotations.VisibleForTesting;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import org.bitcoinj.crypto.ChildNumber;
 import org.bitcoinj.crypto.DeterministicKey;
 import org.bitcoinj.crypto.HDPath;
 import org.bitcoinj.wallet.DeterministicKeyChain;
 import org.bitcoinj.wallet.DeterministicSeed;
-
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Deterministic key producer based on a BIP39 mnemonic + BIP44 path.
@@ -41,13 +40,14 @@ public class BIP39KeyProducer extends java.util.Random {
      * @param creationTime   the seed creation time
      * @param hardened       whether the derived child indices are hardened
      */
-    public BIP39KeyProducer(String mnemonic, String passphrase, String bip44BasePath, Instant creationTime, boolean hardened) {
+    public BIP39KeyProducer(
+            String mnemonic, String passphrase, String bip44BasePath, Instant creationTime, boolean hardened) {
         DeterministicSeed seed = DeterministicSeed.ofMnemonic(mnemonic, passphrase, creationTime);
         this.keyChain = DeterministicKeyChain.builder().seed(seed).build();
         this.basePath = HDPath.parsePath(bip44BasePath); // e.g., "M/44H/0H/0H/0"
         this.hardened = hardened;
     }
-    
+
     /**
      * Returns the next derived key along the BIP44 path.
      *
@@ -62,7 +62,7 @@ public class BIP39KeyProducer extends java.util.Random {
         List<ChildNumber> path = append(basePath, new ChildNumber(index, hardened));
         return keyChain.getKeyByPath(path, true);
     }
-    
+
     /**
      * Returns a new list with {@code child} appended to {@code base}.
      *

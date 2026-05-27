@@ -3,6 +3,16 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
+import static org.jocl.CL.clBuildProgram;
+import static org.jocl.CL.clCreateCommandQueueWithProperties;
+import static org.jocl.CL.clCreateContext;
+import static org.jocl.CL.clCreateKernel;
+import static org.jocl.CL.clCreateProgramWithSource;
+import static org.jocl.CL.clReleaseCommandQueue;
+import static org.jocl.CL.clReleaseContext;
+import static org.jocl.CL.clReleaseKernel;
+import static org.jocl.CL.clReleaseProgram;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.Resources;
 import java.io.IOException;
@@ -13,20 +23,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDeviceSelection;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatformSelector;
-import static org.jocl.CL.clBuildProgram;
-import static org.jocl.CL.clCreateCommandQueueWithProperties;
-import static org.jocl.CL.clCreateContext;
-import static org.jocl.CL.clCreateKernel;
-import static org.jocl.CL.clCreateProgramWithSource;
-import static org.jocl.CL.clReleaseCommandQueue;
-import static org.jocl.CL.clReleaseContext;
+import org.jocl.CL;
 import org.jocl.cl_command_queue;
 import org.jocl.cl_context;
 import org.jocl.cl_context_properties;
@@ -34,10 +37,6 @@ import org.jocl.cl_device_id;
 import org.jocl.cl_kernel;
 import org.jocl.cl_program;
 import org.jocl.cl_queue_properties;
-import org.jocl.CL;
-import static org.jocl.CL.clReleaseKernel;
-import static org.jocl.CL.clReleaseProgram;
-
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +65,7 @@ public class OpenCLContext implements ReleaseCLObject {
         String[] openClPrograms = resourceNamesContentWithReplacements.toArray(new String[0]);
         return openClPrograms;
     }
-    
+
     private List<String> getResourceNames() {
         List<String> resourceNames = new ArrayList<>();
         resourceNames.add("inc_defines.h");
@@ -86,10 +85,10 @@ public class OpenCLContext implements ReleaseCLObject {
         resourceNames.add("inc_ecc_secp256k1custom.cl");
         return resourceNames;
     }
-    
-    private final static String KERNEL_NAME = "generateKeysKernel_grid";
-    private final static boolean EXCEPTIONS_ENABLED = true;
-    
+
+    private static final String KERNEL_NAME = "generateKeysKernel_grid";
+    private static final boolean EXCEPTIONS_ENABLED = true;
+
     private final CProducerOpenCL producerOpenCL;
     private final BitHelper bitHelper;
 
@@ -100,9 +99,9 @@ public class OpenCLContext implements ReleaseCLObject {
     private @Nullable cl_kernel kernel;
     private @Nullable OpenClTask openClTask;
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
-    
+
     private boolean closed = false;
-    
+
     /**
      * Creates a new context using the default logger.
      *
@@ -119,7 +118,7 @@ public class OpenCLContext implements ReleaseCLObject {
         this.bitHelper = bitHelper;
         this.logger = logger;
     }
-    
+
     /**
      * Initialises the OpenCL context, command queue, program and kernel.
      *
@@ -136,36 +135,32 @@ public class OpenCLContext implements ReleaseCLObject {
 
         OpenCLPlatformSelector platformSelector = new OpenCLPlatformSelector();
         OpenCLDeviceSelection selection = platformSelector.select(
-            platforms,
-            producerOpenCL.platformIndex,
-            producerOpenCL.deviceType,
-            producerOpenCL.deviceIndex
-        );
-        
+                platforms, producerOpenCL.platformIndex, producerOpenCL.deviceType, producerOpenCL.deviceIndex);
+
         device = selection.device();
         logger.info("Selected OpenCL device:\n{}", device.toStringPretty());
         cl_context_properties contextProperties = selection.contextProperties();
-        cl_device_id[] cl_device_ids = new cl_device_id[]{device.device()};
-        
+        cl_device_id[] cl_device_ids = new cl_device_id[] {device.device()};
+
         // Create a context for the selected device
         context = clCreateContext(contextProperties, 1, cl_device_ids, null, null, null);
-        
+
         // Create a command-queue for the selected device
         cl_queue_properties properties = new cl_queue_properties();
         commandQueue = clCreateCommandQueueWithProperties(context, device.device(), properties, null);
-        
+
         // #################### kernel specifix ####################
-        
+
         String[] openCLPrograms = getOpenCLPrograms();
         // Create the program from the source code
         program = clCreateProgramWithSource(context, openCLPrograms.length, openCLPrograms, null, null);
 
         // Build the program
         clBuildProgram(program, 0, null, null, null, null);
-        
+
         // Create the kernel
         kernel = clCreateKernel(program, KERNEL_NAME, null);
-        
+
         openClTask = new OpenClTask(context, producerOpenCL, bitHelper, byteBufferUtility);
     }
 
@@ -173,7 +168,7 @@ public class OpenCLContext implements ReleaseCLObject {
     OpenClTask getOpenClTask() {
         return openClTask;
     }
-    
+
     @Override
     public boolean isClosed() {
         return closed;
@@ -220,7 +215,8 @@ public class OpenCLContext implements ReleaseCLObject {
         localOpenClTask.setSrcPrivateKeyChunk(privateKeyBase);
         ByteBuffer dstByteBuffer = localOpenClTask.executeKernel(localKernel, localCommandQueue);
 
-        OpenCLGridResult openCLGridResult = new OpenCLGridResult(privateKeyBase, producerOpenCL.getOverallWorkSize(bitHelper), dstByteBuffer);
+        OpenCLGridResult openCLGridResult =
+                new OpenCLGridResult(privateKeyBase, producerOpenCL.getOverallWorkSize(bitHelper), dstByteBuffer);
         return openCLGridResult;
     }
 
@@ -233,5 +229,4 @@ public class OpenCLContext implements ReleaseCLObject {
         }
         return contents;
     }
-
 }

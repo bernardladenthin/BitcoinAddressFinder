@@ -15,8 +15,7 @@ import org.slf4j.LoggerFactory;
 public class FileHelper {
 
     /** Creates a new {@link FileHelper}. */
-    public FileHelper() {
-    }
+    public FileHelper() {}
 
     private final Logger logger = LoggerFactory.getLogger(FileHelper.class);
 

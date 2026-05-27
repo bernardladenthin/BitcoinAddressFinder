@@ -58,7 +58,8 @@ public interface Persistence extends AutoCloseable {
      * @param shouldRun               cancellation flag checked between rows
      * @throws IOException if writing fails
      */
-    void writeAllAmountsToAddressFile(File file, CAddressFileOutputFormat addressFileOutputFormat, AtomicBoolean shouldRun) throws IOException;
+    void writeAllAmountsToAddressFile(
+            File file, CAddressFileOutputFormat addressFileOutputFormat, AtomicBoolean shouldRun) throws IOException;
 
     /**
      * Adds or subtracts an amount from the value stored for {@code hash160}.

@@ -9,8 +9,7 @@ package net.ladenthin.bitcoinaddressfinder;
 public class ByteConversion {
 
     /** Creates a new {@link ByteConversion}. */
-    public ByteConversion() {
-    }
+    public ByteConversion() {}
 
     /**
      * Converts mebibytes to bytes.
@@ -29,6 +28,6 @@ public class ByteConversion {
      * @return amount in MiB ({@code bytes / 1024 / 1024})
      */
     public double bytesToMib(long bytes) {
-        return (double)bytes / (double)(1_024L * 1_024L);
+        return (double) bytes / (double) (1_024L * 1_024L);
     }
 }

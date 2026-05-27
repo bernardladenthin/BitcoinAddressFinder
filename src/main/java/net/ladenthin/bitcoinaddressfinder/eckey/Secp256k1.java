@@ -23,11 +23,10 @@ import java.security.spec.EllipticCurve;
 public class Secp256k1 {
 
     /** Creates a new {@link Secp256k1}. */
-    public Secp256k1() {
-    }
+    public Secp256k1() {}
 
-    final static BigInteger FieldP_2 = BigInteger.valueOf(2); // constant for scalar operations
-    final static BigInteger FieldP_3 = BigInteger.valueOf(3); // constant for scalar operations
+    static final BigInteger FieldP_2 = BigInteger.valueOf(2); // constant for scalar operations
+    static final BigInteger FieldP_3 = BigInteger.valueOf(3); // constant for scalar operations
 
     /**
      * Encodes a byte array as an uppercase hex string.
@@ -53,8 +52,7 @@ public class Secp256k1 {
         int len = s.length();
         byte[] data = new byte[len / 2];
         for (int i = 0; i < len; i += 2) {
-            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
-                    + Character.digit(s.charAt(i + 1), 16));
+            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i + 1), 16));
         }
         return data;
     }
@@ -69,8 +67,11 @@ public class Secp256k1 {
         BigInteger slope = (R.getAffineX().pow(2)).multiply(FieldP_3);
         slope = slope.add(a);
         slope = slope.multiply((R.getAffineY().multiply(FieldP_2)).modInverse(p));
-        final BigInteger Xout = slope.pow(2).subtract(R.getAffineX().multiply(FieldP_2)).mod(p);
-        final BigInteger Yout = (R.getAffineY().negate()).add(slope.multiply(R.getAffineX().subtract(Xout))).mod(p);
+        final BigInteger Xout =
+                slope.pow(2).subtract(R.getAffineX().multiply(FieldP_2)).mod(p);
+        final BigInteger Yout = (R.getAffineY().negate())
+                .add(slope.multiply(R.getAffineX().subtract(Xout)))
+                .mod(p);
         return new ECPoint(Xout, Yout);
     }
 
@@ -88,8 +89,10 @@ public class Secp256k1 {
         final BigInteger sY = g.getAffineY();
         final BigInteger rX = r.getAffineX();
         final BigInteger rY = r.getAffineY();
-        final BigInteger slope = (rY.subtract(sY)).multiply(rX.subtract(gX).modInverse(p)).mod(p);
-        final BigInteger Xout = (slope.modPow(FieldP_2, p).subtract(rX)).subtract(gX).mod(p);
+        final BigInteger slope =
+                (rY.subtract(sY)).multiply(rX.subtract(gX).modInverse(p)).mod(p);
+        final BigInteger Xout =
+                (slope.modPow(FieldP_2, p).subtract(rX)).subtract(gX).mod(p);
         BigInteger Yout = sY.negate().mod(p);
         Yout = Yout.add(slope.multiply(gX.subtract(Xout))).mod(p);
         return new ECPoint(Xout, Yout);
@@ -115,7 +118,8 @@ public class Secp256k1 {
         // value only valid for curve secp256k1, code taken from https://www.secg.org/sec2-v2.pdf,
         // see "Finally the order n of G and the cofactor are: n = "FF.."
         BigInteger SECP256K1_Q = params.getOrder();
-        //BigInteger SECP256K1_Q = new BigInteger("00FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",16);
+        // BigInteger SECP256K1_Q = new
+        // BigInteger("00FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",16);
         BigInteger k = kin.mod(SECP256K1_Q); // uses this !
         // BigInteger k = kin.mod(p); // do not use this ! wrong as per comment from President James Moveon Polk
         final int length = k.bitLength();
@@ -151,7 +155,8 @@ public class Secp256k1 {
         ECPoint R = ECPoint.POINT_INFINITY;
         // value only valid for curve secp256k1, code taken from https://www.secg.org/sec2-v2.pdf,
         // see "Finally the order n of G and the cofactor are: n = "FF.."
-        BigInteger SECP256K1_Q = new BigInteger("00FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16);
+        BigInteger SECP256K1_Q =
+                new BigInteger("00FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16);
         BigInteger k = kin.mod(SECP256K1_Q); // uses this !
         // wrong as per comment from President James Moveon Polk
         // BigInteger k = kin.mod(p); // do not use this !
@@ -183,7 +188,7 @@ public class Secp256k1 {
     public static ECPublicKey getPublicKey(final ECPrivateKey pk) throws GeneralSecurityException {
         final ECParameterSpec params = pk.getParams();
         final ECPoint w = scalmultNew(params, pk.getParams().getGenerator(), pk.getS());
-        //final ECPoint w = scalmult(params.getCurve(), pk.getParams().getGenerator(), pk.getS());
+        // final ECPoint w = scalmult(params.getCurve(), pk.getParams().getGenerator(), pk.getS());
         final KeyFactory kg = KeyFactory.getInstance("EC");
         return (ECPublicKey) kg.generatePublic(new ECPublicKeySpec(w, params));
     }

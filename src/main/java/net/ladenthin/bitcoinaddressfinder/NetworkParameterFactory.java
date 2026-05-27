@@ -13,8 +13,7 @@ import org.bitcoinj.params.MainNetParams;
 public class NetworkParameterFactory {
 
     /** Creates a new {@link NetworkParameterFactory}. */
-    public NetworkParameterFactory() {
-    }
+    public NetworkParameterFactory() {}
 
     /**
      * Returns the configured {@link Network}.
@@ -24,7 +23,7 @@ public class NetworkParameterFactory {
     public Network getNetwork() {
         return getNetworkParameters().network();
     }
-    
+
     private NetworkParameters getNetworkParameters() {
         NetworkParameters networkParameters = MainNetParams.get();
         return networkParameters;

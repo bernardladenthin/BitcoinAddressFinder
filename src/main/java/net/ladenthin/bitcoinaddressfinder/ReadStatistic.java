@@ -14,8 +14,7 @@ import java.util.Map;
 public class ReadStatistic {
 
     /** Creates a new {@link ReadStatistic}. */
-    public ReadStatistic() {
-    }
+    public ReadStatistic() {}
 
     /** Number of successfully parsed entries. */
     public long successful = 0;
@@ -50,6 +49,8 @@ public class ReadStatistic {
 
     @Override
     public String toString() {
-        return "ReadStatistic{" + "successful=" + successful + ", unsupportedTotal=" + getUnsupportedTotal() + ", unsupportedReasons=" + unsupportedReasons + ", currentFileProgress=" + currentFileProgress + ", errors=" + errors + '}';
+        return "ReadStatistic{" + "successful=" + successful + ", unsupportedTotal=" + getUnsupportedTotal()
+                + ", unsupportedReasons=" + unsupportedReasons + ", currentFileProgress=" + currentFileProgress
+                + ", errors=" + errors + '}';
     }
 }

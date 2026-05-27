@@ -3,28 +3,27 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.io.IOException;
-import java.nio.ByteOrder;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.emptyOrNullString;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
+import java.nio.ByteOrder;
+import java.util.Collections;
+import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import org.apache.maven.artifact.versioning.ComparableVersion;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.emptyOrNullString;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.not;
-import org.junit.jupiter.api.Test;
 import org.jocl.CL;
 import org.jocl.cl_device_id;
+import org.junit.jupiter.api.Test;
 
 public class OpenCLDeviceTest {
-    
+
     // <editor-fold defaultstate="collapsed" desc="getByteOrder">
     @Test
     public void getByteOrder_endianLittleTrue_returnsLittleEndian() {
@@ -58,19 +57,20 @@ public class OpenCLDeviceTest {
     public void toStringPretty_openCLDeviceExisting_stringCreated() throws IOException {
         // arrange
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
-        
+
         OpenCLBuilder openCLBuilder = new OpenCLBuilder();
         List<OpenCLPlatform> openCLPlatforms = openCLBuilder.build();
-        final OpenCLDevice openCLDevice = openCLPlatforms.getFirst().openCLDevices().getFirst();
-        
+        final OpenCLDevice openCLDevice =
+                openCLPlatforms.getFirst().openCLDevices().getFirst();
+
         // act
         final String toStringPretty = openCLDevice.toStringPretty();
-        
+
         // assert
         assertThat(toStringPretty, not(emptyOrNullString()));
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="toStringPretty (static sample)">
     @Test
     @OpenCLTest
@@ -79,51 +79,56 @@ public class OpenCLDeviceTest {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadable();
         // arrange
         OpenCLDevice device = new OpenCLDevice(
-            new cl_device_id(),
-            "NVIDIA GeForce RTX 3070 Laptop GPU",
-            "NVIDIA Corporation",
-            "561.19",
-            "FULL_PROFILE",
-            "OpenCL 3.0 CUDA",
-            "cl_khr_global_int32_base_atomics cl_khr_global_int32_extended_atomics cl_khr_local_int32_base_atomics cl_khr_local_int32_extended_atomics cl_khr_fp64 cl_khr_3d_image_writes cl_khr_byte_addressable_store cl_khr_icd cl_khr_gl_sharing cl_nv_compiler_options cl_nv_device_attribute_query cl_nv_pragma_unroll cl_nv_d3d10_sharing cl_khr_d3d10_sharing cl_nv_d3d11_sharing cl_nv_copy_opts cl_nv_create_buffer cl_khr_int64_base_atomics cl_khr_int64_extended_atomics cl_khr_device_uuid cl_khr_pci_bus_info cl_khr_external_semaphore cl_khr_external_memory cl_khr_external_semaphore_win32 cl_khr_external_memory_win32",
-            CL.CL_DEVICE_TYPE_GPU,
-            true,
-            40,
-            3,
-            ImmutableList.copyOf(List.of(1024L, 1024L, 64L)),
-            1024,
-            1290,
-            64,
-            2047L * 1024 * 1024,
-            8191L * 1024 * 1024,
-            0,
-            CL.CL_LOCAL,
-            48L * 1024,
-            64L * 1024,
-            CL.CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE | CL.CL_QUEUE_PROFILING_ENABLE,
-            1,
-            256,
-            32,
-            CL.CL_FP_DENORM | CL.CL_FP_INF_NAN | CL.CL_FP_ROUND_TO_NEAREST | CL.CL_FP_ROUND_TO_ZERO | CL.CL_FP_ROUND_TO_INF | CL.CL_FP_FMA | CL.CL_FP_CORRECTLY_ROUNDED_DIVIDE_SQRT,
-            32768,
-            32768,
-            16384,
-            16384,
-            16384,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1
-        );
+                new cl_device_id(),
+                "NVIDIA GeForce RTX 3070 Laptop GPU",
+                "NVIDIA Corporation",
+                "561.19",
+                "FULL_PROFILE",
+                "OpenCL 3.0 CUDA",
+                "cl_khr_global_int32_base_atomics cl_khr_global_int32_extended_atomics cl_khr_local_int32_base_atomics cl_khr_local_int32_extended_atomics cl_khr_fp64 cl_khr_3d_image_writes cl_khr_byte_addressable_store cl_khr_icd cl_khr_gl_sharing cl_nv_compiler_options cl_nv_device_attribute_query cl_nv_pragma_unroll cl_nv_d3d10_sharing cl_khr_d3d10_sharing cl_nv_d3d11_sharing cl_nv_copy_opts cl_nv_create_buffer cl_khr_int64_base_atomics cl_khr_int64_extended_atomics cl_khr_device_uuid cl_khr_pci_bus_info cl_khr_external_semaphore cl_khr_external_memory cl_khr_external_semaphore_win32 cl_khr_external_memory_win32",
+                CL.CL_DEVICE_TYPE_GPU,
+                true,
+                40,
+                3,
+                ImmutableList.copyOf(List.of(1024L, 1024L, 64L)),
+                1024,
+                1290,
+                64,
+                2047L * 1024 * 1024,
+                8191L * 1024 * 1024,
+                0,
+                CL.CL_LOCAL,
+                48L * 1024,
+                64L * 1024,
+                CL.CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE | CL.CL_QUEUE_PROFILING_ENABLE,
+                1,
+                256,
+                32,
+                CL.CL_FP_DENORM
+                        | CL.CL_FP_INF_NAN
+                        | CL.CL_FP_ROUND_TO_NEAREST
+                        | CL.CL_FP_ROUND_TO_ZERO
+                        | CL.CL_FP_ROUND_TO_INF
+                        | CL.CL_FP_FMA
+                        | CL.CL_FP_CORRECTLY_ROUNDED_DIVIDE_SQRT,
+                32768,
+                32768,
+                16384,
+                16384,
+                16384,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1);
 
         // act
         String output = device.toStringPretty();
 
         // assert
         final String expectedString =
-            """
+                """
             --- Info for OpenCL device: NVIDIA GeForce RTX 3070 Laptop GPU ---
             cl_device_id:                          cl_device_id[0x0]
             CL_DEVICE_NAME:                        NVIDIA GeForce RTX 3070 Laptop GPU
@@ -132,7 +137,7 @@ public class OpenCLDeviceTest {
             CL_DEVICE_PROFILE:                     FULL_PROFILE
             CL_DEVICE_VERSION:                     OpenCL 3.0 CUDA
             CL_DEVICE_EXTENSIONS:                  cl_khr_global_int32_base_atomics cl_khr_global_int32_extended_atomics cl_khr_local_int32_base_atomics cl_khr_local_int32_extended_atomics cl_khr_fp64 cl_khr_3d_image_writes cl_khr_byte_addressable_store cl_khr_icd cl_khr_gl_sharing cl_nv_compiler_options cl_nv_device_attribute_query cl_nv_pragma_unroll cl_nv_d3d10_sharing cl_khr_d3d10_sharing cl_nv_d3d11_sharing cl_nv_copy_opts cl_nv_create_buffer cl_khr_int64_base_atomics cl_khr_int64_extended_atomics cl_khr_device_uuid cl_khr_pci_bus_info cl_khr_external_semaphore cl_khr_external_memory cl_khr_external_semaphore_win32 cl_khr_external_memory_win32
-            CL_DEVICE_TYPE:                        CL_DEVICE_TYPE_GPU 
+            CL_DEVICE_TYPE:                        CL_DEVICE_TYPE_GPU
             CL_DEVICE_ENDIAN_LITTLE:               true
             CL_DEVICE_MAX_COMPUTE_UNITS:           40
             CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS:    3
@@ -146,11 +151,11 @@ public class OpenCLDeviceTest {
             CL_DEVICE_LOCAL_MEM_TYPE:              CL_LOCAL
             CL_DEVICE_LOCAL_MEM_SIZE:              48 KByte
             CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE:    64 KByte
-            CL_DEVICE_QUEUE_PROPERTIES:            CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE CL_QUEUE_PROFILING_ENABLE 
+            CL_DEVICE_QUEUE_PROPERTIES:            CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE CL_QUEUE_PROFILING_ENABLE
             CL_DEVICE_IMAGE_SUPPORT:               1
             CL_DEVICE_MAX_READ_IMAGE_ARGS:         256
             CL_DEVICE_MAX_WRITE_IMAGE_ARGS:        32
-            CL_DEVICE_SINGLE_FP_CONFIG:            CL_FP_DENORM CL_FP_INF_NAN CL_FP_ROUND_TO_NEAREST CL_FP_ROUND_TO_ZERO CL_FP_ROUND_TO_INF CL_FP_FMA CL_FP_CORRECTLY_ROUNDED_DIVIDE_SQRT 
+            CL_DEVICE_SINGLE_FP_CONFIG:            CL_FP_DENORM CL_FP_INF_NAN CL_FP_ROUND_TO_NEAREST CL_FP_ROUND_TO_ZERO CL_FP_ROUND_TO_INF CL_FP_FMA CL_FP_CORRECTLY_ROUNDED_DIVIDE_SQRT
             CL_DEVICE_IMAGE2D_MAX_WIDTH:           32768
             CL_DEVICE_IMAGE2D_MAX_HEIGHT:          32768
             CL_DEVICE_IMAGE3D_MAX_WIDTH:           16384
@@ -158,16 +163,17 @@ public class OpenCLDeviceTest {
             CL_DEVICE_IMAGE3D_MAX_DEPTH:           16384
             CL_DEVICE_PREFERRED_VECTOR_WIDTHS:     CHAR 1, SHORT 1, INT 1, LONG 1, FLOAT 1, DOUBLE 1
             """;
-    
+
         assertThat(output, not(emptyOrNullString()));
-        
+
         List<String> outputLines = output.lines().map(String::stripTrailing).toList();
-        List<String> expectedLines = expectedString.lines().map(String::stripTrailing).toList();
-        
+        List<String> expectedLines =
+                expectedString.lines().map(String::stripTrailing).toList();
+
         assertThat(outputLines, is(equalTo(expectedLines)));
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="formatWorkItemSizes">
     @Test
     public void formatWorkItemSizes_emptyInput_returnsNone() {
@@ -217,17 +223,17 @@ public class OpenCLDeviceTest {
         assertThat(result, is("1 / 2 / 3 / 4 / 5"));
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="getComparableVersionFromDeviceVersion">
 
     @Test
     public void getComparableVersionFromDeviceVersion_openCLPrefix_removedCorrectly() {
         // arrange
         String input = "OpenCL 3.0 CUDA";
-        
+
         // act
         ComparableVersion version = OpenCLDevice.getComparableVersionFromDeviceVersion(input);
-        
+
         // assert
         assertThat(version.toString(), equalTo("3.0"));
     }
@@ -236,10 +242,10 @@ public class OpenCLDeviceTest {
     public void getComparableVersionFromDeviceVersion_cudaSuffix_removedCorrectly() {
         // arrange
         String input = "3.0 CUDA";
-        
+
         // act
         ComparableVersion version = OpenCLDevice.getComparableVersionFromDeviceVersion(input);
-        
+
         // assert
         assertThat(version.toString(), equalTo("3.0"));
     }
@@ -248,10 +254,10 @@ public class OpenCLDeviceTest {
     public void getComparableVersionFromDeviceVersion_noPrefixOrSuffix_versionUnchanged() {
         // arrange
         String input = "2.1";
-        
+
         // act
         ComparableVersion version = OpenCLDevice.getComparableVersionFromDeviceVersion(input);
-        
+
         // assert
         assertThat(version.toString(), equalTo("2.1"));
     }
@@ -260,14 +266,14 @@ public class OpenCLDeviceTest {
     public void getComparableVersionFromDeviceVersion_emptyString_returnsEmptyVersion() {
         // arrange
         String input = "";
-        
+
         // act
         ComparableVersion version = OpenCLDevice.getComparableVersionFromDeviceVersion(input);
-        
+
         // assert
         assertThat(version.toString(), equalTo(""));
     }
-    
+
     @Test
     public void getComparableVersionFromDeviceVersion_trailingWhitespace_trimmedCorrectly() {
         // arrange
@@ -288,15 +294,43 @@ public class OpenCLDeviceTest {
 
     private static OpenCLDevice createTestDeviceWithEndianness(boolean endianLittle) {
         return new OpenCLDevice(
-            new cl_device_id(), "TestDevice", "TestVendor", "1.0",
-            "FULL_PROFILE", "OpenCL 2.0", "", DEVICE_TYPE_GPU,
-            endianLittle, 1, 1L, ImmutableList.of(64L), 64L, 1000L, 32,
-            1024L * 1024L, 1024L * 1024L * 1024L, 0L, 1,
-            32L * 1024L, 64L * 1024L, 0L,
-            1, 128, 8, 0L,
-            4096L, 4096L, 2048L, 2048L, 2048L,
-            1, 1, 1, 1, 1, 1
-        );
+                new cl_device_id(),
+                "TestDevice",
+                "TestVendor",
+                "1.0",
+                "FULL_PROFILE",
+                "OpenCL 2.0",
+                "",
+                DEVICE_TYPE_GPU,
+                endianLittle,
+                1,
+                1L,
+                ImmutableList.of(64L),
+                64L,
+                1000L,
+                32,
+                1024L * 1024L,
+                1024L * 1024L * 1024L,
+                0L,
+                1,
+                32L * 1024L,
+                64L * 1024L,
+                0L,
+                1,
+                128,
+                8,
+                0L,
+                4096L,
+                4096L,
+                2048L,
+                2048L,
+                2048L,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1);
     }
     // </editor-fold>
 }

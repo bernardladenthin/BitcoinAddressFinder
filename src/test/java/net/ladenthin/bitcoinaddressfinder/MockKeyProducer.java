@@ -3,11 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
+import static org.mockito.Mockito.mock;
+
 import java.math.BigInteger;
 import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
-import static org.mockito.Mockito.mock;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import org.slf4j.Logger;
 
 public class MockKeyProducer implements KeyProducer {
@@ -16,20 +17,21 @@ public class MockKeyProducer implements KeyProducer {
     private final Random random;
     private final int maximumBitLength;
     private final Logger mockLogger;
-    
+
     MockKeyProducer(KeyUtility keyUtility, Random random, int maximumBitLength) {
         this.keyUtility = keyUtility;
         this.random = random;
         this.maximumBitLength = maximumBitLength;
         mockLogger = mock(Logger.class);
     }
-    
+
     MockKeyProducer(KeyUtility keyUtility, Random random) {
         this(keyUtility, random, PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS);
     }
 
     @Override
-    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
+    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly)
+            throws NoMoreSecretsAvailableException {
         int length = returnStartSecretOnly ? 1 : overallWorkSize;
         BigInteger[] secrets = new BigInteger[length];
         for (int i = 0; i < secrets.length; i++) {
@@ -39,12 +41,10 @@ public class MockKeyProducer implements KeyProducer {
     }
 
     @Override
-    public void interrupt() {
-    }
+    public void interrupt() {}
 
     @Override
     public Logger getLogger() {
         return mockLogger;
     }
-    
 }

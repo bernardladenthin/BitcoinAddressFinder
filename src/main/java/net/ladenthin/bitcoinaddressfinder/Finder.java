@@ -11,16 +11,10 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
+import java.util.function.*;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
-import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
-import org.bitcoinj.base.Network;
-import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import java.util.function.*;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdIsNotUniqueException;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdNullException;
@@ -31,6 +25,11 @@ import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaRandom;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocket;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaZmq;
+import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
+import org.bitcoinj.base.Network;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Orchestrator: wires up key producers, producers and the consumer based on the configuration and
@@ -43,29 +42,29 @@ public class Finder implements Interruptable {
      */
     @VisibleForTesting
     static Duration AWAIT_DURATION_TERMINATE = Duration.ofDays(365L * 1000L);
-    
+
     /** SLF4J logger for the {@link Finder}. */
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
-    
+
     private final CFinder finder;
-    
+
     private final Map<String, KeyProducer> keyProducers = new HashMap<>();
-    
+
     @Nullable
     private ConsumerJava consumerJava;
-    
+
     private final List<ProducerOpenCL> openCLProducers = new ArrayList<>();
     private final List<ProducerJava> javaProducers = new ArrayList<>();
     private final List<ProducerJavaSecretsFiles> javaProducersSecretsFiles = new ArrayList<>();
-    
+
     @VisibleForTesting
     final ExecutorService producerExecutorService = Executors.newCachedThreadPool();
-    
+
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final PersistenceUtils persistenceUtils = new PersistenceUtils(network);
     private final BitHelper bitHelper = new BitHelper();
-    
+
     /**
      * Creates a new finder.
      *
@@ -81,54 +80,65 @@ public class Finder implements Interruptable {
     public void startKeyProducer() {
         logger.info("startKeyProducer");
         processKeyProducers(
-            finder.keyProducerJavaRandom,
-            cKeyProducerJavaRandom -> new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility, bitHelper, LoggerFactory.getLogger(KeyProducerJavaRandom.class)),
-            cKeyProducerJavaRandom -> cKeyProducerJavaRandom.keyProducerId,
-            keyProducers
-        );
+                finder.keyProducerJavaRandom,
+                cKeyProducerJavaRandom -> new KeyProducerJavaRandom(
+                        cKeyProducerJavaRandom,
+                        keyUtility,
+                        bitHelper,
+                        LoggerFactory.getLogger(KeyProducerJavaRandom.class)),
+                cKeyProducerJavaRandom -> cKeyProducerJavaRandom.keyProducerId,
+                keyProducers);
 
         processKeyProducers(
-            finder.keyProducerJavaBip39,
-            cKeyProducerJavaBip39 -> new KeyProducerJavaBip39(cKeyProducerJavaBip39, keyUtility, bitHelper, LoggerFactory.getLogger(KeyProducerJavaBip39.class)),
-            cKeyProducerJavaBip39 -> cKeyProducerJavaBip39.keyProducerId,
-            keyProducers
-        );
+                finder.keyProducerJavaBip39,
+                cKeyProducerJavaBip39 -> new KeyProducerJavaBip39(
+                        cKeyProducerJavaBip39,
+                        keyUtility,
+                        bitHelper,
+                        LoggerFactory.getLogger(KeyProducerJavaBip39.class)),
+                cKeyProducerJavaBip39 -> cKeyProducerJavaBip39.keyProducerId,
+                keyProducers);
 
         processKeyProducers(
-            finder.keyProducerJavaIncremental,
-            cKeyProducerJavaIncremental -> new KeyProducerJavaIncremental(cKeyProducerJavaIncremental, keyUtility, bitHelper, LoggerFactory.getLogger(KeyProducerJavaIncremental.class)),
-            cKeyProducerJavaIncremental -> cKeyProducerJavaIncremental.keyProducerId,
-            keyProducers
-        );
+                finder.keyProducerJavaIncremental,
+                cKeyProducerJavaIncremental -> new KeyProducerJavaIncremental(
+                        cKeyProducerJavaIncremental,
+                        keyUtility,
+                        bitHelper,
+                        LoggerFactory.getLogger(KeyProducerJavaIncremental.class)),
+                cKeyProducerJavaIncremental -> cKeyProducerJavaIncremental.keyProducerId,
+                keyProducers);
 
         processKeyProducers(
-            finder.keyProducerJavaSocket,
-            cKeyProducerJavaSocket -> new KeyProducerJavaSocket(cKeyProducerJavaSocket, keyUtility, bitHelper, LoggerFactory.getLogger(KeyProducerJavaSocket.class)),
-            cKeyProducerJavaSocket -> cKeyProducerJavaSocket.keyProducerId,
-            keyProducers
-        );
+                finder.keyProducerJavaSocket,
+                cKeyProducerJavaSocket -> new KeyProducerJavaSocket(
+                        cKeyProducerJavaSocket,
+                        keyUtility,
+                        bitHelper,
+                        LoggerFactory.getLogger(KeyProducerJavaSocket.class)),
+                cKeyProducerJavaSocket -> cKeyProducerJavaSocket.keyProducerId,
+                keyProducers);
 
         processKeyProducers(
-            finder.keyProducerJavaWebSocket,
-            cKeyProducerJavaWebSocket -> new KeyProducerJavaWebSocket(cKeyProducerJavaWebSocket, keyUtility, bitHelper, LoggerFactory.getLogger(KeyProducerJavaWebSocket.class)),
-            cKeyProducerJavaWebSocket -> cKeyProducerJavaWebSocket.keyProducerId,
-            keyProducers
-        );
+                finder.keyProducerJavaWebSocket,
+                cKeyProducerJavaWebSocket -> new KeyProducerJavaWebSocket(
+                        cKeyProducerJavaWebSocket,
+                        keyUtility,
+                        bitHelper,
+                        LoggerFactory.getLogger(KeyProducerJavaWebSocket.class)),
+                cKeyProducerJavaWebSocket -> cKeyProducerJavaWebSocket.keyProducerId,
+                keyProducers);
 
         processKeyProducers(
-            finder.keyProducerJavaZmq,
-            cKeyProducerJavaZmq -> new KeyProducerJavaZmq(cKeyProducerJavaZmq, keyUtility, bitHelper, LoggerFactory.getLogger(KeyProducerJavaZmq.class)),
-            cKeyProducerJavaZmq -> cKeyProducerJavaZmq.keyProducerId,
-            keyProducers
-        );
+                finder.keyProducerJavaZmq,
+                cKeyProducerJavaZmq -> new KeyProducerJavaZmq(
+                        cKeyProducerJavaZmq, keyUtility, bitHelper, LoggerFactory.getLogger(KeyProducerJavaZmq.class)),
+                cKeyProducerJavaZmq -> cKeyProducerJavaZmq.keyProducerId,
+                keyProducers);
     }
-    
+
     private <T, K> void processKeyProducers(
-        List<T> configList,
-        Function<T, K> constructor,
-        Function<T, String> getId,
-        Map<String, K> keyProducers
-    ) {
+            List<T> configList, Function<T, K> constructor, Function<T, String> getId, Map<String, K> keyProducers) {
         if (configList != null) {
             for (T config : configList) {
                 String keyProducerId = getId.apply(config);
@@ -167,34 +177,33 @@ public class Finder implements Interruptable {
                 finder.producerJava,
                 bitHelper::assertBatchSizeInBitsIsInRange,
                 this::getKeyProducer,
-                (config, keyProducer) -> new ProducerJava(config, localConsumerJava, keyUtility, keyProducer, bitHelper),
-                javaProducers
-        );
+                (config, keyProducer) ->
+                        new ProducerJava(config, localConsumerJava, keyUtility, keyProducer, bitHelper),
+                javaProducers);
 
         processProducers(
                 finder.producerJavaSecretsFiles,
                 bitHelper::assertBatchSizeInBitsIsInRange,
                 this::getKeyProducer,
-                (config, keyProducer) -> new ProducerJavaSecretsFiles(config, localConsumerJava, keyUtility, keyProducer, bitHelper),
-                javaProducersSecretsFiles
-        );
+                (config, keyProducer) ->
+                        new ProducerJavaSecretsFiles(config, localConsumerJava, keyUtility, keyProducer, bitHelper),
+                javaProducersSecretsFiles);
 
         processProducers(
                 finder.producerOpenCL,
                 bitHelper::assertBatchSizeInBitsIsInRange,
                 this::getKeyProducer,
-                (config, keyProducer) -> new ProducerOpenCL(config, localConsumerJava, keyUtility, keyProducer, bitHelper),
-                openCLProducers
-        );
+                (config, keyProducer) ->
+                        new ProducerOpenCL(config, localConsumerJava, keyUtility, keyProducer, bitHelper),
+                openCLProducers);
     }
-    
+
     private <T extends CProducer, P> void processProducers(
-        List<T> configs,
-        java.util.function.Consumer<Integer> batchSizeAssert,
-        Function<T, KeyProducer> getKeyProducer,
-        BiFunction<T, KeyProducer, P> producerConstructor,
-        Collection<P> targetCollection
-    ) {
+            List<T> configs,
+            java.util.function.Consumer<Integer> batchSizeAssert,
+            Function<T, KeyProducer> getKeyProducer,
+            BiFunction<T, KeyProducer, P> producerConstructor,
+            Collection<P> targetCollection) {
         if (configs != null) {
             for (T config : configs) {
                 batchSizeAssert.accept(config.batchSizeInBits);
@@ -214,12 +223,12 @@ public class Finder implements Interruptable {
      */
     public KeyProducer getKeyProducer(CProducer cProducer) throws RuntimeException {
         KeyProducer keyProducer = keyProducers.get(cProducer.keyProducerId);
-        if(keyProducer == null) {
+        if (keyProducer == null) {
             throw new KeyProducerIdUnknownException(cProducer.keyProducerId);
         }
         return keyProducer;
     }
-    
+
     /**
      * Calls {@code initProducer()} on every configured producer.
      */
@@ -247,11 +256,12 @@ public class Finder implements Interruptable {
         logger.info("shutdownAndAwaitTermination");
         try {
             producerExecutorService.shutdown();
-            producerExecutorService.awaitTermination(AWAIT_DURATION_TERMINATE.get(ChronoUnit.SECONDS), TimeUnit.SECONDS);
+            producerExecutorService.awaitTermination(
+                    AWAIT_DURATION_TERMINATE.get(ChronoUnit.SECONDS), TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        
+
         // no producers are running anymore, the consumer can be interrupted
         if (consumerJava != null) {
             logger.info("Interrupt: " + consumerJava);
@@ -260,11 +270,11 @@ public class Finder implements Interruptable {
         }
         logger.info("consumerJava released.");
     }
-    
+
     @Override
     public void interrupt() {
         logger.info("interrupt called: delegate interrupt to all keyProducers and producers");
-        
+
         // Interrupt all Producers
         for (Producer producer : getAllProducers()) {
             logger.info("Interrupt Producer: " + producer.toString());
@@ -274,7 +284,7 @@ public class Finder implements Interruptable {
             producer.releaseProducer();
         }
         freeAllProducers();
-        
+
         // Interrupt all KeyProducers
         for (KeyProducer keyProducer : getKeyProducers().values()) {
             logger.info("Interrupt KeyProducer: " + keyProducer.toString());
@@ -284,7 +294,7 @@ public class Finder implements Interruptable {
 
         logger.info("All producers released and freed.");
     }
-    
+
     /**
      * Returns a snapshot of all configured key producers.
      *

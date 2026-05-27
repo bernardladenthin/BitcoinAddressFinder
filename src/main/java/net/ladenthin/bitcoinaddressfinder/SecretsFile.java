@@ -33,7 +33,12 @@ public class SecretsFile extends AbstractPlaintextFile {
      * @param readStatistic   statistic updated while reading
      * @param secretConsumer  consumer that receives the decoded secrets
      */
-    public SecretsFile(@NonNull Network network, @NonNull File file, @NonNull CSecretFormat secretFormat, @NonNull ReadStatistic readStatistic, @NonNull Consumer<BigInteger[]> secretConsumer) {
+    public SecretsFile(
+            @NonNull Network network,
+            @NonNull File file,
+            @NonNull CSecretFormat secretFormat,
+            @NonNull ReadStatistic readStatistic,
+            @NonNull Consumer<BigInteger[]> secretConsumer) {
         super(file, readStatistic);
         this.network = network;
         this.secretFormat = secretFormat;
@@ -45,8 +50,10 @@ public class SecretsFile extends AbstractPlaintextFile {
         final BigInteger secret;
         switch (secretFormat) {
             case STRING_DO_SHA256:
-                byte[] sha256 = Hashing.sha256().hashString(line, StandardCharsets.UTF_8).asBytes();
-                String hexOfHash = Hex.encodeHexString( sha256 );
+                byte[] sha256 = Hashing.sha256()
+                        .hashString(line, StandardCharsets.UTF_8)
+                        .asBytes();
+                String hexOfHash = Hex.encodeHexString(sha256);
                 secret = new BigInteger(hexOfHash, 16);
                 break;
             case BIG_INTEGER:

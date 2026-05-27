@@ -9,8 +9,7 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 public class CKeyProducerJavaWebSocket extends CKeyProducerJavaReceiver {
 
     /** Creates a new {@link CKeyProducerJavaWebSocket}. */
-    public CKeyProducerJavaWebSocket() {
-    }
+    public CKeyProducerJavaWebSocket() {}
 
     /**
      * Timeout for receiving secrets from the internal queue, in milliseconds.

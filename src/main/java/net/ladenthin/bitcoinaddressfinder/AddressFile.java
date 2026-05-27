@@ -15,10 +15,13 @@ public class AddressFile extends AbstractPlaintextFile {
 
     @NonNull
     private final Network network;
+
     @NonNull
     private final KeyUtility keyUtility;
+
     @NonNull
     private final Consumer<AddressToCoin> addressConsumer;
+
     @NonNull
     private final Consumer<String> unsupportedConsumer;
 
@@ -31,7 +34,12 @@ public class AddressFile extends AbstractPlaintextFile {
      * @param addressConsumer     receives parsed {@link AddressToCoin} entries
      * @param unsupportedConsumer receives lines that could not be parsed
      */
-    public AddressFile(@NonNull File file, ReadStatistic readStatistic, @NonNull Network network, @NonNull Consumer<AddressToCoin> addressConsumer, @NonNull Consumer<String> unsupportedConsumer) {
+    public AddressFile(
+            @NonNull File file,
+            ReadStatistic readStatistic,
+            @NonNull Network network,
+            @NonNull Consumer<AddressToCoin> addressConsumer,
+            @NonNull Consumer<String> unsupportedConsumer) {
         super(file, readStatistic);
         this.network = network;
         this.addressConsumer = addressConsumer;

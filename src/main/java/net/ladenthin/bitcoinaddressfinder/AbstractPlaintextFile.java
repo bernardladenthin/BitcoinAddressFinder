@@ -23,6 +23,7 @@ public abstract class AbstractPlaintextFile implements Interruptable {
     /** Statistic updated while the file is being processed. */
     @NonNull
     protected final ReadStatistic readStatistic;
+
     @NonNull
     private final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
@@ -45,7 +46,7 @@ public abstract class AbstractPlaintextFile implements Interruptable {
      * @throws IOException if the file pointer or length cannot be read
      */
     protected double calculateFileProgress(@NonNull RandomAccessFile raf) throws IOException {
-        return ((double)(Math.max(raf.getFilePointer(),1)) / (double)raf.length()) * 100.0d;
+        return ((double) (Math.max(raf.getFilePointer(), 1)) / (double) raf.length()) * 100.0d;
     }
 
     /**
@@ -62,7 +63,7 @@ public abstract class AbstractPlaintextFile implements Interruptable {
      */
     public void readFile() throws IOException {
         try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
-            while(shouldRun.get()) {
+            while (shouldRun.get()) {
                 String line = raf.readLine();
                 if (line == null) {
                     return;
@@ -71,7 +72,7 @@ public abstract class AbstractPlaintextFile implements Interruptable {
                 readStatistic.currentFileProgress = calculateFileProgress(raf);
                 try {
                     processLine(utf8);
-                } catch(LmdbException e) {
+                } catch (LmdbException e) {
                     // do not catch expections from LMDB (e. g. MapFullException).
                     throw e;
                 } catch (Exception e) {
@@ -87,5 +88,4 @@ public abstract class AbstractPlaintextFile implements Interruptable {
     public void interrupt() {
         shouldRun.set(false);
     }
-    
 }

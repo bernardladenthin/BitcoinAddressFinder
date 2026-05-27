@@ -9,51 +9,50 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 public class CLMDBConfigurationReadOnly {
 
     /** Creates a new {@link CLMDBConfigurationReadOnly}. */
-    public CLMDBConfigurationReadOnly() {
-    }
+    public CLMDBConfigurationReadOnly() {}
 
     /**
      * The directory of the LMDB database.
      */
     public String lmdbDirectory = "";
-    
+
     /**
-     * Whether to use the optimal LMDB proxy implementation 
+     * Whether to use the optimal LMDB proxy implementation
      * (see {@link org.lmdbjava.ByteBufferProxy#PROXY_OPTIMAL}).
      */
     public boolean useProxyOptimal = true;
-    
+
     /**
      * Whether to log detailed LMDB statistics when initializing the environment.
      * This causes a full iteration over the database, which can be expensive on large datasets,
      * but also results in the data being fully cached by the OS.
      */
     public boolean logStatsOnInit = false;
-    
+
     /**
      * Whether to log LMDB statistics when closing the environment.
      */
     public boolean logStatsOnClose = false;
-    
+
     /**
      * If set to true, the LMDB database will load a Bloom filter into memory on initialization.
      * This filter is used to perform fast probabilistic membership checks for hash160 addresses.
-     * 
+     *
      * The Bloom filter does not store the full set of addresses in memory, but instead uses a compact bit array
      * and multiple hash functions to determine whether an address might exist in the database.
-     * 
+     *
      * Advantages:
      *  - Extremely fast `containsAddress()` lookups (O(1))
      *  - Low memory consumption even for millions or billions of entries
-     * 
+     *
      * Tradeoff:
      *  - False positives are possible: an address might be reported as present, even if it is not.
      *    This may lead to unnecessary database lookups, but never to false negatives.
-     * 
+     *
      * If this is set to false, LMDB will perform direct queries for each address using transactions.
      */
     public boolean useBloomFilter = true;
-    
+
     /**
      * The expected false positive probability (FPP) for the Bloom filter.
      * <p>
@@ -69,7 +68,7 @@ public class CLMDBConfigurationReadOnly {
      * <p>
      * This value is only used if {@link #useBloomFilter} is <code>true</code>.
      */
-   public double bloomFilterFpp = 0.1;
+    public double bloomFilterFpp = 0.1;
 
     /**
      * If true, {@code containsAddress(...)} will always return {@code false}, skipping both LMDB and in-memory lookups.

@@ -3,25 +3,26 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.List;
-import org.jspecify.annotations.NonNull;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import java.nio.file.Path;
-import org.lmdbjava.LmdbException;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import org.jspecify.annotations.NonNull;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.lmdbjava.LmdbException;
 
 public class AbstractPlaintextFileTest {
 
@@ -215,7 +216,8 @@ public class AbstractPlaintextFileTest {
 
         private final RuntimeException exceptionToThrow;
 
-        ThrowingPlaintextFile(@NonNull File file, @NonNull ReadStatistic readStatistic, RuntimeException exceptionToThrow) {
+        ThrowingPlaintextFile(
+                @NonNull File file, @NonNull ReadStatistic readStatistic, RuntimeException exceptionToThrow) {
             super(file, readStatistic);
             this.exceptionToThrow = exceptionToThrow;
         }

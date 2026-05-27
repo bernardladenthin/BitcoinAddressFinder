@@ -3,6 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
+import static net.ladenthin.bitcoinaddressfinder.cli.Main.printAllStackTracesWithDelay;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import ch.qos.logback.classic.Level;
 import java.io.File;
 import java.io.IOException;
@@ -16,38 +27,28 @@ import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.cli.Main;
 import net.ladenthin.bitcoinaddressfinder.configuration.CCommand;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
-
-import static net.ladenthin.bitcoinaddressfinder.cli.Main.printAllStackTracesWithDelay;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import java.nio.file.Path;
 import org.mockito.ArgumentCaptor;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import org.slf4j.Logger;
 
 public class MainTest {
 
     @TempDir
     public Path folder;
-    
-    private final Path resourceDirectory = Path.of("src","test","resources");
+
+    private final Path resourceDirectory = Path.of("src", "test", "resources");
     private final Path testRoundtripDirectory = resourceDirectory.resolve("testRoundtrip");
     private final Path testOpenCLInfoDirectory = resourceDirectory.resolve("testOpenCLInfo");
-    
-    private final Path config_AddressFilesToLMDB_json = testRoundtripDirectory.resolve("config_AddressFilesToLMDB.json");
+
+    private final Path config_AddressFilesToLMDB_json =
+            testRoundtripDirectory.resolve("config_AddressFilesToLMDB.json");
     private final Path config_LMDBToAddressFile_json = testRoundtripDirectory.resolve("config_LMDBToAddressFile.json");
     private final Path config_Find_SecretsFile_json = testRoundtripDirectory.resolve("config_Find_SecretsFile.json");
-    
-    private final Path config_Find_1OpenCLDevice_json = testRoundtripDirectory.resolve("config_Find_1OpenCLDevice.json");
-    
+
+    private final Path config_Find_1OpenCLDevice_json =
+            testRoundtripDirectory.resolve("config_Find_1OpenCLDevice.json");
+
     private final Path config_OpenCLInfo_json = testOpenCLInfoDirectory.resolve("config_OpenCLInfo.json");
     private final Path config_OpenCLInfo_yaml = testOpenCLInfoDirectory.resolve("config_OpenCLInfo.yaml");
     private final Path config_OpenCLInfo_yml = testOpenCLInfoDirectory.resolve("config_OpenCLInfo.yml");
@@ -59,47 +60,52 @@ public class MainTest {
     private static final String OPEN_CL_INFO_YAML_STRING = "command: OpenCLInfo\n";
 
     private static final long DEFAULT_INTERRUPT_DELAY_SECONDS = 10;
-    
+
     private void interruptAfterDelay(Main main, long delaySeconds) {
         ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
-        executor.schedule(() -> {
-            main.interrupt();
-        }, delaySeconds, TimeUnit.SECONDS);
+        executor.schedule(
+                () -> {
+                    main.interrupt();
+                },
+                delaySeconds,
+                TimeUnit.SECONDS);
     }
 
     // <editor-fold defaultstate="collapsed" desc="testRoundtrip">
     @Test
-    public void testRoundtrip_configurationsGiven_lmdbCreatedExportedAndRunFindSecretsFile() throws IOException, InterruptedException {
+    public void testRoundtrip_configurationsGiven_lmdbCreatedExportedAndRunFindSecretsFile()
+            throws IOException, InterruptedException {
         // arrange, act, assert
-        Main.main(new String[]{config_AddressFilesToLMDB_json.toAbsolutePath().toString()});
-        Main.main(new String[]{config_LMDBToAddressFile_json.toAbsolutePath().toString()});
-        Main.main(new String[]{config_Find_SecretsFile_json.toAbsolutePath().toString()});
+        Main.main(new String[] {config_AddressFilesToLMDB_json.toAbsolutePath().toString()});
+        Main.main(new String[] {config_LMDBToAddressFile_json.toAbsolutePath().toString()});
+        Main.main(new String[] {config_Find_SecretsFile_json.toAbsolutePath().toString()});
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="testRoundtrip OpenCL producer">
     @Test
     @OpenCLTest
-    public void testRoundtripOpenCLProducer_configurationsGiven_lmdbCreatedAndRunFindOpenCLDevice() throws IOException, InterruptedException {
+    public void testRoundtripOpenCLProducer_configurationsGiven_lmdbCreatedAndRunFindOpenCLDevice()
+            throws IOException, InterruptedException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // arrange
         Main mainAddressFilesToLMDB = new Main(Main.fromJson(Main.readString(config_AddressFilesToLMDB_json)));
         mainAddressFilesToLMDB.logConfigurationTransformation();
         mainAddressFilesToLMDB.run();
-        
+
         new LogLevelChange().setLevel(Level.DEBUG);
-        
+
         Main mainFind_1OpenCLDevice = new Main(Main.fromJson(Main.readString(config_Find_1OpenCLDevice_json)));
-        
+
         // interrupt the act after 10 seconds
         interruptAfterDelay(mainFind_1OpenCLDevice, DEFAULT_INTERRUPT_DELAY_SECONDS);
-        
+
         // act
         mainFind_1OpenCLDevice.logConfigurationTransformation();
         mainFind_1OpenCLDevice.run();
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="testRoundtrip">
     @Test
     @OpenCLTest
@@ -111,7 +117,7 @@ public class MainTest {
         mainFind_SecretsFile.run();
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="invalidArgument">
     @Test
     public void main_noArgumentGiven_errorLogged() throws IOException, InterruptedException {
@@ -119,10 +125,10 @@ public class MainTest {
         Logger logger = mock(Logger.class);
         when(logger.isTraceEnabled()).thenReturn(true);
         Main.logger = logger;
-        
+
         // act
         Main.main(new String[0]);
-        
+
         // assert
         ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
         verify(logger, times(1)).error(logCaptor.capture());
@@ -179,7 +185,7 @@ public class MainTest {
     public void main_jsonExtensionPath_parsesAndRunsConfiguration() {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // act
-        Main.main(new String[]{config_OpenCLInfo_json.toAbsolutePath().toString()});
+        Main.main(new String[] {config_OpenCLInfo_json.toAbsolutePath().toString()});
     }
 
     @Test
@@ -187,7 +193,7 @@ public class MainTest {
     public void main_jsExtensionPath_parsesAndRunsConfiguration() {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // act
-        Main.main(new String[]{config_OpenCLInfo_js.toAbsolutePath().toString()});
+        Main.main(new String[] {config_OpenCLInfo_js.toAbsolutePath().toString()});
     }
 
     @Test
@@ -195,7 +201,7 @@ public class MainTest {
     public void main_yamlExtensionPath_parsesAndRunsConfiguration() {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // act
-        Main.main(new String[]{config_OpenCLInfo_yaml.toAbsolutePath().toString()});
+        Main.main(new String[] {config_OpenCLInfo_yaml.toAbsolutePath().toString()});
     }
 
     @Test
@@ -203,7 +209,7 @@ public class MainTest {
     public void main_ymlExtensionPath_parsesAndRunsConfiguration() {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // act
-        Main.main(new String[]{config_OpenCLInfo_yml.toAbsolutePath().toString()});
+        Main.main(new String[] {config_OpenCLInfo_yml.toAbsolutePath().toString()});
     }
 
     @Test
@@ -213,7 +219,7 @@ public class MainTest {
         Files.writeString(tempFile.toPath(), OPEN_CL_INFO_JSON_STRING, StandardCharsets.UTF_8);
 
         // act
-        assertThrows(IllegalArgumentException.class, () -> Main.main(new String[]{tempFile.getAbsolutePath()}));
+        assertThrows(IllegalArgumentException.class, () -> Main.main(new String[] {tempFile.getAbsolutePath()}));
     }
     // </editor-fold>
 }

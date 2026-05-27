@@ -3,15 +3,16 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-import java.io.DataInputStream;
-import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
-import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-import java.util.concurrent.TimeUnit;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.*;
 
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -19,33 +20,31 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.concurrent.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import org.bitcoinj.base.Network;
-
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.*;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.mockito.Mockito.*;
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 
 public class KeyProducerJavaSocketTest {
-    
+
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
 
     private ExecutorService executorService;
     private Logger mockLogger;
-    
+
     public static int findFreePort() {
         try (ServerSocket socket = new ServerSocket(0)) {
             return socket.getLocalPort();
@@ -79,7 +78,7 @@ public class KeyProducerJavaSocketTest {
         config.port = port;
         return config;
     }
-    
+
     @Test
     public void testServerReadsSecretWithoutReset() throws Exception {
         int port = findFreePort();
@@ -89,7 +88,7 @@ public class KeyProducerJavaSocketTest {
             try (ServerSocket serverSocket = new ServerSocket(port)) {
                 serverStarted.countDown(); // only now signal ready
                 try (Socket socket = serverSocket.accept();
-                     DataInputStream in = new DataInputStream(socket.getInputStream())) {
+                        DataInputStream in = new DataInputStream(socket.getInputStream())) {
 
                     byte[] buffer = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
                     in.readFully(buffer); // exactly 32 bytes
@@ -101,7 +100,7 @@ public class KeyProducerJavaSocketTest {
         serverStarted.await(); // wait for real readiness
 
         try (Socket clientSocket = new Socket("localhost", port);
-             DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream())) {
+                DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream())) {
 
             byte[] secret = new KeyProducerTestUtility().createZeroedSecret();
             out.write(secret);
@@ -123,7 +122,8 @@ public class KeyProducerJavaSocketTest {
         serverConfig.connectionRetryCount = TestTimeProvider.DEFAULT_CONNECTION_RETRY_COUNT;
         serverConfig.retryDelayMillisConnect = TestTimeProvider.SHORT_DELAY;
         serverConfig.retryDelayMillisRead = TestTimeProvider.SHORT_DELAY;
-        KeyProducerJavaSocket serverKeyProducer = new KeyProducerJavaSocket(serverConfig, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaSocket serverKeyProducer =
+                new KeyProducerJavaSocket(serverConfig, keyUtility, bitHelper, mockLogger);
 
         // Server thread: start createSecrets(1, true)
         Future<Void> serverFuture = executorService.submit(() -> {
@@ -142,7 +142,7 @@ public class KeyProducerJavaSocketTest {
 
         // Client: connect and send exactly 1 secret
         try (Socket clientSocket = new Socket(serverConfig.host, serverConfig.port);
-             DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream())) {
+                DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream())) {
             byte[] secret = new KeyProducerTestUtility().createZeroedSecret();
             out.write(secret);
             out.flush();
@@ -154,7 +154,7 @@ public class KeyProducerJavaSocketTest {
         serverFuture.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
         serverKeyProducer.interrupt();
     }
-    
+
     private void waitUntilPortOpen(int timeoutMillis) throws Exception {
         Thread.sleep(timeoutMillis);
     }
@@ -193,13 +193,13 @@ public class KeyProducerJavaSocketTest {
         int port = findFreePort();
 
         // The secret bytes to send (32 bytes = 256 bits)
-        byte[] secretBytes = new KeyProducerTestUtility().createFilledSecret((byte)0xCC);
+        byte[] secretBytes = new KeyProducerTestUtility().createFilledSecret((byte) 0xCC);
         BigInteger expected = new BigInteger(1, secretBytes);
 
         ServerSocket serverSocket = new ServerSocket(port);
         Future<Void> serverFuture = executorService.submit(() -> {
             try (Socket clientSocket = serverSocket.accept();
-                 DataOutputStream dos = new DataOutputStream(clientSocket.getOutputStream())) {
+                    DataOutputStream dos = new DataOutputStream(clientSocket.getOutputStream())) {
                 // Send exactly one private key (32 bytes)
                 dos.write(secretBytes);
                 dos.flush();
@@ -228,7 +228,7 @@ public class KeyProducerJavaSocketTest {
         ServerSocket serverSocket = new ServerSocket(port);
         Future<Void> serverFuture = executorService.submit(() -> {
             try (Socket clientSocket = serverSocket.accept();
-                 DataOutputStream dos = new DataOutputStream(clientSocket.getOutputStream())) {
+                    DataOutputStream dos = new DataOutputStream(clientSocket.getOutputStream())) {
                 dos.write(new byte[10]); // insufficient bytes
                 dos.flush();
                 // Close immediately
@@ -250,10 +250,12 @@ public class KeyProducerJavaSocketTest {
     public void interrupt_closesConnectionAndNoExceptionThrown() throws Exception {
         int port = findFreePort();
 
-        final int serverHoldTime = TestTimeProvider.DEFAULT_SOCKET_TIMEOUT;                  // ms - server keeps connection open without sending data
-        final int clientSocketTimeout = TestTimeProvider.LONG_SOCKET_TIMEOUT;                // ms - socket read timeout (should never be hit due to interrupt)
-        final int clientSettleTime = TestTimeProvider.DEFAULT_SETTLE_DELAY;                  // ms - allow client to enter blocking read
-        final int futureWaitTime = clientSocketTimeout;                                      // ms - how long we wait for the future to complete
+        final int serverHoldTime =
+                TestTimeProvider.DEFAULT_SOCKET_TIMEOUT; // ms - server keeps connection open without sending data
+        final int clientSocketTimeout =
+                TestTimeProvider.LONG_SOCKET_TIMEOUT; // ms - socket read timeout (should never be hit due to interrupt)
+        final int clientSettleTime = TestTimeProvider.DEFAULT_SETTLE_DELAY; // ms - allow client to enter blocking read
+        final int futureWaitTime = clientSocketTimeout; // ms - how long we wait for the future to complete
 
         ServerSocket serverSocket = new ServerSocket(port);
         Future<Void> serverFuture = executorService.submit(() -> {
@@ -272,14 +274,14 @@ public class KeyProducerJavaSocketTest {
         // Launch a thread that will block on reading secrets
         Future<BigInteger[]> future = executorService.submit(() -> {
             try {
-                return client.createSecrets(10, false);  // blocks until secret data or interruption
+                return client.createSecrets(10, false); // blocks until secret data or interruption
             } catch (NoMoreSecretsAvailableException e) {
                 return null;
             }
         });
 
         Thread.sleep(clientSettleTime); // Give time to enter read state
-        client.interrupt();             // Should trigger socket close and exit read
+        client.interrupt(); // Should trigger socket close and exit read
 
         // Wait for the client thread to exit cleanly
         BigInteger[] result = future.get(futureWaitTime, TimeUnit.MILLISECONDS);
@@ -358,7 +360,7 @@ public class KeyProducerJavaSocketTest {
 
         Future<Void> serverFuture = executorService.submit(() -> {
             try (Socket s = serverSocket.accept();
-                 DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
+                    DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
                 byte[] secretBytes = new KeyProducerTestUtility().createZeroedSecret();
                 dos.write(secretBytes);
                 dos.flush();
@@ -373,7 +375,7 @@ public class KeyProducerJavaSocketTest {
         // Successful read
         BigInteger[] secrets1 = client.createSecrets(1, true);
         assertThat(secrets1.length, is(1));
-        
+
         byte expectedByte1 = 1;
         for (byte b : secrets1[0].toByteArray()) {
             // Just check one byte, overall logic assumes full byte array match
@@ -401,7 +403,7 @@ public class KeyProducerJavaSocketTest {
         ServerSocket serverSocket = new ServerSocket(port);
         Future<Void> serverFuture = executorService.submit(() -> {
             try (Socket s = serverSocket.accept();
-                 DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
+                    DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
                 for (int i = 0; i < 3; i++) {
                     byte[] secretBytes = new KeyProducerTestUtility().createFilledSecret((byte) (i + 10));
                     dos.write(secretBytes);
@@ -428,15 +430,15 @@ public class KeyProducerJavaSocketTest {
     @Test
     public void createSecrets_connectionRetry_worksWhenServerStartsLate() throws Exception {
         int port = findFreePort();
-        
-        final byte fillByte = (byte)99;
+
+        final byte fillByte = (byte) 99;
 
         // Server that only starts after a delay (simulate late server start)
         Future<Void> serverFuture = executorService.submit(() -> {
             Thread.sleep(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT); // Delay start by 2 seconds
             try (ServerSocket serverSocket = new ServerSocket(port);
-                 Socket s = serverSocket.accept();
-                 DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
+                    Socket s = serverSocket.accept();
+                    DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
                 byte[] secretBytes = new KeyProducerTestUtility().createFilledSecret(fillByte);
                 dos.write(secretBytes);
                 dos.flush();
@@ -451,7 +453,7 @@ public class KeyProducerJavaSocketTest {
         KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
 
         // This will retry internally until server comes up
-        Thread.sleep(TestTimeProvider.DEFAULT_SETTLE_DELAY);  // allow background thread time to connect and read
+        Thread.sleep(TestTimeProvider.DEFAULT_SETTLE_DELAY); // allow background thread time to connect and read
         BigInteger[] secrets = client.createSecrets(1, true);
 
         assertThat(secrets.length, is(1));
@@ -467,7 +469,7 @@ public class KeyProducerJavaSocketTest {
         ServerSocket serverSocket = new ServerSocket(port);
         Future<Void> serverFuture = executorService.submit(() -> {
             try (Socket s = serverSocket.accept();
-                 DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
+                    DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
                 // Write partial bytes, then close abruptly
                 dos.write(new byte[10]); // Less than 32 bytes
                 dos.flush();
@@ -485,7 +487,7 @@ public class KeyProducerJavaSocketTest {
             cleanup(client, serverFuture, serverSocket);
         }
     }
-    
+
     @Test
     public void createSecrets_serverDisconnectsMidTransfer_throwsException() throws Exception {
         int port = findFreePort();
@@ -493,7 +495,7 @@ public class KeyProducerJavaSocketTest {
         ServerSocket serverSocket = new ServerSocket(port);
         Future<Void> serverFuture = executorService.submit(() -> {
             try (Socket s = serverSocket.accept();
-                 DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
+                    DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
                 dos.write(new byte[16]); // only half of a secret (32 bytes)
                 dos.flush();
                 s.close();
@@ -545,7 +547,7 @@ public class KeyProducerJavaSocketTest {
         ServerSocket serverSocket = new ServerSocket(port);
         Future<Void> serverFuture = executorService.submit(() -> {
             try (Socket s = serverSocket.accept();
-                 DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
+                    DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
                 // Send 40 bytes which cannot be split into two full 32-byte secrets
                 dos.write(new byte[40]);
                 dos.flush();
@@ -562,7 +564,7 @@ public class KeyProducerJavaSocketTest {
             cleanup(client, serverFuture, serverSocket);
         }
     }
-    
+
     @Test
     public void testReadRetriesAndCloseCalledOnceMaxReached() throws Exception {
         int port = findFreePort();
@@ -575,12 +577,12 @@ public class KeyProducerJavaSocketTest {
         Future<Void> serverFuture = executorService.submit(() -> {
             for (int i = 0; i < 3; i++) { // allow up to 3 connections
                 try (Socket s = serverSocket.accept();
-                     DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
+                        DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
                     connectionAttempts.incrementAndGet();
-                    dos.write(new byte[10]);  // too few bytes (less than 32)
+                    dos.write(new byte[10]); // too few bytes (less than 32)
                     dos.flush();
-                    Thread.sleep(50);  // simulate partial send delay
-                    s.close();  // force premature closure
+                    Thread.sleep(50); // simulate partial send delay
+                    s.close(); // force premature closure
                 } catch (SocketTimeoutException timeout) {
                     break; // no more clients, exit early
                 }
@@ -609,21 +611,23 @@ public class KeyProducerJavaSocketTest {
         // Wait longer in case of multiple connection retries / socket handshakes
         cleanup(client, serverFuture, serverSocket, 5, TimeUnit.SECONDS);
     }
-    
+
     private ServerSocket hangServer(int port) throws IOException {
         ServerSocket serverSocket = new ServerSocket(port);
         new Thread(() -> {
-            try {
-                Socket client = serverSocket.accept();
-                // Do nothing, just hang the connection
-                Thread.sleep(Long.MAX_VALUE);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            } catch (Exception ignored) {}
-        }).start();
+                    try {
+                        Socket client = serverSocket.accept();
+                        // Do nothing, just hang the connection
+                        Thread.sleep(Long.MAX_VALUE);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } catch (Exception ignored) {
+                    }
+                })
+                .start();
         return serverSocket;
     }
-    
+
     @Test
     @Timeout(value = 5000, unit = TimeUnit.MILLISECONDS)
     public void testInterruptCausesShutdownDuringConnectionAttemptOnly() throws Exception {
@@ -635,11 +639,12 @@ public class KeyProducerJavaSocketTest {
         final int STATE_NATURAL_EXIT = 4;
 
         int port = findFreePort();
-        ServerSocket dummyServer = hangServer(port);  // <-- make sure something accepts
+        ServerSocket dummyServer = hangServer(port); // <-- make sure something accepts
 
         CKeyProducerJavaSocket config = createClientConfig("localhost", port);
         config.connectionRetryCount = 3;
-        config.timeout = TestTimeProvider.DEFAULT_SOCKET_TIMEOUT; // make connection attempt long enough to interrupt mid-way
+        config.timeout =
+                TestTimeProvider.DEFAULT_SOCKET_TIMEOUT; // make connection attempt long enough to interrupt mid-way
         config.retryDelayMillisConnect = 0;
 
         KeyProducerJavaSocket client = new KeyProducerJavaSocket(config, keyUtility, bitHelper, mockLogger);
@@ -668,11 +673,11 @@ public class KeyProducerJavaSocketTest {
 
         future.get(3, TimeUnit.SECONDS);
         executor.shutdownNow();
-        
+
         assertNotEquals(STATE_UNEXPECTED_SUCCESS, state.get(), "Thread exited without triggering interrupt");
         assertEquals(STATE_INTERRUPTED_EXIT, state.get(), "Expected interrupt to cause shutdown");
     }
-    
+
     @Test
     @Timeout(value = 5000, unit = TimeUnit.MILLISECONDS)
     public void serverAcceptTimesOut_whenNoClientConnects() throws Exception {
@@ -693,18 +698,31 @@ public class KeyProducerJavaSocketTest {
         } catch (NoMoreSecretsAvailableException e) {
             long duration = System.currentTimeMillis() - start;
             // Timeout must be honored within reasonable margin (±200ms)
-            assertTrue(duration >= TestTimeProvider.SOCKET_ACCEPT_TIMEOUT && duration <= TestTimeProvider.SOCKET_ACCEPT_TIMEOUT + 200, "Timeout did not occur as expected");
+            assertTrue(
+                    duration >= TestTimeProvider.SOCKET_ACCEPT_TIMEOUT
+                            && duration <= TestTimeProvider.SOCKET_ACCEPT_TIMEOUT + 200,
+                    "Timeout did not occur as expected");
             assertThat(e.getMessage(), containsString("Timeout while waiting for secret"));
         } finally {
             server.interrupt();
         }
     }
-    
-    private void cleanup(@Nullable KeyProducerJavaSocket client, @Nullable Future<?> serverFuture, @Nullable ServerSocket serverSocket) throws Exception {
+
+    private void cleanup(
+            @Nullable KeyProducerJavaSocket client,
+            @Nullable Future<?> serverFuture,
+            @Nullable ServerSocket serverSocket)
+            throws Exception {
         cleanup(client, serverFuture, serverSocket, TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
     }
-    
-    private void cleanup(@Nullable KeyProducerJavaSocket client, @Nullable Future<?> serverFuture, @Nullable ServerSocket serverSocket, long timeout, TimeUnit unit) throws Exception {
+
+    private void cleanup(
+            @Nullable KeyProducerJavaSocket client,
+            @Nullable Future<?> serverFuture,
+            @Nullable ServerSocket serverSocket,
+            long timeout,
+            TimeUnit unit)
+            throws Exception {
         if (client != null) client.interrupt();
         if (serverFuture != null) serverFuture.get(timeout, unit);
         if (serverSocket != null && !serverSocket.isClosed()) serverSocket.close();

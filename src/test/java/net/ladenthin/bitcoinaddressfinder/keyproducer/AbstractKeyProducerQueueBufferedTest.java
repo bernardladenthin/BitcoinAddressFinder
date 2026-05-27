@@ -3,21 +3,18 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import java.math.BigInteger;
-import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
-import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
-import org.bitcoinj.base.Network;
-
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
+import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -25,19 +22,19 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import org.junit.jupiter.api.AfterEach;
-import org.slf4j.Logger;
+import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaReceiver;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.times;
-import static org.mockito.ArgumentMatchers.eq;
+import org.bitcoinj.base.Network;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
 
 public class AbstractKeyProducerQueueBufferedTest {
-    
+
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
@@ -54,14 +51,16 @@ public class AbstractKeyProducerQueueBufferedTest {
     public void tearDown() {
         executorService.shutdownNow();
     }
-    
+
     static class TestKeyProducer extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaReceiver> {
         private int readTimeoutMs = TestTimeProvider.DEFAULT_SOCKET_TIMEOUT;
 
         public TestKeyProducer(CKeyProducerJavaReceiver config, KeyUtility keyUtility, Logger logger) {
             super(config, keyUtility, logger);
         }
-        public TestKeyProducer(CKeyProducerJavaReceiver config, KeyUtility keyUtility, Logger logger, BlockingQueue<byte[]> queue) {
+
+        public TestKeyProducer(
+                CKeyProducerJavaReceiver config, KeyUtility keyUtility, Logger logger, BlockingQueue<byte[]> queue) {
             super(config, keyUtility, logger, queue);
         }
 
@@ -88,22 +87,22 @@ public class AbstractKeyProducerQueueBufferedTest {
     public void createSecrets_returnsSecret_whenAvailableInQueue() throws Exception {
         CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
         TestKeyProducer producer = createTestKeyProducer(config);
-        
+
         byte[] secret = new KeyProducerTestUtility().createFilledSecret((byte) 0xAB);
         BigInteger expectedSecret = new BigInteger(1, secret);
         producer.addSecret(secret);
-        
+
         BigInteger[] secrets = producer.createSecrets(1, true);
-        
+
         assertEquals(1, secrets.length);
         assertEquals(expectedSecret, secrets[0]);
     }
-    
+
     @Test
     public void createSecrets_readsMultipleSecrets() throws Exception {
         CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
         TestKeyProducer producer = createTestKeyProducer(config);
-        
+
         byte[] secret = new KeyProducerTestUtility().createFilledSecret((byte) 0xAB);
         BigInteger expectedSecret = new BigInteger(1, secret);
 
@@ -117,7 +116,7 @@ public class AbstractKeyProducerQueueBufferedTest {
             assertEquals(expectedSecret, bi);
         }
     }
-    
+
     @Test
     public void createSecrets_throwsException_onInvalidLength() throws Exception {
         CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
@@ -128,7 +127,7 @@ public class AbstractKeyProducerQueueBufferedTest {
 
         assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(1, true)); // should throw
     }
-    
+
     @Test
     public void createSecrets_throwsException_onTimeout() throws Exception {
         CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
@@ -137,16 +136,18 @@ public class AbstractKeyProducerQueueBufferedTest {
         // Do not add anything to queue
         assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(1, true)); // should timeout
     }
-    
+
     @Test
     public void createSecrets_throwsException_whenShouldStopSet() throws Exception {
         CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
         TestKeyProducer producer = createTestKeyProducer(config);
 
         producer.shouldStop = true;
-        assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(1, true)); // should throw immediately
+        assertThrows(
+                NoMoreSecretsAvailableException.class,
+                () -> producer.createSecrets(1, true)); // should throw immediately
     }
-    
+
     @Test
     public void createSecrets_logsSecret_whenEnabled() throws Exception {
         CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
@@ -156,7 +157,7 @@ public class AbstractKeyProducerQueueBufferedTest {
 
         byte[] secret = new KeyProducerTestUtility().createFilledSecret((byte) 0xAB);
         BigInteger expectedSecret = new BigInteger(1, secret);
-        
+
         String expectedHex = keyUtility.bigIntegerToFixedLengthHex(expectedSecret);
 
         producer.addSecret(secret);
@@ -178,10 +179,7 @@ public class AbstractKeyProducerQueueBufferedTest {
         producer.addSecret(secret); // fills queue
         producer.addSecret(secret); // must fail
 
-        verify(mockLogger).error(
-                eq("Secret queue is full, ignore secret: {}"),
-                eq(secret)
-        );
+        verify(mockLogger).error(eq("Secret queue is full, ignore secret: {}"), eq(secret));
     }
 
     @Test
@@ -198,8 +196,7 @@ public class AbstractKeyProducerQueueBufferedTest {
         Future<BigInteger[]> future = executorService.submit(() -> producer.createSecrets(1, true));
 
         Thread.sleep(TestTimeProvider.DEFAULT_DELAY);
-        assertThat("createSecrets must block on an empty queue when timeout < 0",
-                future.isDone(), is(false));
+        assertThat("createSecrets must block on an empty queue when timeout < 0", future.isDone(), is(false));
 
         producer.addSecret(secret);
 
@@ -227,8 +224,7 @@ public class AbstractKeyProducerQueueBufferedTest {
         });
 
         Thread.sleep(TestTimeProvider.DEFAULT_DELAY);
-        assertThat("createSecrets must be blocked before interrupt()",
-                future.isDone(), is(false));
+        assertThat("createSecrets must be blocked before interrupt()", future.isDone(), is(false));
 
         producer.interrupt();
 
@@ -266,8 +262,8 @@ public class AbstractKeyProducerQueueBufferedTest {
         // assert
         assertThat(result, is((BigInteger[]) null));
         if (elapsedMs >= longTimeoutMs) {
-            fail("interrupt() did not wake the blocked consumer; createSecrets waited "
-                    + elapsedMs + " ms (timeout was " + longTimeoutMs + " ms)");
+            fail("interrupt() did not wake the blocked consumer; createSecrets waited " + elapsedMs
+                    + " ms (timeout was " + longTimeoutMs + " ms)");
         }
     }
 }

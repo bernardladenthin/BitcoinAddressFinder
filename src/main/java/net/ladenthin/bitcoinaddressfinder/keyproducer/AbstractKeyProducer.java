@@ -9,6 +9,5 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 public abstract class AbstractKeyProducer implements KeyProducer {
 
     /** Creates a new {@link AbstractKeyProducer}. */
-    public AbstractKeyProducer() {
-    }
+    public AbstractKeyProducer() {}
 }

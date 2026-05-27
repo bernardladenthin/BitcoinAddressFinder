@@ -11,8 +11,7 @@ import org.jspecify.annotations.Nullable;
 public class CConfiguration {
 
     /** Creates a new {@link CConfiguration}. */
-    public CConfiguration() {
-    }
+    public CConfiguration() {}
 
     /** Operation to perform when starting the tool. */
     public CCommand command = CCommand.OpenCLInfo;

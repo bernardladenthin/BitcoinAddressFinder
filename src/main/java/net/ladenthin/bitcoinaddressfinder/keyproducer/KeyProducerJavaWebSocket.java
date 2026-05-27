@@ -3,18 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.BitHelper;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
-import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
-import org.java_websocket.WebSocket;
-import org.java_websocket.server.WebSocketServer;
-import org.java_websocket.handshake.ClientHandshake;
-import org.slf4j.Logger;
-
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Executors;
+import net.ladenthin.bitcoinaddressfinder.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
+import org.java_websocket.WebSocket;
+import org.java_websocket.handshake.ClientHandshake;
+import org.java_websocket.server.WebSocketServer;
+import org.slf4j.Logger;
 
 /**
  * Key producer that receives secrets through a WebSocket server.
@@ -31,7 +30,8 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
      * @param bitHelper   bit/batch-size helper (unused but kept for symmetry)
      * @param logger      SLF4J logger
      */
-    public KeyProducerJavaWebSocket(CKeyProducerJavaWebSocket config, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
+    public KeyProducerJavaWebSocket(
+            CKeyProducerJavaWebSocket config, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
         super(config, keyUtility, logger);
         initWebSocketServer();
     }

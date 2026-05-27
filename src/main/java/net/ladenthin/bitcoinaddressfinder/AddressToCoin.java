@@ -29,10 +29,9 @@ public record AddressToCoin(@NonNull ByteBuffer hash160, @NonNull Coin coin, @No
 
     @Override
     public @NonNull String toString() {
-        return "AddressToCoin{" +
-                "hash160=" + new ByteBufferUtility(false).getHexFromByteBuffer(hash160) +
-                ", coin=" + coin +
-                ", type=" + type +
-                '}';
+        return "AddressToCoin{" + "hash160="
+                + new ByteBufferUtility(false).getHexFromByteBuffer(hash160) + ", coin="
+                + coin + ", type="
+                + type + '}';
     }
 }

@@ -18,6 +18,7 @@ public class PersistenceUtils {
 
     @Deprecated
     private final ByteBuffer emptyByteBuffer = ByteBuffer.allocateDirect(0).asReadOnlyBuffer();
+
     private final ByteBuffer zeroByteBuffer = longValueToByteBufferDirectAsReadOnlyBuffer(0L);
 
     /** The {@link Network} associated with the persistence layer. */

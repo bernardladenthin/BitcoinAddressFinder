@@ -26,19 +26,24 @@ public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJava
      * @param bitHelper                   bit/batch-size helper (unused but kept for symmetry)
      * @param logger                      SLF4J logger
      */
-    public KeyProducerJavaIncremental(CKeyProducerJavaIncremental cKeyProducerJavaIncremental, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
+    public KeyProducerJavaIncremental(
+            CKeyProducerJavaIncremental cKeyProducerJavaIncremental,
+            KeyUtility keyUtility,
+            BitHelper bitHelper,
+            Logger logger) {
         super(cKeyProducerJavaIncremental, logger);
         this.currentValue = new BigInteger(cKeyProducerJavaIncremental.startAddress, BitHelper.RADIX_HEX);
     }
 
     @Override
-    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
+    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly)
+            throws NoMoreSecretsAvailableException {
         verifyWorkSize(overallWorkSize, cKeyProducerJava.maxWorkSize);
         final BigInteger endAddress = cKeyProducerJava.getEndAddress();
         if (currentValue.compareTo(endAddress) > 0) {
             throw new NoMoreSecretsAvailableException(currentValue + " exceeds ");
         }
-        
+
         int length = returnStartSecretOnly ? 1 : overallWorkSize;
         BigInteger[] secrets = new BigInteger[length];
         BigInteger counter = currentValue;
@@ -49,13 +54,12 @@ public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJava
             secrets[i] = counter;
             counter = counter.add(BigInteger.ONE);
         }
-        
+
         currentValue = currentValue.add(BigInteger.valueOf(overallWorkSize));
-        
+
         return secrets;
     }
 
     @Override
-    public void interrupt() {
-    }
+    public void interrupt() {}
 }

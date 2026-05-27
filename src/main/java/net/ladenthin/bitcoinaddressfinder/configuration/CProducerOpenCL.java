@@ -11,9 +11,7 @@ import static org.jocl.CL.CL_DEVICE_TYPE_ALL;
 public class CProducerOpenCL extends CProducer {
 
     /** Creates a new {@link CProducerOpenCL}. */
-    public CProducerOpenCL() {
-    }
-
+    public CProducerOpenCL() {}
 
     /** Index of the OpenCL platform to use. */
     public int platformIndex = 0;

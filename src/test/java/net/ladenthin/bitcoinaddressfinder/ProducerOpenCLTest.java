@@ -3,22 +3,22 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import java.nio.file.Path;
+import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.hamcrest.CoreMatchers.nullValue;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThan;
+import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import org.bitcoinj.base.Network;
-import static org.hamcrest.CoreMatchers.notNullValue;
-import static org.hamcrest.CoreMatchers.nullValue;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.greaterThan;
-import static org.hamcrest.Matchers.is;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 public class ProducerOpenCLTest {
 
@@ -28,7 +28,6 @@ public class ProducerOpenCLTest {
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
-    
 
     // <editor-fold defaultstate="collapsed" desc="initProducer">
     @OpenCLTest
@@ -39,22 +38,25 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerOpenCL producerOpenCL =
+                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         AbstractProducerTest.verifyInitProducer(producerOpenCL);
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="releaseProducer">
     @OpenCLTest
     @Test
-    public void releaseProducer_configurationGiven_stateInitializedAndLoggedAndExecuterServiceShutdown() throws IOException, InterruptedException {
+    public void releaseProducer_configurationGiven_stateInitializedAndLoggedAndExecuterServiceShutdown()
+            throws IOException, InterruptedException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerOpenCL producerOpenCL =
+                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         AbstractProducerTest.verifyReleaseProducer(producerOpenCL);
         assertThat(producerOpenCL.resultReaderThreadPoolExecutor.isShutdown(), is(equalTo(Boolean.TRUE)));
@@ -64,18 +66,20 @@ public class ProducerOpenCLTest {
     // <editor-fold defaultstate="collapsed" desc="initProducer">
     @OpenCLTest
     @Test
-    public void initProducer_configurationGiven_stateInitializedAndOpenCLContextSet() throws IOException, InterruptedException {
+    public void initProducer_configurationGiven_stateInitializedAndOpenCLContextSet()
+            throws IOException, InterruptedException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerOpenCL producerOpenCL =
+                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         // pre-assert
         assertThat(producerOpenCL.openCLContext, nullValue());
         assertThat(producerOpenCL.state, is(equalTo(ProducerState.UNINITIALIZED)));
-        
+
         // act
         producerOpenCL.initProducer();
 
@@ -93,36 +97,39 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
-        
+        ProducerOpenCL producerOpenCL =
+                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+
         // act
         producerOpenCL.releaseProducer();
     }
-    
+
     @Test
     @OpenCLTest
-    public void releaseProducers_initialized_noExceptionThrownAndOpenCLContextFreed() throws IOException, InterruptedException {
+    public void releaseProducers_initialized_noExceptionThrownAndOpenCLContextFreed()
+            throws IOException, InterruptedException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
-        
+        ProducerOpenCL producerOpenCL =
+                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+
         producerOpenCL.initProducer();
-        
+
         // pre-assert
         assertThat(producerOpenCL.openCLContext, notNullValue());
-        
+
         // act
         producerOpenCL.releaseProducer();
-        
+
         // assert
         assertThat(producerOpenCL.openCLContext, nullValue());
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="getFreeThreads">
     @Test
     public void getFreeThreads_notInitialized_numberOfFreeThreadsReturned() throws IOException, InterruptedException {
@@ -131,15 +138,16 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
-        
+        ProducerOpenCL producerOpenCL =
+                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+
         // act
         int freeThreads = producerOpenCL.getFreeThreads();
-        
+
         // assert
         assertThat(freeThreads, is(equalTo(Integer.valueOf(cProducerOpenCL.maxResultReaderThreads))));
     }
-    
+
     @Test
     @OpenCLTest
     public void getFreeThreads_initialized_numberOfFreeThreadsReturned() throws IOException, InterruptedException {
@@ -149,18 +157,19 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
-        
+        ProducerOpenCL producerOpenCL =
+                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+
         producerOpenCL.initProducer();
-        
+
         // act
         int freeThreads = producerOpenCL.getFreeThreads();
-        
+
         // assert
         assertThat(freeThreads, is(equalTo(Integer.valueOf(cProducerOpenCL.maxResultReaderThreads))));
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="waitTillFreeThreadsInPool">
     @Test
     public void waitTillFreeThreadsInPool_notInitialized_returnImmediately() throws IOException, InterruptedException {
@@ -169,14 +178,15 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
-        
+        ProducerOpenCL producerOpenCL =
+                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+
         // act
         producerOpenCL.waitTillFreeThreadsInPool();
-        
+
         // assert
     }
-    
+
     @Test
     @OpenCLTest
     public void waitTillFreeThreadsInPool_initialized_returnImmediately() throws IOException, InterruptedException {
@@ -186,31 +196,34 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
-        
+        ProducerOpenCL producerOpenCL =
+                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+
         producerOpenCL.initProducer();
-        
+
         // act
         producerOpenCL.waitTillFreeThreadsInPool();
-        
+
         // assert
     }
-    
+
     @Test
     @OpenCLTest
-    public void waitTillFreeThreadsInPool_initializedAndThreadPoolFull_doNotReturn() throws IOException, InterruptedException {
+    public void waitTillFreeThreadsInPool_initializedAndThreadPoolFull_doNotReturn()
+            throws IOException, InterruptedException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
-        
+        ProducerOpenCL producerOpenCL =
+                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+
         producerOpenCL.initProducer();
-        
+
         Duration sleepDuration = Duration.ofSeconds(5L);
-        
+
         for (int i = 0; i < cProducerOpenCL.maxResultReaderThreads; i++) {
             producerOpenCL.resultReaderThreadPoolExecutor.submit(() -> {
                 try {
@@ -224,14 +237,14 @@ public class ProducerOpenCLTest {
         final long before = System.currentTimeMillis();
         producerOpenCL.waitTillFreeThreadsInPool();
         final long after = System.currentTimeMillis();
-        
-        Duration durationOfWait = Duration.ofMillis(after-before);
+
+        Duration durationOfWait = Duration.ofMillis(after - before);
         // assert
         // expect at least the half of the sleep duration
         assertThat(durationOfWait, is(greaterThan(sleepDuration.dividedBy(2))));
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="produceKeys">
     @Test
     public void produceKeys_notInitialized_illegalStateExceptionThrown() throws Exception {
@@ -240,14 +253,15 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
-        
+        ProducerOpenCL producerOpenCL =
+                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+
         // act
         assertThrows(IllegalStateException.class, () -> producerOpenCL.produceKeys());
 
         // assert
     }
-    
+
     @Test
     @OpenCLTest
     public void produceKeys_initialized_keysInConsumer() throws Exception {
@@ -257,16 +271,17 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL = new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
-        
+        ProducerOpenCL producerOpenCL =
+                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+
         producerOpenCL.initProducer();
-        
+
         // act
         producerOpenCL.produceKeys();
-        
+
         // it takes some time to consume keys
         Thread.sleep(Duration.ofSeconds(10L));
-        
+
         // assert
         assertThat(mockConsumer.publicKeyBytesArrayList.size(), is(greaterThan(0)));
     }

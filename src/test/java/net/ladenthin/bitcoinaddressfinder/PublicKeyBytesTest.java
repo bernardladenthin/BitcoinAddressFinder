@@ -3,18 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
-import java.math.BigInteger;
-import java.util.Arrays;
-import net.ladenthin.bitcoinaddressfinder.Hash160;
-import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
-import org.apache.commons.codec.binary.Hex;
-import org.bitcoinj.base.LegacyAddress;
-import org.bitcoinj.base.Network;
-import org.bitcoinj.crypto.ECKey;
-import org.bitcoinj.crypto.internal.CryptoUtils;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.emptyOrNullString;
 import static org.hamcrest.Matchers.equalTo;
@@ -26,6 +14,17 @@ import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+
+import java.io.IOException;
+import java.math.BigInteger;
+import java.util.Arrays;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
+import org.apache.commons.codec.binary.Hex;
+import org.bitcoinj.base.LegacyAddress;
+import org.bitcoinj.base.Network;
+import org.bitcoinj.crypto.ECKey;
+import org.bitcoinj.crypto.internal.CryptoUtils;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 
 public class PublicKeyBytesTest {
@@ -33,64 +32,97 @@ public class PublicKeyBytesTest {
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
     protected final KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
-    
+
     @Test
     public void publicKeyBytes_fromPublicKey_matchesExpectedHashes() {
         // arrange
         ECKey keyUncompressed = new TestAddresses42(1, false).getECKeys().get(0);
         ECKey keyCompressed = new TestAddresses42(1, true).getECKeys().get(0);
-        
+
         // act
-        PublicKeyBytes publicKeyBytesUncompressed = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey());
-        PublicKeyBytes publicKeyBytesCompressed = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey(), keyCompressed.getPubKey());
-        
+        PublicKeyBytes publicKeyBytesUncompressed =
+                new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey());
+        PublicKeyBytes publicKeyBytesCompressed = new PublicKeyBytes(
+                keyUncompressed.getPrivKey(), keyUncompressed.getPubKey(), keyCompressed.getPubKey());
+
         // assert
         assertThat(publicKeyBytesUncompressed.getUncompressed(), is(equalTo(keyUncompressed.getPubKey())));
         assertThat(publicKeyBytesUncompressed.getUncompressedKeyHash(), is(equalTo(keyUncompressed.getPubKeyHash())));
-        assertThat(CryptoUtils.sha256hash160(publicKeyBytesCompressed.getUncompressed()), is(equalTo(keyUncompressed.getPubKeyHash())));
+        assertThat(
+                CryptoUtils.sha256hash160(publicKeyBytesCompressed.getUncompressed()),
+                is(equalTo(keyUncompressed.getPubKeyHash())));
         assertThat(publicKeyBytesCompressed.getUncompressedKeyHash(), is(equalTo(keyUncompressed.getPubKeyHash())));
-        assertThat(publicKeyBytesUncompressed.getUncompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(network, keyUncompressed.getPubKeyHash()).toBase58())));
-        assertThat(publicKeyBytesCompressed.getUncompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(network, keyUncompressed.getPubKeyHash()).toBase58())));
-        
+        assertThat(
+                publicKeyBytesUncompressed.getUncompressedKeyHashAsBase58(keyUtility),
+                is(equalTo(LegacyAddress.fromPubKeyHash(network, keyUncompressed.getPubKeyHash())
+                        .toBase58())));
+        assertThat(
+                publicKeyBytesCompressed.getUncompressedKeyHashAsBase58(keyUtility),
+                is(equalTo(LegacyAddress.fromPubKeyHash(network, keyUncompressed.getPubKeyHash())
+                        .toBase58())));
+
         assertThat(publicKeyBytesUncompressed.getCompressed(), is(equalTo(keyCompressed.getPubKey())));
         assertThat(publicKeyBytesUncompressed.getCompressedKeyHash(), is(equalTo(keyCompressed.getPubKeyHash())));
-        assertThat(CryptoUtils.sha256hash160(publicKeyBytesCompressed.getCompressed()), is(equalTo(keyCompressed.getPubKeyHash())));
+        assertThat(
+                CryptoUtils.sha256hash160(publicKeyBytesCompressed.getCompressed()),
+                is(equalTo(keyCompressed.getPubKeyHash())));
         assertThat(publicKeyBytesCompressed.getCompressedKeyHash(), is(equalTo(keyCompressed.getPubKeyHash())));
-        assertThat(publicKeyBytesUncompressed.getCompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(network, keyCompressed.getPubKeyHash()).toBase58())));
-        assertThat(publicKeyBytesCompressed.getCompressedKeyHashAsBase58(keyUtility), is(equalTo(LegacyAddress.fromPubKeyHash(network, keyCompressed.getPubKeyHash()).toBase58())));
+        assertThat(
+                publicKeyBytesUncompressed.getCompressedKeyHashAsBase58(keyUtility),
+                is(equalTo(LegacyAddress.fromPubKeyHash(network, keyCompressed.getPubKeyHash())
+                        .toBase58())));
+        assertThat(
+                publicKeyBytesCompressed.getCompressedKeyHashAsBase58(keyUtility),
+                is(equalTo(LegacyAddress.fromPubKeyHash(network, keyCompressed.getPubKeyHash())
+                        .toBase58())));
     }
-    
+
     @Test
     public void publicKeyBytes_toStringEqualsAndHashCode_consistent() {
         // arrange
         ECKey keyUncompressed = new TestAddresses42(1, false).getECKeys().get(0);
         ECKey keyCompressed = new TestAddresses42(1, true).getECKeys().get(0);
-        
+
         // act
-        PublicKeyBytes publicKeyBytesUncompressed = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey());
-        PublicKeyBytes publicKeyBytesUncompressed2 = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey());
-        PublicKeyBytes publicKeyBytesCompressed = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey(), keyCompressed.getPubKey());
-        PublicKeyBytes publicKeyBytesCompressed2 = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey(), keyCompressed.getPubKey());
-        
+        PublicKeyBytes publicKeyBytesUncompressed =
+                new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey());
+        PublicKeyBytes publicKeyBytesUncompressed2 =
+                new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey());
+        PublicKeyBytes publicKeyBytesCompressed = new PublicKeyBytes(
+                keyUncompressed.getPrivKey(), keyUncompressed.getPubKey(), keyCompressed.getPubKey());
+        PublicKeyBytes publicKeyBytesCompressed2 = new PublicKeyBytes(
+                keyUncompressed.getPrivKey(), keyUncompressed.getPubKey(), keyCompressed.getPubKey());
+
         // assert
-        EqualHashCodeToStringTestHelper equalHashCodeToStringTestHelper = new EqualHashCodeToStringTestHelper(publicKeyBytesUncompressed, publicKeyBytesUncompressed2, publicKeyBytesCompressed, publicKeyBytesCompressed2);
+        EqualHashCodeToStringTestHelper equalHashCodeToStringTestHelper = new EqualHashCodeToStringTestHelper(
+                publicKeyBytesUncompressed,
+                publicKeyBytesUncompressed2,
+                publicKeyBytesCompressed,
+                publicKeyBytesCompressed2);
         equalHashCodeToStringTestHelper.assertEqualsHashCodeToStringAIsEqualToB();
 
         // toString
         assertThat(publicKeyBytesUncompressed.toString(), is(equalTo(publicKeyBytesCompressed.toString())));
-        assertThat(publicKeyBytesUncompressed.toString(), is(equalTo("PublicKeyBytes{secretKey=24250429618215260598957696001935175135959229619080974590971174872813112994997}")));
+        assertThat(
+                publicKeyBytesUncompressed.toString(),
+                is(
+                        equalTo(
+                                "PublicKeyBytes{secretKey=24250429618215260598957696001935175135959229619080974590971174872813112994997}")));
     }
-    
+
     @Test
     public void maxPrivateKeyAsHexString_isEqualToConstant() {
         // arrange
-        String maxPrivateKeyAsHexString = Hex.encodeHexString(ByteBufferUtility.bigIntegerToBytes(PublicKeyBytes.MAX_PRIVATE_KEY));
+        String maxPrivateKeyAsHexString =
+                Hex.encodeHexString(ByteBufferUtility.bigIntegerToBytes(PublicKeyBytes.MAX_PRIVATE_KEY));
         // act
-        
+
         // assert
-        assertThat(maxPrivateKeyAsHexString.toLowerCase(), is(equalTo("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141".toLowerCase())));
+        assertThat(
+                maxPrivateKeyAsHexString.toLowerCase(),
+                is(equalTo("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141".toLowerCase())));
     }
-    
+
     // <editor-fold defaultstate="collapsed" desc="Tests for runtimePublicKeyCalculationCheck">
     @Test
     public void runtimePublicKeyCalculationCheck_validKey_returnsTrue() {
@@ -151,7 +183,7 @@ public class PublicKeyBytesTest {
         assertThat(result, is(false));
         verify(logger).error(contains("fromPrivateUncompressed.getPubKeyHash()"));
     }
-    
+
     @Test
     public void runtimePublicKeyCalculationCheck_invalidCompressedAndUncompressed_returnsFalse() {
         // arrange
@@ -172,7 +204,7 @@ public class PublicKeyBytesTest {
         verify(logger).error(contains("fromPrivateCompressed.getPubKeyHash()"));
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="Tests for assembleUncompressedPublicKey">
     @Test
     public void assembleUncompressedPublicKey_validXY_correctlyAssembles() {
@@ -190,8 +222,12 @@ public class PublicKeyBytesTest {
         // assert
         assertThat(result[0], is((byte) PublicKeyBytes.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT));
         for (int i = 0; i < PublicKeyBytes.ONE_COORDINATE_NUM_BYTES; i++) {
-            assertThat("X coordinate mismatch at index " + i, result[i + PublicKeyBytes.SEC_PREFIX_NUM_BYTES], is(x[i]));
-            assertThat("Y coordinate mismatch at index " + i, result[i + PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES], is(y[i]));
+            assertThat(
+                    "X coordinate mismatch at index " + i, result[i + PublicKeyBytes.SEC_PREFIX_NUM_BYTES], is(x[i]));
+            assertThat(
+                    "Y coordinate mismatch at index " + i,
+                    result[i + PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES],
+                    is(y[i]));
         }
     }
 
@@ -210,7 +246,7 @@ public class PublicKeyBytesTest {
             assertThat("Expected zero at index " + i, result[i], is((byte) 0x00));
         }
     }
-    
+
     @Test
     public void assembleUncompressedPublicKey_validXAndY_assemblesCorrectly() {
         // arrange
@@ -219,8 +255,14 @@ public class PublicKeyBytesTest {
         byte[] pubKey = ecKey.getPubKey(); // full uncompressed pubkey (parity + X + Y)
 
         // extract X and Y from real ECKey
-        byte[] x = Arrays.copyOfRange(pubKey, PublicKeyBytes.SEC_PREFIX_NUM_BYTES, PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
-        byte[] y = Arrays.copyOfRange(pubKey, PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES, PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.TWO_COORDINATES_NUM_BYTES);
+        byte[] x = Arrays.copyOfRange(
+                pubKey,
+                PublicKeyBytes.SEC_PREFIX_NUM_BYTES,
+                PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        byte[] y = Arrays.copyOfRange(
+                pubKey,
+                PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES,
+                PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.TWO_COORDINATES_NUM_BYTES);
 
         // act
         byte[] assembledUncompressed = PublicKeyBytes.assembleUncompressedPublicKey(x, y);
@@ -236,16 +278,17 @@ public class PublicKeyBytesTest {
     public void toString_whenCalled_containsClassNameAndPrivateKey() throws IOException {
         // arrange
         ECKey keyUncompressed = new TestAddresses42(1, false).getECKeys().get(0);
-        
+
         // act
-        PublicKeyBytes publicKeyBytesUncompressed = new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey());
+        PublicKeyBytes publicKeyBytesUncompressed =
+                new PublicKeyBytes(keyUncompressed.getPrivKey(), keyUncompressed.getPubKey());
         String toStringOutput = publicKeyBytesUncompressed.toString();
 
         assertThat(toStringOutput, not(emptyOrNullString()));
         assertThat(toStringOutput, matchesPattern("PublicKeyBytes\\{secretKey=\\d+}"));
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="fromPrivate">
     @Test
     public void fromPrivate_validSecretKey_returnsPublicKeyBytesWithCorrectKey() {
@@ -496,8 +539,14 @@ public class PublicKeyBytesTest {
         byte[] compressed = PublicKeyBytes.createCompressedBytes(uncompressed);
 
         // assert
-        byte[] xFromUncompressed = Arrays.copyOfRange(uncompressed, PublicKeyBytes.SEC_PREFIX_NUM_BYTES, PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
-        byte[] xFromCompressed = Arrays.copyOfRange(compressed, PublicKeyBytes.SEC_PREFIX_NUM_BYTES, PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        byte[] xFromUncompressed = Arrays.copyOfRange(
+                uncompressed,
+                PublicKeyBytes.SEC_PREFIX_NUM_BYTES,
+                PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+        byte[] xFromCompressed = Arrays.copyOfRange(
+                compressed,
+                PublicKeyBytes.SEC_PREFIX_NUM_BYTES,
+                PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
         assertThat(xFromCompressed, is(equalTo(xFromUncompressed)));
     }
     // </editor-fold>
@@ -513,7 +562,8 @@ public class PublicKeyBytesTest {
         byte[] compressedKeyHash = CryptoUtils.sha256hash160(ecKeyCompressed.getPubKey());
 
         // act
-        PublicKeyBytes sut = new PublicKeyBytes(secretKey, ecKeyUncompressed.getPubKey(), uncompressedKeyHash, compressedKeyHash);
+        PublicKeyBytes sut =
+                new PublicKeyBytes(secretKey, ecKeyUncompressed.getPubKey(), uncompressedKeyHash, compressedKeyHash);
 
         // assert
         assertThat(sut.getSecretKey(), is(equalTo(secretKey)));

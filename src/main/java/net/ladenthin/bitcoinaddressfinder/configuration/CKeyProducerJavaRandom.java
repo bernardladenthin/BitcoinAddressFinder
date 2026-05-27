@@ -11,9 +11,7 @@ import org.jspecify.annotations.Nullable;
 public class CKeyProducerJavaRandom extends CKeyProducerJava {
 
     /** Creates a new {@link CKeyProducerJavaRandom}. */
-    public CKeyProducerJavaRandom() {
-    }
-
+    public CKeyProducerJavaRandom() {}
 
     /**
      * Selects the pseudo-random number generator (PRNG) used for private-key creation.

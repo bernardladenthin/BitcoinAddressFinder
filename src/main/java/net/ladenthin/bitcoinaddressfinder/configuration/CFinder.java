@@ -3,10 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Configuration for the {@code Find} command: producers, key producers and consumer.
@@ -14,8 +13,7 @@ import java.util.List;
 public class CFinder {
 
     /** Creates a new {@link CFinder}. */
-    public CFinder() {
-    }
+    public CFinder() {}
 
     /** Random-based key producer configurations. */
     public List<CKeyProducerJavaRandom> keyProducerJavaRandom = new ArrayList<>();
@@ -39,5 +37,4 @@ public class CFinder {
     public List<CProducerJavaSecretsFiles> producerJavaSecretsFiles = new ArrayList<>();
     /** OpenCL (GPU) producer configurations. */
     public List<CProducerOpenCL> producerOpenCL = new ArrayList<>();
-
 }
