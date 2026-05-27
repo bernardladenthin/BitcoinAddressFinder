@@ -9,4 +9,30 @@ SPDX-License-Identifier: Apache-2.0
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/4.8.6/spotbugs/etc/findbugsfilter.xsd">
 
+    <!--
+        PREDICTABLE_RANDOM is by design at all three sites:
+
+        KeyProducerJavaRandom.java:56,60 — the class is a configurable
+        PRNG selector with intentionally weak modes
+        (RANDOM_CURRENT_TIME_MILLIS_SEED and RANDOM_CUSTOM_SEED). These
+        exist to exploit CWE-338 for the security-research use case:
+        scan for keys derived from wallets that used a weak PRNG. The
+        "EXPLOIT for: CWE-338" comments at the call sites document
+        this; the constructor already carries
+        @SuppressWarnings("squid:S2245") for the equivalent SonarQube
+        rule.
+
+        BIP39KeyProducer.java:44 — class extends java.util.Random to
+        wrap deterministic BIP39/BIP44 key derivation in the Random
+        interface. Deterministic reproduction from a mnemonic phrase
+        is the BIP39 contract; "predictable" is the feature.
+    -->
+    <Match>
+        <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.BIP39KeyProducer"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaRandom"/>
+        </Or>
+        <Bug pattern="PREDICTABLE_RANDOM"/>
+    </Match>
+
 </FindBugsFilter>
