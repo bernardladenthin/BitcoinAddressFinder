@@ -45,6 +45,9 @@ SPDX-License-Identifier: Apache-2.0
         <logback.version>1.5.32</logback.version>
         <project.build.outputTimestamp>${git.commit.time}</project.build.outputTimestamp>
         <argLine>-Xmx2g -Xms1g --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED</argLine>
+        <jcstress.version>0.16</jcstress.version>
+        <lincheck.version>2.39</lincheck.version>
+        <vmlens.version>1.2.28</vmlens.version>
     </properties>
 
     <distributionManagement>
@@ -186,6 +189,25 @@ SPDX-License-Identifier: Apache-2.0
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+                <executions>
+                    <execution>
+                        <id>default-testCompile</id>
+                        <configuration>
+                            <annotationProcessorPaths combine.children="append">
+                                <path>
+                                    <groupId>org.openjdk.jcstress</groupId>
+                                    <artifactId>jcstress-core</artifactId>
+                                    <version>${jcstress.version}</version>
+                                </path>
+                                <path>
+                                    <groupId>org.openjdk.jmh</groupId>
+                                    <artifactId>jmh-generator-annprocess</artifactId>
+                                    <version>1.37</version>
+                                </path>
+                            </annotationProcessorPaths>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -308,6 +330,26 @@ SPDX-License-Identifier: Apache-2.0
                     <mainClass>org.openjdk.jmh.Main</mainClass>
                     <classpathScope>test</classpathScope>
                 </configuration>
+                <executions>
+                    <execution>
+                        <id>jcstress</id>
+                        <phase>test</phase>
+                        <goals><goal>exec</goal></goals>
+                        <configuration>
+                            <skip>${skipTests}</skip>
+                            <executable>${java.home}/bin/java</executable>
+                            <classpathScope>test</classpathScope>
+                            <arguments>
+                                <argument>-classpath</argument>
+                                <classpath/>
+                                <argument>org.openjdk.jcstress.Main</argument>
+                                <argument>-v</argument>
+                                <argument>-m</argument>
+                                <argument>default</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
 
@@ -497,6 +539,18 @@ SPDX-License-Identifier: Apache-2.0
             <version>1.37</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.openjdk.jcstress</groupId>
+            <artifactId>jcstress-core</artifactId>
+            <version>${jcstress.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlinx</groupId>
+            <artifactId>lincheck-jvm</artifactId>
+            <version>${lincheck.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <profiles>
@@ -534,6 +588,47 @@ SPDX-License-Identifier: Apache-2.0
                             <autoPublish>true</autoPublish>
                             <waitUntil>published</waitUntil>
                         </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>vmlens</id>
+            <dependencies>
+                <dependency>
+                    <groupId>com.vmlens</groupId>
+                    <artifactId>api</artifactId>
+                    <version>${vmlens.version}</version>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.vmlens</groupId>
+                        <artifactId>vmlens-maven-plugin</artifactId>
+                        <version>${vmlens.version}</version>
+                        <configuration>
+                            <!--
+                                Lincheck generates its own TestThreadExecution class on the fly.
+                                That bytecode clashes with vmlens's load-time instrumentation
+                                (java.lang.VerifyError). Skip the Lincheck test under vmlens;
+                                the default test job still runs it.
+                                **/*$* is the plugin default - kept to preserve inner-class skip.
+                            -->
+                            <excludes>
+                                <exclude>**/*$*</exclude>
+                                <exclude>**/BitHelperLincheckTest.java</exclude>
+                            </excludes>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>vmlens-test</id>
+                                <goals>
+                                    <goal>test</goal>
+                                </goals>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>
