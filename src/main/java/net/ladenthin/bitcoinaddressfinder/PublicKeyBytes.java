@@ -23,8 +23,6 @@ public class PublicKeyBytes {
      */
     public static final boolean USE_SHA256_RIPEMD160_FAST = Hash160.DEFAULT_USE_FAST;
 
-    private static final Hash160 HASH160 = new Hash160();
-
     public static final BigInteger MAX_TECHNICALLY_PRIVATE_KEY = BigInteger.valueOf(2).pow(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS).subtract(BigInteger.ONE);
 
     public static final BigInteger MIN_PRIVATE_KEY = BigInteger.ONE;
@@ -213,6 +211,7 @@ public class PublicKeyBytes {
 
     private final BigInteger secretKey;
     private final PrivateKeyValidator privateKeyValidator;
+    private final Hash160 hash160 = new Hash160();
     
     // [4, 121, -66, 102, 126, -7, -36, -69, -84, 85, -96, 98, -107, -50, -121, 11, 7, 2, -101, -4, -37, 45, -50, 40, -39, 89, -14, -127, 91, 22, -8, 23, -104, 72, 58, -38, 119, 38, -93, -60, 101, 93, -92, -5, -4, 14, 17, 8, -88, -3, 23, -76, 72, -90, -123, 84, 25, -100, 71, -48, -113, -5, 16, -44, -72]
     // Hex.decodeHex("0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8")
@@ -346,8 +345,8 @@ public class PublicKeyBytes {
        return true;
    }
    
-   private static byte @NonNull [] calculateHash160(byte[] input) {
-        return HASH160.hash(input);
+   private byte @NonNull [] calculateHash160(byte[] input) {
+        return hash160.hash(input);
     }
 
     public byte @NonNull [] getUncompressedKeyHash() {
@@ -362,16 +361,6 @@ public class PublicKeyBytes {
             compressedKeyHash = calculateHash160(compressed);
         }
         return compressedKeyHash;
-    }
-
-    /**
-     * Calculates RIPEMD-160(SHA-256(input)) using the Guava + Bouncy Castle
-     * fast path. Delegates to {@link Hash160} with {@code useFast = true}.
-     *
-     * @see Hash160#hash(byte[])
-     */
-    public static byte[] sha256hash160Fast(byte[] input) {
-        return new Hash160(true).hash(input);
     }
 
     public @NonNull String getCompressedKeyHashAsBase58(@NonNull KeyUtility keyUtility) {
