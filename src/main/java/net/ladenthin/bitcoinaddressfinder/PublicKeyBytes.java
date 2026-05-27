@@ -337,20 +337,16 @@ public class PublicKeyBytes {
        return true;
    }
    
-   private byte @NonNull [] calculateHash160(byte[] input) {
-        return hash160.hash(input);
-    }
-
     public byte @NonNull [] getUncompressedKeyHash() {
         if (uncompressedKeyHash == null) {
-            uncompressedKeyHash = calculateHash160(uncompressed);
+            uncompressedKeyHash = hash160.hash(uncompressed);
         }
         return uncompressedKeyHash;
     }
 
     public byte @NonNull [] getCompressedKeyHash() {
         if (compressedKeyHash == null) {
-            compressedKeyHash = calculateHash160(compressed);
+            compressedKeyHash = hash160.hash(compressed);
         }
         return compressedKeyHash;
     }
