@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.Arrays;
+import net.ladenthin.bitcoinaddressfinder.Hash160;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.base.LegacyAddress;
@@ -391,16 +392,16 @@ public class PublicKeyBytesTest {
     }
     // </editor-fold>
 
-    // <editor-fold defaultstate="collapsed" desc="sha256hash160Fast">
+    // <editor-fold defaultstate="collapsed" desc="Hash160">
     @Test
-    public void sha256hash160Fast_knownInput_matchesCryptoUtilsResult() {
+    public void hash160Fast_knownInput_matchesCryptoUtilsResult() {
         // arrange
         BigInteger secretKey = new BigInteger("1337");
         ECKey ecKey = ECKey.fromPrivate(secretKey, false);
         byte[] pubKey = ecKey.getPubKey();
 
         // act
-        byte[] fastResult = PublicKeyBytes.sha256hash160Fast(pubKey);
+        byte[] fastResult = new Hash160().hash(pubKey);
 
         // assert
         byte[] expected = CryptoUtils.sha256hash160(pubKey);
@@ -408,14 +409,14 @@ public class PublicKeyBytesTest {
     }
 
     @Test
-    public void sha256hash160Fast_compressedKey_matchesCryptoUtilsResult() {
+    public void hash160Fast_compressedKey_matchesCryptoUtilsResult() {
         // arrange
         BigInteger secretKey = new BigInteger("1337");
         ECKey ecKey = ECKey.fromPrivate(secretKey, true);
         byte[] pubKey = ecKey.getPubKey();
 
         // act
-        byte[] fastResult = PublicKeyBytes.sha256hash160Fast(pubKey);
+        byte[] fastResult = new Hash160().hash(pubKey);
 
         // assert
         byte[] expected = CryptoUtils.sha256hash160(pubKey);
@@ -423,12 +424,12 @@ public class PublicKeyBytesTest {
     }
 
     @Test
-    public void sha256hash160Fast_resultLength_isRipemd160HashLength() {
+    public void hash160Fast_resultLength_isRipemd160HashLength() {
         // arrange
         byte[] input = new byte[] {0x01, 0x02, 0x03};
 
         // act
-        byte[] result = PublicKeyBytes.sha256hash160Fast(input);
+        byte[] result = new Hash160().hash(input);
 
         // assert
         assertThat(result.length, is(equalTo(PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES)));

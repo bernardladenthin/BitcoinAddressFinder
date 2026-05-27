@@ -3,28 +3,18 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.google.common.hash.Hashing;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Objects;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.bitcoinj.core.Utils;
 import org.bitcoinj.crypto.ECKey;
-import org.bitcoinj.crypto.internal.CryptoUtils;
-import org.bouncycastle.crypto.digests.RIPEMD160Digest;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 public class PublicKeyBytes {
     
-    /**
-     * Use {@link com.google.common.hash.Hashing} and
-     * {@link org.bouncycastle.crypto.digests.RIPEMD160Digest} instead
-     * {@link org.bitcoinj.crypto.internal.CryptoUtils#sha256hash160(byte[])}.
-     */
-    public static final boolean USE_SHA256_RIPEMD160_FAST = true;
-
     public static final BigInteger MAX_TECHNICALLY_PRIVATE_KEY = BigInteger.valueOf(2).pow(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS).subtract(BigInteger.ONE);
 
     public static final BigInteger MIN_PRIVATE_KEY = BigInteger.ONE;
@@ -213,6 +203,7 @@ public class PublicKeyBytes {
 
     private final BigInteger secretKey;
     private final PrivateKeyValidator privateKeyValidator;
+    private final Hash160 hash160 = new Hash160();
     
     // [4, 121, -66, 102, 126, -7, -36, -69, -84, 85, -96, 98, -107, -50, -121, 11, 7, 2, -101, -4, -37, 45, -50, 40, -39, 89, -14, -127, 91, 22, -8, 23, -104, 72, 58, -38, 119, 38, -93, -60, 101, 93, -92, -5, -4, 14, 17, 8, -88, -3, 23, -76, 72, -90, -123, 84, 25, -100, 71, -48, -113, -5, 16, -44, -72]
     // Hex.decodeHex("0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8")
@@ -346,40 +337,18 @@ public class PublicKeyBytes {
        return true;
    }
    
-   private static byte @NonNull [] calculateHash160(byte[] input) {
-        if (USE_SHA256_RIPEMD160_FAST) {
-            return sha256hash160Fast(input);
-        } else {
-            return CryptoUtils.sha256hash160(input);
-        }
-    }
-
     public byte @NonNull [] getUncompressedKeyHash() {
         if (uncompressedKeyHash == null) {
-            uncompressedKeyHash = calculateHash160(uncompressed);
+            uncompressedKeyHash = hash160.hash(uncompressed);
         }
         return uncompressedKeyHash;
     }
 
     public byte @NonNull [] getCompressedKeyHash() {
         if (compressedKeyHash == null) {
-            compressedKeyHash = calculateHash160(compressed);
+            compressedKeyHash = hash160.hash(compressed);
         }
         return compressedKeyHash;
-    }
-
-    /**
-     * Calculates RIPEMD160(SHA256(input)). This is used in Address
-     * calculations. Same as {@link org.bitcoinj.crypto.internal.CryptoUtils#sha256hash160(byte[])} but using
-     * {@link DigestUtils}.
-     */
-    public static byte[] sha256hash160Fast(byte[] input) {
-        byte[] sha256 = Hashing.sha256().hashBytes(input).asBytes();
-        RIPEMD160Digest digest = new RIPEMD160Digest();
-        digest.update(sha256, 0, sha256.length);
-        byte[] out = new byte[RIPEMD160_HASH_NUM_BYTES];
-        digest.doFinal(out, 0);
-        return out;
     }
 
     public @NonNull String getCompressedKeyHashAsBase58(@NonNull KeyUtility keyUtility) {
