@@ -74,6 +74,8 @@ SPDX-License-Identifier: Apache-2.0
         <hamcrest.version>3.0</hamcrest.version>
         <mockito.version>5.23.0</mockito.version>
         <jmh.version>1.37</jmh.version>
+        <spotless.version>3.5.1</spotless.version>
+        <palantir-java-format.version>2.66.0</palantir-java-format.version>
     </properties>
 
     <distributionManagement>
@@ -98,6 +100,11 @@ SPDX-License-Identifier: Apache-2.0
         </resources>
         <pluginManagement>
             <plugins>
+                <plugin>
+                    <groupId>com.diffplug.spotless</groupId>
+                    <artifactId>spotless-maven-plugin</artifactId>
+                    <version>${spotless.version}</version>
+                </plugin>
                 <plugin>
                     <groupId>com.github.spotbugs</groupId>
                     <artifactId>spotbugs-maven-plugin</artifactId>
@@ -460,6 +467,29 @@ SPDX-License-Identifier: Apache-2.0
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <!--
+                    No <executions> binding on purpose: spotless is opt-in via
+                    `mvn spotless:check` (preview) or `mvn spotless:apply` (write).
+                    Enabling the verify-phase check is a follow-up step.
+                -->
+                <configuration>
+                    <java>
+                        <includes>
+                            <include>src/main/java/**/*.java</include>
+                            <include>src/test/java/**/*.java</include>
+                        </includes>
+                        <palantirJavaFormat>
+                            <version>${palantir-java-format.version}</version>
+                        </palantirJavaFormat>
+                        <removeUnusedImports/>
+                        <trimTrailingWhitespace/>
+                        <endWithNewline/>
+                    </java>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
