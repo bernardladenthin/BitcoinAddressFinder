@@ -13,7 +13,6 @@ import static org.jocl.CL.clReleaseContext;
 import static org.jocl.CL.clReleaseKernel;
 import static org.jocl.CL.clReleaseProgram;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.Resources;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -46,7 +45,7 @@ import org.slf4j.LoggerFactory;
  */
 public class OpenCLContext implements ReleaseCLObject {
 
-    private final Logger logger;
+    private static final Logger LOGGER = LoggerFactory.getLogger(OpenCLContext.class);
 
     /**
      * Loads the OpenCL kernel sources from the classpath and strips {@code #include} directives.
@@ -103,20 +102,14 @@ public class OpenCLContext implements ReleaseCLObject {
     private boolean closed = false;
 
     /**
-     * Creates a new context using the default logger.
+     * Creates a new OpenCL context.
      *
      * @param producerOpenCL the OpenCL producer configuration
      * @param bitHelper      the bit/batch-size helper
      */
     public OpenCLContext(CProducerOpenCL producerOpenCL, BitHelper bitHelper) {
-        this(producerOpenCL, bitHelper, LoggerFactory.getLogger(OpenCLContext.class));
-    }
-
-    @VisibleForTesting
-    OpenCLContext(CProducerOpenCL producerOpenCL, BitHelper bitHelper, Logger logger) {
         this.producerOpenCL = producerOpenCL;
         this.bitHelper = bitHelper;
-        this.logger = logger;
     }
 
     /**
@@ -138,7 +131,7 @@ public class OpenCLContext implements ReleaseCLObject {
                 platforms, producerOpenCL.platformIndex, producerOpenCL.deviceType, producerOpenCL.deviceIndex);
 
         device = selection.device();
-        logger.info("Selected OpenCL device:\n{}", device.toStringPretty());
+        LOGGER.info("Selected OpenCL device:\n{}", device.toStringPretty());
         cl_context_properties contextProperties = selection.contextProperties();
         cl_device_id[] cl_device_ids = new cl_device_id[] {device.device()};
 
