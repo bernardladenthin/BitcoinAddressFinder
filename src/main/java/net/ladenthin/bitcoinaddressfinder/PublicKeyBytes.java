@@ -3,15 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.google.common.hash.Hashing;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Objects;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.bitcoinj.core.Utils;
 import org.bitcoinj.crypto.ECKey;
-import org.bitcoinj.crypto.internal.CryptoUtils;
-import org.bouncycastle.crypto.digests.RIPEMD160Digest;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -19,11 +16,14 @@ import org.slf4j.Logger;
 public class PublicKeyBytes {
     
     /**
-     * Use {@link com.google.common.hash.Hashing} and
-     * {@link org.bouncycastle.crypto.digests.RIPEMD160Digest} instead
-     * {@link org.bitcoinj.crypto.internal.CryptoUtils#sha256hash160(byte[])}.
+     * Selects the SHA-256 + RIPEMD-160 implementation used by this class.
+     * Delegates to {@link Hash160#DEFAULT_USE_FAST}.
+     *
+     * @see Hash160
      */
-    public static final boolean USE_SHA256_RIPEMD160_FAST = true;
+    public static final boolean USE_SHA256_RIPEMD160_FAST = Hash160.DEFAULT_USE_FAST;
+
+    private static final Hash160 HASH160 = new Hash160();
 
     public static final BigInteger MAX_TECHNICALLY_PRIVATE_KEY = BigInteger.valueOf(2).pow(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS).subtract(BigInteger.ONE);
 
@@ -347,11 +347,7 @@ public class PublicKeyBytes {
    }
    
    private static byte @NonNull [] calculateHash160(byte[] input) {
-        if (USE_SHA256_RIPEMD160_FAST) {
-            return sha256hash160Fast(input);
-        } else {
-            return CryptoUtils.sha256hash160(input);
-        }
+        return HASH160.hash(input);
     }
 
     public byte @NonNull [] getUncompressedKeyHash() {
@@ -369,17 +365,13 @@ public class PublicKeyBytes {
     }
 
     /**
-     * Calculates RIPEMD160(SHA256(input)). This is used in Address
-     * calculations. Same as {@link org.bitcoinj.crypto.internal.CryptoUtils#sha256hash160(byte[])} but using
-     * {@link DigestUtils}.
+     * Calculates RIPEMD-160(SHA-256(input)) using the Guava + Bouncy Castle
+     * fast path. Delegates to {@link Hash160} with {@code useFast = true}.
+     *
+     * @see Hash160#hash(byte[])
      */
     public static byte[] sha256hash160Fast(byte[] input) {
-        byte[] sha256 = Hashing.sha256().hashBytes(input).asBytes();
-        RIPEMD160Digest digest = new RIPEMD160Digest();
-        digest.update(sha256, 0, sha256.length);
-        byte[] out = new byte[RIPEMD160_HASH_NUM_BYTES];
-        digest.doFinal(out, 0);
-        return out;
+        return new Hash160(true).hash(input);
     }
 
     public @NonNull String getCompressedKeyHashAsBase58(@NonNull KeyUtility keyUtility) {

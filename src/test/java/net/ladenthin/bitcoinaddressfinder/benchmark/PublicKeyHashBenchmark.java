@@ -6,8 +6,8 @@
 package net.ladenthin.bitcoinaddressfinder.benchmark;
 
 import java.util.concurrent.TimeUnit;
+import net.ladenthin.bitcoinaddressfinder.Hash160;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
-import org.bitcoinj.crypto.internal.CryptoUtils;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -22,22 +22,21 @@ import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 
 /**
- * Throughput benchmark for the two SHA-256 + RIPEMD-160 implementations used in
- * {@link PublicKeyBytes}.
+ * Throughput benchmark for the two SHA-256 + RIPEMD-160 implementations
+ * encapsulated by {@link Hash160}.
  *
- * <p>The static constant {@link PublicKeyBytes#USE_SHA256_RIPEMD160_FAST} selects
- * between two hash implementations at compile time:</p>
+ * <p>{@link Hash160#DEFAULT_USE_FAST} selects between two hash implementations:</p>
  * <ul>
- *   <li>{@code true} &#x2192; {@link PublicKeyBytes#sha256hash160Fast} &#x2014;
- *       Guava SHA-256 + Bouncy Castle RIPEMD-160</li>
- *   <li>{@code false} &#x2192; {@link CryptoUtils#sha256hash160} &#x2014;
- *       BitcoinJ built-in implementation</li>
+ *   <li>{@code true} &#x2192; Guava SHA-256 + Bouncy Castle RIPEMD-160
+ *       (the fast path)</li>
+ *   <li>{@code false} &#x2192; BitcoinJ {@code CryptoUtils.sha256hash160}
+ *       (the reference path)</li>
  * </ul>
  *
  * <p>This benchmark parameterises over {@code useFast = {false, true}} so that
  * both paths are measured side by side. The expected result is that {@code true}
- * (fast) yields significantly more ops/sec &#x2014; which is why the constant
- * defaults to {@code true}.</p>
+ * yields significantly more ops/sec &#x2014; which is why
+ * {@link Hash160#DEFAULT_USE_FAST} defaults to {@code true}.</p>
  *
  * <p>Run locally:</p>
  * <pre>
@@ -53,11 +52,11 @@ import org.openjdk.jmh.infra.Blackhole;
 public class PublicKeyHashBenchmark {
 
     /**
-     * Selects the hash implementation:
-     * {@code true} &#x2192; {@link PublicKeyBytes#sha256hash160Fast} (Guava + Bouncy Castle),
-     * {@code false} &#x2192; {@link CryptoUtils#sha256hash160} (BitcoinJ).
+     * Selects the hash implementation passed to the {@link Hash160} constructor:
+     * {@code true} &#x2192; Guava + Bouncy Castle,
+     * {@code false} &#x2192; BitcoinJ {@code CryptoUtils}.
      *
-     * <p>Corresponds directly to {@link PublicKeyBytes#USE_SHA256_RIPEMD160_FAST}.</p>
+     * <p>Corresponds directly to {@link Hash160#DEFAULT_USE_FAST}.</p>
      */
     @Param({"false", "true"})
     public boolean useFast;
@@ -68,9 +67,13 @@ public class PublicKeyHashBenchmark {
     /** Fixed 33-byte compressed public key ({@code 02/03 || X}) used as hash input. */
     private byte[] compressedKey = new byte[0];
 
-    /** Initializes fixed-content key byte arrays so every iteration hashes the same input. */
+    /** {@link Hash160} instance configured with the selected implementation. */
+    private Hash160 hash160 = new Hash160();
+
+    /** Initializes fixed-content key byte arrays and the {@link Hash160} instance. */
     @Setup
     public void setUp() {
+        hash160 = new Hash160(useFast);
         uncompressedKey = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
         uncompressedKey[0] = (byte) PublicKeyBytes.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT;
         for (int i = 1; i < uncompressedKey.length; i++) {
@@ -80,7 +83,7 @@ public class PublicKeyHashBenchmark {
     }
 
     /**
-     * Hashes an uncompressed public key (65 bytes) using the selected implementation.
+     * Hashes an uncompressed public key (65 bytes) via {@link Hash160#hash(byte[])}.
      *
      * <p>Uncompressed keys are the larger input; this benchmark shows the per-byte
      * cost difference between the two implementations at full 65-byte input size.</p>
@@ -89,15 +92,11 @@ public class PublicKeyHashBenchmark {
      */
     @Benchmark
     public void hashUncompressed(Blackhole bh) {
-        if (useFast) {
-            bh.consume(PublicKeyBytes.sha256hash160Fast(uncompressedKey));
-        } else {
-            bh.consume(CryptoUtils.sha256hash160(uncompressedKey));
-        }
+        bh.consume(hash160.hash(uncompressedKey));
     }
 
     /**
-     * Hashes a compressed public key (33 bytes) using the selected implementation.
+     * Hashes a compressed public key (33 bytes) via {@link Hash160#hash(byte[])}.
      *
      * <p>Compressed keys are the smaller input; this benchmark shows whether the
      * implementation gap persists at reduced input size.</p>
@@ -106,10 +105,6 @@ public class PublicKeyHashBenchmark {
      */
     @Benchmark
     public void hashCompressed(Blackhole bh) {
-        if (useFast) {
-            bh.consume(PublicKeyBytes.sha256hash160Fast(compressedKey));
-        } else {
-            bh.consume(CryptoUtils.sha256hash160(compressedKey));
-        }
+        bh.consume(hash160.hash(compressedKey));
     }
 }
