@@ -25,7 +25,6 @@ import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.crypto.ECKey;
-import org.bitcoinj.crypto.MnemonicException;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -198,7 +197,7 @@ public class ConsumerJava implements Consumer {
         LOGGER.info("end consumeKeysRunner");
     }
 
-    void consumeKeys(ByteBuffer threadLocalReuseableByteBuffer) throws MnemonicException.MnemonicLengthException {
+    void consumeKeys(ByteBuffer threadLocalReuseableByteBuffer) {
         LOGGER.trace("consumeKeys");
         PublicKeyBytes[] publicKeyBytesArray = keysQueue.poll();
         while (publicKeyBytesArray != null) {

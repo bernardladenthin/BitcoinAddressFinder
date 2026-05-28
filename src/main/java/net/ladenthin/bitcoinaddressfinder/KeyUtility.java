@@ -14,7 +14,6 @@ import org.bitcoinj.base.LegacyAddress;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.MnemonicCode;
-import org.bitcoinj.crypto.MnemonicException;
 import org.bouncycastle.util.encoders.Hex;
 import org.jspecify.annotations.NonNull;
 
@@ -95,9 +94,8 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
      *
      * @param key the key to describe
      * @return the formatted log line
-     * @throws MnemonicException.MnemonicLengthException if the mnemonic library rejects the input length
      */
-    public String createKeyDetails(ECKey key) throws MnemonicException.MnemonicLengthException {
+    public String createKeyDetails(ECKey key) {
         BigInteger privateKeyBigInteger = key.getPrivKey();
         byte[] privateKeyBytes = key.getPrivKeyBytes();
         String privateKeyHex = key.getPrivateKeyAsHex();

@@ -17,7 +17,6 @@ import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
 import org.bitcoinj.base.LegacyAddress;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
-import org.bitcoinj.crypto.MnemonicException;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -165,8 +164,7 @@ public class KeyUtilityTest {
 
     // <editor-fold defaultstate="collapsed" desc="createKeyDetails">
     @Test
-    public void createKeyDetails_uncompressedKey_returnsExpectedDetails()
-            throws IOException, MnemonicException.MnemonicLengthException {
+    public void createKeyDetails_uncompressedKey_returnsExpectedDetails() throws IOException {
         // arrange
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
@@ -190,8 +188,7 @@ public class KeyUtilityTest {
     }
 
     @Test
-    public void createKeyDetails_compressedKey_returnsExpectedDetails()
-            throws IOException, MnemonicException.MnemonicLengthException {
+    public void createKeyDetails_compressedKey_returnsExpectedDetails() throws IOException {
         // arrange
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
