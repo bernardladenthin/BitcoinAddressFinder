@@ -325,7 +325,7 @@ public class OpenCLBuilder {
         clGetDeviceInfo(device, paramName, buffer.length, Pointer.to(buffer), null);
 
         // Create a string from the buffer (excluding the trailing \0 byte)
-        return new String(buffer, 0, buffer.length - 1);
+        return new String(buffer, 0, buffer.length - 1, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     /**
@@ -345,7 +345,7 @@ public class OpenCLBuilder {
         clGetPlatformInfo(platform, paramName, buffer.length, Pointer.to(buffer), null);
 
         // Create a string from the buffer (excluding the trailing \0 byte)
-        return new String(buffer, 0, buffer.length - 1);
+        return new String(buffer, 0, buffer.length - 1, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     /**

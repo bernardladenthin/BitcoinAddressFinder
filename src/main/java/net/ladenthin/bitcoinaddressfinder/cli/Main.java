@@ -8,7 +8,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -88,7 +88,7 @@ public class Main implements Runnable, Interruptable {
      */
     public static String readString(Path path) {
         try {
-            return Files.readString(path, Charset.defaultCharset());
+            return Files.readString(path, StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

@@ -298,7 +298,7 @@ public class LMDBPersistence implements Persistence {
 
         try (Txn<ByteBuffer> txn = localEnv.txnRead()) {
             try (CursorIterable<ByteBuffer> iterable = localLmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
-                try (FileWriter writer = new FileWriter(file)) {
+                try (FileWriter writer = new FileWriter(file, java.nio.charset.StandardCharsets.UTF_8)) {
                     for (final CursorIterable.KeyVal<ByteBuffer> kv : iterable) {
                         if (!shouldRun.get()) {
                             return;
