@@ -120,7 +120,7 @@ public class Bech32Helper {
      * @throws ReflectiveOperationException if the protected method cannot be accessed
      */
     public byte[] getWitnessPrograms(Bech32.Bech32Data bechData) throws ReflectiveOperationException {
-        return invokeProtectedMethod(bechData, "witnessProgram", byte[].class);
+        return invokeProtectedMethod(bechData, "witnessProgram");
     }
 
     /**
@@ -137,14 +137,13 @@ public class Bech32Helper {
      * @throws ReflectiveOperationException if the protected method cannot be accessed
      */
     public Short getWitnessVersion(Bech32.Bech32Data bechData) throws ReflectiveOperationException {
-        return invokeProtectedMethod(bechData, "witnessVersion", Short.class);
+        return invokeProtectedMethod(bechData, "witnessVersion");
     }
 
     @SuppressWarnings("unchecked")
-    private <T> T invokeProtectedMethod(Bech32.Bech32Bytes bech32Bytes, String methodName, Class<T> returnType)
+    private <T> T invokeProtectedMethod(Bech32.Bech32Bytes bech32Bytes, String methodName)
             throws ReflectiveOperationException {
-        Class<?> clazz = Bech32.Bech32Bytes.class;
-        Method method = clazz.getDeclaredMethod(methodName);
+        Method method = Bech32.Bech32Bytes.class.getDeclaredMethod(methodName);
         method.setAccessible(true);
         return (T) method.invoke(bech32Bytes);
     }

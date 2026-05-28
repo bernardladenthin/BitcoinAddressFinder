@@ -21,10 +21,29 @@ import org.bitcoinj.wallet.DeterministicSeed;
  */
 public class BIP39KeyProducer extends java.util.Random {
 
-    /** Underlying deterministic key chain seeded from the mnemonic. */
-    private final DeterministicKeyChain keyChain;
-    /** Parsed BIP44 base derivation path. */
-    private final List<ChildNumber> basePath;
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * Underlying deterministic key chain seeded from the mnemonic.
+     * <p>
+     * Marked transient because {@link DeterministicKeyChain} is not Serializable.
+     * Serialization is inherited from {@link java.util.Random} as a side effect
+     * of using Random as a façade for this deterministic producer; it is not a
+     * supported operation. A deserialised instance will have a {@code null}
+     * keyChain and NPE on first use, which is the intended fail-fast. The
+     * field cannot be declared {@code final} together with {@code transient}
+     * because spotbugs NFF_NON_FUNCTIONAL_FIELD flags the combination
+     * (a {@code final transient} field can never be restored on
+     * deserialisation); the field is in practice immutable since it is only
+     * assigned by the constructor.
+     */
+    private transient DeterministicKeyChain keyChain;
+    /**
+     * Parsed BIP44 base derivation path.
+     * <p>
+     * Marked transient for the same reason as {@link #keyChain}.
+     */
+    private transient List<ChildNumber> basePath;
     /** Whether derived child indices are hardened. */
     private final boolean hardened;
     /** Monotonically increasing child-index counter (visible for testing). */
