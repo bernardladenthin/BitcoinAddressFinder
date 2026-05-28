@@ -20,7 +20,7 @@ public abstract class AbstractProducer implements Producer {
 
     private static final int SLEEP_WAIT_TILL_RUNNING = 10;
 
-    private Logger logger = LoggerFactory.getLogger(this.getClass());
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractProducer.class);
 
     /** Flag indicating whether the producer is currently running. */
     protected final AtomicBoolean running = new AtomicBoolean(false);
@@ -69,19 +69,19 @@ public abstract class AbstractProducer implements Producer {
 
     @Override
     public void initProducer() {
-        logger.info("Init producer.");
+        LOGGER.info("Init producer.");
         this.state = ProducerState.INITIALIZED;
     }
 
     @Override
     public void releaseProducer() {
-        logger.info("Release producer.");
+        LOGGER.info("Release producer.");
     }
 
     @Override
     public void run() {
         if (!shouldRun.get()) {
-            logger.info("Producer was interrupted before it started running.");
+            LOGGER.info("Producer was interrupted before it started running.");
             state = ProducerState.NOT_RUNNING;
             return;
         }
@@ -93,7 +93,7 @@ public abstract class AbstractProducer implements Producer {
             try {
                 produceKeys();
             } catch (Exception e) {
-                logger.error("Error in produceKeys", e);
+                LOGGER.error("Error in produceKeys", e);
                 break;
             }
             if (cProducer.runOnce) {
@@ -154,7 +154,7 @@ public abstract class AbstractProducer implements Producer {
      * @param secret the secret to be able to recover the issue
      */
     protected void logErrorInProduceKeys(Throwable e, BigInteger secret) {
-        logger.error("Error in produceKey for secret " + secret + ".", e);
+        LOGGER.error("Error in produceKey for secret " + secret + ".", e);
     }
 
     /**
@@ -163,14 +163,14 @@ public abstract class AbstractProducer implements Producer {
      * @param e the exception to log
      */
     protected void logErrorInProduceKeys(Exception e) {
-        logger.error("Error in produceKey", e);
+        LOGGER.error("Error in produceKey", e);
     }
 
     /**
      * Logs that the underlying secret source has been exhausted.
      */
     protected void logNoMoreSecretsInSecretFactory() {
-        logger.error("No more keys in secret factory. Shutdown producer.");
+        LOGGER.error("No more keys in secret factory. Shutdown producer.");
     }
 
     @Override
@@ -195,16 +195,16 @@ public abstract class AbstractProducer implements Producer {
         BigInteger secretBase = keyUtility.killBits(secret, killBits);
 
         if (logSecretBase) {
-            logger.info("secretBase: " + keyUtility.bigIntegerToFixedLengthHex(secretBase) + "/"
+            LOGGER.info("secretBase: " + keyUtility.bigIntegerToFixedLengthHex(secretBase) + "/"
                     + cProducer.batchSizeInBits);
         }
 
-        if (logger.isTraceEnabled()) {
-            logger.trace("secret BigInteger: " + secret);
-            logger.trace("secret as byte array: " + keyUtility.bigIntegerToFixedLengthHex(secret));
-            logger.trace("killBits: " + Hex.encodeHexString(killBits.toByteArray()));
-            logger.trace("secretBase: " + secretBase);
-            logger.trace("secretBase as byte array: " + keyUtility.bigIntegerToFixedLengthHex(secretBase));
+        if (LOGGER.isTraceEnabled()) {
+            LOGGER.trace("secret BigInteger: " + secret);
+            LOGGER.trace("secret as byte array: " + keyUtility.bigIntegerToFixedLengthHex(secret));
+            LOGGER.trace("killBits: " + Hex.encodeHexString(killBits.toByteArray()));
+            LOGGER.trace("secretBase: " + secretBase);
+            LOGGER.trace("secretBase as byte array: " + keyUtility.bigIntegerToFixedLengthHex(secretBase));
         }
 
         return secretBase;
@@ -223,14 +223,6 @@ public abstract class AbstractProducer implements Producer {
             return secretBase.add(BigInteger.valueOf(keyNumber));
         }
         return secretBase.or(BigInteger.valueOf(keyNumber));
-    }
-
-    Logger getLogger() {
-        return logger;
-    }
-
-    void setLogger(Logger logger) {
-        this.logger = logger;
     }
 
     @Override

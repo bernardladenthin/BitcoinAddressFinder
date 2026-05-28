@@ -5,12 +5,10 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -18,6 +16,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
+import nl.altindag.log.LogCaptor;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.base.Network;
@@ -25,8 +24,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.ArgumentCaptor;
-import org.slf4j.Logger;
 
 public class AbstractProducerTest {
 
@@ -90,34 +87,30 @@ public class AbstractProducerTest {
         AbstractProducerTestImpl abstractProducerTestImpl =
                 new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
-        Logger logger = mock(Logger.class);
-        when(logger.isTraceEnabled()).thenReturn(true);
-        abstractProducerTestImpl.setLogger(logger);
-
         BigInteger secret = new BigInteger(1, Hex.decodeHex(givenSecret));
         boolean logSecretBase = true;
 
-        // act
-        BigInteger secretBase = abstractProducerTestImpl.createSecretBase(secret, logSecretBase);
+        try (LogCaptor logCaptor = LogCaptor.forClass(AbstractProducer.class)) {
+            logCaptor.setLogLevelToTrace();
 
-        // assert
-        assertThat(keyUtility.bigIntegerToFixedLengthHex(secretBase), is(equalTo(expectedSecretBase)));
+            // act
+            BigInteger secretBase = abstractProducerTestImpl.createSecretBase(secret, logSecretBase);
 
-        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
-        verify(logger, times(1)).info(logCaptor.capture());
-        verify(logger, times(5)).trace(logCaptor.capture());
-        List<String> arguments = logCaptor.getAllValues();
-        // assert log secret base
-        {
-            assertThat(arguments.get(0), is(equalTo(logInfo0)));
-        }
-        // assert log trace
-        {
-            assertThat(arguments.get(1), is(equalTo(logTrace0)));
-            assertThat(arguments.get(2), is(equalTo(logTrace1)));
-            assertThat(arguments.get(3), is(equalTo(logTrace2)));
-            assertThat(arguments.get(4), is(equalTo(logTrace3)));
-            assertThat(arguments.get(5), is(equalTo(logTrace4)));
+            // assert
+            assertThat(keyUtility.bigIntegerToFixedLengthHex(secretBase), is(equalTo(expectedSecretBase)));
+
+            List<String> infoLogs = logCaptor.getInfoLogs();
+            List<String> traceLogs = logCaptor.getTraceLogs();
+            assertThat(infoLogs, hasSize(1));
+            assertThat(traceLogs, hasSize(5));
+            // assert log secret base
+            assertThat(infoLogs.get(0), is(equalTo(logInfo0)));
+            // assert log trace
+            assertThat(traceLogs.get(0), is(equalTo(logTrace0)));
+            assertThat(traceLogs.get(1), is(equalTo(logTrace1)));
+            assertThat(traceLogs.get(2), is(equalTo(logTrace2)));
+            assertThat(traceLogs.get(3), is(equalTo(logTrace3)));
+            assertThat(traceLogs.get(4), is(equalTo(logTrace4)));
         }
     }
 
@@ -134,25 +127,19 @@ public class AbstractProducerTest {
         AbstractProducerTestImpl abstractProducerTestImpl =
                 new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
-        Logger logger = mock(Logger.class);
-        when(logger.isTraceEnabled()).thenReturn(true);
-        abstractProducerTestImpl.setLogger(logger);
-
         BigInteger secret = new BigInteger(Hex.decodeHex("ABCDEF"));
         boolean logSecretBase = false;
 
-        // act
-        abstractProducerTestImpl.createSecretBase(secret, logSecretBase);
+        try (LogCaptor logCaptor = LogCaptor.forClass(AbstractProducer.class)) {
+            logCaptor.setLogLevelToTrace();
 
-        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
-        // assert
-        // assert log secret base
-        {
-            verify(logger, times(0)).info(logCaptor.capture());
-        }
-        // assert log trace
-        {
-            verify(logger, times(5)).trace(logCaptor.capture());
+            // act
+            abstractProducerTestImpl.createSecretBase(secret, logSecretBase);
+
+            // assert log secret base disabled
+            assertThat(logCaptor.getInfoLogs(), hasSize(0));
+            // assert log trace
+            assertThat(logCaptor.getTraceLogs(), hasSize(5));
         }
     }
 
@@ -169,71 +156,52 @@ public class AbstractProducerTest {
         AbstractProducerTestImpl abstractProducerTestImpl =
                 new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
-        Logger logger = mock(Logger.class);
-        when(logger.isTraceEnabled()).thenReturn(false);
-        abstractProducerTestImpl.setLogger(logger);
-
         BigInteger secret = new BigInteger(Hex.decodeHex("ABCDEF"));
         boolean logSecretBase = true;
 
-        // act
-        abstractProducerTestImpl.createSecretBase(secret, logSecretBase);
+        try (LogCaptor logCaptor = LogCaptor.forClass(AbstractProducer.class)) {
+            logCaptor.setLogLevelToInfo();
 
-        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
-        // assert
-        // assert log secret base
-        {
-            verify(logger, times(1)).info(logCaptor.capture());
-        }
-        // assert log trace
-        {
-            verify(logger, times(0)).trace(logCaptor.capture());
+            // act
+            abstractProducerTestImpl.createSecretBase(secret, logSecretBase);
+
+            // assert log secret base
+            assertThat(logCaptor.getInfoLogs(), hasSize(1));
+            // assert log trace
+            assertThat(logCaptor.getTraceLogs(), hasSize(0));
         }
     }
     // </editor-fold>
 
     static void verifyReleaseProducer(AbstractProducer abstractProducer) {
-        Logger logger = mock(Logger.class);
-        when(logger.isTraceEnabled()).thenReturn(true);
-        abstractProducer.setLogger(logger);
+        try (LogCaptor logCaptor = LogCaptor.forClass(AbstractProducer.class)) {
+            abstractProducer.initProducer();
 
-        abstractProducer.initProducer();
+            // act
+            abstractProducer.releaseProducer();
 
-        // act
-        abstractProducer.releaseProducer();
+            // assert
+            assertThat(abstractProducer.state, is(equalTo(ProducerState.INITIALIZED)));
 
-        // assert
-        assertThat(abstractProducer.state, is(equalTo(ProducerState.INITIALIZED)));
-
-        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
-        verify(logger, times(2)).info(logCaptor.capture());
-        List<String> arguments = logCaptor.getAllValues();
-        // assert log initProducer
-        {
-            assertThat(arguments.get(1), is(equalTo("Release producer.")));
+            List<String> infoLogs = logCaptor.getInfoLogs();
+            assertThat(infoLogs, hasSize(2));
+            // assert log initProducer
+            assertThat(infoLogs.get(1), is(equalTo("Release producer.")));
         }
     }
 
     static void verifyInitProducer(AbstractProducer abstractProducer) {
-        Logger logger = mock(Logger.class);
-        when(logger.isTraceEnabled()).thenReturn(true);
-        abstractProducer.setLogger(logger);
+        try (LogCaptor logCaptor = LogCaptor.forClass(AbstractProducer.class)) {
+            // pre-assert
+            assertThat(abstractProducer.state, is(equalTo(ProducerState.UNINITIALIZED)));
 
-        // pre-assert
-        assertThat(abstractProducer.state, is(equalTo(ProducerState.UNINITIALIZED)));
+            // act
+            abstractProducer.initProducer();
 
-        // act
-        abstractProducer.initProducer();
+            // assert
+            assertThat(abstractProducer.state, is(equalTo(ProducerState.INITIALIZED)));
 
-        // assert
-        assertThat(abstractProducer.state, is(equalTo(ProducerState.INITIALIZED)));
-
-        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
-        verify(logger, times(1)).info(logCaptor.capture());
-        List<String> arguments = logCaptor.getAllValues();
-        // assert log initProducer
-        {
-            assertThat(arguments.get(0), is(equalTo("Init producer.")));
+            assertThat(logCaptor.getInfoLogs(), hasItem(equalTo("Init producer.")));
         }
     }
 
@@ -262,21 +230,19 @@ public class AbstractProducerTest {
         AbstractProducerTestImpl abstractProducerTestImpl =
                 new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
-        Logger logger = mock(Logger.class);
-        abstractProducerTestImpl.setLogger(logger);
-        abstractProducerTestImpl.initProducer();
-        abstractProducerTestImpl.interrupt();
+        try (LogCaptor logCaptor = LogCaptor.forClass(AbstractProducer.class)) {
+            abstractProducerTestImpl.initProducer();
+            abstractProducerTestImpl.interrupt();
 
-        // act
-        abstractProducerTestImpl.run();
+            // act
+            abstractProducerTestImpl.run();
 
-        // assert
-        assertThat(abstractProducerTestImpl.state, is(equalTo(ProducerState.NOT_RUNNING)));
+            // assert
+            assertThat(abstractProducerTestImpl.state, is(equalTo(ProducerState.NOT_RUNNING)));
 
-        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
-        verify(logger, times(2)).info(logCaptor.capture());
-        List<String> arguments = logCaptor.getAllValues();
-        assertThat(arguments.get(1), is(equalTo("Producer was interrupted before it started running.")));
+            assertThat(
+                    logCaptor.getInfoLogs(), hasItem(equalTo("Producer was interrupted before it started running.")));
+        }
     }
 
     @Test
@@ -295,25 +261,17 @@ public class AbstractProducerTest {
                     }
                 };
 
-        Logger logger = mock(Logger.class);
-        abstractProducerTestImpl.setLogger(logger);
-        abstractProducerTestImpl.initProducer();
+        try (LogCaptor logCaptor = LogCaptor.forClass(AbstractProducer.class)) {
+            abstractProducerTestImpl.initProducer();
 
-        // act
-        abstractProducerTestImpl.run();
+            // act
+            abstractProducerTestImpl.run();
 
-        // assert
-        assertThat(abstractProducerTestImpl.state, is(equalTo(ProducerState.NOT_RUNNING)));
+            // assert
+            assertThat(abstractProducerTestImpl.state, is(equalTo(ProducerState.NOT_RUNNING)));
 
-        ArgumentCaptor<String> logCaptorMessage = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<Exception> logCaptorException = ArgumentCaptor.forClass(Exception.class);
-        verify(logger, times(1)).error(logCaptorMessage.capture(), logCaptorException.capture());
-
-        List<String> arguments = logCaptorMessage.getAllValues();
-        List<Exception> exceptions = logCaptorException.getAllValues();
-
-        assertThat(arguments.get(0), is(equalTo("Error in produceKeys")));
-        assertThat(exceptions.get(0).getMessage(), is(equalTo("Test exception")));
+            assertThat(logCaptor.getErrorLogs(), hasItem(equalTo("Error in produceKeys")));
+        }
     }
     // </editor-fold>
 }

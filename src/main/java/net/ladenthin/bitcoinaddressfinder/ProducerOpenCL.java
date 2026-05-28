@@ -19,6 +19,8 @@ import org.slf4j.LoggerFactory;
  */
 public class ProducerOpenCL extends AbstractProducer {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(ProducerOpenCL.class);
+
     private final CProducerOpenCL producerOpenCL;
 
     @VisibleForTesting
@@ -73,15 +75,15 @@ public class ProducerOpenCL extends AbstractProducer {
         }
         try {
             waitTillFreeThreadsInPool();
-            if (getLogger().isDebugEnabled()) {
-                getLogger().debug("openCLContext.createKeys for secretBase: " + secretBase);
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("openCLContext.createKeys for secretBase: " + secretBase);
             }
             OpenCLGridResult openCLGridResult = openCLContext.createKeys(secretBase);
             ResultReaderRunnable resultReaderRunnable =
                     new ResultReaderRunnable(openCLGridResult, consumer, secretBase, this);
 
-            if (getLogger().isDebugEnabled()) {
-                getLogger().debug("submit resultReaderRunnable for secretBase: " + secretBase);
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("submit resultReaderRunnable for secretBase: " + secretBase);
             }
             // Use execute() rather than submit() because we never consume the
             // returned Future: ResultReaderRunnable reports completion via the
@@ -142,7 +144,7 @@ public class ProducerOpenCL extends AbstractProducer {
     void waitTillFreeThreadsInPool() throws InterruptedException {
         while (getFreeThreads() < 1) {
             Thread.sleep(producerOpenCL.delayBlockedReader);
-            getLogger().trace("No possible free threads to read OpenCL results. May increase maxResultReaderThreads.");
+            LOGGER.trace("No possible free threads to read OpenCL results. May increase maxResultReaderThreads.");
         }
     }
 
