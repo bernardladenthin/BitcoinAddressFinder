@@ -119,4 +119,39 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="LO_SUSPECT_LOG_CLASS"/>
     </Match>
 
+    <!--
+        KeyProducerJavaSocket and ConnectionUtils form the project's TCP
+        plumbing for the socket-based key producer
+        (CKeyProducerJavaSocket): the SERVER mode listens for clients
+        pushing 32-byte candidate private keys, the CLIENT mode pulls
+        them from a configured host. ConnectionUtils.waitUntilTcpPortOpen
+        is a port-liveness probe that transmits no data.
+
+        The "private keys" exchanged are candidate keys being checked
+        against the local LMDB known-address database, not real wallet
+        credentials. The producer is a security-research orchestration
+        primitive: operators run it localhost-to-localhost or on a
+        trusted LAN as part of their batch-scan setup. There is no
+        production-facing TLS endpoint to harden.
+
+        findsecbugs UNENCRYPTED_SOCKET / UNENCRYPTED_SERVER_SOCKET
+        assume a general-purpose-app threat model where any socket
+        carrying any "private key" bytes must be TLS-protected. That
+        model does not apply here; adding TLS plumbing (keystore,
+        certs, client-cert validation) would be substantial
+        architectural surface for zero security gain in the documented
+        use case. Same design-intent rationale as the PREDICTABLE_RANDOM
+        suppression above.
+    -->
+    <Match>
+        <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.ConnectionUtils"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocket"/>
+        </Or>
+        <Or>
+            <Bug pattern="UNENCRYPTED_SOCKET"/>
+            <Bug pattern="UNENCRYPTED_SERVER_SOCKET"/>
+        </Or>
+    </Match>
+
 </FindBugsFilter>
