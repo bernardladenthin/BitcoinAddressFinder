@@ -90,7 +90,6 @@ public class OpenCLContext implements ReleaseCLObject {
     private final CProducerOpenCL producerOpenCL;
     private final BitHelper bitHelper;
 
-    private @Nullable OpenCLDevice device;
     private @Nullable cl_context context;
     private @Nullable cl_command_queue commandQueue;
     private @Nullable cl_program program;
@@ -129,7 +128,7 @@ public class OpenCLContext implements ReleaseCLObject {
         OpenCLDeviceSelection selection = platformSelector.select(
                 platforms, producerOpenCL.platformIndex, producerOpenCL.deviceType, producerOpenCL.deviceIndex);
 
-        device = selection.device();
+        OpenCLDevice device = selection.device();
         LOGGER.info("Selected OpenCL device:\n{}", device.toStringPretty());
         cl_context_properties contextProperties = selection.contextProperties();
         cl_device_id[] cl_device_ids = new cl_device_id[] {device.device()};
@@ -168,7 +167,6 @@ public class OpenCLContext implements ReleaseCLObject {
 
     @Override
     public void close() {
-        device = null;
         if (!closed) {
             if (openClTask != null) {
                 openClTask = null;
