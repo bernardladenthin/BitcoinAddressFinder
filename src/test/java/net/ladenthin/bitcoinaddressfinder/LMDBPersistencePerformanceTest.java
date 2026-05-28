@@ -65,8 +65,9 @@ public class LMDBPersistencePerformanceTest {
                 ManualDebugConstants.ENABLE_RUNTIME_PUBLIC_KEY_CALCULATION_CHECK;
 
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
-        ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) consumerJava.getLogger();
-        logger.setLevel(Level.INFO);
+        // Quiet ConsumerJava's class-level logger down to INFO for this perf test.
+        ((ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ConsumerJava.class))
+                .setLevel(Level.INFO);
 
         consumerJava.initLMDB();
 

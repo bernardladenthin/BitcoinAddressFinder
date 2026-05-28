@@ -37,8 +37,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.ArgumentCaptor;
-import org.slf4j.Logger;
 
 public class ConsumerJavaTest {
 
@@ -102,28 +100,26 @@ public class ConsumerJavaTest {
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         cConsumerJava.printStatisticsEveryNSeconds = 1;
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
-        Logger logger = mock(Logger.class);
-        consumerJava.setLogger(logger);
         consumerJava.initLMDB();
 
-        // act
-        consumerJava.startStatisticsTimer();
+        try (LogCaptor logCaptor = LogCaptor.forClass(ConsumerJava.class)) {
+            // act
+            consumerJava.startStatisticsTimer();
 
-        // sleep close to runTimes+1 cycles to let the tasks run runTimes times
-        Thread.sleep(((long) cConsumerJava.printStatisticsEveryNSeconds * (runTimes + 1) * 1000) - 300);
+            // sleep close to runTimes+1 cycles to let the tasks run runTimes times
+            Thread.sleep(((long) cConsumerJava.printStatisticsEveryNSeconds * (runTimes + 1) * 1000) - 300);
 
-        // assert
-        consumerJava.interrupt();
+            // assert
+            consumerJava.interrupt();
 
-        ArgumentCaptor<String> logCaptorInfo = ArgumentCaptor.forClass(String.class);
-        verify(logger, atLeast(runTimes)).info(logCaptorInfo.capture());
-        List<String> arguments = logCaptorInfo.getAllValues();
-
-        assertThat(
-                arguments.get(0),
-                is(
-                        equalTo(
-                                "Statistics: [Checked 0 M keys in 0 minutes] [0 k keys/second] [0 M keys/minute] [Times an empty consumer: 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
+            List<String> arguments = logCaptor.getInfoLogs();
+            assertThat(arguments.size(), is(greaterThanOrEqualTo(runTimes)));
+            assertThat(
+                    arguments,
+                    hasItem(
+                            equalTo(
+                                    "Statistics: [Checked 0 M keys in 0 minutes] [0 k keys/second] [0 M keys/minute] [Times an empty consumer: 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
+        }
     }
 
     @Test
@@ -150,8 +146,6 @@ public class ConsumerJavaTest {
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
-        Logger logger = mock(Logger.class);
-        consumerJava.setLogger(logger);
         consumerJava.initLMDB();
 
         // add keys
@@ -197,8 +191,6 @@ public class ConsumerJavaTest {
         cConsumerJava.printStatisticsEveryNSeconds = 1;
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
 
-        Logger logger = mock(Logger.class);
-        consumerJava.setLogger(logger);
         consumerJava.initLMDB();
         // pre-assert
         assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(equalTo(Boolean.FALSE)));
@@ -292,47 +284,47 @@ public class ConsumerJavaTest {
         ProducerJava producerJava =
                 new ProducerJava(cProducerJava, consumerJava, keyUtility, mockKeyProducer, bitHelper);
 
-        Logger logger = mock(Logger.class);
-        consumerJava.setLogger(logger);
-        producerJava.produceKeys();
-        consumerJava.consumeKeys(createHash160ByteBuffer());
+        try (LogCaptor logCaptor = LogCaptor.forClass(ConsumerJava.class)) {
+            producerJava.produceKeys();
+            consumerJava.consumeKeys(createHash160ByteBuffer());
 
-        // assert
-        assertThat(consumerJava.hits.get(), is(equalTo(1L)));
-        assertThat(consumerJava.vanityHits.get(), is(equalTo(0L)));
-        ArgumentCaptor<String> logCaptorInfo = ArgumentCaptor.forClass(String.class);
-        verify(logger, times(6)).info(logCaptorInfo.capture());
+            // assert
+            assertThat(consumerJava.hits.get(), is(equalTo(1L)));
+            assertThat(consumerJava.vanityHits.get(), is(equalTo(0L)));
 
-        List<String> arguments = logCaptorInfo.getAllValues();
+            List<String> arguments = logCaptor.getInfoLogs();
+            assertThat(arguments, hasSize(6));
 
-        ECKey key = new TestAddresses42(1, compressed).getECKeys().get(0);
+            ECKey key = new TestAddresses42(1, compressed).getECKeys().get(0);
 
-        PublicKeyBytes publicKeyBytes = PublicKeyBytes.fromPrivate(key.getPrivKey());
+            PublicKeyBytes publicKeyBytes = PublicKeyBytes.fromPrivate(key.getPrivKey());
 
-        // to prevent any exception in further hit message creation and a possible missing hit message, log the secret
-        // alone first that a recovery is possible
-        String hitMessageSecretKey =
-                ConsumerJava.HIT_SAFE_PREFIX + "publicKeyBytes.getSecretKey(): " + key.getPrivKey();
-        assertThat(arguments.get(0), is(equalTo(hitMessageSecretKey)));
+            // to prevent any exception in further hit message creation and a possible missing hit message, log the
+            // secret
+            // alone first that a recovery is possible
+            String hitMessageSecretKey =
+                    ConsumerJava.HIT_SAFE_PREFIX + "publicKeyBytes.getSecretKey(): " + key.getPrivKey();
+            assertThat(arguments.get(0), is(equalTo(hitMessageSecretKey)));
 
-        String hitMessagePublicKeyBytesUncompressed = ConsumerJava.HIT_SAFE_PREFIX
-                + "publicKeyBytes.getUncompressed(): " + Hex.encodeHexString(publicKeyBytes.getUncompressed());
-        assertThat(arguments.get(1), is(equalTo(hitMessagePublicKeyBytesUncompressed)));
+            String hitMessagePublicKeyBytesUncompressed = ConsumerJava.HIT_SAFE_PREFIX
+                    + "publicKeyBytes.getUncompressed(): " + Hex.encodeHexString(publicKeyBytes.getUncompressed());
+            assertThat(arguments.get(1), is(equalTo(hitMessagePublicKeyBytesUncompressed)));
 
-        String hitMessagePublicKeyBytesCompressed = ConsumerJava.HIT_SAFE_PREFIX + "publicKeyBytes.getCompressed(): "
-                + Hex.encodeHexString(publicKeyBytes.getCompressed());
-        assertThat(arguments.get(2), is(equalTo(hitMessagePublicKeyBytesCompressed)));
+            String hitMessagePublicKeyBytesCompressed = ConsumerJava.HIT_SAFE_PREFIX
+                    + "publicKeyBytes.getCompressed(): " + Hex.encodeHexString(publicKeyBytes.getCompressed());
+            assertThat(arguments.get(2), is(equalTo(hitMessagePublicKeyBytesCompressed)));
 
-        String hitMessageHash160Uncompressed = ConsumerJava.HIT_SAFE_PREFIX + "hash160Uncompressed: "
-                + Hex.encodeHexString(publicKeyBytes.getUncompressedKeyHash());
-        assertThat(arguments.get(3), is(equalTo(hitMessageHash160Uncompressed)));
+            String hitMessageHash160Uncompressed = ConsumerJava.HIT_SAFE_PREFIX + "hash160Uncompressed: "
+                    + Hex.encodeHexString(publicKeyBytes.getUncompressedKeyHash());
+            assertThat(arguments.get(3), is(equalTo(hitMessageHash160Uncompressed)));
 
-        String hitMessageHash160Compressed = ConsumerJava.HIT_SAFE_PREFIX + "hash160Compressed: "
-                + Hex.encodeHexString(publicKeyBytes.getCompressedKeyHash());
-        assertThat(arguments.get(4), is(equalTo(hitMessageHash160Compressed)));
+            String hitMessageHash160Compressed = ConsumerJava.HIT_SAFE_PREFIX + "hash160Compressed: "
+                    + Hex.encodeHexString(publicKeyBytes.getCompressedKeyHash());
+            assertThat(arguments.get(4), is(equalTo(hitMessageHash160Compressed)));
 
-        String hitMessageFull = ConsumerJava.HIT_PREFIX + keyUtility.createKeyDetails(key);
-        assertThat(arguments.get(5), is(equalTo(hitMessageFull)));
+            String hitMessageFull = ConsumerJava.HIT_PREFIX + keyUtility.createKeyDetails(key);
+            assertThat(arguments.get(5), is(equalTo(hitMessageFull)));
+        }
         consumerJava.interrupt();
     }
 
@@ -361,45 +353,44 @@ public class ConsumerJavaTest {
         ProducerJava producerJava =
                 new ProducerJava(cProducerJava, consumerJava, keyUtility, mockKeyProducer, bitHelper);
 
-        Logger logger = mock(Logger.class);
-        when(logger.isDebugEnabled()).thenReturn(true);
-        when(logger.isTraceEnabled()).thenReturn(true);
-        consumerJava.setLogger(logger);
-        producerJava.produceKeys();
+        try (LogCaptor logCaptor = LogCaptor.forClass(ConsumerJava.class)) {
+            logCaptor.setLogLevelToTrace();
+            producerJava.produceKeys();
 
-        consumerJava.consumeKeys(createHash160ByteBuffer());
+            consumerJava.consumeKeys(createHash160ByteBuffer());
 
-        // assert
-        assertThat(consumerJava.hits.get(), is(equalTo(0L)));
-        assertThat(consumerJava.vanityHits.get(), is(equalTo(0L)));
-        ArgumentCaptor<String> logCaptorDebug = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<String> logCaptorTrace = ArgumentCaptor.forClass(String.class);
-        verify(logger, times(2)).debug(logCaptorDebug.capture());
-        verify(logger, times(9)).trace(logCaptorTrace.capture());
+            // assert
+            assertThat(consumerJava.hits.get(), is(equalTo(0L)));
+            assertThat(consumerJava.vanityHits.get(), is(equalTo(0L)));
 
-        List<String> argumentsDebug = logCaptorDebug.getAllValues();
-        List<String> argumentsTrace = logCaptorTrace.getAllValues();
+            List<String> argumentsDebug = logCaptor.getDebugLogs();
+            List<String> argumentsTrace = logCaptor.getTraceLogs();
+            assertThat(argumentsDebug, hasSize(2));
+            assertThat(argumentsTrace, hasSize(9));
 
-        ECKey unknownKeyUncompressed =
-                new TestAddresses1337(1, false).getECKeys().get(0);
-        ECKey unknownKeyCompressed = new TestAddresses1337(1, true).getECKeys().get(0);
-        String missMessageUncompressed = ConsumerJava.MISS_PREFIX + keyUtility.createKeyDetails(unknownKeyUncompressed);
-        String missMessageCompressed = ConsumerJava.MISS_PREFIX + keyUtility.createKeyDetails(unknownKeyCompressed);
+            ECKey unknownKeyUncompressed =
+                    new TestAddresses1337(1, false).getECKeys().get(0);
+            ECKey unknownKeyCompressed =
+                    new TestAddresses1337(1, true).getECKeys().get(0);
+            String missMessageUncompressed =
+                    ConsumerJava.MISS_PREFIX + keyUtility.createKeyDetails(unknownKeyUncompressed);
+            String missMessageCompressed = ConsumerJava.MISS_PREFIX + keyUtility.createKeyDetails(unknownKeyCompressed);
 
-        assertThat(argumentsDebug.get(0), startsWith("keysQueue.put(publicKeyBytes) with length: 1"));
-        assertThat(argumentsDebug.get(1), startsWith("keysQueue.size(): 1"));
+            assertThat(argumentsDebug.get(0), startsWith("keysQueue.put(publicKeyBytes) with length: 1"));
+            assertThat(argumentsDebug.get(1), startsWith("keysQueue.size(): 1"));
 
-        assertThat(argumentsTrace.get(0), startsWith("consumeKeys"));
-        assertThat(argumentsTrace.get(1), startsWith("Time before persistence.containsAddress: "));
-        assertThat(argumentsTrace.get(2), startsWith("Time after persistence.containsAddress: "));
-        assertThat(argumentsTrace.get(3), startsWith("Time delta: "));
-        assertThat(argumentsTrace.get(4), startsWith("Time before persistence.containsAddress: "));
-        assertThat(argumentsTrace.get(5), startsWith("Time after persistence.containsAddress: "));
-        assertThat(argumentsTrace.get(6), startsWith("Time delta: "));
+            assertThat(argumentsTrace.get(0), startsWith("consumeKeys"));
+            assertThat(argumentsTrace.get(1), startsWith("Time before persistence.containsAddress: "));
+            assertThat(argumentsTrace.get(2), startsWith("Time after persistence.containsAddress: "));
+            assertThat(argumentsTrace.get(3), startsWith("Time delta: "));
+            assertThat(argumentsTrace.get(4), startsWith("Time before persistence.containsAddress: "));
+            assertThat(argumentsTrace.get(5), startsWith("Time after persistence.containsAddress: "));
+            assertThat(argumentsTrace.get(6), startsWith("Time delta: "));
 
-        // assert for expected miss messages
-        assertThat(argumentsTrace.get(7), is(equalTo(missMessageUncompressed)));
-        assertThat(argumentsTrace.get(8), is(equalTo(missMessageCompressed)));
+            // assert for expected miss messages
+            assertThat(argumentsTrace.get(7), is(equalTo(missMessageUncompressed)));
+            assertThat(argumentsTrace.get(8), is(equalTo(missMessageCompressed)));
+        }
         consumerJava.interrupt();
     }
 
@@ -418,9 +409,6 @@ public class ConsumerJavaTest {
 
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
-
-        Logger logger = mock(Logger.class);
-        consumerJava.setLogger(logger);
 
         PublicKeyBytes invalidPublicKeyBytes = PublicKeyBytes.INVALID_KEY_ONE;
         PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[] {invalidPublicKeyBytes};
@@ -531,111 +519,110 @@ public class ConsumerJavaTest {
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
 
-        Logger logger = mock(Logger.class);
-        consumerJava.setLogger(logger);
+        try (LogCaptor logCaptor = LogCaptor.forClass(ConsumerJava.class)) {
+            consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
+            consumerJava.consumeKeys(createHash160ByteBuffer());
 
-        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
-        consumerJava.consumeKeys(createHash160ByteBuffer());
+            // assert
+            assertThat(consumerJava.hits.get(), is(equalTo(0L)));
+            assertThat(consumerJava.vanityHits.get(), is(equalTo(1L)));
 
-        // assert
-        assertThat(consumerJava.hits.get(), is(equalTo(0L)));
-        assertThat(consumerJava.vanityHits.get(), is(equalTo(1L)));
-        ArgumentCaptor<String> logCaptorInfo = ArgumentCaptor.forClass(String.class);
-        verify(logger, times(6)).info(logCaptorInfo.capture());
+            List<String> arguments = logCaptor.getInfoLogs();
+            assertThat(arguments, hasSize(6));
 
-        List<String> arguments = logCaptorInfo.getAllValues();
+            BigInteger secret = BigInteger.valueOf(73);
+            ECKey ecKey = keyUtility.createECKey(secret, true);
+            String mnemonics = keyUtility.createMnemonics(ecKey.getPrivKeyBytes());
 
-        BigInteger secret = BigInteger.valueOf(73);
-        ECKey ecKey = keyUtility.createECKey(secret, true);
-        String mnemonics = keyUtility.createMnemonics(ecKey.getPrivKeyBytes());
+            Map<BIP39Wordlist, String> map = new HashMap<>();
+            map.put(BIP39Wordlist.CHINESE_SIMPLIFIED, "的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 这 铁");
+            map.put(BIP39Wordlist.CHINESE_TRADITIONAL, "的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 這 鐵");
+            map.put(
+                    BIP39Wordlist.CZECH,
+                    "abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace ananas internet");
+            map.put(
+                    BIP39Wordlist.ENGLISH,
+                    "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abuse differ");
+            map.put(
+                    BIP39Wordlist.FRENCH,
+                    "abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abreuver cylindre");
+            map.put(
+                    BIP39Wordlist.ITALIAN,
+                    "abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco accenno disposto");
+            // attention: japanese has a special separator
+            map.put(
+                    BIP39Wordlist.JAPANESE,
+                    "あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あさい　くなん");
+            map.put(
+                    BIP39Wordlist.KOREAN,
+                    "가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가슴 목걸이");
+            map.put(
+                    BIP39Wordlist.PORTUGUESE,
+                    "abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abranger conectar");
+            map.put(
+                    BIP39Wordlist.RUSSIAN,
+                    "абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац агитация завтра");
+            map.put(
+                    BIP39Wordlist.SPANISH,
+                    "ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco abuelo cuota");
+            map.put(
+                    BIP39Wordlist.TURKISH,
+                    "abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur absürt fason");
 
-        Map<BIP39Wordlist, String> map = new HashMap<>();
-        map.put(BIP39Wordlist.CHINESE_SIMPLIFIED, "的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 这 铁");
-        map.put(BIP39Wordlist.CHINESE_TRADITIONAL, "的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 的 這 鐵");
-        map.put(
-                BIP39Wordlist.CZECH,
-                "abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace abdikace ananas internet");
-        map.put(
-                BIP39Wordlist.ENGLISH,
-                "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abuse differ");
-        map.put(
-                BIP39Wordlist.FRENCH,
-                "abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abaisser abreuver cylindre");
-        map.put(
-                BIP39Wordlist.ITALIAN,
-                "abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco abaco accenno disposto");
-        // attention: japanese has a special separator
-        map.put(
-                BIP39Wordlist.JAPANESE,
-                "あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あさい　くなん");
-        map.put(
-                BIP39Wordlist.KOREAN,
-                "가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가격 가슴 목걸이");
-        map.put(
-                BIP39Wordlist.PORTUGUESE,
-                "abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abacate abranger conectar");
-        map.put(
-                BIP39Wordlist.RUSSIAN,
-                "абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац абзац агитация завтра");
-        map.put(
-                BIP39Wordlist.SPANISH,
-                "ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco ábaco abuelo cuota");
-        map.put(
-                BIP39Wordlist.TURKISH,
-                "abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur abajur absürt fason");
+            assertThat(map.size(), is(BIP39Wordlist.values().length));
 
-        assertThat(map.size(), is(BIP39Wordlist.values().length));
+            for (Map.Entry<BIP39Wordlist, String> entry : map.entrySet()) {
+                BIP39Wordlist bip39Wordlist = entry.getKey();
+                String expectedMnemonic = entry.getValue();
+                assertThat(mnemonics, containsString(expectedMnemonic));
+            }
 
-        for (Map.Entry<BIP39Wordlist, String> entry : map.entrySet()) {
-            BIP39Wordlist bip39Wordlist = entry.getKey();
-            String expectedMnemonic = entry.getValue();
-            assertThat(mnemonics, containsString(expectedMnemonic));
+            assertThat(arguments.get(0), is(equalTo("hit: safe log: publicKeyBytes.getSecretKey(): 73")));
+            assertThat(
+                    arguments.get(1),
+                    is(
+                            equalTo(
+                                    "hit: safe log: publicKeyBytes.getUncompressed(): 04af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45f98a3fd831eb2b749a93b0e6f35cfb40c8cd5aa667a15581bc2feded498fd9c6")));
+            assertThat(
+                    arguments.get(2),
+                    is(
+                            equalTo(
+                                    "hit: safe log: publicKeyBytes.getCompressed(): 02af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45")));
+            assertThat(
+                    arguments.get(3),
+                    is(equalTo("hit: safe log: hash160Uncompressed: 2a6f34a72c181bdd4e6d91ffa69e84fd6c49b207")));
+            assertThat(
+                    arguments.get(4),
+                    is(equalTo("hit: safe log: hash160Compressed: c065379323a549fc3547bcb1937d5dcb48df2396")));
+
+            final String privateKeyBytes =
+                    "[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 73]";
+            final String privateKeyHex = "0000000000000000000000000000000000000000000000000000000000000049";
+            final String wif;
+            final String publicKeyAsHex;
+            final String publicKeyHash160Hex;
+            final String publicKeyHash160Base58;
+
+            if (compressed) {
+                wif = "KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU7fj3itoEY";
+                publicKeyAsHex = "02af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45";
+                publicKeyHash160Hex = "c065379323a549fc3547bcb1937d5dcb48df2396";
+                publicKeyHash160Base58 = "1JYHzX3ndZEcnjrWSQ9VC7324TJ9BAoGy4";
+            } else {
+                wif = "5HpHagT65TZzG1PH3CSu63k8DbpvD8s5ip4nEB3kEsreJwwNRRr";
+                publicKeyAsHex =
+                        "04af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45f98a3fd831eb2b749a93b0e6f35cfb40c8cd5aa667a15581bc2feded498fd9c6";
+                publicKeyHash160Hex = "2a6f34a72c181bdd4e6d91ffa69e84fd6c49b207";
+                publicKeyHash160Base58 = "14sNbmEhgiGX6BZe9Q5PCgTQT3576mniZt";
+            }
+
+            String expectedMessage = "vanity pattern match: privateKeyBigInteger: [73] privateKeyBytes: ["
+                    + privateKeyBytes
+                    + "] privateKeyHex: [" + privateKeyHex + "] WiF: [" + wif + "] publicKeyAsHex: [" + publicKeyAsHex
+                    + "] publicKeyHash160Hex: [" + publicKeyHash160Hex + "] publicKeyHash160Base58: ["
+                    + publicKeyHash160Base58 + "] Compressed: [" + compressed + "] " + mnemonics;
+            assertThat(arguments.get(5), is(equalTo(expectedMessage)));
         }
-
-        assertThat(arguments.get(0), is(equalTo("hit: safe log: publicKeyBytes.getSecretKey(): 73")));
-        assertThat(
-                arguments.get(1),
-                is(
-                        equalTo(
-                                "hit: safe log: publicKeyBytes.getUncompressed(): 04af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45f98a3fd831eb2b749a93b0e6f35cfb40c8cd5aa667a15581bc2feded498fd9c6")));
-        assertThat(
-                arguments.get(2),
-                is(
-                        equalTo(
-                                "hit: safe log: publicKeyBytes.getCompressed(): 02af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45")));
-        assertThat(
-                arguments.get(3),
-                is(equalTo("hit: safe log: hash160Uncompressed: 2a6f34a72c181bdd4e6d91ffa69e84fd6c49b207")));
-        assertThat(
-                arguments.get(4),
-                is(equalTo("hit: safe log: hash160Compressed: c065379323a549fc3547bcb1937d5dcb48df2396")));
-
-        final String privateKeyBytes =
-                "[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 73]";
-        final String privateKeyHex = "0000000000000000000000000000000000000000000000000000000000000049";
-        final String wif;
-        final String publicKeyAsHex;
-        final String publicKeyHash160Hex;
-        final String publicKeyHash160Base58;
-
-        if (compressed) {
-            wif = "KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU7fj3itoEY";
-            publicKeyAsHex = "02af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45";
-            publicKeyHash160Hex = "c065379323a549fc3547bcb1937d5dcb48df2396";
-            publicKeyHash160Base58 = "1JYHzX3ndZEcnjrWSQ9VC7324TJ9BAoGy4";
-        } else {
-            wif = "5HpHagT65TZzG1PH3CSu63k8DbpvD8s5ip4nEB3kEsreJwwNRRr";
-            publicKeyAsHex =
-                    "04af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45f98a3fd831eb2b749a93b0e6f35cfb40c8cd5aa667a15581bc2feded498fd9c6";
-            publicKeyHash160Hex = "2a6f34a72c181bdd4e6d91ffa69e84fd6c49b207";
-            publicKeyHash160Base58 = "14sNbmEhgiGX6BZe9Q5PCgTQT3576mniZt";
-        }
-
-        String expectedMessage = "vanity pattern match: privateKeyBigInteger: [73] privateKeyBytes: [" + privateKeyBytes
-                + "] privateKeyHex: [" + privateKeyHex + "] WiF: [" + wif + "] publicKeyAsHex: [" + publicKeyAsHex
-                + "] publicKeyHash160Hex: [" + publicKeyHash160Hex + "] publicKeyHash160Base58: ["
-                + publicKeyHash160Base58 + "] Compressed: [" + compressed + "] " + mnemonics;
-        assertThat(arguments.get(5), is(equalTo(expectedMessage)));
         consumerJava.interrupt();
     }
 

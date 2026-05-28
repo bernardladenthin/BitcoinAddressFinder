@@ -52,7 +52,7 @@ public class ConsumerJava implements Consumer {
     /** Log prefix used by {@code safeLog} to record key details immediately on a hit. */
     public static final String HIT_SAFE_PREFIX = "hit: safe log: ";
 
-    private Logger logger = LoggerFactory.getLogger(this.getClass());
+    private static final Logger LOGGER = LoggerFactory.getLogger(ConsumerJava.class);
 
     private final KeyUtility keyUtility;
     /** Total number of address lookups performed. */
@@ -114,14 +114,6 @@ public class ConsumerJava implements Consumer {
         consumeKeysExecutorService = Executors.newFixedThreadPool(consumerJava.threads);
     }
 
-    Logger getLogger() {
-        return logger;
-    }
-
-    void setLogger(Logger logger) {
-        this.logger = logger;
-    }
-
     /**
      * Initialises the LMDB persistence layer used to query addresses.
      */
@@ -156,7 +148,7 @@ public class ConsumerJava implements Consumer {
                                     hits.get());
 
                     // log the information
-                    logger.info(message);
+                    LOGGER.info(message);
                 },
                 period,
                 period,
@@ -165,27 +157,27 @@ public class ConsumerJava implements Consumer {
 
     @Override
     public void startConsumer() {
-        logger.debug("Starting {} consumer threads...", consumerJava.threads);
+        LOGGER.debug("Starting {} consumer threads...", consumerJava.threads);
         for (int i = 0; i < consumerJava.threads; i++) {
             consumers.add(consumeKeysExecutorService.submit(() -> {
                 consumeKeysRunner();
                 return null;
             }));
         }
-        logger.debug("Successfully started {} consumer threads.", consumers.size());
+        LOGGER.debug("Successfully started {} consumer threads.", consumers.size());
     }
 
     /**
      * This method runs in multiple threads.
      */
     private void consumeKeysRunner() {
-        logger.info("start consumeKeysRunner");
+        LOGGER.info("start consumeKeysRunner");
         final ByteBuffer threadLocalReuseableByteBuffer =
                 ByteBuffer.allocateDirect(PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES);
 
         while (shouldRun.get()) {
             if (keysQueue.size() >= consumerJava.queueSize) {
-                logger.warn("Attention, queue is full. Please increase queue size.");
+                LOGGER.warn("Attention, queue is full. Please increase queue size.");
             }
             try {
                 consumeKeys(threadLocalReuseableByteBuffer);
@@ -194,20 +186,20 @@ public class ConsumerJava implements Consumer {
                 Thread.sleep(consumerJava.delayEmptyConsumer);
             } catch (InterruptedException e) {
                 // we need to catch the exception to not break the thread
-                logger.error("Ignore InterruptedException during Thread.sleep.", e);
+                LOGGER.error("Ignore InterruptedException during Thread.sleep.", e);
             } catch (Exception e) {
                 // log every Exception because it's hard to debug and we do not break down the thread loop
-                logger.error("Error in consumeKeysRunner().", e);
+                LOGGER.error("Error in consumeKeysRunner().", e);
             }
         }
 
         byteBufferUtility.freeByteBuffer(threadLocalReuseableByteBuffer);
 
-        logger.info("end consumeKeysRunner");
+        LOGGER.info("end consumeKeysRunner");
     }
 
     void consumeKeys(ByteBuffer threadLocalReuseableByteBuffer) throws MnemonicException.MnemonicLengthException {
-        logger.trace("consumeKeys");
+        LOGGER.trace("consumeKeys");
         PublicKeyBytes[] publicKeyBytesArray = keysQueue.poll();
         while (publicKeyBytesArray != null) {
             for (PublicKeyBytes publicKeyBytes : publicKeyBytesArray) {
@@ -233,7 +225,7 @@ public class ConsumerJava implements Consumer {
                     ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(
                             publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
                     String hitMessageUncompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
-                    logger.info(hitMessageUncompressed);
+                    LOGGER.info(hitMessageUncompressed);
                 }
 
                 if (containsAddressCompressed) {
@@ -243,7 +235,7 @@ public class ConsumerJava implements Consumer {
                     ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(
                             publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
                     String hitMessageCompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
-                    logger.info(hitMessageCompressed);
+                    LOGGER.info(hitMessageCompressed);
                 }
 
                 if (consumerJava.enableVanity) {
@@ -259,7 +251,7 @@ public class ConsumerJava implements Consumer {
                                 publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
                         String vanityHitMessageUncompressed =
                                 VANITY_HIT_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
-                        logger.info(vanityHitMessageUncompressed);
+                        LOGGER.info(vanityHitMessageUncompressed);
                     }
 
                     String compressedKeyHashAsBase58 = publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility);
@@ -272,21 +264,21 @@ public class ConsumerJava implements Consumer {
                                 publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
                         String vanityHitMessageCompressed =
                                 VANITY_HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
-                        logger.info(vanityHitMessageCompressed);
+                        LOGGER.info(vanityHitMessageCompressed);
                     }
                 }
 
                 if (!containsAddressUncompressed && !containsAddressCompressed) {
-                    if (logger.isTraceEnabled()) {
+                    if (LOGGER.isTraceEnabled()) {
                         ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(
                                 publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
                         String missMessageUncompressed = MISS_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
-                        logger.trace(missMessageUncompressed);
+                        LOGGER.trace(missMessageUncompressed);
 
                         ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(
                                 publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
                         String missMessageCompressed = MISS_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
-                        logger.trace(missMessageCompressed);
+                        LOGGER.trace(missMessageCompressed);
                     }
                 }
             }
@@ -328,19 +320,19 @@ public class ConsumerJava implements Consumer {
      * @param hash160Compressed      the hash160 of the compressed public key
      */
     private void safeLog(PublicKeyBytes publicKeyBytes, byte[] hash160Uncompressed, byte[] hash160Compressed) {
-        logger.info(HIT_SAFE_PREFIX + "publicKeyBytes.getSecretKey(): " + publicKeyBytes.getSecretKey());
-        logger.info(HIT_SAFE_PREFIX + "publicKeyBytes.getUncompressed(): "
+        LOGGER.info(HIT_SAFE_PREFIX + "publicKeyBytes.getSecretKey(): " + publicKeyBytes.getSecretKey());
+        LOGGER.info(HIT_SAFE_PREFIX + "publicKeyBytes.getUncompressed(): "
                 + Hex.encodeHexString(publicKeyBytes.getUncompressed()));
-        logger.info(HIT_SAFE_PREFIX + "publicKeyBytes.getCompressed(): "
+        LOGGER.info(HIT_SAFE_PREFIX + "publicKeyBytes.getCompressed(): "
                 + Hex.encodeHexString(publicKeyBytes.getCompressed()));
-        logger.info(HIT_SAFE_PREFIX + "hash160Uncompressed: " + Hex.encodeHexString(hash160Uncompressed));
-        logger.info(HIT_SAFE_PREFIX + "hash160Compressed: " + Hex.encodeHexString(hash160Compressed));
+        LOGGER.info(HIT_SAFE_PREFIX + "hash160Uncompressed: " + Hex.encodeHexString(hash160Uncompressed));
+        LOGGER.info(HIT_SAFE_PREFIX + "hash160Compressed: " + Hex.encodeHexString(hash160Compressed));
     }
 
     private boolean containsAddress(ByteBuffer hash160AsByteBuffer) {
         long timeBefore = System.currentTimeMillis();
-        if (logger.isTraceEnabled()) {
-            logger.trace("Time before persistence.containsAddress: " + timeBefore);
+        if (LOGGER.isTraceEnabled()) {
+            LOGGER.trace("Time before persistence.containsAddress: " + timeBefore);
         }
         Persistence localPersistence = Objects.requireNonNull(persistence);
         boolean containsAddress = localPersistence.containsAddress(hash160AsByteBuffer);
@@ -348,23 +340,23 @@ public class ConsumerJava implements Consumer {
         long timeDelta = timeAfter - timeBefore;
         checkedKeys.incrementAndGet();
         checkedKeysSumOfTimeToCheckContains.addAndGet(timeDelta);
-        if (logger.isTraceEnabled()) {
-            logger.trace("Time after persistence.containsAddress: " + timeAfter);
-            logger.trace("Time delta: " + timeDelta);
+        if (LOGGER.isTraceEnabled()) {
+            LOGGER.trace("Time after persistence.containsAddress: " + timeAfter);
+            LOGGER.trace("Time delta: " + timeDelta);
         }
         return containsAddress;
     }
 
     @Override
     public void consumeKeys(PublicKeyBytes[] publicKeyBytes) throws InterruptedException {
-        if (logger.isDebugEnabled()) {
-            logger.debug("keysQueue.put(publicKeyBytes) with length: " + publicKeyBytes.length);
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("keysQueue.put(publicKeyBytes) with length: " + publicKeyBytes.length);
         }
 
         keysQueue.put(publicKeyBytes);
 
-        if (logger.isDebugEnabled()) {
-            logger.debug("keysQueue.size(): " + keysQueue.size());
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("keysQueue.size(): " + keysQueue.size());
         }
     }
 
@@ -382,11 +374,11 @@ public class ConsumerJava implements Consumer {
      */
     @Override
     public void interrupt() {
-        logger.info("Interrupt initiated: stopping consumer execution...");
+        LOGGER.info("Interrupt initiated: stopping consumer execution...");
         shouldRun.set(false);
         scheduledExecutorService.shutdown();
         consumeKeysExecutorService.shutdown();
-        logger.info(
+        LOGGER.info(
                 "Waiting for termination of {} consumer threads (timeout: {} seconds)...",
                 consumers.size(),
                 AWAIT_DURATION_QUEUE_EMPTY.getSeconds());
@@ -394,10 +386,10 @@ public class ConsumerJava implements Consumer {
             boolean terminated = consumeKeysExecutorService.awaitTermination(
                     AWAIT_DURATION_QUEUE_EMPTY.getSeconds(), TimeUnit.SECONDS);
             if (!terminated) {
-                logger.warn("Timeout reached. Some consumer threads may not have terminated cleanly.");
+                LOGGER.warn("Timeout reached. Some consumer threads may not have terminated cleanly.");
             }
         } catch (InterruptedException e) {
-            logger.error("Interrupted while awaiting consumer termination.", e);
+            LOGGER.error("Interrupted while awaiting consumer termination.", e);
             throw new RuntimeException(e);
         }
         try {
@@ -409,7 +401,7 @@ public class ConsumerJava implements Consumer {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        logger.debug("Interrupt complete: resources released and persistence closed.");
+        LOGGER.debug("Interrupt complete: resources released and persistence closed.");
     }
 
     @VisibleForTesting
