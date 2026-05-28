@@ -35,13 +35,7 @@ public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRando
     }
 
     private final KeyUtility keyUtility;
-    private final BitHelper bitHelper;
     private final SecretSupplier randomSupplier;
-
-    /**
-     * It is already thread local, no need for {@link java.util.concurrent.ThreadLocalRandom}.
-     */
-    private final Random random;
 
     /**
      * Creates a new random key producer using the algorithm configured in the supplied {@link CKeyProducerJavaRandom}.
@@ -55,8 +49,9 @@ public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRando
             CKeyProducerJavaRandom cKeyProducerJavaRandom, KeyUtility keyUtility, BitHelper bitHelper) {
         super(cKeyProducerJavaRandom);
         this.keyUtility = keyUtility;
-        this.bitHelper = bitHelper;
 
+        // It is already thread local, no need for ThreadLocalRandom.
+        Random random;
         switch (cKeyProducerJavaRandom.keyProducerJavaRandomInstance) {
             case SECURE_RANDOM:
                 try {
