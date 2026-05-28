@@ -512,11 +512,21 @@ Use numeric hex entities (`&#xNNNN;`) for any Unicode symbol outside ASCII. Name
   Plan to capture (do later, not now):
   1. **Either resurrect the in-memory HashSet/HashMap backend or remove the dead README/config references.** Today the README and example configs lie to operators about a working feature; either re-implement (preferred per owner's wish for a HashMap backend) or strip the references in the same commit.
   2. **Pull the BloomFilter accelerator out of `LMDBPersistence`** into its own concern (e.g. `persistence/bloom/BloomFilterAccelerator`) so it can wrap any backend, not just LMDB. Keep the existing `useBloomFilter` config working.
-  3. **Add standalone backends in sibling sub-packages:**
+  3. **Add standalone backends in sibling sub-packages.** The operator picks the right trade-off for their data set size and host memory:
      - `persistence/hashmap/HashMapPersistence` - in-memory `Map<ByteBuffer, Coin>` or `Map<byte[]wrap, Coin>`; pay attention to memory budget (realistic address sets are 10^8 - 10^9 entries; rough estimate 24-32 bytes per entry of overhead alone, 5-15 GB heap for the full set). Note the README's full database has 1.377 billion entries - well outside any reasonable Java heap.
+     - `persistence/array/SortedArrayPersistence` (or similar) - cache-friendly array-backed "is it present?" lookup. Two shapes are interesting and should both be benchmarked:
+       - **Sorted `long[]` of hash160-prefixes** indexed via `Arrays.binarySearch`. O(log n) per lookup but excellent cache locality (no pointer chasing, no boxed objects), so often faster in practice than a HashSet for ~10^8-10^9 entries when the host RAM allows it. Memory ~ 8 bytes per entry plus a small Coin side-table when value lookups are required.
+       - **Open-addressing primitive hash table** (e.g. fastutil `Long2LongOpenHashMap` or roll-our-own over `long[]`) - O(1) average, similar cache profile, slightly more memory than the sorted variant but no log-factor.
+       Whether to truncate hash160 to a 64-bit prefix or store the full 20 bytes is a separate design decision (prefix = collisions need disambiguation against LMDB or full bytes side-table; full = ~2.5x memory).
      - `persistence/bloom/BloomFilterPersistence` - Bloom-only "is it possibly present?" mode for false-positive-tolerant scans; `getAmount` would have to return `Coin.ZERO` or be unsupported, so this needs a contract decision on the interface (probably an `isProbabilistic()` flag or a thrown `UnsupportedOperationException`).
-  4. **Make the backend selectable from config** under `consumerJava` (currently `lmdbConfigurationReadOnly` is mandatory). Likely shape: `consumerJava.persistence: { type: "LMDB"|"HASHMAP"|"BLOOM", ... }` with the existing LMDB config as one variant. Default stays LMDB for backward compat with existing example configs.
-  5. **Optional: a layered/chained backend** so the operator can pick "Bloom in front of LMDB" (current behaviour, but explicit) or "HashMap in front of LMDB" (warm-cache mode for hot addresses) via composition of `Persistence` implementations. This is essentially what the README-documented `loadToMemoryCacheOnInit` flag was meant to do.
-  6. **JMH lookup benchmark** comparing `containsAddress` + `getAmount` throughput on identical datasets across the three backends (cold and warm). The repo already has a JMH benchmark module - extend it. Measure also the build / load time and steady-state RSS for each backend so the trade-off (memory vs. latency vs. setup cost) is visible.
+  4. **Make the backend selectable from config** under `consumerJava` (currently `lmdbConfigurationReadOnly` is mandatory). Likely shape: `consumerJava.persistence: { type: "LMDB"|"HASHMAP"|"SORTED_ARRAY"|"OPEN_HASH_ARRAY"|"BLOOM", ... }` with the existing LMDB config as one variant. Default stays LMDB for backward compat with existing example configs.
+  5. **Optional: a layered/chained backend** so the operator can pick "Bloom in front of LMDB" (current behaviour, but explicit), "HashMap in front of LMDB" (warm-cache mode for hot addresses), or "SortedArray in front of LMDB" (cache-friendly read-only front for the hot set) via composition of `Persistence` implementations. This is essentially what the README-documented `loadToMemoryCacheOnInit` flag was meant to do.
+  6. **JMH lookup benchmark** comparing `containsAddress` + `getAmount` throughput on identical datasets across ALL backends (cold and warm). The repo already has a JMH benchmark module - extend it. Measure for each backend:
+     - throughput (ops/s) cold and warm
+     - p50/p99 lookup latency
+     - build / load time
+     - steady-state RSS (host memory footprint)
+     - false positive rate where applicable (Bloom; truncated SortedArray)
+     so the operator can pick the right trade-off for their data set size and host.
 
   **Out of scope of this TODO:** actually executing any of the above. This entry is a research-and-plan placeholder so the architecture decision is on record. The dead README/config references should at least be addressed in a near-term cleanup commit even if the full backend work is deferred.
