@@ -193,4 +193,47 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD"/>
     </Match>
 
+    <!--
+        RFI_SET_ACCESSIBLE flags reflective access into
+        private/protected members. All 5 sites here reach into
+        third-party libraries that expose no public alternative for
+        what we need:
+
+          - Bech32Helper: bitcoinj 0.17's Bech32.convertBits is
+            package-private, and
+            Bech32.Bech32Bytes.witnessProgram / witnessVersion are
+            protected; both are needed for SegWit address decoding
+            paths that bitcoinj does not expose publicly.
+          - OpenCLBuilder.isOpenCLnativeLibraryLoadable: JOCL exposes
+            no public probe for whether its native lib loaded.
+            Needed for graceful CPU-only fallback on hosts without
+            GPU drivers.
+          - LMDBPersistence.getApproximateSizeBytes: Guava's
+            BloomFilter does not expose its in-memory size. We read
+            the private backing array length for diagnostics.
+
+        The :add-opens JVM flags in .mvn/jvm.config and pom.xml
+        explicitly permit this access at runtime.
+    -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.Bech32Helper"/>
+                <Or>
+                    <Method name="invokeConvertBitsStatic"/>
+                    <Method name="invokeProtectedMethod"/>
+                </Or>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder"/>
+                <Method name="isOpenCLnativeLibraryLoadable"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
+                <Method name="getApproximateSizeBytes"/>
+            </And>
+        </Or>
+        <Bug pattern="RFI_SET_ACCESSIBLE"/>
+    </Match>
+
 </FindBugsFilter>
