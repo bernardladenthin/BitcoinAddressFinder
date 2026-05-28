@@ -51,33 +51,29 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
     }
 
     @Override
-    public void produceKeys() {
-        try {
-            FileHelper fileHelper = new FileHelper();
-            List<File> files = fileHelper.stringsToFiles(producerJavaSecretsFiles.files);
-            fileHelper.assertFilesExists(files);
+    public void produceKeys() throws IOException {
+        FileHelper fileHelper = new FileHelper();
+        List<File> files = fileHelper.stringsToFiles(producerJavaSecretsFiles.files);
+        fileHelper.assertFilesExists(files);
 
-            LOGGER.info("Starting secrets file processing...");
-            for (File file : files) {
-                if (!shouldRun.get()) {
-                    LOGGER.info("Key production stopped by flag.");
-                    break;
-                }
-                SecretsFile secretsFile = new SecretsFile(
-                        network, file, producerJavaSecretsFiles.secretFormat, readStatistic, this::consumeSecrets);
-
-                LOGGER.info("Processing secrets file: {}", file);
-                currentSecretsFile.set(secretsFile);
-                secretsFile.readFile();
-                currentSecretsFile.set(null);
-                LOGGER.info("Finished processing: {}", file);
-
-                logProgress();
+        LOGGER.info("Starting secrets file processing...");
+        for (File file : files) {
+            if (!shouldRun.get()) {
+                LOGGER.info("Key production stopped by flag.");
+                break;
             }
-            LOGGER.info("All secrets files processed.");
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+            SecretsFile secretsFile = new SecretsFile(
+                    network, file, producerJavaSecretsFiles.secretFormat, readStatistic, this::consumeSecrets);
+
+            LOGGER.info("Processing secrets file: {}", file);
+            currentSecretsFile.set(secretsFile);
+            secretsFile.readFile();
+            currentSecretsFile.set(null);
+            LOGGER.info("Finished processing: {}", file);
+
+            logProgress();
         }
+        LOGGER.info("All secrets files processed.");
     }
 
     @Override
