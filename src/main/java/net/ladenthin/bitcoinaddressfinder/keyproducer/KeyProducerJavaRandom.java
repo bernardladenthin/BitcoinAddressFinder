@@ -55,10 +55,9 @@ public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRando
                 break;
             case RANDOM_CUSTOM_SEED:
                 // EXPLOIT for: https://cwe.mitre.org/data/definitions/338
-                random = new Random();
-                if (cKeyProducerJavaRandom.customSeed != null) {
-                    random.setSeed(cKeyProducerJavaRandom.customSeed); // only if explicitly configured
-                }
+                random = cKeyProducerJavaRandom.customSeed != null
+                        ? new Random(cKeyProducerJavaRandom.customSeed)
+                        : new Random();
                 break;
             case SHA1_PRNG:
                 try {
