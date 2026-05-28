@@ -103,7 +103,7 @@ public class ProducerOpenCL extends AbstractProducer {
      */
     protected static class ResultReaderRunnable implements Runnable {
 
-        private final Logger logger = LoggerFactory.getLogger(this.getClass());
+        private static final Logger LOGGER = LoggerFactory.getLogger(ResultReaderRunnable.class);
 
         private final OpenCLGridResult openCLGridResult;
         private final Consumer consumer;
@@ -123,7 +123,7 @@ public class ProducerOpenCL extends AbstractProducer {
 
         @Override
         public void run() {
-            logger.trace("ResultReaderRunnable started");
+            LOGGER.trace("ResultReaderRunnable started");
             try {
                 PublicKeyBytes[] publicKeyBytesArray = openCLGridResult.getPublicKeyBytes();
 
@@ -134,7 +134,7 @@ public class ProducerOpenCL extends AbstractProducer {
             } catch (Throwable e) {
                 abstractProducer.logErrorInProduceKeys(e, secretBase);
             }
-            logger.trace("ResultReaderRunnable finished");
+            LOGGER.trace("ResultReaderRunnable finished");
         }
     }
 

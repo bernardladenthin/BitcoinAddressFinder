@@ -44,7 +44,7 @@ public class Finder implements Interruptable {
     static Duration AWAIT_DURATION_TERMINATE = Duration.ofDays(365L * 1000L);
 
     /** SLF4J logger for the {@link Finder}. */
-    protected Logger logger = LoggerFactory.getLogger(this.getClass());
+    private static final Logger LOGGER = LoggerFactory.getLogger(Finder.class);
 
     private final CFinder finder;
 
@@ -78,7 +78,7 @@ public class Finder implements Interruptable {
      * Instantiates and registers every configured key producer.
      */
     public void startKeyProducer() {
-        logger.info("startKeyProducer");
+        LOGGER.info("startKeyProducer");
         processKeyProducers(
                 finder.keyProducerJavaRandom,
                 cKeyProducerJavaRandom -> new KeyProducerJavaRandom(
@@ -158,7 +158,7 @@ public class Finder implements Interruptable {
      * Initialises and starts the {@link ConsumerJava}.
      */
     public void startConsumer() {
-        logger.info("startConsumer");
+        LOGGER.info("startConsumer");
         CConsumerJava localCConsumerJava = Objects.requireNonNull(finder.consumerJava);
 
         consumerJava = new ConsumerJava(localCConsumerJava, keyUtility, persistenceUtils);
@@ -171,7 +171,7 @@ public class Finder implements Interruptable {
      * Builds the configured producers and binds them to their key producer and consumer.
      */
     public void configureProducer() {
-        logger.info("configureProducer");
+        LOGGER.info("configureProducer");
         var localConsumerJava = Objects.requireNonNull(consumerJava);
         processProducers(
                 finder.producerJava,
@@ -233,7 +233,7 @@ public class Finder implements Interruptable {
      * Calls {@code initProducer()} on every configured producer.
      */
     public void initProducer() {
-        logger.info("initProducer");
+        LOGGER.info("initProducer");
         for (Producer producer : getAllProducers()) {
             producer.initProducer();
         }
@@ -243,7 +243,7 @@ public class Finder implements Interruptable {
      * Submits every configured producer to the producer executor service.
      */
     public void startProducer() {
-        logger.info("startProducer");
+        LOGGER.info("startProducer");
         for (Producer producer : getAllProducers()) {
             producerExecutorService.submit(producer);
         }
@@ -253,7 +253,7 @@ public class Finder implements Interruptable {
      * Shuts down the producer executor and interrupts the consumer once producers have stopped.
      */
     public void shutdownAndAwaitTermination() {
-        logger.info("shutdownAndAwaitTermination");
+        LOGGER.info("shutdownAndAwaitTermination");
         try {
             producerExecutorService.shutdown();
             producerExecutorService.awaitTermination(
@@ -264,22 +264,22 @@ public class Finder implements Interruptable {
 
         // no producers are running anymore, the consumer can be interrupted
         if (consumerJava != null) {
-            logger.info("Interrupt: " + consumerJava);
+            LOGGER.info("Interrupt: " + consumerJava);
             consumerJava.interrupt();
             consumerJava = null;
         }
-        logger.info("consumerJava released.");
+        LOGGER.info("consumerJava released.");
     }
 
     @Override
     public void interrupt() {
-        logger.info("interrupt called: delegate interrupt to all keyProducers and producers");
+        LOGGER.info("interrupt called: delegate interrupt to all keyProducers and producers");
 
         // Interrupt all Producers
         for (Producer producer : getAllProducers()) {
-            logger.info("Interrupt Producer: " + producer.toString());
+            LOGGER.info("Interrupt Producer: " + producer.toString());
             producer.interrupt();
-            logger.info("waitTillProducerNotRunning ...");
+            LOGGER.info("waitTillProducerNotRunning ...");
             producer.waitTillProducerNotRunning();
             producer.releaseProducer();
         }
@@ -287,12 +287,12 @@ public class Finder implements Interruptable {
 
         // Interrupt all KeyProducers
         for (KeyProducer keyProducer : getKeyProducers().values()) {
-            logger.info("Interrupt KeyProducer: " + keyProducer.toString());
+            LOGGER.info("Interrupt KeyProducer: " + keyProducer.toString());
             keyProducer.interrupt();
         }
         freeAllKeyProducers();
 
-        logger.info("All producers released and freed.");
+        LOGGER.info("All producers released and freed.");
     }
 
     /**

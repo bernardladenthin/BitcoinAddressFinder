@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 public class OpenClTask implements ReleaseCLObject {
 
     /** SLF4J logger for this task. */
-    protected Logger logger = LoggerFactory.getLogger(this.getClass());
+    private static final Logger LOGGER = LoggerFactory.getLogger(OpenClTask.class);
 
     private static final int PRIVATE_KEY_SOURCE_SIZE_IN_BYTES = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES;
 
@@ -346,8 +346,8 @@ public class OpenClTask implements ReleaseCLObject {
 
                 final long afterExecute = System.currentTimeMillis();
 
-                if (logger.isTraceEnabled()) {
-                    logger.trace("Executed OpenCL kernel in " + (afterExecute - beforeExecute) + "ms");
+                if (LOGGER.isTraceEnabled()) {
+                    LOGGER.trace("Executed OpenCL kernel in " + (afterExecute - beforeExecute) + "ms");
                 }
             }
             {
@@ -368,8 +368,8 @@ public class OpenClTask implements ReleaseCLObject {
                 destinationArgument.close();
 
                 final long afterRead = System.currentTimeMillis();
-                if (logger.isTraceEnabled()) {
-                    logger.trace("Read OpenCL data " + ((dstSizeInBytes / 1024) / 1024) + "Mb in "
+                if (LOGGER.isTraceEnabled()) {
+                    LOGGER.trace("Read OpenCL data " + ((dstSizeInBytes / 1024) / 1024) + "Mb in "
                             + (afterRead - beforeRead) + "ms");
                 }
             }
