@@ -236,4 +236,34 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="RFI_SET_ACCESSIBLE"/>
     </Match>
 
+    <!--
+        PATH_TRAVERSAL_IN flags new File(userInput) where userInput
+        could be attacker-controlled (HTTP, RPC, etc). Every flagged
+        site here reads a path from the JSON configuration file that
+        the operator hand-picks at CLI launch:
+
+          - FileHelper.stringsToFiles (and its two callers
+            AddressFilesToLMDB / ProducerJavaSecretsFiles): converts
+            the operator-specified addressesFiles / secretsFile
+            arrays.
+          - LMDBToAddressFile: opens the operator-specified output
+            directory.
+          - LMDBPersistence (read-only and write constructors):
+            opens the operator-specified lmdbDirectory.
+
+        The configuration file is part of the CLI invocation
+        (java -jar ... config.json); there is no untrusted-input
+        boundary that an attacker could traverse from.
+    -->
+    <Match>
+        <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.FileHelper"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.ProducerJavaSecretsFiles"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.LMDBToAddressFile"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
+        </Or>
+        <Bug pattern="PATH_TRAVERSAL_IN"/>
+    </Match>
+
 </FindBugsFilter>
