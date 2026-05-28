@@ -62,8 +62,8 @@ public class PersistenceUtils {
 
     @Deprecated
     private List<LegacyAddress> byteBufferToAddressList(ByteBuffer byteBuffer) {
-        List<LegacyAddress> addresses = new ArrayList<>();
         int count = byteBuffer.remaining() / LegacyAddress.LENGTH;
+        List<LegacyAddress> addresses = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             byte[] hash160 = new byte[LegacyAddress.LENGTH];
             byteBuffer.get(hash160);

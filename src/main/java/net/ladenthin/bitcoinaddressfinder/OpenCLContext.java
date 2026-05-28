@@ -55,7 +55,7 @@ public class OpenCLContext implements ReleaseCLObject {
      */
     public String[] getOpenCLPrograms() throws IOException {
         List<String> resourceNamesContent = getResourceNamesContent(getResourceNames());
-        List<String> resourceNamesContentWithReplacements = new ArrayList<>();
+        List<String> resourceNamesContentWithReplacements = new ArrayList<>(resourceNamesContent.size());
         for (String content : resourceNamesContent) {
             String contentWithReplacements = content;
             contentWithReplacements = contentWithReplacements.replaceAll("#include.*", "");
@@ -211,7 +211,7 @@ public class OpenCLContext implements ReleaseCLObject {
     }
 
     private static List<String> getResourceNamesContent(List<String> resourceNames) throws IOException {
-        List<String> contents = new ArrayList<>();
+        List<String> contents = new ArrayList<>(resourceNames.size());
         for (String resourceName : resourceNames) {
             URL url = Resources.getResource(resourceName);
             String content = Resources.toString(url, StandardCharsets.UTF_8);

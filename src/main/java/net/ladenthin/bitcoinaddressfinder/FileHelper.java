@@ -26,7 +26,7 @@ public class FileHelper {
      * @return the corresponding list of {@link File} instances (same order)
      */
     public List<File> stringsToFiles(List<String> strings) {
-        List<File> files = new ArrayList<>();
+        List<File> files = new ArrayList<>(strings.size());
         for (String string : strings) {
             files.add(new File(string));
         }

@@ -83,10 +83,11 @@ public class OpenCLBuilder {
         // Obtain the number of platforms
         int[] numPlatforms = new int[1];
         clGetPlatformIDs(0, null, numPlatforms);
+        int numPlatformCount = numPlatforms[0];
 
         // Obtain the platform IDs
-        List<OpenCLPlatform> openCLPlatforms = new ArrayList<>();
-        cl_platform_id[] platforms = new cl_platform_id[numPlatforms[0]];
+        List<OpenCLPlatform> openCLPlatforms = new ArrayList<>(numPlatformCount);
+        cl_platform_id[] platforms = new cl_platform_id[numPlatformCount];
         clGetPlatformIDs(platforms.length, platforms, null);
 
         for (int i = 0; i < platforms.length; i++) {
@@ -107,7 +108,7 @@ public class OpenCLBuilder {
             cl_device_id[] devicesArray = new cl_device_id[numDevices];
             clGetDeviceIDs(platformId, CL_DEVICE_TYPE_ALL, numDevices, devicesArray, null);
 
-            List<OpenCLDevice> openCLDevices = new ArrayList<>();
+            List<OpenCLDevice> openCLDevices = new ArrayList<>(numDevices);
             for (cl_device_id device : devicesArray) {
                 OpenCLDevice openCLDevice = createOpenCLDevice(device);
                 openCLDevices.add(openCLDevice);
