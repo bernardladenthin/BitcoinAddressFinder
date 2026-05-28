@@ -39,7 +39,7 @@ public class FileHelper {
      * @param files the files to verify
      * @throws IllegalArgumentException if any file is missing
      */
-    public void assertFilesExists(List<File> files) throws IllegalArgumentException {
+    public void assertFilesExists(List<File> files) {
         logger.info("Validating that all input files exist...");
         for (File file : files) {
             if (!file.exists()) {

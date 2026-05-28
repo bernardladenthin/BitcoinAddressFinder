@@ -288,8 +288,7 @@ public class AddressTxtLine {
     }
 
     @NonNull
-    private Coin getCoinIfPossible(@NonNull String[] lineSplitted, @NonNull Coin defaultValue)
-            throws NumberFormatException {
+    private Coin getCoinIfPossible(@NonNull String[] lineSplitted, @NonNull Coin defaultValue) {
         if (lineSplitted.length > 1) {
             String amountString = lineSplitted[1];
             try {
