@@ -321,4 +321,37 @@ SPDX-License-Identifier: Apache-2.0
         </Or>
     </Match>
 
+    <!--
+        EXS_EXCEPTION_SOFTENING_HAS_CHECKED on three internal
+        sanity-check sites. These are "this can never happen if the
+        contract holds" assertions where RuntimeException /
+        IllegalArgumentException is the idiomatic Java choice;
+        promoting them to checked exceptions would force callers to
+        wrap statically unreachable code:
+
+          - AbstractProducer.produceKeys lines 122 + 126:
+            verifies that KeyProducer.createSecrets returned an
+            array of the requested length. A mismatch is a bug in
+            the KeyProducer implementation; the same method catches
+            the RuntimeException right after (line 133) for
+            logging.
+          - LMDBPersistence.writeAllAmountsToAddressFile line 333:
+            exhaustive switch default for CAddressFileOutputFormat.
+            Reachable only if a new enum constant is added without
+            updating this switch.
+    -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.AbstractProducer"/>
+                <Method name="produceKeys"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
+                <Method name="writeAllAmountsToAddressFile"/>
+            </And>
+        </Or>
+        <Bug pattern="EXS_EXCEPTION_SOFTENING_HAS_CHECKED"/>
+    </Match>
+
 </FindBugsFilter>
