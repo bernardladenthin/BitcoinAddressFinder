@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder.persistence;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import org.bitcoinj.base.LegacyAddress;
@@ -51,7 +52,7 @@ public class PersistenceUtils {
     }
 
     @Deprecated
-    private ByteBuffer addressListToByteBufferDirect(List<LegacyAddress> addresses) {
+    private ByteBuffer addressListToByteBufferDirect(Collection<LegacyAddress> addresses) {
         ByteBuffer byteBuffer = ByteBuffer.allocateDirect(LegacyAddress.LENGTH * addresses.size());
         for (LegacyAddress address : addresses) {
             byteBuffer.put(address.getHash());

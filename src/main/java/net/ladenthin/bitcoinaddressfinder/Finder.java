@@ -121,7 +121,10 @@ public class Finder implements Interruptable {
     }
 
     private <T, K> void processKeyProducers(
-            List<T> configList, Function<T, K> constructor, Function<T, String> getId, Map<String, K> keyProducers) {
+            Iterable<T> configList,
+            Function<T, K> constructor,
+            Function<T, String> getId,
+            Map<String, K> keyProducers) {
         if (configList != null) {
             for (T config : configList) {
                 String keyProducerId = getId.apply(config);
@@ -182,7 +185,7 @@ public class Finder implements Interruptable {
     }
 
     private <T extends CProducer, P> void processProducers(
-            List<T> configs,
+            Iterable<T> configs,
             java.util.function.Consumer<Integer> batchSizeAssert,
             Function<T, KeyProducer> getKeyProducer,
             BiFunction<T, KeyProducer, P> producerConstructor,

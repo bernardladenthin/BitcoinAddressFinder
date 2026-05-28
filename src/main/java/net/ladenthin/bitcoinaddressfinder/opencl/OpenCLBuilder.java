@@ -239,7 +239,7 @@ public class OpenCLBuilder {
      * @param openCLPlatforms the platforms to inspect
      * @return {@code true} if at least one OpenCL 2.0+ device exists
      */
-    public static boolean isOneOpenCL2_0OrGreaterDeviceAvailable(List<OpenCLPlatform> openCLPlatforms) {
+    public static boolean isOneOpenCL2_0OrGreaterDeviceAvailable(Iterable<OpenCLPlatform> openCLPlatforms) {
         for (OpenCLPlatform openCLPlatform : openCLPlatforms) {
             List<OpenCLDevice> openCLDevices = openCLPlatform.openCLDevices();
             for (OpenCLDevice openCLDevice : openCLDevices) {

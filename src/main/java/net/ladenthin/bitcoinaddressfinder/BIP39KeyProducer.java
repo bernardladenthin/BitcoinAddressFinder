@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder;
 import com.google.common.annotations.VisibleForTesting;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
@@ -89,7 +90,7 @@ public class BIP39KeyProducer extends java.util.Random {
      * @param child the child number to append
      * @return a new list containing all entries of {@code base} followed by {@code child}
      */
-    public static List<ChildNumber> append(List<ChildNumber> base, ChildNumber child) {
+    public static List<ChildNumber> append(Collection<ChildNumber> base, ChildNumber child) {
         List<ChildNumber> extended = new ArrayList<>(base);
         extended.add(child);
         return extended;

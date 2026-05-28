@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +26,7 @@ public class FileHelper {
      * @param strings the list of path strings
      * @return the corresponding list of {@link File} instances (same order)
      */
-    public List<File> stringsToFiles(List<String> strings) {
+    public List<File> stringsToFiles(Collection<String> strings) {
         List<File> files = new ArrayList<>(strings.size());
         for (String string : strings) {
             files.add(new File(string));

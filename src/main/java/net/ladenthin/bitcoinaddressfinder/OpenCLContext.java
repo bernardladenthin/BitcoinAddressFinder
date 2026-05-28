@@ -20,6 +20,7 @@ import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
@@ -208,7 +209,7 @@ public class OpenCLContext implements ReleaseCLObject {
         return new OpenCLGridResult(privateKeyBase, producerOpenCL.getOverallWorkSize(bitHelper), dstByteBuffer);
     }
 
-    private static List<String> getResourceNamesContent(List<String> resourceNames) throws IOException {
+    private static List<String> getResourceNamesContent(Collection<String> resourceNames) throws IOException {
         List<String> contents = new ArrayList<>(resourceNames.size());
         for (String resourceName : resourceNames) {
             URL url = Resources.getResource(resourceName);
