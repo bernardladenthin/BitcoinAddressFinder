@@ -17,9 +17,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
 public class KeyProducerJavaBip39 extends KeyProducerJava<CKeyProducerJavaBip39> {
 
     private final KeyUtility keyUtility;
-    private final BitHelper bitHelper;
     private final SecretSupplier randomSupplier;
-    private final BIP39KeyProducer bip39KeyProducer;
 
     /**
      * Creates a new BIP39 key producer.
@@ -32,9 +30,8 @@ public class KeyProducerJavaBip39 extends KeyProducerJava<CKeyProducerJavaBip39>
             CKeyProducerJavaBip39 cKeyProducerJavaBip39, KeyUtility keyUtility, BitHelper bitHelper) {
         super(cKeyProducerJavaBip39);
         this.keyUtility = keyUtility;
-        this.bitHelper = bitHelper;
 
-        bip39KeyProducer = new BIP39KeyProducer(
+        BIP39KeyProducer bip39KeyProducer = new BIP39KeyProducer(
                 cKeyProducerJavaBip39.mnemonic,
                 cKeyProducerJavaBip39.passphrase,
                 cKeyProducerJavaBip39.bip32Path,
