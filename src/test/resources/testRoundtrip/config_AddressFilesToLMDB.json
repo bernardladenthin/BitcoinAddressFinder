@@ -1,0 +1,22 @@
+{
+  "command": "AddressFilesToLMDB",
+  "addressFilesToLMDB": {
+    "addressesFiles": [
+      "src/test/resources/testRoundtrip/addresses/fileContainingAddresses0.txt",
+      "src/test/resources/testRoundtrip/addresses/fileContainingAddresses1.tsv",
+      "src/test/resources/testRoundtrip/addresses/fileContainingAddresses2.csv"
+    ],
+    "lmdbConfigurationWrite": {
+      "initialMapSizeInMiB": 16,
+      "deleteEmptyAddresses": false,
+      "staticAmount": 0,
+      "useStaticAmount": true,
+      "increaseMapAutomatically": true,
+      "increaseSizeInMiB": 1,
+      "lmdbDirectory": "src/test/resources/testRoundtrip/lmdb",
+      "useProxyOptimal": true,
+      "logStatsOnInit": true,
+      "logStatsOnClose": true
+    }
+  }
+}

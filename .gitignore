@@ -34,9 +34,6 @@ hs_err_pid*
 /jcstress-results-*.bin.gz
 /results/
 
-# Test-run artefacts (e.g. ConsumerJavaTest roundtrip exports)
-/src/test/resources/testRoundtrip/
-
 # IDEA files
 /.idea/
 *.iml
