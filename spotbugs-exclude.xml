@@ -129,6 +129,16 @@ SPDX-License-Identifier: Apache-2.0
         be substantial architectural surface for zero security gain
         in the documented use case. Same design-intent rationale as
         the PREDICTABLE_RANDOM suppression above.
+
+        PCAIL_POSSIBLE_CONSTANT_ALLOCATION_IN_LOOP fires on
+        ConnectionUtils.waitUntilTcpPortOpen for the `new Socket()`
+        inside the polling loop. The allocation cannot be hoisted: a
+        Socket is single-use, a closed Socket cannot be reopened, and
+        the try-with-resources block exists precisely to guarantee
+        the previous instance is closed before the next connect()
+        attempt. Replacing the per-iteration allocation would require
+        rewriting the helper around channel-based polling which is
+        out of scope for a pre-flight TCP-readiness check.
     -->
     <Match>
         <Or>
@@ -139,6 +149,7 @@ SPDX-License-Identifier: Apache-2.0
             <Bug pattern="UNENCRYPTED_SOCKET"/>
             <Bug pattern="UNENCRYPTED_SERVER_SOCKET"/>
             <Bug pattern="MDM_PROMISCUOUS_SERVERSOCKET"/>
+            <Bug pattern="PCAIL_POSSIBLE_CONSTANT_ALLOCATION_IN_LOOP"/>
         </Or>
     </Match>
 
