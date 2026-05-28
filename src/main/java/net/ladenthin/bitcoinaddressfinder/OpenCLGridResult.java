@@ -185,9 +185,6 @@ public class OpenCLGridResult {
             }
         }
 
-        PublicKeyBytes publicKeyBytes =
-                new PublicKeyBytes(secret, uncompressedFromBigEndian, ripemd160Uncompressed, ripemd160Compressed);
-
-        return publicKeyBytes;
+        return new PublicKeyBytes(secret, uncompressedFromBigEndian, ripemd160Uncompressed, ripemd160Compressed);
     }
 }

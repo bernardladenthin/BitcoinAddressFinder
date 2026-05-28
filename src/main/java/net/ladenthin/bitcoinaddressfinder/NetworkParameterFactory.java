@@ -25,7 +25,6 @@ public class NetworkParameterFactory {
     }
 
     private NetworkParameters getNetworkParameters() {
-        NetworkParameters networkParameters = MainNetParams.get();
-        return networkParameters;
+        return MainNetParams.get();
     }
 }

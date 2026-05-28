@@ -109,8 +109,7 @@ public class ByteBufferUtility {
 
     private ByteBuffer byteArrayToByteBufferWrapped(byte[] bytes) {
         // wrap() delivers a buffer which is already flipped
-        ByteBuffer wrap = ByteBuffer.wrap(bytes);
-        return wrap;
+        return ByteBuffer.wrap(bytes);
     }
 
     private ByteBuffer byteArrayToByteBufferAllocatedDirect(byte[] bytes) {
@@ -141,8 +140,7 @@ public class ByteBufferUtility {
      */
     public String getHexFromByteBuffer(ByteBuffer byteBuffer) {
         byte[] array = byteBufferToBytes(byteBuffer);
-        String hexString = Hex.toHexString(array);
-        return hexString;
+        return Hex.toHexString(array);
     }
 
     /**
@@ -154,8 +152,7 @@ public class ByteBufferUtility {
     public ByteBuffer getByteBufferFromHex(String hex) {
         byte[] decoded = Hex.decode(hex);
         // wrap() delivers a buffer which is already flipped
-        final ByteBuffer byteBuffer = byteArrayToByteBuffer(decoded);
-        return byteBuffer;
+        return byteArrayToByteBuffer(decoded);
     }
     // </editor-fold>
 

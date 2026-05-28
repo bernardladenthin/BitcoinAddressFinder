@@ -88,8 +88,7 @@ public class Main implements Runnable, Interruptable {
      */
     public static String readString(Path path) {
         try {
-            String content = Files.readString(path, Charset.defaultCharset());
-            return content;
+            return Files.readString(path, Charset.defaultCharset());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

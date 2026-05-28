@@ -159,7 +159,7 @@ public class OpenCLBuilder {
         int preferredVectorWidthFloat = getInt(device, CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT);
         int preferredVectorWidthDouble = getInt(device, CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE);
 
-        OpenCLDevice openCLDevice = new OpenCLDevice(
+        return new OpenCLDevice(
                 device,
                 deviceName,
                 deviceVendor,
@@ -197,8 +197,6 @@ public class OpenCLBuilder {
                 preferredVectorWidthLong,
                 preferredVectorWidthFloat,
                 preferredVectorWidthDouble);
-
-        return openCLDevice;
     }
 
     private static ImmutableList<@NonNull Long> longsToImmutableList(long[] array) {

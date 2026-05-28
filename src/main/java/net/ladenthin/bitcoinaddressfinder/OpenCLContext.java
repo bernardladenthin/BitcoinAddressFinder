@@ -61,8 +61,7 @@ public class OpenCLContext implements ReleaseCLObject {
             contentWithReplacements = contentWithReplacements.replaceAll("#include.*", "");
             resourceNamesContentWithReplacements.add(contentWithReplacements);
         }
-        String[] openClPrograms = resourceNamesContentWithReplacements.toArray(new String[0]);
-        return openClPrograms;
+        return resourceNamesContentWithReplacements.toArray(new String[0]);
     }
 
     private List<String> getResourceNames() {
@@ -208,9 +207,7 @@ public class OpenCLContext implements ReleaseCLObject {
         localOpenClTask.setSrcPrivateKeyChunk(privateKeyBase);
         ByteBuffer dstByteBuffer = localOpenClTask.executeKernel(localKernel, localCommandQueue);
 
-        OpenCLGridResult openCLGridResult =
-                new OpenCLGridResult(privateKeyBase, producerOpenCL.getOverallWorkSize(bitHelper), dstByteBuffer);
-        return openCLGridResult;
+        return new OpenCLGridResult(privateKeyBase, producerOpenCL.getOverallWorkSize(bitHelper), dstByteBuffer);
     }
 
     private static List<String> getResourceNamesContent(List<String> resourceNames) throws IOException {

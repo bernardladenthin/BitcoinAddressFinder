@@ -31,10 +31,9 @@ public class Statistics {
         // calculate average contains time
         long averageContainsTime = keysSumOfTimeToCheckContains / Math.max(keys, 1);
 
-        String message = "Statistics: [Checked " + (keys / 1_000_000L) + " M keys in " + uptimeInMinutes + " minutes] ["
+        return "Statistics: [Checked " + (keys / 1_000_000L) + " M keys in " + uptimeInMinutes + " minutes] ["
                 + (keysPerSecond / 1_000L) + " k keys/second] [" + (keysPerMinute / 1_000_000L)
                 + " M keys/minute] [Times an empty consumer: " + emptyConsumer + "] [Average contains time: "
                 + averageContainsTime + " ms] [keys queue size: " + keysQueueSize + "] [Hits: " + hits + "]";
-        return message;
     }
 }

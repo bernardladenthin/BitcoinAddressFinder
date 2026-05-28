@@ -76,8 +76,7 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
      * @return a random secret
      */
     public BigInteger createSecret(int maximumBitLength, Random random) {
-        BigInteger secret = new BigInteger(maximumBitLength, random);
-        return secret;
+        return new BigInteger(maximumBitLength, random);
     }
 
     /**
@@ -177,8 +176,7 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
      * @return a buffer with the address' hash160
      */
     public ByteBuffer addressToByteBuffer(LegacyAddress address) {
-        ByteBuffer byteBuffer = byteBufferUtility.byteArrayToByteBuffer(address.getHash());
-        return byteBuffer;
+        return byteBufferUtility.byteArrayToByteBuffer(address.getHash());
     }
 
     /**

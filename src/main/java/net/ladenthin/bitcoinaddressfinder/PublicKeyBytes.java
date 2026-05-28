@@ -624,9 +624,7 @@ public class PublicKeyBytes {
     // generated, based on secretKey only!
     @Override
     public int hashCode() {
-        int hash = 3;
-        hash = 73 * hash + Objects.hashCode(this.secretKey);
-        return hash;
+        return 73 * 3 + Objects.hashCode(this.secretKey);
     }
 
     // generated, based on secretKey only!

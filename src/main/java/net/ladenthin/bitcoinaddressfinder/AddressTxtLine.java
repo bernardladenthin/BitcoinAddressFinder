@@ -284,8 +284,7 @@ public class AddressTxtLine {
         // fallback
         AddressType addressType = AddressType.P2PKH_OR_P2SH;
 
-        AddressToCoin addressToCoin = new AddressToCoin(hash160AsByteBuffer, DEFAULT_COIN, addressType);
-        return addressToCoin;
+        return new AddressToCoin(hash160AsByteBuffer, DEFAULT_COIN, addressType);
     }
 
     @NonNull
