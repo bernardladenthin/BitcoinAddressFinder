@@ -117,12 +117,18 @@ SPDX-License-Identifier: Apache-2.0
 
         findsecbugs UNENCRYPTED_SOCKET / UNENCRYPTED_SERVER_SOCKET
         assume a general-purpose-app threat model where any socket
-        carrying any "private key" bytes must be TLS-protected. That
-        model does not apply here; adding TLS plumbing (keystore,
-        certs, client-cert validation) would be substantial
-        architectural surface for zero security gain in the documented
-        use case. Same design-intent rationale as the PREDICTABLE_RANDOM
-        suppression above.
+        carrying any "private key" bytes must be TLS-protected.
+        MDM_PROMISCUOUS_SERVERSOCKET assumes the corresponding bind-
+        time threat model: that a ServerSocket bound to 0.0.0.0
+        accepting from any network interface is a security risk.
+        Neither model applies here; the producer is intentionally
+        bound to all interfaces because operators may run it on a
+        host whose primary IP is not the loopback (e.g. a private LAN
+        with a single physical NIC). Adding TLS plumbing (keystore,
+        certs, client-cert validation) or restricting the bind would
+        be substantial architectural surface for zero security gain
+        in the documented use case. Same design-intent rationale as
+        the PREDICTABLE_RANDOM suppression above.
     -->
     <Match>
         <Or>
@@ -132,6 +138,7 @@ SPDX-License-Identifier: Apache-2.0
         <Or>
             <Bug pattern="UNENCRYPTED_SOCKET"/>
             <Bug pattern="UNENCRYPTED_SERVER_SOCKET"/>
+            <Bug pattern="MDM_PROMISCUOUS_SERVERSOCKET"/>
         </Or>
     </Match>
 
