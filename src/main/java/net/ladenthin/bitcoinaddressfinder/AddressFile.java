@@ -14,9 +14,6 @@ import org.jspecify.annotations.NonNull;
 public class AddressFile extends AbstractPlaintextFile {
 
     @NonNull
-    private final Network network;
-
-    @NonNull
     private final KeyUtility keyUtility;
 
     @NonNull
@@ -41,7 +38,6 @@ public class AddressFile extends AbstractPlaintextFile {
             @NonNull Consumer<AddressToCoin> addressConsumer,
             @NonNull Consumer<String> unsupportedConsumer) {
         super(file, readStatistic);
-        this.network = network;
         this.addressConsumer = addressConsumer;
         this.unsupportedConsumer = unsupportedConsumer;
         keyUtility = new KeyUtility(network, new ByteBufferUtility(true));
