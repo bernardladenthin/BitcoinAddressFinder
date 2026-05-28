@@ -18,6 +18,22 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
  */
 public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRandom> {
 
+    /**
+     * Final no-op to prevent the finalizer-attack vector flagged by spotbugs
+     * CT_CONSTRUCTOR_THROW: the constructor wraps two checked
+     * {@link java.security.NoSuchAlgorithmException}s into RuntimeExceptions for
+     * the SECURE_RANDOM / SHA1_PRNG branches, which leaves a partially
+     * constructed instance reachable to any subclass that overrides
+     * {@link Object#finalize()}. Marking {@code finalize()} final here defeats
+     * the override while keeping the class itself subclassable for future
+     * Mockito spies or test doubles.
+     */
+    @SuppressWarnings({"deprecation", "removal"})
+    @Override
+    protected final void finalize() {
+        // no-op
+    }
+
     private final KeyUtility keyUtility;
     private final BitHelper bitHelper;
     private final SecretSupplier randomSupplier;
