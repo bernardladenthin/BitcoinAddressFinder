@@ -119,22 +119,4 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="LO_SUSPECT_LOG_CLASS"/>
     </Match>
 
-    <!--
-        Bech32Helper.invokeConvertBitsStatic unwraps a ReflectiveOperationException
-        thrown by Method.invoke and rethrows the underlying AddressFormatException
-        directly. This is the standard JNI-style reflection unwrap pattern: the
-        wrapper exception carries no useful diagnostic information (just the
-        reflection plumbing), and the cause IS the caller-relevant exception
-        with its own complete stack trace. The reflective wrapper is preserved
-        via Throwable.addSuppressed(e), which is the JDK-recommended way to
-        retain secondary exception history during unwrap. Spotbugs LEST is a
-        syntactic check that looks for new-exception-with-cause patterns and
-        does not recognize addSuppressed-based history preservation.
-    -->
-    <Match>
-        <Class name="net.ladenthin.bitcoinaddressfinder.Bech32Helper"/>
-        <Method name="invokeConvertBitsStatic"/>
-        <Bug pattern="LEST_LOST_EXCEPTION_STACK_TRACE"/>
-    </Match>
-
 </FindBugsFilter>

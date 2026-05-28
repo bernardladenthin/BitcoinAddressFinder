@@ -8,7 +8,6 @@ import static net.ladenthin.bitcoinaddressfinder.AddressTxtLine.BITCOIN_CASH_PRE
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import org.bitcoinj.base.Bech32;
-import org.bitcoinj.base.exceptions.AddressFormatException;
 
 /**
  * Bech32 / CashAddr decoding helpers including SegWit witness program extraction
@@ -80,24 +79,12 @@ public class Bech32Helper {
         return invokeConvertBitsStatic(data, 0, data.length, 8, 5, true);
     }
 
-    @SuppressWarnings("unchecked")
     private byte[] invokeConvertBitsStatic(byte[] in, int inStart, int inLen, int fromBits, int toBits, boolean pad)
             throws ReflectiveOperationException {
         Method method = Bech32.class.getDeclaredMethod(
                 "convertBits", byte[].class, int.class, int.class, int.class, int.class, boolean.class);
         method.setAccessible(true);
-        try {
-            return (byte[]) method.invoke(null, in, inStart, inLen, fromBits, toBits, pad);
-        } catch (ReflectiveOperationException e) {
-            // rethrow AddressFormatException if it's the underlying cause
-            Throwable cause = e.getCause();
-            if (cause instanceof AddressFormatException) {
-                AddressFormatException afe = (AddressFormatException) cause;
-                afe.addSuppressed(e);
-                throw afe;
-            }
-            throw e;
-        }
+        return (byte[]) method.invoke(null, in, inStart, inLen, fromBits, toBits, pad);
     }
 
     /**
