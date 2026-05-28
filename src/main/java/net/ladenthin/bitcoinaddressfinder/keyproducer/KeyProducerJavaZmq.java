@@ -44,8 +44,7 @@ public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyPro
             socket.connect(cKeyProducerJava.address);
         }
 
-        int internalTimeout = getReadTimeout();
-        socket.setReceiveTimeOut(internalTimeout);
+        socket.setReceiveTimeOut(cKeyProducerJava.timeout);
 
         receiverThread = new Thread(
                 () -> {
