@@ -62,8 +62,7 @@ public class Main implements Runnable, Interruptable {
     static final String FILE_EXTENSION_YML = ".yml";
 
     /** SLF4J logger for the CLI entry point. */
-    @VisibleForTesting
-    public static Logger logger = LoggerFactory.getLogger(Main.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
 
     private final List<Interruptable> interruptables = new ArrayList<>();
 
@@ -162,7 +161,7 @@ public class Main implements Runnable, Interruptable {
      */
     public static void main(String[] args) {
         if (args.length != 1) {
-            logger.error("Invalid arguments. Pass path to configuration as first argument.");
+            LOGGER.error("Invalid arguments. Pass path to configuration as first argument.");
             return;
         }
         final Path configurationPath = Path.of(args[0]);
@@ -187,7 +186,7 @@ public class Main implements Runnable, Interruptable {
     public void logConfigurationTransformation() {
         String json = configurationToJson(configuration);
         String yaml = configurationToYAML(configuration);
-        logger.info(
+        LOGGER.info(
                 "Please review the transformed configuration to ensure it aligns with your expectations and requirements before proceeding.:\n"
                         + "########## BEGIN transformed JSON configuration ##########\n"
                         + json
@@ -200,7 +199,7 @@ public class Main implements Runnable, Interruptable {
 
     @Override
     public void run() {
-        logger.info(configuration.command.name());
+        LOGGER.info(configuration.command.name());
 
         addSchutdownHook();
 
@@ -242,7 +241,7 @@ public class Main implements Runnable, Interruptable {
                 throw new UnsupportedOperationException(
                         "Command: " + configuration.command.name() + " currently not supported.");
         }
-        logger.info("Main#run end.");
+        LOGGER.info("Main#run end.");
         runLatch.countDown();
 
         if (false) {
@@ -266,10 +265,8 @@ public class Main implements Runnable, Interruptable {
         Map<Thread, StackTraceElement[]> all = Thread.getAllStackTraces();
 
         List<Map.Entry<Thread, StackTraceElement[]>> entries = new ArrayList<>(all.entrySet());
-        entries.sort(Comparator.comparing((Map.Entry<Thread, StackTraceElement[]> e) -> {
-                    String n = e.getKey().getName();
-                    return n == null ? "" : n;
-                })
+        entries.sort(Comparator.comparing(
+                        (Map.Entry<Thread, StackTraceElement[]> e) -> e.getKey().getName())
                 .thenComparingLong(e -> e.getKey().getId()));
 
         boolean printedAny = false;
@@ -293,18 +290,18 @@ public class Main implements Runnable, Interruptable {
 
     private void addSchutdownHook() {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            logger.info("Shutdown received via hook.");
+            LOGGER.info("Shutdown received via hook.");
             interrupt();
             try {
-                logger.info("runLatch await");
+                LOGGER.info("runLatch await");
                 if (!runLatch.await(30, TimeUnit.SECONDS)) {
-                    logger.warn("runLatch did not complete within 30s shutdown timeout; "
+                    LOGGER.warn("runLatch did not complete within 30s shutdown timeout; "
                             + "remaining tasks may not have finished cleanly.");
                 }
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-            logger.info("Finish shutdown hook.");
+            LOGGER.info("Finish shutdown hook.");
         }));
     }
 

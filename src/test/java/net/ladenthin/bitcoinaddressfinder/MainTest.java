@@ -6,13 +6,10 @@ package net.ladenthin.bitcoinaddressfinder;
 import static net.ladenthin.bitcoinaddressfinder.cli.Main.printAllStackTracesWithDelay;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Level;
 import java.io.File;
@@ -20,17 +17,15 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.cli.Main;
 import net.ladenthin.bitcoinaddressfinder.configuration.CCommand;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
+import nl.altindag.log.LogCaptor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.ArgumentCaptor;
-import org.slf4j.Logger;
 
 public class MainTest {
 
@@ -121,19 +116,15 @@ public class MainTest {
     // <editor-fold defaultstate="collapsed" desc="invalidArgument">
     @Test
     public void main_noArgumentGiven_errorLogged() throws IOException, InterruptedException {
-        // arrange
-        Logger logger = mock(Logger.class);
-        when(logger.isTraceEnabled()).thenReturn(true);
-        Main.logger = logger;
+        try (LogCaptor logCaptor = LogCaptor.forClass(Main.class)) {
+            // act
+            Main.main(new String[0]);
 
-        // act
-        Main.main(new String[0]);
-
-        // assert
-        ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
-        verify(logger, times(1)).error(logCaptor.capture());
-        List<String> arguments = logCaptor.getAllValues();
-        assertThat(arguments.get(0), is(equalTo("Invalid arguments. Pass path to configuration as first argument.")));
+            // assert
+            assertThat(
+                    logCaptor.getErrorLogs(),
+                    hasItem(equalTo("Invalid arguments. Pass path to configuration as first argument.")));
+        }
     }
     // </editor-fold>
 
