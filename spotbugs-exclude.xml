@@ -266,4 +266,59 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="PATH_TRAVERSAL_IN"/>
     </Match>
 
+    <!--
+        EI_EXPOSE_REP / EI_EXPOSE_REP2 findings on this codebase fall
+        into four design-intent categories; defensive copies are
+        inappropriate in every case:
+
+        1. Hot-path byte[] / ByteBuffer ownership transfer.
+           PublicKeyBytes, AddressToCoin.hash160,
+           OpenClTask$CLByteBufferPointerArgument.byteBuffer,
+           OpenCLGridResult.result, and the cached read-only
+           PersistenceUtils.zeroByteBuffer are passed across the
+           GPU/CPU key-derivation pipeline at millions of operations
+           per second. Allocating a copy at every getter or
+           constructor would destroy throughput. The contract is
+           "ownership transfers at boundary";
+           PersistenceUtils.zeroByteBuffer is additionally pinned as
+           asReadOnlyBuffer() to defeat mutation.
+
+        2. JOCL native handles. cl_context, cl_mem, cl_device_id,
+           cl_context_properties, and Pointer are opaque native
+           resource references. They cannot be cloned; the Java owner
+           must retain the reference to release the resource via
+           clRelease*.
+
+        3. Effectively-immutable bitcoinj Coin. AddressToCoin.coin
+           holds a Coin instance which is a value-class style
+           immutable type. SpotBugs lacks the annotation to recognise
+           it.
+
+        4. Deliberate dependency injection.
+           RandomSecretSupplier.random must share state across calls
+           (PRNG progression / seeded reproducibility);
+           LMDBPersistence.persistenceUtils is a stateless helper
+           owned by the caller. Copying either would break the
+           contract.
+    -->
+    <Match>
+        <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.PublicKeyBytes"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.AddressToCoin"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.OpenClTask"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.OpenClTask$CLByteBufferPointerArgument"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.OpenCLGridResult"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDeviceSelection"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.RandomSecretSupplier"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
 </FindBugsFilter>
