@@ -5,17 +5,13 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 
 import java.math.BigInteger;
-import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -27,23 +23,21 @@ import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaReceiver;
+import nl.altindag.log.LogCaptor;
 import org.bitcoinj.base.Network;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
 
 public class AbstractKeyProducerQueueBufferedTest {
 
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
-    private Logger mockLogger;
     private ExecutorService executorService;
 
     @BeforeEach
     public void setUp() {
-        mockLogger = mock(Logger.class);
         executorService = Executors.newCachedThreadPool();
     }
 
@@ -55,13 +49,12 @@ public class AbstractKeyProducerQueueBufferedTest {
     static class TestKeyProducer extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaReceiver> {
         private int readTimeoutMs = TestTimeProvider.DEFAULT_SOCKET_TIMEOUT;
 
-        public TestKeyProducer(CKeyProducerJavaReceiver config, KeyUtility keyUtility, Logger logger) {
-            super(config, keyUtility, logger);
+        public TestKeyProducer(CKeyProducerJavaReceiver config, KeyUtility keyUtility) {
+            super(config, keyUtility);
         }
 
-        public TestKeyProducer(
-                CKeyProducerJavaReceiver config, KeyUtility keyUtility, Logger logger, BlockingQueue<byte[]> queue) {
-            super(config, keyUtility, logger, queue);
+        public TestKeyProducer(CKeyProducerJavaReceiver config, KeyUtility keyUtility, BlockingQueue<byte[]> queue) {
+            super(config, keyUtility, queue);
         }
 
         public void setReadTimeoutMs(int readTimeoutMs) {
@@ -80,7 +73,7 @@ public class AbstractKeyProducerQueueBufferedTest {
     }
 
     private TestKeyProducer createTestKeyProducer(CKeyProducerJavaReceiver config) {
-        return new TestKeyProducer(config, keyUtility, mockLogger);
+        return new TestKeyProducer(config, keyUtility);
     }
 
     @Test
@@ -160,11 +153,13 @@ public class AbstractKeyProducerQueueBufferedTest {
 
         String expectedHex = keyUtility.bigIntegerToFixedLengthHex(expectedSecret);
 
-        producer.addSecret(secret);
-        producer.createSecrets(1, true);
+        try (LogCaptor logCaptor = LogCaptor.forClass(AbstractKeyProducerQueueBuffered.class)) {
+            producer.addSecret(secret);
+            producer.createSecrets(1, true);
 
-        // Verify that logger.info was called with the expected message
-        verify(mockLogger, times(1)).info(eq("Received key: {}"), eq(expectedHex));
+            // Verify the formatted message was emitted at INFO level.
+            assertThat(logCaptor.getInfoLogs(), hasItem("Received key: " + expectedHex));
+        }
     }
 
     @Test()
@@ -172,14 +167,22 @@ public class AbstractKeyProducerQueueBufferedTest {
         CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
 
         BlockingQueue<byte[]> queue = new LinkedBlockingQueue<>(1);
-        TestKeyProducer producer = new TestKeyProducer(config, keyUtility, mockLogger, queue);
+        TestKeyProducer producer = new TestKeyProducer(config, keyUtility, queue);
 
         byte[] secret = new KeyProducerTestUtility().createFilledSecret((byte) 0xAB);
 
-        producer.addSecret(secret); // fills queue
-        producer.addSecret(secret); // must fail
+        try (LogCaptor logCaptor = LogCaptor.forClass(AbstractKeyProducerQueueBuffered.class)) {
+            producer.addSecret(secret); // fills queue
+            producer.addSecret(secret); // must fail
 
-        verify(mockLogger).error(eq("Secret queue is full, ignore secret: {}"), eq(secret));
+            // The formatted message uses the {} placeholder with the byte[] reference --
+            // because byte[].toString() prints '[B@<hash>' the formatted log line is
+            // non-deterministic, but the prefix is stable. Match the prefix only.
+            assertThat(
+                    logCaptor.getErrorLogs().stream()
+                            .anyMatch(s -> s.startsWith("Secret queue is full, ignore secret: ")),
+                    is(true));
+        }
     }
 
     @Test

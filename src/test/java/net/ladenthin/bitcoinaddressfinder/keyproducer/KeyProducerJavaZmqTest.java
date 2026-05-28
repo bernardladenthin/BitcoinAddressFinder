@@ -6,9 +6,6 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
 
 import java.math.BigInteger;
 import java.util.concurrent.ExecutorService;
@@ -20,15 +17,14 @@ import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
+import nl.altindag.log.LogCaptor;
 import org.bitcoinj.base.Network;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
 import org.zeromq.SocketType;
 import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
-import org.zeromq.ZMQException;
 
 public class KeyProducerJavaZmqTest {
 
@@ -36,12 +32,10 @@ public class KeyProducerJavaZmqTest {
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
     private ExecutorService executorService;
-    private Logger mockLogger;
 
     @BeforeEach
     public void setup() {
         executorService = Executors.newCachedThreadPool();
-        mockLogger = mock(Logger.class);
     }
 
     @AfterEach
@@ -50,7 +44,7 @@ public class KeyProducerJavaZmqTest {
     }
 
     private KeyProducerJavaZmq createKeyProducerJavaZmq(CKeyProducerJavaZmq config) {
-        return new KeyProducerJavaZmq(config, keyUtility, bitHelper, mockLogger);
+        return new KeyProducerJavaZmq(config, keyUtility, bitHelper);
     }
 
     public static String findFreeZmqAddress() {
@@ -233,7 +227,8 @@ public class KeyProducerJavaZmqTest {
     @Test
     public void createSecrets_invalidSecretLength_errorLogged() throws Exception {
         // arrange
-        try (ZContext context = new ZContext()) {
+        try (ZContext context = new ZContext();
+                LogCaptor logCaptor = LogCaptor.forClass(KeyProducerJavaZmq.class)) {
             String address = findFreeZmqAddress();
 
             // Server socket (push) binds
@@ -267,7 +262,7 @@ public class KeyProducerJavaZmqTest {
             assertThat(secrets.length, is(1));
 
             // Verify logger was called with error message for invalid length
-            verify(mockLogger).error("Received invalid secret length: 16");
+            assertThat(logCaptor.getErrorLogs(), hasItem("Received invalid secret length: 16"));
 
             keyProducer.interrupt();
             sender.close();
@@ -286,33 +281,35 @@ public class KeyProducerJavaZmqTest {
         config.timeout = -1; // block indefinitely
         KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
 
-        // Start a thread that will block on createSecrets
-        Future<BigInteger[]> future = executorService.submit(() -> {
-            try {
-                return producer.createSecrets(1, true);
-            } catch (NoMoreSecretsAvailableException e) {
-                return null;
-            }
-        });
+        try (LogCaptor logCaptor = LogCaptor.forClass(KeyProducerJavaZmq.class)) {
+            // Start a thread that will block on createSecrets
+            Future<BigInteger[]> future = executorService.submit(() -> {
+                try {
+                    return producer.createSecrets(1, true);
+                } catch (NoMoreSecretsAvailableException e) {
+                    return null;
+                }
+            });
 
-        // Let it enter the blocking receive
-        Thread.sleep(TestTimeProvider.DEFAULT_SEND_WAIT);
+            // Let it enter the blocking receive
+            Thread.sleep(TestTimeProvider.DEFAULT_SEND_WAIT);
 
-        // Sanity check: with timeout=-1 the consumer must still be parked, otherwise
-        // the test is exercising a different code path than its name claims.
-        assertThat("createSecrets must be blocked before interrupt()", future.isDone(), is(false));
+            // Sanity check: with timeout=-1 the consumer must still be parked, otherwise
+            // the test is exercising a different code path than its name claims.
+            assertThat("createSecrets must be blocked before interrupt()", future.isDone(), is(false));
 
-        // act
-        // Now interrupt from another thread (will close socket/context)
-        producer.interrupt();
+            // act
+            // Now interrupt from another thread (will close socket/context)
+            producer.interrupt();
 
-        // assert
-        // Assert the future exits cleanly within timeout
-        BigInteger[] result = future.get(2, TimeUnit.SECONDS);
-        assertThat(result, is(nullValue()));
+            // assert
+            // Assert the future exits cleanly within timeout
+            BigInteger[] result = future.get(2, TimeUnit.SECONDS);
+            assertThat(result, is(nullValue()));
 
-        // Verify no unexpected ZMQ errors were logged
-        verify(mockLogger, never()).error(eq("ZMQ error"), any(ZMQException.class));
+            // Verify no unexpected ZMQ errors were logged
+            assertThat(logCaptor.getErrorLogs(), not(hasItem("ZMQ error")));
+        }
     }
     // </editor-fold>
 

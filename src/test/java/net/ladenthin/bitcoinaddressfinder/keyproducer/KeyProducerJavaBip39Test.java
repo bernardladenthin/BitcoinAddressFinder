@@ -6,7 +6,6 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import static org.mockito.Mockito.mock;
 
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
@@ -16,26 +15,18 @@ import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
 import org.bitcoinj.base.Network;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
 
 public class KeyProducerJavaBip39Test {
 
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
-    private Logger mockLogger;
 
     String keyProducerId = "exampleId";
 
-    @BeforeEach
-    public void setUp() {
-        mockLogger = mock(Logger.class);
-    }
-
     private KeyProducerJavaBip39 createKeyProducerJavaBip39(CKeyProducerJavaBip39 config) {
-        return new KeyProducerJavaBip39(config, keyUtility, bitHelper, mockLogger);
+        return new KeyProducerJavaBip39(config, keyUtility, bitHelper);
     }
 
     private BigInteger[] generateSecrets() throws NoMoreSecretsAvailableException {

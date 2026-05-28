@@ -81,58 +81,39 @@ public class Finder implements Interruptable {
         LOGGER.info("startKeyProducer");
         processKeyProducers(
                 finder.keyProducerJavaRandom,
-                cKeyProducerJavaRandom -> new KeyProducerJavaRandom(
-                        cKeyProducerJavaRandom,
-                        keyUtility,
-                        bitHelper,
-                        LoggerFactory.getLogger(KeyProducerJavaRandom.class)),
+                cKeyProducerJavaRandom -> new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility, bitHelper),
                 cKeyProducerJavaRandom -> cKeyProducerJavaRandom.keyProducerId,
                 keyProducers);
 
         processKeyProducers(
                 finder.keyProducerJavaBip39,
-                cKeyProducerJavaBip39 -> new KeyProducerJavaBip39(
-                        cKeyProducerJavaBip39,
-                        keyUtility,
-                        bitHelper,
-                        LoggerFactory.getLogger(KeyProducerJavaBip39.class)),
+                cKeyProducerJavaBip39 -> new KeyProducerJavaBip39(cKeyProducerJavaBip39, keyUtility, bitHelper),
                 cKeyProducerJavaBip39 -> cKeyProducerJavaBip39.keyProducerId,
                 keyProducers);
 
         processKeyProducers(
                 finder.keyProducerJavaIncremental,
-                cKeyProducerJavaIncremental -> new KeyProducerJavaIncremental(
-                        cKeyProducerJavaIncremental,
-                        keyUtility,
-                        bitHelper,
-                        LoggerFactory.getLogger(KeyProducerJavaIncremental.class)),
+                cKeyProducerJavaIncremental ->
+                        new KeyProducerJavaIncremental(cKeyProducerJavaIncremental, keyUtility, bitHelper),
                 cKeyProducerJavaIncremental -> cKeyProducerJavaIncremental.keyProducerId,
                 keyProducers);
 
         processKeyProducers(
                 finder.keyProducerJavaSocket,
-                cKeyProducerJavaSocket -> new KeyProducerJavaSocket(
-                        cKeyProducerJavaSocket,
-                        keyUtility,
-                        bitHelper,
-                        LoggerFactory.getLogger(KeyProducerJavaSocket.class)),
+                cKeyProducerJavaSocket -> new KeyProducerJavaSocket(cKeyProducerJavaSocket, keyUtility, bitHelper),
                 cKeyProducerJavaSocket -> cKeyProducerJavaSocket.keyProducerId,
                 keyProducers);
 
         processKeyProducers(
                 finder.keyProducerJavaWebSocket,
-                cKeyProducerJavaWebSocket -> new KeyProducerJavaWebSocket(
-                        cKeyProducerJavaWebSocket,
-                        keyUtility,
-                        bitHelper,
-                        LoggerFactory.getLogger(KeyProducerJavaWebSocket.class)),
+                cKeyProducerJavaWebSocket ->
+                        new KeyProducerJavaWebSocket(cKeyProducerJavaWebSocket, keyUtility, bitHelper),
                 cKeyProducerJavaWebSocket -> cKeyProducerJavaWebSocket.keyProducerId,
                 keyProducers);
 
         processKeyProducers(
                 finder.keyProducerJavaZmq,
-                cKeyProducerJavaZmq -> new KeyProducerJavaZmq(
-                        cKeyProducerJavaZmq, keyUtility, bitHelper, LoggerFactory.getLogger(KeyProducerJavaZmq.class)),
+                cKeyProducerJavaZmq -> new KeyProducerJavaZmq(cKeyProducerJavaZmq, keyUtility, bitHelper),
                 cKeyProducerJavaZmq -> cKeyProducerJavaZmq.keyProducerId,
                 keyProducers);
     }

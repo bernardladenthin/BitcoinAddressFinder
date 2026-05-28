@@ -10,7 +10,6 @@ import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.RandomSecretSupplier;
 import net.ladenthin.bitcoinaddressfinder.SecretSupplier;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
-import org.slf4j.Logger;
 
 /**
  * Key producer that derives secrets deterministically from a BIP39 mnemonic.
@@ -28,11 +27,10 @@ public class KeyProducerJavaBip39 extends KeyProducerJava<CKeyProducerJavaBip39>
      * @param cKeyProducerJavaBip39 the BIP39 configuration
      * @param keyUtility            cryptographic helper
      * @param bitHelper             bit/batch-size helper
-     * @param logger                SLF4J logger
      */
     public KeyProducerJavaBip39(
-            CKeyProducerJavaBip39 cKeyProducerJavaBip39, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
-        super(cKeyProducerJavaBip39, logger);
+            CKeyProducerJavaBip39 cKeyProducerJavaBip39, KeyUtility keyUtility, BitHelper bitHelper) {
+        super(cKeyProducerJavaBip39);
         this.keyUtility = keyUtility;
         this.bitHelper = bitHelper;
 

@@ -17,11 +17,14 @@ import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Key producer that receives secrets from a TCP socket (client or server mode).
  */
 public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaSocket> {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(KeyProducerJavaSocket.class);
 
     private @Nullable ServerSocket serverSocket;
     private @Nullable Socket socket;
@@ -36,11 +39,9 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
      * @param config      the socket configuration
      * @param keyUtility  cryptographic helper
      * @param bitHelper   bit/batch-size helper (unused but kept for symmetry)
-     * @param logger      SLF4J logger
      */
-    public KeyProducerJavaSocket(
-            CKeyProducerJavaSocket config, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
-        super(config, keyUtility, logger);
+    public KeyProducerJavaSocket(CKeyProducerJavaSocket config, KeyUtility keyUtility, BitHelper bitHelper) {
+        super(config, keyUtility);
         setupSocket();
     }
 
@@ -57,13 +58,13 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
                             serverSocket.setSoTimeout(cKeyProducerJava.timeout);
                         }
                         socket = serverSocket.accept();
-                        logger.info("Accepted client connection at port {}", cKeyProducerJava.getPort());
+                        LOGGER.info("Accepted client connection at port {}", cKeyProducerJava.getPort());
                     } else {
                         socket = new Socket();
                         socket.connect(
                                 new InetSocketAddress(cKeyProducerJava.getHost(), cKeyProducerJava.getPort()),
                                 cKeyProducerJava.timeout);
-                        logger.info(
+                        LOGGER.info(
                                 "Connected to server at {}:{}", cKeyProducerJava.getHost(), cKeyProducerJava.getPort());
                     }
 
@@ -84,7 +85,7 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
 
                 } catch (IOException e) {
                     lastException = e;
-                    logger.warn("Connection attempt {} failed: {}", attempts + 1, e.getMessage());
+                    LOGGER.warn("Connection attempt {} failed: {}", attempts + 1, e.getMessage());
                     attempts++;
                     closeConnections();
                     sleep(cKeyProducerJava.retryDelayMillisConnect);

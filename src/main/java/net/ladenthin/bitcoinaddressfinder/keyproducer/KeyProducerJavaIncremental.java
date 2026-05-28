@@ -8,7 +8,6 @@ import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
 import org.jspecify.annotations.NonNull;
-import org.slf4j.Logger;
 
 /**
  * Key producer that iterates a private-key range sequentially.
@@ -24,14 +23,10 @@ public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJava
      * @param cKeyProducerJavaIncremental the incremental configuration
      * @param keyUtility                  cryptographic helper (unused but kept for symmetry)
      * @param bitHelper                   bit/batch-size helper (unused but kept for symmetry)
-     * @param logger                      SLF4J logger
      */
     public KeyProducerJavaIncremental(
-            CKeyProducerJavaIncremental cKeyProducerJavaIncremental,
-            KeyUtility keyUtility,
-            BitHelper bitHelper,
-            Logger logger) {
-        super(cKeyProducerJavaIncremental, logger);
+            CKeyProducerJavaIncremental cKeyProducerJavaIncremental, KeyUtility keyUtility, BitHelper bitHelper) {
+        super(cKeyProducerJavaIncremental);
         this.currentValue = new BigInteger(cKeyProducerJavaIncremental.startAddress, BitHelper.RADIX_HEX);
     }
 

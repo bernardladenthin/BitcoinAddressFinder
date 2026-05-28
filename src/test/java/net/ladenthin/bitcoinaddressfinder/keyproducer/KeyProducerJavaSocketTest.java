@@ -10,7 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.Mockito.*;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -34,7 +33,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.slf4j.Logger;
 
 public class KeyProducerJavaSocketTest {
 
@@ -43,7 +41,6 @@ public class KeyProducerJavaSocketTest {
     private final BitHelper bitHelper = new BitHelper();
 
     private ExecutorService executorService;
-    private Logger mockLogger;
 
     public static int findFreePort() {
         try (ServerSocket socket = new ServerSocket(0)) {
@@ -56,7 +53,6 @@ public class KeyProducerJavaSocketTest {
     @BeforeEach
     public void setup() {
         executorService = Executors.newCachedThreadPool();
-        mockLogger = mock(Logger.class);
     }
 
     @AfterEach
@@ -122,8 +118,7 @@ public class KeyProducerJavaSocketTest {
         serverConfig.connectionRetryCount = TestTimeProvider.DEFAULT_CONNECTION_RETRY_COUNT;
         serverConfig.retryDelayMillisConnect = TestTimeProvider.SHORT_DELAY;
         serverConfig.retryDelayMillisRead = TestTimeProvider.SHORT_DELAY;
-        KeyProducerJavaSocket serverKeyProducer =
-                new KeyProducerJavaSocket(serverConfig, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaSocket serverKeyProducer = new KeyProducerJavaSocket(serverConfig, keyUtility, bitHelper);
 
         // Server thread: start createSecrets(1, true)
         Future<Void> serverFuture = executorService.submit(() -> {
@@ -175,7 +170,7 @@ public class KeyProducerJavaSocketTest {
 
         // Client config to connect
         CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
 
         // Open connection implicitly on createSecrets call with length=1 and returnStartSecretOnly true (1 secret)
         try {
@@ -210,7 +205,7 @@ public class KeyProducerJavaSocketTest {
         });
 
         CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
 
         BigInteger[] secrets = client.createSecrets(1, true);
 
@@ -237,7 +232,7 @@ public class KeyProducerJavaSocketTest {
         });
 
         CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
 
         try {
             assertThrows(NoMoreSecretsAvailableException.class, () -> client.createSecrets(1, true));
@@ -269,7 +264,7 @@ public class KeyProducerJavaSocketTest {
         // Configure client socket with read timeout
         CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
         clientConfig.timeout = clientSocketTimeout;
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
 
         // Launch a thread that will block on reading secrets
         Future<BigInteger[]> future = executorService.submit(() -> {
@@ -321,7 +316,7 @@ public class KeyProducerJavaSocketTest {
 
         CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
         clientConfig.timeout = clientSocketTimeout;
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
 
         Future<BigInteger[]> future = executorService.submit(() -> {
             try {
@@ -370,7 +365,7 @@ public class KeyProducerJavaSocketTest {
         });
 
         CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
 
         // Successful read
         BigInteger[] secrets1 = client.createSecrets(1, true);
@@ -415,7 +410,7 @@ public class KeyProducerJavaSocketTest {
         });
 
         CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
 
         for (int i = 0; i < 3; i++) {
             BigInteger[] secrets = client.createSecrets(1, true);
@@ -450,7 +445,7 @@ public class KeyProducerJavaSocketTest {
         clientConfig.connectionRetryCount = TestTimeProvider.DEFAULT_CONNECTION_RETRY_COUNT;
         clientConfig.retryDelayMillisConnect = TestTimeProvider.DEFAULT_RETRY_DELAY;
         clientConfig.timeout = TestTimeProvider.LONG_SOCKET_TIMEOUT;
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
 
         // This will retry internally until server comes up
         Thread.sleep(TestTimeProvider.DEFAULT_SETTLE_DELAY); // allow background thread time to connect and read
@@ -479,7 +474,7 @@ public class KeyProducerJavaSocketTest {
         });
 
         CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
 
         try {
             assertThrows(NoMoreSecretsAvailableException.class, () -> client.createSecrets(1, true));
@@ -504,7 +499,7 @@ public class KeyProducerJavaSocketTest {
         });
 
         CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
 
         try {
             assertThrows(NoMoreSecretsAvailableException.class, () -> client.createSecrets(1, true));
@@ -532,7 +527,7 @@ public class KeyProducerJavaSocketTest {
         });
 
         CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
 
         BigInteger[] secrets = client.createSecrets(0, false);
         assertThat(secrets.length, is(0));
@@ -556,7 +551,7 @@ public class KeyProducerJavaSocketTest {
         });
 
         CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
 
         try {
             assertThrows(NoMoreSecretsAvailableException.class, () -> client.createSecrets(2, false));
@@ -595,7 +590,7 @@ public class KeyProducerJavaSocketTest {
         clientConfig.retryDelayMillisRead = TestTimeProvider.SHORT_DELAY;
         clientConfig.timeout = TestTimeProvider.SOCKET_ACCEPT_TIMEOUT;
 
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
 
         try {
             client.createSecrets(1, true);
@@ -647,7 +642,7 @@ public class KeyProducerJavaSocketTest {
                 TestTimeProvider.DEFAULT_SOCKET_TIMEOUT; // make connection attempt long enough to interrupt mid-way
         config.retryDelayMillisConnect = 0;
 
-        KeyProducerJavaSocket client = new KeyProducerJavaSocket(config, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaSocket client = new KeyProducerJavaSocket(config, keyUtility, bitHelper);
 
         ExecutorService executor = Executors.newSingleThreadExecutor();
         AtomicInteger state = new AtomicInteger(STATE_UNKNOWN);
@@ -688,7 +683,7 @@ public class KeyProducerJavaSocketTest {
         config.connectionRetryCount = 1;
         config.retryDelayMillisConnect = 0;
 
-        KeyProducerJavaSocket server = new KeyProducerJavaSocket(config, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaSocket server = new KeyProducerJavaSocket(config, keyUtility, bitHelper);
 
         long start = System.currentTimeMillis();
 

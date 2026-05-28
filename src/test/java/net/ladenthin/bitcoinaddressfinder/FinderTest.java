@@ -37,7 +37,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.slf4j.Logger;
 
 public class FinderTest {
 
@@ -296,14 +295,11 @@ public class FinderTest {
             // assert
             assertThat(finder.getKeyProducers().keySet(), hasSize(1));
         }
-        // assert logger is correctly bound to the concrete class
+        // assert the constructed producer is of the expected concrete class
         {
             KeyProducer keyProducer =
                     Objects.requireNonNull(finder.getKeyProducers().get(keyProducerId));
-            Logger logger = keyProducer.getLogger();
-
-            // Verify logger name matches the fully qualified class name
-            assertThat(logger.getName(), is(keyProducerClass.getCanonicalName()));
+            assertThat(keyProducer.getClass().getCanonicalName(), is(keyProducerClass.getCanonicalName()));
         }
         {
             // pre-assert

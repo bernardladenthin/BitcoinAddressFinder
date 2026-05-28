@@ -8,6 +8,7 @@ import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.zeromq.SocketType;
 import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
@@ -17,6 +18,8 @@ import org.zeromq.ZMQException;
  * Key producer that receives secrets through a ZeroMQ PULL socket.
  */
 public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaZmq> {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(KeyProducerJavaZmq.class);
 
     private final ZContext context;
     private final ZMQ.Socket socket;
@@ -28,10 +31,9 @@ public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyPro
      * @param config      the ZMQ configuration
      * @param keyUtility  cryptographic helper
      * @param bitHelper   bit/batch-size helper (unused but kept for symmetry)
-     * @param logger      SLF4J logger
      */
-    public KeyProducerJavaZmq(CKeyProducerJavaZmq config, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
-        super(config, keyUtility, logger);
+    public KeyProducerJavaZmq(CKeyProducerJavaZmq config, KeyUtility keyUtility, BitHelper bitHelper) {
+        super(config, keyUtility);
 
         context = new ZContext();
         socket = context.createSocket(SocketType.PULL);
@@ -54,13 +56,13 @@ public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyPro
                                 if (msg.length == PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES) {
                                     addSecret(msg);
                                 } else {
-                                    logger.error("Received invalid secret length: " + msg.length);
+                                    LOGGER.error("Received invalid secret length: " + msg.length);
                                 }
                             }
                             // if msg is null: it's a timeout — just loop again
                         } catch (ZMQException e) {
                             if (shouldStop || e.getErrorCode() == ZMQ.Error.ETERM.getCode()) break;
-                            logger.error("ZMQ error", e); // unexpected ZMQ errors
+                            LOGGER.error("ZMQ error", e); // unexpected ZMQ errors
                         }
                     }
                 },

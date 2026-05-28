@@ -11,6 +11,7 @@ import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaReceiver;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Base class to manage secret buffering using a blocking queue.
@@ -19,6 +20,8 @@ import org.slf4j.Logger;
  * @param <T> the configuration type for this receiver-based key producer
  */
 public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJavaReceiver> extends KeyProducerJava<T> {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractKeyProducerQueueBuffered.class);
 
     /**
      * Sentinel value pushed onto {@link #secretQueue} by {@link #signalShutdown()}
@@ -40,10 +43,9 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
      *
      * @param config     the receiver configuration
      * @param keyUtility the helper used to decode received byte arrays
-     * @param logger     the SLF4J logger
      */
-    public AbstractKeyProducerQueueBuffered(T config, KeyUtility keyUtility, Logger logger) {
-        super(config, logger);
+    public AbstractKeyProducerQueueBuffered(T config, KeyUtility keyUtility) {
+        super(config);
         this.keyUtility = keyUtility;
         this.secretQueue = new LinkedBlockingQueue<>();
     }
@@ -53,12 +55,10 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
      *
      * @param config     the receiver configuration
      * @param keyUtility the helper used to decode received byte arrays
-     * @param logger     the SLF4J logger
      * @param queue      the queue used to buffer received secrets
      */
-    protected AbstractKeyProducerQueueBuffered(
-            T config, KeyUtility keyUtility, Logger logger, BlockingQueue<byte[]> queue) {
-        super(config, logger);
+    protected AbstractKeyProducerQueueBuffered(T config, KeyUtility keyUtility, BlockingQueue<byte[]> queue) {
+        super(config);
         this.keyUtility = keyUtility;
         this.secretQueue = queue;
     }
@@ -101,7 +101,7 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
                 secrets[i] = keyUtility.bigIntegerFromUnsignedByteArray(secret);
 
                 if (cKeyProducerJava.logReceivedSecret) {
-                    logger.info("Received key: {}", keyUtility.bigIntegerToFixedLengthHex(secrets[i]));
+                    LOGGER.info("Received key: {}", keyUtility.bigIntegerToFixedLengthHex(secrets[i]));
                 }
 
             } catch (InterruptedException e) {
@@ -134,7 +134,7 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
     protected void addSecret(byte[] secret) {
         if (!shouldStop) {
             if (!secretQueue.offer(secret)) {
-                logger.error("Secret queue is full, ignore secret: {}", secret);
+                LOGGER.error("Secret queue is full, ignore secret: {}", secret);
             }
         }
     }
@@ -155,7 +155,7 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
     protected void signalShutdown() {
         shouldStop = true;
         if (!secretQueue.offer(SHUTDOWN_SENTINEL)) {
-            logger.trace("Shutdown sentinel not enqueued (queue full); consumer will observe shouldStop after drain.");
+            LOGGER.trace("Shutdown sentinel not enqueued (queue full); consumer will observe shouldStop after drain.");
         }
     }
 

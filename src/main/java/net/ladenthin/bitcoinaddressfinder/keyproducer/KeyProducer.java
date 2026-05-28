@@ -5,7 +5,6 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.Interruptable;
-import org.slf4j.Logger;
 
 /**
  * Strategy for creating batches of secret scalars used as candidate private keys.
@@ -21,11 +20,4 @@ public interface KeyProducer extends Interruptable {
      */
     BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly)
             throws NoMoreSecretsAvailableException;
-
-    /**
-     * Returns the logger associated with this producer.
-     *
-     * @return the logger associated with this producer
-     */
-    Logger getLogger();
 }

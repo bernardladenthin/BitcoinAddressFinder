@@ -6,7 +6,6 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
 
 import java.math.BigInteger;
 import java.net.URI;
@@ -22,13 +21,11 @@ import org.java_websocket.handshake.ServerHandshake;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
 
 public class KeyProducerJavaWebSocketTest {
 
     private KeyUtility keyUtility;
     private BitHelper bitHelper;
-    private Logger mockLogger;
 
     private ExecutorService executorService;
 
@@ -37,7 +34,6 @@ public class KeyProducerJavaWebSocketTest {
         Network network = new NetworkParameterFactory().getNetwork();
         keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
         bitHelper = new BitHelper();
-        mockLogger = mock(Logger.class);
         executorService = Executors.newCachedThreadPool();
     }
 
@@ -60,7 +56,7 @@ public class KeyProducerJavaWebSocketTest {
     @Test
     public void createSecrets_receivesValidSecret() throws Exception {
         CKeyProducerJavaWebSocket config = createConfig();
-        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
 
         // WebSocket client to send a valid 32-byte secret
         byte[] secret = new KeyProducerTestUtility().createZeroedSecret();
@@ -103,7 +99,7 @@ public class KeyProducerJavaWebSocketTest {
     public void createSecrets_timeoutWithoutMessage_throwsException() throws Exception {
         CKeyProducerJavaWebSocket config = createConfig();
         config.timeout = TestTimeProvider.DEFAULT_TIMEOUT;
-        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
 
         assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(1, true));
     }
@@ -113,7 +109,7 @@ public class KeyProducerJavaWebSocketTest {
         // arrange
         CKeyProducerJavaWebSocket config = createConfig();
         config.timeout = -1; // explicit: block indefinitely
-        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
 
         byte[] secret = new KeyProducerTestUtility().createZeroedSecret();
         BigInteger expected = new BigInteger(1, secret);
@@ -167,7 +163,7 @@ public class KeyProducerJavaWebSocketTest {
     public void interrupt_stopsReceiverAndCausesNoMoreSecretsAvailableException() throws Exception {
         // arrange
         CKeyProducerJavaWebSocket config = createConfig();
-        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
 
         Future<BigInteger[]> future = executorService.submit(() -> {
             try {
@@ -195,7 +191,7 @@ public class KeyProducerJavaWebSocketTest {
     public void createSecrets_invalidMessageLength_ignoredByServer() throws Exception {
         // arrange
         CKeyProducerJavaWebSocket config = createConfig();
-        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
 
         ConnectionUtils.waitUntilTcpPortOpen("localhost", config.port, TestTimeProvider.DEFAULT_SOCKET_TIMEOUT);
 

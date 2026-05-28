@@ -6,7 +6,6 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import static org.mockito.Mockito.mock;
 
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
@@ -19,28 +18,20 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomInstance;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.slf4j.Logger;
 
 public class KeyProducerJavaRandomTest {
 
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
-    private Logger mockLogger;
 
     String keyProducerId = "exampleId";
 
-    @BeforeEach
-    public void setUp() {
-        mockLogger = mock(Logger.class);
-    }
-
     private KeyProducerJavaRandom createKeyProducerJavaRandom(CKeyProducerJavaRandom cKeyProducerJavaRandom) {
-        return new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility, bitHelper, mockLogger);
+        return new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility, bitHelper);
     }
 
     // <editor-fold defaultstate="collapsed" desc="createStatisticsMessage">

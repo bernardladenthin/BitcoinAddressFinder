@@ -8,7 +8,6 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.Mockito.mock;
 
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.*;
@@ -16,7 +15,6 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremen
 import org.bitcoinj.base.Network;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
 
 /**
  * Tests for KeyProducerJavaIncremental with respect to key range boundaries and batch handling.
@@ -128,22 +126,19 @@ public class KeyProducerJavaIncrementalTest {
     private String startHex;
     private String endHex;
 
-    private Logger mockLogger;
-
     @BeforeEach
     public void setUp() {
         keyUtility = new KeyUtility(network, byteBufferUtility);
         bitHelper = new BitHelper();
         startHex = PublicKeyBytes.MIN_VALID_PRIVATE_KEY_HEX;
         endHex = "000000000000000000000000000000000000000000000000000000000000000A";
-        mockLogger = mock(Logger.class);
     }
 
     private KeyProducerJavaIncremental createKeyProducerJavaIncremental(String start, String end) {
         CKeyProducerJavaIncremental config = new CKeyProducerJavaIncremental();
         config.startAddress = start;
         config.endAddress = end;
-        return new KeyProducerJavaIncremental(config, keyUtility, bitHelper, mockLogger);
+        return new KeyProducerJavaIncremental(config, keyUtility, bitHelper);
     }
 
     /**

@@ -4,7 +4,6 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.Mockito.mock;
 
 import java.io.IOException;
 import net.ladenthin.bitcoinaddressfinder.*;
@@ -20,7 +19,6 @@ import org.bitcoinj.base.Network;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.slf4j.Logger;
 
 public class KeyProducerJavaTest {
 
@@ -32,7 +30,6 @@ public class KeyProducerJavaTest {
 
     private KeyUtility keyUtility;
     private BitHelper bitHelper;
-    private Logger mockLogger;
 
     private final Network network = new NetworkParameterFactory().getNetwork();
 
@@ -40,7 +37,6 @@ public class KeyProducerJavaTest {
     public void setUp() {
         keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
         bitHelper = new BitHelper();
-        mockLogger = mock(Logger.class);
     }
 
     @ParameterizedTest
@@ -78,37 +74,33 @@ public class KeyProducerJavaTest {
             case KeyProducerJavaRandom:
                 CKeyProducerJavaRandom configureKeyProducerJavaRandom =
                         configureKeyProducerJavaRandom(keyProducerId, maxWorkSize);
-                keyProducer =
-                        new KeyProducerJavaRandom(configureKeyProducerJavaRandom, keyUtility, bitHelper, mockLogger);
+                keyProducer = new KeyProducerJavaRandom(configureKeyProducerJavaRandom, keyUtility, bitHelper);
                 break;
             case KeyProducerJavaIncremental:
                 CKeyProducerJavaIncremental configureKeyProducerJavaIncremental =
                         configureKeyProducerJavaIncremental(keyProducerId, maxWorkSize);
-                keyProducer = new KeyProducerJavaIncremental(
-                        configureKeyProducerJavaIncremental, keyUtility, bitHelper, mockLogger);
+                keyProducer =
+                        new KeyProducerJavaIncremental(configureKeyProducerJavaIncremental, keyUtility, bitHelper);
                 break;
             case KeyProducerJavaBip39:
                 CKeyProducerJavaBip39 configureKeyProducerJavaBip39 =
                         configureKeyProducerJavaBip39(keyProducerId, maxWorkSize);
-                keyProducer =
-                        new KeyProducerJavaBip39(configureKeyProducerJavaBip39, keyUtility, bitHelper, mockLogger);
+                keyProducer = new KeyProducerJavaBip39(configureKeyProducerJavaBip39, keyUtility, bitHelper);
                 break;
             case KeyProducerJavaSocket:
                 CKeyProducerJavaSocket configureKeyProducerJavaSocket =
                         configureKeyProducerJavaSocket(keyProducerId, maxWorkSize);
-                keyProducer =
-                        new KeyProducerJavaSocket(configureKeyProducerJavaSocket, keyUtility, bitHelper, mockLogger);
+                keyProducer = new KeyProducerJavaSocket(configureKeyProducerJavaSocket, keyUtility, bitHelper);
                 break;
             case KeyProducerJavaWebSocket:
                 CKeyProducerJavaWebSocket configureKeyProducerJavaWebSocket =
                         configureKeyProducerJavaWebSocket(keyProducerId, maxWorkSize);
-                keyProducer = new KeyProducerJavaWebSocket(
-                        configureKeyProducerJavaWebSocket, keyUtility, bitHelper, mockLogger);
+                keyProducer = new KeyProducerJavaWebSocket(configureKeyProducerJavaWebSocket, keyUtility, bitHelper);
                 break;
             case KeyProducerJavaZmq:
                 CKeyProducerJavaZmq configureKeyProducerJavaZmq =
                         configureKeyProducerJavaZmq(keyProducerId, maxWorkSize);
-                keyProducer = new KeyProducerJavaZmq(configureKeyProducerJavaZmq, keyUtility, bitHelper, mockLogger);
+                keyProducer = new KeyProducerJavaZmq(configureKeyProducerJavaZmq, keyUtility, bitHelper);
                 break;
             default:
                 throw new IllegalArgumentException("Unknown KeyProducerType: " + keyProducerType);
