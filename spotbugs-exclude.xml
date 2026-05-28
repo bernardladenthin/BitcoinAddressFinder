@@ -178,4 +178,19 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="CLI_CONSTANT_LIST_INDEX"/>
     </Match>
 
+    <!--
+        UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD: every C-prefixed POJO
+        in the configuration package is populated by Jackson via
+        reflection when JSON is deserialized (see
+        examples/config_*.json). SpotBugs only tracks direct bytecode
+        writes and cannot see reflection writes, so every Jackson-only
+        field shows up as unwritten. Each flagged field has a matching
+        JSON key in the example configs and is read by production
+        code.
+    -->
+    <Match>
+        <Class name="~net\.ladenthin\.bitcoinaddressfinder\.configuration\..*"/>
+        <Bug pattern="UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+
 </FindBugsFilter>
