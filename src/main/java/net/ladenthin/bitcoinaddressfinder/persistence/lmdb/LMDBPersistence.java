@@ -60,8 +60,9 @@ public class LMDBPersistence implements Persistence {
     private final @NonNull KeyUtility keyUtility;
     private @Nullable Env<ByteBuffer> env;
     private @Nullable Dbi<ByteBuffer> lmdb_h160ToAmount;
-    private long increasedCounter = 0;
-    private long increasedSum = 0;
+    private final java.util.concurrent.atomic.AtomicLong increasedCounter =
+            new java.util.concurrent.atomic.AtomicLong(0);
+    private final java.util.concurrent.atomic.AtomicLong increasedSum = new java.util.concurrent.atomic.AtomicLong(0);
     private @Nullable BloomFilter<byte[]> addressBloomFilter = null;
 
     /**
@@ -169,7 +170,9 @@ public class LMDBPersistence implements Persistence {
         // We always need an Env. An Env owns a physical on-disk storage file. One
         // Env can store many different databases (ie sorted maps).
         File lmdbDirectory = new File(localLmdbConfigurationWrite.lmdbDirectory);
-        lmdbDirectory.mkdirs();
+        if (!lmdbDirectory.mkdirs() && !lmdbDirectory.isDirectory()) {
+            throw new IllegalStateException("Failed to create LMDB directory: " + lmdbDirectory);
+        }
 
         BufferProxy<ByteBuffer> bufferProxy =
                 getBufferProxyByUseProxyOptimal(localLmdbConfigurationWrite.useProxyOptimal);
@@ -443,20 +446,20 @@ public class LMDBPersistence implements Persistence {
     public void increaseDatabaseSize(long toIncrease) {
         Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
 
-        increasedCounter++;
-        increasedSum += toIncrease;
+        increasedCounter.incrementAndGet();
+        increasedSum.addAndGet(toIncrease);
         long newSize = getDatabaseSize() + toIncrease;
         localEnv.setMapSize(newSize);
     }
 
     @Override
     public long getIncreasedCounter() {
-        return increasedCounter;
+        return increasedCounter.get();
     }
 
     @Override
     public long getIncreasedSum() {
-        return increasedSum;
+        return increasedSum.get();
     }
 
     @Override

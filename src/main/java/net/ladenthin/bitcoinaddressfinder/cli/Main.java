@@ -297,7 +297,10 @@ public class Main implements Runnable, Interruptable {
             interrupt();
             try {
                 logger.info("runLatch await");
-                runLatch.await(30, TimeUnit.SECONDS);
+                if (!runLatch.await(30, TimeUnit.SECONDS)) {
+                    logger.warn("runLatch did not complete within 30s shutdown timeout; "
+                            + "remaining tasks may not have finished cleanly.");
+                }
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }

@@ -83,7 +83,11 @@ public class ProducerOpenCL extends AbstractProducer {
             if (getLogger().isDebugEnabled()) {
                 getLogger().debug("submit resultReaderRunnable for secretBase: " + secretBase);
             }
-            resultReaderThreadPoolExecutor.submit(resultReaderRunnable, openCLContext);
+            // Use execute() rather than submit() because we never consume the
+            // returned Future: ResultReaderRunnable reports completion via the
+            // consumer pipeline, and this producer submits in a tight loop
+            // without joining per-task.
+            resultReaderThreadPoolExecutor.execute(resultReaderRunnable);
         } catch (Exception e) {
             logErrorInProduceKeys(e, secretBase);
         }
