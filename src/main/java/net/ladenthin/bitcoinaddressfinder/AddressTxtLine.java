@@ -13,12 +13,16 @@ import org.bitcoinj.base.SegwitAddress;
 import org.bitcoinj.base.exceptions.AddressFormatException;
 import org.bouncycastle.util.encoders.DecoderException;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Most txt files have a common format which uses Base58 address and separated
  * anmount.
  */
 public class AddressTxtLine {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AddressTxtLine.class);
 
     /** Creates a new {@link AddressTxtLine}. */
     public AddressTxtLine() {}
@@ -256,7 +260,6 @@ public class AddressTxtLine {
             checksum = null;
         }
 
-        boolean checksumMatches = false;
         if (version != null && checksum != null) {
             byte[] payload = new byte[version.length + hash160.length];
             System.arraycopy(version, 0, payload, 0, version.length);
@@ -266,7 +269,18 @@ public class AddressTxtLine {
             byte[] secondHash = Hashing.sha256().hashBytes(firstHash).asBytes();
             byte[] calculatedChecksum = Arrays.copyOfRange(secondHash, 0, checksumBytes);
 
-            checksumMatches = Arrays.equals(calculatedChecksum, checksum);
+            final boolean checksumMatches = Arrays.equals(calculatedChecksum, checksum);
+            if (!checksumMatches && LOGGER.isDebugEnabled()) {
+                // Bulk-import contract: accept addresses with bad Base58
+                // checksums (data-quality issues are common in scraped /
+                // exported address dumps). Log at DEBUG so operators
+                // investigating import quality can enable detail without
+                // spamming the default INFO log for million-line imports.
+                LOGGER.debug(
+                        "Base58 checksum mismatch for parsed address (accepted anyway): " + "expected={}, got={}",
+                        org.apache.commons.codec.binary.Hex.encodeHexString(checksum),
+                        org.apache.commons.codec.binary.Hex.encodeHexString(calculatedChecksum));
+            }
             if (false) {
                 // TODO: For debugging only
                 String versionAsHex = org.apache.commons.codec.binary.Hex.encodeHexString(version);
