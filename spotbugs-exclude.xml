@@ -153,4 +153,29 @@ SPDX-License-Identifier: Apache-2.0
         </Or>
     </Match>
 
+    <!--
+        CLI_CONSTANT_LIST_INDEX is a fb-contrib style check that flags
+        `arr[N]` constant indices as a possible typo for a loop
+        variable. The detector ALREADY suppresses the finding when the
+        array comes from String.split() (see fb-contrib
+        ConstantListIndex.java): column-based access into a tokenized
+        line is a legitimate idiom, not a bug pattern.
+
+        SeparatorFormat.split() is functionally a String.split:
+        internally it calls String.split for each separator and
+        concatenates the parts (recursive multi-separator tokenizer).
+        The fb-contrib special-case cannot trace through the wrapper,
+        so the finding fires on AddressTxtLine.getCoinIfPossible which
+        reads the optional amount column. The named constants
+        COLUMN_ADDRESS / COLUMN_AMOUNT document the column layout, the
+        read is bounds-checked by length comparison, and the access
+        pattern matches exactly the idiom the detector author already
+        carved out for String.split callers.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.AddressTxtLine"/>
+        <Method name="getCoinIfPossible"/>
+        <Bug pattern="CLI_CONSTANT_LIST_INDEX"/>
+    </Match>
+
 </FindBugsFilter>
