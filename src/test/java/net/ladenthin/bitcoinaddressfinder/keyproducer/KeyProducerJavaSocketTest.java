@@ -114,10 +114,8 @@ public class KeyProducerJavaSocketTest {
         // Set up server
         CKeyProducerJavaSocket serverConfig = createServerConfig(port);
         serverConfig.timeout = TestTimeProvider.DEFAULT_SOCKET_TIMEOUT;
-        serverConfig.readRetryCount = TestTimeProvider.DEFAULT_RETRY_COUNT;
         serverConfig.connectionRetryCount = TestTimeProvider.DEFAULT_CONNECTION_RETRY_COUNT;
         serverConfig.retryDelayMillisConnect = TestTimeProvider.SHORT_DELAY;
-        serverConfig.retryDelayMillisRead = TestTimeProvider.SHORT_DELAY;
         KeyProducerJavaSocket serverKeyProducer = new KeyProducerJavaSocket(serverConfig, keyUtility, bitHelper);
 
         // Server thread: start createSecrets(1, true)
@@ -586,8 +584,6 @@ public class KeyProducerJavaSocketTest {
         });
 
         CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        clientConfig.readRetryCount = TestTimeProvider.DEFAULT_RETRY_COUNT;
-        clientConfig.retryDelayMillisRead = TestTimeProvider.SHORT_DELAY;
         clientConfig.timeout = TestTimeProvider.SOCKET_ACCEPT_TIMEOUT;
 
         KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);

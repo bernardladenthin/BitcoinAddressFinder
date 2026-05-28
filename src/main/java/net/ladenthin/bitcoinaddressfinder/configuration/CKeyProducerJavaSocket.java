@@ -53,20 +53,8 @@ public class CKeyProducerJavaSocket extends CKeyProducerJavaReceiver {
     /** Number of attempts to reconnect if connection fails */
     public int connectionRetryCount = 5;
 
-    /** Number of attempts to retry reading a secret after I/O failure */
-    public int readRetryCount = 5;
-
     /** Delay in milliseconds between retry attempts */
     public int retryDelayMillisConnect = 1000;
-
-    /** Delay in milliseconds between retry attempts */
-    public int retryDelayMillisRead = 1000;
-
-    /** Maximum retry attempts when partially reading a single secret */
-    public int readPartialRetryCount = 5;
-
-    /** Delay in milliseconds between partial read retry attempts */
-    public int readPartialRetryDelayMillis = 20;
 
     /**
      * Returns the configured host name.

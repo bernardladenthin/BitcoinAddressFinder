@@ -36,11 +36,7 @@
             "mode": "SERVER",
             "timeout": 3000,
             "connectionRetryCount": 5,
-            "readRetryCount": 5,
-            "retryDelayMillisConnect": 1000,
-            "retryDelayMillisRead": 1000,
-            "readPartialRetryCount": 5,
-            "readPartialRetryDelayMillis": 20
+            "retryDelayMillisConnect": 1000
         }
     ],
 	"keyProducerJavaWebSocket": [
