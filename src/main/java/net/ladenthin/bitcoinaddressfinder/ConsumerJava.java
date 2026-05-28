@@ -223,7 +223,7 @@ public class ConsumerJava implements Consumer {
                 boolean containsAddressCompressed = containsAddress(threadLocalReuseableByteBuffer, hash160Compressed);
 
                 if (consumerJava.runtimePublicKeyCalculationCheck) {
-                    publicKeyBytes.runtimePublicKeyCalculationCheck(logger);
+                    publicKeyBytes.runtimePublicKeyCalculationCheck();
                 }
 
                 if (containsAddressUncompressed) {

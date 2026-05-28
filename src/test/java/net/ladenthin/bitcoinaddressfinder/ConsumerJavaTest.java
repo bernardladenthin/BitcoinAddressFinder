@@ -27,6 +27,7 @@ import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses1337;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
+import nl.altindag.log.LogCaptor;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.base.Network;
@@ -444,9 +445,6 @@ public class ConsumerJavaTest {
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
 
-        Logger logger = mock(Logger.class);
-        consumerJava.setLogger(logger);
-
         PublicKeyBytes invalidPublicKeyBytes = PublicKeyBytes.fromPrivate(BigInteger.valueOf(1337));
         // invalidate compressed or uncompressed
         if (compressed) {
@@ -455,50 +453,57 @@ public class ConsumerJavaTest {
             invalidPublicKeyBytes.getUncompressed()[7] = 0;
         }
         PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[] {invalidPublicKeyBytes};
-        consumerJava.consumeKeys(publicKeyBytesArray);
-        consumerJava.consumeKeys(createHash160ByteBuffer());
 
-        // assert
-        assertThat(consumerJava.hits.get(), is(equalTo(0L)));
-        assertThat(consumerJava.vanityHits.get(), is(equalTo(0L)));
-        ArgumentCaptor<String> logCaptorError = ArgumentCaptor.forClass(String.class);
-        verify(logger, times(6)).error(logCaptorError.capture());
+        try (LogCaptor logCaptor = LogCaptor.forClass(PublicKeyBytes.class)) {
+            consumerJava.consumeKeys(publicKeyBytesArray);
+            consumerJava.consumeKeys(createHash160ByteBuffer());
 
-        List<String> arguments = logCaptorError.getAllValues();
+            // assert
+            assertThat(consumerJava.hits.get(), is(equalTo(0L)));
+            assertThat(consumerJava.vanityHits.get(), is(equalTo(0L)));
 
-        if (compressed) {
-            assertThat(arguments.get(0), is(equalTo("fromPrivateCompressed.getPubKeyHash() != hash160Compressed")));
-            assertThat(arguments.get(1), is(equalTo("getSecretKey: 1337")));
-            assertThat(
-                    arguments.get(2),
-                    is(equalTo(
-                            "pubKeyCompressed: 02db0c51cc634a0096374b0b895584a3ca2fb3bea4fd0ee2361f8db63a650fcee6")));
-            assertThat(
-                    arguments.get(3),
-                    is(
-                            equalTo(
-                                    "pubKeyCompressedFromEcKey: 02db0c51cc634a4096374b0b895584a3ca2fb3bea4fd0ee2361f8db63a650fcee6")));
-            assertThat(arguments.get(4), is(equalTo("hash160Compressed: a1039a5001eaccd75abb339b446b83b1ecf54ef7")));
-            assertThat(
-                    arguments.get(5),
-                    is(equalTo("hash160CompressedFromEcKey: 879f5696d90c1c280fa3c7d77723ebc59d7ac108")));
-        } else {
-            assertThat(arguments.get(0), is(equalTo("fromPrivateUncompressed.getPubKeyHash() != hash160Uncompressed")));
-            assertThat(arguments.get(1), is(equalTo("getSecretKey: 1337")));
-            assertThat(
-                    arguments.get(2),
-                    is(
-                            equalTo(
-                                    "pubKeyUncompressed: 04db0c51cc634a0096374b0b895584a3ca2fb3bea4fd0ee2361f8db63a650fcee67ec0bd2baea1ae184bd16fd397b0e64d5d28257f85836486367fe33cc5b6e6a0")));
-            assertThat(
-                    arguments.get(3),
-                    is(
-                            equalTo(
-                                    "pubKeyUncompressedFromEcKey: 04db0c51cc634a4096374b0b895584a3ca2fb3bea4fd0ee2361f8db63a650fcee67ec0bd2baea1ae184bd16fd397b0e64d5d28257f85836486367fe33cc5b6e6a0")));
-            assertThat(arguments.get(4), is(equalTo("hash160Uncompressed: 1a69285cb42032d77801a15a30357d510b247100")));
-            assertThat(
-                    arguments.get(5),
-                    is(equalTo("hash160UncompressedFromEcKey: e02e1cae178d3a2f84a5d897ee8b7ed6c0e2bbc4")));
+            List<String> arguments = logCaptor.getErrorLogs();
+            assertThat(arguments, hasSize(6));
+
+            if (compressed) {
+                assertThat(arguments.get(0), is(equalTo("fromPrivateCompressed.getPubKeyHash() != hash160Compressed")));
+                assertThat(arguments.get(1), is(equalTo("getSecretKey: 1337")));
+                assertThat(
+                        arguments.get(2),
+                        is(
+                                equalTo(
+                                        "pubKeyCompressed: 02db0c51cc634a0096374b0b895584a3ca2fb3bea4fd0ee2361f8db63a650fcee6")));
+                assertThat(
+                        arguments.get(3),
+                        is(
+                                equalTo(
+                                        "pubKeyCompressedFromEcKey: 02db0c51cc634a4096374b0b895584a3ca2fb3bea4fd0ee2361f8db63a650fcee6")));
+                assertThat(
+                        arguments.get(4), is(equalTo("hash160Compressed: a1039a5001eaccd75abb339b446b83b1ecf54ef7")));
+                assertThat(
+                        arguments.get(5),
+                        is(equalTo("hash160CompressedFromEcKey: 879f5696d90c1c280fa3c7d77723ebc59d7ac108")));
+            } else {
+                assertThat(
+                        arguments.get(0),
+                        is(equalTo("fromPrivateUncompressed.getPubKeyHash() != hash160Uncompressed")));
+                assertThat(arguments.get(1), is(equalTo("getSecretKey: 1337")));
+                assertThat(
+                        arguments.get(2),
+                        is(
+                                equalTo(
+                                        "pubKeyUncompressed: 04db0c51cc634a0096374b0b895584a3ca2fb3bea4fd0ee2361f8db63a650fcee67ec0bd2baea1ae184bd16fd397b0e64d5d28257f85836486367fe33cc5b6e6a0")));
+                assertThat(
+                        arguments.get(3),
+                        is(
+                                equalTo(
+                                        "pubKeyUncompressedFromEcKey: 04db0c51cc634a4096374b0b895584a3ca2fb3bea4fd0ee2361f8db63a650fcee67ec0bd2baea1ae184bd16fd397b0e64d5d28257f85836486367fe33cc5b6e6a0")));
+                assertThat(
+                        arguments.get(4), is(equalTo("hash160Uncompressed: 1a69285cb42032d77801a15a30357d510b247100")));
+                assertThat(
+                        arguments.get(5),
+                        is(equalTo("hash160UncompressedFromEcKey: e02e1cae178d3a2f84a5d897ee8b7ed6c0e2bbc4")));
+            }
         }
         consumerJava.interrupt();
     }

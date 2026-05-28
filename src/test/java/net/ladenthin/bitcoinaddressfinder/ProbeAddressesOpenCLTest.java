@@ -9,7 +9,6 @@ import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.jocl.CL.*;
-import static org.mockito.Mockito.mock;
 
 import com.google.common.io.Resources;
 import java.io.File;
@@ -38,7 +37,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.slf4j.Logger;
 
 public class ProbeAddressesOpenCLTest {
 
@@ -565,14 +563,14 @@ public class ProbeAddressesOpenCLTest {
         }
     }
 
-    private static void assertAllRuntimePublicKeyCalculationsValid(PublicKeyBytes[] publicKeys, Logger logger) {
+    private static void assertAllRuntimePublicKeyCalculationsValid(PublicKeyBytes[] publicKeys) {
         for (int i = 0; i < publicKeys.length; i++) {
-            assertRuntimePublicKeyCalculationValid(publicKeys[i], logger);
+            assertRuntimePublicKeyCalculationValid(publicKeys[i]);
         }
     }
 
-    private static void assertRuntimePublicKeyCalculationValid(PublicKeyBytes publicKeyBytes, Logger logger) {
-        boolean valid = publicKeyBytes.runtimePublicKeyCalculationCheck(logger);
+    private static void assertRuntimePublicKeyCalculationValid(PublicKeyBytes publicKeyBytes) {
+        boolean valid = publicKeyBytes.runtimePublicKeyCalculationCheck();
         assertThat(
                 "runtimePublicKeyCalculationCheck failed for secretKey: " + publicKeyBytes.getSecretKey(),
                 valid,
@@ -581,8 +579,7 @@ public class ProbeAddressesOpenCLTest {
 
     private static void assertPublicKeyBytesCalculatedCorrect(
             PublicKeyBytes[] publicKeys, BigInteger secretBase, final boolean souts, KeyUtility keyUtility) {
-        Logger logger = mock(Logger.class);
-        assertAllRuntimePublicKeyCalculationsValid(publicKeys, logger);
+        assertAllRuntimePublicKeyCalculationsValid(publicKeys);
 
         for (int i = 0; i < publicKeys.length; i++) {
             if (i % 10_000 == 0) {

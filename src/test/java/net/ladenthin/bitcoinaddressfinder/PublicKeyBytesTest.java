@@ -4,28 +4,26 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.emptyOrNullString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.Arrays;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
+import nl.altindag.log.LogCaptor;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.base.LegacyAddress;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.internal.CryptoUtils;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
 
 public class PublicKeyBytesTest {
 
@@ -132,14 +130,14 @@ public class PublicKeyBytesTest {
         byte[] uncompressed = ecKey.getPubKey();
         PublicKeyBytes publicKeyBytes = new PublicKeyBytes(secretKey, uncompressed); // compressed is derived
 
-        Logger logger = mock(Logger.class);
+        try (LogCaptor logCaptor = LogCaptor.forClass(PublicKeyBytes.class)) {
+            // act
+            boolean result = publicKeyBytes.runtimePublicKeyCalculationCheck();
 
-        // act
-        boolean result = publicKeyBytes.runtimePublicKeyCalculationCheck(logger);
-
-        // assert
-        assertThat(result, is(true));
-        verify(logger, never()).error(anyString());
+            // assert
+            assertThat(result, is(true));
+            assertThat(logCaptor.getErrorLogs(), is(empty()));
+        }
     }
 
     @Test
@@ -148,19 +146,18 @@ public class PublicKeyBytesTest {
         BigInteger secretKey = new BigInteger("1337");
         ECKey ecKey = ECKey.fromPrivate(secretKey, false);
         byte[] uncompressed = ecKey.getPubKey();
-        byte[] compressed = ECKey.fromPrivate(secretKey, true).getPubKey();
         byte[] wrongCompressedHash = new byte[PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES]; // all-zero hash (invalid)
 
         PublicKeyBytes publicKeyBytes = new PublicKeyBytes(secretKey, uncompressed, wrongCompressedHash);
 
-        Logger logger = mock(Logger.class);
+        try (LogCaptor logCaptor = LogCaptor.forClass(PublicKeyBytes.class)) {
+            // act
+            boolean result = publicKeyBytes.runtimePublicKeyCalculationCheck();
 
-        // act
-        boolean result = publicKeyBytes.runtimePublicKeyCalculationCheck(logger);
-
-        // assert
-        assertThat(result, is(false));
-        verify(logger).error(contains("fromPrivateCompressed.getPubKeyHash()"));
+            // assert
+            assertThat(result, is(false));
+            assertThat(logCaptor.getErrorLogs(), hasItem(containsString("fromPrivateCompressed.getPubKeyHash()")));
+        }
     }
 
     @Test
@@ -174,14 +171,14 @@ public class PublicKeyBytesTest {
 
         PublicKeyBytes publicKeyBytes = new PublicKeyBytes(secretKey, wrongUncompressedHash, compressed);
 
-        Logger logger = mock(Logger.class);
+        try (LogCaptor logCaptor = LogCaptor.forClass(PublicKeyBytes.class)) {
+            // act
+            boolean result = publicKeyBytes.runtimePublicKeyCalculationCheck();
 
-        // act
-        boolean result = publicKeyBytes.runtimePublicKeyCalculationCheck(logger);
-
-        // assert
-        assertThat(result, is(false));
-        verify(logger).error(contains("fromPrivateUncompressed.getPubKeyHash()"));
+            // assert
+            assertThat(result, is(false));
+            assertThat(logCaptor.getErrorLogs(), hasItem(containsString("fromPrivateUncompressed.getPubKeyHash()")));
+        }
     }
 
     @Test
@@ -193,15 +190,15 @@ public class PublicKeyBytesTest {
 
         PublicKeyBytes publicKeyBytes = new PublicKeyBytes(secretKey, uncompressedWrong, compressedWrong);
 
-        Logger logger = mock(Logger.class);
+        try (LogCaptor logCaptor = LogCaptor.forClass(PublicKeyBytes.class)) {
+            // act
+            boolean result = publicKeyBytes.runtimePublicKeyCalculationCheck();
 
-        // act
-        boolean result = publicKeyBytes.runtimePublicKeyCalculationCheck(logger);
-
-        // assert
-        assertThat(result, is(false));
-        verify(logger).error(contains("fromPrivateUncompressed.getPubKeyHash()"));
-        verify(logger).error(contains("fromPrivateCompressed.getPubKeyHash()"));
+            // assert
+            assertThat(result, is(false));
+            assertThat(logCaptor.getErrorLogs(), hasItem(containsString("fromPrivateUncompressed.getPubKeyHash()")));
+            assertThat(logCaptor.getErrorLogs(), hasItem(containsString("fromPrivateCompressed.getPubKeyHash()")));
+        }
     }
     // </editor-fold>
 

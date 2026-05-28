@@ -10,12 +10,15 @@ import org.bitcoinj.crypto.ECKey;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Container for the public-key bytes derived from a secp256k1 private key together with their
  * RIPEMD-160 hashes (compressed and uncompressed).
  */
 public class PublicKeyBytes {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(PublicKeyBytes.class);
 
     /** Maximum technically representable 256-bit private key value ({@code 2^256 - 1}). */
     public static final BigInteger MAX_TECHNICALLY_PRIVATE_KEY =
@@ -559,11 +562,11 @@ public class PublicKeyBytes {
 
     /**
      * Runs a self-consistency check by recomputing the public-key hashes via bitcoinj.
+     * Mismatches are reported via the class-level SLF4J logger at ERROR level.
      *
-     * @param logger the SLF4J logger used to report mismatches
      * @return {@code true} if the precomputed hashes match the freshly computed ones
      */
-    public boolean runtimePublicKeyCalculationCheck(Logger logger) {
+    public boolean runtimePublicKeyCalculationCheck() {
         byte[] hash160Uncompressed = getUncompressedKeyHash();
         byte[] hash160Compressed = getCompressedKeyHash();
         ECKey fromPrivateUncompressed = ECKey.fromPrivate(getSecretKey(), false);
@@ -577,28 +580,28 @@ public class PublicKeyBytes {
 
         boolean isValid = true;
         if (!Arrays.equals(hash160UncompressedFromEcKey, hash160Uncompressed)) {
-            logger.error("fromPrivateUncompressed.getPubKeyHash() != hash160Uncompressed");
-            logger.error("getSecretKey: " + getSecretKey());
-            logger.error(
+            LOGGER.error("fromPrivateUncompressed.getPubKeyHash() != hash160Uncompressed");
+            LOGGER.error("getSecretKey: " + getSecretKey());
+            LOGGER.error(
                     "pubKeyUncompressed: " + org.apache.commons.codec.binary.Hex.encodeHexString(getUncompressed()));
-            logger.error("pubKeyUncompressedFromEcKey: "
+            LOGGER.error("pubKeyUncompressedFromEcKey: "
                     + org.apache.commons.codec.binary.Hex.encodeHexString(pubKeyUncompressedFromEcKey));
-            logger.error(
+            LOGGER.error(
                     "hash160Uncompressed: " + org.apache.commons.codec.binary.Hex.encodeHexString(hash160Uncompressed));
-            logger.error("hash160UncompressedFromEcKey: "
+            LOGGER.error("hash160UncompressedFromEcKey: "
                     + org.apache.commons.codec.binary.Hex.encodeHexString(hash160UncompressedFromEcKey));
             isValid = false;
         }
 
         if (!Arrays.equals(hash160CompressedFromEcKey, hash160Compressed)) {
-            logger.error("fromPrivateCompressed.getPubKeyHash() != hash160Compressed");
-            logger.error("getSecretKey: " + getSecretKey());
-            logger.error("pubKeyCompressed: " + org.apache.commons.codec.binary.Hex.encodeHexString(getCompressed()));
-            logger.error("pubKeyCompressedFromEcKey: "
+            LOGGER.error("fromPrivateCompressed.getPubKeyHash() != hash160Compressed");
+            LOGGER.error("getSecretKey: " + getSecretKey());
+            LOGGER.error("pubKeyCompressed: " + org.apache.commons.codec.binary.Hex.encodeHexString(getCompressed()));
+            LOGGER.error("pubKeyCompressedFromEcKey: "
                     + org.apache.commons.codec.binary.Hex.encodeHexString(pubKeyCompressedFromEcKey));
-            logger.error(
+            LOGGER.error(
                     "hash160Compressed: " + org.apache.commons.codec.binary.Hex.encodeHexString(hash160Compressed));
-            logger.error("hash160CompressedFromEcKey: "
+            LOGGER.error("hash160CompressedFromEcKey: "
                     + org.apache.commons.codec.binary.Hex.encodeHexString(hash160CompressedFromEcKey));
             isValid = false;
         }

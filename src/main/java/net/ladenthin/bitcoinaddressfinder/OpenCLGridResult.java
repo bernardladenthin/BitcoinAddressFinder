@@ -21,7 +21,7 @@ public class OpenCLGridResult {
      * Useful only during debugging or when validating OpenCL/GPU kernel correctness.
      * </p>
      * <p>
-     * Superseded by {@link PublicKeyBytes#runtimePublicKeyCalculationCheck(org.slf4j.Logger)}
+     * Superseded by {@link PublicKeyBytes#runtimePublicKeyCalculationCheck()}
      * and its activation via {@link CConsumerJava#runtimePublicKeyCalculationCheck}.
      * </p>
      */
