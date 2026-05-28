@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
  */
 public class LMDBToAddressFile implements Runnable, Interruptable {
 
-    private final Logger logger = LoggerFactory.getLogger(LMDBToAddressFile.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(LMDBToAddressFile.class);
 
     private final Network network = new NetworkParameterFactory().getNetwork();
 
@@ -41,16 +41,16 @@ public class LMDBToAddressFile implements Runnable, Interruptable {
         try (LMDBPersistence persistence =
                 new LMDBPersistence(lmdbToAddressFile.lmdbConfigurationReadOnly, persistenceUtils)) {
             persistence.init();
-            logger.info("writeAllAmounts ...");
+            LOGGER.info("writeAllAmounts ...");
             File addressesFile = new File(lmdbToAddressFile.addressesFile);
             // delete before write all addresses
             boolean deleted = addressesFile.delete();
             if (deleted) {
-                logger.info("deleted existing address file " + addressesFile);
+                LOGGER.info("deleted existing address file " + addressesFile);
             }
             persistence.writeAllAmountsToAddressFile(
                     addressesFile, lmdbToAddressFile.addressFileOutputFormat, shouldRun);
-            logger.info("writeAllAmounts done");
+            LOGGER.info("writeAllAmounts done");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

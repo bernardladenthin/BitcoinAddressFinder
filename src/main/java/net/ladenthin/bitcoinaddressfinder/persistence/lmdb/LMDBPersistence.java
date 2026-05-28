@@ -52,7 +52,7 @@ public class LMDBPersistence implements Persistence {
     private static final String DB_NAME_HASH160_TO_COINT = "hash160toCoin";
     private static final int DB_COUNT = 1;
 
-    private final Logger logger = LoggerFactory.getLogger(LMDBPersistence.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(LMDBPersistence.class);
 
     private final @NonNull PersistenceUtils persistenceUtils;
     private final @Nullable CLMDBConfigurationWrite lmdbConfigurationWrite;
@@ -108,7 +108,7 @@ public class LMDBPersistence implements Persistence {
      * Iterates the database once and builds the in-memory Bloom filter used to short-circuit lookups.
      */
     public void buildAddressBloomFilter() {
-        logger.info("##### BEGIN: buildAddressBloomFilter #####");
+        LOGGER.info("##### BEGIN: buildAddressBloomFilter #####");
         CLMDBConfigurationReadOnly localLmdbConfigurationReadOnly = Objects.requireNonNull(lmdbConfigurationReadOnly);
         Dbi<ByteBuffer> localLmdb_h160ToAmount = Objects.requireNonNull(lmdb_h160ToAmount);
 
@@ -135,8 +135,8 @@ public class LMDBPersistence implements Persistence {
 
         addressBloomFilter = filter;
         long size = getApproximateSizeBytes(filter);
-        logger.info("Inserted {} addresses into BloomFilter with size of {}", inserted, formatSize(size));
-        logger.info("##### END: buildAddressBloomFilter #####");
+        LOGGER.info("Inserted {} addresses into BloomFilter with size of {}", inserted, formatSize(size));
+        LOGGER.info("##### END: buildAddressBloomFilter #####");
     }
 
     /**
@@ -307,10 +307,10 @@ public class LMDBPersistence implements Persistence {
                             return;
                         }
                         ByteBuffer addressAsByteBuffer = kv.key();
-                        if (logger.isTraceEnabled()) {
+                        if (LOGGER.isTraceEnabled()) {
                             String hexFromByteBuffer =
                                     new ByteBufferUtility(false).getHexFromByteBuffer(addressAsByteBuffer);
-                            logger.trace("Process address: " + hexFromByteBuffer);
+                            LOGGER.trace("Process address: " + hexFromByteBuffer);
                         }
                         LegacyAddress address = keyUtility.byteBufferToAddress(addressAsByteBuffer);
                         final String line;
@@ -466,16 +466,16 @@ public class LMDBPersistence implements Persistence {
     public void logStats() {
         Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
 
-        logger.info("##### BEGIN: LMDB stats #####");
-        logger.info("... this may take a lot of time ...");
-        logger.info("DatabaseSize: " + new ByteConversion().bytesToMib(getDatabaseSize()) + " MiB");
-        logger.info("IncreasedCounter: " + getIncreasedCounter());
-        logger.info("IncreasedSum: " + new ByteConversion().bytesToMib(getIncreasedSum()) + " MiB");
-        logger.info("Stat: " + localEnv.stat());
+        LOGGER.info("##### BEGIN: LMDB stats #####");
+        LOGGER.info("... this may take a lot of time ...");
+        LOGGER.info("DatabaseSize: " + new ByteConversion().bytesToMib(getDatabaseSize()) + " MiB");
+        LOGGER.info("IncreasedCounter: " + getIncreasedCounter());
+        LOGGER.info("IncreasedSum: " + new ByteConversion().bytesToMib(getIncreasedSum()) + " MiB");
+        LOGGER.info("Stat: " + localEnv.stat());
         // Attention: slow!
         long count = count();
-        logger.info("LMDB contains " + count + " unique entries.");
-        logger.info("##### END: LMDB stats #####");
+        LOGGER.info("LMDB contains " + count + " unique entries.");
+        LOGGER.info("##### END: LMDB stats #####");
     }
 
     /**

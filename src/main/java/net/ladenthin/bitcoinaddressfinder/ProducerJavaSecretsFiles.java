@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ProducerJavaSecretsFiles extends ProducerJava {
 
-    private final Logger logger = LoggerFactory.getLogger(ProducerJavaSecretsFiles.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ProducerJavaSecretsFiles.class);
 
     private final Network network = new NetworkParameterFactory().getNetwork();
 
@@ -57,24 +57,24 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
             List<File> files = fileHelper.stringsToFiles(producerJavaSecretsFiles.files);
             fileHelper.assertFilesExists(files);
 
-            logger.info("Starting secrets file processing...");
+            LOGGER.info("Starting secrets file processing...");
             for (File file : files) {
                 if (!shouldRun.get()) {
-                    logger.info("Key production stopped by flag.");
+                    LOGGER.info("Key production stopped by flag.");
                     break;
                 }
                 SecretsFile secretsFile = new SecretsFile(
                         network, file, producerJavaSecretsFiles.secretFormat, readStatistic, this::consumeSecrets);
 
-                logger.info("Processing secrets file: {}", file);
+                LOGGER.info("Processing secrets file: {}", file);
                 currentSecretsFile.set(secretsFile);
                 secretsFile.readFile();
                 currentSecretsFile.set(null);
-                logger.info("Finished processing: {}", file);
+                LOGGER.info("Finished processing: {}", file);
 
                 logProgress();
             }
-            logger.info("All secrets files processed.");
+            LOGGER.info("All secrets files processed.");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -86,7 +86,7 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
     }
 
     private void logProgress() {
-        logger.info("Progress: Unsupported: " + readStatistic.getUnsupportedTotal() + ". Errors: "
+        LOGGER.info("Progress: Unsupported: " + readStatistic.getUnsupportedTotal() + ". Errors: "
                 + readStatistic.errors.size() + ". Current File progress: "
                 + String.format("%.2f", readStatistic.currentFileProgress) + "%.");
     }

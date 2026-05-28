@@ -17,7 +17,7 @@ public class FileHelper {
     /** Creates a new {@link FileHelper}. */
     public FileHelper() {}
 
-    private final Logger logger = LoggerFactory.getLogger(FileHelper.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(FileHelper.class);
 
     /**
      * Converts a list of path strings to {@link File} objects.
@@ -40,13 +40,13 @@ public class FileHelper {
      * @throws IllegalArgumentException if any file is missing
      */
     public void assertFilesExists(List<File> files) {
-        logger.info("Validating that all input files exist...");
+        LOGGER.info("Validating that all input files exist...");
         for (File file : files) {
             if (!file.exists()) {
                 throw new IllegalArgumentException("Missing file: " + file);
             }
-            logger.debug("Found file: {}", file);
+            LOGGER.debug("Found file: {}", file);
         }
-        logger.info("All input files verified successfully.");
+        LOGGER.info("All input files verified successfully.");
     }
 }
