@@ -61,12 +61,16 @@ import org.jocl.cl_context_properties;
 import org.jocl.cl_device_id;
 import org.jocl.cl_platform_id;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Discovers available OpenCL platforms and devices via JOCL and wraps them in
  * {@link OpenCLPlatform} / {@link OpenCLDevice} objects.
  */
 public class OpenCLBuilder {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(OpenCLBuilder.class);
 
     /** Creates a new {@link OpenCLBuilder}. */
     public OpenCLBuilder() {}
@@ -224,7 +228,7 @@ public class OpenCLBuilder {
         } catch (java.lang.NoClassDefFoundError e) {
             return false;
         } catch (Exception e) {
-            e.printStackTrace();
+            LOGGER.error("OpenCL native library probe failed", e);
             return false;
         }
     }

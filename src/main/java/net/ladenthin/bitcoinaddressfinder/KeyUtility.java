@@ -149,7 +149,7 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
             try {
                 MnemonicCode mnemonicCode = new MnemonicCode(wordList.getWordListStream(), null);
                 List<String> mnemonics = mnemonicCode.toMnemonic(privateKeyBytes);
-                logMnemonic.append(" ");
+                logMnemonic.append(' ');
                 logMnemonic.append(wordList.name());
                 logMnemonic.append(": [");
                 boolean first = true;
@@ -160,7 +160,7 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
                     logMnemonic.append(mnemonic);
                     first = false;
                 }
-                logMnemonic.append("]");
+                logMnemonic.append(']');
             } catch (IOException | IllegalArgumentException ex) {
                 throw new RuntimeException(ex);
             }

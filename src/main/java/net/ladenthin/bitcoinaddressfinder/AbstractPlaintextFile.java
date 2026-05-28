@@ -10,12 +10,16 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.jspecify.annotations.NonNull;
 import org.lmdbjava.LmdbException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Base class for line-by-line readers of plaintext files that update a {@link ReadStatistic}
  * and can be interrupted gracefully.
  */
 public abstract class AbstractPlaintextFile implements Interruptable {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractPlaintextFile.class);
 
     /** The file being read. */
     @NonNull
@@ -76,8 +80,7 @@ public abstract class AbstractPlaintextFile implements Interruptable {
                     // do not catch expections from LMDB (e. g. MapFullException).
                     throw e;
                 } catch (Exception e) {
-                    System.err.println("Error in line: " + utf8);
-                    e.printStackTrace();
+                    LOGGER.error("Error in line: {}", utf8, e);
                     readStatistic.errors.add(utf8);
                 }
             }

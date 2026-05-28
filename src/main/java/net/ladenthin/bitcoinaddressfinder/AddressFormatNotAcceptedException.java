@@ -25,6 +25,17 @@ public class AddressFormatNotAcceptedException extends Exception {
     }
 
     /**
+     * Creates a new exception with a human-readable reason and a chained cause.
+     *
+     * @param reason a short description of why the format was rejected
+     * @param cause  the original exception that led to the rejection
+     */
+    public AddressFormatNotAcceptedException(String reason, Throwable cause) {
+        super("Address format not accepted: " + reason, cause);
+        this.reason = reason;
+    }
+
+    /**
      * Returns the human-readable rejection reason.
      *
      * @return the human-readable rejection reason

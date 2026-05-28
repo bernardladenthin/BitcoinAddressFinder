@@ -214,7 +214,7 @@ public class AddressTxtLine {
         } catch (DecoderException e) {
             throw e;
         } catch (RuntimeException | ReflectiveOperationException e) {
-            throw new AddressFormatNotAcceptedException(REASON_BITCOIN_CASH_Q_ADDRESS_NOT_PARSABLE);
+            throw new AddressFormatNotAcceptedException(REASON_BITCOIN_CASH_Q_ADDRESS_NOT_PARSABLE, e);
         }
 
         // Fallback: assume Base58 with 1-byte version prefix
@@ -223,7 +223,7 @@ public class AddressTxtLine {
                     parseBase58Address(address, VERSION_BYTES_REGULAR, CHECKSUM_BYTES_REGULAR, keyUtility);
             return new AddressToCoin(addressToCoin.hash160(), amount, addressToCoin.type());
         } catch (AddressFormatException e) {
-            throw new AddressFormatNotAcceptedException(REASON_INVALID_BASE58);
+            throw new AddressFormatNotAcceptedException(REASON_INVALID_BASE58, e);
         }
     }
 

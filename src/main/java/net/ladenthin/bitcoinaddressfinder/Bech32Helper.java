@@ -92,7 +92,9 @@ public class Bech32Helper {
             // rethrow AddressFormatException if it's the underlying cause
             Throwable cause = e.getCause();
             if (cause instanceof AddressFormatException) {
-                throw (AddressFormatException) cause;
+                AddressFormatException afe = (AddressFormatException) cause;
+                afe.addSuppressed(e);
+                throw afe;
             }
             throw e;
         }
