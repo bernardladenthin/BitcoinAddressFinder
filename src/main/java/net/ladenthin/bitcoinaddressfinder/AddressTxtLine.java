@@ -93,6 +93,12 @@ public class AddressTxtLine {
      */
     private static final int WITNESS_VERSION_1 = 1;
 
+    /** Column index of the address field after {@link SeparatorFormat#split}. */
+    private static final int COLUMN_ADDRESS = 0;
+
+    /** Column index of the (optional) amount field after {@link SeparatorFormat#split}. */
+    private static final int COLUMN_AMOUNT = 1;
+
     Bech32Helper bech32Helper = new Bech32Helper();
 
     /**
@@ -121,7 +127,7 @@ public class AddressTxtLine {
             line = line.replace(BITCOIN_CASH_PREFIX, "");
         }
         String[] lineSplitted = SeparatorFormat.split(line);
-        String address = lineSplitted[0];
+        String address = lineSplitted[COLUMN_ADDRESS];
         Coin amount = getCoinIfPossible(lineSplitted, DEFAULT_COIN);
         address = address.trim();
         if (address.isEmpty()) {
@@ -303,8 +309,8 @@ public class AddressTxtLine {
 
     @NonNull
     private Coin getCoinIfPossible(@NonNull String[] lineSplitted, @NonNull Coin defaultValue) {
-        if (lineSplitted.length > 1) {
-            String amountString = lineSplitted[1];
+        if (lineSplitted.length > COLUMN_AMOUNT) {
+            String amountString = lineSplitted[COLUMN_AMOUNT];
             try {
                 return Coin.valueOf(Long.parseLong(amountString));
             } catch (NumberFormatException e) {
