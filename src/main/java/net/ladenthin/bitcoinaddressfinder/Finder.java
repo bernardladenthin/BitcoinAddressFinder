@@ -60,9 +60,8 @@ public class Finder implements Interruptable {
     @VisibleForTesting
     final ExecutorService producerExecutorService = Executors.newCachedThreadPool();
 
-    private final Network network = new NetworkParameterFactory().getNetwork();
-    private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
-    private final PersistenceUtils persistenceUtils = new PersistenceUtils(network);
+    private final KeyUtility keyUtility;
+    private final PersistenceUtils persistenceUtils;
     private final BitHelper bitHelper = new BitHelper();
 
     /**
@@ -72,6 +71,9 @@ public class Finder implements Interruptable {
      */
     public Finder(CFinder finder) {
         this.finder = finder;
+        Network network = new NetworkParameterFactory().getNetwork();
+        this.keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+        this.persistenceUtils = new PersistenceUtils(network);
     }
 
     /**
