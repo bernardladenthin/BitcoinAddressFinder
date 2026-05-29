@@ -299,6 +299,7 @@ public class Main implements Runnable, Interruptable {
                             + "remaining tasks may not have finished cleanly.");
                 }
             } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 throw new RuntimeException(e);
             }
             LOGGER.info("Finish shutdown hook.");

@@ -245,6 +245,7 @@ public class Finder implements Interruptable {
             producerExecutorService.awaitTermination(
                     AWAIT_DURATION_TERMINATE.get(ChronoUnit.SECONDS), TimeUnit.SECONDS);
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             throw new RuntimeException(e);
         }
 

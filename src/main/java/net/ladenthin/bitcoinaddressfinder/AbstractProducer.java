@@ -20,6 +20,25 @@ public abstract class AbstractProducer implements Producer {
 
     private static final int SLEEP_WAIT_TILL_RUNNING = 10;
 
+    /**
+     * Marker for the {@link #waitTillProducerNotRunning} spin-wait's intentional
+     * InterruptedException swallow.
+     *
+     * <p>This wait is uncancellable by design: it is called from
+     * {@link Finder#interrupt()} during shutdown, and the shutdown sequence must
+     * complete (each producer must observe its own
+     * {@link ProducerState#NOT_RUNNING} transition before the orchestrator moves
+     * on). Restoring the interrupt flag would make the next
+     * {@link Thread#sleep(long)} immediately re-throw, producing a tight CPU loop
+     * while the producer is still finishing its current batch.
+     *
+     * <p>The constant is {@code false} so the if-branch is dead code (eliminated by
+     * the JIT), but the {@code interrupt()} call site is preserved in source for
+     * readers and IDE navigation. See also the Open TODO in CLAUDE.md about adding
+     * a timeout to this wait so a stuck producer cannot hang shutdown forever.
+     */
+    private static final boolean WAIT_TILL_NOT_RUNNING_RESTORES_INTERRUPT_FLAG = false;
+
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractProducer.class);
 
     /** Flag indicating whether the producer is currently running. */
@@ -179,6 +198,11 @@ public abstract class AbstractProducer implements Producer {
             try {
                 Thread.sleep(SLEEP_WAIT_TILL_RUNNING);
             } catch (InterruptedException e) {
+                LOGGER.warn(
+                        "waitTillProducerNotRunning sleep interrupted; continuing to wait for producer shutdown.", e);
+                if (WAIT_TILL_NOT_RUNNING_RESTORES_INTERRUPT_FLAG) {
+                    Thread.currentThread().interrupt();
+                }
             }
         }
     }

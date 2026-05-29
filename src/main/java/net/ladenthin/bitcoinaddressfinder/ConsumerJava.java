@@ -42,6 +42,24 @@ public class ConsumerJava implements Consumer {
     @VisibleForTesting
     static Duration AWAIT_DURATION_QUEUE_EMPTY = Duration.ofMinutes(1);
 
+    /**
+     * Marker for the {@link #consumeKeysRunner} poll loop's intentional
+     * InterruptedException swallow.
+     *
+     * <p>Cancellation of this consumer is signalled via {@link #shouldRun}, not via
+     * {@link Thread#interrupt()}. {@link #interrupt()} sets {@code shouldRun = false}
+     * BEFORE calling {@code shutdown()} on the executor service that interrupts the
+     * worker threads; the worker's outer {@code while (shouldRun.get())} therefore
+     * exits cleanly on the next iteration.
+     *
+     * <p>Restoring the interrupt flag here would make the next
+     * {@link Thread#sleep(long)} call immediately re-throw, producing a tight CPU
+     * loop until {@code shouldRun} also flips. The constant is {@code false} so the
+     * if-branch is dead code (eliminated by the JIT), but the {@code interrupt()}
+     * call site is preserved in source for readers and IDE navigation.
+     */
+    private static final boolean POLL_LOOP_RESTORES_INTERRUPT_FLAG = false;
+
     /** Log prefix for misses in trace-level logging. */
     public static final String MISS_PREFIX = "miss: Could not find the address: ";
     /** Log prefix for confirmed address hits. */
@@ -184,8 +202,12 @@ public class ConsumerJava implements Consumer {
                 emptyConsumer.incrementAndGet();
                 Thread.sleep(consumerJava.delayEmptyConsumer);
             } catch (InterruptedException e) {
-                // we need to catch the exception to not break the thread
-                LOGGER.error("Ignore InterruptedException during Thread.sleep.", e);
+                // Cancellation is via shouldRun, not Thread.interrupt; see
+                // POLL_LOOP_RESTORES_INTERRUPT_FLAG.
+                LOGGER.warn("Consumer poll loop sleep interrupted; relying on shouldRun for shutdown.", e);
+                if (POLL_LOOP_RESTORES_INTERRUPT_FLAG) {
+                    Thread.currentThread().interrupt();
+                }
             } catch (Exception e) {
                 // log every Exception because it's hard to debug and we do not break down the thread loop
                 LOGGER.error("Error in consumeKeysRunner().", e);
