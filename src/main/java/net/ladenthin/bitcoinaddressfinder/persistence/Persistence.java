@@ -14,8 +14,12 @@ import org.bitcoinj.base.Coin;
 
 /**
  * Persistence abstraction for the address &#x2192; amount mapping used by the consumer.
+ *
+ * <p>Extends {@link AddressLookup} so accelerators (Bloom filter, HashMap cache,
+ * sorted-array prefix) can be composed in front of any full backend by implementing
+ * the smaller {@link AddressLookup} contract instead of this full surface.
  */
-public interface Persistence extends AutoCloseable {
+public interface Persistence extends AddressLookup, AutoCloseable {
 
     /** Opens the underlying storage. */
     void init();
@@ -33,22 +37,6 @@ public interface Persistence extends AutoCloseable {
      * @return the number of entries currently stored
      */
     long count();
-
-    /**
-     * Returns the stored amount for the given address.
-     *
-     * @param hash160 the address hash to look up
-     * @return the stored amount for the address (or zero if absent)
-     */
-    Coin getAmount(ByteBuffer hash160);
-
-    /**
-     * Checks whether the given address is present in the database.
-     *
-     * @param hash160 the address hash to look up
-     * @return {@code true} if the address is present in the database
-     */
-    boolean containsAddress(ByteBuffer hash160);
 
     /**
      * Writes all (hash160, amount) entries to {@code file} in the given output format.
