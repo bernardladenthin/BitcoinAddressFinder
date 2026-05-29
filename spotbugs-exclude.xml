@@ -288,6 +288,22 @@ SPDX-License-Identifier: Apache-2.0
     </Match>
 
     <!--
+        EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
+        AbstractPlaintextFile.readFile: same type-filtering catch
+        idiom as AddressTxtLine.fromLine above. LmdbException
+        (subclass e.g. MapFullException is the trigger for the
+        map-auto-grow recovery path elsewhere) must propagate
+        unchanged; everything else is logged and the read
+        continues to the next line. The in-source comment at the
+        catch makes the intent explicit.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.AbstractPlaintextFile"/>
+        <Method name="readFile"/>
+        <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
+    </Match>
+
+    <!--
         PATH_TRAVERSAL_IN flags new File(userInput) where userInput
         could be attacker-controlled (HTTP, RPC, etc). Every flagged
         site here reads a path from the JSON configuration file that
