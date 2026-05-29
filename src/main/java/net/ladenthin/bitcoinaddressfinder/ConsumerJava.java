@@ -19,9 +19,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.ladenthin.bitcoinaddressfinder.configuration.AddressLookupBackend;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
+import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
+import net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerator;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.HashSetAddressPresence;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.SortedArrayAddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.crypto.ECKey;
@@ -89,8 +94,21 @@ public class ConsumerJava implements Consumer {
     @VisibleForTesting
     ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 
-    /** The persistence implementation queried by the consumer; initialised in {@link #initLMDB()}. */
+    /**
+     * The persistence implementation; initialised in {@link #initLMDB()}. May be set to
+     * {@code null} after population when the chosen accelerator does not require the
+     * backing storage to stay open (see
+     * {@link AddressPresence#requiresBackend()}).
+     */
     protected @Nullable Persistence persistence;
+
+    /**
+     * Read-only presence chain the scan hot path queries through. Always non-null after
+     * {@link #initLMDB()} returns; may be the LMDB instance itself ({@code LMDB_ONLY}),
+     * a {@code BloomFilterAccelerator} wrapping it ({@code BLOOM}), or a self-contained
+     * in-memory snapshot ({@code HASHSET}, {@code SORTED_ARRAY}).
+     */
+    protected @Nullable AddressPresence lookup;
 
     private final PersistenceUtils persistenceUtils;
 
@@ -132,11 +150,43 @@ public class ConsumerJava implements Consumer {
     }
 
     /**
-     * Initialises the LMDB persistence layer used to query addresses.
+     * Initialises the LMDB persistence layer and builds the address-lookup chain selected
+     * by {@code consumerJava.lmdbConfigurationReadOnly.addressLookupBackend}.
+     *
+     * <p>If the chosen chain is self-contained
+     * ({@link AddressPresence#requiresBackend()} returns {@code false}), the LMDB env is
+     * closed and the {@code persistence} reference is dropped after the in-memory
+     * snapshot is built; the on-disk store becomes eligible for garbage collection.
+     *
+     * @throws Exception if the LMDB env cannot be opened, the snapshot population fails,
+     *     or the LMDB cannot be closed after population for self-contained backends
      */
-    protected void initLMDB() {
-        persistence = new LMDBPersistence(consumerJava.lmdbConfigurationReadOnly, persistenceUtils);
-        persistence.init();
+    protected void initLMDB() throws Exception {
+        var cfg = consumerJava.lmdbConfigurationReadOnly;
+        LMDBPersistence lmdb = new LMDBPersistence(cfg, persistenceUtils);
+        lmdb.init();
+        persistence = lmdb;
+
+        AddressPresence chain = buildLookupChain(lmdb, cfg.addressLookupBackend, cfg.bloomFilterFpp);
+        lookup = chain;
+
+        if (!chain.requiresBackend()) {
+            LOGGER.info(
+                    "Address lookup backend {} is self-contained; closing LMDB env to release on-disk resources.",
+                    cfg.addressLookupBackend);
+            lmdb.close();
+            persistence = null;
+        }
+    }
+
+    private static AddressPresence buildLookupChain(
+            LMDBPersistence lmdb, AddressLookupBackend choice, double bloomFpp) {
+        return switch (choice) {
+            case LMDB_ONLY -> lmdb;
+            case BLOOM -> BloomFilterAccelerator.populateFrom(lmdb, lmdb, bloomFpp);
+            case HASHSET -> HashSetAddressPresence.populateFrom(lmdb);
+            case SORTED_ARRAY -> SortedArrayAddressPresence.populateFrom(lmdb);
+        };
     }
 
     /**
@@ -353,16 +403,16 @@ public class ConsumerJava implements Consumer {
     private boolean containsAddress(ByteBuffer hash160AsByteBuffer) {
         long timeBefore = System.currentTimeMillis();
         if (LOGGER.isTraceEnabled()) {
-            LOGGER.trace("Time before persistence.containsAddress: " + timeBefore);
+            LOGGER.trace("Time before lookup.containsAddress: " + timeBefore);
         }
-        Persistence localPersistence = Objects.requireNonNull(persistence);
-        boolean containsAddress = localPersistence.containsAddress(hash160AsByteBuffer);
+        AddressPresence localLookup = Objects.requireNonNull(lookup);
+        boolean containsAddress = localLookup.containsAddress(hash160AsByteBuffer);
         long timeAfter = System.currentTimeMillis();
         long timeDelta = timeAfter - timeBefore;
         checkedKeys.incrementAndGet();
         checkedKeysSumOfTimeToCheckContains.addAndGet(timeDelta);
         if (LOGGER.isTraceEnabled()) {
-            LOGGER.trace("Time after persistence.containsAddress: " + timeAfter);
+            LOGGER.trace("Time after lookup.containsAddress: " + timeAfter);
             LOGGER.trace("Time delta: " + timeDelta);
         }
         return containsAddress;

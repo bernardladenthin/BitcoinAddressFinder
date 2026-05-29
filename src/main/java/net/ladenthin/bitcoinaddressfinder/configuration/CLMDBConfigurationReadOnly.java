@@ -35,38 +35,24 @@ public class CLMDBConfigurationReadOnly {
     public boolean logStatsOnClose = false;
 
     /**
-     * If set to true, the LMDB database will load a Bloom filter into memory on initialization.
-     * This filter is used to perform fast probabilistic membership checks for hash160 addresses.
-     *
-     * The Bloom filter does not store the full set of addresses in memory, but instead uses a compact bit array
-     * and multiple hash functions to determine whether an address might exist in the database.
-     *
-     * Advantages:
-     *  - Extremely fast `containsAddress()` lookups (O(1))
-     *  - Low memory consumption even for millions or billions of entries
-     *
-     * Tradeoff:
-     *  - False positives are possible: an address might be reported as present, even if it is not.
-     *    This may lead to unnecessary database lookups, but never to false negatives.
-     *
-     * If this is set to false, LMDB will perform direct queries for each address using transactions.
+     * Selects the address-lookup chain placed in front of LMDB. See
+     * {@link AddressLookupBackend} for the full trade-off matrix. Defaults to
+     * {@link AddressLookupBackend#BLOOM} which matches the historical behaviour of
+     * {@code useBloomFilter = true}.
      */
-    public boolean useBloomFilter = true;
+    public AddressLookupBackend addressLookupBackend = AddressLookupBackend.BLOOM;
 
     /**
-     * The expected false positive probability (FPP) for the Bloom filter.
-     * <p>
-     * Lower values reduce the chance of false positives but increase memory usage.
-     * Higher values save memory but allow more false positives, potentially causing unnecessary LMDB lookups.
-     * <p>
-     * Recommended values:
+     * The expected false positive probability (FPP) for the Bloom filter. Consulted only
+     * when {@link #addressLookupBackend} is {@link AddressLookupBackend#BLOOM}.
+     *
+     * <p>Recommended values:
      * <ul>
-     *   <li><b>0.01</b> – ~1% false positives: High accuracy, higher memory usage</li>
-     *   <li><b>0.05</b> – ~5% false positives: Balanced performance and memory</li>
-     *   <li><b>0.1</b> or <b>0.2</b> – 10–20% false positives: Very memory-efficient, suitable if occasional extra DB reads are acceptable</li>
+     *   <li><b>0.01</b> &#x2013; ~1% false positives: high accuracy, higher memory usage</li>
+     *   <li><b>0.05</b> &#x2013; ~5% false positives: balanced performance and memory</li>
+     *   <li><b>0.1</b> or <b>0.2</b> &#x2013; 10&#x2013;20% false positives: very memory-efficient,
+     *       suitable when occasional extra DB reads are acceptable</li>
      * </ul>
-     * <p>
-     * This value is only used if {@link #useBloomFilter} is <code>true</code>.
      */
     public double bloomFilterFpp = 0.1;
 

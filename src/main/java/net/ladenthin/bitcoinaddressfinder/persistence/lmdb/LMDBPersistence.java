@@ -6,19 +6,15 @@ package net.ladenthin.bitcoinaddressfinder.persistence.lmdb;
 import static org.lmdbjava.DbiFlags.MDB_CREATE;
 import static org.lmdbjava.Env.create;
 
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Spliterators;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
@@ -49,13 +45,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * LMDB-backed implementation of {@link Persistence} with optional Bloom-filter acceleration.
- *
- * <p>Also implements {@link AddressIterable} so accelerator factories
- * (e.g. {@code BloomFilterAccelerator.populateFrom},
- * {@code HashSetAddressPresence.populateFrom},
- * {@code SortedArrayAddressPresence.populateFrom}) can build their in-memory snapshots
- * from this backend without depending on the LMDB API directly.
+ * LMDB-backed implementation of {@link Persistence}. Pure backend: holds no accelerator
+ * state itself. Accelerator chains (Bloom, HashSet, SortedArray) are built externally
+ * via the {@code populateFrom} factories on each accelerator class, consuming this
+ * instance through {@link AddressIterable}.
  */
 public class LMDBPersistence implements Persistence, AddressIterable {
 
@@ -73,8 +66,6 @@ public class LMDBPersistence implements Persistence, AddressIterable {
     private final java.util.concurrent.atomic.AtomicLong increasedCounter =
             new java.util.concurrent.atomic.AtomicLong(0);
     private final java.util.concurrent.atomic.AtomicLong increasedSum = new java.util.concurrent.atomic.AtomicLong(0);
-    private @Nullable BloomFilter<byte[]> addressBloomFilter = null;
-
     /**
      * Creates a new writable LMDB-backed persistence instance.
      *
@@ -114,48 +105,6 @@ public class LMDBPersistence implements Persistence, AddressIterable {
         logStatsIfConfigured(true);
     }
 
-    /**
-     * Iterates the database once and builds the in-memory Bloom filter used to short-circuit lookups.
-     */
-    public void buildAddressBloomFilter() {
-        LOGGER.info("##### BEGIN: buildAddressBloomFilter #####");
-        CLMDBConfigurationReadOnly localLmdbConfigurationReadOnly = Objects.requireNonNull(lmdbConfigurationReadOnly);
-        Dbi<ByteBuffer> localLmdb_h160ToAmount = Objects.requireNonNull(lmdb_h160ToAmount);
-
-        var localEnv = Objects.requireNonNull(env);
-        // Attention: slow!
-        long count = count();
-
-        BloomFilter<byte[]> filter =
-                BloomFilter.create(Funnels.byteArrayFunnel(), count, localLmdbConfigurationReadOnly.bloomFilterFpp);
-        long inserted = 0;
-
-        try (Txn<ByteBuffer> txn = localEnv.txnRead()) {
-            try (CursorIterable<ByteBuffer> iterable = localLmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
-                for (CursorIterable.KeyVal<ByteBuffer> kv : iterable) {
-                    ByteBuffer key = kv.key();
-                    byte[] keyBytes = new byte[key.remaining()];
-                    key.get(keyBytes);
-                    key.rewind();
-                    filter.put(keyBytes);
-                    inserted++;
-                }
-            }
-        }
-
-        addressBloomFilter = filter;
-        long size = getApproximateSizeBytes(filter);
-        LOGGER.info("Inserted {} addresses into BloomFilter with size of {}", inserted, formatSize(size));
-        LOGGER.info("##### END: buildAddressBloomFilter #####");
-    }
-
-    /**
-     * Frees the in-memory Bloom filter (subsequent {@code containsAddress} calls hit LMDB directly).
-     */
-    public void unloadBloomFilter() {
-        addressBloomFilter = null;
-    }
-
     private void initReadOnly() {
         CLMDBConfigurationReadOnly localLmdbConfigurationReadOnly = Objects.requireNonNull(lmdbConfigurationReadOnly);
         BufferProxy<ByteBuffer> bufferProxy =
@@ -167,10 +116,6 @@ public class LMDBPersistence implements Persistence, AddressIterable {
                         EnvFlags.MDB_RDONLY_ENV,
                         EnvFlags.MDB_NOLOCK);
         lmdb_h160ToAmount = env.openDbi(DB_NAME_HASH160_TO_COINT);
-
-        if (localLmdbConfigurationReadOnly.useBloomFilter) {
-            buildAddressBloomFilter();
-        }
     }
 
     private void initWritable() {
@@ -283,20 +228,6 @@ public class LMDBPersistence implements Persistence, AddressIterable {
             return false;
         }
 
-        byte[] hash160AsByteArray = new byte[hash160.remaining()];
-        hash160.get(hash160AsByteArray);
-        hash160.rewind();
-
-        // Use Bloom filter if available for fast pre-check
-        if (addressBloomFilter != null) {
-            boolean mightContain = addressBloomFilter.mightContain(hash160AsByteArray);
-            if (!mightContain) {
-                return false; // definitely not present
-            }
-            // Possibly in DB, proceed to verify
-        }
-
-        // Perform LMDB lookup (always happens if no Bloom filter is present)
         try (Txn<ByteBuffer> txn = localEnv.txnRead()) {
             ByteBuffer byteBuffer = localLmdb_h160ToAmount.get(txn, hash160);
             return byteBuffer != null;
@@ -525,45 +456,5 @@ public class LMDBPersistence implements Persistence, AddressIterable {
         long count = count();
         LOGGER.info("LMDB contains " + count + " unique entries.");
         LOGGER.info("##### END: LMDB stats #####");
-    }
-
-    /**
-     * Returns an approximate in-memory size of a Guava {@link BloomFilter} in bytes via reflection.
-     *
-     * @param bloomFilter the Bloom filter to measure
-     * @return the approximate in-memory size in bytes
-     */
-    public static long getApproximateSizeBytes(BloomFilter<?> bloomFilter) {
-        try {
-            // Access private field: bits
-            Field bitsField = BloomFilter.class.getDeclaredField("bits");
-            bitsField.setAccessible(true);
-            Object bits = bitsField.get(bloomFilter);
-
-            // Access internal AtomicLongArray: data
-            Field dataField = bits.getClass().getDeclaredField("data");
-            dataField.setAccessible(true);
-            AtomicLongArray data = (AtomicLongArray) dataField.get(bits);
-
-            return (long) data.length() * Long.BYTES; // 8 bytes per long
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to estimate BloomFilter size", e);
-        }
-    }
-
-    /**
-     * Formats a byte size as a human-readable string (B / KB / MB).
-     *
-     * @param sizeInBytes the size in bytes
-     * @return the formatted string
-     */
-    public static String formatSize(long sizeInBytes) {
-        if (sizeInBytes >= 1024 * 1024) {
-            return String.format("%.2f MB", sizeInBytes / 1024.0 / 1024.0);
-        } else if (sizeInBytes >= 1024) {
-            return String.format("%.2f KB", sizeInBytes / 1024.0);
-        } else {
-            return sizeInBytes + " bytes";
-        }
     }
 }

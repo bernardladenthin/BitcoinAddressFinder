@@ -11,7 +11,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 import java.io.File;
-import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -28,7 +27,6 @@ import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import nl.altindag.log.LogCaptor;
-import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
@@ -58,7 +56,7 @@ public class ConsumerJavaTest {
     }
 
     @Test
-    public void initLMDB_lmdbNotExisting_noExceptionThrown() throws IOException {
+    public void initLMDB_lmdbNotExisting_noExceptionThrown() throws Exception {
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory =
@@ -71,7 +69,7 @@ public class ConsumerJavaTest {
     // <editor-fold defaultstate="collapsed" desc="toString">
     @ToStringTest
     @Test
-    public void toString_whenCalled_containsClassNameAndIdentityHash() throws IOException {
+    public void toString_whenCalled_containsClassNameAndIdentityHash() throws Exception {
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory =
@@ -87,7 +85,7 @@ public class ConsumerJavaTest {
     // </editor-fold>
 
     @Test
-    public void startStatisticsTimer_noExceptionThrown() throws IOException, InterruptedException {
+    public void startStatisticsTimer_noExceptionThrown() throws Exception {
         final int runTimes = 3;
 
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
@@ -122,7 +120,7 @@ public class ConsumerJavaTest {
     }
 
     @Test
-    public void startStatisticsTimer_invalidparameter_throwsException() throws IOException {
+    public void startStatisticsTimer_invalidparameter_throwsException() throws Exception {
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.printStatisticsEveryNSeconds = 0;
 
@@ -132,8 +130,7 @@ public class ConsumerJavaTest {
 
     @AwaitTimeTest
     @Test
-    public void interrupt_keysQueueNotEmpty_consumerNotRunningWaitedInternallyForTheDuration()
-            throws IOException, InterruptedException {
+    public void interrupt_keysQueueNotEmpty_consumerNotRunningWaitedInternallyForTheDuration() throws Exception {
         // Change await duration
         ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY = AwaitTimeTests.AWAIT_DURATION;
 
@@ -179,7 +176,7 @@ public class ConsumerJavaTest {
     }
 
     @Test
-    public void interrupt_statisticsTimerStarted_executerServiceShutdown() throws IOException, InterruptedException {
+    public void interrupt_statisticsTimerStarted_executerServiceShutdown() throws Exception {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
         File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
@@ -211,7 +208,7 @@ public class ConsumerJavaTest {
     }
 
     @Test
-    public void initLMDB_initialize_databaseOpened() throws IOException, InterruptedException, DecoderException {
+    public void initLMDB_initialize_databaseOpened() throws Exception {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
         File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
@@ -235,8 +232,7 @@ public class ConsumerJavaTest {
     }
 
     @Test
-    public void interrupt_consumerInitialized_databaseClosed()
-            throws IOException, InterruptedException, DecoderException {
+    public void interrupt_consumerInitialized_databaseClosed() throws Exception {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
         File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
@@ -378,11 +374,11 @@ public class ConsumerJavaTest {
             assertThat(argumentsDebug.get(1), startsWith("keysQueue.size(): 1"));
 
             assertThat(argumentsTrace.get(0), startsWith("consumeKeys"));
-            assertThat(argumentsTrace.get(1), startsWith("Time before persistence.containsAddress: "));
-            assertThat(argumentsTrace.get(2), startsWith("Time after persistence.containsAddress: "));
+            assertThat(argumentsTrace.get(1), startsWith("Time before lookup.containsAddress: "));
+            assertThat(argumentsTrace.get(2), startsWith("Time after lookup.containsAddress: "));
             assertThat(argumentsTrace.get(3), startsWith("Time delta: "));
-            assertThat(argumentsTrace.get(4), startsWith("Time before persistence.containsAddress: "));
-            assertThat(argumentsTrace.get(5), startsWith("Time after persistence.containsAddress: "));
+            assertThat(argumentsTrace.get(4), startsWith("Time before lookup.containsAddress: "));
+            assertThat(argumentsTrace.get(5), startsWith("Time after lookup.containsAddress: "));
             assertThat(argumentsTrace.get(6), startsWith("Time delta: "));
 
             // assert for expected miss messages
@@ -393,8 +389,7 @@ public class ConsumerJavaTest {
     }
 
     @Test
-    public void consumeKeys_invalidSecretGiven_continueExpectedAndNoExceptionThrown()
-            throws IOException, InterruptedException, DecoderException {
+    public void consumeKeys_invalidSecretGiven_continueExpectedAndNoExceptionThrown() throws Exception {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
         File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
@@ -418,7 +413,7 @@ public class ConsumerJavaTest {
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_COMPRESSED)
     public void consumeKeys_withRuntimeKeyCalculationEnabled_logsError_whenPublicKeyHashIsInvalid(boolean compressed)
-            throws IOException, InterruptedException, DecoderException {
+            throws Exception {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
         File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
@@ -496,8 +491,7 @@ public class ConsumerJavaTest {
 
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_COMPRESSED)
-    public void consumeKeys_testVanityPattern_patternMatches(boolean compressed)
-            throws IOException, InterruptedException, DecoderException {
+    public void consumeKeys_testVanityPattern_patternMatches(boolean compressed) throws Exception {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
         File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);

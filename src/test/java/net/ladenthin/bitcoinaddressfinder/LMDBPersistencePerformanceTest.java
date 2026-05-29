@@ -9,7 +9,6 @@ import static org.hamcrest.Matchers.nullValue;
 
 import ch.qos.logback.classic.Level;
 import java.io.File;
-import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.concurrent.Executors;
@@ -44,9 +43,7 @@ public class LMDBPersistencePerformanceTest {
 
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_BLOOM_FILTER_ENABLED)
-    public void runProber_performanceTest(boolean useBloomFilter)
-            throws IOException, InterruptedException, IllegalArgumentException, NoSuchFieldException,
-                    IllegalAccessException {
+    public void runProber_performanceTest(boolean useBloomFilter) throws Exception {
         new LMDBPlatformAssume().assumeLMDBExecution();
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
@@ -60,7 +57,9 @@ public class LMDBPersistencePerformanceTest {
         cConsumerJava.delayEmptyConsumer = 1;
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
-        cConsumerJava.lmdbConfigurationReadOnly.useBloomFilter = useBloomFilter;
+        cConsumerJava.lmdbConfigurationReadOnly.addressLookupBackend = useBloomFilter
+                ? net.ladenthin.bitcoinaddressfinder.configuration.AddressLookupBackend.BLOOM
+                : net.ladenthin.bitcoinaddressfinder.configuration.AddressLookupBackend.LMDB_ONLY;
         cConsumerJava.runtimePublicKeyCalculationCheck =
                 ManualDebugConstants.ENABLE_RUNTIME_PUBLIC_KEY_CALCULATION_CHECK;
 

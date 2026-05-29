@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFileOutputFormat;
-import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,11 +34,12 @@ public class LMDBToAddressFileTest extends LMDBBase {
         // arrange
         AtomicBoolean shouldRun = new AtomicBoolean(true);
         TestAddressesFiles testAddressesFiles = new TestAddressesFiles(compressed);
-        try (Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false, false)) {
+        try (LMDBHandle handle = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false, false)) {
             // act
             File file = Files.createTempFile(folder, "junit", "").toFile();
-            persistence.writeAllAmountsToAddressFile(
-                    file, CAddressFileOutputFormat.DynamicWidthBase58BitcoinAddressWithAmount, shouldRun);
+            handle.persistence()
+                    .writeAllAmountsToAddressFile(
+                            file, CAddressFileOutputFormat.DynamicWidthBase58BitcoinAddressWithAmount, shouldRun);
 
             // assert
             List<String> contents = FileUtils.readLines(file, StandardCharsets.UTF_8);
@@ -73,12 +73,13 @@ public class LMDBToAddressFileTest extends LMDBBase {
         // arrange
         AtomicBoolean shouldRun = new AtomicBoolean(true);
         TestAddressesFiles testAddressesFiles = new TestAddressesFiles(compressed);
-        try (Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false, false)) {
+        try (LMDBHandle handle = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false, false)) {
 
             // act
             File file = Files.createTempFile(folder, "junit", "").toFile();
-            persistence.writeAllAmountsToAddressFile(
-                    file, CAddressFileOutputFormat.FixedWidthBase58BitcoinAddress, shouldRun);
+            handle.persistence()
+                    .writeAllAmountsToAddressFile(
+                            file, CAddressFileOutputFormat.FixedWidthBase58BitcoinAddress, shouldRun);
 
             // assert
             List<String> contents = FileUtils.readLines(file, StandardCharsets.UTF_8);
@@ -107,10 +108,10 @@ public class LMDBToAddressFileTest extends LMDBBase {
         // arrange
         AtomicBoolean shouldRun = new AtomicBoolean(true);
         TestAddressesFiles testAddressesFiles = new TestAddressesFiles(compressed);
-        try (Persistence persistence = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false, false)) {
+        try (LMDBHandle handle = createAndFillAndOpenLMDB(useStaticAmount, testAddressesFiles, false, false)) {
             // act
             File file = Files.createTempFile(folder, "junit", "").toFile();
-            persistence.writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.HexHash, shouldRun);
+            handle.persistence().writeAllAmountsToAddressFile(file, CAddressFileOutputFormat.HexHash, shouldRun);
 
             // assert
             List<String> contents = FileUtils.readLines(file, StandardCharsets.UTF_8);

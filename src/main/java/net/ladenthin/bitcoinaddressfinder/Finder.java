@@ -142,8 +142,11 @@ public class Finder implements Interruptable {
 
     /**
      * Initialises and starts the {@link ConsumerJava}.
+     *
+     * @throws Exception if the consumer's LMDB layer cannot be opened or the
+     *     accelerator snapshot cannot be built
      */
-    public void startConsumer() {
+    public void startConsumer() throws Exception {
         LOGGER.info("startConsumer");
         CConsumerJava localCConsumerJava = Objects.requireNonNull(finder.consumerJava);
 
