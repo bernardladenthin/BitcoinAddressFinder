@@ -268,6 +268,26 @@ SPDX-License-Identifier: Apache-2.0
     </Match>
 
     <!--
+        EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
+        AddressTxtLine.fromLine: the inner try block uses a
+        type-filtering catch pattern - DecoderException (Bouncy
+        Castle unchecked, signalling invalid Bech32 chars) is
+        caught and rethrown unchanged so callers see the original
+        type, while a broader
+        catch (RuntimeException | ReflectiveOperationException)
+        wraps every other failure in the domain-specific
+        AddressFormatNotAcceptedException. fb-contrib's bytecode
+        analysis sees a checked-to-unchecked conversion in the
+        catch block but cannot reconstruct the "filter and rethrow
+        same type" idiom. The behaviour is intentional.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.AddressTxtLine"/>
+        <Method name="fromLine"/>
+        <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
+    </Match>
+
+    <!--
         PATH_TRAVERSAL_IN flags new File(userInput) where userInput
         could be attacker-controlled (HTTP, RPC, etc). Every flagged
         site here reads a path from the JSON configuration file that
