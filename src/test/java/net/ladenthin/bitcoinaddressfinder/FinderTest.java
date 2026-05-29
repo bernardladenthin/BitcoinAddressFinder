@@ -121,7 +121,7 @@ public class FinderTest {
     @AwaitTimeTest
     @Test
     public void shutdownAndAwaitTermination_producersSetAndInitialized_shutdownCalledAndAwaitTermination()
-            throws IOException {
+            throws Exception {
         // Change await duration
         Finder.AWAIT_DURATION_TERMINATE = AwaitTimeTests.AWAIT_DURATION;
 
@@ -192,7 +192,7 @@ public class FinderTest {
 
     // <editor-fold defaultstate="collapsed" desc="startKeyProducer">
     @Test
-    public void startKeyProducer_keyProducerIdIsNull_ExceptionThrown() throws IOException, InterruptedException {
+    public void startKeyProducer_keyProducerIdIsNull_ExceptionThrown() throws Exception {
         // arrange
         CFinder cFinder = new CFinder();
         configureKeyProducerJavaRandom(null, cFinder);
@@ -204,7 +204,7 @@ public class FinderTest {
     }
 
     @Test
-    public void startKeyProducer_keyProducerIdIsNotUnique_ExceptionThrown() throws IOException, InterruptedException {
+    public void startKeyProducer_keyProducerIdIsNotUnique_ExceptionThrown() throws Exception {
         // arrange
         CFinder cFinder = new CFinder();
         String sameIdTwice = "123";
@@ -220,7 +220,7 @@ public class FinderTest {
 
     // <editor-fold defaultstate="collapsed" desc="configureProducer">
     @Test
-    public void configureProducer_keyProducerIdIsUnknown_ExceptionThrown() throws IOException, InterruptedException {
+    public void configureProducer_keyProducerIdIsUnknown_ExceptionThrown() throws Exception {
         // arrange
         CFinder cFinder = new CFinder();
         final CProducerJava cProducerJava = new CProducerJava();
@@ -246,7 +246,7 @@ public class FinderTest {
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_KEY_PRODUCER_TYPES)
     public void testFullCycle_keyProducerJavaSetAndInitialized_statesCorrect(
-            CommonDataProvider.KeyProducerTypesLocal keyProducerType) throws IOException, InterruptedException {
+            CommonDataProvider.KeyProducerTypesLocal keyProducerType) throws Exception {
         // arrange
         CFinder cFinder = new CFinder();
         String keyProducerId = "exampleId";

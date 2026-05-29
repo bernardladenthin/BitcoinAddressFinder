@@ -217,8 +217,12 @@ public class Finder implements Interruptable {
 
     /**
      * Calls {@code initProducer()} on every configured producer.
+     *
+     * @throws Exception if any producer fails to initialise; the orchestrator does not
+     *                   catch this here, the Main run loop is the architectural place
+     *                   that catches, logs and triggers shutdown
      */
-    public void initProducer() {
+    public void initProducer() throws Exception {
         LOGGER.info("initProducer");
         for (Producer producer : getAllProducers()) {
             producer.initProducer();

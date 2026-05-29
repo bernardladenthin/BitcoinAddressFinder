@@ -11,7 +11,6 @@ import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Random;
@@ -32,7 +31,7 @@ public class ProducerOpenCLTest {
     // <editor-fold defaultstate="collapsed" desc="initProducer">
     @OpenCLTest
     @Test
-    public void initProducer_configurationGiven_stateInitializedAndLogged() throws IOException, InterruptedException {
+    public void initProducer_configurationGiven_stateInitializedAndLogged() throws Exception {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         MockConsumer mockConsumer = new MockConsumer();
@@ -49,7 +48,7 @@ public class ProducerOpenCLTest {
     @OpenCLTest
     @Test
     public void releaseProducer_configurationGiven_stateInitializedAndLoggedAndExecuterServiceShutdown()
-            throws IOException, InterruptedException {
+            throws Exception {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         MockConsumer mockConsumer = new MockConsumer();
@@ -66,8 +65,7 @@ public class ProducerOpenCLTest {
     // <editor-fold defaultstate="collapsed" desc="initProducer">
     @OpenCLTest
     @Test
-    public void initProducer_configurationGiven_stateInitializedAndOpenCLContextSet()
-            throws IOException, InterruptedException {
+    public void initProducer_configurationGiven_stateInitializedAndOpenCLContextSet() throws Exception {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         MockConsumer mockConsumer = new MockConsumer();
@@ -91,7 +89,7 @@ public class ProducerOpenCLTest {
 
     // <editor-fold defaultstate="collapsed" desc="releaseProducers">
     @Test
-    public void releaseProducers_notInitialized_noExceptionThrown() throws IOException, InterruptedException {
+    public void releaseProducers_notInitialized_noExceptionThrown() throws Exception {
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
@@ -106,8 +104,7 @@ public class ProducerOpenCLTest {
 
     @Test
     @OpenCLTest
-    public void releaseProducers_initialized_noExceptionThrownAndOpenCLContextFreed()
-            throws IOException, InterruptedException {
+    public void releaseProducers_initialized_noExceptionThrownAndOpenCLContextFreed() throws Exception {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
@@ -132,7 +129,7 @@ public class ProducerOpenCLTest {
 
     // <editor-fold defaultstate="collapsed" desc="getFreeThreads">
     @Test
-    public void getFreeThreads_notInitialized_numberOfFreeThreadsReturned() throws IOException, InterruptedException {
+    public void getFreeThreads_notInitialized_numberOfFreeThreadsReturned() throws Exception {
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
@@ -150,7 +147,7 @@ public class ProducerOpenCLTest {
 
     @Test
     @OpenCLTest
-    public void getFreeThreads_initialized_numberOfFreeThreadsReturned() throws IOException, InterruptedException {
+    public void getFreeThreads_initialized_numberOfFreeThreadsReturned() throws Exception {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
@@ -172,7 +169,7 @@ public class ProducerOpenCLTest {
 
     // <editor-fold defaultstate="collapsed" desc="waitTillFreeThreadsInPool">
     @Test
-    public void waitTillFreeThreadsInPool_notInitialized_returnImmediately() throws IOException, InterruptedException {
+    public void waitTillFreeThreadsInPool_notInitialized_returnImmediately() throws Exception {
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
@@ -189,7 +186,7 @@ public class ProducerOpenCLTest {
 
     @Test
     @OpenCLTest
-    public void waitTillFreeThreadsInPool_initialized_returnImmediately() throws IOException, InterruptedException {
+    public void waitTillFreeThreadsInPool_initialized_returnImmediately() throws Exception {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
@@ -209,8 +206,7 @@ public class ProducerOpenCLTest {
 
     @Test
     @OpenCLTest
-    public void waitTillFreeThreadsInPool_initializedAndThreadPoolFull_doNotReturn()
-            throws IOException, InterruptedException {
+    public void waitTillFreeThreadsInPool_initializedAndThreadPoolFull_doNotReturn() throws Exception {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 

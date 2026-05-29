@@ -4,7 +4,6 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.IOException;
 import java.math.BigInteger;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -58,14 +57,10 @@ public class ProducerOpenCL extends AbstractProducer {
     }
 
     @Override
-    public void initProducer() {
+    public void initProducer() throws Exception {
         super.initProducer();
         openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
-        try {
-            openCLContext.init();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        openCLContext.init();
     }
 
     @Override

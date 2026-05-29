@@ -88,7 +88,7 @@ public abstract class AbstractProducer implements Producer {
     }
 
     @Override
-    public void initProducer() {
+    public void initProducer() throws Exception {
         LOGGER.info("Init producer.");
         this.state = ProducerState.INITIALIZED;
     }

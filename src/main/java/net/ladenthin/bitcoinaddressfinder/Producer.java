@@ -14,8 +14,10 @@ public interface Producer extends Runnable, Interruptable, ProducerStateProvider
     /**
      * Initialize the producer to procue keys with
      * {@link #produceKeys()} continuously.
+     *
+     * @throws Exception if initialisation fails for any reason
      */
-    void initProducer();
+    void initProducer() throws Exception;
 
     /**
      * Release the producer.

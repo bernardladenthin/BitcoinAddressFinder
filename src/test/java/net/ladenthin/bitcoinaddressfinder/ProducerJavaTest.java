@@ -9,7 +9,6 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.hamcrest.text.MatchesPattern.matchesPattern;
 
-import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.Random;
@@ -29,7 +28,7 @@ public class ProducerJavaTest {
 
     // <editor-fold defaultstate="collapsed" desc="initProducer">
     @Test
-    public void initProducer_configurationGiven_stateInitializedAndLogged() throws IOException, InterruptedException {
+    public void initProducer_configurationGiven_stateInitializedAndLogged() throws Exception {
         CProducerJava cProducerJava = new CProducerJava();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
@@ -61,8 +60,7 @@ public class ProducerJavaTest {
 
     // <editor-fold defaultstate="collapsed" desc="releaseProducer">
     @Test
-    public void releaseProducer_configurationGiven_stateInitializedAndLogged()
-            throws IOException, InterruptedException {
+    public void releaseProducer_configurationGiven_stateInitializedAndLogged() throws Exception {
         CProducerJava cProducerJava = new CProducerJava();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);

@@ -42,7 +42,7 @@ public class AbstractProducerTest {
 
     // <editor-fold defaultstate="collapsed" desc="initProducer">
     @Test
-    public void initProducer_configurationGiven_stateInitializedAndLogged() throws IOException, InterruptedException {
+    public void initProducer_configurationGiven_stateInitializedAndLogged() throws Exception {
         CProducer cProducer = new CProducer();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
@@ -56,8 +56,7 @@ public class AbstractProducerTest {
 
     // <editor-fold defaultstate="collapsed" desc="initProducer">
     @Test
-    public void releaseProducer_configurationGiven_stateInitializedAndLogged()
-            throws IOException, InterruptedException {
+    public void releaseProducer_configurationGiven_stateInitializedAndLogged() throws Exception {
         CProducer cProducer = new CProducer();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
@@ -82,7 +81,7 @@ public class AbstractProducerTest {
             String logTrace2,
             String logTrace3,
             String logTrace4)
-            throws IOException, InterruptedException, DecoderException {
+            throws Exception, DecoderException {
         // arrange
         CProducer cProducer = new CProducer();
         cProducer.batchSizeInBits = batchSizeInBits;
@@ -122,7 +121,7 @@ public class AbstractProducerTest {
 
     @Test
     public void createSecretBase_secretGivenAndLogSecretBaseDisabledTraceEnabled_bitsKilledAndLogged()
-            throws IOException, InterruptedException, DecoderException {
+            throws Exception, DecoderException {
         // arrange
         CProducer cProducer = new CProducer();
         cProducer.batchSizeInBits = 2;
@@ -151,7 +150,7 @@ public class AbstractProducerTest {
 
     @Test
     public void createSecretBase_secretGivenAndLogSecretBaseEnabledTraceDisabled_bitsKilledAndLogged()
-            throws IOException, InterruptedException, DecoderException {
+            throws Exception, DecoderException {
         // arrange
         CProducer cProducer = new CProducer();
         cProducer.batchSizeInBits = 2;
@@ -179,7 +178,7 @@ public class AbstractProducerTest {
     }
     // </editor-fold>
 
-    static void verifyReleaseProducer(AbstractProducer abstractProducer) {
+    static void verifyReleaseProducer(AbstractProducer abstractProducer) throws Exception {
         try (LogCaptor logCaptor = LogCaptor.forClass(AbstractProducer.class)) {
             abstractProducer.initProducer();
 
@@ -196,7 +195,7 @@ public class AbstractProducerTest {
         }
     }
 
-    static void verifyInitProducer(AbstractProducer abstractProducer) {
+    static void verifyInitProducer(AbstractProducer abstractProducer) throws Exception {
         try (LogCaptor logCaptor = LogCaptor.forClass(AbstractProducer.class)) {
             // pre-assert
             assertThat(abstractProducer.state, is(equalTo(ProducerState.UNINITIALIZED)));
@@ -213,7 +212,7 @@ public class AbstractProducerTest {
 
     // <editor-fold defaultstate="collapsed" desc="run">
     @Test
-    public void run_notInitialized_illegalStateExceptionThrown() throws IOException, InterruptedException {
+    public void run_notInitialized_illegalStateExceptionThrown() throws Exception {
         // arrange
         CProducer cProducer = new CProducer();
         MockConsumer mockConsumer = new MockConsumer();
@@ -227,7 +226,7 @@ public class AbstractProducerTest {
     }
 
     @Test
-    public void run_interruptedBeforeStarted_stateSetToNotRunning() throws IOException, InterruptedException {
+    public void run_interruptedBeforeStarted_stateSetToNotRunning() throws Exception {
         // arrange
         CProducer cProducer = new CProducer();
         MockConsumer mockConsumer = new MockConsumer();
@@ -252,7 +251,7 @@ public class AbstractProducerTest {
     }
 
     @Test
-    public void run_exceptionInProduceKeys_exceptionCaughtAndLoggedToError() throws IOException, InterruptedException {
+    public void run_exceptionInProduceKeys_exceptionCaughtAndLoggedToError() throws Exception {
         // arrange
         CProducer cProducer = new CProducer();
         MockConsumer mockConsumer = new MockConsumer();
@@ -301,8 +300,7 @@ public class AbstractProducerTest {
     }
 
     @Test
-    public void waitTillProducerNotRunning_stateBecomesNotRunning_returnsWithinDuration()
-            throws IOException, InterruptedException {
+    public void waitTillProducerNotRunning_stateBecomesNotRunning_returnsWithinDuration() throws Exception {
         CProducer cProducer = new CProducer();
         cProducer.shutdownTimeoutSeconds = 60;
         MockConsumer mockConsumer = new MockConsumer();

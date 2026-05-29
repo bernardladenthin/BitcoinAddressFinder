@@ -68,7 +68,21 @@ public class Main implements Runnable, Interruptable {
 
     private final CConfiguration configuration;
 
-    CountDownLatch runLatch = new CountDownLatch(1);
+    @VisibleForTesting
+    final CountDownLatch runLatch = new CountDownLatch(1);
+
+    /**
+     * Returns the run-completion latch.
+     *
+     * <p>Exposed for tests so they can assert that {@link #run()} counted down the
+     * latch on both success and failure paths.
+     *
+     * @return the run-completion latch
+     */
+    @VisibleForTesting
+    public CountDownLatch getRunLatch() {
+        return runLatch;
+    }
 
     /**
      * Creates a new main instance for the given configuration.
@@ -203,46 +217,53 @@ public class Main implements Runnable, Interruptable {
 
         addSchutdownHook();
 
-        switch (configuration.command) {
-            case Find:
-                CFinder cFinder = Objects.requireNonNull(configuration.finder);
-                Finder finder = new Finder(cFinder);
-                interruptables.add(finder);
-                // key producer first
-                finder.startKeyProducer();
+        try {
+            switch (configuration.command) {
+                case Find:
+                    CFinder cFinder = Objects.requireNonNull(configuration.finder);
+                    Finder finder = new Finder(cFinder);
+                    interruptables.add(finder);
+                    // key producer first
+                    finder.startKeyProducer();
 
-                // consumer second
-                finder.startConsumer();
+                    // consumer second
+                    finder.startConsumer();
 
-                // producer last
-                finder.configureProducer();
-                finder.initProducer();
-                finder.startProducer();
-                finder.shutdownAndAwaitTermination();
-                break;
-            case LMDBToAddressFile:
-                CLMDBToAddressFile cLMDBToAddressFile = Objects.requireNonNull(configuration.lmdbToAddressFile);
-                LMDBToAddressFile lmdbToAddressFile = new LMDBToAddressFile(cLMDBToAddressFile);
-                interruptables.add(lmdbToAddressFile);
-                lmdbToAddressFile.run();
-                break;
-            case AddressFilesToLMDB:
-                CAddressFilesToLMDB cAddressFilesToLMDB = Objects.requireNonNull(configuration.addressFilesToLMDB);
-                AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(cAddressFilesToLMDB);
-                interruptables.add(addressFilesToLMDB);
-                addressFilesToLMDB.run();
-                break;
-            case OpenCLInfo:
-                OpenCLBuilder openCLBuilder = new OpenCLBuilder();
-                List<OpenCLPlatform> openCLPlatforms = openCLBuilder.build();
-                System.out.println(openCLPlatforms);
-                break;
-            default:
-                throw new UnsupportedOperationException(
-                        "Command: " + configuration.command.name() + " currently not supported.");
+                    // producer last
+                    finder.configureProducer();
+                    finder.initProducer();
+                    finder.startProducer();
+                    finder.shutdownAndAwaitTermination();
+                    break;
+                case LMDBToAddressFile:
+                    CLMDBToAddressFile cLMDBToAddressFile = Objects.requireNonNull(configuration.lmdbToAddressFile);
+                    LMDBToAddressFile lmdbToAddressFile = new LMDBToAddressFile(cLMDBToAddressFile);
+                    interruptables.add(lmdbToAddressFile);
+                    lmdbToAddressFile.run();
+                    break;
+                case AddressFilesToLMDB:
+                    CAddressFilesToLMDB cAddressFilesToLMDB = Objects.requireNonNull(configuration.addressFilesToLMDB);
+                    AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(cAddressFilesToLMDB);
+                    interruptables.add(addressFilesToLMDB);
+                    addressFilesToLMDB.run();
+                    break;
+                case OpenCLInfo:
+                    OpenCLBuilder openCLBuilder = new OpenCLBuilder();
+                    List<OpenCLPlatform> openCLPlatforms = openCLBuilder.build();
+                    System.out.println(openCLPlatforms);
+                    break;
+                default:
+                    throw new UnsupportedOperationException(
+                            "Command: " + configuration.command.name() + " currently not supported.");
+            }
+            LOGGER.info("Main#run end.");
+        } catch (Exception e) {
+            LOGGER.error("Fatal error during Main.run; triggering shutdown of all registered components.", e);
+            interrupt();
+            throw new RuntimeException(e);
+        } finally {
+            runLatch.countDown();
         }
-        LOGGER.info("Main#run end.");
-        runLatch.countDown();
 
         if (false) {
             printAllStackTracesWithDelay(2_000L, true);

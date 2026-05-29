@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import static net.ladenthin.bitcoinaddressfinder.cli.Main.printAllStackTracesWithDelay;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
@@ -23,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.cli.Main;
 import net.ladenthin.bitcoinaddressfinder.configuration.CCommand;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
+import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import nl.altindag.log.LogCaptor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -211,6 +213,32 @@ public class MainTest {
 
         // act
         assertThrows(IllegalArgumentException.class, () -> Main.main(new String[] {tempFile.getAbsolutePath()}));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="run() error path: catch + interrupt + countDown + rethrow">
+    @Test
+    public void run_finderFailsDuringStartup_runLatchCountedDownAndExceptionRethrown() {
+        // arrange: Find with finder.consumerJava = null triggers NPE inside
+        // Finder.startConsumer's Objects.requireNonNull. That exception propagates
+        // through Main.run's switch body and must hit the new catch/finally.
+        CConfiguration configuration = new CConfiguration();
+        configuration.command = CCommand.Find;
+        configuration.finder = new CFinder();
+        // intentionally leave configuration.finder.consumerJava = null
+        Main main = new Main(configuration);
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(Main.class)) {
+            // act + assert: Main.run must rethrow the wrapped exception
+            RuntimeException thrown = assertThrows(RuntimeException.class, main::run);
+            assertThat(thrown.getCause(), is(notNullValue()));
+
+            // assert: fatal-error log was emitted
+            assertThat(logCaptor.getErrorLogs(), hasItem(containsString("Fatal error during Main.run")));
+
+            // assert: finally block ran -> runLatch counted down (shutdown hook would not hang)
+            assertThat(main.getRunLatch().getCount(), is(equalTo(0L)));
+        }
     }
     // </editor-fold>
 }

@@ -82,7 +82,7 @@ public class ProducerJavaSecretsFilesTest {
 
     // <editor-fold defaultstate="collapsed" desc="initProducer">
     @Test
-    public void initProducer_configurationGiven_stateInitializedAndLogged() throws IOException, InterruptedException {
+    public void initProducer_configurationGiven_stateInitializedAndLogged() throws Exception {
         CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
@@ -96,8 +96,7 @@ public class ProducerJavaSecretsFilesTest {
 
     // <editor-fold defaultstate="collapsed" desc="releaseProducer">
     @Test
-    public void releaseProducer_configurationGiven_stateInitializedAndLogged()
-            throws IOException, InterruptedException {
+    public void releaseProducer_configurationGiven_stateInitializedAndLogged() throws Exception {
         CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
@@ -111,7 +110,7 @@ public class ProducerJavaSecretsFilesTest {
 
     // <editor-fold defaultstate="collapsed" desc="produceKeys">
     @Test
-    public void produceKeys_noFileConfigured_noKeysCreated() throws IOException, InterruptedException {
+    public void produceKeys_noFileConfigured_noKeysCreated() throws Exception {
         CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
 
         MockConsumer mockConsumer = new MockConsumer();
@@ -129,8 +128,7 @@ public class ProducerJavaSecretsFilesTest {
 
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_CSECRET_FORMAT)
-    public void produceKeys_filesConfigured_keysCreated(CSecretFormat cSecretFormat)
-            throws IOException, InterruptedException {
+    public void produceKeys_filesConfigured_keysCreated(CSecretFormat cSecretFormat) throws Exception {
         CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
         List<File> secretsFiles = createSecretsFiles(cSecretFormat);
         List<String> secretsFilesAsStringList =
