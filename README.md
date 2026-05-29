@@ -214,45 +214,72 @@ This reduction in scalar size speeds up `k·G` computations, resulting in signif
 > ✅ Matches the size of `RIPEMD160(SHA256(pubkey))`  
 > ✅ Especially effective when combined with OpenCL acceleration
 
-### 🚀 Bloom Filter Address Cache (`useBloomFilter`)
-As of version 1.5.0, a memory-efficient Bloom filter can be used to significantly accelerate address checks:
+### 🚀 Pluggable Address Lookup Backends (`addressLookupBackend`)
+
+As of version 1.6.0, the address presence check is decoupled from the on-disk LMDB store via a small `AddressPresence` interface. The consumer's scan hot path queries through whichever backend is selected in the config — LMDB itself, a Bloom filter in front of LMDB, or a self-contained in-memory snapshot that lets the LMDB env be closed and garbage-collected after population.
 
 ```json
-"useBloomFilter": true
+"addressLookupBackend": "BLOOM"
 ```
 
-Instead of loading all addresses into a Java `HashSet`, a compact Bloom filter is loaded into RAM. This enables ultra-fast `containsAddress()` checks with minimal memory usage — even for millions or billions of entries.
-Advantages:
-- ✅ O(1) lookup speed (comparable to HashSet)
-- ✅ Low memory usage, even with large datasets
-- ✅ No false negatives (real matches are always detected)
-- ⚠️ Possible false positives → only trigger additional LMDB lookups
+Supported values:
 
-#### Estimated Memory Usage:
-| fpp    | Light Database (~132M) | Full Database (~1.37B)  |
-|--------|------------------------|-------------------------|
-| 0.1    | ~**80 MB**             | ~**800 MB**             |
-| 0.05   | ~**100 MB**            | ~**1024 MB**            |
-| 0.01   | ~**151 MB**            | ~**1574 MB**            |
+| Value          | RAM cost                | Lookup latency  | LMDB stays open? | Best for                                                          |
+|----------------|-------------------------|-----------------|------------------|-------------------------------------------------------------------|
+| `LMDB_ONLY`    | minimal (mmap only)     | slowest         | yes              | very large databases that do not fit in RAM at all                |
+| `BLOOM`        | ~80 MB – ~1.5 GB (FPP)  | fast for misses | yes              | the historical default; great when most queries miss the database |
+| `HASHSET`      | ~80 B / entry           | fastest         | **no**           | small/medium databases where every lookup matters                 |
+| `SORTED_ARRAY` | ~20 B / entry           | fast            | **no**           | larger databases that still fit in RAM (~4× more compact than HASHSET)|
 
-#### 🔧 Tuning Accuracy with `bloomFilterFpp`
-The expected false positive probability (FPP) can be configured:
+#### Self-contained snapshots release the LMDB env
+
+`HASHSET` and `SORTED_ARRAY` are *replacements*, not decorators: they are populated once from LMDB via a streaming pass, then the LMDB env is closed and the reference to it is dropped. The on-disk store is no longer needed and the file-backed mmap pages can be reclaimed by the OS. Whether the chain still needs LMDB is reported by the `requiresBackend()` method on the chosen backend.
+
+#### `SORTED_ARRAY` is bucketed by the first byte
+
+A single Java `byte[]` is capped at `Integer.MAX_VALUE` bytes (~2.1 GB), which at 20 bytes per hash160 leaves only ~107 M entries per array — well below the published "Full database" tier of ~1.37 B entries. `SORTED_ARRAY` therefore stores 256 flat `byte[]` chunks bucketed by the first byte of each hash160 (~5.4 M entries per bucket at full scale; binary search inside each bucket on lookup). This keeps every bucket well below the array-size limit and gives up to ~27.5 B total capacity.
+
+#### Benchmark numbers
+
+`AddressLookupBenchmarkTest` writes 2048 random hash160 entries into LMDB, then runs 200,000 random lookups against each backend (50,000 dropped for JIT warmup, same query sequence used for every backend so the comparison is apples-to-apples). Sample numbers from one workstation run — **relative ordering** is the architecturally interesting part; absolute values vary by machine, JVM, and dataset size:
+
+| Backend        | Build (ms) | ns / op |
+|----------------|-----------:|--------:|
+| `LMDB_ONLY`    | 1          | 1291    |
+| `BLOOM`        | 73         |  763    |
+| `HASHSET`      | 8          |   83    |
+| `SORTED_ARRAY` | 7          |  247    |
+
+Run the benchmark yourself with:
+
+```bash
+./mvnw test -Dtest=AddressLookupBenchmarkTest
+```
+
+The test logs a result table at INFO; passing/failing is informational only (timings are not asserted).
+
+#### Bloom filter — FPP tuning
+
+When `addressLookupBackend` is `BLOOM`, the false positive probability is configurable via `bloomFilterFpp`:
 
 ```json
+"addressLookupBackend": "BLOOM",
 "bloomFilterFpp": 0.1
 ```
 
-| Value | Description |
-|-------|-------------|
-| `0.01` | ✅ Only ~1% false positives – high accuracy, more memory |
-| `0.05` | ⚖️ Balanced tradeoff between memory and performance |
-| `0.1`–`0.2` | 🪶 Very memory-efficient – suitable if some false positives are acceptable |
+| `bloomFilterFpp` | Behaviour                                                                   |
+|------------------|-----------------------------------------------------------------------------|
+| `0.01`           | ✅ Only ~1% false positives — high accuracy, more memory                     |
+| `0.05`           | ⚖️ Balanced tradeoff between memory and performance                          |
+| `0.1` – `0.2`    | 🪶 Very memory-efficient — suitable if some false positives are acceptable  |
 
-```json
-"useBloomFilter": true,
-"bloomFilterFpp": 0.1
-```
-Recommended setting for best balance between speed and memory usage.
+Memory cost (Bloom only — `HASHSET` and `SORTED_ARRAY` follow the `RAM cost` column of the backend table above):
+
+| `bloomFilterFpp` | Light Database (~132M) | Full Database (~1.37B) |
+|------------------|------------------------|------------------------|
+| `0.1`            | ~**80 MB**             | ~**800 MB**            |
+| `0.05`           | ~**100 MB**            | ~**1024 MB**           |
+| `0.01`           | ~**151 MB**            | ~**1574 MB**           |
 
 ### 🔐 Public Key Hashing on GPU (SHA-256 + RIPEMD-160)
 The OpenCL kernel performs **blazing fast public key hashing** directly on the GPU using:
@@ -507,12 +534,11 @@ If you're missing any information or have questions about usage or content, feel
   * Link (3.66 GiB zip archive): http://ladenthin.net/lmdb_light.zip
   * Link extracted addresses as txt (5.17 GiB) (2.29 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Light_HexHash.zip
 
-> 💡 **Hint:** When using the light database, it is **strongly recommended** to enable the following setting in your configuration:
+> 💡 **Hint:** When using the light database it is **strongly recommended** to switch the lookup backend to a self-contained in-memory snapshot:
 > ```json
-> "loadToMemoryCacheOnInit" : true
-> ```  
-> Although LMDB is very fast, a Java `HashSet` provides true **O(1)** lookups compared to **O(log n)** (or worse) with disk-backed access.
-> Enabling this flag loads all addresses into memory at startup, resulting in significantly higher throughput during key scanning — especially for OpenCL or high-frequency batch operations.
+> "addressLookupBackend" : "HASHSET"
+> ```
+> See [Pluggable Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend) above for the full trade-off matrix and benchmark numbers. `HASHSET` loads every hash160 into RAM once at startup, then closes the LMDB env and releases its mmap pages, giving you the fastest possible `containsAddress()` path for the rest of the run. For the light database (~132 M entries) this costs roughly **10 GB of RAM**; if that is too much on your machine, `SORTED_ARRAY` is about 4× more compact at a small latency cost, and `BLOOM` keeps LMDB open while still skipping it for the overwhelming majority of misses.
 
 <details>
 <summary>Checksums lmdb_light.zip</summary>
