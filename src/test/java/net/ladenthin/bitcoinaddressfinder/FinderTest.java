@@ -55,7 +55,7 @@ public class FinderTest {
     }
 
     @Test
-    public void interrupt_producersSetAndNotInitialized_noExceptionThrown() throws IOException {
+    public void interrupt_producersSetAndNotInitialized_noExceptionThrown() throws Exception {
         // arrange
         CFinder cFinder = new CFinder();
         configureProducerWithExamples(cFinder);
@@ -71,7 +71,7 @@ public class FinderTest {
     }
 
     @Test
-    public void interrupt_consumerStarted_consumerNotStopped() throws IOException {
+    public void interrupt_consumerStarted_consumerNotStopped() throws Exception {
         // arrange
         CFinder cFinder = new CFinder();
         configureProducerWithExamples(cFinder);
@@ -90,7 +90,7 @@ public class FinderTest {
 
     // <editor-fold defaultstate="collapsed" desc="shutdownAndAwaitTermination">
     @Test
-    public void shutdownAndAwaitTermination_noProducersSet_shutdownCalled() throws IOException {
+    public void shutdownAndAwaitTermination_noProducersSet_shutdownCalled() throws Exception {
         // arrange
         CFinder cFinder = new CFinder();
         Finder finder = new Finder(cFinder);
@@ -103,7 +103,7 @@ public class FinderTest {
     }
 
     @Test
-    public void shutdownAndAwaitTermination_producersSetAndNotInitialized_shutdownCalled() throws IOException {
+    public void shutdownAndAwaitTermination_producersSetAndNotInitialized_shutdownCalled() throws Exception {
         // arrange
         CFinder cFinder = new CFinder();
         configureProducerWithExamples(cFinder);
@@ -172,7 +172,7 @@ public class FinderTest {
     }
 
     @Test
-    public void getAllProducers_producersSetAndNotInitialized_returnList() throws IOException {
+    public void getAllProducers_producersSetAndNotInitialized_returnList() throws Exception {
         // arrange
         CFinder cFinder = new CFinder();
         configureProducerWithExamples(cFinder);

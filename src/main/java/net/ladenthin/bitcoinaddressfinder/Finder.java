@@ -241,17 +241,15 @@ public class Finder implements Interruptable {
 
     /**
      * Shuts down the producer executor and interrupts the consumer once producers have stopped.
+     *
+     * @throws InterruptedException if the calling thread is interrupted while awaiting termination;
+     *                              callers are responsible for restoring the interrupt flag or
+     *                              propagating it according to their own design.
      */
-    public void shutdownAndAwaitTermination() {
+    public void shutdownAndAwaitTermination() throws InterruptedException {
         LOGGER.info("shutdownAndAwaitTermination");
-        try {
-            producerExecutorService.shutdown();
-            producerExecutorService.awaitTermination(
-                    AWAIT_DURATION_TERMINATE.get(ChronoUnit.SECONDS), TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException(e);
-        }
+        producerExecutorService.shutdown();
+        producerExecutorService.awaitTermination(AWAIT_DURATION_TERMINATE.get(ChronoUnit.SECONDS), TimeUnit.SECONDS);
 
         // no producers are running anymore, the consumer can be interrupted
         if (consumerJava != null) {
