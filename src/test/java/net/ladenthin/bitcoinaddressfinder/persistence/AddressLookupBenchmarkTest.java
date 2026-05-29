@@ -18,6 +18,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 import net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerator;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.HashSetAddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.SortedArrayAddressPresence;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.TruncatedLong64SortedArrayPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.Network;
@@ -158,6 +159,7 @@ public class AddressLookupBenchmarkTest {
             case BLOOM -> BloomFilterAccelerator.populateFrom(lmdb, lmdb, BLOOM_FPP);
             case HASHSET -> HashSetAddressPresence.populateFrom(lmdb);
             case SORTED_ARRAY -> SortedArrayAddressPresence.populateFrom(lmdb);
+            case TRUNCATED_LONG_64 -> TruncatedLong64SortedArrayPresence.populateFrom(lmdb);
         };
     }
 

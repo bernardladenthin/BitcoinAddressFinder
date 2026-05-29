@@ -13,6 +13,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerator;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.HashSetAddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.SortedArrayAddressPresence;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.TruncatedLong64SortedArrayPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.AddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
@@ -68,6 +69,7 @@ public class LMDBBase {
                         BloomFilterAccelerator.populateFrom(lmdb, lmdb, lmdbConfigurationReadOnly.bloomFilterFpp);
                     case HASHSET -> HashSetAddressPresence.populateFrom(lmdb);
                     case SORTED_ARRAY -> SortedArrayAddressPresence.populateFrom(lmdb);
+                    case TRUNCATED_LONG_64 -> TruncatedLong64SortedArrayPresence.populateFrom(lmdb);
                 };
 
         return new LMDBHandle(lmdb, lookup);

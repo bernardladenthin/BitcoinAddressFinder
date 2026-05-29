@@ -224,31 +224,54 @@ As of version 1.6.0, the address presence check is decoupled from the on-disk LM
 
 Supported values:
 
-| Value          | RAM cost                | Lookup latency  | LMDB stays open? | Best for                                                          |
-|----------------|-------------------------|-----------------|------------------|-------------------------------------------------------------------|
-| `LMDB_ONLY`    | minimal (mmap only)     | slowest         | yes              | very large databases that do not fit in RAM at all                |
-| `BLOOM`        | ~80 MB – ~1.5 GB (FPP)  | fast for misses | yes              | the historical default; great when most queries miss the database |
-| `HASHSET`      | ~80 B / entry           | fastest         | **no**           | small/medium databases where every lookup matters                 |
-| `SORTED_ARRAY` | ~20 B / entry           | fast            | **no**           | larger databases that still fit in RAM (~4× more compact than HASHSET)|
+| Value               | RAM cost                | Lookup latency       | LMDB stays open? | Best for                                                                                |
+|---------------------|-------------------------|----------------------|------------------|-----------------------------------------------------------------------------------------|
+| `LMDB_ONLY`         | minimal (mmap only)     | slowest              | yes              | very large databases that do not fit in RAM at all                                      |
+| `BLOOM`             | ~80 MB – ~1.5 GB (FPP)  | fast for misses      | yes              | the historical default; great when most queries miss the database                       |
+| `HASHSET`           | ~80 B / entry           | fast                 | **no**           | small/medium databases where lookup latency matters but memory is plentiful             |
+| `SORTED_ARRAY`      | ~20 B / entry           | medium               | **no**           | larger datasets that still fit in RAM (~4× more compact than HASHSET, exact lookup)     |
+| `TRUNCATED_LONG_64` | **~8 B / entry**        | **near HASHSET**     | **no**           | the recommended default for any in-RAM choice — best memory/latency trade-off           |
+
+#### Memory footprint per backend across the published database tiers
+
+`HASHSET` and `SORTED_ARRAY` store the full hash160; `TRUNCATED_LONG_64` keeps only the 8 bytes after the bucket byte. All four in-RAM backends use the same 256-bucket layout (one chunk per first-byte value) so per-entry numbers dominate.
+
+| Backend             | 100 M entries (operational) | 132 M entries (Light DB) | 1.377 B entries (Full DB) |
+|---------------------|----------------------------:|-------------------------:|--------------------------:|
+| `HASHSET`           | ~8.0 GB                     | ~10 GB                   | ~110 GB ❌                |
+| `SORTED_ARRAY`      | ~2.0 GB                     | ~2.6 GB                  | ~28 GB                    |
+| `TRUNCATED_LONG_64` | **~0.8 GB**                 | **~1.1 GB**              | **~11 GB**                |
+| `BLOOM` (FPP 0.01)  | ~120 MB                     | ~150 MB                  | ~1.6 GB                   |
 
 #### Self-contained snapshots release the LMDB env
 
-`HASHSET` and `SORTED_ARRAY` are *replacements*, not decorators: they are populated once from LMDB via a streaming pass, then the LMDB env is closed and the reference to it is dropped. The on-disk store is no longer needed and the file-backed mmap pages can be reclaimed by the OS. Whether the chain still needs LMDB is reported by the `requiresBackend()` method on the chosen backend.
+`HASHSET`, `SORTED_ARRAY` and `TRUNCATED_LONG_64` are *replacements*, not decorators: they are populated once from LMDB via a streaming pass, then the LMDB env is closed and the reference to it is dropped. The on-disk store is no longer needed and the file-backed mmap pages can be reclaimed by the OS. Whether the chain still needs LMDB is reported by the `requiresBackend()` method on the chosen backend.
 
-#### `SORTED_ARRAY` is bucketed by the first byte
+#### Bucketing by the first byte
 
-A single Java `byte[]` is capped at `Integer.MAX_VALUE` bytes (~2.1 GB), which at 20 bytes per hash160 leaves only ~107 M entries per array — well below the published "Full database" tier of ~1.37 B entries. `SORTED_ARRAY` therefore stores 256 flat `byte[]` chunks bucketed by the first byte of each hash160 (~5.4 M entries per bucket at full scale; binary search inside each bucket on lookup). This keeps every bucket well below the array-size limit and gives up to ~27.5 B total capacity.
+`SORTED_ARRAY` and `TRUNCATED_LONG_64` both use 256 buckets indexed by the first byte of each hash160. A single Java `byte[]` / `long[]` is capped at `Integer.MAX_VALUE` elements; bucketing keeps every bucket well below that limit and gives O(1) bucket selection plus a much smaller per-bucket binary search. At the Full DB tier each bucket holds ~5.4 M entries.
+
+#### Why `TRUNCATED_LONG_64` is so close to `HASHSET` despite being a binary search
+
+hash160 is the output of SHA-256 followed by RIPEMD-160 and is cryptographically uniform; any subset of its bits is also uniform. `TRUNCATED_LONG_64` keeps only the 8 bytes after the bucket byte (72 bits of total resolution: 8-bit bucket + 64-bit stored value). The probability that a random query collides with one of N stored entries is N/2⁶⁴, which for the largest published database tier is ~7.5 × 10⁻¹¹ per query — and any such collision falls through to the LMDB delegate. In return:
+
+- **Cache-line dense**: 8 longs per 64-byte cache line, the binary search walks very little memory.
+- **JDK intrinsic**: `Arrays.binarySearch(long[], long)` is heavily JIT-optimised and produces branchless comparisons on modern CPUs.
+- **No boxing**, no per-entry object header, no pointer chasing — every comparison is a single CPU instruction.
 
 #### Benchmark numbers
 
 `AddressLookupBenchmarkTest` writes 2048 random hash160 entries into LMDB, then runs 200,000 random lookups against each backend (50,000 dropped for JIT warmup, same query sequence used for every backend so the comparison is apples-to-apples). Sample numbers from one workstation run — **relative ordering** is the architecturally interesting part; absolute values vary by machine, JVM, and dataset size:
 
-| Backend        | Build (ms) | ns / op |
-|----------------|-----------:|--------:|
-| `LMDB_ONLY`    | 1          | 1291    |
-| `BLOOM`        | 73         |  763    |
-| `HASHSET`      | 8          |   83    |
-| `SORTED_ARRAY` | 7          |  247    |
+| Backend             | Build (ms) | ns / op |
+|---------------------|-----------:|--------:|
+| `LMDB_ONLY`         | 1          | 1301    |
+| `BLOOM`             | 77         |  731    |
+| `HASHSET`           | 10         |   85    |
+| `SORTED_ARRAY`      | 7          |  234    |
+| `TRUNCATED_LONG_64` | 6          |  108    |
+
+`TRUNCATED_LONG_64` reaches near-`HASHSET` latency at ~10× lower memory cost; for most practical database sizes (Light DB and smaller) it is the recommended default.
 
 Run the benchmark yourself with:
 
@@ -536,9 +559,9 @@ If you're missing any information or have questions about usage or content, feel
 
 > 💡 **Hint:** When using the light database it is **strongly recommended** to switch the lookup backend to a self-contained in-memory snapshot:
 > ```json
-> "addressLookupBackend" : "HASHSET"
+> "addressLookupBackend" : "TRUNCATED_LONG_64"
 > ```
-> See [Pluggable Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend) above for the full trade-off matrix and benchmark numbers. `HASHSET` loads every hash160 into RAM once at startup, then closes the LMDB env and releases its mmap pages, giving you the fastest possible `containsAddress()` path for the rest of the run. For the light database (~132 M entries) this costs roughly **10 GB of RAM**; if that is too much on your machine, `SORTED_ARRAY` is about 4× more compact at a small latency cost, and `BLOOM` keeps LMDB open while still skipping it for the overwhelming majority of misses.
+> See [Pluggable Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend) above for the full trade-off matrix and benchmark numbers. `TRUNCATED_LONG_64` loads every hash160 into RAM once at startup as 256 sorted `long[]` buckets (~1.1 GB for the Light DB), then closes the LMDB env and releases its mmap pages — near-`HASHSET` lookup latency at ~10× lower memory cost. If you have memory to spare and prefer exact-bit storage with no probabilistic fallthrough, `HASHSET` (~10 GB for the Light DB) is the next step up; `SORTED_ARRAY` sits between the two; `BLOOM` keeps LMDB open while still skipping it for the overwhelming majority of misses.
 
 <details>
 <summary>Checksums lmdb_light.zip</summary>

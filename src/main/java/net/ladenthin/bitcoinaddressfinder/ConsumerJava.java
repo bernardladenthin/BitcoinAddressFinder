@@ -27,6 +27,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerator;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.HashSetAddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.SortedArrayAddressPresence;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.TruncatedLong64SortedArrayPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.crypto.ECKey;
@@ -186,6 +187,7 @@ public class ConsumerJava implements Consumer {
             case BLOOM -> BloomFilterAccelerator.populateFrom(lmdb, lmdb, bloomFpp);
             case HASHSET -> HashSetAddressPresence.populateFrom(lmdb);
             case SORTED_ARRAY -> SortedArrayAddressPresence.populateFrom(lmdb);
+            case TRUNCATED_LONG_64 -> TruncatedLong64SortedArrayPresence.populateFrom(lmdb);
         };
     }
 
