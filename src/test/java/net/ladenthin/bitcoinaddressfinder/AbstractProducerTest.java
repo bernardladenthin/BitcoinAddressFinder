@@ -4,17 +4,23 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.lessThan;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import nl.altindag.log.LogCaptor;
 import org.apache.commons.codec.DecoderException;
@@ -271,6 +277,82 @@ public class AbstractProducerTest {
             assertThat(abstractProducerTestImpl.state, is(equalTo(ProducerState.NOT_RUNNING)));
 
             assertThat(logCaptor.getErrorLogs(), hasItem(equalTo("Error in produceKeys")));
+        }
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="waitTillProducerNotRunning">
+    @Test
+    public void waitTillProducerNotRunning_stateAlreadyNotRunning_returnsImmediately() throws IOException {
+        CProducer cProducer = new CProducer();
+        cProducer.shutdownTimeoutSeconds = 60;
+        MockConsumer mockConsumer = new MockConsumer();
+        Random random = new Random(1);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        AbstractProducerTestImpl producer =
+                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        producer.state = ProducerState.NOT_RUNNING;
+
+        Instant start = Instant.now();
+        producer.waitTillProducerNotRunning();
+        Duration elapsed = Duration.between(start, Instant.now());
+
+        assertThat(elapsed.toMillis(), is(lessThan(1000L)));
+    }
+
+    @Test
+    public void waitTillProducerNotRunning_stateBecomesNotRunning_returnsWithinDuration()
+            throws IOException, InterruptedException {
+        CProducer cProducer = new CProducer();
+        cProducer.shutdownTimeoutSeconds = 60;
+        MockConsumer mockConsumer = new MockConsumer();
+        Random random = new Random(1);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        AbstractProducerTestImpl producer =
+                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        producer.state = ProducerState.RUNNING;
+
+        CountDownLatch flipped = new CountDownLatch(1);
+        Thread flipper = new Thread(() -> {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            producer.state = ProducerState.NOT_RUNNING;
+            flipped.countDown();
+        });
+        flipper.start();
+
+        Instant start = Instant.now();
+        producer.waitTillProducerNotRunning();
+        Duration elapsed = Duration.between(start, Instant.now());
+
+        assertThat(flipped.await(1, TimeUnit.SECONDS), is(true));
+        assertThat(elapsed.toMillis(), is(lessThan(2000L)));
+        flipper.join();
+    }
+
+    @Test
+    public void waitTillProducerNotRunning_stateStaysRunning_returnsAfterTimeoutAndLogsError() throws IOException {
+        CProducer cProducer = new CProducer();
+        cProducer.shutdownTimeoutSeconds = 1;
+        MockConsumer mockConsumer = new MockConsumer();
+        Random random = new Random(1);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        AbstractProducerTestImpl producer =
+                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        producer.state = ProducerState.RUNNING;
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(AbstractProducer.class)) {
+            Instant start = Instant.now();
+            producer.waitTillProducerNotRunning();
+            Duration elapsed = Duration.between(start, Instant.now());
+
+            assertThat(elapsed.toSeconds(), is(equalTo(1L)));
+            assertThat(producer.state, is(equalTo(ProducerState.RUNNING)));
+            assertThat(
+                    logCaptor.getErrorLogs(), hasItem(containsString("waitTillProducerNotRunning timed out after 1s")));
         }
     }
     // </editor-fold>

@@ -39,6 +39,19 @@ public class CProducer {
     public boolean runOnce = false;
 
     /**
+     * Maximum time (seconds) the orchestrator will wait inside
+     * {@link net.ladenthin.bitcoinaddressfinder.Producer#waitTillProducerNotRunning()}
+     * for this producer to leave the {@code RUNNING} state during shutdown. After this
+     * elapses {@code Finder.interrupt()} logs an error and continues with the rest of
+     * the shutdown chain so a hung producer cannot block the whole process.
+     *
+     * <p>Default: {@code 300} (5 minutes). Increase for producers known to do long
+     * batches at shutdown (large OpenCL grids, slow blocking I/O); decrease for fast
+     * unit-test setups.
+     */
+    public int shutdownTimeoutSeconds = 300;
+
+    /**
      * Computes the overall work size implied by {@link #batchSizeInBits}.
      *
      * @param bitHelper helper used to convert bits to size

@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
@@ -194,7 +195,15 @@ public abstract class AbstractProducer implements Producer {
 
     @Override
     public void waitTillProducerNotRunning() {
+        Instant deadline = Instant.now().plusSeconds(cProducer.shutdownTimeoutSeconds);
         while (state == ProducerState.RUNNING) {
+            if (Instant.now().isAfter(deadline)) {
+                LOGGER.error(
+                        "waitTillProducerNotRunning timed out after {}s; producer state still RUNNING. "
+                                + "Continuing shutdown without confirming this producer stopped.",
+                        cProducer.shutdownTimeoutSeconds);
+                return;
+            }
             try {
                 Thread.sleep(SLEEP_WAIT_TILL_RUNNING);
             } catch (InterruptedException e) {

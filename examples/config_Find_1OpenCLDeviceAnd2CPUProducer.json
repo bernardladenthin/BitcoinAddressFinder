@@ -44,14 +44,16 @@
         "batchSizeInBits": 14,
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
-        "runOnce": false
+        "runOnce": false,
+        "shutdownTimeoutSeconds": 300
       },
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_3",
         "batchSizeInBits": 14,
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
-        "runOnce": false
+        "runOnce": false,
+        "shutdownTimeoutSeconds": 300
       }
     ],
     "producerJavaSecretsFiles": [],
@@ -67,7 +69,8 @@
         "loopCount" : 4,
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
-        "runOnce": false
+        "runOnce": false,
+        "shutdownTimeoutSeconds": 300
       }
     ]
   }

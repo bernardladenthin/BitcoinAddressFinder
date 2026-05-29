@@ -87,7 +87,8 @@
         "loopCount" : 4,
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
-        "runOnce": false
+        "runOnce": false,
+        "shutdownTimeoutSeconds": 300
       }
     ]
   }
