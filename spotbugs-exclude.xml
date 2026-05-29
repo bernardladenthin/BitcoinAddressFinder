@@ -239,6 +239,35 @@ SPDX-License-Identifier: Apache-2.0
     </Match>
 
     <!--
+        EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
+        KeyProducerJavaRandom constructor (3 sites). Same
+        "this cannot happen if invariants hold" idiom we suppress
+        elsewhere:
+
+          - NoSuchAlgorithmException from
+            SecureRandom.getInstanceStrong() and
+            SecureRandom.getInstance("SHA1PRNG"). Both algorithm
+            names are required by the standard JDK security
+            provider list; the catch+wrap exists only to satisfy
+            the compiler.
+          - switch default for an unknown
+            CKeyProducerJavaRandom.keyProducerJavaRandomInstance
+            enum value, reachable only if a new enum constant is
+            added without updating the switch.
+
+        Widening the constructor to declare throws is not an
+        option: KeyProducerJavaRandom is instantiated from a
+        Function&lt;T, K&gt; lambda in Finder.startKeyProducer; the
+        functional interface cannot propagate checked exceptions
+        without a hierarchy-wide redesign.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaRandom"/>
+        <Method name="&lt;init&gt;"/>
+        <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
+    </Match>
+
+    <!--
         PATH_TRAVERSAL_IN flags new File(userInput) where userInput
         could be attacker-controlled (HTTP, RPC, etc). Every flagged
         site here reads a path from the JSON configuration file that
