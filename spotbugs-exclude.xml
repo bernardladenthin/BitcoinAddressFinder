@@ -420,6 +420,7 @@ SPDX-License-Identifier: Apache-2.0
             <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.RandomSecretSupplier"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerator"/>
         </Or>
         <Or>
             <Bug pattern="EI_EXPOSE_REP"/>
