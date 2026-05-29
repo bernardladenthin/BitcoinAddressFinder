@@ -16,8 +16,11 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Spliterators;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.ByteConversion;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
@@ -25,6 +28,7 @@ import net.ladenthin.bitcoinaddressfinder.SeparatorFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFileOutputFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
+import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import org.apache.commons.codec.binary.Hex;
@@ -46,8 +50,14 @@ import org.slf4j.LoggerFactory;
 
 /**
  * LMDB-backed implementation of {@link Persistence} with optional Bloom-filter acceleration.
+ *
+ * <p>Also implements {@link AddressIterable} so accelerator factories
+ * (e.g. {@code BloomFilterAccelerator.populateFrom},
+ * {@code HashSetAddressPresence.populateFrom},
+ * {@code SortedArrayAddressPresence.populateFrom}) can build their in-memory snapshots
+ * from this backend without depending on the LMDB API directly.
  */
-public class LMDBPersistence implements Persistence {
+public class LMDBPersistence implements Persistence, AddressIterable {
 
     private static final String DB_NAME_HASH160_TO_COINT = "hash160toCoin";
     private static final int DB_COUNT = 1;
@@ -291,6 +301,45 @@ public class LMDBPersistence implements Persistence {
             ByteBuffer byteBuffer = localLmdb_h160ToAmount.get(txn, hash160);
             return byteBuffer != null;
         }
+    }
+
+    /**
+     * LMDB is the backing storage itself, not a decorator. It does not require any
+     * further delegate.
+     *
+     * @return always {@code false}
+     */
+    @Override
+    public boolean requiresBackend() {
+        return false;
+    }
+
+    /**
+     * Streams every hash160 stored in the database. Each emitted {@link ByteBuffer} is a
+     * cursor-owned view; callers MUST copy bytes out before advancing the stream.
+     *
+     * <p>Closing the returned stream releases the LMDB cursor and the read transaction.
+     */
+    @Override
+    public Stream<ByteBuffer> addresses() {
+        Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
+        Dbi<ByteBuffer> localLmdb_h160ToAmount = Objects.requireNonNull(lmdb_h160ToAmount);
+
+        Txn<ByteBuffer> txn = localEnv.txnRead();
+        CursorIterable<ByteBuffer> iterable;
+        try {
+            iterable = localLmdb_h160ToAmount.iterate(txn, KeyRange.all());
+        } catch (RuntimeException e) {
+            txn.close();
+            throw e;
+        }
+
+        Stream<CursorIterable.KeyVal<ByteBuffer>> rawStream =
+                StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterable.iterator(), 0), false);
+        return rawStream.map(CursorIterable.KeyVal::key).onClose(() -> {
+            iterable.close();
+            txn.close();
+        });
     }
 
     @Override

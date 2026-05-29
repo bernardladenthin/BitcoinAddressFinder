@@ -4,7 +4,10 @@
 package net.ladenthin.bitcoinaddressfinder.persistence.bloom;
 
 import com.google.common.hash.BloomFilter;
+import com.google.common.hash.Funnels;
 import java.nio.ByteBuffer;
+import java.util.stream.Stream;
+import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressLookup;
 import org.bitcoinj.base.Coin;
 import org.jspecify.annotations.NonNull;
@@ -65,5 +68,45 @@ public final class BloomFilterAccelerator implements AddressLookup {
     public Coin getAmount(ByteBuffer hash160) {
         // Bloom filter has no value information; always delegate.
         return delegate.getAmount(hash160);
+    }
+
+    /**
+     * Bloom is a probabilistic decorator: a {@code mightContain == true} answer may be a
+     * false positive that must be disambiguated against the delegate. The backing
+     * storage must therefore remain open for the lifetime of this accelerator.
+     *
+     * @return {@code true} - bloom always requires its delegate to be available
+     */
+    @Override
+    public boolean requiresBackend() {
+        return true;
+    }
+
+    /**
+     * Builds an accelerator by streaming every address from {@code source} into a fresh
+     * Bloom filter, then wrapping {@code delegate} for the disambiguation path.
+     *
+     * <p>The source is iterated exactly once (one stream open/close cycle); the source
+     * reference is dropped before this method returns so it has no impact on whether
+     * the backing storage can be released.
+     *
+     * @param source                   the address set to materialise into the filter
+     * @param delegate                 the lookup used to disambiguate Bloom positives
+     * @param falsePositiveProbability the Bloom-filter FPP target (e.g. {@code 0.01})
+     * @return a populated accelerator wrapping {@code delegate}
+     */
+    public static BloomFilterAccelerator populateFrom(
+            @NonNull AddressIterable source, @NonNull AddressLookup delegate, double falsePositiveProbability) {
+        long count = source.count();
+        BloomFilter<byte[]> bloom =
+                BloomFilter.create(Funnels.byteArrayFunnel(), Math.max(count, 1L), falsePositiveProbability);
+        try (Stream<ByteBuffer> stream = source.addresses()) {
+            stream.forEach(bb -> {
+                byte[] bytes = new byte[bb.remaining()];
+                bb.duplicate().get(bytes);
+                bloom.put(bytes);
+            });
+        }
+        return new BloomFilterAccelerator(bloom, delegate);
     }
 }

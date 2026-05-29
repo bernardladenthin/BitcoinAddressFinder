@@ -304,6 +304,23 @@ SPDX-License-Identifier: Apache-2.0
     </Match>
 
     <!--
+        EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
+        SortedArrayAddressPresence.populateFrom: the throw on bucket
+        overflow is a "cannot happen unless the input violates the
+        Integer.MAX_VALUE-per-array contract" invariant assertion.
+        IllegalStateException is the idiomatic choice here; the
+        bucket-prefix would need to be widened by the caller (e.g.
+        to 2 bytes) before this path could ever fire. Same idiom as
+        the AbstractProducer.produceKeys assertions suppressed
+        above.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.persistence.inmemory.SortedArrayAddressPresence"/>
+        <Method name="populateFrom"/>
+        <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
+    </Match>
+
+    <!--
         EXS_EXCEPTION_SOFTENING_NO_CHECKED: 3 sites convert a
         checked exception to a RuntimeException by design, in two
         different intentional patterns:
