@@ -389,6 +389,7 @@ public class ConsumerJava implements Consumer {
             }
         } catch (InterruptedException e) {
             LOGGER.error("Interrupted while awaiting consumer termination.", e);
+            Thread.currentThread().interrupt();
             throw new RuntimeException(e);
         }
         try {
