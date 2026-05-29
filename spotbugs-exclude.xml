@@ -222,6 +222,23 @@ SPDX-License-Identifier: Apache-2.0
     </Match>
 
     <!--
+        EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
+        LMDBPersistence.getApproximateSizeBytes: the reflective
+        access suppressed in the RFI block above can throw checked
+        exceptions (NoSuchFieldException, IllegalAccessException).
+        They are wrapped in RuntimeException because this is a
+        best-effort diagnostic-size estimate; callers log the
+        result and continue regardless. Adding throws to the static
+        helper would force every caller to handle exceptions for a
+        non-critical metric.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
+        <Method name="getApproximateSizeBytes"/>
+        <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
+    </Match>
+
+    <!--
         PATH_TRAVERSAL_IN flags new File(userInput) where userInput
         could be attacker-controlled (HTTP, RPC, etc). Every flagged
         site here reads a path from the JSON configuration file that
