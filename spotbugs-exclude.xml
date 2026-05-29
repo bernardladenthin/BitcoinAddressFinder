@@ -304,6 +304,45 @@ SPDX-License-Identifier: Apache-2.0
     </Match>
 
     <!--
+        EXS_EXCEPTION_SOFTENING_NO_CHECKED: 3 sites convert a
+        checked exception to a RuntimeException by design, in two
+        different intentional patterns:
+
+          - ConsumerJava.interrupt: fail-loud during shutdown. An
+            InterruptedException while awaiting consumer
+            termination, or an Exception from persistence.close(),
+            means the shutdown could not complete cleanly. The
+            throw makes the failure visible to the operator
+            instead of silently logging and losing it. The
+            InterruptedException site restores the interrupt flag
+            before rethrowing per the Java idiom. Adding throws to
+            interrupt() is not an option because the Interruptable
+            interface declares no throws.
+          - AbstractKeyProducerQueueBuffered.createSecrets: catches
+            InterruptedException, restores the interrupt flag
+            (Thread.currentThread().interrupt()), then throws the
+            domain-specific NoMoreSecretsAvailableException.
+            fb-contrib flags this only because
+            NoMoreSecretsAvailableException extends
+            RuntimeException; the pattern is the idiomatic
+            translation of "blocking queue interrupted during
+            shutdown" into the producer's domain language.
+    -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.ConsumerJava"/>
+                <Method name="interrupt"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.AbstractKeyProducerQueueBuffered"/>
+                <Method name="createSecrets"/>
+            </And>
+        </Or>
+        <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CHECKED"/>
+    </Match>
+
+    <!--
         PATH_TRAVERSAL_IN flags new File(userInput) where userInput
         could be attacker-controlled (HTTP, RPC, etc). Every flagged
         site here reads a path from the JSON configuration file that
