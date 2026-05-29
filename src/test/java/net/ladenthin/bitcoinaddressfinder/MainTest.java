@@ -146,7 +146,7 @@ public class MainTest {
 
     // <editor-fold defaultstate="collapsed" desc="fromJson">
     @Test
-    public void fromJson_validJsonString_returnsExpectedConfiguration() {
+    public void fromJson_validJsonString_returnsExpectedConfiguration() throws IOException {
         // act
         CConfiguration configuration = Main.fromJson(OPEN_CL_INFO_JSON_STRING);
 
@@ -160,7 +160,7 @@ public class MainTest {
 
     // <editor-fold defaultstate="collapsed" desc="fromYaml">
     @Test
-    public void fromYaml_validYamlString_returnsExpectedConfiguration() {
+    public void fromYaml_validYamlString_returnsExpectedConfiguration() throws IOException {
         // act
         CConfiguration configuration = Main.fromYaml(OPEN_CL_INFO_YAML_STRING);
 
@@ -175,7 +175,7 @@ public class MainTest {
     // <editor-fold defaultstate="collapsed" desc="main format detection">
     @Test
     @OpenCLTest
-    public void main_jsonExtensionPath_parsesAndRunsConfiguration() {
+    public void main_jsonExtensionPath_parsesAndRunsConfiguration() throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // act
         Main.main(new String[] {config_OpenCLInfo_json.toAbsolutePath().toString()});
@@ -183,7 +183,7 @@ public class MainTest {
 
     @Test
     @OpenCLTest
-    public void main_jsExtensionPath_parsesAndRunsConfiguration() {
+    public void main_jsExtensionPath_parsesAndRunsConfiguration() throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // act
         Main.main(new String[] {config_OpenCLInfo_js.toAbsolutePath().toString()});
@@ -191,7 +191,7 @@ public class MainTest {
 
     @Test
     @OpenCLTest
-    public void main_yamlExtensionPath_parsesAndRunsConfiguration() {
+    public void main_yamlExtensionPath_parsesAndRunsConfiguration() throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // act
         Main.main(new String[] {config_OpenCLInfo_yaml.toAbsolutePath().toString()});
@@ -199,7 +199,7 @@ public class MainTest {
 
     @Test
     @OpenCLTest
-    public void main_ymlExtensionPath_parsesAndRunsConfiguration() {
+    public void main_ymlExtensionPath_parsesAndRunsConfiguration() throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // act
         Main.main(new String[] {config_OpenCLInfo_yml.toAbsolutePath().toString()});

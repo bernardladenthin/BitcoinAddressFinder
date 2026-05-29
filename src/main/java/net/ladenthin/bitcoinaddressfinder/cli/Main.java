@@ -94,17 +94,14 @@ public class Main implements Runnable, Interruptable {
     }
 
     /**
-     * Reads the entire contents of {@code path} as a string using the default charset.
+     * Reads the entire contents of {@code path} as a string using UTF-8.
      *
      * @param path the file to read
      * @return the file contents
+     * @throws IOException if the file cannot be read
      */
-    public static String readString(Path path) {
-        try {
-            return Files.readString(path, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    public static String readString(Path path) throws IOException {
+        return Files.readString(path, StandardCharsets.UTF_8);
     }
 
     /**
@@ -112,14 +109,11 @@ public class Main implements Runnable, Interruptable {
      *
      * @param configurationString the JSON document
      * @return the parsed {@link CConfiguration}
+     * @throws IOException if the JSON cannot be deserialised
      */
-    public static CConfiguration fromJson(String configurationString) {
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            return mapper.readValue(configurationString, CConfiguration.class);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    public static CConfiguration fromJson(String configurationString) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        return mapper.readValue(configurationString, CConfiguration.class);
     }
 
     /**
@@ -127,14 +121,11 @@ public class Main implements Runnable, Interruptable {
      *
      * @param configurationString the YAML document
      * @return the parsed {@link CConfiguration}
+     * @throws IOException if the YAML cannot be deserialised
      */
-    public static CConfiguration fromYaml(String configurationString) {
-        try {
-            YAMLMapper mapper = new YAMLMapper();
-            return mapper.readValue(configurationString, CConfiguration.class);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    public static CConfiguration fromYaml(String configurationString) throws IOException {
+        YAMLMapper mapper = new YAMLMapper();
+        return mapper.readValue(configurationString, CConfiguration.class);
     }
 
     /**
@@ -142,15 +133,12 @@ public class Main implements Runnable, Interruptable {
      *
      * @param configuration the configuration to serialise
      * @return the JSON representation
+     * @throws IOException if the configuration cannot be serialised
      */
-    public static String configurationToJson(CConfiguration configuration) {
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.enable(SerializationFeature.INDENT_OUTPUT);
-            return mapper.writeValueAsString(configuration);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    public static String configurationToJson(CConfiguration configuration) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.enable(SerializationFeature.INDENT_OUTPUT);
+        return mapper.writeValueAsString(configuration);
     }
 
     /**
@@ -158,22 +146,20 @@ public class Main implements Runnable, Interruptable {
      *
      * @param configuration the configuration to serialise
      * @return the YAML representation
+     * @throws IOException if the configuration cannot be serialised
      */
-    public static String configurationToYAML(CConfiguration configuration) {
-        try {
-            YAMLMapper mapper = new YAMLMapper();
-            return mapper.writeValueAsString(configuration);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    public static String configurationToYAML(CConfiguration configuration) throws IOException {
+        YAMLMapper mapper = new YAMLMapper();
+        return mapper.writeValueAsString(configuration);
     }
 
     /**
      * Java entry point. Loads the configuration file passed as the first argument and runs the tool.
      *
      * @param args the program arguments; expects a single path to a JSON or YAML configuration file
+     * @throws IOException if the configuration file cannot be read or deserialised
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         if (args.length != 1) {
             LOGGER.error("Invalid arguments. Pass path to configuration as first argument.");
             return;
@@ -196,8 +182,10 @@ public class Main implements Runnable, Interruptable {
 
     /**
      * Logs the JSON and YAML representations of the loaded configuration for review.
+     *
+     * @throws IOException if the configuration cannot be serialised
      */
-    public void logConfigurationTransformation() {
+    public void logConfigurationTransformation() throws IOException {
         String json = configurationToJson(configuration);
         String yaml = configurationToYAML(configuration);
         LOGGER.info(
