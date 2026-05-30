@@ -806,5 +806,32 @@ SPDX-License-Identifier: Apache-2.0
                 </plugins>
             </build>
         </profile>
+        <profile>
+            <!--
+                Builds the fat (jar-with-dependencies) jar for shipping the CLI.
+                Off by default because the assembly step is expensive and only
+                needed when packaging a runnable artifact, not during inner-loop
+                builds. Documented in CLAUDE.md "Build Commands" as
+                `./mvnw package -P assembly`.
+            -->
+            <id>assembly</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>build-fat-jar</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>single</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
     </profiles>
 </project>
