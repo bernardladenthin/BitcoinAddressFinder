@@ -20,18 +20,15 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
  *       once at startup. Exact lookup. LMDB env is closed after population - the on-disk
  *       store is no longer needed. ~80 B/entry; suitable for the light database
  *       (~10 GB RAM at 132 M entries) on machines with enough RAM.</li>
- *   <li>{@link #SORTED_ARRAY} - 256-bucket sorted flat {@code byte[]} snapshot,
- *       populated from LMDB once at startup. Exact lookup. LMDB env is closed after
- *       population. ~20 B/entry; about 4&#xD7; more compact than HASHSET, suitable for
- *       larger datasets up to ~27 billion entries.</li>
  *   <li>{@link #TRUNCATED_LONG_64} - 256-bucket sorted {@code long[]} snapshot keeping
  *       only the first 8 bytes after the bucket byte (72-bit effective resolution).
  *       Probabilistic with negligible false-positive rate (N/2&#x2074;&#x2074;), the
  *       enclosing chain must fall through to the LMDB delegate to disambiguate a
  *       collision but in practice that is expected ~10&#x207B;&#x00b9;&#x00b9; per
- *       query at the project's largest published database size. ~8 B/entry, ~2.5&#x00d7;
- *       more compact than SORTED_ARRAY, primitive {@code long} binary search uses the
- *       JDK intrinsic and is typically the fastest lookup of any backend.</li>
+ *       query at the project's largest published database size. ~8 B/entry, primitive
+ *       {@code long} binary search uses the JDK intrinsic and is typically the fastest
+ *       lookup of any backend (~10&#x00d7; more compact than HASHSET at near-HASHSET
+ *       latency).</li>
  * </ul>
  */
 public enum AddressLookupBackend {
@@ -41,8 +38,6 @@ public enum AddressLookupBackend {
     BLOOM,
     /** HashSet snapshot in RAM; LMDB closed and GC'd after population. */
     HASHSET,
-    /** Sorted-array snapshot in RAM (256 buckets by first byte); LMDB closed and GC'd after population. */
-    SORTED_ARRAY,
     /**
      * Truncated 64-bit snapshot in RAM (256 buckets by first byte; each entry stored
      * as the next 8 bytes of the hash160 as a primitive {@code long}). Probabilistic

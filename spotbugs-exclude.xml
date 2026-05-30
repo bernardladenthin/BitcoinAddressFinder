@@ -314,20 +314,12 @@ SPDX-License-Identifier: Apache-2.0
         the AbstractProducer.produceKeys assertions suppressed
         above.
     -->
-    <Match>
-        <Class name="net.ladenthin.bitcoinaddressfinder.persistence.inmemory.SortedArrayAddressPresence"/>
-        <Method name="populateFrom"/>
-        <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
-    </Match>
-
     <!--
         EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
-        TruncatedLong64SortedArrayPresence.populateFrom: same
-        bucket-overflow invariant assertion as the SortedArray
-        suppression above. The throw fires only if a single bucket
-        would exceed Integer.MAX_VALUE entries; a finer bucket
-        prefix would be required for the caller to ever observe
-        this.
+        TruncatedLong64SortedArrayPresence.populateFrom: the throw
+        fires only if a single bucket would exceed Integer.MAX_VALUE
+        entries; a finer bucket prefix would be required for the
+        caller to ever observe this.
     -->
     <Match>
         <Class name="net.ladenthin.bitcoinaddressfinder.persistence.inmemory.TruncatedLong64SortedArrayPresence"/>

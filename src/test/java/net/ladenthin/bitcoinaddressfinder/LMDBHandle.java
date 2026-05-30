@@ -13,7 +13,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
  *   <li>{@link #persistence()} - write / lifecycle / stats path (the LMDB instance itself).</li>
  *   <li>{@link #lookup()} - read path; equal to {@code persistence()} when {@code LMDB_ONLY},
  *       a {@code BloomFilterAccelerator} wrapping it when {@code BLOOM}, or a self-contained
- *       in-memory snapshot when {@code HASHSET} / {@code SORTED_ARRAY}.</li>
+ *       in-memory snapshot when {@code HASHSET} / {@code TRUNCATED_LONG_64}.</li>
  * </ul>
  */
 public record LMDBHandle(Persistence persistence, AddressPresence lookup) implements AutoCloseable {

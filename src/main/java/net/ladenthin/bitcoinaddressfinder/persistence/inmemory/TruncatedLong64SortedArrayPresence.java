@@ -27,10 +27,8 @@ import org.jspecify.annotations.NonNull;
  *
  * <h2>Memory cost</h2>
  * Exactly 8 bytes per entry plus 256 array headers - no per-entry object overhead.
- * Roughly 2.5&#x00d7; more compact than {@link SortedArrayAddressPresence} (20
- * B/entry) and ~10&#x00d7; more compact than {@link HashSetAddressPresence}
- * (~80 B/entry). For the Light database (~132 M entries) the in-memory footprint
- * is ~1.1 GB.
+ * Roughly 10&#x00d7; more compact than {@link HashSetAddressPresence} (~80 B/entry).
+ * For the Light database (~132 M entries) the in-memory footprint is ~1.1 GB.
  *
  * <h2>Lookup</h2>
  * O(1) bucket pick by first byte, then {@link Arrays#binarySearch(long[], long)} in

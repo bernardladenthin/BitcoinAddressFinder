@@ -26,7 +26,6 @@ import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerator;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.HashSetAddressPresence;
-import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.SortedArrayAddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.TruncatedLong64SortedArrayPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import org.apache.commons.codec.binary.Hex;
@@ -107,7 +106,7 @@ public class ConsumerJava implements Consumer {
      * Read-only presence chain the scan hot path queries through. Always non-null after
      * {@link #initLMDB()} returns; may be the LMDB instance itself ({@code LMDB_ONLY}),
      * a {@code BloomFilterAccelerator} wrapping it ({@code BLOOM}), or a self-contained
-     * in-memory snapshot ({@code HASHSET}, {@code SORTED_ARRAY}).
+     * in-memory snapshot ({@code HASHSET}, {@code TRUNCATED_LONG_64}).
      */
     protected @Nullable AddressPresence lookup;
 
@@ -186,7 +185,6 @@ public class ConsumerJava implements Consumer {
             case LMDB_ONLY -> lmdb;
             case BLOOM -> BloomFilterAccelerator.populateFrom(lmdb, lmdb, bloomFpp);
             case HASHSET -> HashSetAddressPresence.populateFrom(lmdb);
-            case SORTED_ARRAY -> SortedArrayAddressPresence.populateFrom(lmdb);
             case TRUNCATED_LONG_64 -> TruncatedLong64SortedArrayPresence.populateFrom(lmdb);
         };
     }

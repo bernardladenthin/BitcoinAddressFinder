@@ -227,29 +227,27 @@ Supported values:
 | Value               | RAM cost                | Lookup latency       | LMDB stays open? | Best for                                                                                |
 |---------------------|-------------------------|----------------------|------------------|-----------------------------------------------------------------------------------------|
 | `LMDB_ONLY`         | minimal (mmap only)     | slowest              | yes              | very large databases that do not fit in RAM at all                                      |
-| `BLOOM`             | ~80 MB – ~1.5 GB (FPP)  | fast for misses      | yes              | the historical default; great when most queries miss the database                       |
-| `HASHSET`           | ~80 B / entry           | fast                 | **no**           | small/medium databases where lookup latency matters but memory is plentiful             |
-| `SORTED_ARRAY`      | ~20 B / entry           | medium               | **no**           | larger datasets that still fit in RAM (~4× more compact than HASHSET, exact lookup)     |
-| `TRUNCATED_LONG_64` | **~8 B / entry**        | **near HASHSET**     | **no**           | the recommended default for any in-RAM choice — best memory/latency trade-off           |
+| `BLOOM`             | ~80 MB – ~1.5 GB (FPP)  | fast for misses      | yes              | when LMDB must stay open and most queries miss the database                             |
+| `HASHSET`           | ~80 B / entry           | fast                 | **no**           | small databases where memory is plentiful and exact lookup is required by callers       |
+| `TRUNCATED_LONG_64` | **~8 B / entry**        | **near HASHSET**     | **no**           | **recommended default for any in-RAM choice** — best memory/latency trade-off           |
 
 #### Memory footprint per backend across the published database tiers
 
-`HASHSET` and `SORTED_ARRAY` store the full hash160; `TRUNCATED_LONG_64` keeps only the 8 bytes after the bucket byte. All four in-RAM backends use the same 256-bucket layout (one chunk per first-byte value) so per-entry numbers dominate.
+`HASHSET` stores the full hash160; `TRUNCATED_LONG_64` keeps only the 8 bytes after the bucket byte. Both in-RAM backends use the same 256-bucket layout (one chunk per first-byte value) so per-entry numbers dominate.
 
 | Backend             | 100 M entries (operational) | 132 M entries (Light DB) | 1.377 B entries (Full DB) |
 |---------------------|----------------------------:|-------------------------:|--------------------------:|
 | `HASHSET`           | ~8.0 GB                     | ~10 GB                   | ~110 GB ❌                |
-| `SORTED_ARRAY`      | ~2.0 GB                     | ~2.6 GB                  | ~28 GB                    |
 | `TRUNCATED_LONG_64` | **~0.8 GB**                 | **~1.1 GB**              | **~11 GB**                |
 | `BLOOM` (FPP 0.01)  | ~120 MB                     | ~150 MB                  | ~1.6 GB                   |
 
 #### Self-contained snapshots release the LMDB env
 
-`HASHSET`, `SORTED_ARRAY` and `TRUNCATED_LONG_64` are *replacements*, not decorators: they are populated once from LMDB via a streaming pass, then the LMDB env is closed and the reference to it is dropped. The on-disk store is no longer needed and the file-backed mmap pages can be reclaimed by the OS. Whether the chain still needs LMDB is reported by the `requiresBackend()` method on the chosen backend.
+`HASHSET` and `TRUNCATED_LONG_64` are *replacements*, not decorators: they are populated once from LMDB via a streaming pass, then the LMDB env is closed and the reference to it is dropped. The on-disk store is no longer needed and the file-backed mmap pages can be reclaimed by the OS. Whether the chain still needs LMDB is reported by the `requiresBackend()` method on the chosen backend.
 
 #### Bucketing by the first byte
 
-`SORTED_ARRAY` and `TRUNCATED_LONG_64` both use 256 buckets indexed by the first byte of each hash160. A single Java `byte[]` / `long[]` is capped at `Integer.MAX_VALUE` elements; bucketing keeps every bucket well below that limit and gives O(1) bucket selection plus a much smaller per-bucket binary search. At the Full DB tier each bucket holds ~5.4 M entries.
+`TRUNCATED_LONG_64` uses 256 buckets indexed by the first byte of each hash160. A single Java `long[]` is capped at `Integer.MAX_VALUE` elements; bucketing keeps every bucket well below that limit and gives O(1) bucket selection plus a much smaller per-bucket binary search. At the Full DB tier each bucket holds ~5.4 M entries.
 
 #### Why `TRUNCATED_LONG_64` is so close to `HASHSET` despite being a binary search
 
@@ -268,7 +266,6 @@ hash160 is the output of SHA-256 followed by RIPEMD-160 and is cryptographically
 | `LMDB_ONLY`         | 1          | 1301    |
 | `BLOOM`             | 77         |  731    |
 | `HASHSET`           | 10         |   85    |
-| `SORTED_ARRAY`      | 7          |  234    |
 | `TRUNCATED_LONG_64` | 6          |  108    |
 
 `TRUNCATED_LONG_64` reaches near-`HASHSET` latency at ~10× lower memory cost; for most practical database sizes (Light DB and smaller) it is the recommended default.
@@ -296,7 +293,7 @@ When `addressLookupBackend` is `BLOOM`, the false positive probability is config
 | `0.05`           | ⚖️ Balanced tradeoff between memory and performance                          |
 | `0.1` – `0.2`    | 🪶 Very memory-efficient — suitable if some false positives are acceptable  |
 
-Memory cost (Bloom only — `HASHSET` and `SORTED_ARRAY` follow the `RAM cost` column of the backend table above):
+Memory cost (Bloom only — `HASHSET` and `TRUNCATED_LONG_64` follow the `RAM cost` column of the backend table above):
 
 | `bloomFilterFpp` | Light Database (~132M) | Full Database (~1.37B) |
 |------------------|------------------------|------------------------|
