@@ -3,25 +3,23 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.everyItem;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.is;
+import static org.jocl.CL.*;
+
 import com.google.common.io.Resources;
 import java.io.File;
-import java.nio.file.Files;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
-import org.apache.commons.io.FileUtils;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
-
-import static org.jocl.CL.*;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -29,18 +27,16 @@ import java.util.Random;
 import java.util.stream.Collectors;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
+import org.apache.commons.io.FileUtils;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.hasItem;
-import static org.hamcrest.Matchers.everyItem;
-import static org.mockito.Mockito.mock;
-
 import org.jocl.*;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
-import org.slf4j.Logger;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public class ProbeAddressesOpenCLTest {
 
@@ -48,17 +44,18 @@ public class ProbeAddressesOpenCLTest {
 
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
-    
+
     private static final TestAddresses42 testAddresses = new TestAddresses42(1024, false);
-    
+
     /**
      * 22:  256Mb: executed in: 1253ms, read in:  74ms
      * 23:  512Mb: executed in: 2346ms, read in: 148ms
      * 24: 1024Mb: executed in: 4622ms, read in: 302ms
-    */
-    private final static int BITS_FOR_BATCH = 8;
-    private final static int LOOP_COUNT = BITS_FOR_BATCH >> 1;
-    
+     */
+    private static final int BITS_FOR_BATCH = 8;
+
+    private static final int LOOP_COUNT = BITS_FOR_BATCH >> 1;
+
     private final BitHelper bitHelper = new BitHelper();
 
     @TempDir
@@ -74,7 +71,8 @@ public class ProbeAddressesOpenCLTest {
     }
 
     public void createTemporaryAddressesFile() throws IOException {
-        File tempAddressesFile = Files.createFile(tempFolder.resolve(ADDRESSES_CSV)).toFile();
+        File tempAddressesFile =
+                Files.createFile(tempFolder.resolve(ADDRESSES_CSV)).toFile();
         fillAddressesFiles(tempAddressesFile);
     }
 
@@ -86,8 +84,7 @@ public class ProbeAddressesOpenCLTest {
         /**
          * The source code of the OpenCL program to execute
          */
-        String programSource
-                = "__kernel void "
+        String programSource = "__kernel void "
                 + "sampleKernel(__global const float *a,"
                 + "             __global const float *b,"
                 + "             __global float *c)"
@@ -96,7 +93,7 @@ public class ProbeAddressesOpenCLTest {
                 + "    c[gid] = a[gid] * b[gid];"
                 + "}";
 
-        // Create input- and output data 
+        // Create input- and output data
         int n = 10;
         float[] srcArrayA = new float[n];
         float[] srcArrayB = new float[n];
@@ -137,35 +134,27 @@ public class ProbeAddressesOpenCLTest {
         clGetDeviceIDs(platform, deviceType, 0, null, numDevicesArray);
         int numDevices = numDevicesArray[0];
 
-        // Obtain a device ID 
+        // Obtain a device ID
         cl_device_id[] devices = new cl_device_id[numDevices];
         clGetDeviceIDs(platform, deviceType, numDevices, devices, null);
         cl_device_id device = devices[deviceIndex];
 
         // Create a context for the selected device
-        cl_context context = clCreateContext(
-                contextProperties, 1, new cl_device_id[]{device},
-                null, null, null);
+        cl_context context = clCreateContext(contextProperties, 1, new cl_device_id[] {device}, null, null, null);
 
         // Create a command-queue for the selected device
         cl_queue_properties properties = new cl_queue_properties();
-        cl_command_queue commandQueue = clCreateCommandQueueWithProperties(
-                context, device, properties, null);
+        cl_command_queue commandQueue = clCreateCommandQueueWithProperties(context, device, properties, null);
 
         // Allocate the memory objects for the input- and output data
-        cl_mem srcMemA = clCreateBuffer(context,
-                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                (long)Sizeof.cl_float * n, srcA, null);
-        cl_mem srcMemB = clCreateBuffer(context,
-                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                (long)Sizeof.cl_float * n, srcB, null);
-        cl_mem dstMem = clCreateBuffer(context,
-                CL_MEM_READ_WRITE,
-                (long)Sizeof.cl_float * n, null, null);
+        cl_mem srcMemA = clCreateBuffer(
+                context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_float * n, srcA, null);
+        cl_mem srcMemB = clCreateBuffer(
+                context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_float * n, srcB, null);
+        cl_mem dstMem = clCreateBuffer(context, CL_MEM_READ_WRITE, (long) Sizeof.cl_float * n, null, null);
 
         // Create the program from the source code
-        cl_program program = clCreateProgramWithSource(context,
-                1, new String[]{programSource}, null, null);
+        cl_program program = clCreateProgramWithSource(context, 1, new String[] {programSource}, null, null);
 
         // Build the program
         clBuildProgram(program, 0, null, null, null, null);
@@ -180,16 +169,14 @@ public class ProbeAddressesOpenCLTest {
         clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(dstMem));
 
         // Set the work-item dimensions
-        long[] global_work_size = new long[]{n};
+        long[] global_work_size = new long[] {n};
 
         // Execute the kernel
-        clEnqueueNDRangeKernel(commandQueue, kernel, 1, null,
-                global_work_size, null, 0, null, null);
+        clEnqueueNDRangeKernel(commandQueue, kernel, 1, null, global_work_size, null, 0, null, null);
 
         // Read the output data
         long cb = (long) n * Sizeof.cl_float;
-        clEnqueueReadBuffer(commandQueue, dstMem, CL_TRUE, 0,
-                cb, dst, 0, null, null);
+        clEnqueueReadBuffer(commandQueue, dstMem, CL_TRUE, 0, cb, dst, 0, null, null);
 
         // Release kernel, program, and memory objects
         clReleaseMemObject(srcMemA);
@@ -216,48 +203,45 @@ public class ProbeAddressesOpenCLTest {
         assertThat(passed, is(equalTo(Boolean.TRUE)));
     }
 
-    
     public static int BN_NBITS = 256;
     public static int BN_WSHIFT = 5;
     public static int BN_WBITS = (1 << BN_WSHIFT);
-    public static int BN_NWORDS = ((BN_NBITS/8) / 4); // 4 == sizeof(bn_word)
+    public static int BN_NWORDS = ((BN_NBITS / 8) / 4); // 4 == sizeof(bn_word)
 
     public static int ACCESS_BUNDLE = 1024;
-    public static int ACCESS_STRIDE = (ACCESS_BUNDLE/BN_NWORDS);
-    
+    public static int ACCESS_STRIDE = (ACCESS_BUNDLE / BN_NWORDS);
+
     @Test
     @Disabled
     public void reverseEngineering_startPoints() {
         int GLOBAL_SIZE = 1024;
         for (int j = 0; j < 1024; j++) {
             for (int k = 0; k < 64; k++) {
-                        int i, cell, start;
-                        System.out.println("========================================");
-                        /* Load the row increment point */
-                        i = 2 * j;
-                        System.out.println("i: " + i);
+                int i, cell, start;
+                System.out.println("========================================");
+                /* Load the row increment point */
+                i = 2 * j;
+                System.out.println("i: " + i);
 
-                        cell = i;
-                        System.out.println("cell: " + cell);
-                        start = ((((2 * cell) / ACCESS_STRIDE) * ACCESS_BUNDLE) +
-                                 (cell % (ACCESS_STRIDE/2)));
-                        System.out.println("start: " + start);
+                cell = i;
+                System.out.println("cell: " + cell);
+                start = ((((2 * cell) / ACCESS_STRIDE) * ACCESS_BUNDLE) + (cell % (ACCESS_STRIDE / 2)));
+                System.out.println("start: " + start);
 
-                        int row_in_access_1 = start + (i*ACCESS_STRIDE);
-                        System.out.println("row_in_access_1: " + row_in_access_1);
+                int row_in_access_1 = start + (i * ACCESS_STRIDE);
+                System.out.println("row_in_access_1: " + row_in_access_1);
 
-                        start += (ACCESS_STRIDE/2);
-                        System.out.println("start: " + start);
+                start += (ACCESS_STRIDE / 2);
+                System.out.println("start: " + start);
 
-                        int row_in_access_2 = start + (i*ACCESS_STRIDE);
-                        System.out.println("row_in_access_2: " + row_in_access_2);
+                int row_in_access_2 = start + (i * ACCESS_STRIDE);
+                System.out.println("row_in_access_2: " + row_in_access_2);
 
-                        cell += (k * GLOBAL_SIZE);
-                        System.out.println("cell: " + cell);
-                        start = (((cell / ACCESS_STRIDE) * ACCESS_BUNDLE) +
-                                 (cell % ACCESS_STRIDE));
-                        System.out.println("start: " + start);
-                        System.out.println("========================================");
+                cell += (k * GLOBAL_SIZE);
+                System.out.println("cell: " + cell);
+                start = (((cell / ACCESS_STRIDE) * ACCESS_BUNDLE) + (cell % ACCESS_STRIDE));
+                System.out.println("start: " + start);
+                System.out.println("========================================");
             }
         }
     }
@@ -266,19 +250,15 @@ public class ProbeAddressesOpenCLTest {
     @Disabled
     public void calcAddrsFixZeroCl_loadWithoutErrors() throws IOException {
         // ATTENTION: BLDEBUG
-        
-        
-        
+
         int CELLS = 64;
         int ROW_SIZE = 2; // x1, y1
         int COL_SIZE = 2; // rx, ry
-        
-        
+
         String calcAddrsFixZeroClFileName = "calc_addrs.cl";
         URL url = Resources.getResource(calcAddrsFixZeroClFileName);
         String calcAddrsFixZeroCl = Resources.toString(url, StandardCharsets.UTF_8);
 
-        
         // Create input- and output data
         // out:
         int[] src_points_out = new int[ACCESS_BUNDLE];
@@ -291,7 +271,7 @@ public class ProbeAddressesOpenCLTest {
         Pointer zHeap = Pointer.to(src_z_heap);
         Pointer rowIn = Pointer.to(src_row_in);
         Pointer colIn = Pointer.to(src_col_in);
-        
+
         // The platform, device type and device number
         // that will be used
         final int platformIndex = 0;
@@ -320,42 +300,30 @@ public class ProbeAddressesOpenCLTest {
         clGetDeviceIDs(platform, deviceType, 0, null, numDevicesArray);
         int numDevices = numDevicesArray[0];
 
-        // Obtain a device ID 
+        // Obtain a device ID
         cl_device_id[] devices = new cl_device_id[numDevices];
         clGetDeviceIDs(platform, deviceType, numDevices, devices, null);
         cl_device_id device = devices[deviceIndex];
 
         // Create a context for the selected device
-        cl_context context = clCreateContext(
-                contextProperties, 1, new cl_device_id[]{device},
-                null, null, null);
+        cl_context context = clCreateContext(contextProperties, 1, new cl_device_id[] {device}, null, null, null);
 
         // Create a command-queue for the selected device
         cl_queue_properties properties = new cl_queue_properties();
-        cl_command_queue commandQueue = clCreateCommandQueueWithProperties(
-                context, device, properties, null);
+        cl_command_queue commandQueue = clCreateCommandQueueWithProperties(context, device, properties, null);
 
         // Allocate the memory objects for the input- and output data
-        cl_mem pointsOutMem = clCreateBuffer(context,
-                CL_MEM_READ_WRITE,
-                (long)Sizeof.cl_int * src_points_out.length,
-                pointsOut, null);
-        cl_mem zHeapMem = clCreateBuffer(context,
-                CL_MEM_READ_WRITE,
-                (long)Sizeof.cl_int * src_z_heap.length,
-                zHeap, null);
-        cl_mem rowInMem = clCreateBuffer(context,
-                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                (long)Sizeof.cl_int * src_row_in.length,
-                null, null);
-        cl_mem colInMem = clCreateBuffer(context,
-                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                (long)Sizeof.cl_int * src_col_in.length,
-                null, null);
-        
+        cl_mem pointsOutMem = clCreateBuffer(
+                context, CL_MEM_READ_WRITE, (long) Sizeof.cl_int * src_points_out.length, pointsOut, null);
+        cl_mem zHeapMem =
+                clCreateBuffer(context, CL_MEM_READ_WRITE, (long) Sizeof.cl_int * src_z_heap.length, zHeap, null);
+        cl_mem rowInMem = clCreateBuffer(
+                context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_int * src_row_in.length, null, null);
+        cl_mem colInMem = clCreateBuffer(
+                context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_int * src_col_in.length, null, null);
+
         // Create the program from the source code
-        cl_program program = clCreateProgramWithSource(context,
-                1, new String[]{calcAddrsFixZeroCl}, null, null);
+        cl_program program = clCreateProgramWithSource(context, 1, new String[] {calcAddrsFixZeroCl}, null, null);
 
         // Build the program
         clBuildProgram(program, 0, null, null, null, null);
@@ -372,14 +340,13 @@ public class ProbeAddressesOpenCLTest {
         clSetKernelArg(kernel_ec_add_grid, a++, Sizeof.cl_mem, Pointer.to(rowInMem));
         clSetKernelArg(kernel_ec_add_grid, a++, Sizeof.cl_mem, Pointer.to(colInMem));
 
-        
-        
         // Set the work-item dimensions
-        long[] global_work_size = new long[]{ACCESS_BUNDLE, };
+        long[] global_work_size = new long[] {
+            ACCESS_BUNDLE,
+        };
 
         // Execute the kernel
-        clEnqueueNDRangeKernel(commandQueue, kernel_ec_add_grid, 1, null,
-                global_work_size, null, 0, null, null);
+        clEnqueueNDRangeKernel(commandQueue, kernel_ec_add_grid, 1, null, global_work_size, null, 0, null, null);
     }
 
     @ParameterizedTest
@@ -394,7 +361,7 @@ public class ProbeAddressesOpenCLTest {
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = bitSize;
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
-        openCLContext.init();
+            openCLContext.init();
             Random sr = new Random(1337);
             BigInteger secret = keyUtility.createSecret(bitSize, sr);
             BigInteger secretBase = keyUtility.killBits(secret, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
@@ -402,67 +369,66 @@ public class ProbeAddressesOpenCLTest {
             openCLContext.createKeys(secretBase);
         }
     }
-    
+
     @Test
     @OpenCLTest
     public void createKeys_bitsLowerThanGridSize_useMoreNevertheless() throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
-        
+
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
         producerOpenCL.loopCount = LOOP_COUNT;
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
-        openCLContext.init();
+            openCLContext.init();
             Random sr = new Random(1337);
-            BigInteger secret = keyUtility.createSecret(BITS_FOR_BATCH-1, sr);
+            BigInteger secret = keyUtility.createSecret(BITS_FOR_BATCH - 1, sr);
             BigInteger secretBase = keyUtility.killBits(secret, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
 
             openCLContext.createKeys(secretBase);
-       }
+        }
     }
-    
+
     /**
-    * Verifies that at least one test input triggers BigInteger encoding with a leading zero byte (sign bit = 1).
-    * This is a prerequisite for testing OpenCL buffer serialization of such keys.
-    */
+     * Verifies that at least one test input triggers BigInteger encoding with a leading zero byte (sign bit = 1).
+     * This is a prerequisite for testing OpenCL buffer serialization of such keys.
+     */
     @Test
     public void dataProvider_largePrivateKeys_containsAtLeastOneEncodingWithLeadingZeroByte() {
         List<Integer> lengths = Arrays.stream(CommonDataProvider.largePrivateKeys())
-            .map(data -> ((BigInteger) data[0]).toByteArray().length)
-            .collect(Collectors.toList());
+                .map(data -> ((BigInteger) data[0]).toByteArray().length)
+                .collect(Collectors.toList());
 
         assertThat(
-            "Expected at least one BigInteger with 33-byte encoding (sign-preserving leading zero)",
-            lengths,
-            hasItem(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES + 1)
-        );
+                "Expected at least one BigInteger with 33-byte encoding (sign-preserving leading zero)",
+                lengths,
+                hasItem(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES + 1));
     }
-    
-    /**
-    * Verifies that all test inputs in largePrivate32ByteKeys() produce a 33-byte encoding
-    * due to the high bit being set (i.e., sign-preserving leading zero is required).
-    */
-   @Test
-   public void dataProvider_largePrivateKeys_allHaveLeadingZeroEncoding() {
-       List<Integer> lengths = Arrays.stream(CommonDataProvider.privateKeys32ByteRequiringStrip())
-           .map(data -> ((BigInteger) data[0]).toByteArray().length)
-           .collect(Collectors.toList());
 
-       assertThat(
-           "Expected all BigIntegers to be encoded with 33 bytes (sign bit set → leading zero required)",
-           lengths,
-           everyItem(is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES + 1))
-       );
-   }
-   
+    /**
+     * Verifies that all test inputs in largePrivate32ByteKeys() produce a 33-byte encoding
+     * due to the high bit being set (i.e., sign-preserving leading zero is required).
+     */
+    @Test
+    public void dataProvider_largePrivateKeys_allHaveLeadingZeroEncoding() {
+        List<Integer> lengths = Arrays.stream(CommonDataProvider.privateKeys32ByteRequiringStrip())
+                .map(data -> ((BigInteger) data[0]).toByteArray().length)
+                .collect(Collectors.toList());
+
+        assertThat(
+                "Expected all BigIntegers to be encoded with 33 bytes (sign bit set → leading zero required)",
+                lengths,
+                everyItem(is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES + 1)));
+    }
+
     @OpenCLTest
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE)
-    public void setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException(BigInteger privateKey, int chunkSize) throws IOException {
+    public void setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException(BigInteger privateKey, int chunkSize)
+            throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
-        
+
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = chunkSize;
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
@@ -471,13 +437,14 @@ public class ProbeAddressesOpenCLTest {
 
             // Force a key that exceeds the limit
             openClTask.setSrcPrivateKeyChunk(privateKey);
-       }
+        }
     }
 
     @ParameterizedTest
     @OpenCLTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_32_BYTE_REQUIRING_STRIP)
-    public void setSrcPrivateKeyChunk_handlesLeadingZero_correctlySerializesTo32Bytes(BigInteger privateKey) throws IOException {
+    public void setSrcPrivateKeyChunk_handlesLeadingZero_correctlySerializesTo32Bytes(BigInteger privateKey)
+            throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
@@ -486,16 +453,25 @@ public class ProbeAddressesOpenCLTest {
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
             openCLContext.init();
             byte[] encoded = privateKey.toByteArray();
-            assertThat("Encoded must hold exactly 33 bytes", encoded.length, is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES + 1));
+            assertThat(
+                    "Encoded must hold exactly 33 bytes",
+                    encoded.length,
+                    is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES + 1));
             byte[] expectedStripped = Arrays.copyOfRange(encoded, 1, encoded.length);
-            assertThat("ExpectedStripped must hold exactly 32 bytes", expectedStripped.length, is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES));
+            assertThat(
+                    "ExpectedStripped must hold exactly 32 bytes",
+                    expectedStripped.length,
+                    is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES));
 
             // Perform the actual OpenCL buffer population
             OpenClTask openClTask = Objects.requireNonNull(openCLContext.getOpenClTask());
             openClTask.setSrcPrivateKeyChunk(privateKey);
 
             ByteBuffer buffer = openClTask.getPrivateKeySourceArgument().getByteBuffer();
-            assertThat("Buffer must hold exactly 32 bytes", buffer.capacity(), is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES));
+            assertThat(
+                    "Buffer must hold exactly 32 bytes",
+                    buffer.capacity(),
+                    is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES));
 
             byte[] openClEndianBytes = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
             buffer.rewind();
@@ -507,26 +483,29 @@ public class ProbeAddressesOpenCLTest {
             // OpenCL provides the bytes in device-specific endianness (could be little-endian or big-endian).
             // BigInteger(byte[]) always expects a Big-Endian (MSB-first) format.
             // Therefore, we convert the device-endian buffer to Big-Endian before creating the BigInteger.
-            EndiannessConverter endiannessConverter = new EndiannessConverter(ByteOrder.LITTLE_ENDIAN, ByteOrder.BIG_ENDIAN, byteBufferUtility);
+            EndiannessConverter endiannessConverter =
+                    new EndiannessConverter(ByteOrder.LITTLE_ENDIAN, ByteOrder.BIG_ENDIAN, byteBufferUtility);
             endiannessConverter.convertEndian(bigEndianBytes);
 
             BigInteger result = new BigInteger(1, bigEndianBytes);
 
             // Validate that the OpenCL buffer correctly represents the original private key
-            assertThat("bigEndianBytes content must match stripped BigInteger encoding", bigEndianBytes, is(equalTo(expectedStripped)));
+            assertThat(
+                    "bigEndianBytes content must match stripped BigInteger encoding",
+                    bigEndianBytes,
+                    is(equalTo(expectedStripped)));
             assertThat("Reconstructed BigInteger must match original private key", result, is(equalTo(privateKey)));
-
-       }
+        }
     }
-    
+
     @ParameterizedTest
     @OpenCLTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_LARGE_PRIVATE_KEYS)
     public void createKeys_fromLargePrivateKey_generatesValidPublicKeys(BigInteger privateKey) throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
-        
+
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
-        
+
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
         producerOpenCL.loopCount = LOOP_COUNT;
@@ -537,7 +516,8 @@ public class ProbeAddressesOpenCLTest {
 
             openClTask.setSrcPrivateKeyChunk(privateKey);
 
-            BigInteger secretBase = keyUtility.killBits(privateKey, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
+            BigInteger secretBase =
+                    keyUtility.killBits(privateKey, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
 
             OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
             PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
@@ -547,16 +527,16 @@ public class ProbeAddressesOpenCLTest {
 
             final boolean souts = false;
             assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
-       }
+        }
     }
-    
+
     @Test
     @OpenCLTest
     public void createKeys_fromRandomPrivateKey_correctlyHashesAndVerifiesResults() throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
-        
+
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
-        
+
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
@@ -566,7 +546,8 @@ public class ProbeAddressesOpenCLTest {
             Random random = new Random(1337);
             BigInteger secretKeyBase = keyUtility.createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, random);
 
-            BigInteger secretBase = keyUtility.killBits(secretKeyBase, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
+            BigInteger secretBase =
+                    keyUtility.killBits(secretKeyBase, bitHelper.getKillBits(producerOpenCL.batchSizeInBits));
 
             OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
             PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
@@ -579,86 +560,109 @@ public class ProbeAddressesOpenCLTest {
             hashPublicKeysFast(publicKeys, souts); // just for performance tests
 
             assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
-       }
-    }
-
-    private static void assertAllRuntimePublicKeyCalculationsValid(PublicKeyBytes[] publicKeys, Logger logger) {
-        for (int i = 0; i < publicKeys.length; i++) {
-            assertRuntimePublicKeyCalculationValid(publicKeys[i], logger);
         }
     }
 
-    private static void assertRuntimePublicKeyCalculationValid(PublicKeyBytes publicKeyBytes, Logger logger) {
-        boolean valid = publicKeyBytes.runtimePublicKeyCalculationCheck(logger);
-        assertThat("runtimePublicKeyCalculationCheck failed for secretKey: " + publicKeyBytes.getSecretKey(), valid, is(true));
+    private static void assertAllRuntimePublicKeyCalculationsValid(PublicKeyBytes[] publicKeys) {
+        for (int i = 0; i < publicKeys.length; i++) {
+            assertRuntimePublicKeyCalculationValid(publicKeys[i]);
+        }
     }
 
-    private static void assertPublicKeyBytesCalculatedCorrect(PublicKeyBytes[] publicKeys, BigInteger secretBase, final boolean souts, KeyUtility keyUtility) {
-        Logger logger = mock(Logger.class);
-        assertAllRuntimePublicKeyCalculationsValid(publicKeys, logger);
-        
+    private static void assertRuntimePublicKeyCalculationValid(PublicKeyBytes publicKeyBytes) {
+        boolean valid = publicKeyBytes.runtimePublicKeyCalculationCheck();
+        assertThat(
+                "runtimePublicKeyCalculationCheck failed for secretKey: " + publicKeyBytes.getSecretKey(),
+                valid,
+                is(true));
+    }
+
+    private static void assertPublicKeyBytesCalculatedCorrect(
+            PublicKeyBytes[] publicKeys, BigInteger secretBase, final boolean souts, KeyUtility keyUtility) {
+        assertAllRuntimePublicKeyCalculationsValid(publicKeys);
+
         for (int i = 0; i < publicKeys.length; i++) {
-            if (i%10_000 == 0) {
-                if(souts) System.out.println("progress: " + i);
+            if (i % 10_000 == 0) {
+                if (souts) System.out.println("progress: " + i);
             }
             BigInteger privateKey = AbstractProducer.calculateSecretKey(secretBase, i);
             byte[] privateKeyAsByteArray = privateKey.toByteArray();
-            
-            if(souts) System.out.println("privateKey: " + Arrays.toString(privateKeyAsByteArray));
-            
+
+            if (souts) System.out.println("privateKey: " + Arrays.toString(privateKeyAsByteArray));
+
             PublicKeyBytes publicKeyBytes = publicKeys[i];
-            
-            ECKey resultOpenCLKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(privateKeyAsByteArray, publicKeyBytes.getCompressed());
-            ECKey resultOpenCLKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(privateKeyAsByteArray, publicKeyBytes.getUncompressed());
+
+            ECKey resultOpenCLKeyCompressed =
+                    ECKey.fromPrivateAndPrecalculatedPublic(privateKeyAsByteArray, publicKeyBytes.getCompressed());
+            ECKey resultOpenCLKeyUncompressed =
+                    ECKey.fromPrivateAndPrecalculatedPublic(privateKeyAsByteArray, publicKeyBytes.getUncompressed());
             byte[] resultOpenCLKeyCompressedPubKey = resultOpenCLKeyCompressed.getPubKey();
             byte[] resultOpenCLKeyCompressedPubKeyHash = resultOpenCLKeyCompressed.getPubKeyHash();
             byte[] resultOpenCLKeyUncompressedPubKey = resultOpenCLKeyUncompressed.getPubKey();
             byte[] resultOpenCLKeyUncompressedPubKeyHash = resultOpenCLKeyUncompressed.getPubKeyHash();
-            
+
             if (souts) {
                 System.out.println("publicKeyBytes.compressed: " + Arrays.toString(publicKeyBytes.getCompressed()));
                 System.out.println("publicKeyBytes.uncompressed: " + Arrays.toString(publicKeyBytes.getUncompressed()));
-                System.out.println("resultOpenCLKeyCompressedPubKey: " + Arrays.toString(resultOpenCLKeyCompressedPubKey));
-                System.out.println("resultOpenCLKeyCompressedPubKeyHash: " + Arrays.toString(resultOpenCLKeyCompressedPubKeyHash));
-                System.out.println("resultOpenCLKeyUncompressedPubKey: " + Arrays.toString(resultOpenCLKeyUncompressedPubKey));
-                System.out.println("resultOpenCLKeyUncompressedPubKeyHash: " + Arrays.toString(resultOpenCLKeyUncompressedPubKeyHash));
+                System.out.println(
+                        "resultOpenCLKeyCompressedPubKey: " + Arrays.toString(resultOpenCLKeyCompressedPubKey));
+                System.out.println(
+                        "resultOpenCLKeyCompressedPubKeyHash: " + Arrays.toString(resultOpenCLKeyCompressedPubKeyHash));
+                System.out.println(
+                        "resultOpenCLKeyUncompressedPubKey: " + Arrays.toString(resultOpenCLKeyUncompressedPubKey));
+                System.out.println("resultOpenCLKeyUncompressedPubKeyHash: "
+                        + Arrays.toString(resultOpenCLKeyUncompressedPubKeyHash));
             }
-            
-            String resultOpenCLKeyCompressedPubKeyHashBase58 = keyUtility.toBase58(resultOpenCLKeyCompressed.getPubKeyHash());
-            String resultOpenCLKeyUncompressedPubKeyHashBase58 = keyUtility.toBase58(resultOpenCLKeyUncompressed.getPubKeyHash());
-            
+
+            String resultOpenCLKeyCompressedPubKeyHashBase58 =
+                    keyUtility.toBase58(resultOpenCLKeyCompressed.getPubKeyHash());
+            String resultOpenCLKeyUncompressedPubKeyHashBase58 =
+                    keyUtility.toBase58(resultOpenCLKeyUncompressed.getPubKeyHash());
+
             if (souts) {
-                System.out.println("resultOpenCLKeyCompressedPubKeyHashBase58: " + resultOpenCLKeyCompressedPubKeyHashBase58);
-                System.out.println("resultOpenCLKeyUncompressedPubKeyHashBase58: " + resultOpenCLKeyUncompressedPubKeyHashBase58);
-                
-                System.out.println("publicKeyBytes.getCompressedKeyHash(): " + Arrays.toString(publicKeyBytes.getCompressedKeyHash()));
-                System.out.println("publicKeyBytes.getUncompressedKeyHash(): " + Arrays.toString(publicKeyBytes.getUncompressedKeyHash()));
-                
-                System.out.println("publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility): " + publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility));
-                System.out.println("publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility): " + publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility));
+                System.out.println(
+                        "resultOpenCLKeyCompressedPubKeyHashBase58: " + resultOpenCLKeyCompressedPubKeyHashBase58);
+                System.out.println(
+                        "resultOpenCLKeyUncompressedPubKeyHashBase58: " + resultOpenCLKeyUncompressedPubKeyHashBase58);
+
+                System.out.println("publicKeyBytes.getCompressedKeyHash(): "
+                        + Arrays.toString(publicKeyBytes.getCompressedKeyHash()));
+                System.out.println("publicKeyBytes.getUncompressedKeyHash(): "
+                        + Arrays.toString(publicKeyBytes.getUncompressedKeyHash()));
+
+                System.out.println("publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility): "
+                        + publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility));
+                System.out.println("publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility): "
+                        + publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility));
             }
             ECKey expectedUncompressedKey = ECKey.fromPrivate(privateKey, false);
             BigInteger expectedPrivateKeyBigInteger = expectedUncompressedKey.getPrivKey();
             ECKey expectedCompressedKey = ECKey.fromPrivate(privateKey, true);
-            
+
             byte[] expectedCompressedPublicKeyBytes = expectedCompressedKey.getPubKey();
             byte[] expectedUncompressedPublicKeyBytes = expectedUncompressedKey.getPubKey();
 
             if (souts) {
                 System.out.println("expectedPrivateKeyBigInteger: " + expectedPrivateKeyBigInteger);
-                System.out.println("expectedCompressedPublicKeyBytes: " + Arrays.toString(expectedCompressedPublicKeyBytes));
-                System.out.println("expectedUncompressedPublicKeyBytes: " + Arrays.toString(expectedUncompressedPublicKeyBytes));
+                System.out.println(
+                        "expectedCompressedPublicKeyBytes: " + Arrays.toString(expectedCompressedPublicKeyBytes));
+                System.out.println(
+                        "expectedUncompressedPublicKeyBytes: " + Arrays.toString(expectedUncompressedPublicKeyBytes));
             }
-            
+
             String expectedCompressedPublicKeyHashBase58 = keyUtility.toBase58(expectedCompressedKey.getPubKeyHash());
-            String expectedUncompressedPublicKeyHashBase58 = keyUtility.toBase58(expectedUncompressedKey.getPubKeyHash());
-            
+            String expectedUncompressedPublicKeyHashBase58 =
+                    keyUtility.toBase58(expectedUncompressedKey.getPubKeyHash());
+
             assertThat(resultOpenCLKeyCompressedPubKey, is(equalTo(expectedCompressedPublicKeyBytes)));
             assertThat(resultOpenCLKeyUncompressedPubKey, is(equalTo(expectedUncompressedPublicKeyBytes)));
 
-            assertThat(publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility), is(equalTo(expectedCompressedPublicKeyHashBase58)));
-            assertThat(publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility), is(equalTo(expectedUncompressedPublicKeyHashBase58)));
-            
+            assertThat(
+                    publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility),
+                    is(equalTo(expectedCompressedPublicKeyHashBase58)));
+            assertThat(
+                    publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility),
+                    is(equalTo(expectedUncompressedPublicKeyHashBase58)));
         }
     }
 
@@ -668,12 +672,16 @@ public class ProbeAddressesOpenCLTest {
         for (int i = 0; i < publicKeys.length; i++) {
             byte[] compressedKeyHashFast = publicKeys[i].getCompressedKeyHash();
             byte[] uncompressedKeyHashFast = publicKeys[i].getUncompressedKeyHash();
-            
-            //assertThat(compressedKeyHash, is(equalTo(compressedKeyHashFast)));
-            //assertThat(uncompressedKeyHash, is(equalTo(uncompressedKeyHashFast)));
-            
-            if (souts) System.out.println("publicKeys["+i+"].compressedKeyHashFast: " + Arrays.toString(compressedKeyHashFast));
-            if (souts) System.out.println("publicKeys["+i+"].uncompressedKeyHashFast: " + Arrays.toString(uncompressedKeyHashFast));
+
+            // assertThat(compressedKeyHash, is(equalTo(compressedKeyHashFast)));
+            // assertThat(uncompressedKeyHash, is(equalTo(uncompressedKeyHashFast)));
+
+            if (souts)
+                System.out.println(
+                        "publicKeys[" + i + "].compressedKeyHashFast: " + Arrays.toString(compressedKeyHashFast));
+            if (souts)
+                System.out.println(
+                        "publicKeys[" + i + "].uncompressedKeyHashFast: " + Arrays.toString(uncompressedKeyHashFast));
         }
         long afterHash = System.currentTimeMillis();
         if (souts) System.out.println("... hashed fast in: " + (afterHash - beforeHash) + "ms");
@@ -685,17 +693,20 @@ public class ProbeAddressesOpenCLTest {
         for (int i = 0; i < publicKeys.length; i++) {
             byte[] compressedKeyHash = publicKeys[i].getCompressedKeyHash();
             byte[] uncompressedKeyHash = publicKeys[i].getUncompressedKeyHash();
-            
-            //assertThat(compressedKeyHash, is(equalTo(compressedKeyHashFast)));
-            //assertThat(uncompressedKeyHash, is(equalTo(uncompressedKeyHashFast)));
-            
-            if (souts) System.out.println("publicKeys["+i+"].compressedKeyHash: " + Arrays.toString(compressedKeyHash));
-            if (souts) System.out.println("publicKeys["+i+"].uncompressedKeyHash: " + Arrays.toString(uncompressedKeyHash));
+
+            // assertThat(compressedKeyHash, is(equalTo(compressedKeyHashFast)));
+            // assertThat(uncompressedKeyHash, is(equalTo(uncompressedKeyHashFast)));
+
+            if (souts)
+                System.out.println("publicKeys[" + i + "].compressedKeyHash: " + Arrays.toString(compressedKeyHash));
+            if (souts)
+                System.out.println(
+                        "publicKeys[" + i + "].uncompressedKeyHash: " + Arrays.toString(uncompressedKeyHash));
         }
         long afterHash = System.currentTimeMillis();
         if (souts) System.out.println("... hashed in: " + (afterHash - beforeHash) + "ms");
     }
-    
+
     /**
      * Read the inner bytes in reverse order. Remove padding bytes to return a clean byte array. Only for x with padding
      */
@@ -707,35 +718,34 @@ public class ProbeAddressesOpenCLTest {
         // its not inverted because the memory was written in OpenCL
         int offset = publicKeyByteLength * keyOffset;
         outer:
-        for (int i=0; i<PublicKeyBytes.SEC_PUBLIC_KEY_COMPRESSED_WORDS; i++) {
-            int x = i*PublicKeyBytes.U32_NUM_BYTES;
+        for (int i = 0; i < PublicKeyBytes.SEC_PUBLIC_KEY_COMPRESSED_WORDS; i++) {
+            int x = i * PublicKeyBytes.U32_NUM_BYTES;
             for (int j = 0; j < PublicKeyBytes.U32_NUM_BYTES; j++) {
-                int publicKeyOffset = x+j;
+                int publicKeyOffset = x + j;
                 if (publicKeyOffset == publicKey.length) {
                     // return the public key, read of all bytes finish
                     break outer;
                 }
-                int y = PublicKeyBytes.U32_NUM_BYTES-j-1;
-                int byteBufferOffset = offset+x+y;
+                int y = PublicKeyBytes.U32_NUM_BYTES - j - 1;
+                int byteBufferOffset = offset + x + y;
                 publicKey[publicKeyOffset] = b.get(byteBufferOffset);
             }
         }
         return publicKey;
     }
-    
+
     @Deprecated
     private static void dumpIntArray(String name, int[] intArray) {
         for (int i = 0; i < intArray.length; i++) {
-            System.out.println(name + "["+i+"]: " + Integer.toHexString(intArray[i]));
+            System.out.println(name + "[" + i + "]: " + Integer.toHexString(intArray[i]));
         }
     }
-    
+
     /**
      * from https://java-browser.yawk.at/org.bouncycastle/bcprov-jdk15/1.46/org/bouncycastle/math/ec/WNafMultiplier.java
      */
     @Deprecated
-    private static byte[] windowNaf(byte width, BigInteger k)
-    {
+    private static byte[] windowNaf(byte width, BigInteger k) {
         // The window NAF is at most 1 element longer than the binary
         // representation of the integer k. byte can be used instead of short or
         // int unless the window width is larger than 8. For larger width use
@@ -745,7 +755,7 @@ public class ProbeAddressesOpenCLTest {
         byte[] wnaf = new byte[k.bitLength() + 1];
 
         // 2^width as short and BigInteger
-        short pow2wB = (short)(1 << width);
+        short pow2wB = (short) (1 << width);
         BigInteger pow2wBI = BigInteger.valueOf(pow2wB);
 
         int i = 0;
@@ -754,30 +764,23 @@ public class ProbeAddressesOpenCLTest {
         int length = 0;
 
         // while k >= 1
-        while (k.signum() > 0)
-        {
+        while (k.signum() > 0) {
             // if k is odd
-            if (k.testBit(0))
-            {
+            if (k.testBit(0)) {
                 // k mod 2^width
                 BigInteger remainder = k.mod(pow2wBI);
 
                 // if remainder > 2^(width - 1) - 1
-                if (remainder.testBit(width - 1))
-                {
-                    wnaf[i] = (byte)(remainder.intValue() - pow2wB);
-                }
-                else
-                {
-                    wnaf[i] = (byte)remainder.intValue();
+                if (remainder.testBit(width - 1)) {
+                    wnaf[i] = (byte) (remainder.intValue() - pow2wB);
+                } else {
+                    wnaf[i] = (byte) remainder.intValue();
                 }
                 // wnaf[i] is now in [-2^(width-1), 2^(width-1)-1]
 
                 k = k.subtract(BigInteger.valueOf(wnaf[i]));
                 length = i;
-            }
-            else
-            {
+            } else {
                 wnaf[i] = 0;
             }
 
@@ -793,5 +796,4 @@ public class ProbeAddressesOpenCLTest {
         System.arraycopy(wnaf, 0, wnafShort, 0, length);
         return wnafShort;
     }
-
 }

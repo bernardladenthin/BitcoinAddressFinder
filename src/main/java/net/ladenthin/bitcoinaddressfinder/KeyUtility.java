@@ -3,37 +3,52 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
-import static net.ladenthin.bitcoinaddressfinder.PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import org.bitcoinj.base.LegacyAddress;
 import org.bitcoinj.base.Network;
-
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.MnemonicCode;
-import org.bitcoinj.crypto.MnemonicException;
 import org.bouncycastle.util.encoders.Hex;
 import org.jspecify.annotations.NonNull;
 
 /**
- * https://stackoverflow.com/questions/5399798/byte-array-and-int-conversion-in-java/11419863
- * https://stackoverflow.com/questions/21087651/how-to-efficiently-change-endianess-of-byte-array-in-java
- * https://stackoverflow.com/questions/7619058/convert-a-byte-array-to-integer-in-java-and-vice-versa
+ * Cryptographic helpers for the {@link Network} (address derivation, key conversion).
+ *
+ * <p>References:
+ * <ul>
+ *   <li>https://stackoverflow.com/questions/5399798/byte-array-and-int-conversion-in-java/11419863</li>
+ *   <li>https://stackoverflow.com/questions/21087651/how-to-efficiently-change-endianess-of-byte-array-in-java</li>
+ *   <li>https://stackoverflow.com/questions/7619058/convert-a-byte-array-to-integer-in-java-and-vice-versa</li>
+ * </ul>
+ *
+ * @param network           the Bitcoin/altcoin network used for address derivation
+ * @param byteBufferUtility helper for {@link ByteBuffer} conversions
  */
 public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility byteBufferUtility) {
 
+    /**
+     * Clears the bits set in {@code killBits} from {@code bigInteger}.
+     *
+     * @param bigInteger the source value
+     * @param killBits   the bit mask of bits to clear
+     * @return {@code bigInteger AND NOT killBits}
+     */
     public BigInteger killBits(BigInteger bigInteger, BigInteger killBits) {
         return bigInteger.andNot(killBits);
     }
 
-
     /**
-     * Require networkParameters.
+     * Decodes a Base58 address and returns its hash160 as a {@link ByteBuffer}.
+     * <p>Requires {@code networkParameters}.
+     *
+     * @param base58 the Base58-encoded address
+     * @return the hash160 wrapped in a {@link ByteBuffer}
      */
     public ByteBuffer getHash160ByteBufferFromBase58String(String base58) {
         LegacyAddress address = LegacyAddress.fromBase58(base58, network);
@@ -41,21 +56,46 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
         return byteBufferUtility.byteArrayToByteBuffer(hash160);
     }
 
+    /**
+     * Encodes a hash160 as a Base58 legacy address.
+     *
+     * @param hash160 the 20-byte address hash
+     * @return the Base58-encoded legacy address
+     */
     public String toBase58(byte[] hash160) {
         LegacyAddress address = LegacyAddress.fromPubKeyHash(network, hash160);
         return address.toBase58();
     }
 
+    /**
+     * Draws a non-negative random {@link BigInteger} of up to {@code maximumBitLength} bits.
+     *
+     * @param maximumBitLength the maximum bit length of the resulting secret
+     * @param random           the random number generator
+     * @return a random secret
+     */
     public BigInteger createSecret(int maximumBitLength, Random random) {
-        BigInteger secret = new BigInteger(maximumBitLength, random);
-        return secret;
+        return new BigInteger(maximumBitLength, random);
     }
 
+    /**
+     * Creates an {@link ECKey} from a private-key {@link BigInteger}.
+     *
+     * @param bi         the private-key value
+     * @param compressed whether to use the compressed public-key representation
+     * @return the constructed {@link ECKey}
+     */
     public ECKey createECKey(BigInteger bi, boolean compressed) {
         return ECKey.fromPrivate(bi, compressed);
     }
 
-    public String createKeyDetails(ECKey key) throws MnemonicException.MnemonicLengthException {
+    /**
+     * Builds a verbose, single-line description of all relevant key fields, including BIP39 mnemonics.
+     *
+     * @param key the key to describe
+     * @return the formatted log line
+     */
+    public String createKeyDetails(ECKey key) {
         BigInteger privateKeyBigInteger = key.getPrivKey();
         byte[] privateKeyBytes = key.getPrivKeyBytes();
         String privateKeyHex = key.getPrivateKeyAsHex();
@@ -76,16 +116,38 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
         String logMnemonic = createMnemonics(privateKeyBytes);
 
         String space = " ";
-        return logprivateKeyBigInteger + space + logprivateKeyBytes + space + logprivateKeyHex + space + logWiF + space + logPublicKeyAsHex + space + logPublicKeyHash160 + space + logPublicKeyHash160Base58 + space + logCompressed + space + logMnemonic;
+        return logprivateKeyBigInteger
+                + space
+                + logprivateKeyBytes
+                + space
+                + logprivateKeyHex
+                + space
+                + logWiF
+                + space
+                + logPublicKeyAsHex
+                + space
+                + logPublicKeyHash160
+                + space
+                + logPublicKeyHash160Base58
+                + space
+                + logCompressed
+                + space
+                + logMnemonic;
     }
 
+    /**
+     * Generates BIP39 mnemonics from the given private-key bytes for every supported wordlist.
+     *
+     * @param privateKeyBytes the raw private-key bytes
+     * @return a string containing the mnemonic for each {@link BIP39Wordlist}
+     */
     public String createMnemonics(byte[] privateKeyBytes) {
         StringBuilder logMnemonic = new StringBuilder("Mnemonic:");
         for (BIP39Wordlist wordList : BIP39Wordlist.values()) {
             try {
                 MnemonicCode mnemonicCode = new MnemonicCode(wordList.getWordListStream(), null);
                 List<String> mnemonics = mnemonicCode.toMnemonic(privateKeyBytes);
-                logMnemonic.append(" ");
+                logMnemonic.append(' ');
                 logMnemonic.append(wordList.name());
                 logMnemonic.append(": [");
                 boolean first = true;
@@ -96,7 +158,7 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
                     logMnemonic.append(mnemonic);
                     first = false;
                 }
-                logMnemonic.append("]");
+                logMnemonic.append(']');
             } catch (IOException | IllegalArgumentException ex) {
                 throw new RuntimeException(ex);
             }
@@ -105,20 +167,41 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
     }
 
     // <editor-fold defaultstate="collapsed" desc="ByteBuffer LegacyAddress conversion">
+    /**
+     * Converts a {@link LegacyAddress} into a {@link ByteBuffer} containing its hash160.
+     *
+     * @param address the legacy address
+     * @return a buffer with the address' hash160
+     */
     public ByteBuffer addressToByteBuffer(LegacyAddress address) {
-        ByteBuffer byteBuffer = byteBufferUtility.byteArrayToByteBuffer(address.getHash());
-        return byteBuffer;
+        return byteBufferUtility.byteArrayToByteBuffer(address.getHash());
     }
 
     /**
-     * Require networkParameters.
+     * Reads a hash160 from {@code byteBuffer} and constructs a {@link LegacyAddress}.
+     * <p>Requires {@code networkParameters}.
+     *
+     * @param byteBuffer the buffer containing the hash160
+     * @return the reconstructed legacy address
      */
     public LegacyAddress byteBufferToAddress(ByteBuffer byteBuffer) {
         return LegacyAddress.fromPubKeyHash(network, byteBufferUtility.byteBufferToBytes(byteBuffer));
     }
     // </editor-fold>
 
-    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly, int privateKeyMaxNumBits, SecretSupplier supplier) throws NoMoreSecretsAvailableException {
+    /**
+     * Creates a batch of secrets via the given {@link SecretSupplier}.
+     *
+     * @param overallWorkSize        the requested number of secrets
+     * @param returnStartSecretOnly  if {@code true} only one secret is generated
+     * @param privateKeyMaxNumBits   maximum bit length of each secret
+     * @param supplier               the supplier providing concrete secrets
+     * @return the generated secrets
+     * @throws NoMoreSecretsAvailableException if the supplier cannot satisfy the request
+     */
+    public BigInteger[] createSecrets(
+            int overallWorkSize, boolean returnStartSecretOnly, int privateKeyMaxNumBits, SecretSupplier supplier)
+            throws NoMoreSecretsAvailableException {
         int length = returnStartSecretOnly ? 1 : overallWorkSize;
         BigInteger[] secrets = new BigInteger[length];
         for (int i = 0; i < secrets.length; i++) {

@@ -29,6 +29,16 @@ hs_err_pid*
 /target/
 /bin/
 
+# jcstress / jqwik test outputs (generated in repo root)
+/.jqwik-database
+/jcstress-results-*.bin.gz
+/results/
+
+# Test-run artefacts produced by ConsumerJavaTest's roundtrip path
+# (the rest of src/test/resources/testRoundtrip/ holds checked-in fixtures)
+/src/test/resources/testRoundtrip/export.txt
+/src/test/resources/testRoundtrip/lmdb/
+
 # IDEA files
 /.idea/
 *.iml

@@ -3,64 +3,67 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 
+import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.COMMA;
+import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.SEMICOLON;
+import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.TAB_SPLIT;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.SeparatorFormat;
-import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.COMMA;
-import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.SEMICOLON;
-import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.TAB_SPLIT;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2WPKH;
-import java.nio.file.Path;
 import org.bitcoinj.base.Coin;
 
 public class TestAddressesFiles implements AddressesFiles {
 
-    public final static Set<String> compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount = new HashSet<>();
-    public final static Set<String> uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount = new HashSet<>();
-    public final static Set<String> compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount = new HashSet<>();
-    public final static Set<String> uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount = new HashSet<>();
-    
-    public final static Set<String> compressedTestAddressesAsFixedWidthBase58BitcoinAddress = new HashSet<>();
-    public final static Set<String> uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress = new HashSet<>();
-    public final static Set<String> compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress = new HashSet<>();
-    public final static Set<String> uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress = new HashSet<>();
-    
-    public final static Set<String> compressedTestAddressesAsHexHash = new HashSet<>();
-    public final static Set<String> uncompressedTestAddressesAsHexHash = new HashSet<>();
-    public final static Set<String> compressedTestAddressesWithStaticAmountAsHexHash = new HashSet<>();
-    public final static Set<String> uncompressedTestAddressesWithStaticAmountAsHexHash = new HashSet<>();
+    public static final Set<String> compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount =
+            new HashSet<>();
+    public static final Set<String> uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount =
+            new HashSet<>();
+    public static final Set<String>
+            compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount = new HashSet<>();
+    public static final Set<String>
+            uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount = new HashSet<>();
 
-    private final static String ADDRESS_FILE_ONE = "addressesOne.txt";
-    private final static String ADDRESS_FILE_TWO = "addressesTwo.txt";
-    private final static String ADDRESS_FILE_THREE = "addressesThree.txt";
-    public final static int NUMBER_OF_ADRESSES = 5;
+    public static final Set<String> compressedTestAddressesAsFixedWidthBase58BitcoinAddress = new HashSet<>();
+    public static final Set<String> uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress = new HashSet<>();
+    public static final Set<String> compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress =
+            new HashSet<>();
+    public static final Set<String> uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress =
+            new HashSet<>();
+
+    public static final Set<String> compressedTestAddressesAsHexHash = new HashSet<>();
+    public static final Set<String> uncompressedTestAddressesAsHexHash = new HashSet<>();
+    public static final Set<String> compressedTestAddressesWithStaticAmountAsHexHash = new HashSet<>();
+    public static final Set<String> uncompressedTestAddressesWithStaticAmountAsHexHash = new HashSet<>();
+
+    private static final String ADDRESS_FILE_ONE = "addressesOne.txt";
+    private static final String ADDRESS_FILE_TWO = "addressesTwo.txt";
+    private static final String ADDRESS_FILE_THREE = "addressesThree.txt";
+    public static final int NUMBER_OF_ADRESSES = 5;
 
     public static final Coin amountFirstAddress = Coin.FIFTY_COINS;
     public static final Coin amountOtherAddresses = Coin.SATOSHI;
-    
+
     public static final String AMOUNT_FIRST_ADDRESS_AS_STRING = "5000000000";
     public static final String AMOUNT_OTHER_ADDRESSES_AS_STRING = "1";
-    
+
     public static final String STATIC_EMPTY_AMOUNT_AS_STRING = "0";
 
-    public final static Coin[] AMOUNTS = {
-        amountFirstAddress,
-        amountOtherAddresses,
-        amountOtherAddresses,
-        amountOtherAddresses,
-        amountOtherAddresses
+    public static final Coin[] AMOUNTS = {
+        amountFirstAddress, amountOtherAddresses, amountOtherAddresses, amountOtherAddresses, amountOtherAddresses
     };
 
     private final TestAddresses42 testAddresses;
-    
+
     private static final String COMMA_SEPARATOR = SeparatorFormat.COMMA.getSymbol();
     private static final List<String> NO_AMOUNTS = List.of();
-    
+
     /**
      * A 20-byte test address (hash160) that is guaranteed not to exist in the generated test datasets.
      * <p>
@@ -74,113 +77,99 @@ public class TestAddressesFiles implements AddressesFiles {
      * Note: This address does not collide with any hash160 values in {@link TestAddresses42}.
      */
     public static final byte[] NON_EXISTING_ADDRESS = {
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
-        11, 12, 13, 14, 15, 16, 17, 18, 19, PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES
     };
-    
+
     public TestAddressesFiles(boolean compressed) {
         testAddresses = new TestAddresses42(NUMBER_OF_ADRESSES, compressed);
 
         TestAddresses42 uc = new TestAddresses42(NUMBER_OF_ADRESSES, false);
         TestAddresses42 co = new TestAddresses42(NUMBER_OF_ADRESSES, true);
-        
+
         final String witnessProgramAsBase58 = P2WPKH.BitcoinP2WPKH.getWitnessProgramAsBase58();
         final String witnessProgramAsHex = P2WPKH.BitcoinP2WPKH.getWitnessProgramAsHex();
 
         // DynamicWidthBase58BitcoinAddressWithAmount
         addFormattedAddresses(
-            uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount,
-            uc::getIndexAsBase58String,
-            () -> witnessProgramAsBase58,
-            List.of(AMOUNT_FIRST_ADDRESS_AS_STRING, AMOUNT_OTHER_ADDRESSES_AS_STRING)
-        );
+                uncompressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount,
+                uc::getIndexAsBase58String,
+                () -> witnessProgramAsBase58,
+                List.of(AMOUNT_FIRST_ADDRESS_AS_STRING, AMOUNT_OTHER_ADDRESSES_AS_STRING));
 
         addFormattedAddresses(
-            compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount,
-            co::getIndexAsBase58String,
-            () -> witnessProgramAsBase58,
-            List.of(AMOUNT_FIRST_ADDRESS_AS_STRING, AMOUNT_OTHER_ADDRESSES_AS_STRING)
-        );
+                compressedTestAddressesAsDynamicWidthBase58BitcoinAddressWithAmount,
+                co::getIndexAsBase58String,
+                () -> witnessProgramAsBase58,
+                List.of(AMOUNT_FIRST_ADDRESS_AS_STRING, AMOUNT_OTHER_ADDRESSES_AS_STRING));
 
         addFormattedAddresses(
-            uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount,
-            uc::getIndexAsBase58String,
-            () -> witnessProgramAsBase58,
-            List.of(STATIC_EMPTY_AMOUNT_AS_STRING)
-        );
+                uncompressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount,
+                uc::getIndexAsBase58String,
+                () -> witnessProgramAsBase58,
+                List.of(STATIC_EMPTY_AMOUNT_AS_STRING));
 
         addFormattedAddresses(
-            compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount,
-            co::getIndexAsBase58String,
-            () -> witnessProgramAsBase58,
-            List.of(STATIC_EMPTY_AMOUNT_AS_STRING)
-        );
+                compressedTestAddressesWithStaticAmountAsDynamicWidthBase58BitcoinAddressWithAmount,
+                co::getIndexAsBase58String,
+                () -> witnessProgramAsBase58,
+                List.of(STATIC_EMPTY_AMOUNT_AS_STRING));
 
         // FixedWidthBase58BitcoinAddress (no amounts)
         addFormattedAddresses(
-            uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress,
-            uc::getIndexAsBase58String,
-            () -> witnessProgramAsBase58,
-            NO_AMOUNTS
-        );
+                uncompressedTestAddressesAsFixedWidthBase58BitcoinAddress,
+                uc::getIndexAsBase58String,
+                () -> witnessProgramAsBase58,
+                NO_AMOUNTS);
 
         addFormattedAddresses(
-            compressedTestAddressesAsFixedWidthBase58BitcoinAddress,
-            co::getIndexAsBase58String,
-            () -> witnessProgramAsBase58,
-            NO_AMOUNTS
-        );
+                compressedTestAddressesAsFixedWidthBase58BitcoinAddress,
+                co::getIndexAsBase58String,
+                () -> witnessProgramAsBase58,
+                NO_AMOUNTS);
 
         addFormattedAddresses(
-            uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress,
-            uc::getIndexAsBase58String,
-            () -> witnessProgramAsBase58,
-            NO_AMOUNTS
-        );
+                uncompressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress,
+                uc::getIndexAsBase58String,
+                () -> witnessProgramAsBase58,
+                NO_AMOUNTS);
 
         addFormattedAddresses(
-            compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress,
-            co::getIndexAsBase58String,
-            () -> witnessProgramAsBase58,
-            NO_AMOUNTS
-        );
+                compressedTestAddressesWithStaticAmountAsFixedWidthBase58BitcoinAddress,
+                co::getIndexAsBase58String,
+                () -> witnessProgramAsBase58,
+                NO_AMOUNTS);
 
         // HexHash (no amounts)
         addFormattedAddresses(
-            uncompressedTestAddressesAsHexHash,
-            uc::getIndexAsHash160HexEncoded,
-            () -> witnessProgramAsHex,
-            NO_AMOUNTS
-        );
+                uncompressedTestAddressesAsHexHash,
+                uc::getIndexAsHash160HexEncoded,
+                () -> witnessProgramAsHex,
+                NO_AMOUNTS);
 
         addFormattedAddresses(
-            compressedTestAddressesAsHexHash,
-            co::getIndexAsHash160HexEncoded,
-            () -> witnessProgramAsHex,
-            NO_AMOUNTS
-        );
+                compressedTestAddressesAsHexHash,
+                co::getIndexAsHash160HexEncoded,
+                () -> witnessProgramAsHex,
+                NO_AMOUNTS);
 
         addFormattedAddresses(
-            uncompressedTestAddressesWithStaticAmountAsHexHash,
-            uc::getIndexAsHash160HexEncoded,
-            () -> witnessProgramAsHex,
-            NO_AMOUNTS
-        );
+                uncompressedTestAddressesWithStaticAmountAsHexHash,
+                uc::getIndexAsHash160HexEncoded,
+                () -> witnessProgramAsHex,
+                NO_AMOUNTS);
 
         addFormattedAddresses(
-            compressedTestAddressesWithStaticAmountAsHexHash,
-            co::getIndexAsHash160HexEncoded,
-            () -> witnessProgramAsHex,
-            NO_AMOUNTS
-        );
+                compressedTestAddressesWithStaticAmountAsHexHash,
+                co::getIndexAsHash160HexEncoded,
+                () -> witnessProgramAsHex,
+                NO_AMOUNTS);
     }
 
     private void addFormattedAddresses(
-        Set<String> targetSet,
-        Function<Integer, String> addressGenerator,
-        Supplier<String> staticAddressSupplier,
-        List<String> amounts
-    ) {
+            Set<String> targetSet,
+            Function<Integer, String> addressGenerator,
+            Supplier<String> staticAddressSupplier,
+            List<String> amounts) {
         boolean includeAmounts = !amounts.isEmpty();
         String fallbackAmount = includeAmounts ? amounts.getLast() : null;
 
@@ -195,10 +184,7 @@ public class TestAddressesFiles implements AddressesFiles {
         }
 
         String staticAddress = staticAddressSupplier.get();
-        targetSet.add(includeAmounts
-            ? staticAddress + COMMA_SEPARATOR + fallbackAmount
-            : staticAddress
-        );
+        targetSet.add(includeAmounts ? staticAddress + COMMA_SEPARATOR + fallbackAmount : staticAddress);
     }
 
     @Override
@@ -207,17 +193,16 @@ public class TestAddressesFiles implements AddressesFiles {
         File two = Files.createFile(folder.resolve(ADDRESS_FILE_TWO)).toFile();
         File three = Files.createFile(folder.resolve(ADDRESS_FILE_THREE)).toFile();
 
-        Files.write(one.toPath(), Arrays.asList(
-                testAddresses.getIndexAsBase58String(0) + COMMA.getSymbol() + amountFirstAddress,
-                testAddresses.getIndexAsBase58String(1) + TAB_SPLIT.getSymbol() + amountOtherAddresses,
-                testAddresses.getIndexAsBase58String(2) + SEMICOLON.getSymbol() + "1"
-        ));
-        Files.write(two.toPath(), Collections.singletonList(
-                testAddresses.getIndexAsBase58String(3)
-        ));
-        
+        Files.write(
+                one.toPath(),
+                Arrays.asList(
+                        testAddresses.getIndexAsBase58String(0) + COMMA.getSymbol() + amountFirstAddress,
+                        testAddresses.getIndexAsBase58String(1) + TAB_SPLIT.getSymbol() + amountOtherAddresses,
+                        testAddresses.getIndexAsBase58String(2) + SEMICOLON.getSymbol() + "1"));
+        Files.write(two.toPath(), Collections.singletonList(testAddresses.getIndexAsBase58String(3)));
+
         List<String> listThree = new ArrayList<>();
-        
+
         {
             listThree.add("# Test");
             listThree.add("1WrOngAddressFormat");
@@ -228,9 +213,9 @@ public class TestAddressesFiles implements AddressesFiles {
                 // secret : 1
                 listThree.add("1EHNa6Q4Jz2uvNExL497mE43ikXhwF6kZm");
                 listThree.add("1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH");
-            }   
+            }
         }
-        
+
         Files.write(three.toPath(), listThree);
         List<String> addresses = new ArrayList<>();
         addresses.add(one.getAbsolutePath());
@@ -241,7 +226,6 @@ public class TestAddressesFiles implements AddressesFiles {
 
     @Override
     public TestAddresses getTestAddresses() {
-        return testAddresses; 
+        return testAddresses;
     }
-
 }

@@ -5,21 +5,36 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.InputStream;
 
+/**
+ * Enumerates the official BIP39 wordlists shipped with the project.
+ */
 public enum BIP39Wordlist {
-    
+
+    /** Simplified Chinese BIP39 wordlist. */
     CHINESE_SIMPLIFIED("chinese_simplified.txt"),
+    /** Traditional Chinese BIP39 wordlist. */
     CHINESE_TRADITIONAL("chinese_traditional.txt"),
+    /** Czech BIP39 wordlist. */
     CZECH("czech.txt"),
+    /** English BIP39 wordlist. */
     ENGLISH("english.txt"),
+    /** French BIP39 wordlist. */
     FRENCH("french.txt"),
+    /** Italian BIP39 wordlist. */
     ITALIAN("italian.txt"),
+    /** Japanese BIP39 wordlist. */
     JAPANESE("japanese.txt"),
+    /** Korean BIP39 wordlist. */
     KOREAN("korean.txt"),
+    /** Portuguese BIP39 wordlist. */
     PORTUGUESE("portuguese.txt"),
+    /** Russian BIP39 wordlist. */
     RUSSIAN("russian.txt"),
+    /** Spanish BIP39 wordlist. */
     SPANISH("spanish.txt"),
+    /** Turkish BIP39 wordlist. */
     TURKISH("turkish.txt");
-    
+
     /**
      * Unicode character for an ideographic space (U+3000), used in East Asian languages such as Japanese.
      * This space is wider than a standard space and is required for correct formatting of Japanese mnemonics.
@@ -31,15 +46,15 @@ public enum BIP39Wordlist {
      * Used as the default separator between words in most BIP39 wordlists, such as English.
      */
     public static final String NORMAL_SPACE = " ";
-    
+
     /**
-    * The name of the wordlist file associated with this BIP39 language.
-    * <p>
-    * This filename is used to locate the corresponding wordlist resource file in the
-    * {@code /mnemonic/wordlist/} directory of the classpath (e.g., {@code english.txt}).
-    */
+     * The name of the wordlist file associated with this BIP39 language.
+     * <p>
+     * This filename is used to locate the corresponding wordlist resource file in the
+     * {@code /mnemonic/wordlist/} directory of the classpath (e.g., {@code english.txt}).
+     */
     private final String fileName;
-    
+
     /**
      * Constructs a BIP39 wordlist enum constant with the associated filename.
      *
@@ -51,22 +66,22 @@ public enum BIP39Wordlist {
     }
 
     /**
-    * Loads the BIP39 wordlist file as an {@link InputStream} for this language.
-    * <p>
-    * The wordlist file is expected to be located in the resource path:
-    * {@code /mnemonic/wordlist/{fileName}}, where {@code fileName} corresponds
-    * to the file name associated with the enum constant (e.g. {@code english.txt}).
-    * <p>
-    * This method is used to initialize a {@link org.bitcoinj.crypto.MnemonicCode} instance with the correct
-    * wordlist for a given language.
-    *
-    * @return the input stream of the wordlist file for this language, or {@code null}
-    *         if the resource is not found.
-    */
+     * Loads the BIP39 wordlist file as an {@link InputStream} for this language.
+     * <p>
+     * The wordlist file is expected to be located in the resource path:
+     * {@code /mnemonic/wordlist/{fileName}}, where {@code fileName} corresponds
+     * to the file name associated with the enum constant (e.g. {@code english.txt}).
+     * <p>
+     * This method is used to initialize a {@link org.bitcoinj.crypto.MnemonicCode} instance with the correct
+     * wordlist for a given language.
+     *
+     * @return the input stream of the wordlist file for this language, or {@code null}
+     *         if the resource is not found.
+     */
     public InputStream getWordListStream() {
         return BIP39Wordlist.class.getResourceAsStream("/mnemonic/wordlist/" + fileName);
     }
-    
+
     /**
      * Converts a filename-like language name into the corresponding {@link BIP39Wordlist} enum constant.
      * <p>
@@ -91,15 +106,15 @@ public enum BIP39Wordlist {
     public static BIP39Wordlist fromLanguageName(String name) {
         return valueOf(name.toUpperCase().replace('-', '_'));
     }
-    
+
     /**
-    * Returns the word separator used in the mnemonic phrase for the given language.
-    * <p>
-    * Most languages use a single space (" ") as the separator between words.
-    * However, Japanese uses the IDEOGRAPHIC SPACE (U+3000) to conform with the official BIP39 specification.
-    *
-    * @return the word separator specific to the language
-    */
+     * Returns the word separator used in the mnemonic phrase for the given language.
+     * <p>
+     * Most languages use a single space (" ") as the separator between words.
+     * However, Japanese uses the IDEOGRAPHIC SPACE (U+3000) to conform with the official BIP39 specification.
+     *
+     * @return the word separator specific to the language
+     */
     public String getSeparator() {
         if (this == JAPANESE) {
             return IDEOGRAPHIC_SPACE;

@@ -16,6 +16,9 @@ import org.jspecify.annotations.NonNull;
  */
 public class PrivateKeyValidator {
 
+    /** Creates a new {@link PrivateKeyValidator}. */
+    public PrivateKeyValidator() {}
+
     /**
      * Calculates the maximum allowed private key value that can safely be used as a base
      * for grid-based key generation without exceeding the secp256k1 private key limit.
@@ -31,14 +34,16 @@ public class PrivateKeyValidator {
      */
     public BigInteger getMaxPrivateKeyForBatchSize(int batchSizeInBits) {
         if (batchSizeInBits < 0 || batchSizeInBits > PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS) {
-            throw new IllegalArgumentException("batchSizeInBits must be between 0 and " + PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS);
+            throw new IllegalArgumentException(
+                    "batchSizeInBits must be between 0 and " + PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS);
         }
 
         // 2^batchSizeInBits represents the maximum offset (grid size)
         BigInteger maxOffset = BigInteger.ONE.shiftLeft(batchSizeInBits);
 
         // Subtract maxOffset - 1 to ensure that baseKey + (2^bits - 1) ≤ MAX_PRIVATE_KEY
-        BigInteger maxSafeKey = PublicKeyBytes.MAX_PRIVATE_KEY.subtract(maxOffset).add(BigInteger.ONE);
+        BigInteger maxSafeKey =
+                PublicKeyBytes.MAX_PRIVATE_KEY.subtract(maxOffset).add(BigInteger.ONE);
 
         if (maxSafeKey.signum() < 0) {
             throw new IllegalStateException("batchSizeInBits too large; no valid private keys remain.");
@@ -54,7 +59,8 @@ public class PrivateKeyValidator {
      * @param maxPrivateKeyForBatchSize the maximum allowed value for the batch size
      * @return true if the key exceeds the maximum; false otherwise
      */
-    public boolean isInvalidWithBatchSize(@NonNull BigInteger privateKeyBase, @NonNull BigInteger maxPrivateKeyForBatchSize) {
+    public boolean isInvalidWithBatchSize(
+            @NonNull BigInteger privateKeyBase, @NonNull BigInteger maxPrivateKeyForBatchSize) {
         return privateKeyBase.compareTo(maxPrivateKeyForBatchSize) > 0;
     }
 

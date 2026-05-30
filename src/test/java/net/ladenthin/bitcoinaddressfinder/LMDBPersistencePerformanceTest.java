@@ -3,10 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
+
 import ch.qos.logback.classic.Level;
 import java.io.File;
-import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.file.Path;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -16,36 +20,30 @@ import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import org.bitcoinj.base.Network;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import java.nio.file.Path;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.nullValue;
-
 public class LMDBPersistencePerformanceTest {
-    
+
     @TempDir
     public Path folder;
-    
+
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final PersistenceUtils persistenceUtils = new PersistenceUtils(network);
-    
-    private final static int ARRAY_SIZE = 1024*8;
-    private final static BigInteger PRIVATE_KEY = BigInteger.valueOf(1337);
-    private final static int CONSUMER_THREADS = 32;
-    private final static int TEST_TIME_IN_SECONDS = 4;
-    
-    private final static int KEYS_QUEUE_SIZE = CONSUMER_THREADS*2;
-    private final static int PRODUCER_THREADS = KEYS_QUEUE_SIZE;
-    
+
+    private static final int ARRAY_SIZE = 1024 * 8;
+    private static final BigInteger PRIVATE_KEY = BigInteger.valueOf(1337);
+    private static final int CONSUMER_THREADS = 32;
+    private static final int TEST_TIME_IN_SECONDS = 4;
+
+    private static final int KEYS_QUEUE_SIZE = CONSUMER_THREADS * 2;
+    private static final int PRODUCER_THREADS = KEYS_QUEUE_SIZE;
+
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_BLOOM_FILTER_ENABLED)
-    public void runProber_performanceTest(boolean useBloomFilter) throws IOException, InterruptedException, IllegalArgumentException, NoSuchFieldException, IllegalAccessException {
+    public void runProber_performanceTest(boolean useBloomFilter) throws Exception {
         new LMDBPlatformAssume().assumeLMDBExecution();
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
@@ -59,25 +57,28 @@ public class LMDBPersistencePerformanceTest {
         cConsumerJava.delayEmptyConsumer = 1;
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
-        cConsumerJava.lmdbConfigurationReadOnly.useBloomFilter = useBloomFilter;
-        cConsumerJava.runtimePublicKeyCalculationCheck = ManualDebugConstants.ENABLE_RUNTIME_PUBLIC_KEY_CALCULATION_CHECK;
-        
+        cConsumerJava.lmdbConfigurationReadOnly.addressLookupBackend = useBloomFilter
+                ? net.ladenthin.bitcoinaddressfinder.configuration.AddressLookupBackend.BLOOM
+                : net.ladenthin.bitcoinaddressfinder.configuration.AddressLookupBackend.LMDB_ONLY;
+        cConsumerJava.runtimePublicKeyCalculationCheck =
+                ManualDebugConstants.ENABLE_RUNTIME_PUBLIC_KEY_CALCULATION_CHECK;
+
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
-        ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) consumerJava.getLogger();
-        logger.setLevel(Level.INFO);
-        
+        // Quiet ConsumerJava's class-level logger down to INFO for this perf test.
+        ((ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ConsumerJava.class)).setLevel(Level.INFO);
+
         consumerJava.initLMDB();
-        
+
         // create producer
         PublicKeyBytes[] publicKeyByteses = createPublicKeyBytesArray();
         ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(PRODUCER_THREADS);
         AtomicBoolean producerShouldRun = new AtomicBoolean(true);
         createProducerThreads(threadPoolExecutor, consumerJava, publicKeyByteses, producerShouldRun);
-        
+
         // act
         consumerJava.startConsumer();
         consumerJava.startStatisticsTimer();
-        
+
         Thread.sleep(TEST_TIME_IN_SECONDS * Statistics.ONE_SECOND_IN_MILLISECONDS);
         // Signal all producer threads to stop by setting the shared flag to false.
         // Each producer thread will check this flag in its loop and exit cleanly.
@@ -86,18 +87,21 @@ public class LMDBPersistencePerformanceTest {
         consumerJava.interrupt();
 
         assertThat(consumerJava.persistence, is(nullValue()));
-        assertThat(consumerJava.shouldRun.get(), is(false ));
+        assertThat(consumerJava.shouldRun.get(), is(false));
         assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(true));
         assertThat(consumerJava.scheduledExecutorService.isTerminated(), is(true));
         assertThat(consumerJava.consumeKeysExecutorService.isShutdown(), is(true));
         assertThat(consumerJava.consumeKeysExecutorService.isTerminated(), is(true));
-
     }
 
-    private void createProducerThreads(ThreadPoolExecutor threadPoolExecutor, ConsumerJava consumerJava, PublicKeyBytes[] publicKeyByteses, AtomicBoolean producerShouldRun) {
+    private void createProducerThreads(
+            ThreadPoolExecutor threadPoolExecutor,
+            ConsumerJava consumerJava,
+            PublicKeyBytes[] publicKeyByteses,
+            AtomicBoolean producerShouldRun) {
         for (int i = 0; i < PRODUCER_THREADS; i++) {
-            threadPoolExecutor.submit(() ->{
-                while(producerShouldRun.get()) {
+            threadPoolExecutor.submit(() -> {
+                while (producerShouldRun.get()) {
                     try {
                         consumerJava.consumeKeys(publicKeyByteses);
                     } catch (InterruptedException e) {

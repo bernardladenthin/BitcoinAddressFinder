@@ -3,16 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.opencl;
 
+import com.google.common.collect.ImmutableList;
+import com.google.errorprone.annotations.Immutable;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.Serializable;
 import java.nio.ByteOrder;
 import java.nio.charset.Charset;
-import java.util.Collection;
 import java.util.List;
-
-import com.google.common.collect.ImmutableList;
-import com.google.errorprone.annotations.Immutable;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.jocl.CL;
 import org.jocl.cl_device_id;
@@ -61,53 +59,62 @@ import org.jspecify.annotations.NonNull;
  */
 @Immutable
 public record OpenCLDevice(
-    @SuppressWarnings("Immutable")
-    cl_device_id device,
-    String deviceName,
-    String deviceVendor,
-    String driverVersion,
-    String deviceProfile,
-    String deviceVersion,
-    String deviceExtensions,
-    long deviceType,
-    boolean endianLittle,
-    int maxComputeUnits,
-    long maxWorkItemDimensions,
-    ImmutableList<@NonNull Long> maxWorkItemSizes,
-    long maxWorkGroupSize,
-    long maxClockFrequency,
-    int addressBits,
-    long maxMemAllocSize,
-    long globalMemSize,
-    long errorCorrectionSupport,
-    int localMemType,
-    long localMemSize,
-    long maxConstantBufferSize,
-    long queueProperties,
-    int imageSupport,
-    int maxReadImageArgs,
-    int maxWriteImageArgs,
-    long singleFpConfig,
-    long image2dMaxWidth,
-    long image2dMaxHeight,
-    long image3dMaxWidth,
-    long image3dMaxHeight,
-    long image3dMaxDepth,
-    int preferredVectorWidthChar,
-    int preferredVectorWidthShort,
-    int preferredVectorWidthInt,
-    int preferredVectorWidthLong,
-    int preferredVectorWidthFloat,
-    int preferredVectorWidthDouble
-) implements Serializable {
-    
+        @SuppressWarnings("Immutable") cl_device_id device,
+        String deviceName,
+        String deviceVendor,
+        String driverVersion,
+        String deviceProfile,
+        String deviceVersion,
+        String deviceExtensions,
+        long deviceType,
+        boolean endianLittle,
+        int maxComputeUnits,
+        long maxWorkItemDimensions,
+        ImmutableList<@NonNull Long> maxWorkItemSizes,
+        long maxWorkGroupSize,
+        long maxClockFrequency,
+        int addressBits,
+        long maxMemAllocSize,
+        long globalMemSize,
+        long errorCorrectionSupport,
+        int localMemType,
+        long localMemSize,
+        long maxConstantBufferSize,
+        long queueProperties,
+        int imageSupport,
+        int maxReadImageArgs,
+        int maxWriteImageArgs,
+        long singleFpConfig,
+        long image2dMaxWidth,
+        long image2dMaxHeight,
+        long image3dMaxWidth,
+        long image3dMaxHeight,
+        long image3dMaxDepth,
+        int preferredVectorWidthChar,
+        int preferredVectorWidthShort,
+        int preferredVectorWidthInt,
+        int preferredVectorWidthLong,
+        int preferredVectorWidthFloat,
+        int preferredVectorWidthDouble)
+        implements Serializable {
+
+    /**
+     * Returns the byte order this device uses.
+     *
+     * @return {@link ByteOrder#LITTLE_ENDIAN} or {@link ByteOrder#BIG_ENDIAN}
+     */
     public ByteOrder getByteOrder() {
-        if(endianLittle) {
+        if (endianLittle) {
             return ByteOrder.LITTLE_ENDIAN;
         }
         return ByteOrder.BIG_ENDIAN;
     }
-    
+
+    /**
+     * Returns a human-readable, multi-line description of this device.
+     *
+     * @return a multi-line string describing this OpenCL device
+     */
     public String toStringPretty() {
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         final Charset charset = java.nio.charset.StandardCharsets.UTF_8;
@@ -132,10 +139,13 @@ public record OpenCLDevice(
             ps.printf("CL_DEVICE_MAX_MEM_ALLOC_SIZE:          %d MByte%n", maxMemAllocSize / (1024 * 1024));
             ps.printf("CL_DEVICE_GLOBAL_MEM_SIZE:             %d MByte%n", globalMemSize / (1024 * 1024));
             ps.printf("CL_DEVICE_ERROR_CORRECTION_SUPPORT:    %s%n", errorCorrectionSupport != 0 ? "yes" : "no");
-            ps.printf("CL_DEVICE_LOCAL_MEM_TYPE:              %s%n", CL.stringFor_cl_device_local_mem_type(localMemType));
+            ps.printf(
+                    "CL_DEVICE_LOCAL_MEM_TYPE:              %s%n", CL.stringFor_cl_device_local_mem_type(localMemType));
             ps.printf("CL_DEVICE_LOCAL_MEM_SIZE:              %d KByte%n", localMemSize / 1024);
             ps.printf("CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE:    %d KByte%n", maxConstantBufferSize / 1024);
-            ps.printf("CL_DEVICE_QUEUE_PROPERTIES:            %s%n", CL.stringFor_cl_command_queue_properties(queueProperties));
+            ps.printf(
+                    "CL_DEVICE_QUEUE_PROPERTIES:            %s%n",
+                    CL.stringFor_cl_command_queue_properties(queueProperties));
             ps.printf("CL_DEVICE_IMAGE_SUPPORT:               %d%n", imageSupport);
             ps.printf("CL_DEVICE_MAX_READ_IMAGE_ARGS:         %d%n", maxReadImageArgs);
             ps.printf("CL_DEVICE_MAX_WRITE_IMAGE_ARGS:        %d%n", maxWriteImageArgs);
@@ -145,15 +155,25 @@ public record OpenCLDevice(
             ps.printf("CL_DEVICE_IMAGE3D_MAX_WIDTH:           %d%n", image3dMaxWidth);
             ps.printf("CL_DEVICE_IMAGE3D_MAX_HEIGHT:          %d%n", image3dMaxHeight);
             ps.printf("CL_DEVICE_IMAGE3D_MAX_DEPTH:           %d%n", image3dMaxDepth);
-            ps.printf("CL_DEVICE_PREFERRED_VECTOR_WIDTHS:     CHAR %d, SHORT %d, INT %d, LONG %d, FLOAT %d, DOUBLE %d%n",
-                preferredVectorWidthChar, preferredVectorWidthShort,
-                preferredVectorWidthInt, preferredVectorWidthLong,
-                preferredVectorWidthFloat, preferredVectorWidthDouble);
+            ps.printf(
+                    "CL_DEVICE_PREFERRED_VECTOR_WIDTHS:     CHAR %d, SHORT %d, INT %d, LONG %d, FLOAT %d, DOUBLE %d%n",
+                    preferredVectorWidthChar,
+                    preferredVectorWidthShort,
+                    preferredVectorWidthInt,
+                    preferredVectorWidthLong,
+                    preferredVectorWidthFloat,
+                    preferredVectorWidthDouble);
         }
 
         return baos.toString(charset);
     }
-    
+
+    /**
+     * Formats a list of maximum work-item sizes as a slash-separated string.
+     *
+     * @param sizes the work-item sizes
+     * @return the formatted representation
+     */
     public static String formatWorkItemSizes(List<Long> sizes) {
         if (sizes.isEmpty()) return "(none)";
         StringBuilder sb = new StringBuilder();
@@ -163,11 +183,22 @@ public record OpenCLDevice(
         }
         return sb.toString();
     }
-    
+
+    /**
+     * Returns the device's OpenCL version as a {@link ComparableVersion}.
+     *
+     * @return the parsed device version
+     */
     public ComparableVersion getDeviceVersionAsComparableVersion() {
         return getComparableVersionFromDeviceVersion(deviceVersion());
     }
-    
+
+    /**
+     * Parses a {@code CL_DEVICE_VERSION} string into a {@link ComparableVersion}, stripping the {@code OpenCL} and {@code CUDA} prefixes.
+     *
+     * @param deviceVersion the raw device version string
+     * @return the parsed comparable version
+     */
     public static ComparableVersion getComparableVersionFromDeviceVersion(String deviceVersion) {
         String s = deviceVersion;
         s = s.replace("OpenCL ", "");

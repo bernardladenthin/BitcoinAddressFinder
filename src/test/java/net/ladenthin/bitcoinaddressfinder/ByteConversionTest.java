@@ -3,11 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.io.IOException;
-import org.apache.commons.codec.DecoderException;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+
+import java.io.IOException;
+import org.apache.commons.codec.DecoderException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -19,7 +20,8 @@ public class ByteConversionTest {
     // <editor-fold defaultstate="collapsed" desc="bytesToMib">
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_BYTES_TO_MIB)
-    public void bytesToMib_bytesGiven_returnExpectedMib(long bytes, double expectedMib) throws IOException, InterruptedException, DecoderException {
+    public void bytesToMib_bytesGiven_returnExpectedMib(long bytes, double expectedMib)
+            throws IOException, InterruptedException, DecoderException {
         // act
         double result = byteConversion.bytesToMib(bytes);
 
@@ -95,7 +97,8 @@ public class ByteConversionTest {
     // <editor-fold defaultstate="collapsed" desc="mibToBytes">
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_MIB_TO_BYTES)
-    public void mibToBytes_mibGiven_returnExpectedBytes(long mib, long expectedBytes) throws IOException, InterruptedException, DecoderException {
+    public void mibToBytes_mibGiven_returnExpectedBytes(long mib, long expectedBytes)
+            throws IOException, InterruptedException, DecoderException {
         // act
         long result = byteConversion.mibToBytes(mib);
 

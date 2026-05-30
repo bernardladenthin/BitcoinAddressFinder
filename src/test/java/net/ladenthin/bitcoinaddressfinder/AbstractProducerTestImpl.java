@@ -9,20 +9,21 @@ import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 
 public class AbstractProducerTestImpl extends AbstractProducer {
 
-    public AbstractProducerTestImpl(CProducer cProducer, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer, BitHelper bitHelper) {
+    public AbstractProducerTestImpl(
+            CProducer cProducer,
+            Consumer consumer,
+            KeyUtility keyUtility,
+            KeyProducer keyProducer,
+            BitHelper bitHelper) {
         super(cProducer, consumer, keyUtility, keyProducer, bitHelper);
     }
 
     @Override
-    public void produceKeys() {
-    }
+    public void produceKeys() {}
 
     @Override
-    public void processSecretBase(BigInteger secretBase) {
-    }
+    public void processSecretBase(BigInteger secretBase) {}
 
     @Override
-    public void processSecrets(BigInteger[] secret) {
-    }
-    
+    public void processSecrets(BigInteger[] secret) {}
 }

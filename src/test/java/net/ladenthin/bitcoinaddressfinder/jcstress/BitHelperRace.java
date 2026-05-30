@@ -16,7 +16,10 @@ import org.openjdk.jcstress.infra.results.J_Result;
 @JCStressTest
 @Description("Two concurrent incrementers on an AtomicLong must yield a sum of exactly 2.")
 @Outcome(id = "2", expect = Expect.ACCEPTABLE, desc = "Both increments applied atomically")
-@Outcome(id = {"0", "1"}, expect = Expect.FORBIDDEN, desc = "BUG: lost update on AtomicLong")
+@Outcome(
+        id = {"0", "1"},
+        expect = Expect.FORBIDDEN,
+        desc = "BUG: lost update on AtomicLong")
 @State
 public class BitHelperRace {
 

@@ -3,22 +3,23 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2PKH;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2WPKH;
 import org.apache.commons.io.FileUtils;
 import org.bitcoinj.base.Network;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.is;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import java.nio.file.Path;
-import java.nio.file.Files;
 
 /**
  * Unit tests for {@link AddressFile}.
@@ -83,7 +84,8 @@ public class AddressFileTest {
         File file = Files.createFile(folder.resolve("addresses.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<String> unsupportedCapture = new ArrayList<>();
-        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressToCoin -> {}, unsupportedCapture::add);
+        AddressFile addressFile =
+                new AddressFile(file, readStatistic, network, addressToCoin -> {}, unsupportedCapture::add);
 
         // act
         addressFile.processLine("");
@@ -113,7 +115,8 @@ public class AddressFileTest {
         File file = Files.createFile(folder.resolve("addresses.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<String> unsupportedCapture = new ArrayList<>();
-        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressToCoin -> {}, unsupportedCapture::add);
+        AddressFile addressFile =
+                new AddressFile(file, readStatistic, network, addressToCoin -> {}, unsupportedCapture::add);
 
         // act
         addressFile.processLine("# this is a comment");
@@ -129,7 +132,8 @@ public class AddressFileTest {
         File file = Files.createFile(folder.resolve("addresses.txt")).toFile();
         ReadStatistic readStatistic = new ReadStatistic();
         List<String> unsupportedCapture = new ArrayList<>();
-        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressToCoin -> {}, unsupportedCapture::add);
+        AddressFile addressFile =
+                new AddressFile(file, readStatistic, network, addressToCoin -> {}, unsupportedCapture::add);
 
         // act
         addressFile.processLine(AddressTxtLine.ADDRESS_HEADER);
@@ -197,14 +201,14 @@ public class AddressFileTest {
     public void readFile_mixedValidAndCommentLines_correctCountsUpdated() throws IOException {
         // arrange
         File file = Files.createFile(folder.resolve("addresses.txt")).toFile();
-        String content = P2PKH.Bitcoin.getPublicAddress() + "\n"
-                + "# comment line\n"
-                + P2PKH.Litecoin.getPublicAddress() + "\n";
+        String content =
+                P2PKH.Bitcoin.getPublicAddress() + "\n" + "# comment line\n" + P2PKH.Litecoin.getPublicAddress() + "\n";
         FileUtils.writeStringToFile(file, content, StandardCharsets.UTF_8.name());
         ReadStatistic readStatistic = new ReadStatistic();
         List<AddressToCoin> addressCapture = new ArrayList<>();
         List<String> unsupportedCapture = new ArrayList<>();
-        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressCapture::add, unsupportedCapture::add);
+        AddressFile addressFile =
+                new AddressFile(file, readStatistic, network, addressCapture::add, unsupportedCapture::add);
 
         // act
         addressFile.readFile();

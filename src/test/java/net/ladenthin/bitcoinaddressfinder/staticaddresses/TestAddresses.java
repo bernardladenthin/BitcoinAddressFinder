@@ -8,20 +8,20 @@ import java.util.List;
 import org.bitcoinj.crypto.ECKey;
 
 public interface TestAddresses {
-    
+
     int getNumberOfAddresses();
-    
+
     List<ECKey> getECKeys();
-    
+
     String getAsBase58Strings();
-    
+
     List<String> getAsBase58StringList();
-    
+
     String getIndexAsBase58String(int index);
 
     String getIndexAsHash160HexEncoded(int index);
-    
+
     byte[] getIndexAsHash160(int index);
-    
+
     ByteBuffer getIndexAsHash160ByteBuffer(int index);
 }

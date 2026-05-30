@@ -3,8 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+/**
+ * Supported on-disk formats of the secrets-file producer input.
+ */
 public enum CSecretFormat {
-    
+
     /**
      * Represents a big integer.
      * e.g.:
@@ -15,7 +18,7 @@ public enum CSecretFormat {
      * </pre>
      */
     BIG_INTEGER,
-    
+
     /**
      * Also referred to as WiF (Wallet Import Format).
      * e.g.:
@@ -26,7 +29,7 @@ public enum CSecretFormat {
      * </pre>
      */
     DUMPED_RIVATE_KEY,
-    
+
     /**
      * A HEX-encoded SHA256 string. This might already be the hashed brainwallet.
      * e.g.:
@@ -37,10 +40,10 @@ public enum CSecretFormat {
      * </pre>
      */
     SHA256,
-    
+
     /**
      * Also known as a brainwallet. A string is hashed using SHA256 and used as the private key.
-     * e.g.: 
+     * e.g.:
      * <pre>
      * test
      * test with space

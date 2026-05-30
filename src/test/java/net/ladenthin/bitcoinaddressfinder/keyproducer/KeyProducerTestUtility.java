@@ -3,12 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 
 import java.math.BigInteger;
+import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 
 /**
  * Utility class providing convenience methods for creating and initializing
@@ -19,7 +19,7 @@ import java.math.BigInteger;
  * are required to simulate secret key transmission.
  */
 public class KeyProducerTestUtility {
-    
+
     /**
      * Creates a new secret byte array of the standard private key length
      * defined by {@link PublicKeyBytes#PRIVATE_KEY_MAX_NUM_BYTES}, filled entirely with zeroes.
@@ -30,9 +30,9 @@ public class KeyProducerTestUtility {
      *         {@link PublicKeyBytes#PRIVATE_KEY_MAX_NUM_BYTES}.
      */
     public byte[] createZeroedSecret() {
-        return createFilledSecret((byte)0x0);
+        return createFilledSecret((byte) 0x0);
     }
-    
+
     /**
      * Creates a new secret byte array filled with the specified byte value.
      * <p>
@@ -49,7 +49,7 @@ public class KeyProducerTestUtility {
         }
         return secretBytes;
     }
-    
+
     /**
      * Creates a new secret byte array where each byte is derived by incrementing the given {@code fillByte}.
      * <p>
@@ -68,7 +68,7 @@ public class KeyProducerTestUtility {
         for (int i = 0; i < secretBytes.length; i++) {
             secretBytes[i] = (byte) (startByte + 1);
         }
-        return secretBytes;               
+        return secretBytes;
     }
 
     /**
@@ -87,38 +87,33 @@ public class KeyProducerTestUtility {
             byte lastByte = bytes[bytes.length - 1];
             byte expected = (byte) (i + 1);
 
-            assertThat(
-                "Secret at index " + i + " should end with byte value " + expected,
-                lastByte,
-                is(expected)
-            );
+            assertThat("Secret at index " + i + " should end with byte value " + expected, lastByte, is(expected));
         }
     }
-    
+
     /**
-    * Asserts that the given secret consists entirely of the specified fill byte.
-    * <p>
-    * This checks the least significant byte of the {@link BigInteger}'s backing array,
-    * which is sufficient when verifying uniformly filled secrets produced by
-    * {@code generateFilledSecret(byte)} or similar utilities.
-    *
-    * @param secret   the BigInteger secret to verify
-    * @param fillByte the byte value expected to fill the secret
-    */
-   public void assertFilledSecret(BigInteger secret, byte fillByte) {
-       byte[] bytes = secret.toByteArray();
+     * Asserts that the given secret consists entirely of the specified fill byte.
+     * <p>
+     * This checks the least significant byte of the {@link BigInteger}'s backing array,
+     * which is sufficient when verifying uniformly filled secrets produced by
+     * {@code generateFilledSecret(byte)} or similar utilities.
+     *
+     * @param secret   the BigInteger secret to verify
+     * @param fillByte the byte value expected to fill the secret
+     */
+    public void assertFilledSecret(BigInteger secret, byte fillByte) {
+        byte[] bytes = secret.toByteArray();
 
-       // Defensive: skip any sign byte (0x00) that BigInteger may prepend
-       int lastIndex = bytes.length - 1;
-       byte lastByte = bytes[lastIndex];
+        // Defensive: skip any sign byte (0x00) that BigInteger may prepend
+        int lastIndex = bytes.length - 1;
+        byte lastByte = bytes[lastIndex];
 
-       assertThat(
-           "Secret should end with byte value " + fillByte + " but was " + lastByte,
-           lastByte,
-           is(equalTo(fillByte))
-       );
-   }
-    
+        assertThat(
+                "Secret should end with byte value " + fillByte + " but was " + lastByte,
+                lastByte,
+                is(equalTo(fillByte)));
+    }
+
     /**
      * Creates a deliberately invalid secret byte array for negative or edge-case testing.
      * <p>
@@ -136,5 +131,4 @@ public class KeyProducerTestUtility {
     public byte[] createInvalidSecret() {
         return new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES - 1];
     }
-    
 }

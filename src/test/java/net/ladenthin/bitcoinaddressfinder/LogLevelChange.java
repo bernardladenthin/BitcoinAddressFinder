@@ -9,11 +9,12 @@ import org.slf4j.LoggerFactory;
 
 public class LogLevelChange {
     public void turnOff() {
-        final Logger logger = (Logger)LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+        final Logger logger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
         logger.setLevel(Level.OFF);
     }
+
     public void setLevel(Level newLevel) {
-        final Logger logger = (Logger)LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+        final Logger logger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
         logger.setLevel(newLevel);
     }
 }

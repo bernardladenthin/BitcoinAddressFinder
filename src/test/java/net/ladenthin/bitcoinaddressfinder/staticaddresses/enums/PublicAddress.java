@@ -4,7 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.staticaddresses.enums;
 
 public interface PublicAddress {
-    
+
     /**
      * Returns the public address.
      * @return the public address.

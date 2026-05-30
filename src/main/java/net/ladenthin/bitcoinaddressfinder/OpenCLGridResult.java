@@ -3,13 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.util.Arrays;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 
+/**
+ * Holds the raw OpenCL grid result for a single secret-key base together with helpers to convert
+ * it into {@link PublicKeyBytes} objects.
+ */
 public class OpenCLGridResult {
-    
+
     /**
      * Enable additional validation to check if generated uncompressed keys are not all zero.
      * <p>
@@ -17,34 +21,49 @@ public class OpenCLGridResult {
      * Useful only during debugging or when validating OpenCL/GPU kernel correctness.
      * </p>
      * <p>
-     * Superseded by {@link PublicKeyBytes#runtimePublicKeyCalculationCheck(org.slf4j.Logger)}
+     * Superseded by {@link PublicKeyBytes#runtimePublicKeyCalculationCheck()}
      * and its activation via {@link CConsumerJava#runtimePublicKeyCalculationCheck}.
      * </p>
      */
     private static final boolean ENABLE_UNCOMPRESSED_KEY_VALIDATION = false;
-    
+
     private final BigInteger secretKeyBase;
     private final int workSize;
     private final ByteBuffer result;
-    
+
     OpenCLGridResult(BigInteger secretKeyBase, int workSize, ByteBuffer result) {
         this.secretKeyBase = secretKeyBase;
         this.workSize = workSize;
         this.result = result;
     }
 
+    /**
+     * Returns the base secret used by the kernel for this batch.
+     *
+     * @return the base secret used by the kernel for this batch
+     */
     public BigInteger getSecretKeyBase() {
         return secretKeyBase;
     }
 
+    /**
+     * Returns the number of keys in this batch.
+     *
+     * @return the number of keys in this batch
+     */
     public int getWorkSize() {
         return workSize;
     }
 
+    /**
+     * Returns the raw OpenCL result buffer.
+     *
+     * @return the raw OpenCL result buffer
+     */
     public ByteBuffer getResult() {
         return result;
     }
-    
+
     /**
      * Reads the computed public keys from the OpenCL result buffer and converts them into the correct format.
      * <p>
@@ -68,14 +87,20 @@ public class OpenCLGridResult {
     public PublicKeyBytes[] getPublicKeyBytes() {
         ByteBuffer readOnlyResult = result.asReadOnlyBuffer();
         PublicKeyBytes[] publicKeys = new PublicKeyBytes[workSize];
-        
+
         for (int i = 0; i < workSize; i++) {
             PublicKeyBytes publicKeyBytes = getPublicKeyFromByteBufferXY(readOnlyResult, i, secretKeyBase);
             publicKeys[i] = publicKeyBytes;
         }
         return publicKeys;
     }
-    
+
+    /**
+     * Trims the leading {@code u32} prefix bytes written by the OpenCL kernel.
+     *
+     * @param fullArray the raw array with prefix bytes
+     * @return a new array with the leading prefix bytes removed
+     */
     public static byte[] trimU32PrefixBytes(byte[] fullArray) {
         final int PREFIX_BYTES_TO_SKIP = 3;
         return Arrays.copyOfRange(fullArray, PREFIX_BYTES_TO_SKIP, fullArray.length);
@@ -107,43 +132,59 @@ public class OpenCLGridResult {
      * @return the reconstructed {@link PublicKeyBytes} object
      * @throws RuntimeException if the key bytes are invalid (e.g. all coordinate bytes are zero)
      */
-    private static final PublicKeyBytes getPublicKeyFromByteBufferXY(ByteBuffer resultBuffer, int keyNumber, BigInteger secretKeyBase) {
+    private static final PublicKeyBytes getPublicKeyFromByteBufferXY(
+            ByteBuffer resultBuffer, int keyNumber, BigInteger secretKeyBase) {
         BigInteger secret = AbstractProducer.calculateSecretKey(secretKeyBase, keyNumber);
-        if(BigInteger.ZERO.equals(secret)) {
+        if (BigInteger.ZERO.equals(secret)) {
             // the calculated key is invalid, return a fallback
             return PublicKeyBytes.INVALID_KEY_ONE;
         }
-        
+
         final int keyOffsetInByteBuffer = PublicKeyBytes.CHUNK_SIZE_NUM_BYTES * keyNumber;
-        
+
         // Get X
         byte[] xFromBigEndian = new byte[PublicKeyBytes.CHUNK_SIZE_00_NUM_BYTES_BIG_ENDIAN_X];
-        resultBuffer.get(keyOffsetInByteBuffer + PublicKeyBytes.CHUNK_OFFSET_00_NUM_BYTES_BIG_ENDIAN_X, xFromBigEndian, 0, xFromBigEndian.length);
-        
+        resultBuffer.get(
+                keyOffsetInByteBuffer + PublicKeyBytes.CHUNK_OFFSET_00_NUM_BYTES_BIG_ENDIAN_X,
+                xFromBigEndian,
+                0,
+                xFromBigEndian.length);
+
         // Get Y
         byte[] yFromBigEndian = new byte[PublicKeyBytes.CHUNK_SIZE_01_NUM_BYTES_BIG_ENDIAN_Y];
-        resultBuffer.get(keyOffsetInByteBuffer + PublicKeyBytes.CHUNK_OFFSET_01_NUM_BYTES_BIG_ENDIAN_Y, yFromBigEndian, 0, yFromBigEndian.length);
-        
+        resultBuffer.get(
+                keyOffsetInByteBuffer + PublicKeyBytes.CHUNK_OFFSET_01_NUM_BYTES_BIG_ENDIAN_Y,
+                yFromBigEndian,
+                0,
+                yFromBigEndian.length);
+
         // Assemble uncompressed key
         byte[] uncompressedFromBigEndian = PublicKeyBytes.assembleUncompressedPublicKey(xFromBigEndian, yFromBigEndian);
-        
+
         // Get RIPEMD160 for uncompressed key
         byte[] ripemd160Uncompressed = new byte[PublicKeyBytes.CHUNK_SIZE_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED];
-        resultBuffer.get(keyOffsetInByteBuffer + PublicKeyBytes.CHUNK_OFFSET_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED, ripemd160Uncompressed, 0, ripemd160Uncompressed.length);
-        
+        resultBuffer.get(
+                keyOffsetInByteBuffer + PublicKeyBytes.CHUNK_OFFSET_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED,
+                ripemd160Uncompressed,
+                0,
+                ripemd160Uncompressed.length);
+
         // Get RIPEMD160 for uncompressed key
         byte[] ripemd160Compressed = new byte[PublicKeyBytes.CHUNK_SIZE_11_NUM_BYTES_RIPEMD160_COMPRESSED];
-        resultBuffer.get(keyOffsetInByteBuffer + PublicKeyBytes.CHUNK_OFFSET_11_NUM_BYTES_RIPEMD160_COMPRESSED, ripemd160Compressed, 0, ripemd160Compressed.length);
+        resultBuffer.get(
+                keyOffsetInByteBuffer + PublicKeyBytes.CHUNK_OFFSET_11_NUM_BYTES_RIPEMD160_COMPRESSED,
+                ripemd160Compressed,
+                0,
+                ripemd160Compressed.length);
 
         if (ENABLE_UNCOMPRESSED_KEY_VALIDATION) {
             boolean allZero = PublicKeyBytes.isAllCoordinateBytesZero(uncompressedFromBigEndian);
             if (allZero) {
-                throw new RuntimeException("Invalid GPU result: all coordinate bytes are zero in uncompressed public key.");
+                throw new RuntimeException(
+                        "Invalid GPU result: all coordinate bytes are zero in uncompressed public key.");
             }
         }
-        
-        PublicKeyBytes publicKeyBytes = new PublicKeyBytes(secret, uncompressedFromBigEndian,  ripemd160Uncompressed, ripemd160Compressed);
-        
-        return publicKeyBytes;
+
+        return new PublicKeyBytes(secret, uncompressedFromBigEndian, ripemd160Uncompressed, ripemd160Compressed);
     }
 }

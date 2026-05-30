@@ -8,26 +8,37 @@ import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
 import org.jspecify.annotations.NonNull;
-import org.slf4j.Logger;
 
+/**
+ * Key producer that iterates a private-key range sequentially.
+ */
 public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJavaIncremental> {
-    
+
     @NonNull
     private BigInteger currentValue;
-    
-    public KeyProducerJavaIncremental(CKeyProducerJavaIncremental cKeyProducerJavaIncremental, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
-        super(cKeyProducerJavaIncremental, logger);
+
+    /**
+     * Creates a new incremental key producer.
+     *
+     * @param cKeyProducerJavaIncremental the incremental configuration
+     * @param keyUtility                  cryptographic helper (unused but kept for symmetry)
+     * @param bitHelper                   bit/batch-size helper (unused but kept for symmetry)
+     */
+    public KeyProducerJavaIncremental(
+            CKeyProducerJavaIncremental cKeyProducerJavaIncremental, KeyUtility keyUtility, BitHelper bitHelper) {
+        super(cKeyProducerJavaIncremental);
         this.currentValue = new BigInteger(cKeyProducerJavaIncremental.startAddress, BitHelper.RADIX_HEX);
     }
 
     @Override
-    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
+    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly)
+            throws NoMoreSecretsAvailableException {
         verifyWorkSize(overallWorkSize, cKeyProducerJava.maxWorkSize);
         final BigInteger endAddress = cKeyProducerJava.getEndAddress();
         if (currentValue.compareTo(endAddress) > 0) {
             throw new NoMoreSecretsAvailableException(currentValue + " exceeds ");
         }
-        
+
         int length = returnStartSecretOnly ? 1 : overallWorkSize;
         BigInteger[] secrets = new BigInteger[length];
         BigInteger counter = currentValue;
@@ -38,13 +49,12 @@ public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJava
             secrets[i] = counter;
             counter = counter.add(BigInteger.ONE);
         }
-        
+
         currentValue = currentValue.add(BigInteger.valueOf(overallWorkSize));
-        
+
         return secrets;
     }
 
     @Override
-    public void interrupt() {
-    }
+    public void interrupt() {}
 }

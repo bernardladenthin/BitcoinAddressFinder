@@ -12,25 +12,46 @@ import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.RandomSecretSupplier;
 import net.ladenthin.bitcoinaddressfinder.SecretSupplier;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
-import org.slf4j.Logger;
 
+/**
+ * Key producer that draws secrets from a configurable random-number generator.
+ */
 public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRandom> {
 
-    private final KeyUtility keyUtility;
-    private final BitHelper bitHelper;
-    private final SecretSupplier randomSupplier;
-    
     /**
-     * It is already thread local, no need for {@link java.util.concurrent.ThreadLocalRandom}.
+     * Final no-op to prevent the finalizer-attack vector flagged by spotbugs
+     * CT_CONSTRUCTOR_THROW: the constructor wraps two checked
+     * {@link java.security.NoSuchAlgorithmException}s into RuntimeExceptions for
+     * the SECURE_RANDOM / SHA1_PRNG branches, which leaves a partially
+     * constructed instance reachable to any subclass that overrides
+     * {@link Object#finalize()}. Marking {@code finalize()} final here defeats
+     * the override while keeping the class itself subclassable for future
+     * Mockito spies or test doubles.
      */
-    private final Random random;
+    @SuppressWarnings({"deprecation", "removal"})
+    @Override
+    protected final void finalize() {
+        // no-op
+    }
 
+    private final KeyUtility keyUtility;
+    private final SecretSupplier randomSupplier;
+
+    /**
+     * Creates a new random key producer using the algorithm configured in the supplied {@link CKeyProducerJavaRandom}.
+     *
+     * @param cKeyProducerJavaRandom the random configuration
+     * @param keyUtility             cryptographic helper
+     * @param bitHelper              bit/batch-size helper
+     */
     @SuppressWarnings({"squid:S2245"})
-    public KeyProducerJavaRandom(CKeyProducerJavaRandom cKeyProducerJavaRandom, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
-        super(cKeyProducerJavaRandom, logger);
+    public KeyProducerJavaRandom(
+            CKeyProducerJavaRandom cKeyProducerJavaRandom, KeyUtility keyUtility, BitHelper bitHelper) {
+        super(cKeyProducerJavaRandom);
         this.keyUtility = keyUtility;
-        this.bitHelper = bitHelper;
-        
+
+        // It is already thread local, no need for ThreadLocalRandom.
+        Random random;
         switch (cKeyProducerJavaRandom.keyProducerJavaRandomInstance) {
             case SECURE_RANDOM:
                 try {
@@ -45,15 +66,14 @@ public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRando
                 break;
             case RANDOM_CUSTOM_SEED:
                 // EXPLOIT for: https://cwe.mitre.org/data/definitions/338
-                random = new Random();
-                if (cKeyProducerJavaRandom.customSeed != null) {
-                    random.setSeed(cKeyProducerJavaRandom.customSeed); // only if explicitly configured
-                }
+                random = cKeyProducerJavaRandom.customSeed != null
+                        ? new Random(cKeyProducerJavaRandom.customSeed)
+                        : new Random();
                 break;
             case SHA1_PRNG:
                 try {
                     random = SecureRandom.getInstance("SHA1PRNG");
-                    
+
                     // To simulate bug: do NOT set a seed at all
                     if (cKeyProducerJavaRandom.customSeed != null) {
                         random.setSeed(cKeyProducerJavaRandom.customSeed); // only if explicitly configured
@@ -63,18 +83,20 @@ public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRando
                 }
                 break;
             default:
-                throw new RuntimeException("Unknown keyProducerJavaRandomInstance: " + cKeyProducerJavaRandom.keyProducerJavaRandomInstance);
+                throw new RuntimeException("Unknown keyProducerJavaRandomInstance: "
+                        + cKeyProducerJavaRandom.keyProducerJavaRandomInstance);
         }
         randomSupplier = new RandomSecretSupplier(random);
     }
-    
+
     @Override
-    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) throws NoMoreSecretsAvailableException {
+    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly)
+            throws NoMoreSecretsAvailableException {
         verifyWorkSize(overallWorkSize, cKeyProducerJava.maxWorkSize);
-        return keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, this.cKeyProducerJava.privateKeyMaxNumBits, randomSupplier);
+        return keyUtility.createSecrets(
+                overallWorkSize, returnStartSecretOnly, this.cKeyProducerJava.privateKeyMaxNumBits, randomSupplier);
     }
 
     @Override
-    public void interrupt() {
-    }
+    public void interrupt() {}
 }

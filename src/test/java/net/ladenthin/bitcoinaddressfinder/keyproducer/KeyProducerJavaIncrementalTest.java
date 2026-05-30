@@ -6,20 +6,15 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-
-import java.math.BigInteger;
-
-import net.ladenthin.bitcoinaddressfinder.*;
-
-import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.math.BigInteger;
+import net.ladenthin.bitcoinaddressfinder.*;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
 import org.bitcoinj.base.Network;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import static org.mockito.Mockito.mock;
-import org.slf4j.Logger;
 
 /**
  * Tests for KeyProducerJavaIncremental with respect to key range boundaries and batch handling.
@@ -130,8 +125,6 @@ public class KeyProducerJavaIncrementalTest {
     private BitHelper bitHelper;
     private String startHex;
     private String endHex;
-    
-    private Logger mockLogger;
 
     @BeforeEach
     public void setUp() {
@@ -139,14 +132,13 @@ public class KeyProducerJavaIncrementalTest {
         bitHelper = new BitHelper();
         startHex = PublicKeyBytes.MIN_VALID_PRIVATE_KEY_HEX;
         endHex = "000000000000000000000000000000000000000000000000000000000000000A";
-        mockLogger = mock(Logger.class);
     }
 
     private KeyProducerJavaIncremental createKeyProducerJavaIncremental(String start, String end) {
         CKeyProducerJavaIncremental config = new CKeyProducerJavaIncremental();
         config.startAddress = start;
         config.endAddress = end;
-        return new KeyProducerJavaIncremental(config, keyUtility, bitHelper, mockLogger);
+        return new KeyProducerJavaIncremental(config, keyUtility, bitHelper);
     }
 
     /**
@@ -188,8 +180,7 @@ public class KeyProducerJavaIncrementalTest {
     public void createSecrets_startExceedsEnd_throwsException() throws Exception {
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
                 "0000000000000000000000000000000000000000000000000000000000000010",
-                "0000000000000000000000000000000000000000000000000000000000000005"
-        );
+                "0000000000000000000000000000000000000000000000000000000000000005");
         assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(1, true));
     }
 
@@ -200,9 +191,7 @@ public class KeyProducerJavaIncrementalTest {
     @Test
     public void createSecrets_batchExceedsEnd_throwsException() throws Exception {
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
-                startHex,
-                "0000000000000000000000000000000000000000000000000000000000000003"
-        );
+                startHex, "0000000000000000000000000000000000000000000000000000000000000003");
         assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(5, false));
     }
 
@@ -214,23 +203,23 @@ public class KeyProducerJavaIncrementalTest {
     public void createSecrets_currentValueAdvancesByBatchSize() throws Exception {
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(startHex, endHex);
         int batchSize = 3;
-        
+
         BigInteger expectedFirstBatchStart = new BigInteger(startHex, BitHelper.RADIX_HEX);
-        
+
         BigInteger[] secrets1 = producer.createSecrets(batchSize, false);
         verifySecrets(secrets1, expectedFirstBatchStart);
-        
+
         BigInteger expectedSecondBatchStart = expectedFirstBatchStart.add(BigInteger.valueOf(batchSize));
         BigInteger[] secrets2 = producer.createSecrets(batchSize, false);
         verifySecrets(secrets2, expectedSecondBatchStart);
     }
-    
+
     private void verifySecrets(BigInteger[] secrets, BigInteger expectedStart) {
         for (int i = 0; i < secrets.length; i++) {
             assertThat(secrets[i], is(equalTo(expectedStart.add(BigInteger.valueOf(i)))));
         }
     }
-    
+
     /**
      * Tests the case where the end address is exactly at the boundary of a batch.
      * Confirms that all batches complete successfully without exceptions.
@@ -239,9 +228,8 @@ public class KeyProducerJavaIncrementalTest {
     public void createSecrets_endAddressExactlyAtBatchBoundary_allBatchesValid() throws Exception {
         // Setup: start=1, end=4 (allowed keys: 1, 2, 3, 4)
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
-            "0000000000000000000000000000000000000000000000000000000000000001",
-            "0000000000000000000000000000000000000000000000000000000000000004"
-        );
+                "0000000000000000000000000000000000000000000000000000000000000001",
+                "0000000000000000000000000000000000000000000000000000000000000004");
         int batchSize = 2;
 
         // 1st batch: [1, 2]
@@ -256,7 +244,7 @@ public class KeyProducerJavaIncrementalTest {
         assertThat(batch2[0], is(equalTo(BigInteger.valueOf(3))));
         assertThat(batch2[1], is(equalTo(BigInteger.valueOf(4))));
     }
-    
+
     /**
      * Tests that if a batch would partially exceed the end address, an exception is thrown.
      * This test confirms partial batches are not allowed when returnStartSecretOnly is false.
@@ -265,9 +253,8 @@ public class KeyProducerJavaIncrementalTest {
     public void createSecrets_threeBatches_twoElementsEach_thirdThrowsException() throws Exception {
         // Setup: start = 1, end = 5 (allowed keys: 1, 2, 3, 4, 5)
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
-            "0000000000000000000000000000000000000000000000000000000000000001",
-            "0000000000000000000000000000000000000000000000000000000000000004"
-        );
+                "0000000000000000000000000000000000000000000000000000000000000001",
+                "0000000000000000000000000000000000000000000000000000000000000004");
         int batchSize = 2;
 
         assertTwoBatchedOk(producer, batchSize);
@@ -276,7 +263,7 @@ public class KeyProducerJavaIncrementalTest {
         // the next values would be 5 and 6, but 6 exceeds the end address
         assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(batchSize, false));
     }
-    
+
     /**
      * Similar to above, but with the end address included.
      * Demonstrates that partial batches beyond the end are disallowed and cause an exception,
@@ -286,9 +273,8 @@ public class KeyProducerJavaIncrementalTest {
     public void createSecrets_endAddressInclusive_butPartialBatchNotAllowed_throwsException() throws Exception {
         // Setup: start=1, end=5 (allowed keys: 1, 2, 3, 4, 5)
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
-            "0000000000000000000000000000000000000000000000000000000000000001",
-            "0000000000000000000000000000000000000000000000000000000000000005"
-        );
+                "0000000000000000000000000000000000000000000000000000000000000001",
+                "0000000000000000000000000000000000000000000000000000000000000005");
         int batchSize = 2;
 
         assertTwoBatchedOk(producer, batchSize);
@@ -296,19 +282,19 @@ public class KeyProducerJavaIncrementalTest {
         // 3rd batch: tries [5, 6], but 6 > end (5), so exception thrown
         assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(batchSize, false));
     }
-    
+
     /**
      * Tests that if partial batches are allowed by setting returnStartSecretOnly=true,
      * the last single key within the range can still be retrieved without exception,
      * even if a full batch would exceed the end address.
      */
     @Test
-    public void createSecrets_endAddressInclusive_partialBatchAllowedWithReturnStartOnly_noException() throws Exception {
+    public void createSecrets_endAddressInclusive_partialBatchAllowedWithReturnStartOnly_noException()
+            throws Exception {
         // Setup: start=1, end=5 (allowed keys: 1, 2, 3, 4, 5)
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
-            "0000000000000000000000000000000000000000000000000000000000000001",
-            "0000000000000000000000000000000000000000000000000000000000000005"
-        );
+                "0000000000000000000000000000000000000000000000000000000000000001",
+                "0000000000000000000000000000000000000000000000000000000000000005");
         int batchSize = 2;
 
         assertTwoBatchedOk(producer, batchSize);

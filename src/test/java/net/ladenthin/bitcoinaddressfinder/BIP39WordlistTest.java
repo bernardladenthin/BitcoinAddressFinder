@@ -3,12 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.io.InputStream;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import java.io.InputStream;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -336,7 +337,10 @@ public class BIP39WordlistTest {
             String separator = wordlist.getSeparator();
 
             // assert
-            assertThat("Expected normal space for wordlist: " + wordlist.name(), separator, is(equalTo(BIP39Wordlist.NORMAL_SPACE)));
+            assertThat(
+                    "Expected normal space for wordlist: " + wordlist.name(),
+                    separator,
+                    is(equalTo(BIP39Wordlist.NORMAL_SPACE)));
         }
     }
     // </editor-fold>

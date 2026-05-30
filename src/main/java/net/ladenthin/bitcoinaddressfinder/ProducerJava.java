@@ -7,11 +7,29 @@ import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 
+/**
+ * CPU-based producer that derives public keys using bitcoinj's {@link PublicKeyBytes#fromPrivate}.
+ */
 public class ProducerJava extends AbstractProducer {
 
+    /** Producer-specific configuration. */
     protected final CProducerJava producerJava;
 
-    public ProducerJava(CProducerJava producerJava, Consumer consumer, KeyUtility keyUtility, KeyProducer keyProducer, BitHelper bitHelper) {
+    /**
+     * Creates a new CPU producer.
+     *
+     * @param producerJava the producer configuration
+     * @param consumer     the downstream consumer
+     * @param keyUtility   cryptographic helper
+     * @param keyProducer  the secret supplying strategy
+     * @param bitHelper    bit/batch-size helper
+     */
+    public ProducerJava(
+            CProducerJava producerJava,
+            Consumer consumer,
+            KeyUtility keyUtility,
+            KeyProducer keyProducer,
+            BitHelper bitHelper) {
         super(producerJava, consumer, keyUtility, keyProducer, bitHelper);
         this.producerJava = producerJava;
     }
@@ -39,6 +57,12 @@ public class ProducerJava extends AbstractProducer {
         }
     }
 
+    /**
+     * Creates the grid of derived keys for the given secret base.
+     *
+     * @param secretBase the masked base secret
+     * @return the array of derived {@link PublicKeyBytes}
+     */
     protected PublicKeyBytes[] createGrid(final BigInteger secretBase) {
         PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[producerJava.getOverallWorkSize(bitHelper)];
         for (int i = 0; i < publicKeyBytesArray.length; i++) {
@@ -52,7 +76,7 @@ public class ProducerJava extends AbstractProducer {
         }
         return publicKeyBytesArray;
     }
-    
+
     @Override
     public String toString() {
         return "ProducerJava@" + Integer.toHexString(System.identityHashCode(this));

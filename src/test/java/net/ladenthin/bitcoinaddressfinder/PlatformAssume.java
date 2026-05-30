@@ -13,6 +13,4 @@ package net.ladenthin.bitcoinaddressfinder;
  *
  * @see org.junit.jupiter.api.Assumptions
  */
-public interface PlatformAssume {
-    
-}
+public interface PlatformAssume {}

@@ -214,45 +214,92 @@ This reduction in scalar size speeds up `k·G` computations, resulting in signif
 > ✅ Matches the size of `RIPEMD160(SHA256(pubkey))`  
 > ✅ Especially effective when combined with OpenCL acceleration
 
-### 🚀 Bloom Filter Address Cache (`useBloomFilter`)
-As of version 1.5.0, a memory-efficient Bloom filter can be used to significantly accelerate address checks:
+### 🚀 Pluggable Address Lookup Backends (`addressLookupBackend`)
+
+As of version 1.6.0, the address presence check is decoupled from the on-disk LMDB store via a small `AddressPresence` interface. The consumer's scan hot path queries through whichever backend is selected in the config — LMDB itself, a Bloom filter in front of LMDB, or a self-contained in-memory snapshot that lets the LMDB env be closed and garbage-collected after population.
 
 ```json
-"useBloomFilter": true
+"addressLookupBackend": "BLOOM"
 ```
 
-Instead of loading all addresses into a Java `HashSet`, a compact Bloom filter is loaded into RAM. This enables ultra-fast `containsAddress()` checks with minimal memory usage — even for millions or billions of entries.
-Advantages:
-- ✅ O(1) lookup speed (comparable to HashSet)
-- ✅ Low memory usage, even with large datasets
-- ✅ No false negatives (real matches are always detected)
-- ⚠️ Possible false positives → only trigger additional LMDB lookups
+Supported values:
 
-#### Estimated Memory Usage:
-| fpp    | Light Database (~132M) | Full Database (~1.37B)  |
-|--------|------------------------|-------------------------|
-| 0.1    | ~**80 MB**             | ~**800 MB**             |
-| 0.05   | ~**100 MB**            | ~**1024 MB**            |
-| 0.01   | ~**151 MB**            | ~**1574 MB**            |
+| Value               | RAM cost                | Lookup latency       | LMDB stays open? | Best for                                                                                |
+|---------------------|-------------------------|----------------------|------------------|-----------------------------------------------------------------------------------------|
+| `LMDB_ONLY`         | minimal (mmap only)     | slowest              | yes              | very large databases that do not fit in RAM at all                                      |
+| `BLOOM`             | ~80 MB – ~1.5 GB (FPP)  | fast for misses      | yes              | when LMDB must stay open and most queries miss the database                             |
+| `HASHSET`           | ~80 B / entry           | fast                 | **no**           | small databases where memory is plentiful and exact lookup is required by callers       |
+| `TRUNCATED_LONG_64` | **~8 B / entry**        | **near HASHSET**     | **no**           | **recommended default for any in-RAM choice** — best memory/latency trade-off           |
 
-#### 🔧 Tuning Accuracy with `bloomFilterFpp`
-The expected false positive probability (FPP) can be configured:
+#### Memory footprint per backend across the published database tiers
+
+`HASHSET` stores the full hash160; `TRUNCATED_LONG_64` keeps only the 8 bytes after the bucket byte. Both in-RAM backends use the same 256-bucket layout (one chunk per first-byte value) so per-entry numbers dominate.
+
+| Backend             | 100 M entries (operational) | 132 M entries (Light DB) | 1.377 B entries (Full DB) |
+|---------------------|----------------------------:|-------------------------:|--------------------------:|
+| `HASHSET`           | ~8.0 GB                     | ~10 GB                   | ~110 GB ❌                |
+| `TRUNCATED_LONG_64` | **~0.8 GB**                 | **~1.1 GB**              | **~11 GB**                |
+| `BLOOM` (FPP 0.01)  | ~120 MB                     | ~150 MB                  | ~1.6 GB                   |
+
+#### Self-contained snapshots release the LMDB env
+
+`HASHSET` and `TRUNCATED_LONG_64` are *replacements*, not decorators: they are populated once from LMDB via a streaming pass, then the LMDB env is closed and the reference to it is dropped. The on-disk store is no longer needed and the file-backed mmap pages can be reclaimed by the OS. Whether the chain still needs LMDB is reported by the `requiresBackend()` method on the chosen backend.
+
+#### Bucketing by the first byte
+
+`TRUNCATED_LONG_64` uses 256 buckets indexed by the first byte of each hash160. A single Java `long[]` is capped at `Integer.MAX_VALUE` elements; bucketing keeps every bucket well below that limit and gives O(1) bucket selection plus a much smaller per-bucket binary search. At the Full DB tier each bucket holds ~5.4 M entries.
+
+#### Why `TRUNCATED_LONG_64` is so close to `HASHSET` despite being a binary search
+
+hash160 is the output of SHA-256 followed by RIPEMD-160 and is cryptographically uniform; any subset of its bits is also uniform. `TRUNCATED_LONG_64` keeps only the 8 bytes after the bucket byte (72 bits of total resolution: 8-bit bucket + 64-bit stored value). The probability that a random query collides with one of N stored entries is N/2⁶⁴, which for the largest published database tier is ~7.5 × 10⁻¹¹ per query — and any such collision falls through to the LMDB delegate. In return:
+
+- **Cache-line dense**: 8 longs per 64-byte cache line, the binary search walks very little memory.
+- **JDK intrinsic**: `Arrays.binarySearch(long[], long)` is heavily JIT-optimised and produces branchless comparisons on modern CPUs.
+- **No boxing**, no per-entry object header, no pointer chasing — every comparison is a single CPU instruction.
+
+#### Benchmark numbers
+
+`AddressLookupBenchmarkTest` writes 2048 random hash160 entries into LMDB, then runs 200,000 random lookups against each backend (50,000 dropped for JIT warmup, same query sequence used for every backend so the comparison is apples-to-apples). Sample numbers from one workstation run — **relative ordering** is the architecturally interesting part; absolute values vary by machine, JVM, and dataset size:
+
+| Backend             | Build (ms) | ns / op |
+|---------------------|-----------:|--------:|
+| `LMDB_ONLY`         | 1          | 1301    |
+| `BLOOM`             | 77         |  731    |
+| `HASHSET`           | 10         |   85    |
+| `TRUNCATED_LONG_64` | 6          |  108    |
+
+`TRUNCATED_LONG_64` reaches near-`HASHSET` latency at ~10× lower memory cost; for most practical database sizes (Light DB and smaller) it is the recommended default.
+
+Run the benchmark yourself with:
+
+```bash
+./mvnw test -Dtest=AddressLookupBenchmarkTest
+```
+
+The test logs a result table at INFO; passing/failing is informational only (timings are not asserted).
+
+#### Bloom filter — FPP tuning
+
+When `addressLookupBackend` is `BLOOM`, the false positive probability is configurable via `bloomFilterFpp`:
 
 ```json
+"addressLookupBackend": "BLOOM",
 "bloomFilterFpp": 0.1
 ```
 
-| Value | Description |
-|-------|-------------|
-| `0.01` | ✅ Only ~1% false positives – high accuracy, more memory |
-| `0.05` | ⚖️ Balanced tradeoff between memory and performance |
-| `0.1`–`0.2` | 🪶 Very memory-efficient – suitable if some false positives are acceptable |
+| `bloomFilterFpp` | Behaviour                                                                   |
+|------------------|-----------------------------------------------------------------------------|
+| `0.01`           | ✅ Only ~1% false positives — high accuracy, more memory                     |
+| `0.05`           | ⚖️ Balanced tradeoff between memory and performance                          |
+| `0.1` – `0.2`    | 🪶 Very memory-efficient — suitable if some false positives are acceptable  |
 
-```json
-"useBloomFilter": true,
-"bloomFilterFpp": 0.1
-```
-Recommended setting for best balance between speed and memory usage.
+Memory cost (Bloom only — `HASHSET` and `TRUNCATED_LONG_64` follow the `RAM cost` column of the backend table above):
+
+| `bloomFilterFpp` | Light Database (~132M) | Full Database (~1.37B) |
+|------------------|------------------------|------------------------|
+| `0.1`            | ~**80 MB**             | ~**800 MB**            |
+| `0.05`           | ~**100 MB**            | ~**1024 MB**           |
+| `0.01`           | ~**151 MB**            | ~**1574 MB**           |
 
 ### 🔐 Public Key Hashing on GPU (SHA-256 + RIPEMD-160)
 The OpenCL kernel performs **blazing fast public key hashing** directly on the GPU using:
@@ -507,12 +554,11 @@ If you're missing any information or have questions about usage or content, feel
   * Link (3.66 GiB zip archive): http://ladenthin.net/lmdb_light.zip
   * Link extracted addresses as txt (5.17 GiB) (2.29 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Light_HexHash.zip
 
-> 💡 **Hint:** When using the light database, it is **strongly recommended** to enable the following setting in your configuration:
+> 💡 **Hint:** When using the light database it is **strongly recommended** to switch the lookup backend to a self-contained in-memory snapshot:
 > ```json
-> "loadToMemoryCacheOnInit" : true
-> ```  
-> Although LMDB is very fast, a Java `HashSet` provides true **O(1)** lookups compared to **O(log n)** (or worse) with disk-backed access.
-> Enabling this flag loads all addresses into memory at startup, resulting in significantly higher throughput during key scanning — especially for OpenCL or high-frequency batch operations.
+> "addressLookupBackend" : "TRUNCATED_LONG_64"
+> ```
+> See [Pluggable Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend) above for the full trade-off matrix and benchmark numbers. `TRUNCATED_LONG_64` loads every hash160 into RAM once at startup as 256 sorted `long[]` buckets (~1.1 GB for the Light DB), then closes the LMDB env and releases its mmap pages — near-`HASHSET` lookup latency at ~10× lower memory cost. If you have memory to spare and prefer exact-bit storage with no probabilistic fallthrough, `HASHSET` (~10 GB for the Light DB) is the next step up; `SORTED_ARRAY` sits between the two; `BLOOM` keeps LMDB open while still skipping it for the overwhelming majority of misses.
 
 <details>
 <summary>Checksums lmdb_light.zip</summary>

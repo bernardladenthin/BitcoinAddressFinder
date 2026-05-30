@@ -3,34 +3,35 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
-import java.time.Instant;
-import java.util.List;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.hamcrest.Matchers.*;
 import static org.hamcrest.Matchers.equalTo;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import java.text.Normalizer;
 import java.text.Normalizer.Form;
+import java.time.Instant;
+import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
-import static org.hamcrest.Matchers.*;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import org.apache.commons.codec.binary.Hex;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
-
 import org.bitcoinj.crypto.DeterministicKey;
 import org.bitcoinj.crypto.HDKeyDerivation;
 import org.bitcoinj.crypto.MnemonicCode;
 import org.bitcoinj.params.MainNetParams;
 import org.bitcoinj.wallet.DeterministicSeed;
-import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public class BIP39KeyProducerTest {
 
     @Test
     public void nextKey_givenKnownMnemonic_returnsExpectedPrivateKey() {
         // arrange
-        String mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        String mnemonic =
+                "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
         String passphrase = "";
         String bip32Path = CKeyProducerJavaBip39.DEFAULT_BIP32_PATH;
         Instant creationTime = Instant.ofEpochSecond(0);
@@ -49,7 +50,8 @@ public class BIP39KeyProducerTest {
     @Test
     public void nextBytes_calledTwice_returnsDeterministicByteArrays() {
         // arrange
-        String mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        String mnemonic =
+                "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
         String passphrase = "";
         String bip32Path = CKeyProducerJavaBip39.DEFAULT_BIP32_PATH;
         Instant creationTime = Instant.ofEpochSecond(0);
@@ -78,23 +80,24 @@ public class BIP39KeyProducerTest {
 
         // act
         var extended = BIP39KeyProducer.append(
-            org.bitcoinj.crypto.HDPath.parsePath(path),
-            new org.bitcoinj.crypto.ChildNumber(index, false)
-        );
+                org.bitcoinj.crypto.HDPath.parsePath(path), new org.bitcoinj.crypto.ChildNumber(index, false));
 
         // assert
         assertThat(extended.size(), is(5));
         assertThat(extended.get(4).num(), is(index));
     }
-    
+
     @Test
     public void bip39Vector_givenEnglishMnemonic_returnsExpectedSeedAndXprv() throws Exception {
         // Arrange
         String passphrase = "TREZOR";
         String entropyHex = "00000000000000000000000000000000";
-        String expectedMnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-        String expectedSeedHex = "c55257c360c07c72029aebc1b53c05ed0362ada38ead3e3e9efa3708e53495531f09a6987599d18264c1e1c92f2cf141630c7a3c4ab7c81b2f001698e7463b04";
-        String expectedXprv = "xprv9s21ZrQH143K3h3fDYiay8mocZ3afhfULfb5GX8kCBdno77K4HiA15Tg23wpbeF1pLfs1c5SPmYHrEpTuuRhxMwvKDwqdKiGJS9XFKzUsAF";
+        String expectedMnemonic =
+                "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        String expectedSeedHex =
+                "c55257c360c07c72029aebc1b53c05ed0362ada38ead3e3e9efa3708e53495531f09a6987599d18264c1e1c92f2cf141630c7a3c4ab7c81b2f001698e7463b04";
+        String expectedXprv =
+                "xprv9s21ZrQH143K3h3fDYiay8mocZ3afhfULfb5GX8kCBdno77K4HiA15Tg23wpbeF1pLfs1c5SPmYHrEpTuuRhxMwvKDwqdKiGJS9XFKzUsAF";
 
         byte[] entropy = Hex.decodeHex(entropyHex);
         List<String> mnemonic = MnemonicCode.INSTANCE.toMnemonic(entropy);
@@ -109,22 +112,26 @@ public class BIP39KeyProducerTest {
         // Assert
         assertThat(masterKey.serializePrivB58(MainNetParams.get().network()), is(expectedXprv));
     }
-    
+
     @ParameterizedTest
     @MethodSource(BIP39DataProvider.DATA_PROVIDER_BIP39_TEST_VECTORS)
-    public void bip39Vector_givenTestVector_returnsExpectedSeedAndXprvForLanguage(String language, String entropyHex, String mnemonicStr, String passphrase, String expectedSeedHex, String expectedXprv) throws Exception {
+    public void bip39Vector_givenTestVector_returnsExpectedSeedAndXprvForLanguage(
+            String language,
+            String entropyHex,
+            String mnemonicStr,
+            String passphrase,
+            String expectedSeedHex,
+            String expectedXprv)
+            throws Exception {
         // Arrange
         byte[] entropy = Hex.decodeHex(entropyHex);
-        
+
         final BIP39Wordlist wordList = BIP39Wordlist.fromLanguageName(language);
-        
-        MnemonicCode mnemonicCode = new MnemonicCode(
-            wordList.getWordListStream(),
-            null
-        );
+
+        MnemonicCode mnemonicCode = new MnemonicCode(wordList.getWordListStream(), null);
 
         List<String> mnemonic = mnemonicCode.toMnemonic(entropy);
-        
+
         String normalizedMnemonic = Normalizer.normalize(mnemonicStr, Form.NFKD);
         String normalizedPassphrase = Normalizer.normalize(passphrase, Form.NFKD);
 
@@ -141,18 +148,23 @@ public class BIP39KeyProducerTest {
         DeterministicKey masterKey = HDKeyDerivation.createMasterPrivateKey(seed.getSeedBytes());
 
         // Assert xprv
-        assertThat("Language: " + language, masterKey.serializePrivB58(MainNetParams.get().network()), is(expectedXprv));
+        assertThat(
+                "Language: " + language,
+                masterKey.serializePrivB58(MainNetParams.get().network()),
+                is(expectedXprv));
     }
-    
+
     @Test
     public void nextKey_counterOverflow_throwsException() {
         // arrange
-        String mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        String mnemonic =
+                "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
         String passphrase = "";
         String bip32Path = "M/44H/0H/0H/0";
         boolean hardened = false;
 
-        BIP39KeyProducer producer = new BIP39KeyProducer(mnemonic, passphrase, bip32Path, Instant.ofEpochSecond(0), hardened);
+        BIP39KeyProducer producer =
+                new BIP39KeyProducer(mnemonic, passphrase, bip32Path, Instant.ofEpochSecond(0), hardened);
 
         producer.counter.set(Integer.MAX_VALUE);
 
@@ -166,7 +178,7 @@ public class BIP39KeyProducerTest {
         // This call should overflow and throw NoMoreSecretsAvailableException
         assertThrows(NoMoreSecretsAvailableException.class, () -> producer.nextKey());
     }
-    
+
     @Test
     public void testDefaultBip32PathConstant() {
         assertThat(CKeyProducerJavaBip39.DEFAULT_BIP32_PATH, is("M/44H/0H/0H/0"));

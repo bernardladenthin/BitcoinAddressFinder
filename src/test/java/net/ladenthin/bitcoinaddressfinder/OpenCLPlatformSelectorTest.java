@@ -3,9 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.List;
-import com.google.common.collect.ImmutableList;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDeviceSelection;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
@@ -13,11 +19,6 @@ import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatformSelector;
 import org.jocl.cl_context_properties;
 import org.jocl.cl_device_id;
 import org.junit.jupiter.api.Test;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class OpenCLPlatformSelectorTest {
 
@@ -146,15 +147,43 @@ public class OpenCLPlatformSelectorTest {
 
     private static OpenCLDevice createTestDevice(long deviceType) {
         return new OpenCLDevice(
-            new cl_device_id(), "TestDevice", "TestVendor", "1.0",
-            "FULL_PROFILE", "OpenCL 2.0", "", deviceType,
-            true, 1, 1L, ImmutableList.of(64L), 64L, 1000L, 32,
-            1024L * 1024L, 1024L * 1024L * 1024L, 0L, 1,
-            32L * 1024L, 64L * 1024L, 0L,
-            1, 128, 8, 0L,
-            4096L, 4096L, 2048L, 2048L, 2048L,
-            1, 1, 1, 1, 1, 1
-        );
+                new cl_device_id(),
+                "TestDevice",
+                "TestVendor",
+                "1.0",
+                "FULL_PROFILE",
+                "OpenCL 2.0",
+                "",
+                deviceType,
+                true,
+                1,
+                1L,
+                ImmutableList.of(64L),
+                64L,
+                1000L,
+                32,
+                1024L * 1024L,
+                1024L * 1024L * 1024L,
+                0L,
+                1,
+                32L * 1024L,
+                64L * 1024L,
+                0L,
+                1,
+                128,
+                8,
+                0L,
+                4096L,
+                4096L,
+                2048L,
+                2048L,
+                2048L,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1);
     }
     // </editor-fold>
 }

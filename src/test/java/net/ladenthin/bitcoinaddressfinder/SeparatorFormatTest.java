@@ -3,15 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.io.IOException;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.equalTo;
+
+import java.util.Arrays;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import java.util.Arrays;
-import java.util.List;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.*;
 
 /**
  * Unit tests for {@link SeparatorFormat}.
@@ -74,7 +74,7 @@ public class SeparatorFormatTest {
         assertThat(result.length, is(equalTo(1)));
         assertThat(result[0], is(equalTo(input)));
     }
-    
+
     /**
      * Tests that the input is recursively split on all matching separators,
      * starting with the longest, respecting their defined priority.
@@ -82,7 +82,8 @@ public class SeparatorFormatTest {
     @Test
     public void split_inputWithMultipleValidSeparators_recursivelySplitsAll() {
         // arrange
-        String input = "a" + SeparatorFormat.DOUBLE_COLON.getSymbol() + "b" + SeparatorFormat.SEMICOLON.getSymbol() + "c";
+        String input =
+                "a" + SeparatorFormat.DOUBLE_COLON.getSymbol() + "b" + SeparatorFormat.SEMICOLON.getSymbol() + "c";
 
         // act
         String[] result = SeparatorFormat.split(input);
@@ -214,17 +215,17 @@ public class SeparatorFormatTest {
         String[] result = SeparatorFormat.split(input);
         assertThat(result.length, is(equalTo(2)));
     }
-    
+
     @Test
     public void split_recursiveSplitting_allRelevantSeparatorsAreResolvedInOrder() {
         // arrange
-        String input = "first" 
-            + SeparatorFormat.DOUBLE_COLON.getSymbol() 
-            + "second" 
-            + SeparatorFormat.COLON.getSymbol() 
-            + "third" 
-            + SeparatorFormat.PIPE.getSymbol() 
-            + "fourth";
+        String input = "first"
+                + SeparatorFormat.DOUBLE_COLON.getSymbol()
+                + "second"
+                + SeparatorFormat.COLON.getSymbol()
+                + "third"
+                + SeparatorFormat.PIPE.getSymbol()
+                + "fourth";
 
         // Expected splitting order:
         // 1. DOUBLE_COLON splits "first" and "second:third|fourth"

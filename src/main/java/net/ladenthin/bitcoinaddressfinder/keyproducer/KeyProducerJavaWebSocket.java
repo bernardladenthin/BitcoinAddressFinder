@@ -3,25 +3,37 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.BitHelper;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
-import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
-import org.java_websocket.WebSocket;
-import org.java_websocket.server.WebSocketServer;
-import org.java_websocket.handshake.ClientHandshake;
-import org.slf4j.Logger;
-
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Executors;
+import net.ladenthin.bitcoinaddressfinder.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
+import org.java_websocket.WebSocket;
+import org.java_websocket.handshake.ClientHandshake;
+import org.java_websocket.server.WebSocketServer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+/**
+ * Key producer that receives secrets through a WebSocket server.
+ */
 public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaWebSocket> {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(KeyProducerJavaWebSocket.class);
 
     private WebSocketServer webSocketServer;
 
-    public KeyProducerJavaWebSocket(CKeyProducerJavaWebSocket config, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
-        super(config, keyUtility, logger);
+    /**
+     * Creates a new WebSocket-based key producer and starts the embedded server.
+     *
+     * @param config      the WebSocket configuration
+     * @param keyUtility  cryptographic helper
+     * @param bitHelper   bit/batch-size helper (unused but kept for symmetry)
+     */
+    public KeyProducerJavaWebSocket(CKeyProducerJavaWebSocket config, KeyUtility keyUtility, BitHelper bitHelper) {
+        super(config, keyUtility);
         initWebSocketServer();
     }
 
@@ -29,12 +41,12 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
         webSocketServer = new WebSocketServer(new InetSocketAddress(cKeyProducerJava.getPort())) {
             @Override
             public void onOpen(WebSocket conn, ClientHandshake handshake) {
-                logger.info("WebSocket connection opened from: {}", conn.getRemoteSocketAddress());
+                LOGGER.info("WebSocket connection opened from: {}", conn.getRemoteSocketAddress());
             }
 
             @Override
             public void onClose(WebSocket conn, int code, String reason, boolean remote) {
-                logger.info("WebSocket closed: {}", conn.getRemoteSocketAddress());
+                LOGGER.info("WebSocket closed: {}", conn.getRemoteSocketAddress());
             }
 
             @Override
@@ -45,23 +57,23 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
                     message.get(secret);
                     addSecret(secret);
                 } else {
-                    logger.warn("Invalid message length: {}", message.remaining());
+                    LOGGER.warn("Invalid message length: {}", message.remaining());
                 }
             }
 
             @Override
             public void onError(WebSocket conn, Exception ex) {
-                logger.error("WebSocket error", ex);
+                LOGGER.error("WebSocket error", ex);
             }
 
             @Override
             public void onStart() {
-                logger.info("WebSocket server started on port: {}", getPort());
+                LOGGER.info("WebSocket server started on port: {}", getPort());
             }
 
             @Override
             public void onMessage(WebSocket ws, String string) {
-                logger.info("onMessage: {}", string);
+                LOGGER.info("onMessage: {}", string);
             }
         };
 

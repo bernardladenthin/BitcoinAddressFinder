@@ -3,6 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
+
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
@@ -13,102 +17,95 @@ import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomInstance;
 import org.bitcoinj.base.Network;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.is;
-
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import static org.mockito.Mockito.mock;
-import org.slf4j.Logger;
 
 public class KeyProducerJavaRandomTest {
-    
+
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
-    private Logger mockLogger;
-    
+
     String keyProducerId = "exampleId";
-    
-    @BeforeEach
-    public void setUp() {
-        mockLogger = mock(Logger.class);
-    }
 
     private KeyProducerJavaRandom createKeyProducerJavaRandom(CKeyProducerJavaRandom cKeyProducerJavaRandom) {
-        return new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility, bitHelper, mockLogger);
+        return new KeyProducerJavaRandom(cKeyProducerJavaRandom, keyUtility, bitHelper);
     }
-    
+
     // <editor-fold defaultstate="collapsed" desc="createStatisticsMessage">
     @Test
-    public void createSecrets_parameterBatchSizeInBitsZeroAndReturnStartSecretOnlyTrue_returnExpectedSecrets() throws NoMoreSecretsAvailableException {
+    public void createSecrets_parameterBatchSizeInBitsZeroAndReturnStartSecretOnlyTrue_returnExpectedSecrets()
+            throws NoMoreSecretsAvailableException {
         // arrange
         CKeyProducerJavaRandom cKeyProducerJavaRandom = new CKeyProducerJavaRandom();
         cKeyProducerJavaRandom.keyProducerId = keyProducerId;
         cKeyProducerJavaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
         cKeyProducerJavaRandom.customSeed = 0L;
         cKeyProducerJavaRandom.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
-        
+
         KeyProducerJavaRandom keyProducerJavaRandom = createKeyProducerJavaRandom(cKeyProducerJavaRandom);
-        
+
         int overallWorkSize = bitHelper.convertBitsToSize(0);
-        
+
         // act
         BigInteger[] result = keyProducerJavaRandom.createSecrets(overallWorkSize, true);
-        
+
         // assert
         assertThat(result.length, is(equalTo(1)));
     }
-    
+
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX)
-    public void createSecrets_parameterBatchSizeInBitsFromDataProviderAndReturnStartSecretOnlyTrue_returnExpectedSecrets(int batchSizeInBits) throws NoMoreSecretsAvailableException {
+    public void
+            createSecrets_parameterBatchSizeInBitsFromDataProviderAndReturnStartSecretOnlyTrue_returnExpectedSecrets(
+                    int batchSizeInBits) throws NoMoreSecretsAvailableException {
         // arrange
         CKeyProducerJavaRandom cKeyProducerJavaRandom = new CKeyProducerJavaRandom();
         cKeyProducerJavaRandom.keyProducerId = keyProducerId;
         cKeyProducerJavaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
         cKeyProducerJavaRandom.customSeed = 0L;
         cKeyProducerJavaRandom.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
-        
+
         KeyProducerJavaRandom keyProducerJavaRandom = createKeyProducerJavaRandom(cKeyProducerJavaRandom);
-        
+
         int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
-        
+
         // act
         BigInteger[] result = keyProducerJavaRandom.createSecrets(overallWorkSize, true);
-        
+
         // assert
         assertThat(result.length, is(equalTo(1)));
     }
-    
+
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX)
-    public void createSecrets_parameterBatchSizeInBitsFromDataProviderAndReturnStartSecretOnlyFalse_returnExpectedSecrets(int batchSizeInBits) throws NoMoreSecretsAvailableException {
+    public void
+            createSecrets_parameterBatchSizeInBitsFromDataProviderAndReturnStartSecretOnlyFalse_returnExpectedSecrets(
+                    int batchSizeInBits) throws NoMoreSecretsAvailableException {
         // arrange
         CKeyProducerJavaRandom cKeyProducerJavaRandom = new CKeyProducerJavaRandom();
         cKeyProducerJavaRandom.keyProducerId = keyProducerId;
         cKeyProducerJavaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
         cKeyProducerJavaRandom.customSeed = 0L;
         cKeyProducerJavaRandom.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
-                
+
         KeyProducerJavaRandom keyProducerJavaRandom = createKeyProducerJavaRandom(cKeyProducerJavaRandom);
-        
+
         int overallWorkSize = bitHelper.convertBitsToSize(batchSizeInBits);
-        
+
         // act
         BigInteger[] result = keyProducerJavaRandom.createSecrets(overallWorkSize, false);
-        
+
         // assert
         assertThat(result.length, is(equalTo(bitHelper.convertBitsToSize(batchSizeInBits))));
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="testAllRNGs">
-    private BigInteger[] generateSecrets(CKeyProducerJavaRandomInstance instance, @Nullable Long customSeed) throws NoMoreSecretsAvailableException {
+    private BigInteger[] generateSecrets(CKeyProducerJavaRandomInstance instance, @Nullable Long customSeed)
+            throws NoMoreSecretsAvailableException {
         CKeyProducerJavaRandom config = new CKeyProducerJavaRandom();
         config.keyProducerId = keyProducerId;
         config.keyProducerJavaRandomInstance = instance;

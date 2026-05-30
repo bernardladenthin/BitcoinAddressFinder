@@ -9,13 +9,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class CProducerTest {
-    
+
     private final BitHelper bitHelper = new BitHelper();
-    
+
     @BeforeEach
-    public void init() throws IOException {
-    }
-    
+    public void init() throws IOException {}
+
     // <editor-fold defaultstate="collapsed" desc="default parameter for batchSizeInBits">
     @Test
     public void batchSizeInBits_configurationConstantsSet_isValidDefaultValue() throws IOException {

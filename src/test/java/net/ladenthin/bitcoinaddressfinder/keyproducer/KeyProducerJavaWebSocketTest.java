@@ -3,6 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import java.math.BigInteger;
+import java.net.URI;
+import java.util.concurrent.*;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
@@ -14,23 +21,11 @@ import org.java_websocket.handshake.ServerHandshake;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-
-import java.math.BigInteger;
-import java.net.URI;
-import java.util.concurrent.*;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
-
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.*;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
 
 public class KeyProducerJavaWebSocketTest {
 
     private KeyUtility keyUtility;
     private BitHelper bitHelper;
-    private Logger mockLogger;
 
     private ExecutorService executorService;
 
@@ -39,7 +34,6 @@ public class KeyProducerJavaWebSocketTest {
         Network network = new NetworkParameterFactory().getNetwork();
         keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
         bitHelper = new BitHelper();
-        mockLogger = mock(Logger.class);
         executorService = Executors.newCachedThreadPool();
     }
 
@@ -62,7 +56,7 @@ public class KeyProducerJavaWebSocketTest {
     @Test
     public void createSecrets_receivesValidSecret() throws Exception {
         CKeyProducerJavaWebSocket config = createConfig();
-        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
 
         // WebSocket client to send a valid 32-byte secret
         byte[] secret = new KeyProducerTestUtility().createZeroedSecret();
@@ -71,10 +65,21 @@ public class KeyProducerJavaWebSocketTest {
         CountDownLatch connected = new CountDownLatch(1);
 
         WebSocketClient client = new WebSocketClient(new URI("ws://localhost:" + config.port)) {
-            @Override public void onOpen(ServerHandshake handshakedata) { connected.countDown(); }
-            @Override public void onMessage(String message) {}
-            @Override public void onClose(int code, String reason, boolean remote) {}
-            @Override public void onError(Exception ex) { ex.printStackTrace(); }
+            @Override
+            public void onOpen(ServerHandshake handshakedata) {
+                connected.countDown();
+            }
+
+            @Override
+            public void onMessage(String message) {}
+
+            @Override
+            public void onClose(int code, String reason, boolean remote) {}
+
+            @Override
+            public void onError(Exception ex) {
+                ex.printStackTrace();
+            }
         };
 
         client.connectBlocking();
@@ -94,7 +99,7 @@ public class KeyProducerJavaWebSocketTest {
     public void createSecrets_timeoutWithoutMessage_throwsException() throws Exception {
         CKeyProducerJavaWebSocket config = createConfig();
         config.timeout = TestTimeProvider.DEFAULT_TIMEOUT;
-        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
 
         assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(1, true));
     }
@@ -104,7 +109,7 @@ public class KeyProducerJavaWebSocketTest {
         // arrange
         CKeyProducerJavaWebSocket config = createConfig();
         config.timeout = -1; // explicit: block indefinitely
-        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
 
         byte[] secret = new KeyProducerTestUtility().createZeroedSecret();
         BigInteger expected = new BigInteger(1, secret);
@@ -118,16 +123,26 @@ public class KeyProducerJavaWebSocketTest {
         // Give the consumer time to actually park in take(); a quick spin would
         // not exercise the blocking path.
         Thread.sleep(TestTimeProvider.DEFAULT_DELAY);
-        assertThat("createSecrets must block when timeout < 0 and queue is empty",
-                future.isDone(), is(false));
+        assertThat("createSecrets must block when timeout < 0 and queue is empty", future.isDone(), is(false));
 
         // Now publish a message; the consumer should wake and return it.
         CountDownLatch connected = new CountDownLatch(1);
         WebSocketClient client = new WebSocketClient(new URI("ws://localhost:" + config.port)) {
-            @Override public void onOpen(ServerHandshake handshakedata) { connected.countDown(); }
-            @Override public void onMessage(String message) {}
-            @Override public void onClose(int code, String reason, boolean remote) {}
-            @Override public void onError(Exception ex) { ex.printStackTrace(); }
+            @Override
+            public void onOpen(ServerHandshake handshakedata) {
+                connected.countDown();
+            }
+
+            @Override
+            public void onMessage(String message) {}
+
+            @Override
+            public void onClose(int code, String reason, boolean remote) {}
+
+            @Override
+            public void onError(Exception ex) {
+                ex.printStackTrace();
+            }
         };
         client.connectBlocking();
         waitForConnectionOrFail(client, connected, TestTimeProvider.DEFAULT_SOCKET_TIMEOUT);
@@ -148,7 +163,7 @@ public class KeyProducerJavaWebSocketTest {
     public void interrupt_stopsReceiverAndCausesNoMoreSecretsAvailableException() throws Exception {
         // arrange
         CKeyProducerJavaWebSocket config = createConfig();
-        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
 
         Future<BigInteger[]> future = executorService.submit(() -> {
             try {
@@ -176,7 +191,7 @@ public class KeyProducerJavaWebSocketTest {
     public void createSecrets_invalidMessageLength_ignoredByServer() throws Exception {
         // arrange
         CKeyProducerJavaWebSocket config = createConfig();
-        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper, mockLogger);
+        KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
 
         ConnectionUtils.waitUntilTcpPortOpen("localhost", config.port, TestTimeProvider.DEFAULT_SOCKET_TIMEOUT);
 
@@ -186,10 +201,21 @@ public class KeyProducerJavaWebSocketTest {
 
         CountDownLatch connected = new CountDownLatch(1);
         WebSocketClient client = new WebSocketClient(new URI("ws://localhost:" + config.port)) {
-            @Override public void onOpen(ServerHandshake handshakedata) { connected.countDown(); }
-            @Override public void onMessage(String message) {}
-            @Override public void onClose(int code, String reason, boolean remote) {}
-            @Override public void onError(Exception ex) { ex.printStackTrace(); }
+            @Override
+            public void onOpen(ServerHandshake handshakedata) {
+                connected.countDown();
+            }
+
+            @Override
+            public void onMessage(String message) {}
+
+            @Override
+            public void onClose(int code, String reason, boolean remote) {}
+
+            @Override
+            public void onError(Exception ex) {
+                ex.printStackTrace();
+            }
         };
 
         client.connectBlocking();
@@ -213,7 +239,8 @@ public class KeyProducerJavaWebSocketTest {
         client.close();
     }
 
-    public static void waitForConnectionOrFail(WebSocketClient client, CountDownLatch latch, int timeoutMillis) throws InterruptedException {
+    public static void waitForConnectionOrFail(WebSocketClient client, CountDownLatch latch, int timeoutMillis)
+            throws InterruptedException {
         boolean opened = latch.await(timeoutMillis, TimeUnit.MILLISECONDS);
         if (!opened || !client.isOpen()) {
             throw new IllegalStateException("WebSocket not open after " + timeoutMillis + "ms");

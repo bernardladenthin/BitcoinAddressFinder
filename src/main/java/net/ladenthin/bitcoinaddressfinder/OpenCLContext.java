@@ -3,23 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.io.Resources;
-import java.io.IOException;
-import java.math.BigInteger;
-import java.net.URL;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-
-import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
-import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
-import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
-import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDeviceSelection;
-import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
-import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatformSelector;
 import static org.jocl.CL.clBuildProgram;
 import static org.jocl.CL.clCreateCommandQueueWithProperties;
 import static org.jocl.CL.clCreateContext;
@@ -27,6 +10,26 @@ import static org.jocl.CL.clCreateKernel;
 import static org.jocl.CL.clCreateProgramWithSource;
 import static org.jocl.CL.clReleaseCommandQueue;
 import static org.jocl.CL.clReleaseContext;
+import static org.jocl.CL.clReleaseKernel;
+import static org.jocl.CL.clReleaseProgram;
+
+import com.google.common.io.Resources;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.net.URL;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDeviceSelection;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatformSelector;
+import org.jocl.CL;
 import org.jocl.cl_command_queue;
 import org.jocl.cl_context;
 import org.jocl.cl_context_properties;
@@ -34,30 +37,34 @@ import org.jocl.cl_device_id;
 import org.jocl.cl_kernel;
 import org.jocl.cl_program;
 import org.jocl.cl_queue_properties;
-import org.jocl.CL;
-import static org.jocl.CL.clReleaseKernel;
-import static org.jocl.CL.clReleaseProgram;
-
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * OpenCL context and kernel lifecycle wrapper used by the GPU producer.
+ */
 public class OpenCLContext implements ReleaseCLObject {
 
-    private final Logger logger;
+    private static final Logger LOGGER = LoggerFactory.getLogger(OpenCLContext.class);
 
+    /**
+     * Loads the OpenCL kernel sources from the classpath and strips {@code #include} directives.
+     *
+     * @return one source string per kernel source resource
+     * @throws IOException if a resource cannot be read
+     */
     public String[] getOpenCLPrograms() throws IOException {
         List<String> resourceNamesContent = getResourceNamesContent(getResourceNames());
-        List<String> resourceNamesContentWithReplacements = new ArrayList<>();
+        List<String> resourceNamesContentWithReplacements = new ArrayList<>(resourceNamesContent.size());
         for (String content : resourceNamesContent) {
             String contentWithReplacements = content;
             contentWithReplacements = contentWithReplacements.replaceAll("#include.*", "");
             resourceNamesContentWithReplacements.add(contentWithReplacements);
         }
-        String[] openClPrograms = resourceNamesContentWithReplacements.toArray(new String[0]);
-        return openClPrograms;
+        return resourceNamesContentWithReplacements.toArray(new String[0]);
     }
-    
+
     private List<String> getResourceNames() {
         List<String> resourceNames = new ArrayList<>();
         resourceNames.add("inc_defines.h");
@@ -77,34 +84,38 @@ public class OpenCLContext implements ReleaseCLObject {
         resourceNames.add("inc_ecc_secp256k1custom.cl");
         return resourceNames;
     }
-    
-    private final static String KERNEL_NAME = "generateKeysKernel_grid";
-    private final static boolean EXCEPTIONS_ENABLED = true;
-    
+
+    private static final String KERNEL_NAME = "generateKeysKernel_grid";
+    private static final boolean EXCEPTIONS_ENABLED = true;
+
     private final CProducerOpenCL producerOpenCL;
     private final BitHelper bitHelper;
 
-    private @Nullable OpenCLDevice device;
     private @Nullable cl_context context;
     private @Nullable cl_command_queue commandQueue;
     private @Nullable cl_program program;
     private @Nullable cl_kernel kernel;
     private @Nullable OpenClTask openClTask;
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
-    
-    private boolean closed = false;
-    
-    public OpenCLContext(CProducerOpenCL producerOpenCL, BitHelper bitHelper) {
-        this(producerOpenCL, bitHelper, LoggerFactory.getLogger(OpenCLContext.class));
-    }
 
-    @VisibleForTesting
-    OpenCLContext(CProducerOpenCL producerOpenCL, BitHelper bitHelper, Logger logger) {
+    private boolean closed = false;
+
+    /**
+     * Creates a new OpenCL context.
+     *
+     * @param producerOpenCL the OpenCL producer configuration
+     * @param bitHelper      the bit/batch-size helper
+     */
+    public OpenCLContext(CProducerOpenCL producerOpenCL, BitHelper bitHelper) {
         this.producerOpenCL = producerOpenCL;
         this.bitHelper = bitHelper;
-        this.logger = logger;
     }
-    
+
+    /**
+     * Initialises the OpenCL context, command queue, program and kernel.
+     *
+     * @throws IOException if loading the kernel sources fails
+     */
     public void init() throws IOException {
 
         // #################### general ####################
@@ -116,36 +127,32 @@ public class OpenCLContext implements ReleaseCLObject {
 
         OpenCLPlatformSelector platformSelector = new OpenCLPlatformSelector();
         OpenCLDeviceSelection selection = platformSelector.select(
-            platforms,
-            producerOpenCL.platformIndex,
-            producerOpenCL.deviceType,
-            producerOpenCL.deviceIndex
-        );
-        
-        device = selection.device();
-        logger.info("Selected OpenCL device:\n{}", device.toStringPretty());
+                platforms, producerOpenCL.platformIndex, producerOpenCL.deviceType, producerOpenCL.deviceIndex);
+
+        OpenCLDevice device = selection.device();
+        LOGGER.info("Selected OpenCL device:\n{}", device.toStringPretty());
         cl_context_properties contextProperties = selection.contextProperties();
-        cl_device_id[] cl_device_ids = new cl_device_id[]{device.device()};
-        
+        cl_device_id[] cl_device_ids = new cl_device_id[] {device.device()};
+
         // Create a context for the selected device
         context = clCreateContext(contextProperties, 1, cl_device_ids, null, null, null);
-        
+
         // Create a command-queue for the selected device
         cl_queue_properties properties = new cl_queue_properties();
         commandQueue = clCreateCommandQueueWithProperties(context, device.device(), properties, null);
-        
+
         // #################### kernel specifix ####################
-        
+
         String[] openCLPrograms = getOpenCLPrograms();
         // Create the program from the source code
         program = clCreateProgramWithSource(context, openCLPrograms.length, openCLPrograms, null, null);
 
         // Build the program
         clBuildProgram(program, 0, null, null, null, null);
-        
+
         // Create the kernel
         kernel = clCreateKernel(program, KERNEL_NAME, null);
-        
+
         openClTask = new OpenClTask(context, producerOpenCL, bitHelper, byteBufferUtility);
     }
 
@@ -153,7 +160,7 @@ public class OpenCLContext implements ReleaseCLObject {
     OpenClTask getOpenClTask() {
         return openClTask;
     }
-    
+
     @Override
     public boolean isClosed() {
         return closed;
@@ -161,7 +168,6 @@ public class OpenCLContext implements ReleaseCLObject {
 
     @Override
     public void close() {
-        device = null;
         if (!closed) {
             if (openClTask != null) {
                 openClTask = null;
@@ -186,6 +192,12 @@ public class OpenCLContext implements ReleaseCLObject {
         }
     }
 
+    /**
+     * Runs the kernel for the given private-key base and returns the result grid.
+     *
+     * @param privateKeyBase the base private key for the batch
+     * @return the grid result containing the derived public-key bytes
+     */
     public OpenCLGridResult createKeys(BigInteger privateKeyBase) {
         OpenClTask localOpenClTask = Objects.requireNonNull(openClTask);
         cl_kernel localKernel = Objects.requireNonNull(kernel);
@@ -194,12 +206,11 @@ public class OpenCLContext implements ReleaseCLObject {
         localOpenClTask.setSrcPrivateKeyChunk(privateKeyBase);
         ByteBuffer dstByteBuffer = localOpenClTask.executeKernel(localKernel, localCommandQueue);
 
-        OpenCLGridResult openCLGridResult = new OpenCLGridResult(privateKeyBase, producerOpenCL.getOverallWorkSize(bitHelper), dstByteBuffer);
-        return openCLGridResult;
+        return new OpenCLGridResult(privateKeyBase, producerOpenCL.getOverallWorkSize(bitHelper), dstByteBuffer);
     }
 
-    private static List<String> getResourceNamesContent(List<String> resourceNames) throws IOException {
-        List<String> contents = new ArrayList<>();
+    private static List<String> getResourceNamesContent(Collection<String> resourceNames) throws IOException {
+        List<String> contents = new ArrayList<>(resourceNames.size());
         for (String resourceName : resourceNames) {
             URL url = Resources.getResource(resourceName);
             String content = Resources.toString(url, StandardCharsets.UTF_8);
@@ -207,5 +218,4 @@ public class OpenCLContext implements ReleaseCLObject {
         }
         return contents;
     }
-
 }

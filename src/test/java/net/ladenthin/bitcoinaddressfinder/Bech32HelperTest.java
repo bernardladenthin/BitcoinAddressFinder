@@ -3,27 +3,32 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.nio.ByteBuffer;
-import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2PKH;
-import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2WPKH;
-import org.bitcoinj.base.Bech32;
-import org.junit.jupiter.api.Test;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.nio.ByteBuffer;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2PKH;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2WPKH;
+import org.bitcoinj.base.Bech32;
+import org.junit.jupiter.api.Test;
+
 public class Bech32HelperTest {
 
-    private final KeyUtility keyUtility = new KeyUtility(new NetworkParameterFactory().getNetwork(), new ByteBufferUtility(false));
+    private final KeyUtility keyUtility =
+            new KeyUtility(new NetworkParameterFactory().getNetwork(), new ByteBufferUtility(false));
 
     // <editor-fold defaultstate="collapsed" desc="decodeBech32CharsetToValues">
     @Test
     public void decodeBech32CharsetToValues_fullCharset_returnsValuesZeroToThirtyOne() {
         // arrange
         Bech32Helper sut = new Bech32Helper();
-        byte[] expected = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31};
+        byte[] expected = {
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
+            29, 30, 31
+        };
 
         // act
         byte[] result = sut.decodeBech32CharsetToValues(Bech32Helper.CHARSET);
@@ -45,7 +50,8 @@ public class Bech32HelperTest {
 
     // <editor-fold defaultstate="collapsed" desc="extractPKHFromBitcoinCashAddress">
     @Test
-    public void extractPKHFromBitcoinCashAddress_withoutPrefix_returnsCorrectHash160() throws ReflectiveOperationException {
+    public void extractPKHFromBitcoinCashAddress_withoutPrefix_returnsCorrectHash160()
+            throws ReflectiveOperationException {
         // arrange
         P2PKH address = P2PKH.BitcoinCash;
 
@@ -59,7 +65,8 @@ public class Bech32HelperTest {
     }
 
     @Test
-    public void extractPKHFromBitcoinCashAddress_withPrefix_returnsCorrectHash160() throws ReflectiveOperationException {
+    public void extractPKHFromBitcoinCashAddress_withPrefix_returnsCorrectHash160()
+            throws ReflectiveOperationException {
         // arrange
         P2PKH address = P2PKH.BitcoinCashWithPrefix;
 

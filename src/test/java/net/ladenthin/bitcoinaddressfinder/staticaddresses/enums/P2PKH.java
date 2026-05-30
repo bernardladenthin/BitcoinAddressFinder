@@ -11,7 +11,7 @@ import org.bitcoinj.base.Network;
 import org.bouncycastle.util.encoders.Hex;
 
 public enum P2PKH implements PublicAddress {
-    
+
     /**
      * https://chainz.cryptoid.info/42/address.dws?7793.htm
      */
@@ -67,7 +67,8 @@ public enum P2PKH implements PublicAddress {
     /**
      * https://privatekeys.pw/address/bitcoin-cash/qzh96ajgz9ufvs4zmrzq8jr95s7nm0qlnclvk3vpe0
      */
-    BitcoinCashWithPrefix("bitcoincash:qzh96ajgz9ufvs4zmrzq8jr95s7nm0qlnclvk3vpe0", "ae5d764811789642a2d8c403c865a43d3dbc1f9e"),
+    BitcoinCashWithPrefix(
+            "bitcoincash:qzh96ajgz9ufvs4zmrzq8jr95s7nm0qlnclvk3vpe0", "ae5d764811789642a2d8c403c865a43d3dbc1f9e"),
     /**
      * https://bitinfocharts.com/de/bitcoin%20gold/address/GUGsnYNyGYDe4GT2iQKLDjKFPpd4KBXMQB
      */
@@ -572,10 +573,10 @@ public enum P2PKH implements PublicAddress {
      * https://privatekeys.pw/zcash/address/t1VShHAhsQc5RVndQLyM1ZbQXLHKd35GkG1
      */
     Zcash("t1VShHAhsQc5RVndQLyM1ZbQXLHKd35GkG1", "7eeb8313a6c3829217d83a28acb0433a3d6a2bb0");
-    
+
     private final String publicAddress;
     private final String publicKeyHash;
-    
+
     P2PKH(String publicAddress, String publicKeyHash) {
         this.publicAddress = publicAddress;
         this.publicKeyHash = publicKeyHash;
@@ -589,15 +590,15 @@ public enum P2PKH implements PublicAddress {
     public String getPublicKeyHashAsHex() {
         return publicKeyHash;
     }
-    
+
     public byte[] getPublicKeyHash() {
         return Hex.decode(getPublicKeyHashAsHex());
     }
-    
+
     public ByteBuffer getPublicKeyHashAsByteBuffer() {
         return new ByteBufferUtility(true).getByteBufferFromHex(getPublicKeyHashAsHex());
     }
-    
+
     public String getPublicKeyHashAsBase58() {
         final Network network = new NetworkParameterFactory().getNetwork();
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(true));

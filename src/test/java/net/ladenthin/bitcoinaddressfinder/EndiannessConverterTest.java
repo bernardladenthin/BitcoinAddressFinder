@@ -3,10 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import static org.mockito.Mockito.*;
-
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+import static org.mockito.Mockito.*;
 
 import java.nio.ByteOrder;
 import org.junit.jupiter.api.Test;
@@ -56,7 +55,8 @@ public class EndiannessConverterTest {
     @Test
     public void getSourceOrder_returnsCorrectSourceOrder() {
         // arrange
-        EndiannessConverter converter = new EndiannessConverter(ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN, byteBufferUtility);
+        EndiannessConverter converter =
+                new EndiannessConverter(ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN, byteBufferUtility);
 
         // act
         ByteOrder source = converter.getSourceOrder();
@@ -68,7 +68,8 @@ public class EndiannessConverterTest {
     @Test
     public void getTargetOrder_returnsCorrectTargetOrder() {
         // arrange
-        EndiannessConverter converter = new EndiannessConverter(ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN, byteBufferUtility);
+        EndiannessConverter converter =
+                new EndiannessConverter(ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN, byteBufferUtility);
 
         // act
         ByteOrder target = converter.getTargetOrder();

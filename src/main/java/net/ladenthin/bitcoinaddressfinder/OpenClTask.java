@@ -3,12 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import com.google.common.annotations.VisibleForTesting;
-import java.math.BigInteger;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
-import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import static org.jocl.CL.CL_MEM_READ_ONLY;
 import static org.jocl.CL.CL_MEM_USE_HOST_PTR;
 import static org.jocl.CL.CL_MEM_WRITE_ONLY;
@@ -20,6 +14,12 @@ import static org.jocl.CL.clEnqueueWriteBuffer;
 import static org.jocl.CL.clFinish;
 import static org.jocl.CL.clReleaseMemObject;
 import static org.jocl.CL.clSetKernelArg;
+
+import com.google.common.annotations.VisibleForTesting;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import org.jocl.Pointer;
 import org.jocl.Sizeof;
 import org.jocl.cl_command_queue;
@@ -29,18 +29,22 @@ import org.jocl.cl_mem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Encapsulates one OpenCL kernel invocation: manages source/destination buffers and runs the kernel.
+ */
 public class OpenClTask implements ReleaseCLObject {
 
-    protected Logger logger = LoggerFactory.getLogger(this.getClass());
-    
-    private final static int PRIVATE_KEY_SOURCE_SIZE_IN_BYTES = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES;
-    
+    /** SLF4J logger for this task. */
+    private static final Logger LOGGER = LoggerFactory.getLogger(OpenClTask.class);
+
+    private static final int PRIVATE_KEY_SOURCE_SIZE_IN_BYTES = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES;
+
     private final CProducerOpenCL cProducer;
 
     private final cl_context context;
-    
+
     private final SourceArgument privateKeySourceArgument;
-    
+
     private final BitHelper bitHelper;
     private final ByteBufferUtility byteBufferUtility;
     private final BigInteger maxPrivateKeyForBatchSize;
@@ -48,6 +52,9 @@ public class OpenClTask implements ReleaseCLObject {
 
     private boolean closed = false;
 
+    /**
+     * Common base for source and destination OpenCL buffer arguments backed by a {@link ByteBuffer}.
+     */
     public abstract static class CLByteBufferPointerArgument implements ReleaseCLObject {
         /**
          * Controls how memory is allocated for the OpenCL output buffer.
@@ -69,33 +76,65 @@ public class OpenClTask implements ReleaseCLObject {
          */
         protected static final boolean USE_HOST_PTR = false;
 
+        /** Host-side direct byte buffer holding the data. */
         protected final ByteBuffer byteBuffer;
+        /** {@link Pointer} that references {@link #byteBuffer} for host memory transfers. */
         protected final Pointer hostMemoryPointer;
+        /** Underlying OpenCL memory object. */
         protected final cl_mem mem;
+        /** {@link Pointer} that references {@link #mem} for {@code clSetKernelArg}. */
         protected final Pointer clMemPointer;
+
         private boolean closed = false;
 
-        public CLByteBufferPointerArgument(ByteBuffer byteBuffer, Pointer hostMemoryPointer, cl_mem mem, Pointer clMemPointer) {
+        /**
+         * Creates a new wrapper around an allocated OpenCL buffer.
+         *
+         * @param byteBuffer        the backing direct byte buffer
+         * @param hostMemoryPointer pointer to {@code byteBuffer}
+         * @param mem               the OpenCL memory object
+         * @param clMemPointer      pointer to {@code mem}
+         */
+        public CLByteBufferPointerArgument(
+                ByteBuffer byteBuffer, Pointer hostMemoryPointer, cl_mem mem, Pointer clMemPointer) {
             this.byteBuffer = byteBuffer;
             this.hostMemoryPointer = hostMemoryPointer;
             this.mem = mem;
             this.clMemPointer = clMemPointer;
         }
 
+        /**
+         * Returns the backing host-side byte buffer.
+         *
+         * @return the backing host-side byte buffer
+         */
         public ByteBuffer getByteBuffer() {
             return byteBuffer;
         }
 
-        /** Used for reading/writing data to the host via clEnqueueRead/WriteBuffer. */
+        /**
+         * Returns the host-memory pointer used for {@code clEnqueueRead/WriteBuffer}.
+         *
+         * @return the host-memory pointer used for {@code clEnqueueRead/WriteBuffer}
+         */
         public Pointer getHostMemoryPointer() {
             return hostMemoryPointer;
         }
 
-        /** Used to pass the buffer to the kernel via clSetKernelArg. */
+        /**
+         * Returns the {@code cl_mem} pointer used for {@code clSetKernelArg}.
+         *
+         * @return the {@code cl_mem} pointer used for {@code clSetKernelArg}
+         */
         public Pointer getClMemPointer() {
             return clMemPointer;
         }
 
+        /**
+         * Returns the wrapped {@link cl_mem} object.
+         *
+         * @return the wrapped {@link cl_mem} object
+         */
         public cl_mem getMem() {
             return mem;
         }
@@ -114,14 +153,26 @@ public class OpenClTask implements ReleaseCLObject {
         }
     }
 
+    /**
+     * Destination (kernel output) OpenCL buffer argument.
+     */
     public static class DestinationArgument extends CLByteBufferPointerArgument {
-        
-        private DestinationArgument(ByteBuffer byteBuffer, Pointer hostMemoryPointer, cl_mem mem, Pointer clMemPointer) {
+
+        private DestinationArgument(
+                ByteBuffer byteBuffer, Pointer hostMemoryPointer, cl_mem mem, Pointer clMemPointer) {
             super(byteBuffer, hostMemoryPointer, mem, clMemPointer);
         }
 
+        /**
+         * Allocates a new destination buffer of {@code sizeInBytes} bytes.
+         *
+         * @param context     the OpenCL context
+         * @param sizeInBytes the buffer size in bytes
+         * @return the created {@link DestinationArgument}
+         */
         public static DestinationArgument create(cl_context context, long sizeInBytes) {
-            final ByteBuffer byteBuffer = ByteBuffer.allocateDirect(ByteBufferUtility.ensureByteBufferCapacityFitsInt(sizeInBytes));
+            final ByteBuffer byteBuffer =
+                    ByteBuffer.allocateDirect(ByteBufferUtility.ensureByteBufferCapacityFitsInt(sizeInBytes));
             final Pointer hostMemoryPointer = Pointer.to(byteBuffer);
             final cl_mem mem;
 
@@ -134,26 +185,45 @@ public class OpenClTask implements ReleaseCLObject {
 
             return new DestinationArgument(byteBuffer, hostMemoryPointer, mem, clMemPointer);
         }
-        
     }
-    
+
+    /**
+     * Source (kernel input) OpenCL buffer argument.
+     */
     public static class SourceArgument extends CLByteBufferPointerArgument {
 
         private SourceArgument(ByteBuffer byteBuffer, Pointer hostMemoryPointer, cl_mem mem, Pointer clMemPointer) {
             super(byteBuffer, hostMemoryPointer, mem, clMemPointer);
         }
 
+        /**
+         * Allocates a new source buffer of {@code sizeInBytes} bytes.
+         *
+         * @param context     the OpenCL context
+         * @param sizeInBytes the buffer size in bytes
+         * @return the created {@link SourceArgument}
+         */
         public static SourceArgument create(cl_context context, long sizeInBytes) {
-            final ByteBuffer byteBuffer = ByteBuffer.allocateDirect(ByteBufferUtility.ensureByteBufferCapacityFitsInt(sizeInBytes));
+            final ByteBuffer byteBuffer =
+                    ByteBuffer.allocateDirect(ByteBufferUtility.ensureByteBufferCapacityFitsInt(sizeInBytes));
             final Pointer hostMemoryPointer = Pointer.to(byteBuffer);
-            final cl_mem mem = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeInBytes, hostMemoryPointer, null);
+            final cl_mem mem = clCreateBuffer(
+                    context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeInBytes, hostMemoryPointer, null);
             final Pointer clMemPointer = Pointer.to(mem);
             return new SourceArgument(byteBuffer, hostMemoryPointer, mem, clMemPointer);
         }
     }
 
-    // Only available after init
-    public OpenClTask(cl_context context, CProducerOpenCL cProducer, BitHelper bitHelper, ByteBufferUtility byteBufferUtility) {
+    /**
+     * Creates a new OpenCL task. Only usable after the surrounding {@link OpenCLContext} has been initialised.
+     *
+     * @param context           the OpenCL context
+     * @param cProducer         the OpenCL producer configuration
+     * @param bitHelper         bit/batch-size helper
+     * @param byteBufferUtility byte-buffer helper used for endian conversion
+     */
+    public OpenClTask(
+            cl_context context, CProducerOpenCL cProducer, BitHelper bitHelper, ByteBufferUtility byteBufferUtility) {
         this.context = context;
         this.cProducer = cProducer;
         this.bitHelper = bitHelper;
@@ -163,79 +233,100 @@ public class OpenClTask implements ReleaseCLObject {
         this.privateKeySourceArgument = SourceArgument.create(context, PRIVATE_KEY_SOURCE_SIZE_IN_BYTES);
     }
 
+    /**
+     * Returns the size of the destination buffer for the current batch.
+     *
+     * @return the size of the destination buffer in bytes for the current batch
+     */
     public long getDstSizeInBytes() {
         return (long) PublicKeyBytes.CHUNK_SIZE_NUM_BYTES * cProducer.getOverallWorkSize(bitHelper);
     }
 
     /**
-    * Writes the base private key to the source buffer in the format expected by the OpenCL kernel.
-    * <p>
-    * The method ensures that the provided private key is valid for the current batch size. If it exceeds
-    * the allowed range, a {@link PrivateKeyTooLargeException} is thrown.
-    * <p>
-    * Internally, the private key is first converted to a byte array in Big-Endian format (as returned
-    * by {@link BigInteger#toByteArray()}). Because the OpenCL kernel expects the private key as a
-    * {@code __global const u32 *k} array in <strong>Little-Endian</strong> word order, the byte array
-    * is then converted from Big-Endian to Little-Endian before being written to the OpenCL input buffer.
-    * <p>
-    * This matches the behavior of the OpenCL kernel {@code generateKeysKernel_grid}, which reads the key
-    * using {@code copy_u32_array(k_littleEndian_local, k, ...)} assuming Little-Endian input and applies
-    * the work-item ID to the least-significant word.
-    *
-    * @param privateKeyBase the base private key used as input to the OpenCL kernel
-    * @throws PrivateKeyTooLargeException if the key is too large for the current batch size
-    */
+     * Writes the base private key to the source buffer in the format expected by the OpenCL kernel.
+     * <p>
+     * The method ensures that the provided private key is valid for the current batch size. If it exceeds
+     * the allowed range, a {@link PrivateKeyTooLargeException} is thrown.
+     * <p>
+     * Internally, the private key is first converted to a byte array in Big-Endian format (as returned
+     * by {@link BigInteger#toByteArray()}). Because the OpenCL kernel expects the private key as a
+     * {@code __global const u32 *k} array in <strong>Little-Endian</strong> word order, the byte array
+     * is then converted from Big-Endian to Little-Endian before being written to the OpenCL input buffer.
+     * <p>
+     * This matches the behavior of the OpenCL kernel {@code generateKeysKernel_grid}, which reads the key
+     * using {@code copy_u32_array(k_littleEndian_local, k, ...)} assuming Little-Endian input and applies
+     * the work-item ID to the least-significant word.
+     *
+     * @param privateKeyBase the base private key used as input to the OpenCL kernel
+     * @throws PrivateKeyTooLargeException if the key is too large for the current batch size
+     */
     public void setSrcPrivateKeyChunk(BigInteger privateKeyBase) {
         if (privateKeyValidator.isInvalidWithBatchSize(privateKeyBase, maxPrivateKeyForBatchSize)) {
             throw new PrivateKeyTooLargeException(privateKeyBase, maxPrivateKeyForBatchSize, cProducer.batchSizeInBits);
         }
 
-        // BigInteger.toByteArray() always returns a big-endian (MSB-first) representation, 
+        // BigInteger.toByteArray() always returns a big-endian (MSB-first) representation,
         // meaning the most significant byte (MSB) comes first.
         // Therefore, the source format is always Big Endian.
         final byte[] byteArray = ByteBufferUtility.bigIntegerToBytes(privateKeyBase);
-        EndiannessConverter endiannessConverter = new EndiannessConverter(ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN, byteBufferUtility);
+        EndiannessConverter endiannessConverter =
+                new EndiannessConverter(ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN, byteBufferUtility);
         endiannessConverter.convertEndian(byteArray);
         ByteBufferUtility.putToByteBuffer(privateKeySourceArgument.getByteBuffer(), byteArray);
     }
-    
+
+    /**
+     * Returns the private-key source argument backing this task (visible for testing).
+     *
+     * @return the private-key source argument backing this task (visible for testing)
+     */
     @VisibleForTesting
     public SourceArgument getPrivateKeySourceArgument() {
         return privateKeySourceArgument;
     }
 
+    /**
+     * Runs the OpenCL kernel for the configured batch and returns the result buffer.
+     *
+     * @param kernel       the compiled OpenCL kernel
+     * @param commandQueue the OpenCL command queue
+     * @return the destination buffer containing kernel results
+     */
     public ByteBuffer executeKernel(cl_kernel kernel, cl_command_queue commandQueue) {
         final long dstSizeInBytes = getDstSizeInBytes();
         // Allocate a new destination buffer so that cloning after kernel execution is unnecessary
-        try (final DestinationArgument destinationArgument = DestinationArgument.create(context, dstSizeInBytes) ) {
+        try (final DestinationArgument destinationArgument = DestinationArgument.create(context, dstSizeInBytes)) {
             // Set the work-item dimensions
             final long totalResultCount = bitHelper.convertBitsToSize(cProducer.batchSizeInBits);
             final int loopCount = cProducer.loopCount;
             final long adjustedWorkSize = totalResultCount / loopCount;
-            
+
             // Validate loopCount constraints
             if (loopCount < 1) {
                 throw new IllegalArgumentException("loopCount must be >= 1.");
             }
             if (loopCount > totalResultCount) {
-                throw new IllegalArgumentException("loopCount must not exceed total result count. Given: " + loopCount + ", max: " + totalResultCount);
+                throw new IllegalArgumentException("loopCount must not exceed total result count. Given: " + loopCount
+                        + ", max: " + totalResultCount);
             }
             if (totalResultCount % loopCount != 0) {
-                throw new IllegalArgumentException("batchSizeInBits is not divisible by loopCount; result count would be invalid.");
+                throw new IllegalArgumentException(
+                        "batchSizeInBits is not divisible by loopCount; result count would be invalid.");
             }
-            
-            final long[] global_work_size = new long[]{adjustedWorkSize};
+
+            final long[] global_work_size = new long[] {adjustedWorkSize};
             final long[] localWorkSize = null; // new long[]{1}; // enabling the system to choose the work-group size.
             final int workDim = 1;
-            
+
             // Set the arguments for the kernel
             clSetKernelArg(kernel, 0, Sizeof.cl_mem, destinationArgument.getClMemPointer());
             clSetKernelArg(kernel, 1, Sizeof.cl_mem, privateKeySourceArgument.getClMemPointer());
-            clSetKernelArg(kernel, 2, Sizeof.cl_uint, Pointer.to(new int[] { loopCount }));
+            clSetKernelArg(kernel, 2, Sizeof.cl_uint, Pointer.to(new int[] {loopCount}));
 
             {
                 // write src buffer
-                clEnqueueWriteBuffer(commandQueue,
+                clEnqueueWriteBuffer(
+                        commandQueue,
                         privateKeySourceArgument.getMem(),
                         CL_TRUE,
                         0,
@@ -243,37 +334,28 @@ public class OpenClTask implements ReleaseCLObject {
                         privateKeySourceArgument.getHostMemoryPointer(),
                         0,
                         null,
-                        null
-                );
+                        null);
                 clFinish(commandQueue);
             }
             {
                 // execute the kernel
                 final long beforeExecute = System.currentTimeMillis();
                 clEnqueueNDRangeKernel(
-                        commandQueue,
-                        kernel,
-                        workDim,
-                        null,
-                        global_work_size,
-                        localWorkSize,
-                        0,
-                        null,
-                        null
-                );
+                        commandQueue, kernel, workDim, null, global_work_size, localWorkSize, 0, null, null);
                 clFinish(commandQueue);
 
                 final long afterExecute = System.currentTimeMillis();
 
-                if (logger.isTraceEnabled()) {
-                    logger.trace("Executed OpenCL kernel in " + (afterExecute - beforeExecute) + "ms");
+                if (LOGGER.isTraceEnabled()) {
+                    LOGGER.trace("Executed OpenCL kernel in " + (afterExecute - beforeExecute) + "ms");
                 }
             }
             {
                 // read the dst buffer
                 final long beforeRead = System.currentTimeMillis();
 
-                clEnqueueReadBuffer(commandQueue,
+                clEnqueueReadBuffer(
+                        commandQueue,
                         destinationArgument.getMem(),
                         CL_TRUE,
                         0,
@@ -281,14 +363,14 @@ public class OpenClTask implements ReleaseCLObject {
                         destinationArgument.getHostMemoryPointer(),
                         0,
                         null,
-                        null
-                );
+                        null);
                 clFinish(commandQueue);
                 destinationArgument.close();
 
                 final long afterRead = System.currentTimeMillis();
-                if (logger.isTraceEnabled()) {
-                    logger.trace("Read OpenCL data "+((dstSizeInBytes / 1024) / 1024) + "Mb in " + (afterRead - beforeRead) + "ms");
+                if (LOGGER.isTraceEnabled()) {
+                    LOGGER.trace("Read OpenCL data " + ((dstSizeInBytes / 1024) / 1024) + "Mb in "
+                            + (afterRead - beforeRead) + "ms");
                 }
             }
             return destinationArgument.getByteBuffer();
@@ -299,10 +381,10 @@ public class OpenClTask implements ReleaseCLObject {
     public boolean isClosed() {
         return closed;
     }
-    
+
     @Override
     public void close() {
-        if(!closed) {
+        if (!closed) {
             privateKeySourceArgument.close();
             closed = true;
             // hint: destinationArgument will be released immediately
@@ -328,5 +410,4 @@ public class OpenClTask implements ReleaseCLObject {
 
         return clone;
     }
-
 }

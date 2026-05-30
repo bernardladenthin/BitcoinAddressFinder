@@ -9,7 +9,7 @@ import static org.hamcrest.Matchers.is;
 import org.junit.jupiter.api.Test;
 
 public class HexEncodeTest {
-    
+
     // <editor-fold defaultstate="collapsed" desc="compare BouncyCastle vs Apache Commons Hex encoding">
     @Test
     public void encodeHexString_bouncyCastleAndApacheCommons_resultMustMatch() {

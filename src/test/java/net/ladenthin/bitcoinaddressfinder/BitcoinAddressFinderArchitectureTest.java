@@ -18,8 +18,10 @@ public class BitcoinAddressFinderArchitectureTest {
      */
     @ArchTest
     static final ArchRule cliIsLeaf = noClasses()
-            .that().resideOutsideOfPackage("net.ladenthin.bitcoinaddressfinder.cli..")
-            .should().dependOnClassesThat()
+            .that()
+            .resideOutsideOfPackage("net.ladenthin.bitcoinaddressfinder.cli..")
+            .should()
+            .dependOnClassesThat()
             .resideInAPackage("net.ladenthin.bitcoinaddressfinder.cli..");
 
     /**
@@ -27,7 +29,9 @@ public class BitcoinAddressFinderArchitectureTest {
      */
     @ArchTest
     static final ArchRule noTestFrameworksInProduction = noClasses()
-            .that().resideInAPackage("net.ladenthin.bitcoinaddressfinder..")
-            .should().dependOnClassesThat()
+            .that()
+            .resideInAPackage("net.ladenthin.bitcoinaddressfinder..")
+            .should()
+            .dependOnClassesThat()
             .resideInAnyPackage("org.junit..", "net.jqwik..", "com.tngtech.archunit..");
 }

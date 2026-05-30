@@ -19,20 +19,21 @@ import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.crypto.ECKey;
 
 public abstract class AbstractTestAddresses implements TestAddresses {
-    
+
     public final Network network = new NetworkParameterFactory().getNetwork();
 
     private final List<ECKey> ecKeys = new ArrayList<>();
-    
+
     public AbstractTestAddresses(int randomSeed, int numberOfAddresses, boolean compressed) {
         Random random = new Random(randomSeed);
         for (int i = 0; i < numberOfAddresses; i++) {
-            BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false)).createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, random);
+            BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false))
+                    .createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, random);
             ECKey ecKey = ECKey.fromPrivate(secret, compressed);
             ecKeys.add(ecKey);
         }
     }
-    
+
     @Override
     public int getNumberOfAddresses() {
         return ecKeys.size();
@@ -42,11 +43,11 @@ public abstract class AbstractTestAddresses implements TestAddresses {
     public List<ECKey> getECKeys() {
         return ecKeys;
     }
-    
+
     private LegacyAddress toLegacyAddress(ECKey ecKey) {
         return (LegacyAddress) ecKey.toAddress(ScriptType.P2PKH, network);
     }
-    
+
     private LegacyAddress getLegacyAddressAtIndex(int index) {
         ECKey ecKey = getECKeys().get(index);
         return toLegacyAddress(ecKey);
@@ -57,7 +58,7 @@ public abstract class AbstractTestAddresses implements TestAddresses {
         LegacyAddress legacyAddress = getLegacyAddressAtIndex(index);
         return legacyAddress.toBase58();
     }
-    
+
     @Override
     public byte[] getIndexAsHash160(int index) {
         LegacyAddress legacyAddress = getLegacyAddressAtIndex(index);
@@ -69,7 +70,7 @@ public abstract class AbstractTestAddresses implements TestAddresses {
         byte[] hash = getIndexAsHash160(index);
         return Hex.encodeHexString(hash);
     }
-    
+
     @Override
     public ByteBuffer getIndexAsHash160ByteBuffer(int index) {
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);

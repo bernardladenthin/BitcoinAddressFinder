@@ -3,6 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -13,14 +17,10 @@ import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
 import org.bitcoinj.base.LegacyAddress;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
-import org.bitcoinj.crypto.MnemonicException;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.hamcrest.Matchers.*;
 
 public class KeyUtilityTest {
 
@@ -61,18 +61,22 @@ public class KeyUtilityTest {
 
     // <editor-fold defaultstate="collapsed" desc="getHash160ByteBufferFromBase58String">
     @Test
-    public void getHash160ByteBufferFromBase58String_uncompressedPublicKeyAddress_returnsExpectedByteBuffer() throws IOException {
+    public void getHash160ByteBufferFromBase58String_uncompressedPublicKeyAddress_returnsExpectedByteBuffer()
+            throws IOException {
         // act
-        ByteBuffer byteBufferPublicKeyUncompressed = new KeyUtility(network, new ByteBufferUtility(false)).getHash160ByteBufferFromBase58String(staticKey.publicKeyUncompressed);
+        ByteBuffer byteBufferPublicKeyUncompressed = new KeyUtility(network, new ByteBufferUtility(false))
+                .getHash160ByteBufferFromBase58String(staticKey.publicKeyUncompressed);
 
         // assert
         assertThat(byteBufferPublicKeyUncompressed, is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
     }
 
     @Test
-    public void getHash160ByteBufferFromBase58String_compressedPublicKeyAddress_returnsExpectedByteBuffer() throws IOException {
+    public void getHash160ByteBufferFromBase58String_compressedPublicKeyAddress_returnsExpectedByteBuffer()
+            throws IOException {
         // act
-        ByteBuffer byteBufferPublicKeyCompressed = new KeyUtility(network, new ByteBufferUtility(false)).getHash160ByteBufferFromBase58String(staticKey.publicKeyCompressed);
+        ByteBuffer byteBufferPublicKeyCompressed = new KeyUtility(network, new ByteBufferUtility(false))
+                .getHash160ByteBufferFromBase58String(staticKey.publicKeyCompressed);
 
         // assert
         assertThat(byteBufferPublicKeyCompressed, is(equalTo(staticKey.byteBufferPublicKeyCompressed)));
@@ -97,7 +101,8 @@ public class KeyUtilityTest {
     @Test
     public void getHexFromByteBuffer_uncompressedPublicKeyHash_returnsExpectedHex() throws IOException {
         // act
-        String hexPublicKeyUncompressed = new ByteBufferUtility(false).getHexFromByteBuffer(staticKey.byteBufferPublicKeyUncompressed);
+        String hexPublicKeyUncompressed =
+                new ByteBufferUtility(false).getHexFromByteBuffer(staticKey.byteBufferPublicKeyUncompressed);
 
         // assert
         assertThat(hexPublicKeyUncompressed, is(equalTo(staticKey.publicKeyUncompressedHash160Hex)));
@@ -106,7 +111,8 @@ public class KeyUtilityTest {
     @Test
     public void getHexFromByteBuffer_compressedPublicKeyHash_returnsExpectedHex() throws IOException {
         // act
-        String hexPublicKeyCompressed = new ByteBufferUtility(false).getHexFromByteBuffer(staticKey.byteBufferPublicKeyCompressed);
+        String hexPublicKeyCompressed =
+                new ByteBufferUtility(false).getHexFromByteBuffer(staticKey.byteBufferPublicKeyCompressed);
 
         // assert
         assertThat(hexPublicKeyCompressed, is(equalTo(staticKey.publicKeyCompressedHash160Hex)));
@@ -117,7 +123,8 @@ public class KeyUtilityTest {
     @Test
     public void getByteBufferFromHex_uncompressedPublicKeyHashHex_returnsExpectedByteBuffer() throws IOException {
         // act
-        ByteBuffer byteBufferPublicKeyUncompressed = new ByteBufferUtility(false).getByteBufferFromHex(staticKey.publicKeyUncompressedHash160Hex);
+        ByteBuffer byteBufferPublicKeyUncompressed =
+                new ByteBufferUtility(false).getByteBufferFromHex(staticKey.publicKeyUncompressedHash160Hex);
 
         // assert
         assertThat(byteBufferPublicKeyUncompressed, is(equalTo(staticKey.byteBufferPublicKeyUncompressed)));
@@ -126,7 +133,8 @@ public class KeyUtilityTest {
     @Test
     public void getByteBufferFromHex_compressedPublicKeyHashHex_returnsExpectedByteBuffer() throws IOException {
         // act
-        ByteBuffer byteBufferPublicKeyCompressed = new ByteBufferUtility(false).getByteBufferFromHex(staticKey.publicKeyCompressedHash160Hex);
+        ByteBuffer byteBufferPublicKeyCompressed =
+                new ByteBufferUtility(false).getByteBufferFromHex(staticKey.publicKeyCompressedHash160Hex);
 
         // assert
         assertThat(byteBufferPublicKeyCompressed, is(equalTo(staticKey.byteBufferPublicKeyCompressed)));
@@ -137,7 +145,8 @@ public class KeyUtilityTest {
     @Test
     public void createSecret_maxBitLength_returnsNonEmptySecret() throws IOException {
         // act
-        BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false)).createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, new Random(42));
+        BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false))
+                .createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, new Random(42));
 
         // assert
         assertThat(secret.toString(), is(not(equalTo(""))));
@@ -155,7 +164,7 @@ public class KeyUtilityTest {
 
     // <editor-fold defaultstate="collapsed" desc="createKeyDetails">
     @Test
-    public void createKeyDetails_uncompressedKey_returnsExpectedDetails() throws IOException, MnemonicException.MnemonicLengthException {
+    public void createKeyDetails_uncompressedKey_returnsExpectedDetails() throws IOException {
         // arrange
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
@@ -168,11 +177,18 @@ public class KeyUtilityTest {
 
         // assert
         String mnemonics = keyUtility.createMnemonics(ecKey.getPrivKeyBytes());
-        assertThat(keyDetails, is(equalTo("privateKeyBigInteger: [" + staticKey.privateKeyBigInteger + "] privateKeyBytes: [" + Arrays.toString(staticKey.privateKeyBytes) + "] privateKeyHex: [" + staticKey.privateKeyHex + "] WiF: [" + staticKey.privateKeyWiFUncompressed + "] publicKeyAsHex: [" + staticKey.publicKeyUncompressedHex + "] publicKeyHash160Hex: [" + staticKey.publicKeyUncompressedHash160Hex + "] publicKeyHash160Base58: [" + staticKey.publicKeyUncompressed + "] Compressed: [false] " + mnemonics)));
+        assertThat(
+                keyDetails,
+                is(equalTo("privateKeyBigInteger: [" + staticKey.privateKeyBigInteger + "] privateKeyBytes: ["
+                        + Arrays.toString(staticKey.privateKeyBytes) + "] privateKeyHex: [" + staticKey.privateKeyHex
+                        + "] WiF: [" + staticKey.privateKeyWiFUncompressed + "] publicKeyAsHex: ["
+                        + staticKey.publicKeyUncompressedHex + "] publicKeyHash160Hex: ["
+                        + staticKey.publicKeyUncompressedHash160Hex + "] publicKeyHash160Base58: ["
+                        + staticKey.publicKeyUncompressed + "] Compressed: [false] " + mnemonics)));
     }
 
     @Test
-    public void createKeyDetails_compressedKey_returnsExpectedDetails() throws IOException, MnemonicException.MnemonicLengthException {
+    public void createKeyDetails_compressedKey_returnsExpectedDetails() throws IOException {
         // arrange
         ByteBufferUtility byteBufferUtility = new ByteBufferUtility(false);
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
@@ -185,7 +201,14 @@ public class KeyUtilityTest {
 
         // assert
         String mnemonics = keyUtility.createMnemonics(ecKey.getPrivKeyBytes());
-        assertThat(keyDetails, is(equalTo("privateKeyBigInteger: [" + staticKey.privateKeyBigInteger + "] privateKeyBytes: [" + Arrays.toString(staticKey.privateKeyBytes) + "] privateKeyHex: [" + staticKey.privateKeyHex + "] WiF: [" + staticKey.privateKeyWiFCompressed + "] publicKeyAsHex: [" + staticKey.publicKeyCompressedHex + "] publicKeyHash160Hex: [" + staticKey.publicKeyCompressedHash160Hex + "] publicKeyHash160Base58: [" + staticKey.publicKeyCompressed + "] Compressed: [true] " + mnemonics)));
+        assertThat(
+                keyDetails,
+                is(equalTo("privateKeyBigInteger: [" + staticKey.privateKeyBigInteger + "] privateKeyBytes: ["
+                        + Arrays.toString(staticKey.privateKeyBytes) + "] privateKeyHex: [" + staticKey.privateKeyHex
+                        + "] WiF: [" + staticKey.privateKeyWiFCompressed + "] publicKeyAsHex: ["
+                        + staticKey.publicKeyCompressedHex + "] publicKeyHash160Hex: ["
+                        + staticKey.publicKeyCompressedHash160Hex + "] publicKeyHash160Base58: ["
+                        + staticKey.publicKeyCompressed + "] Compressed: [true] " + mnemonics)));
     }
     // </editor-fold>
 
@@ -193,7 +216,8 @@ public class KeyUtilityTest {
     @Test
     public void killBits_valueWithAllBitsSetGiven_bitsKilled() throws IOException {
         // act
-        BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false)).killBits(BigInteger.valueOf(63L), BigInteger.valueOf(5L));
+        BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false))
+                .killBits(BigInteger.valueOf(63L), BigInteger.valueOf(5L));
 
         // assert
         assertThat(secret, is(equalTo(BigInteger.valueOf(58))));
@@ -202,13 +226,13 @@ public class KeyUtilityTest {
     @Test
     public void killBits_valueWithNotAllBitsSetGiven_bitsKilled() throws IOException {
         // act
-        BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false)).killBits(BigInteger.valueOf(62L), BigInteger.valueOf(5L));
+        BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false))
+                .killBits(BigInteger.valueOf(62L), BigInteger.valueOf(5L));
 
         // assert
         assertThat(secret, is(equalTo(BigInteger.valueOf(58))));
     }
     // </editor-fold>
-
 
     // <editor-fold defaultstate="collapsed" desc="ECKey.fromPrivate: boundaries">
     @Test
@@ -229,8 +253,8 @@ public class KeyUtilityTest {
         assertThrows(IllegalArgumentException.class, () -> ECKey.fromPrivate(PublicKeyBytes.MIN_PRIVATE_KEY, false));
     }
 
-    @Disabled("bitcoinj.ECKey.fromPrivate(...) accepts values > MAX_PRIVATE_KEY without throwing an exception. " +
-       "Test ignored because the library does not enforce the upper bound.")
+    @Disabled("bitcoinj.ECKey.fromPrivate(...) accepts values > MAX_PRIVATE_KEY without throwing an exception. "
+            + "Test ignored because the library does not enforce the upper bound.")
     @Test
     public void ecKey_fromPrivate_maxPrivateKeyPlusOne_throwsException() {
         // act
@@ -255,7 +279,6 @@ public class KeyUtilityTest {
         assertThat(ecKey.getPrivKey(), is(equalTo(PublicKeyBytes.MAX_PRIVATE_KEY)));
     }
     // </editor-fold>
-
 
     // <editor-fold defaultstate="collapsed" desc="intToByteArray">
     @Test
@@ -334,7 +357,9 @@ public class KeyUtilityTest {
         // assert
         assertThat(Arrays.copyOfRange(buffer, offset, offset + intByteLength), is(expectedWritten));
         assertThat(Arrays.copyOfRange(buffer, 0, offset), is(new byte[offset]));
-        assertThat(Arrays.copyOfRange(buffer, offset + intByteLength, bufferLength), is(new byte[bufferLength - offset - intByteLength]));
+        assertThat(
+                Arrays.copyOfRange(buffer, offset + intByteLength, bufferLength),
+                is(new byte[bufferLength - offset - intByteLength]));
     }
     // </editor-fold>
 
@@ -529,7 +554,8 @@ public class KeyUtilityTest {
         boolean returnStartSecretOnly = true;
 
         // act
-        BigInteger[] secrets = keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, randomSupplier);
+        BigInteger[] secrets =
+                keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, randomSupplier);
 
         // assert
         assertThat(secrets.length, is(1));
@@ -547,7 +573,8 @@ public class KeyUtilityTest {
         boolean returnStartSecretOnly = false;
 
         // act
-        BigInteger[] secrets = keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, randomSupplier);
+        BigInteger[] secrets =
+                keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, randomSupplier);
 
         // assert
         assertThat(secrets.length, is(overallWorkSize));
@@ -570,7 +597,10 @@ public class KeyUtilityTest {
         boolean returnStartSecretOnly = false;
 
         // act
-        assertThrows(NoMoreSecretsAvailableException.class, () -> keyUtility.createSecrets(overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, randomSupplier));
+        assertThrows(
+                NoMoreSecretsAvailableException.class,
+                () -> keyUtility.createSecrets(
+                        overallWorkSize, returnStartSecretOnly, privateKeyMaxNumBits, randomSupplier));
     }
     // </editor-fold>
 

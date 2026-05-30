@@ -55,10 +55,20 @@ public class EndiannessConverter {
         return sourceOrder != targetOrder;
     }
 
+    /**
+     * Returns the configured source byte order.
+     *
+     * @return the source byte order
+     */
     public ByteOrder getSourceOrder() {
         return sourceOrder;
     }
 
+    /**
+     * Returns the configured target byte order.
+     *
+     * @return the target byte order
+     */
     public ByteOrder getTargetOrder() {
         return targetOrder;
     }

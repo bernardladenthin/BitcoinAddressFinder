@@ -3,19 +3,19 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.io.IOException;
-import java.math.BigInteger;
-import java.util.Random;
 import static net.ladenthin.bitcoinaddressfinder.PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT;
-import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
-import org.bitcoinj.base.Network;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.hamcrest.text.MatchesPattern.matchesPattern;
+
+import java.math.BigInteger;
+import java.nio.file.Path;
+import java.util.Random;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
+import org.bitcoinj.base.Network;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import java.nio.file.Path;
 
 public class ProducerJavaTest {
 
@@ -28,17 +28,18 @@ public class ProducerJavaTest {
 
     // <editor-fold defaultstate="collapsed" desc="initProducer">
     @Test
-    public void initProducer_configurationGiven_stateInitializedAndLogged() throws IOException, InterruptedException {
+    public void initProducer_configurationGiven_stateInitializedAndLogged() throws Exception {
         CProducerJava cProducerJava = new CProducerJava();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerJava producerJava =
+                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         AbstractProducerTest.verifyInitProducer(producerJava);
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="toString">
     @ToStringTest
     @Test
@@ -47,7 +48,8 @@ public class ProducerJavaTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerJava producerJava =
+                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         String toStringOutput = producerJava.toString();
 
@@ -55,20 +57,21 @@ public class ProducerJavaTest {
         assertThat(toStringOutput, matchesPattern("ProducerJava@\\p{XDigit}+"));
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="releaseProducer">
     @Test
-    public void releaseProducer_configurationGiven_stateInitializedAndLogged() throws IOException, InterruptedException {
+    public void releaseProducer_configurationGiven_stateInitializedAndLogged() throws Exception {
         CProducerJava cProducerJava = new CProducerJava();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerJava producerJava =
+                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         AbstractProducerTest.verifyReleaseProducer(producerJava);
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="produceKeys">
     @Test
     public void produceKeys_BatchSizeInBitsEqualsKeyMaxNumBits_noExceptionThrown() throws Exception {
@@ -80,22 +83,30 @@ public class ProducerJavaTest {
         int maximumBitLength = 2;
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerJava producerJava =
+                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         // act
         producerJava.produceKeys();
 
         // assert
         assertThat(mockConsumer.publicKeyBytesArrayList.size(), is(equalTo(1)));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0).length, is(equalTo(bitHelper.convertBitsToSize(cProducerJava.batchSizeInBits))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0).length,
+                is(equalTo(bitHelper.convertBitsToSize(cProducerJava.batchSizeInBits))));
         assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[0], is(equalTo(PublicKeyBytes.INVALID_KEY_ONE)));
         assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[1], is(equalTo(PublicKeyBytes.INVALID_KEY_ONE)));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[2], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(2)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[3], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(3)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[2],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(2)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[3],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(3)))));
     }
 
     @Test
-    public void produceKeys_KeyMaxNumBitsLowerThanBatchSizeInBits_produceBatchSizeInBitsNevertheless() throws Exception {
+    public void produceKeys_KeyMaxNumBitsLowerThanBatchSizeInBits_produceBatchSizeInBitsNevertheless()
+            throws Exception {
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.batchUsePrivateKeyIncrement = true;
         cProducerJava.batchSizeInBits = 4;
@@ -104,34 +115,66 @@ public class ProducerJavaTest {
         int maximumBitLength = 3;
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerJava producerJava =
+                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         // act
         producerJava.produceKeys();
 
         // assert
         assertThat(mockConsumer.publicKeyBytesArrayList.size(), is(equalTo(1)));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0).length, is(equalTo(bitHelper.convertBitsToSize(cProducerJava.batchSizeInBits))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0).length,
+                is(equalTo(bitHelper.convertBitsToSize(cProducerJava.batchSizeInBits))));
         assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[0], is(equalTo(PublicKeyBytes.INVALID_KEY_ONE)));
         assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[1], is(equalTo(PublicKeyBytes.INVALID_KEY_ONE)));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[2], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(2)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[3], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(3)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[4], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(4)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[5], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(5)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[6], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(6)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[7], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(7)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[8], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(8)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[9], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(9)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[10], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(10)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[11], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(11)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[12], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(12)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[13], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(13)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[14], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(14)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[15], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(15)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[2],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(2)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[3],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(3)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[4],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(4)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[5],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(5)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[6],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(6)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[7],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(7)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[8],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(8)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[9],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(9)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[10],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(10)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[11],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(11)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[12],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(12)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[13],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(13)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[14],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(14)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[15],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(15)))));
     }
 
     @Test
-    public void produceKeys_privateKeyMaxNumBitsIsVeryLowAndProduceReplacedKeys_keysEqualsReplacement() throws Exception {
+    public void produceKeys_privateKeyMaxNumBitsIsVeryLowAndProduceReplacedKeys_keysEqualsReplacement()
+            throws Exception {
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.batchUsePrivateKeyIncrement = true;
         cProducerJava.batchSizeInBits = 1;
@@ -140,18 +183,25 @@ public class ProducerJavaTest {
         int maximumBitLength = 2;
         Random random = new Random(0);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerJava producerJava =
+                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         // act
         producerJava.produceKeys();
 
         // assert
         assertThat(mockConsumer.publicKeyBytesArrayList.size(), is(equalTo(1)));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0).length, is(equalTo(bitHelper.convertBitsToSize(cProducerJava.batchSizeInBits))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[0], is(equalTo(PublicKeyBytes.fromPrivate(INVALID_PRIVATE_KEY_REPLACEMENT))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[1], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(3)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0).length,
+                is(equalTo(bitHelper.convertBitsToSize(cProducerJava.batchSizeInBits))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[0],
+                is(equalTo(PublicKeyBytes.fromPrivate(INVALID_PRIVATE_KEY_REPLACEMENT))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[1],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(3)))));
     }
-    
+
     @Test
     public void produceKeys_privateKeyMaxNumBitsIsLowAndProduceReplacedKeys_keysEqualsReplacement() throws Exception {
         CProducerJava cProducerJava = new CProducerJava();
@@ -162,30 +212,65 @@ public class ProducerJavaTest {
         int maximumBitLength = 3;
         Random random = new Random(0);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerJava producerJava =
+                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         // act
         producerJava.produceKeys();
 
         // assert
         assertThat(mockConsumer.publicKeyBytesArrayList.size(), is(equalTo(1)));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0).length, is(equalTo(bitHelper.convertBitsToSize(cProducerJava.batchSizeInBits))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[0], is(equalTo(PublicKeyBytes.fromPrivate(INVALID_PRIVATE_KEY_REPLACEMENT))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[1], is(equalTo(PublicKeyBytes.fromPrivate(INVALID_PRIVATE_KEY_REPLACEMENT))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[2], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(2)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[3], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(6)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[4], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(6)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[5], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(2)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[6], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(7)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[7], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(3)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[8], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(6)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[9], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(5)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[10], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(3)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[11], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(3)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[12], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(3)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[13], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(5)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[14], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(7)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[15], is(equalTo(PublicKeyBytes.fromPrivate(INVALID_PRIVATE_KEY_REPLACEMENT))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0).length,
+                is(equalTo(bitHelper.convertBitsToSize(cProducerJava.batchSizeInBits))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[0],
+                is(equalTo(PublicKeyBytes.fromPrivate(INVALID_PRIVATE_KEY_REPLACEMENT))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[1],
+                is(equalTo(PublicKeyBytes.fromPrivate(INVALID_PRIVATE_KEY_REPLACEMENT))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[2],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(2)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[3],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(6)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[4],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(6)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[5],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(2)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[6],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(7)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[7],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(3)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[8],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(6)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[9],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(5)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[10],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(3)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[11],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(3)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[12],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(3)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[13],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(5)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[14],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(7)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[15],
+                is(equalTo(PublicKeyBytes.fromPrivate(INVALID_PRIVATE_KEY_REPLACEMENT))));
     }
 
     @Test
@@ -198,22 +283,41 @@ public class ProducerJavaTest {
         int maximumBitLength = 6;
         Random random = new Random(2);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
-        ProducerJava producerJava = new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerJava producerJava =
+                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         // act
         producerJava.produceKeys();
 
         // assert
         assertThat(mockConsumer.publicKeyBytesArrayList.size(), is(equalTo(1)));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0).length, is(equalTo(bitHelper.convertBitsToSize(cProducerJava.batchSizeInBits))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[0], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(56)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[1], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(57)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[2], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(58)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[3], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(59)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[4], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(60)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[5], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(61)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[6], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(62)))));
-        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[7], is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(63)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0).length,
+                is(equalTo(bitHelper.convertBitsToSize(cProducerJava.batchSizeInBits))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[0],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(56)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[1],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(57)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[2],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(58)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[3],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(59)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[4],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(60)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[5],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(61)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[6],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(62)))));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(0)[7],
+                is(equalTo(PublicKeyBytes.fromPrivate(BigInteger.valueOf(63)))));
     }
     // </editor-fold>
 

@@ -3,13 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import java.io.IOException;
-import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
-import static org.mockito.Mockito.*;
+
+import java.io.IOException;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import nl.altindag.log.LogCaptor;
+import nl.altindag.log.model.LogEvent;
+import org.junit.jupiter.api.Test;
 
 public class OpenCLContextTest {
 
@@ -27,19 +28,6 @@ public class OpenCLContextTest {
         // assert
         assertThat(openCLContext, is(notNullValue()));
     }
-
-    @Test
-    public void constructor_mockLoggerGiven_noExceptionThrown() {
-        // arrange
-        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
-        Logger mockLogger = mock(Logger.class);
-
-        // act
-        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper, mockLogger);
-
-        // assert
-        assertThat(openCLContext, is(notNullValue()));
-    }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="init">
@@ -48,18 +36,21 @@ public class OpenCLContextTest {
     public void init_defaultConfiguration_logsSelectedDeviceInfo() throws IOException {
         new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // arrange
-        Logger mockLogger = mock(Logger.class);
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
-        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper, mockLogger);
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
 
-        try {
+        try (LogCaptor logCaptor = LogCaptor.forClass(OpenCLContext.class)) {
             // act
             openCLContext.init();
 
             // assert
-            verify(mockLogger, times(1)).info(eq("Selected OpenCL device:\n{}"), argThat(
-                (String s) -> s.contains("--- Info for OpenCL device:")
-            ));
+            assertThat(
+                    logCaptor.getLogEvents().stream()
+                            .filter(e -> "INFO".equals(e.getLevel()))
+                            .map(LogEvent::getFormattedMessage)
+                            .anyMatch(m -> m.startsWith("Selected OpenCL device:")
+                                    && m.contains("--- Info for OpenCL device:")),
+                    is(true));
         } finally {
             openCLContext.close();
         }

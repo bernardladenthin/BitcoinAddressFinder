@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+/**
+ * Output formats supported by the LMDB-to-address-file exporter.
+ */
 public enum CAddressFileOutputFormat {
     /**
      * The hash160 will be written encoded in hex without the amount. Optimal to view with a viewer with a fixed width (e.g. HxD).

@@ -3,11 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.equalTo;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import java.io.File;
-import java.nio.file.Files;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
@@ -17,41 +23,36 @@ import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import java.nio.file.Path;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.*;
 
 public class LMDBPersistenceTest {
-    
+
     @TempDir
     public Path folder;
-    
+
     private final Random random = new Random(1337);
-    
+
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
     private final KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
     private final PersistenceUtils persistenceUtils = new PersistenceUtils(network);
-    
+
     /**
      * The increase should happen a few times. See {@link #TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES}.
      */
-    private final static int TOO_MUCH_KEYS_FOR_1MiB = 1024*128;
-    
+    private static final int TOO_MUCH_KEYS_FOR_1MiB = 1024 * 128;
+
     /**
      * See {@link #TOO_MUCH_KEYS_FOR_1MiB}.
      */
-    private final static int TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES = 5;
-    
-    
+    private static final int TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES = 5;
+
     // <editor-fold defaultstate="collapsed" desc="use static amount">
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_LMDB_AMOUNTS)
-    public void putNewAmount_putNewAmount_correctAmountStored(boolean useStaticAmount, long staticAmount, long amount, long expectedAmount) throws IOException {
+    public void putNewAmount_putNewAmount_correctAmountStored(
+            boolean useStaticAmount, long staticAmount, long amount, long expectedAmount) throws IOException {
         // arrange
         File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
 
@@ -100,11 +101,11 @@ public class LMDBPersistenceTest {
             assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L))));
         }
     }
-    
+
     @Test
     public void getDatabaseSize_valuesAdded_returnInitialDatabaseSize() throws IOException {
         // arrange
-        int keysToAdd = 1024*16;
+        int keysToAdd = 1024 * 16;
         File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
 
         CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
@@ -128,7 +129,8 @@ public class LMDBPersistenceTest {
     // <editor-fold defaultstate="collapsed" desc="getDatabaseSize increaseDatabaseSize and filled">
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_LMDB_INCREASE_SIZE)
-    public void getDatabaseSize_initialLMDBSetTo1MiB_increaseDatabaseSize_returnResizedDatabaseSize(long increaseSize) throws IOException {
+    public void getDatabaseSize_initialLMDBSetTo1MiB_increaseDatabaseSize_returnResizedDatabaseSize(long increaseSize)
+            throws IOException {
         // arrange
         File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
 
@@ -144,15 +146,16 @@ public class LMDBPersistenceTest {
 
             // assert
             long databaseSize = lmdbPersistence.getDatabaseSize();
-            assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L)+increaseSize)));
+            assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L) + increaseSize)));
         }
     }
-    
+
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_LMDB_INCREASE_SIZE)
-    public void getDatabaseSize_valuesAdded_increaseDatabaseSize_returnResizedDatabaseSize(long increaseSize) throws IOException {
+    public void getDatabaseSize_valuesAdded_increaseDatabaseSize_returnResizedDatabaseSize(long increaseSize)
+            throws IOException {
         // arrange
-        int keysToAdd = 1024*16;
+        int keysToAdd = 1024 * 16;
         File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
 
         CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
@@ -169,11 +172,11 @@ public class LMDBPersistenceTest {
 
             // assert
             long databaseSize = lmdbPersistence.getDatabaseSize();
-            assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L)+increaseSize)));
+            assertThat(databaseSize, is(equalTo(new ByteConversion().mibToBytes(1L) + increaseSize)));
         }
     }
     // </editor-fold>
-    
+
     // <editor-fold defaultstate="collapsed" desc="increaseDatabaseSize">
     @Test
     public void putNewAmount_initialLMDBSetTo1MiB_fillWithTooMuchValues_exceptionThrown() throws IOException {
@@ -195,12 +198,15 @@ public class LMDBPersistenceTest {
             assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(new ByteConversion().mibToBytes(0L))));
 
             // act, assert
-            assertThrows(org.lmdbjava.Env.MapFullException.class, () -> fillWithRandomKeys(TOO_MUCH_KEYS_FOR_1MiB, lmdbPersistence));
+            assertThrows(
+                    org.lmdbjava.Env.MapFullException.class,
+                    () -> fillWithRandomKeys(TOO_MUCH_KEYS_FOR_1MiB, lmdbPersistence));
         }
     }
 
     @Test
-    public void putNewAmount_initialLMDBSetTo1MiB_fillWithTooMuchValues_increaseDatabaseSizeAndNoExceptionThrown() throws IOException {
+    public void putNewAmount_initialLMDBSetTo1MiB_fillWithTooMuchValues_increaseDatabaseSizeAndNoExceptionThrown()
+            throws IOException {
         // arrange
         File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
 
@@ -222,13 +228,22 @@ public class LMDBPersistenceTest {
             fillWithRandomKeys(TOO_MUCH_KEYS_FOR_1MiB, lmdbPersistence);
 
             // post assert
-            assertThat(lmdbPersistence.getDatabaseSize(), is(equalTo(new ByteConversion().mibToBytes(1L) + (new ByteConversion().mibToBytes(cLMDBConfigurationWrite.increaseSizeInMiB)) * TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES)));
-            assertThat(lmdbPersistence.getIncreasedCounter(), is(equalTo((long) TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES)));
-            assertThat(lmdbPersistence.getIncreasedSum(), is(equalTo(new ByteConversion().mibToBytes(cLMDBConfigurationWrite.increaseSizeInMiB * TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES))));
+            assertThat(
+                    lmdbPersistence.getDatabaseSize(),
+                    is(equalTo(new ByteConversion().mibToBytes(1L)
+                            + (new ByteConversion().mibToBytes(cLMDBConfigurationWrite.increaseSizeInMiB))
+                                    * TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES)));
+            assertThat(
+                    lmdbPersistence.getIncreasedCounter(), is(equalTo((long) TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES)));
+            assertThat(
+                    lmdbPersistence.getIncreasedSum(),
+                    is(equalTo(new ByteConversion()
+                            .mibToBytes(cLMDBConfigurationWrite.increaseSizeInMiB
+                                    * TOO_MUCH_KEYS_EXPECTED_1MiB_INCREASES))));
         }
     }
     // </editor-fold>
-    
+
     private void fillWithRandomKeys(int keysToAdd, LMDBPersistence lmdbPersistence) {
         // arrange - fill
         for (int i = 0; i < keysToAdd; i++) {
@@ -236,7 +251,7 @@ public class LMDBPersistenceTest {
             ECKey ecKey = keyUtility.createECKey(secret, true);
             byte[] hash160 = ecKey.getPubKeyHash();
             ByteBuffer hash160ByteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160);
-            
+
             lmdbPersistence.putNewAmount(hash160ByteBuffer, Coin.SATOSHI);
         }
     }

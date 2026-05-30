@@ -11,7 +11,7 @@ import org.bitcoinj.base.Network;
 import org.bouncycastle.util.encoders.Hex;
 
 public enum P2SH implements PublicAddress {
-    
+
     /**
      * https://chainz.cryptoid.info/42/address.dws?5973.htm
      */
@@ -38,7 +38,9 @@ public enum P2SH implements PublicAddress {
     /**
      * https://chainz.cryptoid.info/defcon/address.dws?jp6qj5arxERb9xyvRPAHxrvFj9M4BchNdgRbWP9SNnU8aM2VfX65CVckJ4rkeDncswpJv1A.htm
      */
-    Defcon("jp6qj5arxERb9xyvRPAHxrvFj9M4BchNdgRbWP9SNnU8aM2VfX65CVckJ4rkeDncswpJv1A", "5b20fbd82666a13dda6c27be3a867e043cf048d5"),
+    Defcon(
+            "jp6qj5arxERb9xyvRPAHxrvFj9M4BchNdgRbWP9SNnU8aM2VfX65CVckJ4rkeDncswpJv1A",
+            "5b20fbd82666a13dda6c27be3a867e043cf048d5"),
     /**
      * https://chainz.cryptoid.info/dfi/address.dws?2770030.htm
      */

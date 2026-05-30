@@ -5,10 +5,9 @@ package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 
 public class TestAddresses42 extends AbstractTestAddresses {
 
-    public final static int RANDOM_SEED = 42;
+    public static final int RANDOM_SEED = 42;
 
     public TestAddresses42(int numberOfAddresses, boolean compressed) {
         super(RANDOM_SEED, numberOfAddresses, compressed);
     }
-
 }

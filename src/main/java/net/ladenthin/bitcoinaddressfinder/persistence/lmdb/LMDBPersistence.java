@@ -3,29 +3,20 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.persistence.lmdb;
 
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
-import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
-import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
-import org.lmdbjava.CursorIterable;
-import org.lmdbjava.Dbi;
-import org.lmdbjava.Env;
-import org.lmdbjava.EnvFlags;
-import org.lmdbjava.KeyRange;
-import org.lmdbjava.Txn;
+import static org.lmdbjava.DbiFlags.MDB_CREATE;
+import static org.lmdbjava.Env.create;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Spliterators;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.ByteConversion;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
@@ -33,24 +24,38 @@ import net.ladenthin.bitcoinaddressfinder.SeparatorFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFileOutputFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
+import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
+import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
+import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.LegacyAddress;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.lmdbjava.BufferProxy;
 import org.lmdbjava.ByteBufferProxy;
-
-import static org.lmdbjava.DbiFlags.MDB_CREATE;
-import static org.lmdbjava.Env.create;
+import org.lmdbjava.CursorIterable;
+import org.lmdbjava.Dbi;
+import org.lmdbjava.Env;
+import org.lmdbjava.EnvFlags;
 import org.lmdbjava.EnvInfo;
+import org.lmdbjava.KeyRange;
+import org.lmdbjava.Txn;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class LMDBPersistence implements Persistence {
+/**
+ * LMDB-backed implementation of {@link Persistence}. Pure backend: holds no accelerator
+ * state itself. Accelerator chains (Bloom, HashSet, SortedArray) are built externally
+ * via the {@code populateFrom} factories on each accelerator class, consuming this
+ * instance through {@link AddressIterable}.
+ */
+public class LMDBPersistence implements Persistence, AddressIterable {
 
     private static final String DB_NAME_HASH160_TO_COINT = "hash160toCoin";
     private static final int DB_COUNT = 1;
-    
-    private final Logger logger = LoggerFactory.getLogger(LMDBPersistence.class);
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(LMDBPersistence.class);
 
     private final @NonNull PersistenceUtils persistenceUtils;
     private final @Nullable CLMDBConfigurationWrite lmdbConfigurationWrite;
@@ -58,11 +63,15 @@ public class LMDBPersistence implements Persistence {
     private final @NonNull KeyUtility keyUtility;
     private @Nullable Env<ByteBuffer> env;
     private @Nullable Dbi<ByteBuffer> lmdb_h160ToAmount;
-    private long increasedCounter = 0;
-    private long increasedSum = 0;
-    private @Nullable BloomFilter<byte[]> addressBloomFilter = null;
-
-
+    private final java.util.concurrent.atomic.AtomicLong increasedCounter =
+            new java.util.concurrent.atomic.AtomicLong(0);
+    private final java.util.concurrent.atomic.AtomicLong increasedSum = new java.util.concurrent.atomic.AtomicLong(0);
+    /**
+     * Creates a new writable LMDB-backed persistence instance.
+     *
+     * @param lmdbConfigurationWrite the writable LMDB configuration
+     * @param persistenceUtils       persistence helper providing the network
+     */
     public LMDBPersistence(CLMDBConfigurationWrite lmdbConfigurationWrite, PersistenceUtils persistenceUtils) {
         this.lmdbConfigurationReadOnly = null;
         this.lmdbConfigurationWrite = lmdbConfigurationWrite;
@@ -70,13 +79,19 @@ public class LMDBPersistence implements Persistence {
         this.keyUtility = new KeyUtility(persistenceUtils.network, new ByteBufferUtility(true));
     }
 
+    /**
+     * Creates a new read-only LMDB-backed persistence instance.
+     *
+     * @param lmdbConfigurationReadOnly the read-only LMDB configuration
+     * @param persistenceUtils          persistence helper providing the network
+     */
     public LMDBPersistence(CLMDBConfigurationReadOnly lmdbConfigurationReadOnly, PersistenceUtils persistenceUtils) {
         this.lmdbConfigurationReadOnly = lmdbConfigurationReadOnly;
         lmdbConfigurationWrite = null;
         this.persistenceUtils = persistenceUtils;
         this.keyUtility = new KeyUtility(persistenceUtils.network, new ByteBufferUtility(true));
     }
-    
+
     @Override
     public void init() {
         if (lmdbConfigurationWrite != null) {
@@ -86,55 +101,21 @@ public class LMDBPersistence implements Persistence {
         } else {
             throw new IllegalArgumentException("Neither write nor read-only configuration provided.");
         }
-        
-        
+
         logStatsIfConfigured(true);
     }
-    
-    public void buildAddressBloomFilter() {
-        logger.info("##### BEGIN: buildAddressBloomFilter #####");
-        CLMDBConfigurationReadOnly localLmdbConfigurationReadOnly = Objects.requireNonNull(lmdbConfigurationReadOnly);
-        Dbi<ByteBuffer> localLmdb_h160ToAmount = Objects.requireNonNull(lmdb_h160ToAmount);
 
-        var localEnv = Objects.requireNonNull(env);
-        // Attention: slow!
-        long count = count();
-
-        BloomFilter<byte[]> filter = BloomFilter.create(Funnels.byteArrayFunnel(), count, localLmdbConfigurationReadOnly.bloomFilterFpp);
-        long inserted = 0;
-
-        try (Txn<ByteBuffer> txn = localEnv.txnRead()) {
-            try (CursorIterable<ByteBuffer> iterable = localLmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
-                for (CursorIterable.KeyVal<ByteBuffer> kv : iterable) {
-                    ByteBuffer key = kv.key();
-                    byte[] keyBytes = new byte[key.remaining()];
-                    key.get(keyBytes);
-                    key.rewind();
-                    filter.put(keyBytes);
-                    inserted++;
-                }
-            }
-        }
-
-        addressBloomFilter = filter;
-        long size = getApproximateSizeBytes(filter);
-        logger.info("Inserted {} addresses into BloomFilter with size of {}", inserted, formatSize(size));
-        logger.info("##### END: buildAddressBloomFilter #####");
-    }
-
-    public void unloadBloomFilter() {
-        addressBloomFilter = null;
-    }
-    
     private void initReadOnly() {
         CLMDBConfigurationReadOnly localLmdbConfigurationReadOnly = Objects.requireNonNull(lmdbConfigurationReadOnly);
-        BufferProxy<ByteBuffer> bufferProxy = getBufferProxyByUseProxyOptimal(localLmdbConfigurationReadOnly.useProxyOptimal);
-        env = create(bufferProxy).setMaxDbs(DB_COUNT).open(new File(localLmdbConfigurationReadOnly.lmdbDirectory), EnvFlags.MDB_RDONLY_ENV, EnvFlags.MDB_NOLOCK);
+        BufferProxy<ByteBuffer> bufferProxy =
+                getBufferProxyByUseProxyOptimal(localLmdbConfigurationReadOnly.useProxyOptimal);
+        env = create(bufferProxy)
+                .setMaxDbs(DB_COUNT)
+                .open(
+                        new File(localLmdbConfigurationReadOnly.lmdbDirectory),
+                        EnvFlags.MDB_RDONLY_ENV,
+                        EnvFlags.MDB_NOLOCK);
         lmdb_h160ToAmount = env.openDbi(DB_NAME_HASH160_TO_COINT);
-        
-        if (localLmdbConfigurationReadOnly.useBloomFilter) {
-            buildAddressBloomFilter();
-        }
     }
 
     private void initWritable() {
@@ -144,10 +125,13 @@ public class LMDBPersistence implements Persistence {
         // We always need an Env. An Env owns a physical on-disk storage file. One
         // Env can store many different databases (ie sorted maps).
         File lmdbDirectory = new File(localLmdbConfigurationWrite.lmdbDirectory);
-        lmdbDirectory.mkdirs();
-        
-        BufferProxy<ByteBuffer> bufferProxy = getBufferProxyByUseProxyOptimal(localLmdbConfigurationWrite.useProxyOptimal);
-        
+        if (!lmdbDirectory.mkdirs() && !lmdbDirectory.isDirectory()) {
+            throw new IllegalStateException("Failed to create LMDB directory: " + lmdbDirectory);
+        }
+
+        BufferProxy<ByteBuffer> bufferProxy =
+                getBufferProxyByUseProxyOptimal(localLmdbConfigurationWrite.useProxyOptimal);
+
         env = create(bufferProxy)
                 // LMDB also needs to know how large our DB might be. Over-estimating is OK.
                 .setMapSize(new ByteConversion().mibToBytes(localLmdbConfigurationWrite.initialMapSizeInMiB))
@@ -156,9 +140,14 @@ public class LMDBPersistence implements Persistence {
                 // Now let's open the Env. The same path can be concurrently opened and
                 // used in different processes, but do not open the same path twice in
                 // the same process at the same time.
-                
-                //https://github.com/kentnl/CHI-Driver-LMDB
-                .open(lmdbDirectory, EnvFlags.MDB_NOSYNC, EnvFlags.MDB_NOMETASYNC, EnvFlags.MDB_WRITEMAP, EnvFlags.MDB_MAPASYNC);
+
+                // https://github.com/kentnl/CHI-Driver-LMDB
+                .open(
+                        lmdbDirectory,
+                        EnvFlags.MDB_NOSYNC,
+                        EnvFlags.MDB_NOMETASYNC,
+                        EnvFlags.MDB_WRITEMAP,
+                        EnvFlags.MDB_MAPASYNC);
         // We need a Dbi for each DB. A Dbi roughly equates to a sorted map. The
         // MDB_CREATE flag causes the DB to be created if it doesn't already exist.
         lmdb_h160ToAmount = env.openDbi(DB_NAME_HASH160_TO_COINT, MDB_CREATE);
@@ -184,7 +173,7 @@ public class LMDBPersistence implements Persistence {
             return ByteBufferProxy.PROXY_SAFE;
         }
     }
-    
+
     private void logStatsIfConfigured(boolean onInit) {
         if (isLoggingEnabled(lmdbConfigurationWrite, onInit) || isLoggingEnabled(lmdbConfigurationReadOnly, onInit)) {
             logStats();
@@ -204,7 +193,7 @@ public class LMDBPersistence implements Persistence {
         localLmdb_h160ToAmount.close();
         localEnv.close();
     }
-    
+
     @Override
     public boolean isClosed() {
         Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
@@ -221,7 +210,7 @@ public class LMDBPersistence implements Persistence {
             return getCoinFromByteBuffer(byteBuffer);
         }
     }
-    
+
     private Coin getCoinFromByteBuffer(ByteBuffer byteBuffer) {
         if (byteBuffer == null || byteBuffer.capacity() == 0) {
             return Coin.ZERO;
@@ -238,47 +227,74 @@ public class LMDBPersistence implements Persistence {
         if (localLmdbConfigurationReadOnly.disableAddressLookup) {
             return false;
         }
-        
-        byte[] hash160AsByteArray = new byte[hash160.remaining()];
-        hash160.get(hash160AsByteArray);
-        hash160.rewind();
-        
-        // Use Bloom filter if available for fast pre-check
-        if (addressBloomFilter != null) {
-            boolean mightContain = addressBloomFilter.mightContain(hash160AsByteArray);
-            if (!mightContain) {
-                return false; // definitely not present
-            }
-            // Possibly in DB, proceed to verify
-        }
-        
-        // Perform LMDB lookup (always happens if no Bloom filter is present)
+
         try (Txn<ByteBuffer> txn = localEnv.txnRead()) {
             ByteBuffer byteBuffer = localLmdb_h160ToAmount.get(txn, hash160);
             return byteBuffer != null;
         }
     }
 
+    /**
+     * LMDB is the backing storage itself, not a decorator. It does not require any
+     * further delegate.
+     *
+     * @return always {@code false}
+     */
     @Override
-    public void writeAllAmountsToAddressFile(File file, CAddressFileOutputFormat addressFileOutputFormat, AtomicBoolean shouldRun) throws IOException {
+    public boolean requiresBackend() {
+        return false;
+    }
+
+    /**
+     * Streams every hash160 stored in the database. Each emitted {@link ByteBuffer} is a
+     * cursor-owned view; callers MUST copy bytes out before advancing the stream.
+     *
+     * <p>Closing the returned stream releases the LMDB cursor and the read transaction.
+     */
+    @Override
+    public Stream<ByteBuffer> addresses() {
+        Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
+        Dbi<ByteBuffer> localLmdb_h160ToAmount = Objects.requireNonNull(lmdb_h160ToAmount);
+
+        Txn<ByteBuffer> txn = localEnv.txnRead();
+        CursorIterable<ByteBuffer> iterable;
+        try {
+            iterable = localLmdb_h160ToAmount.iterate(txn, KeyRange.all());
+        } catch (RuntimeException e) {
+            txn.close();
+            throw e;
+        }
+
+        Stream<CursorIterable.KeyVal<ByteBuffer>> rawStream =
+                StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterable.iterator(), 0), false);
+        return rawStream.map(CursorIterable.KeyVal::key).onClose(() -> {
+            iterable.close();
+            txn.close();
+        });
+    }
+
+    @Override
+    public void writeAllAmountsToAddressFile(
+            File file, CAddressFileOutputFormat addressFileOutputFormat, AtomicBoolean shouldRun) throws IOException {
         Dbi<ByteBuffer> localLmdb_h160ToAmount = Objects.requireNonNull(lmdb_h160ToAmount);
         Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
 
         try (Txn<ByteBuffer> txn = localEnv.txnRead()) {
             try (CursorIterable<ByteBuffer> iterable = localLmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
-                try (FileWriter writer = new FileWriter(file)) {
+                try (FileWriter writer = new FileWriter(file, java.nio.charset.StandardCharsets.UTF_8)) {
                     for (final CursorIterable.KeyVal<ByteBuffer> kv : iterable) {
                         if (!shouldRun.get()) {
                             return;
                         }
                         ByteBuffer addressAsByteBuffer = kv.key();
-                        if(logger.isTraceEnabled()) {
-                            String hexFromByteBuffer = new ByteBufferUtility(false).getHexFromByteBuffer(addressAsByteBuffer);
-                            logger.trace("Process address: " + hexFromByteBuffer);
+                        if (LOGGER.isTraceEnabled()) {
+                            String hexFromByteBuffer =
+                                    new ByteBufferUtility(false).getHexFromByteBuffer(addressAsByteBuffer);
+                            LOGGER.trace("Process address: " + hexFromByteBuffer);
                         }
                         LegacyAddress address = keyUtility.byteBufferToAddress(addressAsByteBuffer);
                         final String line;
-                        switch(addressFileOutputFormat) {
+                        switch (addressFileOutputFormat) {
                             case HexHash:
                                 line = Hex.encodeHexString(address.getHash()) + System.lineSeparator();
                                 break;
@@ -288,10 +304,14 @@ public class LMDBPersistence implements Persistence {
                             case DynamicWidthBase58BitcoinAddressWithAmount:
                                 ByteBuffer value = kv.val();
                                 Coin coin = getCoinFromByteBuffer(value);
-                                line = address.toBase58() + SeparatorFormat.COMMA.getSymbol() + coin.getValue() + System.lineSeparator();
+                                line = address.toBase58()
+                                        + SeparatorFormat.COMMA.getSymbol()
+                                        + coin.getValue()
+                                        + System.lineSeparator();
                                 break;
                             default:
-                                throw new IllegalArgumentException("Unknown addressFileOutputFormat: " + addressFileOutputFormat);
+                                throw new IllegalArgumentException(
+                                        "Unknown addressFileOutputFormat: " + addressFileOutputFormat);
                         }
                         writer.write(line);
                     }
@@ -340,7 +360,8 @@ public class LMDBPersistence implements Persistence {
         } catch (org.lmdbjava.Env.MapFullException e) {
             if (localLmdbConfigurationWrite.increaseMapAutomatically) {
                 increaseDatabaseSize(new ByteConversion().mibToBytes(lmdbConfigurationWrite.increaseSizeInMiB));
-                // It is possible that the exception will be thrown again, in this case increaseSizeInMiB should be changed and it's a configuration issue.
+                // It is possible that the exception will be thrown again, in this case increaseSizeInMiB should be
+                // changed and it's a configuration issue.
                 // See {@link CLMDBConfigurationWrite#increaseSizeInMiB}.
                 putNewAmountUnsafe(hash160, amount);
             } else {
@@ -348,7 +369,7 @@ public class LMDBPersistence implements Persistence {
             }
         }
     }
-    
+
     private void putNewAmountUnsafe(ByteBuffer hash160, Coin amount) {
         CLMDBConfigurationWrite localLmdbConfigurationWrite = Objects.requireNonNull(lmdbConfigurationWrite);
         Dbi<ByteBuffer> localLmdb_h160ToAmount = Objects.requireNonNull(lmdb_h160ToAmount);
@@ -405,63 +426,35 @@ public class LMDBPersistence implements Persistence {
     public void increaseDatabaseSize(long toIncrease) {
         Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
 
-        increasedCounter++;
-        increasedSum += toIncrease;
+        increasedCounter.incrementAndGet();
+        increasedSum.addAndGet(toIncrease);
         long newSize = getDatabaseSize() + toIncrease;
         localEnv.setMapSize(newSize);
     }
 
     @Override
     public long getIncreasedCounter() {
-        return increasedCounter;
+        return increasedCounter.get();
     }
 
     @Override
     public long getIncreasedSum() {
-        return increasedSum;
+        return increasedSum.get();
     }
-    
+
     @Override
     public void logStats() {
         Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
 
-        logger.info("##### BEGIN: LMDB stats #####");
-        logger.info("... this may take a lot of time ...");
-        logger.info("DatabaseSize: " + new ByteConversion().bytesToMib(getDatabaseSize()) + " MiB");
-        logger.info("IncreasedCounter: " + getIncreasedCounter());
-        logger.info("IncreasedSum: " + new ByteConversion().bytesToMib(getIncreasedSum()) + " MiB");
-        logger.info("Stat: " + localEnv.stat());
+        LOGGER.info("##### BEGIN: LMDB stats #####");
+        LOGGER.info("... this may take a lot of time ...");
+        LOGGER.info("DatabaseSize: " + new ByteConversion().bytesToMib(getDatabaseSize()) + " MiB");
+        LOGGER.info("IncreasedCounter: " + getIncreasedCounter());
+        LOGGER.info("IncreasedSum: " + new ByteConversion().bytesToMib(getIncreasedSum()) + " MiB");
+        LOGGER.info("Stat: " + localEnv.stat());
         // Attention: slow!
         long count = count();
-        logger.info("LMDB contains " + count + " unique entries.");
-        logger.info("##### END: LMDB stats #####");
-    }
-
-    public static long getApproximateSizeBytes(BloomFilter<?> bloomFilter) {
-        try {
-            // Access private field: bits
-            Field bitsField = BloomFilter.class.getDeclaredField("bits");
-            bitsField.setAccessible(true);
-            Object bits = bitsField.get(bloomFilter);
-
-            // Access internal AtomicLongArray: data
-            Field dataField = bits.getClass().getDeclaredField("data");
-            dataField.setAccessible(true);
-            AtomicLongArray data = (AtomicLongArray) dataField.get(bits);
-
-            return (long) data.length() * Long.BYTES; // 8 bytes per long
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to estimate BloomFilter size", e);
-        }
-    }
-
-    public static String formatSize(long sizeInBytes) {
-        if (sizeInBytes >= 1024 * 1024) {
-            return String.format("%.2f MB", sizeInBytes / 1024.0 / 1024.0);
-        } else if (sizeInBytes >= 1024) {
-            return String.format("%.2f KB", sizeInBytes / 1024.0);
-        } else {
-            return sizeInBytes + " bytes";
-        }
+        LOGGER.info("LMDB contains " + count + " unique entries.");
+        LOGGER.info("##### END: LMDB stats #####");
     }
 }

@@ -14,6 +14,4 @@ import java.lang.annotation.Target;
 /**
  * It is an await time test. This tests changes timing durations. Especially for {@link java.util.concurrent.ExecutorService#awaitTermination}.
  */
-public @interface AwaitTimeTest {
-    
-}
+public @interface AwaitTimeTest {}

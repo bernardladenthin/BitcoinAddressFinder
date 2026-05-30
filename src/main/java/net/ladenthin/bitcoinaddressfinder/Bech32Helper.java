@@ -3,15 +3,20 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import org.bitcoinj.base.Bech32;
-import org.bitcoinj.base.exceptions.AddressFormatException;
+import static net.ladenthin.bitcoinaddressfinder.AddressTxtLine.BITCOIN_CASH_PREFIX;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import org.bitcoinj.base.Bech32;
 
-import static net.ladenthin.bitcoinaddressfinder.AddressTxtLine.BITCOIN_CASH_PREFIX;
-
+/**
+ * Bech32 / CashAddr decoding helpers including SegWit witness program extraction
+ * and access to selected protected bitcoinj API via reflection.
+ */
 public class Bech32Helper {
+
+    /** Creates a new {@link Bech32Helper}. */
+    public Bech32Helper() {}
 
     /**
      * Bech32 character set as defined in BIP-0173.
@@ -74,20 +79,12 @@ public class Bech32Helper {
         return invokeConvertBitsStatic(data, 0, data.length, 8, 5, true);
     }
 
-    @SuppressWarnings("unchecked")
-    private byte[] invokeConvertBitsStatic(byte[] in, int inStart, int inLen, int fromBits, int toBits, boolean pad) throws ReflectiveOperationException {
-        Method method = Bech32.class.getDeclaredMethod("convertBits", byte[].class, int.class, int.class, int.class, int.class, boolean.class);
+    private byte[] invokeConvertBitsStatic(byte[] in, int inStart, int inLen, int fromBits, int toBits, boolean pad)
+            throws ReflectiveOperationException {
+        Method method = Bech32.class.getDeclaredMethod(
+                "convertBits", byte[].class, int.class, int.class, int.class, int.class, boolean.class);
         method.setAccessible(true);
-        try {
-            return (byte[]) method.invoke(null, in, inStart, inLen, fromBits, toBits, pad);
-        } catch (ReflectiveOperationException e) {
-            // rethrow AddressFormatException if it's the underlying cause
-            Throwable cause = e.getCause();
-            if (cause instanceof AddressFormatException) {
-                throw (AddressFormatException) cause;
-            }
-            throw e;
-        }
+        return (byte[]) method.invoke(null, in, inStart, inLen, fromBits, toBits, pad);
     }
 
     /**
@@ -123,7 +120,7 @@ public class Bech32Helper {
      * @throws ReflectiveOperationException if the protected method cannot be accessed
      */
     public byte[] getWitnessPrograms(Bech32.Bech32Data bechData) throws ReflectiveOperationException {
-        return invokeProtectedMethod(bechData, "witnessProgram", byte[].class);
+        return invokeProtectedMethod(bechData, "witnessProgram");
     }
 
     /**
@@ -140,13 +137,13 @@ public class Bech32Helper {
      * @throws ReflectiveOperationException if the protected method cannot be accessed
      */
     public Short getWitnessVersion(Bech32.Bech32Data bechData) throws ReflectiveOperationException {
-        return invokeProtectedMethod(bechData, "witnessVersion", Short.class);
+        return invokeProtectedMethod(bechData, "witnessVersion");
     }
 
     @SuppressWarnings("unchecked")
-    private <T> T invokeProtectedMethod(Bech32.Bech32Bytes bech32Bytes, String methodName, Class<T> returnType) throws ReflectiveOperationException  {
-        Class<?> clazz = Bech32.Bech32Bytes.class;
-        Method method = clazz.getDeclaredMethod(methodName);
+    private <T> T invokeProtectedMethod(Bech32.Bech32Bytes bech32Bytes, String methodName)
+            throws ReflectiveOperationException {
+        Method method = Bech32.Bech32Bytes.class.getDeclaredMethod(methodName);
         method.setAccessible(true);
         return (T) method.invoke(bech32Bytes);
     }

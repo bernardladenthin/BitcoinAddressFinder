@@ -72,56 +72,64 @@
         "batchSizeInBits": 14,
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
-        "runOnce": false
+        "runOnce": false,
+        "shutdownTimeoutSeconds": 300
       },
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_2",
         "batchSizeInBits": 14,
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
-        "runOnce": false
+        "runOnce": false,
+        "shutdownTimeoutSeconds": 300
       },
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_3",
         "batchSizeInBits": 14,
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
-        "runOnce": false
+        "runOnce": false,
+        "shutdownTimeoutSeconds": 300
       },
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_4",
         "batchSizeInBits": 14,
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
-        "runOnce": false
+        "runOnce": false,
+        "shutdownTimeoutSeconds": 300
       },
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_5",
         "batchSizeInBits": 14,
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
-        "runOnce": false
+        "runOnce": false,
+        "shutdownTimeoutSeconds": 300
       },
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_6",
         "batchSizeInBits": 14,
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
-        "runOnce": false
+        "runOnce": false,
+        "shutdownTimeoutSeconds": 300
       },
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_7",
         "batchSizeInBits": 14,
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
-        "runOnce": false
+        "runOnce": false,
+        "shutdownTimeoutSeconds": 300
       },
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_8",
         "batchSizeInBits": 14,
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
-        "runOnce": false
+        "runOnce": false,
+        "shutdownTimeoutSeconds": 300
       }
     ],
     "producerJavaSecretsFiles": [],

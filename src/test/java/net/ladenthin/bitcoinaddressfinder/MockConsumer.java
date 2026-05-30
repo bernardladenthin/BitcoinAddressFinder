@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MockConsumer implements Consumer {
-    
+
     public List<PublicKeyBytes[]> publicKeyBytesArrayList = new ArrayList<>();
 
     @Override
@@ -16,11 +16,8 @@ public class MockConsumer implements Consumer {
     }
 
     @Override
-    public void startConsumer() {
-    }
+    public void startConsumer() {}
 
     @Override
-    public void interrupt() {
-    }
-    
+    public void interrupt() {}
 }

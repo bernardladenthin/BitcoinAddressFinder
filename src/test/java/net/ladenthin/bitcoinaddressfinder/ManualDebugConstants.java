@@ -14,11 +14,11 @@ public final class ManualDebugConstants {
 
     /**
      * Enables runtime validation of public key generation logic.
-     * 
+     *
      * Intended only for debugging purposes such as verifying OpenCL results or testing hardware correctness.
-     * 
+     *
      * <p><b>Performance impact:</b> Enabling this drastically reduces throughput.</p>
-     * 
+     *
      * @see net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava#runtimePublicKeyCalculationCheck
      */
     public static final boolean ENABLE_RUNTIME_PUBLIC_KEY_CALCULATION_CHECK = false;

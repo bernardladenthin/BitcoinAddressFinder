@@ -3,22 +3,28 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Objects;
+import java.util.concurrent.*;
 import java.util.concurrent.ExecutorService;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
-import java.util.concurrent.*;
+import org.slf4j.LoggerFactory;
 
+/**
+ * Key producer that receives secrets from a TCP socket (client or server mode).
+ */
 public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaSocket> {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(KeyProducerJavaSocket.class);
 
     private @Nullable ServerSocket serverSocket;
     private @Nullable Socket socket;
@@ -27,8 +33,15 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
 
     private final ExecutorService readerExecutor = Executors.newSingleThreadExecutor();
 
-    public KeyProducerJavaSocket(CKeyProducerJavaSocket config, KeyUtility keyUtility, BitHelper bitHelper, Logger logger) {
-        super(config, keyUtility, logger);
+    /**
+     * Creates a new socket-based key producer and starts the background reader thread.
+     *
+     * @param config      the socket configuration
+     * @param keyUtility  cryptographic helper
+     * @param bitHelper   bit/batch-size helper (unused but kept for symmetry)
+     */
+    public KeyProducerJavaSocket(CKeyProducerJavaSocket config, KeyUtility keyUtility, BitHelper bitHelper) {
+        super(config, keyUtility);
         setupSocket();
     }
 
@@ -45,11 +58,14 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
                             serverSocket.setSoTimeout(cKeyProducerJava.timeout);
                         }
                         socket = serverSocket.accept();
-                        logger.info("Accepted client connection at port {}", cKeyProducerJava.getPort());
+                        LOGGER.info("Accepted client connection at port {}", cKeyProducerJava.getPort());
                     } else {
                         socket = new Socket();
-                        socket.connect(new InetSocketAddress(cKeyProducerJava.getHost(), cKeyProducerJava.getPort()), cKeyProducerJava.timeout);
-                        logger.info("Connected to server at {}:{}", cKeyProducerJava.getHost(), cKeyProducerJava.getPort());
+                        socket.connect(
+                                new InetSocketAddress(cKeyProducerJava.getHost(), cKeyProducerJava.getPort()),
+                                cKeyProducerJava.timeout);
+                        LOGGER.info(
+                                "Connected to server at {}:{}", cKeyProducerJava.getHost(), cKeyProducerJava.getPort());
                     }
 
                     Socket localSocket = Objects.requireNonNull(socket);
@@ -69,7 +85,7 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
 
                 } catch (IOException e) {
                     lastException = e;
-                    logger.warn("Connection attempt {} failed: {}", attempts + 1, e.getMessage());
+                    LOGGER.warn("Connection attempt {} failed: {}", attempts + 1, e.getMessage());
                     attempts++;
                     closeConnections();
                     sleep(cKeyProducerJava.retryDelayMillisConnect);
@@ -83,9 +99,18 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
     }
 
     private void closeConnections() {
-        try { if (inputStream != null) inputStream.close(); } catch (IOException ignored) {}
-        try { if (socket != null) socket.close(); } catch (IOException ignored) {}
-        try { if (serverSocket != null) serverSocket.close(); } catch (IOException ignored) {}
+        try {
+            if (inputStream != null) inputStream.close();
+        } catch (IOException ignored) {
+        }
+        try {
+            if (socket != null) socket.close();
+        } catch (IOException ignored) {
+        }
+        try {
+            if (serverSocket != null) serverSocket.close();
+        } catch (IOException ignored) {
+        }
         inputStream = null;
         socket = null;
         serverSocket = null;
