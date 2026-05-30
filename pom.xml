@@ -535,26 +535,6 @@ SPDX-License-Identifier: Apache-2.0
                     <mainClass>org.openjdk.jmh.Main</mainClass>
                     <classpathScope>test</classpathScope>
                 </configuration>
-                <executions>
-                    <execution>
-                        <id>jcstress</id>
-                        <phase>test</phase>
-                        <goals><goal>exec</goal></goals>
-                        <configuration>
-                            <skip>${skipTests}</skip>
-                            <executable>${java.home}/bin/java</executable>
-                            <classpathScope>test</classpathScope>
-                            <arguments>
-                                <argument>-classpath</argument>
-                                <classpath/>
-                                <argument>org.openjdk.jcstress.Main</argument>
-                                <argument>-v</argument>
-                                <argument>-m</argument>
-                                <argument>default</argument>
-                            </arguments>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
     </build>
@@ -790,6 +770,36 @@ SPDX-License-Identifier: Apache-2.0
                                 <goals>
                                     <goal>test</goal>
                                 </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>jcstress</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>jcstress</id>
+                                <phase>test</phase>
+                                <goals><goal>exec</goal></goals>
+                                <configuration>
+                                    <executable>${java.home}/bin/java</executable>
+                                    <classpathScope>test</classpathScope>
+                                    <arguments>
+                                        <argument>-classpath</argument>
+                                        <classpath/>
+                                        <argument>org.openjdk.jcstress.Main</argument>
+                                        <argument>-v</argument>
+                                        <argument>-m</argument>
+                                        <argument>default</argument>
+                                    </arguments>
+                                </configuration>
                             </execution>
                         </executions>
                     </plugin>

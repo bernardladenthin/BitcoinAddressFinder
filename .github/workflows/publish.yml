@@ -74,7 +74,7 @@ jobs:
           cache: maven
       - name: Test
         shell: bash
-        run: mvn --batch-mode -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=${{ matrix.disable-lmdb }} --update-snapshots test jacoco:report
+        run: mvn --batch-mode -P jcstress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=${{ matrix.disable-lmdb }} --update-snapshots test jacoco:report
       - uses: actions/upload-artifact@v7
         if: always()
         with:
