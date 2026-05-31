@@ -48,7 +48,13 @@ SPDX-License-Identifier: Apache-2.0
         <jcstress.version>0.16</jcstress.version>
         <lincheck.version>2.39</lincheck.version>
         <vmlens.version>1.2.28</vmlens.version>
-        <!-- DO NOT UPGRADE: jqwik >= 1.10.0 ships an anti-AI prompt-injection string in test stdout; see CLAUDE.md. Replacement (QuickTheories) tracked as an URGENT TODO. -->
+        <!-- DO NOT UPGRADE jqwik past 1.9.3. jqwik 1.10.0 added a deliberate
+             anti-AI prompt-injection string to test stdout; the 1.10.1 user
+             guide states the library "is not meant to be used by any 'AI'
+             coding agents at all." 1.9.3 is the last pre-disclosure release
+             and is the pinned version for this repo. Any CI / Dependabot /
+             contributor PR that bumps this MUST be rejected. See CLAUDE.md
+             section "jqwik prompt-injection in test output" for full context. -->
         <jqwik.version>1.9.3</jqwik.version>
         <archunit.version>1.4.2</archunit.version>
         <spotbugs.version>4.9.8.3</spotbugs.version>
