@@ -529,9 +529,11 @@ interim measure until that work lands.
 
 ## Open TODOs
 
-- **[URGENT] Replace jqwik.** Upstream is openly hostile to the AI-assisted workflow this project uses (jqwik 1.10.0 added a deliberate prompt-injection string to test stdout; jqwik 1.10.1 release notes added: *"This project is not meant to be used by any 'AI' coding agents at all."*). See the "jqwik prompt-injection in test output" section above for context and links. Replace the one jqwik test class in this repo (`BitcoinAddressProperties`) with one of:
-  - **junit-quickcheck** (`com.pholser:junit-quickcheck-core` + `-generators`) — closest API match; uses JUnit Vintage runner, well-maintained, no anti-AI behaviour.
-  - A minimal hand-rolled `@ParameterizedTest` + `@MethodSource`/`@ArgumentsSource` approach using JUnit Jupiter that is already on the classpath. Lower dependency count; some shrinking / generator features lost.
+- **[URGENT] Replace jqwik with QuickTheories.** Upstream is openly hostile to the AI-assisted workflow this project uses (jqwik 1.10.0 added a deliberate prompt-injection string to test stdout; jqwik 1.10.1 release notes added: *"This project is not meant to be used by any 'AI' coding agents at all."*). See the "jqwik prompt-injection in test output" section above for context and links. Replace the one jqwik test class in this repo (`BitcoinAddressProperties`) with one of (in order of preference):
+  - **QuickTheories** (`org.quicktheories:quicktheories`, MIT) — preferred. Native JUnit Jupiter (5/6); plain `@Test` methods with `qt().forAll(...).check(...)` bodies. No `@RunWith`, no JUnit Vintage engine. Property-based generation with shrinking preserved; the fluent DSL (`integers().between(...)`, `lists().of(...).ofSizeBetween(...)`, `strings().basicLatinAlphabet().ofLengthBetween(...)`) covers every constraint the current jqwik tests use.
+  - **junit-quickcheck** (`com.pholser:junit-quickcheck-core` + `-generators`) — closest annotation match to jqwik but requires the JUnit Vintage engine alongside Jupiter; only use if the QuickTheories DSL turns out to be a poor fit.
+  - A minimal hand-rolled `@ParameterizedTest` + `@MethodSource`/`@ArgumentsSource` approach using JUnit Jupiter that is already on the classpath. Lower dependency count; loses shrinking and built-in generators.
+
   Remove the jqwik dependency from `pom.xml` (and the `jqwik.version` property), drop the jqwik bullet from any test-frameworks documentation, and verify CI is green with the replacement. Until this lands, the doc-only warning section above is the interim mitigation.
 
 - **`@VisibleForTesting` audit.** 18 existing usages — review each for accuracy (still needed? still test-only?), and walk the production tree for any package-private/protected members that exist purely for tests but are *not* annotated; either add the annotation or move into the test tree.
