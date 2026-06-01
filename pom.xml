@@ -250,12 +250,13 @@ SPDX-License-Identifier: Apache-2.0
 
                     <source>21</source>
                     <target>21</target>
+                    <parameters>true</parameters>
 
                     <compilerArgs>
                         <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
                         <arg>-XDcompilePolicy=simple</arg>
                         <arg>--should-stop=ifError=FLOW</arg>
-                        <arg>-Xplugin:ErrorProne -Xep:NullAway:ERROR -XepOpt:NullAway:AnnotatedPackages=net.ladenthin -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:CheckOptionalEmptiness=true -XepOpt:NullAway:AcknowledgeRestrictiveAnnotations=true -XepOpt:NullAway:AcknowledgeAndroidRecent=true -XepOpt:NullAway:AssertsEnabled=true</arg>
+                        <arg>-Xplugin:ErrorProne -Xep:NullAway:ERROR -XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:CheckOptionalEmptiness=true -XepOpt:NullAway:AcknowledgeRestrictiveAnnotations=true -XepOpt:NullAway:AcknowledgeAndroidRecent=true -XepOpt:NullAway:AssertsEnabled=true</arg>
 
                         <!-- For ErrorProne, DO NOT TOUCH, documented here: https://errorprone.info/docs/installation#jdk-16 -->
                         <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
@@ -318,8 +319,12 @@ SPDX-License-Identifier: Apache-2.0
                                 which NullAway would then analyze and fail (generated code lacks @NonNull
                                 annotations). Turn NullAway OFF for test compilation; hand-written test
                                 code is still checked via the default-compile phase on the main sources.
+
+                                Also drop -parameters here so JMH / jcstress reflection doesn't pick up
+                                parameter names from MethodParameters.
                             -->
-                            <compilerArgs>
+                            <parameters>false</parameters>
+                            <compilerArgs combine.self="override">
                                 <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
                                 <arg>-XDcompilePolicy=simple</arg>
                                 <arg>--should-stop=ifError=FLOW</arg>
