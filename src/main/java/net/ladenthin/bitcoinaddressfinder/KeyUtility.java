@@ -141,6 +141,9 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
      * @param privateKeyBytes the raw private-key bytes
      * @return a string containing the mnemonic for each {@link BIP39Wordlist}
      */
+    // MnemonicCode(InputStream, String) accepts null wordListDigest to skip the SHA256
+    // check on the wordlist; bitcoinj is unannotated upstream so CF infers @NonNull.
+    @SuppressWarnings("nullness:argument")
     public String createMnemonics(byte[] privateKeyBytes) {
         StringBuilder logMnemonic = new StringBuilder("Mnemonic:");
         for (BIP39Wordlist wordList : BIP39Wordlist.values()) {

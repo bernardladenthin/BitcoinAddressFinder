@@ -17,6 +17,9 @@ import org.zeromq.ZMQException;
 /**
  * Key producer that receives secrets through a ZeroMQ PULL socket.
  */
+// The constructor publishes a receiver thread that calls addSecret on this; CF flags
+// this-escape. Tracked in CLAUDE.md as a TODO to refactor with a start() method.
+@SuppressWarnings("nullness:method.invocation")
 public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaZmq> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KeyProducerJavaZmq.class);

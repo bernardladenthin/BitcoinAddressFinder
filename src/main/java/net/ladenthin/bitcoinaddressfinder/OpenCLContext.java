@@ -45,6 +45,11 @@ import org.slf4j.LoggerFactory;
 /**
  * OpenCL context and kernel lifecycle wrapper used by the GPU producer.
  */
+// The JOCL upstream API is not annotated for nullness; every clXxx(...) call here
+// passes the null values that the OpenCL C ABI accepts (e.g. pfn_notify, user_data,
+// errcode_ret). Checker Framework reads those parameters as @NonNull by default and
+// flags every site. Suppress at class scope rather than per call — same justification.
+@SuppressWarnings({"nullness:argument", "nullness:dereference.of.nullable"})
 public class OpenCLContext implements ReleaseCLObject {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OpenCLContext.class);

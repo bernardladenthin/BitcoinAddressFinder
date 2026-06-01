@@ -150,10 +150,11 @@ public class Finder implements Interruptable {
         LOGGER.info("startConsumer");
         CConsumerJava localCConsumerJava = Objects.requireNonNull(finder.consumerJava);
 
-        consumerJava = new ConsumerJava(localCConsumerJava, keyUtility, persistenceUtils);
-        consumerJava.initLMDB();
-        consumerJava.startConsumer();
-        consumerJava.startStatisticsTimer();
+        final ConsumerJava localConsumerJava = new ConsumerJava(localCConsumerJava, keyUtility, persistenceUtils);
+        consumerJava = localConsumerJava;
+        localConsumerJava.initLMDB();
+        localConsumerJava.startConsumer();
+        localConsumerJava.startStatisticsTimer();
     }
 
     /**
@@ -211,9 +212,13 @@ public class Finder implements Interruptable {
      * @throws RuntimeException if the referenced id is unknown
      */
     public KeyProducer getKeyProducer(CProducer cProducer) throws RuntimeException {
-        KeyProducer keyProducer = keyProducers.get(cProducer.keyProducerId);
+        final String id = cProducer.keyProducerId;
+        if (id == null) {
+            throw new KeyProducerIdUnknownException(null);
+        }
+        KeyProducer keyProducer = keyProducers.get(id);
         if (keyProducer == null) {
-            throw new KeyProducerIdUnknownException(cProducer.keyProducerId);
+            throw new KeyProducerIdUnknownException(id);
         }
         return keyProducer;
     }
@@ -255,9 +260,10 @@ public class Finder implements Interruptable {
         producerExecutorService.awaitTermination(AWAIT_DURATION_TERMINATE.get(ChronoUnit.SECONDS), TimeUnit.SECONDS);
 
         // no producers are running anymore, the consumer can be interrupted
-        if (consumerJava != null) {
-            LOGGER.info("Interrupt: " + consumerJava);
-            consumerJava.interrupt();
+        final ConsumerJava localConsumerJava = consumerJava;
+        if (localConsumerJava != null) {
+            LOGGER.info("Interrupt: " + localConsumerJava);
+            localConsumerJava.interrupt();
             consumerJava = null;
         }
         LOGGER.info("consumerJava released.");

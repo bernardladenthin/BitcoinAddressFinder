@@ -79,6 +79,10 @@ public class Bech32Helper {
         return invokeConvertBitsStatic(data, 0, data.length, 8, 5, true);
     }
 
+    // Method.invoke takes a @NonNull obj per CF stub, but the JDK contract accepts null for
+    // static methods (Bech32.convertBits is static). Its byte[] return is also non-null at
+    // runtime but reflection types it as @Nullable Object. Suppress both.
+    @SuppressWarnings({"nullness:argument", "nullness:return"})
     private byte[] invokeConvertBitsStatic(byte[] in, int inStart, int inLen, int fromBits, int toBits, boolean pad)
             throws ReflectiveOperationException {
         Method method = Bech32.class.getDeclaredMethod(

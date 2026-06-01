@@ -13,17 +13,22 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocke
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Key producer that receives secrets through a WebSocket server.
  */
+// The constructor publishes the embedded WebSocketServer that mutates outer-class state
+// via addSecret; CF flags both the this-escape on initWebSocketServer and the
+// initialization order. Tracked in CLAUDE.md as a TODO to refactor with a start() method.
+@SuppressWarnings({"nullness:method.invocation"})
 public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaWebSocket> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KeyProducerJavaWebSocket.class);
 
-    private WebSocketServer webSocketServer;
+    private @Nullable WebSocketServer webSocketServer;
 
     /**
      * Creates a new WebSocket-based key producer and starts the embedded server.
@@ -38,7 +43,7 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
     }
 
     private void initWebSocketServer() {
-        webSocketServer = new WebSocketServer(new InetSocketAddress(cKeyProducerJava.getPort())) {
+        final WebSocketServer localServer = new WebSocketServer(new InetSocketAddress(cKeyProducerJava.getPort())) {
             @Override
             public void onOpen(WebSocket conn, ClientHandshake handshake) {
                 LOGGER.info("WebSocket connection opened from: {}", conn.getRemoteSocketAddress());
@@ -76,8 +81,9 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
                 LOGGER.info("onMessage: {}", string);
             }
         };
+        webSocketServer = localServer;
 
-        Executors.newSingleThreadExecutor().submit(webSocketServer::start);
+        Executors.newSingleThreadExecutor().submit(localServer::start);
     }
 
     @Override

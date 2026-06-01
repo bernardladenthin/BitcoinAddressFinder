@@ -68,6 +68,10 @@ import org.slf4j.LoggerFactory;
  * Discovers available OpenCL platforms and devices via JOCL and wraps them in
  * {@link OpenCLPlatform} / {@link OpenCLDevice} objects.
  */
+// JOCL upstream API is not annotated for nullness; every clGet*(...) call here
+// passes the null values that the OpenCL C ABI accepts (size-only queries, etc.).
+// Field.getBoolean(null) is the documented JDK contract for static fields.
+@SuppressWarnings({"nullness:argument", "nullness:dereference.of.nullable"})
 public class OpenCLBuilder {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OpenCLBuilder.class);

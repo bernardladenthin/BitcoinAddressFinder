@@ -32,6 +32,10 @@ import org.slf4j.LoggerFactory;
 /**
  * Encapsulates one OpenCL kernel invocation: manages source/destination buffers and runs the kernel.
  */
+// JOCL upstream API is not annotated for nullness; every clXxx(...) call here passes
+// the null values that the OpenCL C ABI accepts (e.g. errcode_ret, event_wait_list,
+// event, global_work_offset). Suppress at class scope to avoid per-call noise.
+@SuppressWarnings({"nullness:argument", "nullness:dereference.of.nullable"})
 public class OpenClTask implements ReleaseCLObject {
 
     /** SLF4J logger for this task. */

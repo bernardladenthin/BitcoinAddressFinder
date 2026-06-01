@@ -632,7 +632,7 @@ public class PublicKeyBytes {
 
     // generated, based on secretKey only!
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(@Nullable Object obj) {
         if (this == obj) {
             return true;
         }

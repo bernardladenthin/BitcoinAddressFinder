@@ -78,7 +78,7 @@ public class PersistenceUtils {
         return new ByteBufferUtility(true).byteArrayToByteBuffer(hash.getBytes());
     }
 
-    private ByteBuffer longValueToByteBufferDirectAsReadOnlyBuffer(long value) {
+    private static ByteBuffer longValueToByteBufferDirectAsReadOnlyBuffer(long value) {
         ByteBuffer byteBuffer = ByteBuffer.allocateDirect(Long.BYTES);
         byteBuffer.putLong(value);
         return byteBuffer.asReadOnlyBuffer();

@@ -62,6 +62,7 @@ SPDX-License-Identifier: Apache-2.0
         <findsecbugs.version>1.14.0</findsecbugs.version>
         <errorprone.version>2.49.0</errorprone.version>
         <nullaway.version>0.13.4</nullaway.version>
+        <checker.version>4.1.0</checker.version>
         <java-websocket.version>1.6.0</java-websocket.version>
         <jeromq.version>0.6.0</jeromq.version>
         <jspecify.version>1.0.0</jspecify.version>
@@ -319,6 +320,19 @@ SPDX-License-Identifier: Apache-2.0
                           either fixed or explicitly suppressed.
                         -->
                         <arg>-Xlint:all,-serial,-options,-classfile</arg>
+                        <!--
+                          Checker Framework Nullness Checker runs as a second nullness pass
+                          alongside NullAway. CF is generics-aware and stricter than NullAway,
+                          so it acts as a second-opinion verifier on the same JSpecify
+                          annotations.
+                        -->
+                        <arg>-processor</arg>
+                        <arg>org.checkerframework.checker.nullness.NullnessChecker</arg>
+                        <!--
+                          Override CF 4.1.0's incorrect Objects.requireNonNull stub. The shipped
+                          stub annotates obj as @NonNull, the opposite of the JDK contract.
+                        -->
+                        <arg>-Astubs=src/etc/checker/objects.astub</arg>
                         <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
                         <arg>-XDcompilePolicy=simple</arg>
                         <arg>--should-stop=ifError=FLOW</arg>
@@ -373,6 +387,11 @@ SPDX-License-Identifier: Apache-2.0
                             <groupId>com.uber.nullaway</groupId>
                             <artifactId>nullaway</artifactId>
                             <version>${nullaway.version}</version>
+                        </path>
+                        <path>
+                            <groupId>org.checkerframework</groupId>
+                            <artifactId>checker</artifactId>
+                            <version>${checker.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
@@ -631,6 +650,11 @@ SPDX-License-Identifier: Apache-2.0
             <groupId>org.jspecify</groupId>
             <artifactId>jspecify</artifactId>
             <version>${jspecify.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.checkerframework</groupId>
+            <artifactId>checker-qual</artifactId>
+            <version>${checker.version}</version>
         </dependency>
         <dependency>
             <groupId>org.bitcoinj</groupId>
