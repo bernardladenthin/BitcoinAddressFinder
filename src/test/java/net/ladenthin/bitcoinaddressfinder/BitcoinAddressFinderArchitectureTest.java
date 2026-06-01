@@ -94,4 +94,37 @@ public class BitcoinAddressFinderArchitectureTest {
             .should()
             .dependOnClassesThat()
             .resideInAnyPackage("sun..", "com.sun..", "jdk.internal..");
+
+    /**
+     * Public mutable state forbidden: any non-static field declared
+     * {@code public} must also be {@code final}.
+     *
+     * <p>Two documented exceptions:
+     * <ul>
+     *   <li>The {@code net.ladenthin.bitcoinaddressfinder.configuration..}
+     *       package — these are Maven-/Jackson-style config POJOs populated
+     *       from JSON via reflection. Converting all of them to getter/setter
+     *       form is a separate, larger refactor (see the design-fit review
+     *       Open TODO).</li>
+     *   <li>{@link ReadStatistic} — intentional shared mutable accumulator
+     *       used across the address-file ingestion path. Refactoring to
+     *       getters/setters would add noise without locking semantics; if a
+     *       second mutable-counter class is ever added, prefer extending the
+     *       exception list explicitly over relaxing the rule.</li>
+     * </ul>
+     */
+    @ArchTest
+    static final ArchRule noPublicMutableFields = fields()
+            .that()
+            .arePublic()
+            .and()
+            .areNotStatic()
+            .and()
+            .areDeclaredInClassesThat()
+            .resideOutsideOfPackage("net.ladenthin.bitcoinaddressfinder.configuration..")
+            .and()
+            .areDeclaredInClassesThat()
+            .doNotHaveSimpleName("ReadStatistic")
+            .should()
+            .beFinal();
 }
