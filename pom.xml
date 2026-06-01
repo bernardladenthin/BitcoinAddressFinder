@@ -217,6 +217,11 @@ SPDX-License-Identifier: Apache-2.0
                     <version>0.8.14</version>
                 </plugin>
                 <plugin>
+                    <groupId>org.pitest</groupId>
+                    <artifactId>pitest-maven</artifactId>
+                    <version>1.25.1</version>
+                </plugin>
+                <plugin>
                     <groupId>org.sonatype.central</groupId>
                     <artifactId>central-publishing-maven-plugin</artifactId>
                     <version>0.10.0</version>
@@ -674,6 +679,43 @@ SPDX-License-Identifier: Apache-2.0
                 <configuration>
                     <mainClass>org.openjdk.jmh.Main</mainClass>
                     <classpathScope>test</classpathScope>
+                </configuration>
+            </plugin>
+            <plugin>
+                <!--
+                  PIT mutation testing is INTENTIONALLY scoped to a single class
+                  (BitHelper) so that the wiring is exercised on every CI build
+                  with a 100% mutation threshold gate, without forcing every other
+                  class up to 100% mutation coverage at once. Expand targetClasses
+                  incrementally as classes reach mutation-test parity (see README
+                  TODO).
+
+                  CI invocation pattern (matches streambuffer):
+                      mvn test-compile org.pitest:pitest-maven:mutationCoverage
+                  PIT runs right after test-compile so the prepare-package-bound
+                  module-info-compile execution does not fire; module-info.class
+                  stays out of target/classes/ and the forked PIT JVMs continue
+                  to run in classpath mode (consistent with the rest of the test
+                  suite).
+                -->
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-maven</artifactId>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-junit5-plugin</artifactId>
+                        <version>1.2.3</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <targetClasses>
+                        <param>net.ladenthin.bitcoinaddressfinder.BitHelper</param>
+                    </targetClasses>
+                    <targetTests>
+                        <param>net.ladenthin.bitcoinaddressfinder.BitHelperTest</param>
+                    </targetTests>
+                    <mutationThreshold>100</mutationThreshold>
+                    <timeoutConstant>30000</timeoutConstant>
                 </configuration>
             </plugin>
         </plugins>

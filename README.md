@@ -1273,6 +1273,7 @@ Laptops with hybrid graphics—using both integrated (iGPU) and discrete (dGPU) 
 > If your laptop uses hybrid graphics, always ensure that the **discrete GPU** is explicitly selected for OpenCL workloads to avoid severe performance bottlenecks.
 
 ## Future improvements
+- **Expand PIT mutation-testing scope.** PIT is wired in `pom.xml` and runs on every CI build (in the ubuntu-latest leg of the `test` job) with `<mutationThreshold>100</mutationThreshold>`, but `<targetClasses>` is currently narrowed to a single class (`BitHelper`). The intent is to exercise the wiring and gate against regressions on that single class today; widen `<targetClasses>` incrementally as additional classes reach mutation-test parity. Final target: `<param>net.ladenthin.bitcoinaddressfinder.*</param>` matching the streambuffer pattern (excluding native/OpenCL-bound code where mutation testing is impractical).
 - Refactor the entire key generation infrastructure to support a key provider. This provider should be configurable to supply private keys from various sources, such as Random, Secrets File, Key Range, and others. All consumers should retrieve keys from this provider.
 
 ### KeyProvider
