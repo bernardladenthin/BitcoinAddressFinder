@@ -74,4 +74,24 @@ public class BitcoinAddressFinderArchitectureTest {
             .matching("net.ladenthin.bitcoinaddressfinder.(*)..")
             .should()
             .beFreeOfCycles();
+
+    /**
+     * Production code must not import unsupported / internal JDK packages.
+     * These are not part of the Java SE API and may change or disappear without notice.
+     *
+     * <p><b>Exception</b>: {@code ByteBufferUtility} deliberately uses
+     * {@link jdk.internal.misc.Unsafe} for off-heap deallocation, gated by the
+     * matching {@code --add-exports=java.base/jdk.internal.misc=ALL-UNNAMED}
+     * line in {@code pom.xml}. If a second class ever needs internal JDK access,
+     * widen the exception explicitly rather than relaxing the rule.
+     */
+    @ArchTest
+    static final ArchRule noInternalJdkImports = noClasses()
+            .that()
+            .resideInAPackage("net.ladenthin.bitcoinaddressfinder..")
+            .and()
+            .doNotHaveSimpleName("ByteBufferUtility")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("sun..", "com.sun..", "jdk.internal..");
 }
