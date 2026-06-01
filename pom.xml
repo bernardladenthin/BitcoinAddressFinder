@@ -86,6 +86,43 @@ SPDX-License-Identifier: Apache-2.0
         <palantir-java-format.version>2.66.0</palantir-java-format.version>
     </properties>
 
+    <!--
+        Pin transitively-conflicting versions so maven-enforcer's
+        dependencyConvergence rule passes. Each entry below resolves a real
+        version mismatch surfaced by the rule (the direct dep version we
+        declare in <dependencies> must always win over the older one a
+        transitive dep brings in).
+    -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- slf4j-api: bitcoinj brings 2.0.16, Java-WebSocket brings 2.0.13,
+                 logback-classic brings 2.0.17; we declare 2.0.18 directly. -->
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+            <!-- guava: bitcoinj brings 33.4.0-android; we declare ${guava.version} directly. -->
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>${guava.version}</version>
+            </dependency>
+            <!-- protobuf-javalite: bitcoinj brings 4.33.4; we declare ${protobuf.version} directly. -->
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-javalite</artifactId>
+                <version>${protobuf.version}</version>
+            </dependency>
+            <!-- bouncycastle: bitcoinj brings 1.83; we declare ${bcprov.version} directly. -->
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk15to18</artifactId>
+                <version>${bcprov.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <distributionManagement>
         <snapshotRepository>
             <id>central</id>
@@ -219,7 +256,26 @@ SPDX-License-Identifier: Apache-2.0
                     <requireMavenVersion>
                       <version>[3.6.3,)</version>
                     </requireMavenVersion>
-                  </rules>    
+                    <requireJavaVersion>
+                      <version>[21,)</version>
+                    </requireJavaVersion>
+                    <dependencyConvergence/>
+                    <bannedDependencies>
+                      <excludes>
+                        <!-- Use SLF4J directly; never commons-logging. -->
+                        <exclude>commons-logging:commons-logging</exclude>
+                        <!-- Legacy / EoL logging frameworks. -->
+                        <exclude>log4j:log4j</exclude>
+                        <!-- Old hamcrest split artifacts; use hamcrest:hamcrest 2.x+. -->
+                        <exclude>org.hamcrest:hamcrest-core</exclude>
+                        <exclude>org.hamcrest:hamcrest-library</exclude>
+                        <exclude>org.hamcrest:hamcrest-all</exclude>
+                        <!-- Legacy JUnit 3 / 4; we use Jupiter (junit:junit-jupiter). -->
+                        <exclude>junit:junit</exclude>
+                        <exclude>junit:junit-dep</exclude>
+                      </excludes>
+                    </bannedDependencies>
+                  </rules>
                 </configuration>
               </execution>
             </executions>
