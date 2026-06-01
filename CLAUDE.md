@@ -588,11 +588,41 @@ interim measure until that work lands.
     Two correctness traps: (a) the cast is `(int)(byte)` — the byte is sign-extended (e.g. `0xFF` ⇒ `-1`, not `255`); (b) the loop runs **back-to-front** (last byte first). A JMH benchmark must verify byte-equality against `ByteBuffer.wrap(hash160).hashCode()` over a randomised corpus before the GPU value is trusted in a `Set.contains` path.
   - **Add a new persistence implementation that accepts a precomputed hash.** `HashSet<ByteBuffer>.contains(o)` unconditionally calls `o.hashCode()` — there is no JDK hook to pass in an external hash. So the optimization requires bypassing `java.util.HashSet` entirely. Add `HashSetPrecomputedHashAddressPresence` next to `HashSetAddressPresence` (`persistence/inmemory/`) with a custom open-addressing hash table keyed by the precomputed int hash (collisions resolved by `Arrays.equals(byte[], byte[])` against the stored hash160). Expose a new API `boolean containsAddress(byte[] hash160, int precomputedHash)` on `AddressPresence` (or a sibling interface) so `ConsumerJava` can forward the GPU-precomputed value without rewrapping in a `ByteBuffer`. Document in the class Javadoc that the int hash is reproduced from a frozen OpenJDK formula and a future JDK change would silently corrupt lookups — pin a JMH equality test that fails the build if the JDK ever drifts.
   - **Wire the configuration toggle.** Add `HASHSET_GPU_HASH` to `AddressLookupBackend` (preserve `HASHSET` as the JDK-`HashSet<ByteBuffer>` path) so both implementations live side-by-side and the JMH harness can A/B them on the same workload. Default stays `TRUNCATED_LONG_64` per the README recommendation; this is opt-in for HASHSET deployments only.
-  - **Expected payoff and honest caveats.**
-    - HASHSET lookup is already the fastest CPU backend (85 ns); the realistic upper bound on the saved time is the ~20–25 ns the JDK hash itself costs. Expect ~25 % faster `containsAddress` on the HASHSET path, not order-of-magnitude.
-    - Adds +7.7 % per-candidate PCIe transfer (4 B per direction of hash160 used; both directions if both compressed and uncompressed hashes are checked). On a bandwidth-bound link this can cancel the CPU win — measure end-to-end throughput, not just `containsAddress` micro-latency.
-    - HASHSET is memory-prohibitive at Full DB scale (~110 GB per README §"Memory footprint"). This optimization is only relevant to the Light-DB-and-smaller deployments that already opt into HASHSET for its lookup latency.
-    - This optimization is **superseded** by the "Push the `TRUNCATED_LONG_64` presence check into the OpenCL pipeline" TODO below and by the "Long-term vision" TODO further down. Both eliminate the CPU lookup entirely. Treat this as an interim step that (a) gives the HASHSET backend ~25 % more headroom today and (b) prototypes the GPU-side machinery (struct extension, reproducing JDK semantics in OpenCL C, threading a per-candidate auxiliary field through `OpenClTask` + `OpenCLGridResult`) that the bigger GPU presence-check work will reuse.
+  - **Cost breakdown of one `Set<ByteBuffer>.contains(buf)` call** (the per-step accounting that justifies the percentage):
+
+    | Step inside `contains(...)` | Approximate cost (warm L3 table) | GPU pre-compute helps? |
+    |---|---|---|
+    | `ByteBuffer.hashCode()` — 20 sign-extending multiply-adds (`h = 31*h + (int)(byte)b`) | **~20 ns** — long dependency chain, ILP-limited | ✅ **eliminated** |
+    | `HashMap.spread(h)` — `h ^ (h >>> 16)` | ~1 ns | ✅ eliminated |
+    | Bucket index `(n-1) & h` + array load `tab[i]` | ~5–80 ns (cache-state-dependent) | ❌ no — pre-computed hash doesn't fix cache miss |
+    | Walk node chain (low load factor ⇒ usually 1 step) | ~3–10 ns | ❌ no |
+    | `ByteBuffer.equals(other)` — content compare on hit (or first chain node) | ~15–25 ns (another byte loop) | ❌ no |
+    | **Total per call (warm table)** | **~50–85 ns**, matches the README's "85 ns HASHSET" | **~25 % is the hash chain** |
+
+    At Full-DB scale the bucket-array load becomes an L3/DRAM miss (50–100 ns), and total per-call cost rises to 130–180 ns; the hash chain's *fraction* of total time drops but its absolute cost (~20 ns) stays constant.
+
+  - **Throughput math when 32 cores are saturated on `.contains()` (the real-world scenario).** `ConsumerJava` issues **two** `.contains()` calls per candidate (compressed + uncompressed hash160), so the per-candidate CPU cost is **2 × 85 ns = 170 ns** on the warm-table path.
+
+    | Configuration | Per-candidate CPU time | Throughput on 32 saturated cores |
+    |---|---|---|
+    | Without GPU hash (today) | 170 ns | ~188 M candidates/sec |
+    | With GPU pre-computed hash | 130 ns | ~246 M candidates/sec |
+    | **Delta** | **−40 ns (~23 % faster per call)** | **+~30 % throughput, or equivalently ~7 of 32 cores freed** |
+
+    That is not a marginal improvement when cores are saturated. The earlier "marginal / superseded" framing was wrong for this workload; under CPU-bound saturation the +7.7 % PCIe-bandwidth cost is also not a real concern — CPU saturation and bandwidth saturation are different bottlenecks and one rules out the other.
+
+  - **Realistic ceiling — where this TODO sits relative to bigger wins.**
+
+    | Optimization | Expected throughput gain when 32 cores are saturated on `.contains()` |
+    |---|---|
+    | **GPU pre-computed hash (this TODO)** | **~30 %** — frees ~7 of 32 cores; ship-worthy on its own |
+    | **Pack hash160 into `(long, long, int)` and key the table on `long`** (i.e. use the existing `TRUNCATED_LONG_64` approach, not `HashSet<ByteBuffer>`) | **~2-3×** — eliminates both the hash loop and the 20-byte equality byte loop. Already implemented as a separate backend; the cheapest "fix" is to stop using HASHSET. |
+    | **GPU-side presence check** (the "Push the `TRUNCATED_LONG_64` presence check into OpenCL" TODO below) | **~10–100×** — eliminates the CPU lookup entirely. Cores freed for other work. |
+    | **Batched lookups with software prefetch** (issue 8 candidate hashes, `__builtin_prefetch` their bucket addresses, then check) | **~2×** on cold tables; smaller on warm. Orthogonal to GPU-hash precompute. |
+
+    Honest read: if `.contains()` saturation is the bottleneck *today*, this TODO is worth shipping for the 30 % it gives; **but** for the same investigation cycle it's worth measuring whether simply switching the active backend from HASHSET to TRUNCATED_LONG_64 (2-3×) or doing the GPU-presence-check work (10-100×) gives more and supersedes the need for this TODO at all.
+
+  - **What pre-computed hash does *not* help.** Cache misses on the bucket array at scale (the table is 8× L3 at Light DB and out-of-cache entirely at Full DB); `ByteBuffer.equals(other)` byte compare on the matched node (~15-25 ns); GC pressure if `ConsumerJava.java:367-371`'s "thread-local reusable ByteBuffer" turns out to allocate per call rather than reuse (verify before benchmarking — at 188 M ops/sec a per-call `ByteBuffer.wrap()` would be ~9 GB/sec of allocation pressure).
   - **What needs to be designed first** (before any kernel changes): the canonical reference of `HeapByteBuffer.hashCode()` semantics that the JMH guard will pin against (capture the bytecode of `java.nio.HeapByteBuffer#hashCode` for the running JDK and assert it matches a known-good copy at build time, so a JDK upgrade can't silently corrupt the GPU formula); whether `ConsumerJava` carries the precomputed hash through `AbstractProducer`/`AbstractKeyProducerQueueBuffered` as a parallel `int[]`/`IntBuffer` next to the existing hash160 buffers, or extends the per-candidate result struct in place; whether the `HashSet_PrecomputedHash` map should fall back to JDK `HashSet<ByteBuffer>` semantics on CPU-only paths (e.g. `ProducerJava` producers that don't go through OpenCL) by computing the same hash on the CPU side using the same reference formula — yes, for consistency across producers.
 
 - **Push the `TRUNCATED_LONG_64` presence check into the OpenCL pipeline.** Today the GPU kernel returns derived hash160 bytes per candidate key and the CPU loop calls `lookup.containsAddress(...)` on each. For large workgroup sizes this serialises the most expensive part of the pipeline (the LMDB / in-RAM membership check) on a single CPU thread, throwing away the GPU's parallelism. Move the presence check on-GPU as follows:
