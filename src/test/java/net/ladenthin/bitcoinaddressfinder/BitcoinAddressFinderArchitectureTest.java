@@ -11,6 +11,7 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
+import java.util.Random;
 import org.slf4j.Logger;
 
 @AnalyzeClasses(packages = "net.ladenthin.bitcoinaddressfinder", importOptions = ImportOption.DoNotIncludeTests.class)
@@ -127,4 +128,55 @@ public class BitcoinAddressFinderArchitectureTest {
             .doNotHaveSimpleName("ReadStatistic")
             .should()
             .beFinal();
+
+    /**
+     * Production code must not call {@link System#exit(int)}; throw an exception instead so the
+     * {@code Shutdown} hook gets to run and the cause is visible in stack traces.
+     */
+    @ArchTest
+    static final ArchRule noSystemExit = noClasses()
+            .that()
+            .resideInAPackage("net.ladenthin.bitcoinaddressfinder..")
+            .should()
+            .callMethod(System.class, "exit", int.class)
+            .allowEmptyShould(true);
+
+    /**
+     * Production code must not construct {@link java.util.Random}; {@code Random} is a non-cryptographic
+     * PRNG (CWE-338). Use {@link java.security.SecureRandom} or {@link java.util.concurrent.ThreadLocalRandom}
+     * depending on whether cryptographic strength or thread-local fast jitter is needed.
+     *
+     * <p>Two documented exceptions:
+     * <ul>
+     *   <li>{@code KeyProducerJavaRandom} deliberately constructs weak {@code Random} instances
+     *       as documented CWE-338 demonstrations for vulnerability research (the project's
+     *       raison d'être includes scanning addresses derived from weak-RNG wallets). See the
+     *       {@code RANDOM_CURRENT_TIME_MILLIS_SEED} and {@code RANDOM_CUSTOM_SEED} branches.</li>
+     *   <li>{@code BIP39KeyProducer extends java.util.Random} as a façade pattern (see Javadoc
+     *       on the class); the implicit {@code super()} call hits the {@code Random()}
+     *       constructor. The Random parent is used as a sequential-iterator surface for the
+     *       deterministic HD-wallet derivation, not as a source of randomness.</li>
+     * </ul>
+     * If a third class ever needs {@code new Random()}, extend the exception list explicitly
+     * rather than relaxing the rule.
+     */
+    @ArchTest
+    static final ArchRule noNewRandom = noClasses()
+            .that()
+            .resideInAPackage("net.ladenthin.bitcoinaddressfinder..")
+            .and()
+            .doNotHaveSimpleName("KeyProducerJavaRandom")
+            .and()
+            .doNotHaveSimpleName("BIP39KeyProducer")
+            .should()
+            .callConstructor(Random.class)
+            .orShould()
+            .callConstructor(Random.class, long.class)
+            .allowEmptyShould(true);
+
+    // Note: deliberately NO `noThreadSleep` rule. The producer / consumer threading code has
+    // five legitimate `Thread.sleep(...)` call sites for back-pressure, startup synchronisation
+    // and CLI inter-action pacing (ConsumerJava, ProducerOpenCL, AbstractProducer,
+    // AbstractKeyProducerQueueBuffered, cli.Main). Rewriting them to BlockingQueue.poll(timeout) /
+    // Condition.await(timeout) is a real refactor, out of scope for the rule-tightening pass.
 }
