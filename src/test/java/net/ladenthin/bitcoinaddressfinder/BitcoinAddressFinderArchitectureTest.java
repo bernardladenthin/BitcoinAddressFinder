@@ -3,12 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
+import org.slf4j.Logger;
 
 @AnalyzeClasses(packages = "net.ladenthin.bitcoinaddressfinder", importOptions = ImportOption.DoNotIncludeTests.class)
 public class BitcoinAddressFinderArchitectureTest {
@@ -34,4 +37,41 @@ public class BitcoinAddressFinderArchitectureTest {
             .should()
             .dependOnClassesThat()
             .resideInAnyPackage("org.junit..", "net.jqwik..", "com.tngtech.archunit..");
+
+    /**
+     * Production code must not use {@code java.util.logging} directly; all logging
+     * goes through SLF4J / Logback.
+     */
+    @ArchTest
+    static final ArchRule noJavaUtilLogging = noClasses()
+            .that()
+            .resideInAPackage("net.ladenthin.bitcoinaddressfinder..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("java.util.logging..");
+
+    /**
+     * Every SLF4J {@link Logger} field follows the {@code private static final} idiom.
+     * Locks the convention used by the ongoing logger-DI migration.
+     */
+    @ArchTest
+    static final ArchRule loggersArePrivateStaticFinal = fields()
+            .that()
+            .haveRawType(Logger.class)
+            .should()
+            .bePrivate()
+            .andShould()
+            .beStatic()
+            .andShould()
+            .beFinal();
+
+    /**
+     * No package cycles between sub-packages. Catches design drift where a leaf
+     * package starts importing from its parent or sibling.
+     */
+    @ArchTest
+    static final ArchRule noPackageCycles = slices()
+            .matching("net.ladenthin.bitcoinaddressfinder.(*)..")
+            .should()
+            .beFreeOfCycles();
 }
