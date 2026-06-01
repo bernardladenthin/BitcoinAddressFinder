@@ -1,6 +1,10 @@
 **Build:**  
 ![Java 21+](https://img.shields.io/badge/Java-21%2B-informational)  
-![JUnit](https://img.shields.io/badge/tested%20with-JUnit4-yellow)  
+![JUnit](https://img.shields.io/badge/tested%20with-JUnit6-25A162)  
+[![JSpecify](https://img.shields.io/badge/JSpecify-1.0.0%20%40NullMarked-25A162)](https://jspecify.dev)  
+[![NullAway](https://img.shields.io/badge/NullAway-strict%20JSpecify-25A162)](https://github.com/uber/NullAway)  
+[![Error Prone](https://img.shields.io/badge/Error%20Prone-12%20patterns%20at%20ERROR-25A162)](https://errorprone.info)  
+[![Maven Enforcer](https://img.shields.io/badge/Maven%20Enforcer-strict-25A162)](https://maven.apache.org/enforcer/)  
 [![jqwik](https://img.shields.io/badge/tested%20with-jqwik-1f6feb)](https://jqwik.net)  
 [![ArchUnit](https://img.shields.io/badge/tested%20with-ArchUnit-c71a36)](https://www.archunit.org)  
 [![SpotBugs](https://img.shields.io/badge/analyzed%20with-SpotBugs-3b5998)](https://spotbugs.github.io)  
