@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
@@ -156,9 +157,8 @@ public class OpenCLContext implements ReleaseCLObject {
         openClTask = new OpenClTask(context, producerOpenCL, bitHelper, byteBufferUtility);
     }
 
-    @Nullable
-    OpenClTask getOpenClTask() {
-        return openClTask;
+    Optional<OpenClTask> getOpenClTask() {
+        return Optional.ofNullable(openClTask);
     }
 
     @Override

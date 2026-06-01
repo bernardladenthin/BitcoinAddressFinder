@@ -255,7 +255,7 @@ SPDX-License-Identifier: Apache-2.0
                         <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
                         <arg>-XDcompilePolicy=simple</arg>
                         <arg>--should-stop=ifError=FLOW</arg>
-                        <arg>-Xplugin:ErrorProne -Xep:NullAway:ERROR -XepOpt:NullAway:AnnotatedPackages=net.ladenthin</arg>
+                        <arg>-Xplugin:ErrorProne -Xep:NullAway:ERROR -XepOpt:NullAway:AnnotatedPackages=net.ladenthin -XepOpt:NullAway:JSpecifyMode=true</arg>
 
                         <!-- For ErrorProne, DO NOT TOUCH, documented here: https://errorprone.info/docs/installation#jdk-16 -->
                         <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>

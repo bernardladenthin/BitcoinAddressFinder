@@ -12,6 +12,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFile
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +30,7 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
     private final ReadStatistic readStatistic = new ReadStatistic();
 
     @NonNull
-    AtomicReference<SecretsFile> currentSecretsFile = new AtomicReference<>();
+    AtomicReference<@Nullable SecretsFile> currentSecretsFile = new AtomicReference<>();
 
     /**
      * Creates a new secrets-file producer.

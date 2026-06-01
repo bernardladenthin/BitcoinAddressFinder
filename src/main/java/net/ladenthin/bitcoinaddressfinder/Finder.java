@@ -123,7 +123,7 @@ public class Finder implements Interruptable {
     private <T, K> void processKeyProducers(
             Iterable<T> configList,
             Function<T, K> constructor,
-            Function<T, String> getId,
+            Function<T, @Nullable String> getId,
             Map<String, K> keyProducers) {
         if (configList != null) {
             for (T config : configList) {

@@ -17,6 +17,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +37,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
     private final ReadStatistic readStatistic = new ReadStatistic();
 
     @NonNull
-    AtomicReference<AddressFile> currentAddressFile = new AtomicReference<>();
+    AtomicReference<@Nullable AddressFile> currentAddressFile = new AtomicReference<>();
 
     /** Flag controlling the main import loop; cleared via {@link #interrupt()}. */
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
