@@ -397,6 +397,49 @@ SPDX-License-Identifier: Apache-2.0
                 </configuration>
                 <executions>
                     <execution>
+                        <id>module-info-compile</id>
+                        <!-- Bind to prepare-package (after test-compile, before package) so
+                             module-info.class is not present in target/classes/ while the test
+                             sources compile or run. If it were, javac/the test JVM would
+                             activate module mode and reject the unprefixed add-exports /
+                             add-opens flags that the tests rely on for jdk.internal.ref and
+                             sun.nio.ch access (ByteBufferUtility). By the time
+                             maven-jar-plugin runs in the package phase the descriptor is in
+                             place and ends up at the jar root as expected.
+
+                             Local-dev caveat: running `mvn test` AFTER `mvn package` without
+                             an intervening `mvn clean` will fail with IllegalAccessError on
+                             sun.nio.ch.DirectBuffer because the package phase leaves
+                             module-info.class in target/classes/. CI is unaffected because
+                             the Build and Test jobs run in separate runners with fresh
+                             checkouts. Run `mvn clean test` to reset. -->
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                        <configuration>
+                            <!-- module-info.java lives in src/main/java9 so the default-compile
+                                 pass cannot see it (BAF compiles at source/target 21 which
+                                 supports modules; if javac sees module-info anywhere on its
+                                 source path it auto-activates module mode and rejects every
+                                 ordinary import as "package is not visible in unnamed module").
+                                 This dedicated execution compiles the descriptor alone at
+                                 release 9 without the Error Prone / NullAway / Checker
+                                 Framework processors. BAF runs as a fat-jar (assembly profile)
+                                 on the classpath and tests run on the classpath as well, so
+                                 the module descriptor is informational — it gives module-path
+                                 consumers a deterministic module name and the documented
+                                 Jackson opens directive, but never gates any build or runtime
+                                 resolution. -->
+                            <release>9</release>
+                            <compileSourceRoots>
+                                <compileSourceRoot>${project.basedir}/src/main/java9</compileSourceRoot>
+                            </compileSourceRoots>
+                            <compilerArgs combine.self="override"/>
+                            <annotationProcessorPaths combine.self="override"/>
+                        </configuration>
+                    </execution>
+                    <execution>
                         <id>default-testCompile</id>
                         <configuration>
                             <!--
