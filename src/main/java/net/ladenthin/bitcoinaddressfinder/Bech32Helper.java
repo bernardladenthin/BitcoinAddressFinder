@@ -144,7 +144,12 @@ public class Bech32Helper {
         return invokeProtectedMethod(bechData, "witnessVersion");
     }
 
-    @SuppressWarnings("unchecked")
+    // Caller-fixed return type: the call site picks T (e.g. Short, byte[]) and
+    // accepts the unchecked cast. The bitcoinj Bech32.Bech32Bytes nested methods
+    // return Object via reflection so the project-side helper has no static type
+    // to hand back. Same shape as the self-typing builder idiom Error Prone
+    // flags via TypeParameterUnusedInFormals.
+    @SuppressWarnings({"unchecked", "TypeParameterUnusedInFormals"})
     private <T> T invokeProtectedMethod(Bech32.Bech32Bytes bech32Bytes, String methodName)
             throws ReflectiveOperationException {
         Method method = Bech32.Bech32Bytes.class.getDeclaredMethod(methodName);

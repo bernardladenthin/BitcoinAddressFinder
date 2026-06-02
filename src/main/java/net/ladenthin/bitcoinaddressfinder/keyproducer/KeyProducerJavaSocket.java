@@ -103,18 +103,26 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
         });
     }
 
+    // Best-effort cleanup of the three socket-side resources. Each close() can
+    // throw IOException (broken pipe, already closed by peer, etc.); the producer
+    // is already in shutdown so there is nothing useful to do with those failures
+    // and propagating them would mask the original reason we are closing. The
+    // ignored exception is intentional at every catch site below.
     private void closeConnections() {
         try {
             if (inputStream != null) inputStream.close();
         } catch (IOException ignored) {
+            // best-effort: see method comment
         }
         try {
             if (socket != null) socket.close();
         } catch (IOException ignored) {
+            // best-effort: see method comment
         }
         try {
             if (serverSocket != null) serverSocket.close();
         } catch (IOException ignored) {
+            // best-effort: see method comment
         }
         inputStream = null;
         socket = null;

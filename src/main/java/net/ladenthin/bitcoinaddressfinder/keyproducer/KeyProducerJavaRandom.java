@@ -28,7 +28,7 @@ public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRando
      * the override while keeping the class itself subclassable for future
      * Mockito spies or test doubles.
      */
-    @SuppressWarnings({"deprecation", "removal"})
+    @SuppressWarnings({"deprecation", "removal", "Finalize"})
     @Override
     protected final void finalize() {
         // no-op
