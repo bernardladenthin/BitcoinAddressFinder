@@ -151,7 +151,12 @@ public class OpenCLBuilder {
         int localMemType = getInt(device, CL_DEVICE_LOCAL_MEM_TYPE);
         long localMemSize = getLong(device, CL_DEVICE_LOCAL_MEM_SIZE);
         long maxConstantBufferSize = getLong(device, CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE);
-        long queueProperties = getLong(device, CL_DEVICE_QUEUE_PROPERTIES);
+        // JOCL upstream deprecated CL_DEVICE_QUEUE_PROPERTIES (OpenCL 2.0+ replaced it with
+        // CL_DEVICE_QUEUE_ON_HOST_PROPERTIES); JOCL has not exposed the replacement constant
+        // yet. Suppress narrowly so any other deprecation in this method still surfaces.
+        @SuppressWarnings("deprecation")
+        final int queuePropertiesConstant = CL_DEVICE_QUEUE_PROPERTIES;
+        long queueProperties = getLong(device, queuePropertiesConstant);
         int imageSupport = getInt(device, CL_DEVICE_IMAGE_SUPPORT);
         int maxReadImageArgs = getInt(device, CL_DEVICE_MAX_READ_IMAGE_ARGS);
         int maxWriteImageArgs = getInt(device, CL_DEVICE_MAX_WRITE_IMAGE_ARGS);
