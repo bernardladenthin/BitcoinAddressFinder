@@ -9,6 +9,7 @@ import java.util.concurrent.Executors;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.Startable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
@@ -19,19 +20,24 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Key producer that receives secrets through a WebSocket server.
+ *
+ * <p>The embedded {@link WebSocketServer} is not constructed by the constructor;
+ * callers must invoke {@link #start()} after construction. This matches the
+ * sibling {@link KeyProducerJavaSocket} and {@link KeyProducerJavaZmq} producers
+ * and removes the same partial-construction publication hazard (the anonymous
+ * {@code WebSocketServer} subclass captures the outer-class {@code this} and its
+ * callbacks call back into {@code addSecret} / read {@code shouldStop}).</p>
  */
-// The constructor publishes the embedded WebSocketServer that mutates outer-class state
-// via addSecret; CF flags both the this-escape on initWebSocketServer and the
-// initialization order. Tracked in CLAUDE.md as a TODO to refactor with a start() method.
-@SuppressWarnings({"nullness:method.invocation"})
-public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaWebSocket> {
+public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaWebSocket>
+        implements Startable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KeyProducerJavaWebSocket.class);
 
     private @Nullable WebSocketServer webSocketServer;
 
     /**
-     * Creates a new WebSocket-based key producer and starts the embedded server.
+     * Creates a new WebSocket-based key producer. The embedded server is NOT
+     * constructed here; the caller must invoke {@link #start()} afterwards.
      *
      * @param config      the WebSocket configuration
      * @param keyUtility  cryptographic helper
@@ -39,10 +45,17 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
      */
     public KeyProducerJavaWebSocket(CKeyProducerJavaWebSocket config, KeyUtility keyUtility, BitHelper bitHelper) {
         super(config, keyUtility);
-        initWebSocketServer();
     }
 
-    private void initWebSocketServer() {
+    /**
+     * Builds the embedded {@link WebSocketServer} and submits its blocking
+     * {@code start()} call to a single-thread executor so the server runs in the
+     * background. Idempotency: calling {@code start()} more than once will
+     * replace the server reference; the intended usage is a single invocation
+     * right after construction.
+     */
+    @Override
+    public void start() {
         final WebSocketServer localServer = new WebSocketServer(new InetSocketAddress(cKeyProducerJava.getPort())) {
             @Override
             public void onOpen(WebSocket conn, ClientHandshake handshake) {
