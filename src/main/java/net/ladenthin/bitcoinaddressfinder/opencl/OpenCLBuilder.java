@@ -259,7 +259,7 @@ public class OpenCLBuilder {
      * Checks whether the supplied OpenCL device version is at least 2.0.
      *
      * @param openCLDeviceVersion the parsed device version
-     * @return {@code true} if {@code openCLDeviceVersion &gt;= 2.0}
+     * @return {@code true} if {@code openCLDeviceVersion >= 2.0}
      */
     public static boolean isOpenCL2_0OrGreater(ComparableVersion openCLDeviceVersion) {
         final ComparableVersion v2_0 = new ComparableVersion("2.0");

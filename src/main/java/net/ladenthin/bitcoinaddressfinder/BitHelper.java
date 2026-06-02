@@ -20,7 +20,7 @@ public class BitHelper {
      * Converts a number of bits into the corresponding batch size (2 to the power of {@code bits}).
      *
      * @param bits the number of bits
-     * @return {@code 1 &lt;&lt; bits}
+     * @return {@code 1 << bits}
      */
     public int convertBitsToSize(int bits) {
         return 1 << bits;

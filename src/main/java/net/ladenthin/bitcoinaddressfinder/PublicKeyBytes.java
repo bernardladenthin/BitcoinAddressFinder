@@ -609,20 +609,14 @@ public class PublicKeyBytes {
     }
 
     // <editor-fold defaultstate="collapsed" desc="Overrides: hashCode, equals, toString">
-    /*
-     * Overrides for {@code hashCode()}, {@code equals(Object)}, and {@code toString()}.
-     * <p>
-     * These methods are implemented based **only** on the {@code secretKey} field,
-     * which uniquely identifies the {@code PublicKeyBytes} instance.
-     * <ul>
-     *     <li>{@code hashCode()} – Generated using a prime multiplier and {@code secretKey} hash.</li>
-     *     <li>{@code equals(Object)} – Considers two instances equal if their {@code secretKey} values are equal.</li>
-     *     <li>{@code toString()} – Returns a string including the {@code secretKey} for debugging/logging.</li>
-     * </ul>
-     * <p>
-     * This design ensures that objects with the same {@code secretKey} are treated as equal,
-     * regardless of other internal state (e.g., precomputed hash representations or compressed keys).
-     */
+    // Overrides for hashCode(), equals(Object), and toString() are implemented based ONLY
+    // on the secretKey field, which uniquely identifies the PublicKeyBytes instance:
+    //   - hashCode()       — generated using a prime multiplier and secretKey hash
+    //   - equals(Object)   — considers two instances equal if their secretKey values are equal
+    //   - toString()       — returns a string including the secretKey for debugging/logging
+    // This design ensures that objects with the same secretKey are treated as equal,
+    // regardless of other internal state (e.g., precomputed hash representations or
+    // compressed keys).
 
     // generated, based on secretKey only!
     @Override

@@ -220,7 +220,7 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
 
     @Deprecated
     static int byteArrayToInt(byte[] b, int offsetByteArray) {
-        return b[3 + offsetByteArray] & 0xFF
+        return (b[3 + offsetByteArray] & 0xFF)
                 | (b[2 + offsetByteArray] & 0xFF) << 8
                 | (b[1 + offsetByteArray] & 0xFF) << 16
                 | (b[offsetByteArray] & 0xFF) << 24;

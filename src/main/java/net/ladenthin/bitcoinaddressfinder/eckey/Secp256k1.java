@@ -64,12 +64,12 @@ public class Secp256k1 {
         if (R.equals(ECPoint.POINT_INFINITY)) {
             return R;
         }
-        BigInteger slope = (R.getAffineX().pow(2)).multiply(FieldP_3);
+        BigInteger slope = R.getAffineX().pow(2).multiply(FieldP_3);
         slope = slope.add(a);
-        slope = slope.multiply((R.getAffineY().multiply(FieldP_2)).modInverse(p));
+        slope = slope.multiply(R.getAffineY().multiply(FieldP_2).modInverse(p));
         final BigInteger Xout =
                 slope.pow(2).subtract(R.getAffineX().multiply(FieldP_2)).mod(p);
-        final BigInteger Yout = (R.getAffineY().negate())
+        final BigInteger Yout = R.getAffineY().negate()
                 .add(slope.multiply(R.getAffineX().subtract(Xout)))
                 .mod(p);
         return new ECPoint(Xout, Yout);
@@ -90,9 +90,9 @@ public class Secp256k1 {
         final BigInteger rX = r.getAffineX();
         final BigInteger rY = r.getAffineY();
         final BigInteger slope =
-                (rY.subtract(sY)).multiply(rX.subtract(gX).modInverse(p)).mod(p);
+                rY.subtract(sY).multiply(rX.subtract(gX).modInverse(p)).mod(p);
         final BigInteger Xout =
-                (slope.modPow(FieldP_2, p).subtract(rX)).subtract(gX).mod(p);
+                slope.modPow(FieldP_2, p).subtract(rX).subtract(gX).mod(p);
         BigInteger Yout = sY.negate().mod(p);
         Yout = Yout.add(slope.multiply(gX.subtract(Xout))).mod(p);
         return new ECPoint(Xout, Yout);

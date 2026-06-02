@@ -400,7 +400,7 @@ public class OpenClTask implements ReleaseCLObject {
      */
     private static ByteBuffer cloneByteBuffer(final ByteBuffer original) {
         // Create clone with same capacity as original.
-        final ByteBuffer clone = (original.isDirect())
+        final ByteBuffer clone = original.isDirect()
                 ? ByteBuffer.allocateDirect(original.capacity())
                 : ByteBuffer.allocate(original.capacity());
 
