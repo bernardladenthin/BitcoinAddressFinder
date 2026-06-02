@@ -67,6 +67,11 @@ public class Bech32Helper {
      * Return the data, fully-decoded with 8-bits per byte.
      * @return The data, fully-decoded as a byte array.
      */
+    // Preserved as a reusable helper for potential future Bech32 round-trip support
+    // (e.g. producing addresses, not just reading them). The sibling
+    // decode5to8WithPadding is the variant currently used. No production caller for
+    // this no-padding variant; UnusedMethod suppressed to keep -Werror clean.
+    @SuppressWarnings("UnusedMethod")
     private byte[] decode5to8(byte[] bytes) throws ReflectiveOperationException {
         return invokeConvertBitsStatic(bytes, 0, bytes.length, 5, 8, false);
     }
@@ -75,6 +80,9 @@ public class Bech32Helper {
         return invokeConvertBitsStatic(bytes, 0, bytes.length, 5, 8, true);
     }
 
+    // Preserved as a reusable helper for potential future Bech32 round-trip support
+    // (producing Bech32 addresses). BAF currently only reads addresses, never encodes.
+    @SuppressWarnings("UnusedMethod")
     private byte[] encode8to5(byte[] data) throws ReflectiveOperationException {
         return invokeConvertBitsStatic(data, 0, data.length, 8, 5, true);
     }

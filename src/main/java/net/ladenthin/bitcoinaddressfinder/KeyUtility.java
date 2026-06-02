@@ -246,7 +246,12 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
         b[3 + offset] = (byte) (a & 0xFF);
     }
 
+    // Preserved as a reusable helper for potential future big↔little endian word swap
+    // wiring (e.g. native kernel input adapters). No current production or test caller;
+    // UnusedMethod suppressed to keep -Werror clean while leaving the implementation
+    // available for revival.
     @Deprecated
+    @SuppressWarnings("UnusedMethod")
     private static void swapIntBytes(byte[] bytes) {
         assert bytes.length % 4 == 0;
         for (int i = 0; i < bytes.length; i += 4) {

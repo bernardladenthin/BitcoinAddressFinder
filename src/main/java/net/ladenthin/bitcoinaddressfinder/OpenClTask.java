@@ -398,6 +398,10 @@ public class OpenClTask implements ReleaseCLObject {
     /**
      * https://stackoverflow.com/questions/3366925/deep-copy-duplicate-of-javas-bytebuffer/4074089
      */
+    // Preserved as a reusable helper for potential future safe native↔JVM-heap handoff
+    // in the OpenCL pipeline. No current production or test caller; UnusedMethod
+    // suppressed to keep -Werror clean.
+    @SuppressWarnings("UnusedMethod")
     private static ByteBuffer cloneByteBuffer(final ByteBuffer original) {
         // Create clone with same capacity as original.
         final ByteBuffer clone = original.isDirect()
