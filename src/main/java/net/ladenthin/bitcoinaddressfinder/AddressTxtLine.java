@@ -178,15 +178,15 @@ public class AddressTxtLine {
             byte[] witnessProgram = bech32Helper.getWitnessPrograms(bechData);
 
             switch (witnessVersion) {
-                case WITNESS_VERSION_0:
+                case WITNESS_VERSION_0 -> {
                     if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_PKH) {
                         ByteBuffer hash160 = keyUtility.byteBufferUtility().byteArrayToByteBuffer(witnessProgram);
                         return new AddressToCoin(hash160, amount, AddressType.P2WPKH); // P2WPKH supported
                     } else if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_SH) {
                         throw new AddressFormatNotAcceptedException(REASON_P2WSH_NOT_SUPPORTED);
                     }
-                    break;
-                case WITNESS_VERSION_1:
+                }
+                case WITNESS_VERSION_1 -> {
                     if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_TR) {
                         if (LOGGER.isTraceEnabled()) {
                             byte[] tweakedPublicKey = witnessProgram;
@@ -196,9 +196,8 @@ public class AddressTxtLine {
                         }
                         throw new AddressFormatNotAcceptedException(REASON_P2TR_NOT_SUPPORTED);
                     }
-                    break;
-                default:
-                    throw new AddressFormatNotAcceptedException(REASON_UNSUPPORTED_WITNESS_VERSION);
+                }
+                default -> throw new AddressFormatNotAcceptedException(REASON_UNSUPPORTED_WITNESS_VERSION);
             }
         } catch (AddressFormatException | ReflectiveOperationException e) {
             // Bech32 parsing or reflection failed; continue to next format
