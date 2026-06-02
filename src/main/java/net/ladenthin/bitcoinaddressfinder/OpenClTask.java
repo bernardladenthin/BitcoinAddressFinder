@@ -369,7 +369,6 @@ public class OpenClTask implements ReleaseCLObject {
                         null,
                         null);
                 clFinish(commandQueue);
-                destinationArgument.close();
 
                 final long afterRead = System.currentTimeMillis();
                 if (LOGGER.isTraceEnabled()) {
