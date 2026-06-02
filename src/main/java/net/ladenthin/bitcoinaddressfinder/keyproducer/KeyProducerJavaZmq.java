@@ -6,7 +6,9 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.Startable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.zeromq.SocketType;
@@ -16,20 +18,27 @@ import org.zeromq.ZMQException;
 
 /**
  * Key producer that receives secrets through a ZeroMQ PULL socket.
+ *
+ * <p>The background receiver thread is not spawned by the constructor; callers
+ * must invoke {@link #start()} after construction. This avoids the JEP&nbsp;410
+ * this-escape that would otherwise publish a partially-constructed instance to
+ * the worker thread the moment the {@code new Thread(() -> ...)} lambda captures
+ * {@code this}.</p>
  */
-// The constructor publishes a receiver thread that calls addSecret on this; CF flags
-// this-escape. Tracked in CLAUDE.md as a TODO to refactor with a start() method.
-@SuppressWarnings("nullness:method.invocation")
-public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaZmq> {
+public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaZmq>
+        implements Startable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KeyProducerJavaZmq.class);
 
     private final ZContext context;
     private final ZMQ.Socket socket;
-    private final Thread receiverThread;
+    private @Nullable Thread receiverThread;
 
     /**
-     * Creates a new ZMQ-based key producer and starts the background receiver thread.
+     * Creates a new ZMQ-based key producer and opens the underlying ZMQ socket
+     * (bind or connect according to the configured mode). The background
+     * receiver thread is NOT spawned here; the caller must invoke
+     * {@link #start()} afterwards.
      *
      * @param config      the ZMQ configuration
      * @param keyUtility  cryptographic helper
@@ -48,8 +57,17 @@ public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyPro
         }
 
         socket.setReceiveTimeOut(cKeyProducerJava.timeout);
+    }
 
-        receiverThread = new Thread(
+    /**
+     * Spawns and starts the background receiver thread that polls the ZMQ
+     * socket and feeds incoming messages into the queue. Idempotency: calling
+     * {@code start()} more than once replaces the {@code receiverThread} field;
+     * the intended usage is a single invocation right after construction.
+     */
+    @Override
+    public void start() {
+        Thread thread = new Thread(
                 () -> {
                     while (!shouldStop && !Thread.currentThread().isInterrupted()) {
                         try {
@@ -70,8 +88,9 @@ public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyPro
                 },
                 "ZMQ-Receiver");
 
-        receiverThread.setDaemon(true);
-        receiverThread.start();
+        thread.setDaemon(true);
+        thread.start();
+        receiverThread = thread;
     }
 
     @Override
@@ -82,11 +101,14 @@ public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyPro
     @Override
     public void interrupt() {
         signalShutdown(); // wakes any caller blocked in createSecrets()
-        receiverThread.interrupt(); // allow thread to exit if blocked
-        try {
-            receiverThread.join(500);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        Thread localReceiver = receiverThread;
+        if (localReceiver != null) {
+            localReceiver.interrupt(); // allow thread to exit if blocked
+            try {
+                localReceiver.join(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
         socket.close();
         context.close();
