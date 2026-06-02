@@ -47,28 +47,22 @@ public class SecretsFile extends AbstractPlaintextFile {
 
     @Override
     public void processLine(String line) {
-        final BigInteger secret;
-        switch (secretFormat) {
-            case STRING_DO_SHA256:
+        final BigInteger secret = switch (secretFormat) {
+            case STRING_DO_SHA256 -> {
                 byte[] sha256 = Hashing.sha256()
                         .hashString(line, StandardCharsets.UTF_8)
                         .asBytes();
                 String hexOfHash = Hex.encodeHexString(sha256);
-                secret = new BigInteger(hexOfHash, 16);
-                break;
-            case BIG_INTEGER:
-                secret = new BigInteger(line);
-                break;
-            case SHA256:
-                secret = new BigInteger(line, 16);
-                break;
-            case DUMPED_RIVATE_KEY:
+                yield new BigInteger(hexOfHash, 16);
+            }
+            case BIG_INTEGER -> new BigInteger(line);
+            case SHA256 -> new BigInteger(line, 16);
+            case DUMPED_RIVATE_KEY -> {
                 DumpedPrivateKey dpk = DumpedPrivateKey.fromBase58(network, line);
-                secret = dpk.getKey().getPrivKey();
-                break;
-            default:
-                throw new UnknownSecretFormatException(secretFormat);
-        }
+                yield dpk.getKey().getPrivKey();
+            }
+            default -> throw new UnknownSecretFormatException(secretFormat);
+        };
         final BigInteger[] secrets = new BigInteger[1];
         secrets[0] = secret;
         secretConsumer.accept(secrets);
