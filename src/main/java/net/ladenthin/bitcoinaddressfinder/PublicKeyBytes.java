@@ -636,10 +636,7 @@ public class PublicKeyBytes {
         if (this == obj) {
             return true;
         }
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
+        if (!(obj instanceof PublicKeyBytes)) {
             return false;
         }
         final PublicKeyBytes other = (PublicKeyBytes) obj;
