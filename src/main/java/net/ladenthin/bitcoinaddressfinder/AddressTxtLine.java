@@ -183,13 +183,17 @@ public class AddressTxtLine {
                         ByteBuffer hash160 = keyUtility.byteBufferUtility().byteArrayToByteBuffer(witnessProgram);
                         return new AddressToCoin(hash160, amount, AddressType.P2WPKH); // P2WPKH supported
                     } else if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_SH) {
-                        byte[] scriptHash = witnessProgram;
                         throw new AddressFormatNotAcceptedException(REASON_P2WSH_NOT_SUPPORTED);
                     }
                     break;
                 case WITNESS_VERSION_1:
                     if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_TR) {
-                        byte[] tweakedPublicKey = witnessProgram;
+                        if (LOGGER.isTraceEnabled()) {
+                            byte[] tweakedPublicKey = witnessProgram;
+                            LOGGER.trace(
+                                    "Rejecting P2TR taproot tweaked public key: {}",
+                                    org.apache.commons.codec.binary.Hex.encodeHexString(tweakedPublicKey));
+                        }
                         throw new AddressFormatNotAcceptedException(REASON_P2TR_NOT_SUPPORTED);
                     }
                     break;
@@ -261,7 +265,10 @@ public class AddressTxtLine {
             checksum = new byte[checksumBytes];
             // copy cheksum
             System.arraycopy(decoded, versionBytes + storedBytes, checksum, 0, checksum.length);
-            String checksumAsHex = org.apache.commons.codec.binary.Hex.encodeHexString(checksum);
+            if (LOGGER.isTraceEnabled()) {
+                String checksumAsHex = org.apache.commons.codec.binary.Hex.encodeHexString(checksum);
+                LOGGER.trace("Extracted base58 checksum: {}", checksumAsHex);
+            }
         } else {
             checksum = null;
         }
@@ -287,16 +294,16 @@ public class AddressTxtLine {
                         org.apache.commons.codec.binary.Hex.encodeHexString(checksum),
                         org.apache.commons.codec.binary.Hex.encodeHexString(calculatedChecksum));
             }
-            if (false) {
-                // TODO: For debugging only
+            if (LOGGER.isTraceEnabled()) {
                 String versionAsHex = org.apache.commons.codec.binary.Hex.encodeHexString(version);
+                LOGGER.trace("Base58 version byte(s): {}", versionAsHex);
             }
         }
 
-        if (false) {
-            // TODO: For debugging only
+        if (LOGGER.isTraceEnabled()) {
             String decodedAsHex = org.apache.commons.codec.binary.Hex.encodeHexString(decoded);
             String hash160AsHex = org.apache.commons.codec.binary.Hex.encodeHexString(hash160);
+            LOGGER.trace("Base58 decoded={}, hash160={}", decodedAsHex, hash160AsHex);
         }
 
         ByteBuffer hash160AsByteBuffer = keyUtility.byteBufferUtility().byteArrayToByteBuffer(hash160);
