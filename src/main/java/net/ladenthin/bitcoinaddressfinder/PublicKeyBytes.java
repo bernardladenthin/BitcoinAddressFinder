@@ -631,10 +631,9 @@ public class PublicKeyBytes {
         if (this == obj) {
             return true;
         }
-        if (!(obj instanceof PublicKeyBytes)) {
+        if (!(obj instanceof PublicKeyBytes other)) {
             return false;
         }
-        final PublicKeyBytes other = (PublicKeyBytes) obj;
         return Objects.equals(this.secretKey, other.secretKey);
     }
 

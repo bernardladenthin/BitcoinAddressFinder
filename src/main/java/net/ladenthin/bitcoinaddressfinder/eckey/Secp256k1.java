@@ -109,10 +109,10 @@ public class Secp256k1 {
     public static ECPoint scalmultNew(final ECParameterSpec params, final ECPoint g, final BigInteger kin) {
         EllipticCurve curve = params.getCurve();
         final ECField field = curve.getField();
-        if (!(field instanceof ECFieldFp)) {
+        if (!(field instanceof ECFieldFp ecFieldFp)) {
             throw new UnsupportedOperationException(field.getClass().getCanonicalName());
         }
-        final BigInteger p = ((ECFieldFp) field).getP();
+        final BigInteger p = ecFieldFp.getP();
         final BigInteger a = curve.getA();
         ECPoint R = ECPoint.POINT_INFINITY;
         // value only valid for curve secp256k1, code taken from https://www.secg.org/sec2-v2.pdf,
@@ -147,10 +147,10 @@ public class Secp256k1 {
      */
     public static ECPoint scalmultOrg(final EllipticCurve curve, final ECPoint g, final BigInteger kin) {
         final ECField field = curve.getField();
-        if (!(field instanceof ECFieldFp)) {
+        if (!(field instanceof ECFieldFp ecFieldFp)) {
             throw new UnsupportedOperationException(field.getClass().getCanonicalName());
         }
-        final BigInteger p = ((ECFieldFp) field).getP();
+        final BigInteger p = ecFieldFp.getP();
         final BigInteger a = curve.getA();
         ECPoint R = ECPoint.POINT_INFINITY;
         // value only valid for curve secp256k1, code taken from https://www.secg.org/sec2-v2.pdf,
