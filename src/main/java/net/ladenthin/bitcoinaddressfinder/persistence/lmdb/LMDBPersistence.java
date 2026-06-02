@@ -292,26 +292,22 @@ public class LMDBPersistence implements Persistence, AddressIterable {
                             LOGGER.trace("Process address: " + hexFromByteBuffer);
                         }
                         LegacyAddress address = keyUtility.byteBufferToAddress(addressAsByteBuffer);
-                        final String line;
-                        switch (addressFileOutputFormat) {
-                            case HexHash:
-                                line = Hex.encodeHexString(address.getHash()) + System.lineSeparator();
-                                break;
-                            case FixedWidthBase58BitcoinAddress:
-                                line = String.format("%-34s", address.toBase58()) + System.lineSeparator();
-                                break;
-                            case DynamicWidthBase58BitcoinAddressWithAmount:
+                        final String line = switch (addressFileOutputFormat) {
+                            case HexHash ->
+                                Hex.encodeHexString(address.getHash()) + System.lineSeparator();
+                            case FixedWidthBase58BitcoinAddress ->
+                                String.format("%-34s", address.toBase58()) + System.lineSeparator();
+                            case DynamicWidthBase58BitcoinAddressWithAmount -> {
                                 ByteBuffer value = kv.val();
                                 Coin coin = getCoinFromByteBuffer(value);
-                                line = address.toBase58()
+                                yield address.toBase58()
                                         + SeparatorFormat.COMMA.getSymbol()
                                         + coin.getValue()
                                         + System.lineSeparator();
-                                break;
-                            default:
-                                throw new IllegalArgumentException(
-                                        "Unknown addressFileOutputFormat: " + addressFileOutputFormat);
-                        }
+                            }
+                            default -> throw new IllegalArgumentException(
+                                    "Unknown addressFileOutputFormat: " + addressFileOutputFormat);
+                        };
                         writer.write(line);
                     }
                 }
