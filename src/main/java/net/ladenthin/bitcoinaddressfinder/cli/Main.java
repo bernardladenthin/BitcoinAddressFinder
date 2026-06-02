@@ -207,7 +207,7 @@ public class Main implements Runnable, Interruptable {
 
         try {
             switch (configuration.command) {
-                case Find:
+                case Find -> {
                     CFinder cFinder = Objects.requireNonNull(configuration.finder);
                     Finder finder = new Finder(cFinder);
                     interruptables.add(finder);
@@ -222,27 +222,26 @@ public class Main implements Runnable, Interruptable {
                     finder.initProducer();
                     finder.startProducer();
                     finder.shutdownAndAwaitTermination();
-                    break;
-                case LMDBToAddressFile:
+                }
+                case LMDBToAddressFile -> {
                     CLMDBToAddressFile cLMDBToAddressFile = Objects.requireNonNull(configuration.lmdbToAddressFile);
                     LMDBToAddressFile lmdbToAddressFile = new LMDBToAddressFile(cLMDBToAddressFile);
                     interruptables.add(lmdbToAddressFile);
                     lmdbToAddressFile.run();
-                    break;
-                case AddressFilesToLMDB:
+                }
+                case AddressFilesToLMDB -> {
                     CAddressFilesToLMDB cAddressFilesToLMDB = Objects.requireNonNull(configuration.addressFilesToLMDB);
                     AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(cAddressFilesToLMDB);
                     interruptables.add(addressFilesToLMDB);
                     addressFilesToLMDB.run();
-                    break;
-                case OpenCLInfo:
+                }
+                case OpenCLInfo -> {
                     OpenCLBuilder openCLBuilder = new OpenCLBuilder();
                     List<OpenCLPlatform> openCLPlatforms = openCLBuilder.build();
                     System.out.println(openCLPlatforms);
-                    break;
-                default:
-                    throw new UnsupportedOperationException(
-                            "Command: " + configuration.command.name() + " currently not supported.");
+                }
+                default -> throw new UnsupportedOperationException(
+                        "Command: " + configuration.command.name() + " currently not supported.");
             }
             LOGGER.info("Main#run end.");
         } catch (Exception e) {
