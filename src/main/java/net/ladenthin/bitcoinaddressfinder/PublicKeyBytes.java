@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Objects;
 import org.bitcoinj.crypto.ECKey;
 import org.jspecify.annotations.NonNull;
@@ -47,7 +48,7 @@ public class PublicKeyBytes {
     public static final BigInteger MIN_VALID_PRIVATE_KEY = BigInteger.TWO;
     /** Uppercase hexadecimal representation of {@link #MIN_VALID_PRIVATE_KEY}. */
     public static final String MIN_VALID_PRIVATE_KEY_HEX =
-            MIN_VALID_PRIVATE_KEY.toString(BitHelper.RADIX_HEX).toUpperCase();
+            MIN_VALID_PRIVATE_KEY.toString(BitHelper.RADIX_HEX).toUpperCase(Locale.ROOT);
 
     /**
      * Uppercase hexadecimal representation of the secp256k1 group order

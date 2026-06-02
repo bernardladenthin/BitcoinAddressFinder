@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import java.math.BigInteger;
+import java.util.Locale;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 
@@ -17,7 +18,7 @@ public class CKeyProducerJavaIncremental extends CKeyProducerJava {
 
     /** Inclusive lower bound of the scanned private-key range as an uppercase hex string. */
     public String startAddress =
-            PublicKeyBytes.MIN_VALID_PRIVATE_KEY.toString(BitHelper.RADIX_HEX).toUpperCase();
+            PublicKeyBytes.MIN_VALID_PRIVATE_KEY.toString(BitHelper.RADIX_HEX).toUpperCase(Locale.ROOT);
     /** Inclusive upper bound of the scanned private-key range as a hex string. */
     public String endAddress = PublicKeyBytes.MAX_PRIVATE_KEY_HEX;
 

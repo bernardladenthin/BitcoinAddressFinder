@@ -167,7 +167,7 @@ public class Main implements Runnable, Interruptable {
         final Path configurationPath = Path.of(args[0]);
         String configurationAsString = readString(configurationPath);
         final CConfiguration configuration;
-        String lowerPath = configurationPath.toString().toLowerCase();
+        String lowerPath = configurationPath.toString().toLowerCase(Locale.ROOT);
         if (lowerPath.endsWith(FILE_EXTENSION_JS) || lowerPath.endsWith(FILE_EXTENSION_JSON)) {
             configuration = fromJson(configurationAsString);
         } else if (lowerPath.endsWith(FILE_EXTENSION_YAML) || lowerPath.endsWith(FILE_EXTENSION_YML)) {
@@ -276,7 +276,7 @@ public class Main implements Runnable, Interruptable {
         List<Map.Entry<Thread, StackTraceElement[]>> entries = new ArrayList<>(all.entrySet());
         entries.sort(Comparator.comparing(
                         (Map.Entry<Thread, StackTraceElement[]> e) -> e.getKey().getName())
-                .thenComparingLong(e -> e.getKey().getId()));
+                .thenComparingLong(e -> e.getKey().threadId()));
 
         boolean printedAny = false;
         for (Map.Entry<Thread, StackTraceElement[]> e : entries) {

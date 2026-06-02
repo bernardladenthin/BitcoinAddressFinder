@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.InputStream;
+import java.util.Locale;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -105,7 +106,7 @@ public enum BIP39Wordlist {
      * @throws IllegalArgumentException if no matching enum exists
      */
     public static BIP39Wordlist fromLanguageName(String name) {
-        return valueOf(name.toUpperCase().replace('-', '_'));
+        return valueOf(name.toUpperCase(Locale.ROOT).replace('-', '_'));
     }
 
     /**
