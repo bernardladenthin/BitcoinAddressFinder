@@ -7,6 +7,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Executors;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.FireAndForget;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.Startable;
@@ -96,10 +97,7 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
         };
         webSocketServer = localServer;
 
-        // Fire-and-forget submission of the blocking WebSocketServer.start() on a single-
-        // thread executor. The Future is intentionally discarded: the server lifecycle is
-        // managed via webSocketServer.stop() inside interrupt(); we never need to cancel
-        // the start() call itself.
+        @FireAndForget("lifecycle via WebSocketServer.stop() in interrupt()")
         @SuppressWarnings("FutureReturnValueIgnored")
         Object unused = Executors.newSingleThreadExecutor().submit(localServer::start);
     }
