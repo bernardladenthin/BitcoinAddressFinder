@@ -200,7 +200,12 @@ public class ConsumerJava implements Consumer {
 
         startTime = System.currentTimeMillis();
 
-        scheduledExecutorService.scheduleAtFixedRate(
+        // Fire-and-forget periodic statistics logger. The ScheduledFuture is intentionally
+        // discarded: the task's lifecycle ends when scheduledExecutorService.shutdown() is
+        // called from interrupt(); there is no caller-side cancellation point we need to
+        // hold a reference for.
+        @SuppressWarnings("FutureReturnValueIgnored")
+        Object unused = scheduledExecutorService.scheduleAtFixedRate(
                 () -> {
                     // get transient information
                     long uptime = Math.max(System.currentTimeMillis() - startTime, 1);

@@ -250,7 +250,12 @@ public class Finder implements Interruptable {
     public void startProducer() {
         LOGGER.info("startProducer");
         for (Producer producer : getAllProducers()) {
-            producerExecutorService.submit(producer);
+            // Fire-and-forget producer submission. The Future is intentionally discarded:
+            // producer lifecycle is driven via Producer.interrupt() and the executor is
+            // shut down from Finder's own interrupt() path; there is no caller-side
+            // cancellation point that needs the Future.
+            @SuppressWarnings("FutureReturnValueIgnored")
+            Object unused = producerExecutorService.submit(producer);
         }
     }
 

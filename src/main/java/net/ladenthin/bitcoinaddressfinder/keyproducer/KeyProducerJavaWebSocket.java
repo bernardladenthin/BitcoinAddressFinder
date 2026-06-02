@@ -96,7 +96,12 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
         };
         webSocketServer = localServer;
 
-        Executors.newSingleThreadExecutor().submit(localServer::start);
+        // Fire-and-forget submission of the blocking WebSocketServer.start() on a single-
+        // thread executor. The Future is intentionally discarded: the server lifecycle is
+        // managed via webSocketServer.stop() inside interrupt(); we never need to cancel
+        // the start() call itself.
+        @SuppressWarnings("FutureReturnValueIgnored")
+        Object unused = Executors.newSingleThreadExecutor().submit(localServer::start);
     }
 
     @Override
