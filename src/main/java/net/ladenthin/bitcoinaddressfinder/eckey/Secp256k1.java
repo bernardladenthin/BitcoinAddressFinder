@@ -82,7 +82,7 @@ public class Secp256k1 {
         if (g.equals(ECPoint.POINT_INFINITY)) {
             return r;
         }
-        if (r == g || r.equals(g)) {
+        if (r.equals(g)) {
             return doublePoint(p, a, r);
         }
         final BigInteger gX = g.getAffineX();
