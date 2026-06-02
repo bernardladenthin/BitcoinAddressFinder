@@ -57,13 +57,13 @@ public class UnknownSecretFormatExceptionTest {
     @Test
     public void constructor_withDumpedPrivateKey_messageContainsFormatName() {
         // arrange
-        CSecretFormat secretFormat = CSecretFormat.DUMPED_RIVATE_KEY;
+        CSecretFormat secretFormat = CSecretFormat.DUMPED_PRIVATE_KEY;
 
         // act
         UnknownSecretFormatException exception = new UnknownSecretFormatException(secretFormat);
 
         // assert
-        assertThat(exception.getMessage(), containsString("DUMPED_RIVATE_KEY"));
+        assertThat(exception.getMessage(), containsString("DUMPED_PRIVATE_KEY"));
     }
 
     @Test

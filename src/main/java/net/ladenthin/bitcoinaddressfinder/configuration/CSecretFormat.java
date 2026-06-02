@@ -28,7 +28,7 @@ public enum CSecretFormat {
      * 5JXYuGrwSbyp8sKBmiLcvokqSnxALPjKWQMPJXZYyBWKof7c2pk
      * </pre>
      */
-    DUMPED_RIVATE_KEY,
+    DUMPED_PRIVATE_KEY,
 
     /**
      * A HEX-encoded SHA256 string. This might already be the hashed brainwallet.

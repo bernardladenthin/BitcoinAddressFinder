@@ -211,7 +211,7 @@ public class ProducerJavaSecretsFilesTest {
                 case SHA256:
                     sb.append(secret.getSHA256());
                     break;
-                case DUMPED_RIVATE_KEY:
+                case DUMPED_PRIVATE_KEY:
                     sb.append(secret.getWiF());
                     break;
                 default:

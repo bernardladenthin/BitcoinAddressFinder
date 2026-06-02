@@ -57,7 +57,7 @@ public class SecretsFile extends AbstractPlaintextFile {
             }
             case BIG_INTEGER -> new BigInteger(line);
             case SHA256 -> new BigInteger(line, 16);
-            case DUMPED_RIVATE_KEY -> {
+            case DUMPED_PRIVATE_KEY -> {
                 DumpedPrivateKey dpk = DumpedPrivateKey.fromBase58(network, line);
                 yield dpk.getKey().getPrivKey();
             }
