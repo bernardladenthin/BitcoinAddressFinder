@@ -405,7 +405,7 @@ public class LMDBPersistence implements Persistence, AddressIterable {
         long count = 0;
         try (Txn<ByteBuffer> txn = localEnv.txnRead()) {
             try (CursorIterable<ByteBuffer> iterable = localLmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
-                for (final CursorIterable.KeyVal<ByteBuffer> kv : iterable) {
+                for (final CursorIterable.KeyVal<ByteBuffer> ignored : iterable) {
                     count++;
                 }
             }
