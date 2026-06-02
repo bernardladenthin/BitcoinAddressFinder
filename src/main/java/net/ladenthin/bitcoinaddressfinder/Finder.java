@@ -135,6 +135,13 @@ public class Finder implements Interruptable {
                     throw new KeyProducerIdIsNotUniqueException(keyProducerId);
                 }
                 K keyProducer = constructor.apply(config);
+                // Producers that implement Startable (Socket, Zmq) move their background
+                // reader out of the constructor to avoid the JEP 410 this-escape; this
+                // single dispatch site invokes start() for any such producer, so the
+                // call lives in one place rather than at every factory lambda.
+                if (keyProducer instanceof Startable startable) {
+                    startable.start();
+                }
                 keyProducers.put(keyProducerId, keyProducer);
             }
         }

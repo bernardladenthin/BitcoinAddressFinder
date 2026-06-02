@@ -105,6 +105,12 @@ public class KeyProducerJavaTest {
             default:
                 throw new IllegalArgumentException("Unknown KeyProducerType: " + keyProducerType);
         }
+        // Mirrors the Finder.processKeyProducers dispatch: producers that implement
+        // Startable (Socket, Zmq) have their background reader started here so the
+        // test exercises the same lifecycle the production code uses.
+        if (keyProducer instanceof Startable startable) {
+            startable.start();
+        }
         return keyProducer;
     }
 
