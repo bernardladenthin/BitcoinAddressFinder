@@ -574,6 +574,71 @@ interim measure until that work lands.
   - Add open-addressing primitive hash table backend (defer until measured ROI).
   - Add standalone `BloomFilterPersistence` (defer until a caller asks for probabilistic-only mode).
 
+- **GPU grid-size and context-reuse JMH benchmarks.** Mainline has JMH micro-benchmarks for pure-Java helpers (`ByteSwapBenchmark`, `PublicKeyHashBenchmark`, `BitHelperBenchmark`) but **no parameter sweep that varies `CProducerOpenCL.gridNumBits` / `chunkMode` / `kernelMode` / `loopCount` and measures end-to-end GPU throughput**. That gap shows up the moment an operator wants to pick the best `gridNumBits` for a specific card — they currently have to guess.
+
+  Idea inspired by the cjherm/BitcoinAddressFinder23 fork (commit `2289361` at the tip of its `main`), specifically `benchmark/types/ChunkSizeIteratorBenchmark.java` and `benchmark/types/CtxRoundsIteratorBenchmark.java`. The fork ships a bespoke config-JSON-driven harness (`command: "BenchmarkSeries"` &rarr; `BenchmarkFactory` &rarr; per-round `MeasurementRoundResult` carrying `resultsPerSecond`) plus a LaTeX-table dumper. **The harness itself is NOT worth importing** &mdash; it overlaps with JMH `@Param` and adds a new `CCommand` &mdash; but the two ideas underneath are worth importing as JMH benchmarks:
+
+  1. **Grid-size sweep** (analogue of fork's `ChunkSizeIteratorBenchmark`): vary `gridNumBits` from a low value up to whatever fits in VRAM, measure steady-state keys/sec at each point. Per the fork's design, build a fresh `OpenCLContext` per data point but run several kernel launches inside the same context so the measurement excludes init cost.
+  2. **Context-reuse sweep** (analogue of fork's `CtxRoundsIteratorBenchmark`): fix `gridNumBits`, vary the number of kernel launches per context init; lets the operator see the init-cost amortisation curve and pick a sensible scan-session length.
+
+  Proposed shape for mainline &mdash; one new JMH class per axis, kept out of `mvn test` (OpenCL device usually absent on CI) and exposed via the existing `exec:java` JMH-runner pattern:
+
+  ```java
+  @State(Scope.Benchmark)
+  @BenchmarkMode(Mode.Throughput)
+  @OutputTimeUnit(TimeUnit.SECONDS)
+  @Fork(value = 1, jvmArgsAppend = {"--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"})
+  @Warmup(iterations = 2, time = 5)
+  @Measurement(iterations = 5, time = 10)
+  public class GridSizeSweepBenchmark {
+
+      @Param({"16", "18", "20", "22"})  public int    gridNumBits;
+      @Param({"true", "false"})         public boolean chunkMode;
+      @Param({"0", "2", "3"})           public int    kernelMode;   // XY / RIPEMD160 / address
+      @Param({"1"})                     public int    loopCount;
+
+      private OpenCLContext ctx;
+      private BigInteger[]  keys;
+
+      @Setup(Level.Trial)
+      public void setUp() throws Exception {
+          new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+          CProducerOpenCL p = new CProducerOpenCL();
+          p.gridNumBits = gridNumBits; p.chunkMode = chunkMode;
+          p.kernelMode  = kernelMode;  p.loopCount = loopCount;
+          ctx = new OpenCLContext(p, new BitHelper());
+          ctx.init();
+          keys = new BigInteger[chunkMode ? 1 : p.getWorkSize()];
+          // fill via SecureRandom
+      }
+
+      @Benchmark
+      @OperationsPerInvocation(/* expand to 1 << gridNumBits at @Setup time via a state field */)
+      public OpenCLGridResult oneKernelLaunch() throws Exception {
+          return ctx.createKeys(privateKeyBase);
+      }
+
+      @TearDown(Level.Trial) public void down() { ctx.close(); }
+  }
+  ```
+
+  Companion `ContextReuseAmortisationBenchmark` fixes `gridNumBits`, parameterises the number of kernel launches per `@Setup`/`@TearDown` cycle, and reports init-cost-amortised throughput. (Implementation note: cannot switch `@Setup` level via `@Param`, so it has to be its own class.)
+
+  **Open design questions** the implementation needs to resolve up front:
+  - **VRAM ceiling.** The fork ships an `OutOfMemoryError`-catch self-rescue that re-invokes with `gridNumBits - 1`. JMH should NOT do that &mdash; mark the data point as `ERROR` (or skip-via-`Assume.assumeTrue` in `@Setup` when the projected allocation exceeds a reported device limit) so the asymptote is visible rather than silently shifted. Per-kernel-mode result-struct size is roughly 64 B/key for `kernelMode=0` (X+Y) and 25 B/key for `kernelMode=3` (address-only); the upper `@Param` bound should be derived from VRAM &times; safety factor at `@Setup` time.
+  - **OperationsPerInvocation.** Each `@Benchmark` call produces `2^gridNumBits &times; loopCount` candidates. Without `@OperationsPerInvocation` JMH reports launches/sec, which is misleading at small `gridNumBits`. Compute the value at `@Setup` and pass it through.
+  - **Invalid `@Param` combinations.** `gridNumBits` + `batchSizeInBits` divisibility constraint (`CProducerOpenCL:43-45` in mainline) means some `@Param` cross-products are invalid. Use `Assume.assumeTrue(...)` in `@Setup` so JMH SKIPs rather than ERRORs.
+  - **Device selection.** Mainline `OpenCLContext` picks one device from `CProducerOpenCL.platformIndex` / `deviceIndex`. Surface those as `-D` system properties so operators can target the GPU they actually want to benchmark without editing source.
+  - **Warm-up nuance.** 2&times;5s + 5&times;10s is JMH's CPU-tuned default; for GPU kernels small `gridNumBits` finishes in microseconds and the warm-up wall-clock can be the dominant cost. Worth a one-off check that `@Measurement(time = 10)` actually produces statistically useful sample counts at every `@Param` corner.
+
+  **Out of scope of this TODO** (deliberately, to keep import small): everything from the fork except the two sweep ideas above. Specifically NOT importing: `BenchmarkFactory` / `BenchmarkSeries` / `BenchmarkLogger` / `LatexContentCreator` / the `command: "BenchmarkSeries"` `CCommand` extension / the `Round`-based abstraction. Also explicitly NOT importing the fork's SHA / RIPEMD-160 GPU-vs-CPU comparison rounds &mdash; mainline's primitives are better.
+
+  **Files in the fork worth re-reading if implementing** (under `/tmp/cjherm-baf23/` if cloned again):
+  - `src/main/java/net/ladenthin/bitcoinaddressfinder/benchmark/types/ChunkSizeIteratorBenchmark.java` (the gridNumBits sweep)
+  - `src/main/java/net/ladenthin/bitcoinaddressfinder/benchmark/types/CtxRoundsIteratorBenchmark.java` (the context-reuse sweep)
+  - `src/main/java/net/ladenthin/bitcoinaddressfinder/benchmark/MeasurementRound.java` (the measurement loop)
+  - `examples/benchmark*.json` and `examples/runBenchmark*.bat` (the operator-facing param set the fork chose &mdash; useful as a sanity check on the `@Param` ranges)
+
 - **`@VisibleForTesting` design-fit review.** Complement to the audit above: for every existing or planned `@VisibleForTesting` usage, ask whether widening access is the cleanest path to testability. Common alternatives that should be preferred when applicable: (a) inject the dependency through the constructor and have the test pass a stub or fake; (b) extract the tested behaviour into a separate testable helper class with public methods; (c) restructure the production API so what the test wants to verify is observable through normal public methods. Only keep the annotation where these alternatives are materially worse. `@VisibleForTesting` should be the last resort, not the first.
 
 - **Package hierarchy review.** Walk the full `src/main/java/.../` tree and assess whether the current package layout still expresses the design intent. Look for: classes that have drifted into the wrong package as the codebase grew; flat "kitchen-sink" packages that should be split (high class count, mixed concerns); deeply nested packages that fragment cohesive components; circular dependencies between packages; missing seams where a sub-package boundary would prevent leaking implementation details. Produce a target tree as a separate planning step BEFORE making any moves — large package refactors are expensive to review and easy to do twice if the target isn't clear up front.
