@@ -1,6 +1,22 @@
 # Unit Test Writing Guide — BitcoinAddressFinder (Project-Specific Supplement)
 
-This guide contains **project-specific** test conventions that supplement the generic Java TDD skill (`.claude/skills/java-tdd-guide.md`). For general test conventions (AAA structure, Hamcrest assertions, editor folds, naming, data providers, etc.), refer to the generic guide.
+> **Canonical workspace rules** (JUnit Jupiter framework choices, AAA
+> structure with `// pre-assert` semantics, editor folds, naming pattern,
+> Hamcrest assertions, exception testing, parameterized tests via
+> `@MethodSource`, logger mocking with Mockito or LogCaptor, import
+> grouping, DRY constants per fold) live in
+> [`../workspace/guides/TEST_WRITING_GUIDE.md`](../workspace/guides/TEST_WRITING_GUIDE.md).
+> The TDD workflow lives in
+> [`../workspace/.claude/skills/java-tdd-guide/SKILL.md`](../workspace/.claude/skills/java-tdd-guide/SKILL.md)
+> (referenced locally as `.claude/skills/java-tdd-guide/SKILL.pointer.md`).
+> This file contains only **BAF-specific** test conventions: custom
+> marker annotations (`@AwaitTimeTest`, `@ToStringTest`, `@OpenCLTest`),
+> timing-test patterns with `AwaitTimeTests` constants, the static
+> address constants (`StaticKey`, `TestAddresses42`, `P2PKH` enum,
+> etc.), the `OpenCLPlatformAssume` / `LMDBPlatformAssume` gate
+> pattern, LMDB test helpers via `LMDBBase`, shared `KeyUtility` /
+> `BitHelper` test fields, `AbstractProducerTest` helpers, and socket
+> test utilities via `TestTimeProvider` / `ConnectionUtils`.
 
 ---
 
