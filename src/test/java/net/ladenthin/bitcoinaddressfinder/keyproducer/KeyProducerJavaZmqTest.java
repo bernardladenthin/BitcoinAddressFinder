@@ -44,7 +44,9 @@ public class KeyProducerJavaZmqTest {
     }
 
     private KeyProducerJavaZmq createKeyProducerJavaZmq(CKeyProducerJavaZmq config) {
-        return new KeyProducerJavaZmq(config, keyUtility, bitHelper);
+        KeyProducerJavaZmq producer = new KeyProducerJavaZmq(config, keyUtility, bitHelper);
+        producer.start();
+        return producer;
     }
 
     public static String findFreeZmqAddress() {

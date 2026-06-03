@@ -50,7 +50,7 @@ public abstract class AbstractPlaintextFile implements Interruptable {
      * @throws IOException if the file pointer or length cannot be read
      */
     protected double calculateFileProgress(@NonNull RandomAccessFile raf) throws IOException {
-        return ((double) (Math.max(raf.getFilePointer(), 1)) / (double) raf.length()) * 100.0d;
+        return ((double) Math.max(raf.getFilePointer(), 1) / (double) raf.length()) * 100.0d;
     }
 
     /**

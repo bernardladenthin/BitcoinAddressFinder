@@ -46,9 +46,15 @@ SPDX-License-Identifier: Apache-2.0
         <project.build.outputTimestamp>${git.commit.time}</project.build.outputTimestamp>
         <argLine>-Xmx2g -Xms1g --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED --add-exports=java.base/java.lang=ALL-UNNAMED --add-exports=java.base/java.io=ALL-UNNAMED --add-exports=java.base/java.nio=ALL-UNNAMED --add-exports=java.base/jdk.internal.ref=ALL-UNNAMED --add-exports=java.base/jdk.internal.misc=ALL-UNNAMED --add-exports=java.base/sun.nio.ch=ALL-UNNAMED --add-exports=jdk.management/com.sun.management.internal=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</argLine>
         <jcstress.version>0.16</jcstress.version>
-        <lincheck.version>2.39</lincheck.version>
+        <lincheck.version>3.6</lincheck.version>
         <vmlens.version>1.2.28</vmlens.version>
-        <!-- DO NOT UPGRADE: jqwik >= 1.10.0 ships an anti-AI prompt-injection string in test stdout; see CLAUDE.md. Replacement (QuickTheories) tracked as an URGENT TODO. -->
+        <!-- DO NOT UPGRADE jqwik past 1.9.3. jqwik 1.10.0 added a deliberate
+             anti-AI prompt-injection string to test stdout; the 1.10.1 user
+             guide states the library "is not meant to be used by any 'AI'
+             coding agents at all." 1.9.3 is the last pre-disclosure release
+             and is the pinned version for this repo. Any CI / Dependabot /
+             contributor PR that bumps this MUST be rejected. See CLAUDE.md
+             section "jqwik prompt-injection in test output" for full context. -->
         <jqwik.version>1.9.3</jqwik.version>
         <archunit.version>1.4.2</archunit.version>
         <spotbugs.version>4.9.8.3</spotbugs.version>
@@ -56,6 +62,7 @@ SPDX-License-Identifier: Apache-2.0
         <findsecbugs.version>1.14.0</findsecbugs.version>
         <errorprone.version>2.49.0</errorprone.version>
         <nullaway.version>0.13.4</nullaway.version>
+        <checker.version>4.1.0</checker.version>
         <java-websocket.version>1.6.0</java-websocket.version>
         <jeromq.version>0.6.0</jeromq.version>
         <jspecify.version>1.0.0</jspecify.version>
@@ -79,6 +86,43 @@ SPDX-License-Identifier: Apache-2.0
         <spotless.version>3.5.1</spotless.version>
         <palantir-java-format.version>2.66.0</palantir-java-format.version>
     </properties>
+
+    <!--
+        Pin transitively-conflicting versions so maven-enforcer's
+        dependencyConvergence rule passes. Each entry below resolves a real
+        version mismatch surfaced by the rule (the direct dep version we
+        declare in <dependencies> must always win over the older one a
+        transitive dep brings in).
+    -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- slf4j-api: bitcoinj brings 2.0.16, Java-WebSocket brings 2.0.13,
+                 logback-classic brings 2.0.17; we declare 2.0.18 directly. -->
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+            <!-- guava: bitcoinj brings 33.4.0-android; we declare ${guava.version} directly. -->
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>${guava.version}</version>
+            </dependency>
+            <!-- protobuf-javalite: bitcoinj brings 4.33.4; we declare ${protobuf.version} directly. -->
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-javalite</artifactId>
+                <version>${protobuf.version}</version>
+            </dependency>
+            <!-- bouncycastle: bitcoinj brings 1.83; we declare ${bcprov.version} directly. -->
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk15to18</artifactId>
+                <version>${bcprov.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <distributionManagement>
         <snapshotRepository>
@@ -173,6 +217,11 @@ SPDX-License-Identifier: Apache-2.0
                     <version>0.8.14</version>
                 </plugin>
                 <plugin>
+                    <groupId>org.pitest</groupId>
+                    <artifactId>pitest-maven</artifactId>
+                    <version>1.25.1</version>
+                </plugin>
+                <plugin>
                     <groupId>org.sonatype.central</groupId>
                     <artifactId>central-publishing-maven-plugin</artifactId>
                     <version>0.10.0</version>
@@ -213,7 +262,26 @@ SPDX-License-Identifier: Apache-2.0
                     <requireMavenVersion>
                       <version>[3.6.3,)</version>
                     </requireMavenVersion>
-                  </rules>    
+                    <requireJavaVersion>
+                      <version>[21,)</version>
+                    </requireJavaVersion>
+                    <dependencyConvergence/>
+                    <bannedDependencies>
+                      <excludes>
+                        <!-- Use SLF4J directly; never commons-logging. -->
+                        <exclude>commons-logging:commons-logging</exclude>
+                        <!-- Legacy / EoL logging frameworks. -->
+                        <exclude>log4j:log4j</exclude>
+                        <!-- Old hamcrest split artifacts; use hamcrest:hamcrest 2.x+. -->
+                        <exclude>org.hamcrest:hamcrest-core</exclude>
+                        <exclude>org.hamcrest:hamcrest-library</exclude>
+                        <exclude>org.hamcrest:hamcrest-all</exclude>
+                        <!-- Legacy JUnit 3 / 4; we use Jupiter (junit:junit-jupiter). -->
+                        <exclude>junit:junit</exclude>
+                        <exclude>junit:junit-dep</exclude>
+                      </excludes>
+                    </bannedDependencies>
+                  </rules>
                 </configuration>
               </execution>
             </executions>
@@ -244,12 +312,36 @@ SPDX-License-Identifier: Apache-2.0
 
                     <source>21</source>
                     <target>21</target>
+                    <parameters>true</parameters>
 
                     <compilerArgs>
+                        <!--
+                          -Xlint:all surfaces every category of javac warning at compile time.
+                          -Werror is intentionally NOT set yet; current main compile emits seven
+                          warnings (deprecated Thread.getId, deprecated jocl CL constant, two
+                          'this' escapes in KeyProducerJavaSocket/Zmq, Closeable.close declaring
+                          InterruptedException, explicit close on auto-closeable in OpenClTask).
+                          Captured as the "Make -Werror clean" TODO; flip it on once those are
+                          either fixed or explicitly suppressed.
+                        -->
+                        <arg>-Xlint:all,-serial,-options,-classfile</arg>
+                        <!--
+                          Checker Framework Nullness Checker runs as a second nullness pass
+                          alongside NullAway. CF is generics-aware and stricter than NullAway,
+                          so it acts as a second-opinion verifier on the same JSpecify
+                          annotations.
+                        -->
+                        <arg>-processor</arg>
+                        <arg>org.checkerframework.checker.nullness.NullnessChecker</arg>
+                        <!--
+                          Override CF 4.1.0's incorrect Objects.requireNonNull stub. The shipped
+                          stub annotates obj as @NonNull, the opposite of the JDK contract.
+                        -->
+                        <arg>-Astubs=src/etc/checker/objects.astub</arg>
                         <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
                         <arg>-XDcompilePolicy=simple</arg>
                         <arg>--should-stop=ifError=FLOW</arg>
-                        <arg>-Xplugin:ErrorProne -Xep:NullAway:ERROR -XepOpt:NullAway:AnnotatedPackages=net.ladenthin</arg>
+                        <arg>-Xplugin:ErrorProne -Xep:NullAway:ERROR -XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:CheckOptionalEmptiness=true -XepOpt:NullAway:AcknowledgeRestrictiveAnnotations=true -XepOpt:NullAway:AcknowledgeAndroidRecent=true -XepOpt:NullAway:AssertsEnabled=true -Xep:BoxedPrimitiveEquality:ERROR -Xep:EqualsHashCode:ERROR -Xep:EqualsIncompatibleType:ERROR -Xep:IdentityBinaryExpression:ERROR -Xep:SelfAssignment:ERROR -Xep:SelfComparison:ERROR -Xep:SelfEquals:ERROR -Xep:DeadException:ERROR -Xep:FormatString:ERROR -Xep:InvalidPatternSyntax:ERROR -Xep:OptionalEquality:ERROR -Xep:ImpossibleNullComparison:ERROR</arg>
 
                         <!-- For ErrorProne, DO NOT TOUCH, documented here: https://errorprone.info/docs/installation#jdk-16 -->
                         <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
@@ -301,9 +393,57 @@ SPDX-License-Identifier: Apache-2.0
                             <artifactId>nullaway</artifactId>
                             <version>${nullaway.version}</version>
                         </path>
+                        <path>
+                            <groupId>org.checkerframework</groupId>
+                            <artifactId>checker</artifactId>
+                            <version>${checker.version}</version>
+                        </path>
                     </annotationProcessorPaths>
                 </configuration>
                 <executions>
+                    <execution>
+                        <id>module-info-compile</id>
+                        <!-- Bind to prepare-package (after test-compile, before package) so
+                             module-info.class is not present in target/classes/ while the test
+                             sources compile or run. If it were, javac/the test JVM would
+                             activate module mode and reject the unprefixed add-exports /
+                             add-opens flags that the tests rely on for jdk.internal.ref and
+                             sun.nio.ch access (ByteBufferUtility). By the time
+                             maven-jar-plugin runs in the package phase the descriptor is in
+                             place and ends up at the jar root as expected.
+
+                             Local-dev caveat: running `mvn test` AFTER `mvn package` without
+                             an intervening `mvn clean` will fail with IllegalAccessError on
+                             sun.nio.ch.DirectBuffer because the package phase leaves
+                             module-info.class in target/classes/. CI is unaffected because
+                             the Build and Test jobs run in separate runners with fresh
+                             checkouts. Run `mvn clean test` to reset. -->
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                        <configuration>
+                            <!-- module-info.java lives in src/main/java9 so the default-compile
+                                 pass cannot see it (BAF compiles at source/target 21 which
+                                 supports modules; if javac sees module-info anywhere on its
+                                 source path it auto-activates module mode and rejects every
+                                 ordinary import as "package is not visible in unnamed module").
+                                 This dedicated execution compiles the descriptor alone at
+                                 release 9 without the Error Prone / NullAway / Checker
+                                 Framework processors. BAF runs as a fat-jar (assembly profile)
+                                 on the classpath and tests run on the classpath as well, so
+                                 the module descriptor is informational — it gives module-path
+                                 consumers a deterministic module name and the documented
+                                 Jackson opens directive, but never gates any build or runtime
+                                 resolution. -->
+                            <release>9</release>
+                            <compileSourceRoots>
+                                <compileSourceRoot>${project.basedir}/src/main/java9</compileSourceRoot>
+                            </compileSourceRoots>
+                            <compilerArgs combine.self="override"/>
+                            <annotationProcessorPaths combine.self="override"/>
+                        </configuration>
+                    </execution>
                     <execution>
                         <id>default-testCompile</id>
                         <configuration>
@@ -312,8 +452,12 @@ SPDX-License-Identifier: Apache-2.0
                                 which NullAway would then analyze and fail (generated code lacks @NonNull
                                 annotations). Turn NullAway OFF for test compilation; hand-written test
                                 code is still checked via the default-compile phase on the main sources.
+
+                                Also drop -parameters here so JMH / jcstress reflection doesn't pick up
+                                parameter names from MethodParameters.
                             -->
-                            <compilerArgs>
+                            <parameters>false</parameters>
+                            <compilerArgs combine.self="override">
                                 <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
                                 <arg>-XDcompilePolicy=simple</arg>
                                 <arg>--should-stop=ifError=FLOW</arg>
@@ -537,6 +681,43 @@ SPDX-License-Identifier: Apache-2.0
                     <classpathScope>test</classpathScope>
                 </configuration>
             </plugin>
+            <plugin>
+                <!--
+                  PIT mutation testing is INTENTIONALLY scoped to a single class
+                  (BitHelper) so that the wiring is exercised on every CI build
+                  with a 100% mutation threshold gate, without forcing every other
+                  class up to 100% mutation coverage at once. Expand targetClasses
+                  incrementally as classes reach mutation-test parity (see README
+                  TODO).
+
+                  CI invocation pattern (matches streambuffer):
+                      mvn test-compile org.pitest:pitest-maven:mutationCoverage
+                  PIT runs right after test-compile so the prepare-package-bound
+                  module-info-compile execution does not fire; module-info.class
+                  stays out of target/classes/ and the forked PIT JVMs continue
+                  to run in classpath mode (consistent with the rest of the test
+                  suite).
+                -->
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-maven</artifactId>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-junit5-plugin</artifactId>
+                        <version>1.2.3</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <targetClasses>
+                        <param>net.ladenthin.bitcoinaddressfinder.BitHelper</param>
+                    </targetClasses>
+                    <targetTests>
+                        <param>net.ladenthin.bitcoinaddressfinder.BitHelperTest</param>
+                    </targetTests>
+                    <mutationThreshold>100</mutationThreshold>
+                    <timeoutConstant>30000</timeoutConstant>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
     <dependencies>
@@ -554,6 +735,11 @@ SPDX-License-Identifier: Apache-2.0
             <groupId>org.jspecify</groupId>
             <artifactId>jspecify</artifactId>
             <version>${jspecify.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.checkerframework</groupId>
+            <artifactId>checker-qual</artifactId>
+            <version>${checker.version}</version>
         </dependency>
         <dependency>
             <groupId>org.bitcoinj</groupId>
@@ -693,8 +879,8 @@ SPDX-License-Identifier: Apache-2.0
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.jetbrains.kotlinx</groupId>
-            <artifactId>lincheck-jvm</artifactId>
+            <groupId>org.jetbrains.lincheck</groupId>
+            <artifactId>lincheck</artifactId>
             <version>${lincheck.version}</version>
             <scope>test</scope>
         </dependency>

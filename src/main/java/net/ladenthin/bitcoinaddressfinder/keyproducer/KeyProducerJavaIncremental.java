@@ -27,15 +27,15 @@ public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJava
     public KeyProducerJavaIncremental(
             CKeyProducerJavaIncremental cKeyProducerJavaIncremental, KeyUtility keyUtility, BitHelper bitHelper) {
         super(cKeyProducerJavaIncremental);
-        this.currentValue = new BigInteger(cKeyProducerJavaIncremental.startAddress, BitHelper.RADIX_HEX);
+        this.currentValue = new BigInteger(cKeyProducerJavaIncremental.startPrivateKey, BitHelper.RADIX_HEX);
     }
 
     @Override
     public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly)
             throws NoMoreSecretsAvailableException {
         verifyWorkSize(overallWorkSize, cKeyProducerJava.maxWorkSize);
-        final BigInteger endAddress = cKeyProducerJava.getEndAddress();
-        if (currentValue.compareTo(endAddress) > 0) {
+        final BigInteger endPrivateKey = cKeyProducerJava.getEndPrivateKey();
+        if (currentValue.compareTo(endPrivateKey) > 0) {
             throw new NoMoreSecretsAvailableException(currentValue + " exceeds ");
         }
 
@@ -43,8 +43,8 @@ public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJava
         BigInteger[] secrets = new BigInteger[length];
         BigInteger counter = currentValue;
         for (int i = 0; i < length; i++) {
-            if (counter.compareTo(endAddress) > 0) {
-                throw new NoMoreSecretsAvailableException(counter + " exceeds end address " + endAddress);
+            if (counter.compareTo(endPrivateKey) > 0) {
+                throw new NoMoreSecretsAvailableException(counter + " exceeds end private key " +endPrivateKey);
             }
             secrets[i] = counter;
             counter = counter.add(BigInteger.ONE);

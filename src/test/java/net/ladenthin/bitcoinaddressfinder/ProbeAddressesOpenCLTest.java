@@ -22,7 +22,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.Random;
 import java.util.stream.Collectors;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
@@ -433,7 +432,7 @@ public class ProbeAddressesOpenCLTest {
         producerOpenCL.batchSizeInBits = chunkSize;
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
             openCLContext.init();
-            OpenClTask openClTask = Objects.requireNonNull(openCLContext.getOpenClTask());
+            OpenClTask openClTask = openCLContext.getOpenClTask().orElseThrow();
 
             // Force a key that exceeds the limit
             openClTask.setSrcPrivateKeyChunk(privateKey);
@@ -464,7 +463,7 @@ public class ProbeAddressesOpenCLTest {
                     is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES));
 
             // Perform the actual OpenCL buffer population
-            OpenClTask openClTask = Objects.requireNonNull(openCLContext.getOpenClTask());
+            OpenClTask openClTask = openCLContext.getOpenClTask().orElseThrow();
             openClTask.setSrcPrivateKeyChunk(privateKey);
 
             ByteBuffer buffer = openClTask.getPrivateKeySourceArgument().getByteBuffer();
@@ -512,7 +511,7 @@ public class ProbeAddressesOpenCLTest {
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
             openCLContext.init();
             // Perform the actual OpenCL buffer population
-            OpenClTask openClTask = Objects.requireNonNull(openCLContext.getOpenClTask());
+            OpenClTask openClTask = openCLContext.getOpenClTask().orElseThrow();
 
             openClTask.setSrcPrivateKeyChunk(privateKey);
 

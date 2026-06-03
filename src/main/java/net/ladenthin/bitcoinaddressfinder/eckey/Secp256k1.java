@@ -64,12 +64,12 @@ public class Secp256k1 {
         if (R.equals(ECPoint.POINT_INFINITY)) {
             return R;
         }
-        BigInteger slope = (R.getAffineX().pow(2)).multiply(FieldP_3);
+        BigInteger slope = R.getAffineX().pow(2).multiply(FieldP_3);
         slope = slope.add(a);
-        slope = slope.multiply((R.getAffineY().multiply(FieldP_2)).modInverse(p));
+        slope = slope.multiply(R.getAffineY().multiply(FieldP_2).modInverse(p));
         final BigInteger Xout =
                 slope.pow(2).subtract(R.getAffineX().multiply(FieldP_2)).mod(p);
-        final BigInteger Yout = (R.getAffineY().negate())
+        final BigInteger Yout = R.getAffineY().negate()
                 .add(slope.multiply(R.getAffineX().subtract(Xout)))
                 .mod(p);
         return new ECPoint(Xout, Yout);
@@ -82,7 +82,7 @@ public class Secp256k1 {
         if (g.equals(ECPoint.POINT_INFINITY)) {
             return r;
         }
-        if (r == g || r.equals(g)) {
+        if (r.equals(g)) {
             return doublePoint(p, a, r);
         }
         final BigInteger gX = g.getAffineX();
@@ -90,9 +90,9 @@ public class Secp256k1 {
         final BigInteger rX = r.getAffineX();
         final BigInteger rY = r.getAffineY();
         final BigInteger slope =
-                (rY.subtract(sY)).multiply(rX.subtract(gX).modInverse(p)).mod(p);
+                rY.subtract(sY).multiply(rX.subtract(gX).modInverse(p)).mod(p);
         final BigInteger Xout =
-                (slope.modPow(FieldP_2, p).subtract(rX)).subtract(gX).mod(p);
+                slope.modPow(FieldP_2, p).subtract(rX).subtract(gX).mod(p);
         BigInteger Yout = sY.negate().mod(p);
         Yout = Yout.add(slope.multiply(gX.subtract(Xout))).mod(p);
         return new ECPoint(Xout, Yout);
@@ -109,10 +109,10 @@ public class Secp256k1 {
     public static ECPoint scalmultNew(final ECParameterSpec params, final ECPoint g, final BigInteger kin) {
         EllipticCurve curve = params.getCurve();
         final ECField field = curve.getField();
-        if (!(field instanceof ECFieldFp)) {
+        if (!(field instanceof ECFieldFp ecFieldFp)) {
             throw new UnsupportedOperationException(field.getClass().getCanonicalName());
         }
-        final BigInteger p = ((ECFieldFp) field).getP();
+        final BigInteger p = ecFieldFp.getP();
         final BigInteger a = curve.getA();
         ECPoint R = ECPoint.POINT_INFINITY;
         // value only valid for curve secp256k1, code taken from https://www.secg.org/sec2-v2.pdf,
@@ -147,10 +147,10 @@ public class Secp256k1 {
      */
     public static ECPoint scalmultOrg(final EllipticCurve curve, final ECPoint g, final BigInteger kin) {
         final ECField field = curve.getField();
-        if (!(field instanceof ECFieldFp)) {
+        if (!(field instanceof ECFieldFp ecFieldFp)) {
             throw new UnsupportedOperationException(field.getClass().getCanonicalName());
         }
-        final BigInteger p = ((ECFieldFp) field).getP();
+        final BigInteger p = ecFieldFp.getP();
         final BigInteger a = curve.getA();
         ECPoint R = ECPoint.POINT_INFINITY;
         // value only valid for curve secp256k1, code taken from https://www.secg.org/sec2-v2.pdf,

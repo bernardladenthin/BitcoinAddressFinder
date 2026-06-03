@@ -111,7 +111,7 @@ public class SecretsFileTest {
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
         SecretsFile secretsFile =
-                new SecretsFile(network, file, CSecretFormat.DUMPED_RIVATE_KEY, readStatistic, captured::add);
+                new SecretsFile(network, file, CSecretFormat.DUMPED_PRIVATE_KEY, readStatistic, captured::add);
 
         // act
         secretsFile.processLine(staticKey.privateKeyWiFUncompressed);
@@ -129,7 +129,7 @@ public class SecretsFileTest {
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
         SecretsFile secretsFile =
-                new SecretsFile(network, file, CSecretFormat.DUMPED_RIVATE_KEY, readStatistic, captured::add);
+                new SecretsFile(network, file, CSecretFormat.DUMPED_PRIVATE_KEY, readStatistic, captured::add);
 
         // act
         secretsFile.processLine(staticKey.privateKeyWiFUncompressed);

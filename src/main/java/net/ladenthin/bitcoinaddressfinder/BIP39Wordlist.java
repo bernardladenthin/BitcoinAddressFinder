@@ -4,6 +4,8 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.InputStream;
+import java.util.Locale;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Enumerates the official BIP39 wordlists shipped with the project.
@@ -78,7 +80,7 @@ public enum BIP39Wordlist {
      * @return the input stream of the wordlist file for this language, or {@code null}
      *         if the resource is not found.
      */
-    public InputStream getWordListStream() {
+    public @Nullable InputStream getWordListStream() {
         return BIP39Wordlist.class.getResourceAsStream("/mnemonic/wordlist/" + fileName);
     }
 
@@ -104,7 +106,7 @@ public enum BIP39Wordlist {
      * @throws IllegalArgumentException if no matching enum exists
      */
     public static BIP39Wordlist fromLanguageName(String name) {
-        return valueOf(name.toUpperCase().replace('-', '_'));
+        return valueOf(name.toUpperCase(Locale.ROOT).replace('-', '_'));
     }
 
     /**

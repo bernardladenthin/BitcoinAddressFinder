@@ -1,6 +1,12 @@
 **Build:**  
 ![Java 21+](https://img.shields.io/badge/Java-21%2B-informational)  
-![JUnit](https://img.shields.io/badge/tested%20with-JUnit4-yellow)  
+[![JPMS](https://img.shields.io/badge/JPMS-modular%20JAR-25A162)](https://openjdk.org/projects/jigsaw/)  
+![JUnit](https://img.shields.io/badge/tested%20with-JUnit6-25A162)  
+[![JSpecify](https://img.shields.io/badge/JSpecify-1.0.0%20%40NullMarked-25A162)](https://jspecify.dev)  
+[![NullAway](https://img.shields.io/badge/NullAway-strict%20JSpecify-25A162)](https://github.com/uber/NullAway)  
+[![Checker Framework](https://img.shields.io/badge/Checker%20Framework-Nullness-25A162)](https://checkerframework.org)  
+[![Error Prone](https://img.shields.io/badge/Error%20Prone-12%20patterns%20at%20ERROR-25A162)](https://errorprone.info)  
+[![Maven Enforcer](https://img.shields.io/badge/Maven%20Enforcer-strict-25A162)](https://maven.apache.org/enforcer/)  
 [![jqwik](https://img.shields.io/badge/tested%20with-jqwik-1f6feb)](https://jqwik.net)  
 [![ArchUnit](https://img.shields.io/badge/tested%20with-ArchUnit-c71a36)](https://www.archunit.org)  
 [![SpotBugs](https://img.shields.io/badge/analyzed%20with-SpotBugs-3b5998)](https://spotbugs.github.io)  
@@ -15,10 +21,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/bernardladenthin/BitcoinAddressFinder/badge.svg?branch=main)](https://coveralls.io/github/bernardladenthin/BitcoinAddressFinder?branch=main)  
 [![codecov](https://codecov.io/gh/bernardladenthin/BitcoinAddressFinder/graph/badge.svg?token=RRCR4ZC28T)](https://codecov.io/gh/bernardladenthin/BitcoinAddressFinder)  
 [![JaCoCo](https://img.shields.io/codecov/c/github/bernardladenthin/BitcoinAddressFinder?label=JaCoCo&logo=java)](https://codecov.io/gh/bernardladenthin/BitcoinAddressFinder)  
-<!--
-PIT mutation testing is not configured for this repository.
-Do not add a PIT badge here unless PIT is wired into pom.xml + CI.
--->
+[![PIT Mutation](https://img.shields.io/badge/PIT%20mutation-100%25%20(1%20class)-brightgreen)](https://github.com/bernardladenthin/BitcoinAddressFinder/actions/workflows/publish.yml)  
 
 **Quality:**  
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=bernardladenthin_BitcoinAddressFinder&metric=alert_status)](https://sonarcloud.io/dashboard?id=bernardladenthin_BitcoinAddressFinder)  
@@ -100,6 +103,8 @@ using the assigned ID:
 - [License](#license)
 
 ---
+
+> ⚠️ **DO NOT UPGRADE jqwik past 1.9.3.** jqwik 1.10.0 added an anti-AI prompt-injection string to test stdout; the 1.10.1 user guide states the library "is not meant to be used by any 'AI' coding agents at all." 1.9.3 is the last pre-disclosure release and is the pinned version. See `CLAUDE.md` section "jqwik prompt-injection in test output" for the full context.
 
 ## About BitcoinAddressFinder
 **BitcoinAddressFinder** is a free, high-performance tool for scanning random private keys across a wide range of cryptocurrencies — including Bitcoin, Bitcoin Cash, Bitcoin SV, Litecoin, Dogecoin, Dash, Zcash, and many more.
@@ -818,17 +823,17 @@ This mode generates private keys **sequentially in batches** within a specified 
 #### Configuration Fields
 | JSON field     | Type   | Default                                                                                    | Purpose                                                      |
 |----------------|--------|--------------------------------------------------------------------------------------------|--------------------------------------------------------------|
-| `startAddress` | string | `0000000000000000000000000000000000000000000000000000000000000002`                         | Hex string of the first private key in the range (inclusive) |
-| `endAddress`   | string | `FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141` (secp256k1 group order) | Hex string of the last private key in the range (inclusive)  |
+| `startPrivateKey` | string | `0000000000000000000000000000000000000000000000000000000000000002`                         | Hex string of the first private key in the range (inclusive) |
+| `endPrivateKey`   | string | `FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141` (secp256k1 group order) | Hex string of the last private key in the range (inclusive)  |
 
 #### How it works
-- Scanning begins **at `startAddress`**, producing sequential private keys in batches of size `batchSize`, up to and including `endAddress`.
+- Scanning begins **at `startPrivateKey`**, producing sequential private keys in batches of size `batchSize`, up to and including `endPrivateKey`.
 - Each batch contains exactly `batchSize` keys.
-- If the next full batch would go **beyond `endAddress`**, the process stops with an **exception**.
-- The **`endAddress` is inclusive**, but **partial batches are not allowed by default** — batches must fit completely inside the range.
+- If the next full batch would go **beyond `endPrivateKey`**, the process stops with an **exception**.
+- The **`endPrivateKey` is inclusive**, but **partial batches are not allowed by default** — batches must fit completely inside the range.
 - For optimal performance, especially with OpenCL, configure `batchSize` and your GPU's grid size so that batches align perfectly within the range. This prevents errors and maximizes throughput.
 
-> **Note:** If unsure, set the `endAddress` slightly higher to closely match the batch size. This helps avoid exceptions and ensures efficient scanning.
+> **Note:** If unsure, set the `endPrivateKey` slightly higher to closely match the batch size. This helps avoid exceptions and ensures efficient scanning.
 
 ---
 
@@ -841,8 +846,8 @@ Example minimal configuration:
   "keyProducerJavaIncremental": [
     {
       "keyProducerId": "exampleKeyProducerId",
-      "startAddress": "0000000000000000000000000000000000000000000000000000000000000002",
-      "endAddress": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
+      "startPrivateKey": "0000000000000000000000000000000000000000000000000000000000000002",
+      "endPrivateKey": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
     }
   ]
 }
@@ -850,15 +855,15 @@ Example minimal configuration:
 ```
 
 🧩 This configuration incrementally searches a defined range of private keys. It is particularly suited for brute-force challenges, such as the [71st Bitcoin puzzle transaction](https://privatekeys.pw/puzzles/bitcoin-puzzle-tx?status=unsolved#p71).  
-The private key range is specified by two 64-character hex strings: `startAddress` and `endAddress`.
+The private key range is specified by two 64-character hex strings: `startPrivateKey` and `endPrivateKey`.
 
 ```json
 ...
 "keyProducerJavaIncremental": [
     {
       "keyProducerId": "exampleKeyProducerJavaIncremental",
-      "startAddress": "0000000000000000000000000000000000000000000000400000000000000000",
-      "endAddress":   "00000000000000000000000000000000000000000000007fffffffffffffffff"
+      "startPrivateKey": "0000000000000000000000000000000000000000000000400000000000000000",
+      "endPrivateKey":   "00000000000000000000000000000000000000000000007fffffffffffffffff"
     }
 ],
 ...
@@ -1265,6 +1270,7 @@ Laptops with hybrid graphics—using both integrated (iGPU) and discrete (dGPU) 
 > If your laptop uses hybrid graphics, always ensure that the **discrete GPU** is explicitly selected for OpenCL workloads to avoid severe performance bottlenecks.
 
 ## Future improvements
+- **Expand PIT mutation-testing scope.** PIT is wired in `pom.xml` and runs on every CI build (in the ubuntu-latest leg of the `test` job) with `<mutationThreshold>100</mutationThreshold>`, but `<targetClasses>` is currently narrowed to a single class (`BitHelper`). The intent is to exercise the wiring and gate against regressions on that single class today; widen `<targetClasses>` incrementally as additional classes reach mutation-test parity. Final target: `<param>net.ladenthin.bitcoinaddressfinder.*</param>` matching the streambuffer pattern (excluding native/OpenCL-bound code where mutation testing is impractical).
 - Refactor the entire key generation infrastructure to support a key provider. This provider should be configurable to supply private keys from various sources, such as Random, Secrets File, Key Range, and others. All consumers should retrieve keys from this provider.
 
 ### KeyProvider
@@ -1278,7 +1284,7 @@ Wished from Ulugbek:
 ```
 // Search started from given address. Would be nice if it can save last position...
 "sequentalSearch" : true,
-"startAddress" : xxxxxxxx,
+"startPrivateKey" : xxxxxxxx,
 
 // Random search with batches, here 100000. I,e. some random number is found and after 100000 sequental addresses should be checked.
 "searchAsBatches" : true,

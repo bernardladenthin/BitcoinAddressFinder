@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
  *   </tr>
  *   <tr>
  *     <td>1. Start of range, batch fits</td>
- *     <td>At startAddress (min)</td>
+ *     <td>At startPrivateKey (min)</td>
  *     <td>≤ keys remaining</td>
  *     <td>Yes</td>
  *     <td>Returns full batch sequential keys</td>
@@ -59,7 +59,7 @@ import org.junit.jupiter.api.Test;
  *   </tr>
  *   <tr>
  *     <td>4. At end, batch size = 1, returnStartSecretOnly=true</td>
- *     <td>At endAddress (max)</td>
+ *     <td>At endPrivateKey (max)</td>
  *     <td>1</td>
  *     <td>Yes (single key)</td>
  *     <td>Returns single key (currentValue)</td>
@@ -68,16 +68,16 @@ import org.junit.jupiter.api.Test;
  *   </tr>
  *   <tr>
  *     <td>5. At end, batch size > 1, partial batch not allowed</td>
- *     <td>At endAddress (max)</td>
+ *     <td>At endPrivateKey (max)</td>
  *     <td>Batch size &gt; 1</td>
  *     <td>No (batch overruns end)</td>
  *     <td>Throws NoMoreSecretsAvailableException</td>
  *     <td>Yes</td>
- *     <td><code>createSecrets_endAddressInclusive_butPartialBatchNotAllowed_throwsException</code></td>
+ *     <td><code>createSecrets_endPrivateKeyInclusive_butPartialBatchNotAllowed_throwsException</code></td>
  *   </tr>
  *   <tr>
  *     <td>6. Beyond end address</td>
- *     <td>Beyond endAddress</td>
+ *     <td>Beyond endPrivateKey</td>
  *     <td>Any</td>
  *     <td>N/A</td>
  *     <td>Throws NoMoreSecretsAvailableException immediately</td>
@@ -86,21 +86,21 @@ import org.junit.jupiter.api.Test;
  *   </tr>
  *   <tr>
  *     <td>7. End address exactly on batch boundary</td>
- *     <td>At endAddress (max)</td>
+ *     <td>At endPrivateKey (max)</td>
  *     <td>Batch size divides range exactly</td>
  *     <td>Yes</td>
  *     <td>Returns all batches fully</td>
  *     <td>No</td>
- *     <td><code>createSecrets_endAddressExactlyAtBatchBoundary_allBatchesValid</code></td>
+ *     <td><code>createSecrets_endPrivateKeyExactlyAtBatchBoundary_allBatchesValid</code></td>
  *   </tr>
  *   <tr>
  *     <td>8. Partial batch allowed with returnStartSecretOnly=true at end</td>
- *     <td>At endAddress (max)</td>
+ *     <td>At endPrivateKey (max)</td>
  *     <td>Batch size &gt; keys remaining</td>
  *     <td>No</td>
  *     <td>Returns single start key without exception</td>
  *     <td>No</td>
- *     <td><code>createSecrets_endAddressInclusive_partialBatchAllowedWithReturnStartOnly_noException</code></td>
+ *     <td><code>createSecrets_endPrivateKeyInclusive_partialBatchAllowedWithReturnStartOnly_noException</code></td>
  *   </tr>
  *   <tr>
  *     <td>9. Batch larger than keys before end (batchExceedsEnd)</td>
@@ -136,8 +136,8 @@ public class KeyProducerJavaIncrementalTest {
 
     private KeyProducerJavaIncremental createKeyProducerJavaIncremental(String start, String end) {
         CKeyProducerJavaIncremental config = new CKeyProducerJavaIncremental();
-        config.startAddress = start;
-        config.endAddress = end;
+        config.startPrivateKey = start;
+        config.endPrivateKey = end;
         return new KeyProducerJavaIncremental(config, keyUtility, bitHelper);
     }
 
@@ -225,7 +225,7 @@ public class KeyProducerJavaIncrementalTest {
      * Confirms that all batches complete successfully without exceptions.
      */
     @Test
-    public void createSecrets_endAddressExactlyAtBatchBoundary_allBatchesValid() throws Exception {
+    public void createSecrets_endPrivateKeyExactlyAtBatchBoundary_allBatchesValid() throws Exception {
         // Setup: start=1, end=4 (allowed keys: 1, 2, 3, 4)
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
                 "0000000000000000000000000000000000000000000000000000000000000001",
@@ -270,7 +270,7 @@ public class KeyProducerJavaIncrementalTest {
      * even if the end address itself is technically within the allowed range.
      */
     @Test
-    public void createSecrets_endAddressInclusive_butPartialBatchNotAllowed_throwsException() throws Exception {
+    public void createSecrets_endPrivateKeyInclusive_butPartialBatchNotAllowed_throwsException() throws Exception {
         // Setup: start=1, end=5 (allowed keys: 1, 2, 3, 4, 5)
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
                 "0000000000000000000000000000000000000000000000000000000000000001",
@@ -289,7 +289,7 @@ public class KeyProducerJavaIncrementalTest {
      * even if a full batch would exceed the end address.
      */
     @Test
-    public void createSecrets_endAddressInclusive_partialBatchAllowedWithReturnStartOnly_noException()
+    public void createSecrets_endPrivateKeyInclusive_partialBatchAllowedWithReturnStartOnly_noException()
             throws Exception {
         // Setup: start=1, end=5 (allowed keys: 1, 2, 3, 4, 5)
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(

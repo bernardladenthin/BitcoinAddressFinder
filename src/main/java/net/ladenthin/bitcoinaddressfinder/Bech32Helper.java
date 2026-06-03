@@ -67,6 +67,11 @@ public class Bech32Helper {
      * Return the data, fully-decoded with 8-bits per byte.
      * @return The data, fully-decoded as a byte array.
      */
+    // Preserved as a reusable helper for potential future Bech32 round-trip support
+    // (e.g. producing addresses, not just reading them). The sibling
+    // decode5to8WithPadding is the variant currently used. No production caller for
+    // this no-padding variant; UnusedMethod suppressed to keep -Werror clean.
+    @SuppressWarnings("UnusedMethod")
     private byte[] decode5to8(byte[] bytes) throws ReflectiveOperationException {
         return invokeConvertBitsStatic(bytes, 0, bytes.length, 5, 8, false);
     }
@@ -75,10 +80,17 @@ public class Bech32Helper {
         return invokeConvertBitsStatic(bytes, 0, bytes.length, 5, 8, true);
     }
 
+    // Preserved as a reusable helper for potential future Bech32 round-trip support
+    // (producing Bech32 addresses). BAF currently only reads addresses, never encodes.
+    @SuppressWarnings("UnusedMethod")
     private byte[] encode8to5(byte[] data) throws ReflectiveOperationException {
         return invokeConvertBitsStatic(data, 0, data.length, 8, 5, true);
     }
 
+    // Method.invoke takes a @NonNull obj per CF stub, but the JDK contract accepts null for
+    // static methods (Bech32.convertBits is static). Its byte[] return is also non-null at
+    // runtime but reflection types it as @Nullable Object. Suppress both.
+    @SuppressWarnings({"nullness:argument", "nullness:return"})
     private byte[] invokeConvertBitsStatic(byte[] in, int inStart, int inLen, int fromBits, int toBits, boolean pad)
             throws ReflectiveOperationException {
         Method method = Bech32.class.getDeclaredMethod(
@@ -119,7 +131,7 @@ public class Bech32Helper {
      * @return the raw witness program bytes (e.g., the 20-byte PKH for P2WPKH)
      * @throws ReflectiveOperationException if the protected method cannot be accessed
      */
-    public byte[] getWitnessPrograms(Bech32.Bech32Data bechData) throws ReflectiveOperationException {
+    public byte[] getWitnessProgram(Bech32.Bech32Data bechData) throws ReflectiveOperationException {
         return invokeProtectedMethod(bechData, "witnessProgram");
     }
 
@@ -140,7 +152,12 @@ public class Bech32Helper {
         return invokeProtectedMethod(bechData, "witnessVersion");
     }
 
-    @SuppressWarnings("unchecked")
+    // Caller-fixed return type: the call site picks T (e.g. Short, byte[]) and
+    // accepts the unchecked cast. The bitcoinj Bech32.Bech32Bytes nested methods
+    // return Object via reflection so the project-side helper has no static type
+    // to hand back. Same shape as the self-typing builder idiom Error Prone
+    // flags via TypeParameterUnusedInFormals.
+    @SuppressWarnings({"unchecked", "TypeParameterUnusedInFormals"})
     private <T> T invokeProtectedMethod(Bech32.Bech32Bytes bech32Bytes, String methodName)
             throws ReflectiveOperationException {
         Method method = Bech32.Bech32Bytes.class.getDeclaredMethod(methodName);

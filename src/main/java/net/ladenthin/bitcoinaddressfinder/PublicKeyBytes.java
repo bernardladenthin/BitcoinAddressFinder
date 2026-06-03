@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Objects;
 import org.bitcoinj.crypto.ECKey;
 import org.jspecify.annotations.NonNull;
@@ -47,7 +48,7 @@ public class PublicKeyBytes {
     public static final BigInteger MIN_VALID_PRIVATE_KEY = BigInteger.TWO;
     /** Uppercase hexadecimal representation of {@link #MIN_VALID_PRIVATE_KEY}. */
     public static final String MIN_VALID_PRIVATE_KEY_HEX =
-            MIN_VALID_PRIVATE_KEY.toString(BitHelper.RADIX_HEX).toUpperCase();
+            MIN_VALID_PRIVATE_KEY.toString(BitHelper.RADIX_HEX).toUpperCase(Locale.ROOT);
 
     /**
      * Uppercase hexadecimal representation of the secp256k1 group order
@@ -609,20 +610,14 @@ public class PublicKeyBytes {
     }
 
     // <editor-fold defaultstate="collapsed" desc="Overrides: hashCode, equals, toString">
-    /*
-     * Overrides for {@code hashCode()}, {@code equals(Object)}, and {@code toString()}.
-     * <p>
-     * These methods are implemented based **only** on the {@code secretKey} field,
-     * which uniquely identifies the {@code PublicKeyBytes} instance.
-     * <ul>
-     *     <li>{@code hashCode()} – Generated using a prime multiplier and {@code secretKey} hash.</li>
-     *     <li>{@code equals(Object)} – Considers two instances equal if their {@code secretKey} values are equal.</li>
-     *     <li>{@code toString()} – Returns a string including the {@code secretKey} for debugging/logging.</li>
-     * </ul>
-     * <p>
-     * This design ensures that objects with the same {@code secretKey} are treated as equal,
-     * regardless of other internal state (e.g., precomputed hash representations or compressed keys).
-     */
+    // Overrides for hashCode(), equals(Object), and toString() are implemented based ONLY
+    // on the secretKey field, which uniquely identifies the PublicKeyBytes instance:
+    //   - hashCode()       — generated using a prime multiplier and secretKey hash
+    //   - equals(Object)   — considers two instances equal if their secretKey values are equal
+    //   - toString()       — returns a string including the secretKey for debugging/logging
+    // This design ensures that objects with the same secretKey are treated as equal,
+    // regardless of other internal state (e.g., precomputed hash representations or
+    // compressed keys).
 
     // generated, based on secretKey only!
     @Override
@@ -632,17 +627,13 @@ public class PublicKeyBytes {
 
     // generated, based on secretKey only!
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(@Nullable Object obj) {
         if (this == obj) {
             return true;
         }
-        if (obj == null) {
+        if (!(obj instanceof PublicKeyBytes other)) {
             return false;
         }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final PublicKeyBytes other = (PublicKeyBytes) obj;
         return Objects.equals(this.secretKey, other.secretKey);
     }
 

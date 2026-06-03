@@ -4,7 +4,6 @@
 package net.ladenthin.bitcoinaddressfinder.persistence.lmdb;
 
 import static org.lmdbjava.DbiFlags.MDB_CREATE;
-import static org.lmdbjava.Env.create;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -109,7 +108,7 @@ public class LMDBPersistence implements Persistence, AddressIterable {
         CLMDBConfigurationReadOnly localLmdbConfigurationReadOnly = Objects.requireNonNull(lmdbConfigurationReadOnly);
         BufferProxy<ByteBuffer> bufferProxy =
                 getBufferProxyByUseProxyOptimal(localLmdbConfigurationReadOnly.useProxyOptimal);
-        env = create(bufferProxy)
+        env = Env.create(bufferProxy)
                 .setMaxDbs(DB_COUNT)
                 .open(
                         new File(localLmdbConfigurationReadOnly.lmdbDirectory),
@@ -132,7 +131,7 @@ public class LMDBPersistence implements Persistence, AddressIterable {
         BufferProxy<ByteBuffer> bufferProxy =
                 getBufferProxyByUseProxyOptimal(localLmdbConfigurationWrite.useProxyOptimal);
 
-        env = create(bufferProxy)
+        env = Env.create(bufferProxy)
                 // LMDB also needs to know how large our DB might be. Over-estimating is OK.
                 .setMapSize(new ByteConversion().mibToBytes(localLmdbConfigurationWrite.initialMapSizeInMiB))
                 // LMDB also needs to know how many DBs (Dbi) we want to store in this Env.
@@ -293,26 +292,22 @@ public class LMDBPersistence implements Persistence, AddressIterable {
                             LOGGER.trace("Process address: " + hexFromByteBuffer);
                         }
                         LegacyAddress address = keyUtility.byteBufferToAddress(addressAsByteBuffer);
-                        final String line;
-                        switch (addressFileOutputFormat) {
-                            case HexHash:
-                                line = Hex.encodeHexString(address.getHash()) + System.lineSeparator();
-                                break;
-                            case FixedWidthBase58BitcoinAddress:
-                                line = String.format("%-34s", address.toBase58()) + System.lineSeparator();
-                                break;
-                            case DynamicWidthBase58BitcoinAddressWithAmount:
+                        final String line = switch (addressFileOutputFormat) {
+                            case HexHash ->
+                                Hex.encodeHexString(address.getHash()) + System.lineSeparator();
+                            case FixedWidthBase58BitcoinAddress ->
+                                String.format("%-34s", address.toBase58()) + System.lineSeparator();
+                            case DynamicWidthBase58BitcoinAddressWithAmount -> {
                                 ByteBuffer value = kv.val();
                                 Coin coin = getCoinFromByteBuffer(value);
-                                line = address.toBase58()
+                                yield address.toBase58()
                                         + SeparatorFormat.COMMA.getSymbol()
                                         + coin.getValue()
                                         + System.lineSeparator();
-                                break;
-                            default:
-                                throw new IllegalArgumentException(
-                                        "Unknown addressFileOutputFormat: " + addressFileOutputFormat);
-                        }
+                            }
+                            default -> throw new IllegalArgumentException(
+                                    "Unknown addressFileOutputFormat: " + addressFileOutputFormat);
+                        };
                         writer.write(line);
                     }
                 }
@@ -406,7 +401,7 @@ public class LMDBPersistence implements Persistence, AddressIterable {
         long count = 0;
         try (Txn<ByteBuffer> txn = localEnv.txnRead()) {
             try (CursorIterable<ByteBuffer> iterable = localLmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
-                for (final CursorIterable.KeyVal<ByteBuffer> kv : iterable) {
+                for (final CursorIterable.KeyVal<ByteBuffer> ignored : iterable) {
                     count++;
                 }
             }

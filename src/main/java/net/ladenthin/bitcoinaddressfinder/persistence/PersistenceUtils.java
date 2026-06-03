@@ -17,7 +17,11 @@ import org.bitcoinj.base.Sha256Hash;
  */
 public class PersistenceUtils {
 
+    // Preserved as a reusable helper for potential future use (see git history). No
+    // current production or test caller; UnusedVariable suppressed to keep -Werror clean
+    // while leaving the implementation available for revival.
     @Deprecated
+    @SuppressWarnings("UnusedVariable")
     private final ByteBuffer emptyByteBuffer = ByteBuffer.allocateDirect(0).asReadOnlyBuffer();
 
     private final ByteBuffer zeroByteBuffer = longValueToByteBufferDirectAsReadOnlyBuffer(0L);
@@ -51,7 +55,10 @@ public class PersistenceUtils {
         return newValue;
     }
 
+    // Preserved as a reusable helper for potential future LegacyAddress-batch serialization.
+    // No current production or test caller; UnusedMethod suppressed to keep -Werror clean.
     @Deprecated
+    @SuppressWarnings("UnusedMethod")
     private ByteBuffer addressListToByteBufferDirect(Collection<LegacyAddress> addresses) {
         ByteBuffer byteBuffer = ByteBuffer.allocateDirect(LegacyAddress.LENGTH * addresses.size());
         for (LegacyAddress address : addresses) {
@@ -61,7 +68,9 @@ public class PersistenceUtils {
         return byteBuffer;
     }
 
+    // Inverse of addressListToByteBufferDirect; preserved as a pair for future revival.
     @Deprecated
+    @SuppressWarnings("UnusedMethod")
     private List<LegacyAddress> byteBufferToAddressList(ByteBuffer byteBuffer) {
         int count = byteBuffer.remaining() / LegacyAddress.LENGTH;
         List<LegacyAddress> addresses = new ArrayList<>(count);
@@ -73,12 +82,14 @@ public class PersistenceUtils {
         return addresses;
     }
 
+    // Preserved as a reusable helper for potential future Sha256Hash-direct-buffer wiring.
     @Deprecated
+    @SuppressWarnings("UnusedMethod")
     private ByteBuffer hashToByteBufferDirect(Sha256Hash hash) {
         return new ByteBufferUtility(true).byteArrayToByteBuffer(hash.getBytes());
     }
 
-    private ByteBuffer longValueToByteBufferDirectAsReadOnlyBuffer(long value) {
+    private static ByteBuffer longValueToByteBufferDirectAsReadOnlyBuffer(long value) {
         ByteBuffer byteBuffer = ByteBuffer.allocateDirect(Long.BYTES);
         byteBuffer.putLong(value);
         return byteBuffer.asReadOnlyBuffer();

@@ -25,6 +25,18 @@ public interface Persistence extends AddressLookup, AutoCloseable {
     void init();
 
     /**
+     * Releases the underlying resources. Implementations are expected not to throw
+     * checked exceptions from this method; the narrower declaration here overrides
+     * {@link AutoCloseable#close()}'s {@code throws Exception} so try-with-resources
+     * callers do not have to declare or catch a phantom {@code Exception} — in
+     * particular {@code InterruptedException}, which javac's {@code -Xlint:try}
+     * warns about specifically because silently swallowing it loses the interrupt
+     * signal.
+     */
+    @Override
+    void close();
+
+    /**
      * Indicates whether the persistence layer has been closed.
      *
      * @return {@code true} if the persistence has been closed

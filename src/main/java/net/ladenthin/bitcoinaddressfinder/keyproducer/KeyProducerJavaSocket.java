@@ -14,6 +14,7 @@ import java.util.concurrent.ExecutorService;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.Startable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -21,20 +22,34 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Key producer that receives secrets from a TCP socket (client or server mode).
+ *
+ * <p>The background reader thread is not spawned by the constructor; callers must
+ * invoke {@link #start()} after construction. This avoids the JEP&nbsp;410
+ * this-escape that would otherwise publish a partially-constructed instance to
+ * the worker thread.</p>
  */
-public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaSocket> {
+// The reader runnable still mutates @Nullable socket / serverSocket / inputStream
+// fields and reads them across blocking I/O boundaries that the Checker Framework
+// flow analyser cannot bridge; the surviving suppressions cover only those
+// in-lambda field reads and the @Nullable e.getMessage() passed to Logger.warn —
+// not a this-escape. The constructor no longer publishes this; start() runs after
+// construction so the receiver is fully initialised when the worker observes it.
+@SuppressWarnings({"nullness:dereference.of.nullable", "nullness:argument"})
+public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaSocket>
+        implements Startable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KeyProducerJavaSocket.class);
 
     private @Nullable ServerSocket serverSocket;
     private @Nullable Socket socket;
     private @Nullable DataInputStream inputStream;
-    private Future<?> readerFuture;
+    private @Nullable Future<?> readerFuture;
 
     private final ExecutorService readerExecutor = Executors.newSingleThreadExecutor();
 
     /**
-     * Creates a new socket-based key producer and starts the background reader thread.
+     * Creates a new socket-based key producer. The background reader thread is NOT
+     * started here; the caller must invoke {@link #start()} afterwards.
      *
      * @param config      the socket configuration
      * @param keyUtility  cryptographic helper
@@ -42,10 +57,18 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
      */
     public KeyProducerJavaSocket(CKeyProducerJavaSocket config, KeyUtility keyUtility, BitHelper bitHelper) {
         super(config, keyUtility);
-        setupSocket();
     }
 
-    private void setupSocket() {
+    /**
+     * Submits the background reader runnable that connects (or accepts) on the
+     * configured port and feeds incoming secrets into the queue. Idempotency:
+     * calling {@code start()} more than once will submit a second runnable on
+     * the same single-thread executor, which will sit queued behind the first.
+     * The intended usage is a single invocation right after construction; tests
+     * and the production caller (Finder) do exactly one call.
+     */
+    @Override
+    public void start() {
         readerFuture = readerExecutor.submit(() -> {
             int attempts = 0;
             Exception lastException = null;
@@ -98,18 +121,26 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
         });
     }
 
+    // Best-effort cleanup of the three socket-side resources. Each close() can
+    // throw IOException (broken pipe, already closed by peer, etc.); the producer
+    // is already in shutdown so there is nothing useful to do with those failures
+    // and propagating them would mask the original reason we are closing. The
+    // ignored exception is intentional at every catch site below.
     private void closeConnections() {
         try {
             if (inputStream != null) inputStream.close();
         } catch (IOException ignored) {
+            // best-effort: see method comment
         }
         try {
             if (socket != null) socket.close();
         } catch (IOException ignored) {
+            // best-effort: see method comment
         }
         try {
             if (serverSocket != null) serverSocket.close();
         } catch (IOException ignored) {
+            // best-effort: see method comment
         }
         inputStream = null;
         socket = null;

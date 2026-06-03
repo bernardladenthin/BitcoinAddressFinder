@@ -141,6 +141,9 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
      * @param privateKeyBytes the raw private-key bytes
      * @return a string containing the mnemonic for each {@link BIP39Wordlist}
      */
+    // MnemonicCode(InputStream, String) accepts null wordListDigest to skip the SHA256
+    // check on the wordlist; bitcoinj is unannotated upstream so CF infers @NonNull.
+    @SuppressWarnings("nullness:argument")
     public String createMnemonics(byte[] privateKeyBytes) {
         StringBuilder logMnemonic = new StringBuilder("Mnemonic:");
         for (BIP39Wordlist wordList : BIP39Wordlist.values()) {
@@ -217,7 +220,7 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
 
     @Deprecated
     static int byteArrayToInt(byte[] b, int offsetByteArray) {
-        return b[3 + offsetByteArray] & 0xFF
+        return (b[3 + offsetByteArray] & 0xFF)
                 | (b[2 + offsetByteArray] & 0xFF) << 8
                 | (b[1 + offsetByteArray] & 0xFF) << 16
                 | (b[offsetByteArray] & 0xFF) << 24;
@@ -243,7 +246,12 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
         b[3 + offset] = (byte) (a & 0xFF);
     }
 
+    // Preserved as a reusable helper for potential future big↔little endian word swap
+    // wiring (e.g. native kernel input adapters). No current production or test caller;
+    // UnusedMethod suppressed to keep -Werror clean while leaving the implementation
+    // available for revival.
     @Deprecated
+    @SuppressWarnings("UnusedMethod")
     private static void swapIntBytes(byte[] bytes) {
         assert bytes.length % 4 == 0;
         for (int i = 0; i < bytes.length; i += 4) {

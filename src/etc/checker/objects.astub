@@ -1,0 +1,25 @@
+// SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+// Override Checker Framework 4.1.0's annotated-jdk stub for Objects.requireNonNull.
+// The shipped stub annotates the obj parameter as @NonNull, which is the opposite of
+// the JDK runtime contract: requireNonNull exists precisely to convert a possibly-null
+// value into a non-null value (throwing NPE on null). Without this override, every
+// requireNonNull call against a @Nullable field fails CF's argument check.
+package java.util;
+
+import org.checkerframework.checker.nullness.qual.NonNull;
+import org.checkerframework.checker.nullness.qual.Nullable;
+import org.checkerframework.dataflow.qual.Pure;
+
+class Objects {
+    @Pure
+    public static <T> @NonNull T requireNonNull(@Nullable T obj);
+
+    @Pure
+    public static <T> @NonNull T requireNonNull(@Nullable T obj, @Nullable String message);
+
+    @Pure
+    public static <T> @NonNull T requireNonNull(@Nullable T obj, java.util.function.@NonNull Supplier<@Nullable String> messageSupplier);
+}

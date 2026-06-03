@@ -15,7 +15,6 @@ import static org.jocl.CL.clFinish;
 import static org.jocl.CL.clReleaseMemObject;
 import static org.jocl.CL.clSetKernelArg;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -32,6 +31,10 @@ import org.slf4j.LoggerFactory;
 /**
  * Encapsulates one OpenCL kernel invocation: manages source/destination buffers and runs the kernel.
  */
+// JOCL upstream API is not annotated for nullness; every clXxx(...) call here passes
+// the null values that the OpenCL C ABI accepts (e.g. errcode_ret, event_wait_list,
+// event, global_work_offset). Suppress at class scope to avoid per-call noise.
+@SuppressWarnings({"nullness:argument", "nullness:dereference.of.nullable"})
 public class OpenClTask implements ReleaseCLObject {
 
     /** SLF4J logger for this task. */
@@ -278,9 +281,8 @@ public class OpenClTask implements ReleaseCLObject {
     /**
      * Returns the private-key source argument backing this task (visible for testing).
      *
-     * @return the private-key source argument backing this task (visible for testing)
+     * @return the private-key source argument backing this task
      */
-    @VisibleForTesting
     public SourceArgument getPrivateKeySourceArgument() {
         return privateKeySourceArgument;
     }
@@ -365,7 +367,6 @@ public class OpenClTask implements ReleaseCLObject {
                         null,
                         null);
                 clFinish(commandQueue);
-                destinationArgument.close();
 
                 final long afterRead = System.currentTimeMillis();
                 if (LOGGER.isTraceEnabled()) {
@@ -394,9 +395,13 @@ public class OpenClTask implements ReleaseCLObject {
     /**
      * https://stackoverflow.com/questions/3366925/deep-copy-duplicate-of-javas-bytebuffer/4074089
      */
+    // Preserved as a reusable helper for potential future safe native↔JVM-heap handoff
+    // in the OpenCL pipeline. No current production or test caller; UnusedMethod
+    // suppressed to keep -Werror clean.
+    @SuppressWarnings("UnusedMethod")
     private static ByteBuffer cloneByteBuffer(final ByteBuffer original) {
         // Create clone with same capacity as original.
-        final ByteBuffer clone = (original.isDirect())
+        final ByteBuffer clone = original.isDirect()
                 ? ByteBuffer.allocateDirect(original.capacity())
                 : ByteBuffer.allocate(original.capacity());
 

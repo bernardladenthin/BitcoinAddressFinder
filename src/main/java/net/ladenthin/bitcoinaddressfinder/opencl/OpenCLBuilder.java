@@ -68,6 +68,10 @@ import org.slf4j.LoggerFactory;
  * Discovers available OpenCL platforms and devices via JOCL and wraps them in
  * {@link OpenCLPlatform} / {@link OpenCLDevice} objects.
  */
+// JOCL upstream API is not annotated for nullness; every clGet*(...) call here
+// passes the null values that the OpenCL C ABI accepts (size-only queries, etc.).
+// Field.getBoolean(null) is the documented JDK contract for static fields.
+@SuppressWarnings({"nullness:argument", "nullness:dereference.of.nullable"})
 public class OpenCLBuilder {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OpenCLBuilder.class);
@@ -147,7 +151,12 @@ public class OpenCLBuilder {
         int localMemType = getInt(device, CL_DEVICE_LOCAL_MEM_TYPE);
         long localMemSize = getLong(device, CL_DEVICE_LOCAL_MEM_SIZE);
         long maxConstantBufferSize = getLong(device, CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE);
-        long queueProperties = getLong(device, CL_DEVICE_QUEUE_PROPERTIES);
+        // JOCL upstream deprecated CL_DEVICE_QUEUE_PROPERTIES (OpenCL 2.0+ replaced it with
+        // CL_DEVICE_QUEUE_ON_HOST_PROPERTIES); JOCL has not exposed the replacement constant
+        // yet. Suppress narrowly so any other deprecation in this method still surfaces.
+        @SuppressWarnings("deprecation")
+        final int queuePropertiesConstant = CL_DEVICE_QUEUE_PROPERTIES;
+        long queueProperties = getLong(device, queuePropertiesConstant);
         int imageSupport = getInt(device, CL_DEVICE_IMAGE_SUPPORT);
         int maxReadImageArgs = getInt(device, CL_DEVICE_MAX_READ_IMAGE_ARGS);
         int maxWriteImageArgs = getInt(device, CL_DEVICE_MAX_WRITE_IMAGE_ARGS);
@@ -255,7 +264,7 @@ public class OpenCLBuilder {
      * Checks whether the supplied OpenCL device version is at least 2.0.
      *
      * @param openCLDeviceVersion the parsed device version
-     * @return {@code true} if {@code openCLDeviceVersion &gt;= 2.0}
+     * @return {@code true} if {@code openCLDeviceVersion >= 2.0}
      */
     public static boolean isOpenCL2_0OrGreater(ComparableVersion openCLDeviceVersion) {
         final ComparableVersion v2_0 = new ComparableVersion("2.0");

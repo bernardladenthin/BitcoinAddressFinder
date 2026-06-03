@@ -88,6 +88,23 @@ jobs:
           name: jacoco-report
           path: target/site/jacoco/jacoco.xml
           if-no-files-found: ignore
+      - name: Run PIT mutation tests
+        if: matrix.os == 'ubuntu-latest'
+        run: mvn --batch-mode -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true test-compile org.pitest:pitest-maven:mutationCoverage -Dmaven.javadoc.skip=true
+      - name: Extract PIT survivors
+        if: always() && matrix.os == 'ubuntu-latest'
+        run: |
+          echo "=== PIT Survived Mutations ==="
+          for html_file in $(find target/pit-reports -name "*.html" -type f 2>/dev/null | sort); do
+            if grep -q "SURVIVED" "$html_file"; then
+              echo "Found survivors in $html_file:"
+              grep -B 2 -A 3 "SURVIVED" "$html_file"
+              echo ""
+            fi
+          done
+      - uses: actions/upload-artifact@v7
+        if: always() && matrix.os == 'ubuntu-latest'
+        with: { name: pit-reports, path: target/pit-reports/ }
 
   report:
     name: Report

@@ -57,6 +57,7 @@ public class KeyProducerJavaWebSocketTest {
     public void createSecrets_receivesValidSecret() throws Exception {
         CKeyProducerJavaWebSocket config = createConfig();
         KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
+        producer.start();
 
         // WebSocket client to send a valid 32-byte secret
         byte[] secret = new KeyProducerTestUtility().createZeroedSecret();
@@ -100,6 +101,7 @@ public class KeyProducerJavaWebSocketTest {
         CKeyProducerJavaWebSocket config = createConfig();
         config.timeout = TestTimeProvider.DEFAULT_TIMEOUT;
         KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
+        producer.start();
 
         assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(1, true));
     }
@@ -110,6 +112,7 @@ public class KeyProducerJavaWebSocketTest {
         CKeyProducerJavaWebSocket config = createConfig();
         config.timeout = -1; // explicit: block indefinitely
         KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
+        producer.start();
 
         byte[] secret = new KeyProducerTestUtility().createZeroedSecret();
         BigInteger expected = new BigInteger(1, secret);
@@ -164,6 +167,7 @@ public class KeyProducerJavaWebSocketTest {
         // arrange
         CKeyProducerJavaWebSocket config = createConfig();
         KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
+        producer.start();
 
         Future<BigInteger[]> future = executorService.submit(() -> {
             try {
@@ -192,6 +196,7 @@ public class KeyProducerJavaWebSocketTest {
         // arrange
         CKeyProducerJavaWebSocket config = createConfig();
         KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
+        producer.start();
 
         ConnectionUtils.waitUntilTcpPortOpen("localhost", config.port, TestTimeProvider.DEFAULT_SOCKET_TIMEOUT);
 

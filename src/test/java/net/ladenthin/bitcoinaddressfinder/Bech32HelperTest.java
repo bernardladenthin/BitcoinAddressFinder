@@ -83,16 +83,16 @@ public class Bech32HelperTest {
     }
     // </editor-fold>
 
-    // <editor-fold defaultstate="collapsed" desc="getWitnessPrograms">
+    // <editor-fold defaultstate="collapsed" desc="getWitnessProgram">
     @Test
-    public void getWitnessPrograms_validBech32Data_returnsWitnessProgram() throws ReflectiveOperationException {
+    public void getWitnessProgram_validBech32Data_returnsWitnessProgram() throws ReflectiveOperationException {
         // arrange
         P2WPKH address = P2WPKH.Bitcoin;
         Bech32.Bech32Data bechData = Bech32.decode(address.getPublicAddress());
         Bech32Helper sut = new Bech32Helper();
 
         // act
-        byte[] witnessProgram = sut.getWitnessPrograms(bechData);
+        byte[] witnessProgram = sut.getWitnessProgram(bechData);
 
         // assert
         assertThat(witnessProgram, is(address.getWitnessProgram()));

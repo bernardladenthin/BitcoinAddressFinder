@@ -65,7 +65,8 @@ public class ProducerOpenCL extends AbstractProducer {
 
     @Override
     public void processSecretBase(BigInteger secretBase) {
-        if (openCLContext == null) {
+        final OpenCLContext localOpenCLContext = openCLContext;
+        if (localOpenCLContext == null) {
             throw new IllegalStateException("ProducerOpenCL not initialized");
         }
         try {
@@ -73,7 +74,7 @@ public class ProducerOpenCL extends AbstractProducer {
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("openCLContext.createKeys for secretBase: " + secretBase);
             }
-            OpenCLGridResult openCLGridResult = openCLContext.createKeys(secretBase);
+            OpenCLGridResult openCLGridResult = localOpenCLContext.createKeys(secretBase);
             ResultReaderRunnable resultReaderRunnable =
                     new ResultReaderRunnable(openCLGridResult, consumer, secretBase, this);
 
@@ -135,7 +136,6 @@ public class ProducerOpenCL extends AbstractProducer {
         }
     }
 
-    @VisibleForTesting
     void waitTillFreeThreadsInPool() throws InterruptedException {
         while (getFreeThreads() < 1) {
             Thread.sleep(producerOpenCL.delayBlockedReader);
@@ -143,7 +143,6 @@ public class ProducerOpenCL extends AbstractProducer {
         }
     }
 
-    @VisibleForTesting
     int getFreeThreads() {
         return resultReaderThreadPoolExecutor.getMaximumPoolSize() - resultReaderThreadPoolExecutor.getActiveCount();
     }
