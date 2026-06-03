@@ -131,7 +131,7 @@ public class Bech32Helper {
      * @return the raw witness program bytes (e.g., the 20-byte PKH for P2WPKH)
      * @throws ReflectiveOperationException if the protected method cannot be accessed
      */
-    public byte[] getWitnessPrograms(Bech32.Bech32Data bechData) throws ReflectiveOperationException {
+    public byte[] getWitnessProgram(Bech32.Bech32Data bechData) throws ReflectiveOperationException {
         return invokeProtectedMethod(bechData, "witnessProgram");
     }
 

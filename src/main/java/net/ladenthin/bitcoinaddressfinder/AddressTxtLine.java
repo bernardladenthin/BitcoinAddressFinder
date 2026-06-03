@@ -175,7 +175,7 @@ public class AddressTxtLine {
             // protected: bechData.witnessVersion();
             short witnessVersion = bech32Helper.getWitnessVersion(bechData);
             // protected: bechData.witnessProgram();
-            byte[] witnessProgram = bech32Helper.getWitnessPrograms(bechData);
+            byte[] witnessProgram = bech32Helper.getWitnessProgram(bechData);
 
             switch (witnessVersion) {
                 case WITNESS_VERSION_0 -> {
