@@ -9,7 +9,9 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import ch.qos.logback.classic.Level;
@@ -169,6 +171,97 @@ public class MainTest {
 
         // assert
         assertThat(configuration.command, is(equalTo(CCommand.OpenCLInfo)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="loadConfiguration extension dispatch (round-trip + syntax probe)">
+    /**
+     * Round-trip: serialise via {@code configurationToJson}, write to disk with the given extension,
+     * read back via {@link Main#loadConfiguration(Path)}, assert the loaded configuration matches
+     * the original on the {@code command} field. Also probes the written file content to confirm the
+     * correct serializer was used (JSON content starts with {@code &#123;}; YAML does not).
+     */
+    private void assertRoundTripJsonExtension(String extension) throws IOException {
+        // arrange
+        CConfiguration original = Main.fromJson(OPEN_CL_INFO_JSON_STRING);
+        String serialized = Main.configurationToJson(original);
+        Path file = folder.resolve("config" + extension);
+        Files.writeString(file, serialized, StandardCharsets.UTF_8);
+
+        // syntax probe — JSON content must start with '{'
+        String onDisk = Files.readString(file, StandardCharsets.UTF_8).trim();
+        assertThat(onDisk, startsWith("{"));
+
+        // act
+        CConfiguration loaded = Main.loadConfiguration(file);
+
+        // assert
+        assertThat(loaded, is(notNullValue()));
+        assertThat(loaded.command, is(equalTo(original.command)));
+    }
+
+    private void assertRoundTripYamlExtension(String extension) throws IOException {
+        // arrange
+        CConfiguration original = Main.fromYaml(OPEN_CL_INFO_YAML_STRING);
+        String serialized = Main.configurationToYAML(original);
+        Path file = folder.resolve("config" + extension);
+        Files.writeString(file, serialized, StandardCharsets.UTF_8);
+
+        // syntax probe — YAML content must NOT start with '{' (would indicate JSON serializer ran)
+        String onDisk = Files.readString(file, StandardCharsets.UTF_8).trim();
+        assertThat(onDisk, not(startsWith("{")));
+        assertThat(onDisk, containsString("command"));
+
+        // act
+        CConfiguration loaded = Main.loadConfiguration(file);
+
+        // assert
+        assertThat(loaded, is(notNullValue()));
+        assertThat(loaded.command, is(equalTo(original.command)));
+    }
+
+    @Test
+    public void loadConfiguration_jsonExtension_roundTripsAndWritesJsonContent() throws IOException {
+        assertRoundTripJsonExtension(".json");
+    }
+
+    @Test
+    public void loadConfiguration_jsExtension_roundTripsAndWritesJsonContent() throws IOException {
+        assertRoundTripJsonExtension(".js");
+    }
+
+    @Test
+    public void loadConfiguration_yamlExtension_roundTripsAndWritesYamlContent() throws IOException {
+        assertRoundTripYamlExtension(".yaml");
+    }
+
+    @Test
+    public void loadConfiguration_ymlExtension_roundTripsAndWritesYamlContent() throws IOException {
+        assertRoundTripYamlExtension(".yml");
+    }
+
+    @Test
+    public void loadConfiguration_uppercaseExtension_isCaseInsensitive() throws IOException {
+        // arrange — caller might pass /tmp/config.JSON
+        CConfiguration original = Main.fromJson(OPEN_CL_INFO_JSON_STRING);
+        Path file = folder.resolve("config.JSON");
+        Files.writeString(file, Main.configurationToJson(original), StandardCharsets.UTF_8);
+
+        // act
+        CConfiguration loaded = Main.loadConfiguration(file);
+
+        // assert
+        assertThat(loaded.command, is(equalTo(original.command)));
+    }
+
+    @Test
+    public void loadConfiguration_unknownExtension_throwsIllegalArgumentException() throws IOException {
+        // arrange
+        Path file = folder.resolve("config.txt");
+        Files.writeString(file, OPEN_CL_INFO_JSON_STRING, StandardCharsets.UTF_8);
+
+        // act + assert
+        assertThrows(IllegalArgumentException.class, () -> Main.loadConfiguration(file));
     }
     // </editor-fold>
 
