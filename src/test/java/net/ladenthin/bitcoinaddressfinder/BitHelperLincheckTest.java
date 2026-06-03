@@ -5,8 +5,8 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.util.concurrent.atomic.AtomicLong;
 import org.jetbrains.kotlinx.lincheck.LinChecker;
-import org.jetbrains.lincheck.datastructures.Operation;
 import org.jetbrains.lincheck.datastructures.ModelCheckingOptions;
+import org.jetbrains.lincheck.datastructures.Operation;
 import org.junit.jupiter.api.Test;
 
 /**
