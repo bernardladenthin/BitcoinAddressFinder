@@ -823,17 +823,17 @@ This mode generates private keys **sequentially in batches** within a specified 
 #### Configuration Fields
 | JSON field     | Type   | Default                                                                                    | Purpose                                                      |
 |----------------|--------|--------------------------------------------------------------------------------------------|--------------------------------------------------------------|
-| `startAddress` | string | `0000000000000000000000000000000000000000000000000000000000000002`                         | Hex string of the first private key in the range (inclusive) |
-| `endAddress`   | string | `FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141` (secp256k1 group order) | Hex string of the last private key in the range (inclusive)  |
+| `startPrivateKey` | string | `0000000000000000000000000000000000000000000000000000000000000002`                         | Hex string of the first private key in the range (inclusive) |
+| `endPrivateKey`   | string | `FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141` (secp256k1 group order) | Hex string of the last private key in the range (inclusive)  |
 
 #### How it works
-- Scanning begins **at `startAddress`**, producing sequential private keys in batches of size `batchSize`, up to and including `endAddress`.
+- Scanning begins **at `startPrivateKey`**, producing sequential private keys in batches of size `batchSize`, up to and including `endPrivateKey`.
 - Each batch contains exactly `batchSize` keys.
-- If the next full batch would go **beyond `endAddress`**, the process stops with an **exception**.
-- The **`endAddress` is inclusive**, but **partial batches are not allowed by default** — batches must fit completely inside the range.
+- If the next full batch would go **beyond `endPrivateKey`**, the process stops with an **exception**.
+- The **`endPrivateKey` is inclusive**, but **partial batches are not allowed by default** — batches must fit completely inside the range.
 - For optimal performance, especially with OpenCL, configure `batchSize` and your GPU's grid size so that batches align perfectly within the range. This prevents errors and maximizes throughput.
 
-> **Note:** If unsure, set the `endAddress` slightly higher to closely match the batch size. This helps avoid exceptions and ensures efficient scanning.
+> **Note:** If unsure, set the `endPrivateKey` slightly higher to closely match the batch size. This helps avoid exceptions and ensures efficient scanning.
 
 ---
 
@@ -846,8 +846,8 @@ Example minimal configuration:
   "keyProducerJavaIncremental": [
     {
       "keyProducerId": "exampleKeyProducerId",
-      "startAddress": "0000000000000000000000000000000000000000000000000000000000000002",
-      "endAddress": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
+      "startPrivateKey": "0000000000000000000000000000000000000000000000000000000000000002",
+      "endPrivateKey": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
     }
   ]
 }
@@ -855,15 +855,15 @@ Example minimal configuration:
 ```
 
 🧩 This configuration incrementally searches a defined range of private keys. It is particularly suited for brute-force challenges, such as the [71st Bitcoin puzzle transaction](https://privatekeys.pw/puzzles/bitcoin-puzzle-tx?status=unsolved#p71).  
-The private key range is specified by two 64-character hex strings: `startAddress` and `endAddress`.
+The private key range is specified by two 64-character hex strings: `startPrivateKey` and `endPrivateKey`.
 
 ```json
 ...
 "keyProducerJavaIncremental": [
     {
       "keyProducerId": "exampleKeyProducerJavaIncremental",
-      "startAddress": "0000000000000000000000000000000000000000000000400000000000000000",
-      "endAddress":   "00000000000000000000000000000000000000000000007fffffffffffffffff"
+      "startPrivateKey": "0000000000000000000000000000000000000000000000400000000000000000",
+      "endPrivateKey":   "00000000000000000000000000000000000000000000007fffffffffffffffff"
     }
 ],
 ...
@@ -1284,7 +1284,7 @@ Wished from Ulugbek:
 ```
 // Search started from given address. Would be nice if it can save last position...
 "sequentalSearch" : true,
-"startAddress" : xxxxxxxx,
+"startPrivateKey" : xxxxxxxx,
 
 // Random search with batches, here 100000. I,e. some random number is found and after 100000 sequental addresses should be checked.
 "searchAsBatches" : true,

@@ -4,8 +4,8 @@
     "keyProducerJavaIncremental": [
         {
             "keyProducerId": "exampleKeyProducerJavaIncremental",
-            "startAddress" : "0000000000000000000000000000000000000000000000000000000000000002",
-            "endAddress"   : "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
+            "startPrivateKey" : "0000000000000000000000000000000000000000000000000000000000000002",
+            "endPrivateKey"   : "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
         }
     ],
     "keyProducerJavaBip39": [

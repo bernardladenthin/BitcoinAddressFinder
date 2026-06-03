@@ -17,26 +17,26 @@ public class CKeyProducerJavaIncremental extends CKeyProducerJava {
     public CKeyProducerJavaIncremental() {}
 
     /** Inclusive lower bound of the scanned private-key range as an uppercase hex string. */
-    public String startAddress =
+    public String startPrivateKey =
             PublicKeyBytes.MIN_VALID_PRIVATE_KEY.toString(BitHelper.RADIX_HEX).toUpperCase(Locale.ROOT);
     /** Inclusive upper bound of the scanned private-key range as a hex string. */
-    public String endAddress = PublicKeyBytes.MAX_PRIVATE_KEY_HEX;
+    public String endPrivateKey = PublicKeyBytes.MAX_PRIVATE_KEY_HEX;
 
     /**
-     * Returns the configured start address.
+     * Returns the configured inclusive lower bound of the scanned private-key range.
      *
-     * @return the configured start address as a {@link BigInteger}
+     * @return the configured start private key as a {@link BigInteger}
      */
-    public BigInteger getStartAddress() {
-        return new BigInteger(startAddress, BitHelper.RADIX_HEX);
+    public BigInteger getStartPrivateKey() {
+        return new BigInteger(startPrivateKey, BitHelper.RADIX_HEX);
     }
 
     /**
-     * Returns the configured end address.
+     * Returns the configured inclusive upper bound of the scanned private-key range.
      *
-     * @return the configured end address as a {@link BigInteger}
+     * @return the configured end private key as a {@link BigInteger}
      */
-    public BigInteger getEndAddress() {
-        return new BigInteger(endAddress, BitHelper.RADIX_HEX);
+    public BigInteger getEndPrivateKey() {
+        return new BigInteger(endPrivateKey, BitHelper.RADIX_HEX);
     }
 }

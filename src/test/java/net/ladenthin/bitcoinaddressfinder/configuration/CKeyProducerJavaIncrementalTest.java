@@ -14,122 +14,122 @@ import org.junit.jupiter.api.Test;
 
 public class CKeyProducerJavaIncrementalTest {
 
-    private static final String START_ADDRESS_CUSTOM_HEX = "FF";
-    private static final String END_ADDRESS_CUSTOM_HEX = "FF";
+    private static final String START_PRIVATE_KEY_CUSTOM_HEX = "FF";
+    private static final String END_PRIVATE_KEY_CUSTOM_HEX = "FF";
 
-    // <editor-fold defaultstate="collapsed" desc="getStartAddress">
+    // <editor-fold defaultstate="collapsed" desc="getStartPrivateKey">
     @Test
-    public void getStartAddress_defaultStartAddress_returnsMinValidPrivateKey() {
+    public void getStartPrivateKey_defaultStartAddress_returnsMinValidPrivateKey() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
 
         // act
-        BigInteger result = sut.getStartAddress();
+        BigInteger result = sut.getStartPrivateKey();
 
         // assert
         assertThat(result, is(equalTo(PublicKeyBytes.MIN_VALID_PRIVATE_KEY)));
     }
 
     @Test
-    public void getStartAddress_customUppercaseHexStartAddress_returnsExpectedBigInteger() {
+    public void getStartPrivateKey_customUppercaseHexStartAddress_returnsExpectedBigInteger() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
-        sut.startAddress = START_ADDRESS_CUSTOM_HEX.toUpperCase();
+        sut.startPrivateKey = START_PRIVATE_KEY_CUSTOM_HEX.toUpperCase();
 
         // act
-        BigInteger result = sut.getStartAddress();
+        BigInteger result = sut.getStartPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(new BigInteger(START_ADDRESS_CUSTOM_HEX, BitHelper.RADIX_HEX))));
+        assertThat(result, is(equalTo(new BigInteger(START_PRIVATE_KEY_CUSTOM_HEX, BitHelper.RADIX_HEX))));
     }
 
     @Test
-    public void getStartAddress_customLowercaseHexStartAddress_returnsExpectedBigInteger() {
+    public void getStartPrivateKey_customLowercaseHexStartAddress_returnsExpectedBigInteger() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
-        sut.startAddress = START_ADDRESS_CUSTOM_HEX.toLowerCase();
+        sut.startPrivateKey = START_PRIVATE_KEY_CUSTOM_HEX.toLowerCase();
 
         // act
-        BigInteger result = sut.getStartAddress();
+        BigInteger result = sut.getStartPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(new BigInteger(START_ADDRESS_CUSTOM_HEX, BitHelper.RADIX_HEX))));
+        assertThat(result, is(equalTo(new BigInteger(START_PRIVATE_KEY_CUSTOM_HEX, BitHelper.RADIX_HEX))));
     }
 
     @Test
-    public void getStartAddress_maxPrivateKeyHexStartAddress_returnsMaxPrivateKey() {
+    public void getStartPrivateKey_maxPrivateKeyHexStartAddress_returnsMaxPrivateKey() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
-        sut.startAddress = PublicKeyBytes.MAX_PRIVATE_KEY_HEX;
+        sut.startPrivateKey = PublicKeyBytes.MAX_PRIVATE_KEY_HEX;
 
         // act
-        BigInteger result = sut.getStartAddress();
+        BigInteger result = sut.getStartPrivateKey();
 
         // assert
         assertThat(result, is(equalTo(PublicKeyBytes.MAX_PRIVATE_KEY)));
     }
     // </editor-fold>
 
-    // <editor-fold defaultstate="collapsed" desc="getEndAddress">
+    // <editor-fold defaultstate="collapsed" desc="getEndPrivateKey">
     @Test
-    public void getEndAddress_defaultEndAddress_returnsMaxPrivateKey() {
+    public void getEndPrivateKey_defaultEndAddress_returnsMaxPrivateKey() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
 
         // act
-        BigInteger result = sut.getEndAddress();
+        BigInteger result = sut.getEndPrivateKey();
 
         // assert
         assertThat(result, is(equalTo(PublicKeyBytes.MAX_PRIVATE_KEY)));
     }
 
     @Test
-    public void getEndAddress_customUppercaseHexEndAddress_returnsExpectedBigInteger() {
+    public void getEndPrivateKey_customUppercaseHexEndAddress_returnsExpectedBigInteger() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
-        sut.endAddress = END_ADDRESS_CUSTOM_HEX.toUpperCase();
+        sut.endPrivateKey = END_PRIVATE_KEY_CUSTOM_HEX.toUpperCase();
 
         // act
-        BigInteger result = sut.getEndAddress();
+        BigInteger result = sut.getEndPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(new BigInteger(END_ADDRESS_CUSTOM_HEX, BitHelper.RADIX_HEX))));
+        assertThat(result, is(equalTo(new BigInteger(END_PRIVATE_KEY_CUSTOM_HEX, BitHelper.RADIX_HEX))));
     }
 
     @Test
-    public void getEndAddress_customLowercaseHexEndAddress_returnsExpectedBigInteger() {
+    public void getEndPrivateKey_customLowercaseHexEndAddress_returnsExpectedBigInteger() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
-        sut.endAddress = END_ADDRESS_CUSTOM_HEX.toLowerCase();
+        sut.endPrivateKey = END_PRIVATE_KEY_CUSTOM_HEX.toLowerCase();
 
         // act
-        BigInteger result = sut.getEndAddress();
+        BigInteger result = sut.getEndPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(new BigInteger(END_ADDRESS_CUSTOM_HEX, BitHelper.RADIX_HEX))));
+        assertThat(result, is(equalTo(new BigInteger(END_PRIVATE_KEY_CUSTOM_HEX, BitHelper.RADIX_HEX))));
     }
 
     @Test
-    public void getEndAddress_maxPrivateKeyHexEndAddress_returnsMaxPrivateKey() {
+    public void getEndPrivateKey_maxPrivateKeyHexEndAddress_returnsMaxPrivateKey() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
-        sut.endAddress = PublicKeyBytes.MAX_PRIVATE_KEY_HEX;
+        sut.endPrivateKey = PublicKeyBytes.MAX_PRIVATE_KEY_HEX;
 
         // act
-        BigInteger result = sut.getEndAddress();
+        BigInteger result = sut.getEndPrivateKey();
 
         // assert
         assertThat(result, is(equalTo(PublicKeyBytes.MAX_PRIVATE_KEY)));
     }
 
     @Test
-    public void getEndAddress_minValidPrivateKeyHexEndAddress_returnsMinValidPrivateKey() {
+    public void getEndPrivateKey_minValidPrivateKeyHexEndAddress_returnsMinValidPrivateKey() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
-        sut.endAddress = PublicKeyBytes.MIN_VALID_PRIVATE_KEY_HEX;
+        sut.endPrivateKey = PublicKeyBytes.MIN_VALID_PRIVATE_KEY_HEX;
 
         // act
-        BigInteger result = sut.getEndAddress();
+        BigInteger result = sut.getEndPrivateKey();
 
         // assert
         assertThat(result, is(equalTo(PublicKeyBytes.MIN_VALID_PRIVATE_KEY)));
