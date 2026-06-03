@@ -15,7 +15,6 @@ import static org.jocl.CL.clFinish;
 import static org.jocl.CL.clReleaseMemObject;
 import static org.jocl.CL.clSetKernelArg;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -282,9 +281,8 @@ public class OpenClTask implements ReleaseCLObject {
     /**
      * Returns the private-key source argument backing this task (visible for testing).
      *
-     * @return the private-key source argument backing this task (visible for testing)
+     * @return the private-key source argument backing this task
      */
-    @VisibleForTesting
     public SourceArgument getPrivateKeySourceArgument() {
         return privateKeySourceArgument;
     }

@@ -136,7 +136,6 @@ public class ProducerOpenCL extends AbstractProducer {
         }
     }
 
-    @VisibleForTesting
     void waitTillFreeThreadsInPool() throws InterruptedException {
         while (getFreeThreads() < 1) {
             Thread.sleep(producerOpenCL.delayBlockedReader);
@@ -144,7 +143,6 @@ public class ProducerOpenCL extends AbstractProducer {
         }
     }
 
-    @VisibleForTesting
     int getFreeThreads() {
         return resultReaderThreadPoolExecutor.getMaximumPoolSize() - resultReaderThreadPoolExecutor.getActiveCount();
     }
