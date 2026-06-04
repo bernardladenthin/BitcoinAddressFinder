@@ -69,10 +69,12 @@
       "threads": 8,
       "delayEmptyConsumer": 50,
       "queueSize": 4,
+      "awaitQueueEmptySeconds": 60,
       "runtimePublicKeyCalculationCheck": false,
       "enableVanity": false,
       "vanityPattern": "1[Ee][Mm][Ii][Ll].*"
     },
+    "awaitTerminateSeconds": 31536000000,
     "producerJava": [],
     "producerJavaSecretsFiles": [],
     "producerOpenCL": [
