@@ -62,6 +62,7 @@
         "useProxyOptimal": true,
         "logStatsOnInit": true,
         "logStatsOnClose": false,
+        "addressLookupBackend" : "BLOOM",
         "disableAddressLookup" : false
       },
       "printStatisticsEveryNSeconds": 10,
