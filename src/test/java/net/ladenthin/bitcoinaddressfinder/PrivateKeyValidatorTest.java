@@ -170,38 +170,38 @@ public class PrivateKeyValidatorTest {
     }
     // </editor-fold>
 
-    // <editor-fold defaultstate="collapsed" desc="returnValidPrivateKey">
+    // <editor-fold defaultstate="collapsed" desc="coerceToValidPrivateKey">
     @Test
-    public void returnValidPrivateKey_validKey_returnsSameKey() {
+    public void coerceToValidPrivateKey_validKey_returnsSameKey() {
         // arrange
         BigInteger valid = PublicKeyBytes.MIN_PRIVATE_KEY.add(BigInteger.ONE);
 
         // act
-        BigInteger result = validator.returnValidPrivateKey(valid);
+        BigInteger result = validator.coerceToValidPrivateKey(valid);
 
         // assert
         assertThat(result, is(equalTo(valid)));
     }
 
     @Test
-    public void returnValidPrivateKey_tooSmall_returnsReplacement() {
+    public void coerceToValidPrivateKey_tooSmall_returnsReplacement() {
         // arrange
         BigInteger tooSmall = PublicKeyBytes.MIN_PRIVATE_KEY.subtract(BigInteger.ONE);
 
         // act
-        BigInteger result = validator.returnValidPrivateKey(tooSmall);
+        BigInteger result = validator.coerceToValidPrivateKey(tooSmall);
 
         // assert
         assertThat(result, is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
     }
 
     @Test
-    public void returnValidPrivateKey_tooLarge_returnsReplacement() {
+    public void coerceToValidPrivateKey_tooLarge_returnsReplacement() {
         // arrange
         BigInteger tooLarge = PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE);
 
         // act
-        BigInteger result = validator.returnValidPrivateKey(tooLarge);
+        BigInteger result = validator.coerceToValidPrivateKey(tooLarge);
 
         // assert
         assertThat(result, is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));

@@ -78,15 +78,16 @@ public class PrivateKeyValidator {
     }
 
     /**
-     * Returns a valid private key, or a replacement value if the input is invalid.
+     * Coerces the given private key into the valid secp256k1 range.
      * <p>
-     * If the input key is outside the valid range, this method returns
-     * {@link PublicKeyBytes#INVALID_PRIVATE_KEY_REPLACEMENT}. Otherwise, it returns the input unchanged.
+     * If the input key is already inside the valid range, it is returned unchanged.
+     * Otherwise the {@link PublicKeyBytes#INVALID_PRIVATE_KEY_REPLACEMENT} sentinel
+     * is returned in its place.
      *
-     * @param secret the private key to validate
-     * @return the input key if valid, or the replacement value if invalid
+     * @param secret the private key to coerce
+     * @return the input key if it is already valid, otherwise the replacement sentinel
      */
-    public @NonNull BigInteger returnValidPrivateKey(@NonNull BigInteger secret) {
+    public @NonNull BigInteger coerceToValidPrivateKey(@NonNull BigInteger secret) {
         if (isOutsidePrivateKeyRange(secret)) {
             return PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT;
         }
@@ -103,7 +104,7 @@ public class PrivateKeyValidator {
      */
     public void replaceInvalidPrivateKeys(@NonNull BigInteger[] secrets) {
         for (int i = 0; i < secrets.length; i++) {
-            secrets[i] = returnValidPrivateKey(secrets[i]);
+            secrets[i] = coerceToValidPrivateKey(secrets[i]);
         }
     }
 }

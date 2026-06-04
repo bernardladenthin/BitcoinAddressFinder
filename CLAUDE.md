@@ -178,7 +178,7 @@ Example: `PrivateKeyValidator` contains the following methods (formerly static i
 - `getMaxPrivateKeyForBatchSize(int batchSizeInBits)`
 - `isInvalidWithBatchSize(BigInteger, BigInteger)`
 - `isOutsidePrivateKeyRange(BigInteger)`
-- `returnValidPrivateKey(BigInteger)`
+- `coerceToValidPrivateKey(BigInteger)`
 - `replaceInvalidPrivateKeys(BigInteger[])`
 
 Callers instantiate `PrivateKeyValidator` directly (stateless) or receive it via dependency injection where appropriate.
