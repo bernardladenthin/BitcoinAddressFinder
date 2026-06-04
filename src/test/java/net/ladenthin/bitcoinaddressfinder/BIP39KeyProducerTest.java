@@ -163,10 +163,8 @@ public class BIP39KeyProducerTest {
         String bip32Path = "M/44H/0H/0H/0";
         boolean hardened = false;
 
-        BIP39KeyProducer producer =
-                new BIP39KeyProducer(mnemonic, passphrase, bip32Path, Instant.ofEpochSecond(0), hardened);
-
-        producer.counter.set(Integer.MAX_VALUE);
+        BIP39KeyProducer producer = new BIP39KeyProducer(
+                mnemonic, passphrase, bip32Path, Instant.ofEpochSecond(0), hardened, Integer.MAX_VALUE);
 
         try {
             // act

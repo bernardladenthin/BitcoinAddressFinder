@@ -47,12 +47,12 @@ public class BIP39KeyProducer extends java.util.Random {
     private transient List<ChildNumber> basePath;
     /** Whether derived child indices are hardened. */
     private final boolean hardened;
-    /** Monotonically increasing child-index counter (visible for testing). */
-    @VisibleForTesting
-    final AtomicInteger counter = new AtomicInteger(0);
+    /** Monotonically increasing child-index counter. */
+    private final AtomicInteger counter;
 
     /**
-     * Creates a new deterministic key producer.
+     * Creates a new deterministic key producer with the internal child-index counter
+     * starting at {@code 0}.
      *
      * @param mnemonic       the BIP39 mnemonic phrase
      * @param passphrase     the optional BIP39 passphrase
@@ -62,10 +62,36 @@ public class BIP39KeyProducer extends java.util.Random {
      */
     public BIP39KeyProducer(
             String mnemonic, String passphrase, String bip44BasePath, Instant creationTime, boolean hardened) {
+        this(mnemonic, passphrase, bip44BasePath, creationTime, hardened, 0);
+    }
+
+    /**
+     * Test-friendly constructor that lets the caller seed the starting child-index.
+     *
+     * <p>Useful for tests that need to force the counter near {@link Integer#MAX_VALUE}
+     * so the overflow path in {@link #nextKey()} can be exercised without having to
+     * iterate through 2 billion derivations to get there.
+     *
+     * @param mnemonic       the BIP39 mnemonic phrase
+     * @param passphrase     the optional BIP39 passphrase
+     * @param bip44BasePath  the BIP44 base derivation path
+     * @param creationTime   the seed creation time
+     * @param hardened       whether the derived child indices are hardened
+     * @param startingIndex  initial value of the internal child-index counter
+     */
+    @VisibleForTesting
+    BIP39KeyProducer(
+            String mnemonic,
+            String passphrase,
+            String bip44BasePath,
+            Instant creationTime,
+            boolean hardened,
+            int startingIndex) {
         DeterministicSeed seed = DeterministicSeed.ofMnemonic(mnemonic, passphrase, creationTime);
         this.keyChain = DeterministicKeyChain.builder().seed(seed).build();
         this.basePath = HDPath.parsePath(bip44BasePath); // e.g., "M/44H/0H/0H/0"
         this.hardened = hardened;
+        this.counter = new AtomicInteger(startingIndex);
     }
 
     /**
