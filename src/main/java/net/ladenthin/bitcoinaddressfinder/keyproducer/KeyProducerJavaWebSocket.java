@@ -9,7 +9,7 @@ import java.util.concurrent.Executors;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.FireAndForget;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.Startable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
 import org.java_websocket.WebSocket;
@@ -71,8 +71,8 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
             @Override
             public void onMessage(WebSocket conn, ByteBuffer message) {
                 if (shouldStop) return;
-                if (message.remaining() == PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES) {
-                    byte[] secret = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
+                if (message.remaining() == OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES) {
+                    byte[] secret = new byte[OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES];
                     message.get(secret);
                     addSecret(secret);
                 } else {

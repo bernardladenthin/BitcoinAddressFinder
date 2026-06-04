@@ -10,6 +10,7 @@ import static org.hamcrest.Matchers.notNullValue;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -23,7 +24,7 @@ public class OpenCLGridResultTest {
         // arrange
         BigInteger secretKeyBase = BigInteger.valueOf(12345678L);
         int workSize = 1;
-        ByteBuffer result = ByteBuffer.allocate(PublicKeyBytes.CHUNK_SIZE_NUM_BYTES * workSize);
+        ByteBuffer result = ByteBuffer.allocate(OpenClKernelConstants.CHUNK_SIZE_NUM_BYTES * workSize);
         OpenCLGridResult gridResult = new OpenCLGridResult(secretKeyBase, workSize, result);
 
         // act
@@ -38,7 +39,7 @@ public class OpenCLGridResultTest {
         // arrange
         BigInteger secretKeyBase = BigInteger.ZERO;
         int workSize = 1;
-        ByteBuffer result = ByteBuffer.allocate(PublicKeyBytes.CHUNK_SIZE_NUM_BYTES * workSize);
+        ByteBuffer result = ByteBuffer.allocate(OpenClKernelConstants.CHUNK_SIZE_NUM_BYTES * workSize);
         OpenCLGridResult gridResult = new OpenCLGridResult(secretKeyBase, workSize, result);
 
         // act
@@ -55,7 +56,7 @@ public class OpenCLGridResultTest {
         // arrange
         BigInteger secretKeyBase = BigInteger.ONE;
         int workSize = 64;
-        ByteBuffer result = ByteBuffer.allocate(PublicKeyBytes.CHUNK_SIZE_NUM_BYTES * workSize);
+        ByteBuffer result = ByteBuffer.allocate(OpenClKernelConstants.CHUNK_SIZE_NUM_BYTES * workSize);
         OpenCLGridResult gridResult = new OpenCLGridResult(secretKeyBase, workSize, result);
 
         // act
@@ -70,7 +71,7 @@ public class OpenCLGridResultTest {
         // arrange
         BigInteger secretKeyBase = BigInteger.ONE;
         int workSize = 1;
-        ByteBuffer result = ByteBuffer.allocate(PublicKeyBytes.CHUNK_SIZE_NUM_BYTES * workSize);
+        ByteBuffer result = ByteBuffer.allocate(OpenClKernelConstants.CHUNK_SIZE_NUM_BYTES * workSize);
         OpenCLGridResult gridResult = new OpenCLGridResult(secretKeyBase, workSize, result);
 
         // act
@@ -87,7 +88,7 @@ public class OpenCLGridResultTest {
         // arrange
         BigInteger secretKeyBase = BigInteger.ONE;
         int workSize = 1;
-        ByteBuffer expectedBuffer = ByteBuffer.allocate(PublicKeyBytes.CHUNK_SIZE_NUM_BYTES * workSize);
+        ByteBuffer expectedBuffer = ByteBuffer.allocate(OpenClKernelConstants.CHUNK_SIZE_NUM_BYTES * workSize);
         OpenCLGridResult gridResult = new OpenCLGridResult(secretKeyBase, workSize, expectedBuffer);
 
         // act
@@ -103,7 +104,7 @@ public class OpenCLGridResultTest {
         // arrange
         BigInteger secretKeyBase = BigInteger.ONE;
         int workSize = 1;
-        ByteBuffer buffer = ByteBuffer.allocate(PublicKeyBytes.CHUNK_SIZE_NUM_BYTES * workSize);
+        ByteBuffer buffer = ByteBuffer.allocate(OpenClKernelConstants.CHUNK_SIZE_NUM_BYTES * workSize);
         OpenCLGridResult gridResult = new OpenCLGridResult(secretKeyBase, workSize, buffer);
 
         // act

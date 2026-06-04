@@ -9,6 +9,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import org.bitcoinj.base.LegacyAddress;
 import org.bitcoinj.base.Network;
@@ -301,7 +302,7 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
      */
     public String bigIntegerToFixedLengthHex(BigInteger value) {
         byte[] raw = value.toByteArray();
-        byte[] result = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
+        byte[] result = new byte[OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES];
         int srcPos = Math.max(0, raw.length - result.length);
         int length = Math.min(result.length, raw.length);
         System.arraycopy(raw, srcPos, result, result.length - length, length);
@@ -311,15 +312,15 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
     /**
      * Converts a 32-byte array into a positive BigInteger, preserving leading
      * zeros. The array must be exactly
-     * {@link PublicKeyBytes#PRIVATE_KEY_MAX_NUM_BYTES} bytes.
+     * {@link OpenClKernelConstants#PRIVATE_KEY_MAX_NUM_BYTES} bytes.
      *
      * @param buffer a 32-byte array representing the unsigned big-endian
      *               integer
      * @return a positive BigInteger constructed from the buffer
      */
     public BigInteger bigIntegerFromUnsignedByteArray(byte[] buffer) {
-        if (buffer.length != PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES) {
-            throw new IllegalArgumentException("Expected buffer of length " + PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES);
+        if (buffer.length != OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES) {
+            throw new IllegalArgumentException("Expected buffer of length " + OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES);
         }
         return new BigInteger(1, buffer);
     }

@@ -18,7 +18,7 @@ public class CProducer {
 
     /**
      * Range: {@code 0} (inclusive) to
-     * {@link net.ladenthin.bitcoinaddressfinder.PublicKeyBytes#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY} (inclusive).
+     * {@link net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY} (inclusive).
      */
     public int batchSizeInBits = 0;
 

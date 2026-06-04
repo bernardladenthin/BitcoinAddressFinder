@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 
 /**
  * Helpers for bit-count based batch sizing used by producers.
@@ -50,9 +51,9 @@ public class BitHelper {
         if (batchSizeInBits < 0) {
             throw new IllegalArgumentException("batchSizeInBits must be greater than or equal to 0.");
         }
-        if (batchSizeInBits > PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY) {
+        if (batchSizeInBits > OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY) {
             throw new IllegalArgumentException("batchSizeInBits must be less than or equal to "
-                    + PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY + ".");
+                    + OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY + ".");
         }
     }
 }

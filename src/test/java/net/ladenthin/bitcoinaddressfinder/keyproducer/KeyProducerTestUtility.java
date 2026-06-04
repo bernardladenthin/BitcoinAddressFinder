@@ -9,6 +9,7 @@ import static org.hamcrest.Matchers.is;
 
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 
 /**
  * Utility class providing convenience methods for creating and initializing
@@ -43,7 +44,7 @@ public class KeyProducerTestUtility {
      *         where each element is set to {@code fillByte}.
      */
     public byte[] createFilledSecret(byte fillByte) {
-        byte[] secretBytes = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
+        byte[] secretBytes = new byte[OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES];
         for (int i = 0; i < secretBytes.length; i++) {
             secretBytes[i] = fillByte;
         }
@@ -64,7 +65,7 @@ public class KeyProducerTestUtility {
      *         filled with the value {@code (fillByte + 1)}.
      */
     public byte[] createIncrementedSecret(byte startByte) {
-        byte[] secretBytes = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
+        byte[] secretBytes = new byte[OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES];
         for (int i = 0; i < secretBytes.length; i++) {
             secretBytes[i] = (byte) (startByte + 1);
         }
@@ -126,9 +127,9 @@ public class KeyProducerTestUtility {
      * properly handle malformed or truncated input.
      *
      * @return a new byte array with a length of
-     *         {@code PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES - 1}, representing an invalid secret.
+     *         {@code OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES - 1}, representing an invalid secret.
      */
     public byte[] createInvalidSecret() {
-        return new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES - 1];
+        return new byte[OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES - 1];
     }
 }

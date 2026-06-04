@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import org.jspecify.annotations.Nullable;
 
@@ -28,12 +28,10 @@ public class CKeyProducerJava {
     /**
      * Maximum allowed work size (number of secrets to generate) &mdash; {@code 2^24 = 16 777 216}.
      *
-     * <p>This is the only remaining dependency from {@code configuration} on the
-     * producer-side {@link PublicKeyBytes} class. {@code BIT_COUNT_FOR_MAX_CHUNKS_ARRAY}
-     * encodes Java's array-size cap for the GPU result buffer &mdash; a producer concern,
-     * not a secp256k1 spec value &mdash; so it stays in {@link PublicKeyBytes} until a
-     * future producer-constants extraction (see {@code workspace/policies/code-quality-todos.md}
-     * &sect;4).
+     * <p>The bound comes from {@link OpenClKernelConstants#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
+     * which encodes Java's array-size cap for the GPU result buffer given the
+     * 104-byte OpenCL chunk size. Reading from the constants leaf keeps the
+     * configuration layer free of producer-class dependencies.
      */
-    public int maxWorkSize = 1 << PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY;
+    public int maxWorkSize = 1 << OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY;
 }

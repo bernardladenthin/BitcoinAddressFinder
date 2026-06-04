@@ -8,7 +8,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaReceiver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,7 +94,7 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
                     throw new NoMoreSecretsAvailableException("Interrupted while waiting for secret");
                 }
 
-                if (secret.length != PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES) {
+                if (secret.length != OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES) {
                     throw new NoMoreSecretsAvailableException("Invalid secret length: " + secret.length);
                 }
 

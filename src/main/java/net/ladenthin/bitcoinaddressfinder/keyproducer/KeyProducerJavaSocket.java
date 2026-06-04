@@ -13,7 +13,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.ExecutorService;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.Startable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import org.jspecify.annotations.Nullable;
@@ -95,7 +95,7 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
                     localSocket.setSoTimeout(cKeyProducerJava.timeout);
                     inputStream = new DataInputStream(localSocket.getInputStream());
 
-                    byte[] buffer = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
+                    byte[] buffer = new byte[OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES];
                     while (!shouldStop) {
                         int read = 0;
                         while (read < buffer.length) {

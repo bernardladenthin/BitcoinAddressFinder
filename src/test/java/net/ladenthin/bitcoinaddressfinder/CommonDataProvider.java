@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.*;
 
@@ -101,7 +102,7 @@ public class CommonDataProvider {
     public static Object[][] keyProducerTypeAndBitSize() {
         return mergeMany(
                 keyProducerTypes(), // e.g., Socket, ZMQ, etc.
-                bitSizesAtMostMax() // e.g., 0 – PublicKeyBytes#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY
+                bitSizesAtMostMax() // e.g., 0 – OpenClKernelConstants#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY
                 );
     }
 
@@ -250,7 +251,7 @@ public class CommonDataProvider {
     public static final String DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX = CLASS_NAME + "#bitSizesAtMostMax";
 
     public static Object[][] bitSizesAtMostMax() {
-        final int max = PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY;
+        final int max = OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY;
 
         Object[][] data = new Object[max + 1][1];
         for (int i = 0; i <= max; i++) {
@@ -708,8 +709,8 @@ public class CommonDataProvider {
 
     public static Object[][] privateKeysTooLargeWithChunkSize() {
         return new Object[][] {
-            {PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY, PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
-            {Secp256k1Constants.MAX_PRIVATE_KEY, PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
+            {PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY, OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
+            {Secp256k1Constants.MAX_PRIVATE_KEY, OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
         };
     }
 

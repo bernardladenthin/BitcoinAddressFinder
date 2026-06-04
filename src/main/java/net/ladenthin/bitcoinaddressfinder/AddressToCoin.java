@@ -4,13 +4,15 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.nio.ByteBuffer;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.bitcoinj.base.Coin;
 import org.jspecify.annotations.NonNull;
 
 /**
  * Represents an immutable mapping from a hash160 to a Coin amount.
  *
- * <p>Note: hash160 is expected to be exactly {@code PublicKeyBytes.HASH160_SIZE} bytes long.</p>
+ * <p>Note: hash160 is expected to be exactly
+ * {@link OpenClKernelConstants#RIPEMD160_HASH_NUM_BYTES} bytes long.</p>
  *
  * @param hash160 the 20-byte RIPEMD-160 hash of the public key
  * @param coin    the amount associated with the address
@@ -22,7 +24,7 @@ public record AddressToCoin(@NonNull ByteBuffer hash160, @NonNull Coin coin, @No
      * Compact constructor validating the {@code hash160} byte length.
      */
     public AddressToCoin {
-        if (hash160.limit() != PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES) {
+        if (hash160.limit() != OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES) {
             throw new IllegalArgumentException("Given hash160 has not the correct size: " + hash160.limit());
         }
     }

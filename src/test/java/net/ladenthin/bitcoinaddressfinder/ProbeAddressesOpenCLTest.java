@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
 import org.apache.commons.io.FileUtils;
@@ -403,7 +404,7 @@ public class ProbeAddressesOpenCLTest {
         assertThat(
                 "Expected at least one BigInteger with 33-byte encoding (sign-preserving leading zero)",
                 lengths,
-                hasItem(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES + 1));
+                hasItem(OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES + 1));
     }
 
     /**
@@ -419,7 +420,7 @@ public class ProbeAddressesOpenCLTest {
         assertThat(
                 "Expected all BigIntegers to be encoded with 33 bytes (sign bit set → leading zero required)",
                 lengths,
-                everyItem(is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES + 1)));
+                everyItem(is(OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES + 1)));
     }
 
     @OpenCLTest
@@ -456,12 +457,12 @@ public class ProbeAddressesOpenCLTest {
             assertThat(
                     "Encoded must hold exactly 33 bytes",
                     encoded.length,
-                    is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES + 1));
+                    is(OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES + 1));
             byte[] expectedStripped = Arrays.copyOfRange(encoded, 1, encoded.length);
             assertThat(
                     "ExpectedStripped must hold exactly 32 bytes",
                     expectedStripped.length,
-                    is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES));
+                    is(OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES));
 
             // Perform the actual OpenCL buffer population
             OpenClTask openClTask = openCLContext.getOpenClTask().orElseThrow();
@@ -471,9 +472,9 @@ public class ProbeAddressesOpenCLTest {
             assertThat(
                     "Buffer must hold exactly 32 bytes",
                     buffer.capacity(),
-                    is(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES));
+                    is(OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES));
 
-            byte[] openClEndianBytes = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
+            byte[] openClEndianBytes = new byte[OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES];
             buffer.rewind();
             buffer.get(openClEndianBytes);
 
@@ -713,20 +714,20 @@ public class ProbeAddressesOpenCLTest {
     @Deprecated
     private static final byte[] getPublicKeyFromByteBuffer(ByteBuffer b, int keyOffset) {
         int paddingBytes = 3;
-        int publicKeyByteLength = PublicKeyBytes.SEC_PUBLIC_KEY_COMPRESSED_WORDS * PublicKeyBytes.U32_NUM_BYTES;
+        int publicKeyByteLength = OpenClKernelConstants.SEC_PUBLIC_KEY_COMPRESSED_WORDS * OpenClKernelConstants.U32_NUM_BYTES;
         byte[] publicKey = new byte[publicKeyByteLength - paddingBytes];
         // its not inverted because the memory was written in OpenCL
         int offset = publicKeyByteLength * keyOffset;
         outer:
-        for (int i = 0; i < PublicKeyBytes.SEC_PUBLIC_KEY_COMPRESSED_WORDS; i++) {
-            int x = i * PublicKeyBytes.U32_NUM_BYTES;
-            for (int j = 0; j < PublicKeyBytes.U32_NUM_BYTES; j++) {
+        for (int i = 0; i < OpenClKernelConstants.SEC_PUBLIC_KEY_COMPRESSED_WORDS; i++) {
+            int x = i * OpenClKernelConstants.U32_NUM_BYTES;
+            for (int j = 0; j < OpenClKernelConstants.U32_NUM_BYTES; j++) {
                 int publicKeyOffset = x + j;
                 if (publicKeyOffset == publicKey.length) {
                     // return the public key, read of all bytes finish
                     break outer;
                 }
-                int y = PublicKeyBytes.U32_NUM_BYTES - j - 1;
+                int y = OpenClKernelConstants.U32_NUM_BYTES - j - 1;
                 int byteBufferOffset = offset + x + y;
                 publicKey[publicKeyOffset] = b.get(byteBufferOffset);
             }

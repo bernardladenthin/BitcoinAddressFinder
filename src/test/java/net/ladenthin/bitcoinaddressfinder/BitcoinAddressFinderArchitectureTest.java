@@ -221,23 +221,23 @@ public class BitcoinAddressFinderArchitectureTest {
                     "net.ladenthin.bitcoinaddressfinder.persistence..");
 
     /**
-     * The {@code configuration} sub-package contains Jackson-populated POJOs. They must
-     * not pull in runtime behaviour from the sibling layers ({@code cli},
-     * {@code eckey}, {@code keyproducer}, {@code opencl}, {@code persistence}): a
-     * config POJO that imports a producer / consumer / persistence class couples
-     * the wire format to runtime types and makes the config impossible to evolve
-     * without breaking deserialisation.
+     * The {@code configuration} sub-package contains Jackson-populated POJOs. They
+     * must not pull in runtime behaviour from any sibling layer &mdash; not the
+     * root orchestration package, not {@code cli}, not {@code eckey}, not
+     * {@code keyproducer}, not {@code opencl}, not {@code persistence}. The only
+     * permitted internal dependencies are on the {@code constants} leaf, which
+     * carries pure spec / wire-format values without code.
      *
-     * <p>Secp256k1 spec constants formerly read from {@code PublicKeyBytes} now live
-     * in {@link net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants}
-     * (commit landed this session); the {@code BitHelper} parameter on
-     * {@code CProducer.getOverallWorkSize} was inlined in the same commit. The
-     * remaining {@link net.ladenthin.bitcoinaddressfinder.PublicKeyBytes} reference
-     * from configuration ({@code CKeyProducerJava.maxWorkSize}) uses the
-     * {@code BIT_COUNT_FOR_MAX_CHUNKS_ARRAY} producer-layer cap, not a secp256k1
-     * spec value &mdash; it stays in {@code PublicKeyBytes} until a future
-     * producer-constants extraction (see {@code workspace/policies/code-quality-todos.md}
-     * &sect;4) and is therefore tolerated by this rule.
+     * <p>After this session's leaf extractions the rule is fully strict:
+     * <ul>
+     *   <li>Secp256k1 spec scalars live in {@link
+     *       net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants}.</li>
+     *   <li>The OpenCL chunk-layout block and the derived array-capacity bound
+     *       ({@code MAXIMUM_CHUNK_ELEMENTS}, {@code BIT_COUNT_FOR_MAX_CHUNKS_ARRAY})
+     *       live in {@link
+     *       net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants}.</li>
+     * </ul>
+     * Any reintroduction of a {@code configuration → root} edge fails this test.
      */
     @ArchTest
     static final ArchRule configurationDoesNotDependOnRuntimeLayers = noClasses()
@@ -246,6 +246,7 @@ public class BitcoinAddressFinderArchitectureTest {
             .should()
             .dependOnClassesThat()
             .resideInAnyPackage(
+                    "net.ladenthin.bitcoinaddressfinder",
                     "net.ladenthin.bitcoinaddressfinder.cli..",
                     "net.ladenthin.bitcoinaddressfinder.eckey..",
                     "net.ladenthin.bitcoinaddressfinder.keyproducer..",

@@ -16,6 +16,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.SeparatorFormat;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2WPKH;
 import org.bitcoinj.base.Coin;
 
@@ -77,7 +78,7 @@ public class TestAddressesFiles implements AddressesFiles {
      * Note: This address does not collide with any hash160 values in {@link TestAddresses42}.
      */
     public static final byte[] NON_EXISTING_ADDRESS = {
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES
     };
 
     public TestAddressesFiles(boolean compressed) {

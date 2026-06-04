@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder;
 import com.google.common.hash.Hashing;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.bitcoinj.base.Base58;
 import org.bitcoinj.base.Bech32;
 import org.bitcoinj.base.Coin;
@@ -142,7 +143,7 @@ public class AddressTxtLine {
             final String OP_DUP = "76";
             final String OP_HASH160 = "a9";
             final String OP_PUSH_20_BYTES = "14";
-            final int length20Bytes = PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES;
+            final int length20Bytes = OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES;
             final String riecoinP2SHPrefix = OP_DUP + OP_HASH160 + OP_PUSH_20_BYTES;
             final int riecoinScriptPubKeyLengthHex = length20Bytes * 2 + riecoinP2SHPrefix.length();
             if (address.length() >= riecoinScriptPubKeyLengthHex && address.startsWith(riecoinP2SHPrefix)) {
@@ -163,7 +164,7 @@ public class AddressTxtLine {
             // BitCore (WKH) is base36 encoded hash160
             String addressWKH = address.substring("wkh_".length());
             byte[] hash160 = new Base36Decoder()
-                    .decodeBase36ToFixedLengthBytes(addressWKH, PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES);
+                    .decodeBase36ToFixedLengthBytes(addressWKH, OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
             ByteBuffer hash160AsByteBuffer = keyUtility.byteBufferUtility().byteArrayToByteBuffer(hash160);
             return new AddressToCoin(hash160AsByteBuffer, amount, AddressType.P2WPKH);
         }

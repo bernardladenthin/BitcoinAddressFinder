@@ -19,6 +19,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.jocl.Pointer;
 import org.jocl.Sizeof;
 import org.jocl.cl_command_queue;
@@ -40,7 +41,7 @@ public class OpenClTask implements ReleaseCLObject {
     /** SLF4J logger for this task. */
     private static final Logger LOGGER = LoggerFactory.getLogger(OpenClTask.class);
 
-    private static final int PRIVATE_KEY_SOURCE_SIZE_IN_BYTES = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES;
+    private static final int PRIVATE_KEY_SOURCE_SIZE_IN_BYTES = OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES;
 
     private final CProducerOpenCL cProducer;
 
@@ -242,7 +243,7 @@ public class OpenClTask implements ReleaseCLObject {
      * @return the size of the destination buffer in bytes for the current batch
      */
     public long getDstSizeInBytes() {
-        return (long) PublicKeyBytes.CHUNK_SIZE_NUM_BYTES * cProducer.getOverallWorkSize();
+        return (long) OpenClKernelConstants.CHUNK_SIZE_NUM_BYTES * cProducer.getOverallWorkSize();
     }
 
     /**
