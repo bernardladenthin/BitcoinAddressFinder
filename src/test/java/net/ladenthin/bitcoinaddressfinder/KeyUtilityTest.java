@@ -12,6 +12,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Random;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
 import org.bitcoinj.base.LegacyAddress;
@@ -146,7 +147,7 @@ public class KeyUtilityTest {
     public void createSecret_maxBitLength_returnsNonEmptySecret() throws IOException {
         // act
         BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false))
-                .createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, new Random(42));
+                .createSecret(Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS, new Random(42));
 
         // assert
         assertThat(secret.toString(), is(not(equalTo(""))));
@@ -238,7 +239,7 @@ public class KeyUtilityTest {
     @Test
     public void ecKey_fromPrivate_randomValidInRange_succeeds() {
         // arrange
-        BigInteger randomValidKey = PublicKeyBytes.MIN_VALID_PRIVATE_KEY.add(BigInteger.valueOf(123456));
+        BigInteger randomValidKey = Secp256k1Constants.MIN_VALID_PRIVATE_KEY.add(BigInteger.valueOf(123456));
 
         // act
         ECKey ecKey = ECKey.fromPrivate(randomValidKey, false);
@@ -258,25 +259,25 @@ public class KeyUtilityTest {
     @Test
     public void ecKey_fromPrivate_maxPrivateKeyPlusOne_throwsException() {
         // act
-        ECKey.fromPrivate(PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE), false);
+        ECKey.fromPrivate(Secp256k1Constants.MAX_PRIVATE_KEY.add(BigInteger.ONE), false);
     }
 
     @Test
     public void ecKey_fromPrivate_minValidPrivateKey_noExceptionThrown() {
         // act
-        ECKey ecKey = ECKey.fromPrivate(PublicKeyBytes.MIN_VALID_PRIVATE_KEY, false);
+        ECKey ecKey = ECKey.fromPrivate(Secp256k1Constants.MIN_VALID_PRIVATE_KEY, false);
 
         // assert
-        assertThat(ecKey.getPrivKey(), is(equalTo(PublicKeyBytes.MIN_VALID_PRIVATE_KEY)));
+        assertThat(ecKey.getPrivKey(), is(equalTo(Secp256k1Constants.MIN_VALID_PRIVATE_KEY)));
     }
 
     @Test
     public void ecKey_fromPrivate_maxPrivateKey_noExceptionThrown() {
         // act
-        ECKey ecKey = ECKey.fromPrivate(PublicKeyBytes.MAX_PRIVATE_KEY, false);
+        ECKey ecKey = ECKey.fromPrivate(Secp256k1Constants.MAX_PRIVATE_KEY, false);
 
         // assert
-        assertThat(ecKey.getPrivKey(), is(equalTo(PublicKeyBytes.MAX_PRIVATE_KEY)));
+        assertThat(ecKey.getPrivKey(), is(equalTo(Secp256k1Constants.MAX_PRIVATE_KEY)));
     }
     // </editor-fold>
 
@@ -547,7 +548,7 @@ public class KeyUtilityTest {
     public void createSecrets_returnStartSecretOnlyTrue_returnsOneSecret() throws NoMoreSecretsAvailableException {
         // arrange
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
-        int privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
+        int privateKeyMaxNumBits = Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS;
         Random random = new Random(123);
         SecretSupplier randomSupplier = new RandomSecretSupplier(random);
         int overallWorkSize = 10;
@@ -566,7 +567,7 @@ public class KeyUtilityTest {
     public void createSecrets_returnStartSecretOnlyFalse_returnsAllSecrets() throws NoMoreSecretsAvailableException {
         // arrange
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
-        int privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
+        int privateKeyMaxNumBits = Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS;
         Random random = new Random(123);
         SecretSupplier randomSupplier = new RandomSecretSupplier(random);
         int overallWorkSize = 5;
@@ -585,7 +586,7 @@ public class KeyUtilityTest {
     public void createSecrets_zeroLength_throwsException() throws NoMoreSecretsAvailableException {
         // arrange
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
-        int privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
+        int privateKeyMaxNumBits = Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS;
         Random random = new Random() {
             @Override
             public void nextBytes(byte[] bytes) {

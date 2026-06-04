@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import org.bitcoinj.base.Coin;
@@ -66,7 +67,7 @@ public class LMDBPersistenceTest {
             lmdbPersistence.init();
 
             // create key
-            BigInteger secret = keyUtility.createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, random);
+            BigInteger secret = keyUtility.createSecret(Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS, random);
             ECKey ecKey = keyUtility.createECKey(secret, true);
             byte[] hash160 = ecKey.getPubKeyHash();
             ByteBuffer hash160ByteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160);
@@ -247,7 +248,7 @@ public class LMDBPersistenceTest {
     private void fillWithRandomKeys(int keysToAdd, LMDBPersistence lmdbPersistence) {
         // arrange - fill
         for (int i = 0; i < keysToAdd; i++) {
-            BigInteger secret = keyUtility.createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, random);
+            BigInteger secret = keyUtility.createSecret(Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS, random);
             ECKey ecKey = keyUtility.createECKey(secret, true);
             byte[] hash160 = ecKey.getPubKeyHash();
             ByteBuffer hash160ByteBuffer = byteBufferUtility.byteArrayToByteBuffer(hash160);

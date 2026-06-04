@@ -9,7 +9,8 @@ import java.math.BigInteger;
  * Exception thrown when a given private key exceeds the safe upper bound
  * for use in grid-based key chunking (incrementing the base key).
  * <p>
- * The maximum allowed private key is {@link PublicKeyBytes#MAX_PRIVATE_KEY}.
+ * The maximum allowed private key is
+ * {@link net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants#MAX_PRIVATE_KEY}.
  * This exception is typically thrown if the base key plus the chunk range (2^bits) exceeds this bound.
  */
 public class PrivateKeyTooLargeException extends IllegalArgumentException {
@@ -39,7 +40,8 @@ public class PrivateKeyTooLargeException extends IllegalArgumentException {
         return "Private key exceeds maximum allowed range for chunked grid mode: " + "\nProvided key:        0x"
                 + providedKey.toString(16) + "\nMaximum allowed key: 0x"
                 + maxAllowedKey.toString(16) + "\n(batchSizeInBits = "
-                + batchSizeInBits + ")" + "\nThe maximum private key is defined in: PublicKeyBytes.MAX_PRIVATE_KEY";
+                + batchSizeInBits + ")"
+                + "\nThe maximum private key is defined in: Secp256k1Constants.MAX_PRIVATE_KEY";
     }
 
     /**

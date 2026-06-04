@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
 import java.util.Random;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 
@@ -21,7 +22,7 @@ public class MockKeyProducer implements KeyProducer {
     }
 
     MockKeyProducer(KeyUtility keyUtility, Random random) {
-        this(keyUtility, random, PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS);
+        this(keyUtility, random, Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS);
     }
 
     @Override

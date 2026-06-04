@@ -194,6 +194,33 @@ public class BitcoinAddressFinderArchitectureTest {
     // ---------------------------------------------------------------------------------------
 
     /**
+     * The {@code constants} sub-package is a true architectural leaf. Pure
+     * project-wide invariants (currently the secp256k1 spec values in
+     * {@link net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants}) live
+     * there so every layer above ({@code configuration}, {@code eckey},
+     * {@code keyproducer}, root orchestration, &hellip;) can reference them
+     * without inviting back-and-forth cross-package dependencies.
+     *
+     * <p>This rule pins the "leaf" property as a test failure rather than a
+     * code-review reminder. The package's own {@code package-info.java} carries
+     * the rationale and lists the legitimate sibling clients.
+     */
+    @ArchTest
+    static final ArchRule constantsPackageIsALeaf = noClasses()
+            .that()
+            .resideInAPackage("net.ladenthin.bitcoinaddressfinder.constants..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                    "net.ladenthin.bitcoinaddressfinder",
+                    "net.ladenthin.bitcoinaddressfinder.cli..",
+                    "net.ladenthin.bitcoinaddressfinder.configuration..",
+                    "net.ladenthin.bitcoinaddressfinder.eckey..",
+                    "net.ladenthin.bitcoinaddressfinder.keyproducer..",
+                    "net.ladenthin.bitcoinaddressfinder.opencl..",
+                    "net.ladenthin.bitcoinaddressfinder.persistence..");
+
+    /**
      * The {@code configuration} sub-package contains Jackson-populated POJOs. They must
      * not pull in runtime behaviour from the sibling layers ({@code cli},
      * {@code eckey}, {@code keyproducer}, {@code opencl}, {@code persistence}): a
@@ -201,15 +228,16 @@ public class BitcoinAddressFinderArchitectureTest {
      * the wire format to runtime types and makes the config impossible to evolve
      * without breaking deserialisation.
      *
-     * <p>Dependencies on the root package are <b>currently allowed</b> only because
-     * three config classes reach into root for compile-time constants and one helper:
-     * {@code CKeyProducerJava} and {@code CKeyProducerJavaIncremental} read
-     * {@code PublicKeyBytes} static fields as default values, and
-     * {@code CProducer.getOverallWorkSize(BitHelper)} takes a {@code BitHelper}
-     * parameter. Fully-pure POJOs (zero internal dependencies) require moving those
-     * constants / helpers into {@code configuration} or refactoring the helper-call
-     * up to the caller — see the cross-repo "package-architecture refactor" TODO
-     * at {@code workspace/policies/code-quality-todos.md}.
+     * <p>Secp256k1 spec constants formerly read from {@code PublicKeyBytes} now live
+     * in {@link net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants}
+     * (commit landed this session); the {@code BitHelper} parameter on
+     * {@code CProducer.getOverallWorkSize} was inlined in the same commit. The
+     * remaining {@link net.ladenthin.bitcoinaddressfinder.PublicKeyBytes} reference
+     * from configuration ({@code CKeyProducerJava.maxWorkSize}) uses the
+     * {@code BIT_COUNT_FOR_MAX_CHUNKS_ARRAY} producer-layer cap, not a secp256k1
+     * spec value &mdash; it stays in {@code PublicKeyBytes} until a future
+     * producer-constants extraction (see {@code workspace/policies/code-quality-todos.md}
+     * &sect;4) and is therefore tolerated by this rule.
      */
     @ArchTest
     static final ArchRule configurationDoesNotDependOnRuntimeLayers = noClasses()
@@ -256,6 +284,7 @@ public class BitcoinAddressFinderArchitectureTest {
             .resideInAnyPackage(
                     "net.ladenthin.bitcoinaddressfinder",
                     "net.ladenthin.bitcoinaddressfinder.configuration..",
+                    "net.ladenthin.bitcoinaddressfinder.constants..",
                     "net.ladenthin.bitcoinaddressfinder.eckey..",
                     "net.ladenthin.bitcoinaddressfinder.keyproducer..",
                     "net.ladenthin.bitcoinaddressfinder.opencl..",

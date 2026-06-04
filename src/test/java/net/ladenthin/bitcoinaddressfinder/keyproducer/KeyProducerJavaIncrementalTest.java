@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.*;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import org.bitcoinj.base.Network;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -130,7 +131,7 @@ public class KeyProducerJavaIncrementalTest {
     public void setUp() {
         keyUtility = new KeyUtility(network, byteBufferUtility);
         bitHelper = new BitHelper();
-        startHex = PublicKeyBytes.MIN_VALID_PRIVATE_KEY_HEX;
+        startHex = Secp256k1Constants.MIN_VALID_PRIVATE_KEY_HEX;
         endHex = "000000000000000000000000000000000000000000000000000000000000000A";
     }
 

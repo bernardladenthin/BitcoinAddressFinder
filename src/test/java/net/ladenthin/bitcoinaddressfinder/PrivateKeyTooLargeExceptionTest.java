@@ -11,6 +11,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 
 import java.math.BigInteger;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -20,7 +21,7 @@ public class PrivateKeyTooLargeExceptionTest {
 
     private static final BigInteger PROVIDED_KEY =
             new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 16);
-    private static final BigInteger MAX_ALLOWED_KEY = PublicKeyBytes.MAX_PRIVATE_KEY.subtract(BigInteger.TWO);
+    private static final BigInteger MAX_ALLOWED_KEY = Secp256k1Constants.MAX_PRIVATE_KEY.subtract(BigInteger.TWO);
     private static final int BATCH_SIZE_IN_BITS = 10;
 
     // <editor-fold defaultstate="collapsed" desc="constructor">
@@ -61,7 +62,7 @@ public class PrivateKeyTooLargeExceptionTest {
                 new PrivateKeyTooLargeException(PROVIDED_KEY, MAX_ALLOWED_KEY, BATCH_SIZE_IN_BITS);
 
         // assert
-        assertThat(exception.getMessage(), containsString("PublicKeyBytes.MAX_PRIVATE_KEY"));
+        assertThat(exception.getMessage(), containsString("Secp256k1Constants.MAX_PRIVATE_KEY"));
     }
 
     @Test

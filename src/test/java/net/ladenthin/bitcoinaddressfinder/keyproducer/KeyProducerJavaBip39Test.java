@@ -12,8 +12,8 @@ import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import org.bitcoinj.base.Network;
 import org.junit.jupiter.api.Test;
 
@@ -32,7 +32,7 @@ public class KeyProducerJavaBip39Test {
     private BigInteger[] generateSecrets() throws NoMoreSecretsAvailableException {
         CKeyProducerJavaBip39 config = new CKeyProducerJavaBip39();
         config.keyProducerId = keyProducerId;
-        config.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
+        config.privateKeyMaxNumBits = Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS;
         config.mnemonic = CKeyProducerJavaBip39.DEFAULT_MNEMONIC;
         config.passphrase = "";
         config.creationTimeSeconds = 0L;

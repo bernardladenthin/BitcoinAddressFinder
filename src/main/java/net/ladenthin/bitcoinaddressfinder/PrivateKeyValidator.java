@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import org.jspecify.annotations.NonNull;
 
 /**
@@ -27,15 +28,15 @@ public class PrivateKeyValidator {
      * by up to 2^batchSizeInBits - 1.
      *
      * @param batchSizeInBits The number of bits used for batch size (i.e., the number of keys generated in one grid chunk).
-     *                        Must be in the range [0, {@link PublicKeyBytes#PRIVATE_KEY_MAX_NUM_BITS}].
+     *                        Must be in the range [0, {@link Secp256k1Constants#PRIVATE_KEY_MAX_NUM_BITS}].
      * @return The maximum base private key that will not overflow when incremented by the grid.
      * @throws IllegalArgumentException if batchSizeInBits is outside the valid range
      * @throws IllegalStateException if batchSizeInBits is too large and no valid keys remain
      */
     public BigInteger getMaxPrivateKeyForBatchSize(int batchSizeInBits) {
-        if (batchSizeInBits < 0 || batchSizeInBits > PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS) {
+        if (batchSizeInBits < 0 || batchSizeInBits > Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS) {
             throw new IllegalArgumentException(
-                    "batchSizeInBits must be between 0 and " + PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS);
+                    "batchSizeInBits must be between 0 and " + Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS);
         }
 
         // 2^batchSizeInBits represents the maximum offset (grid size)
@@ -43,7 +44,7 @@ public class PrivateKeyValidator {
 
         // Subtract maxOffset - 1 to ensure that baseKey + (2^bits - 1) ≤ MAX_PRIVATE_KEY
         BigInteger maxSafeKey =
-                PublicKeyBytes.MAX_PRIVATE_KEY.subtract(maxOffset).add(BigInteger.ONE);
+                Secp256k1Constants.MAX_PRIVATE_KEY.subtract(maxOffset).add(BigInteger.ONE);
 
         if (maxSafeKey.signum() < 0) {
             throw new IllegalStateException("batchSizeInBits too large; no valid private keys remain.");
@@ -67,21 +68,21 @@ public class PrivateKeyValidator {
     /**
      * Checks whether a private key falls outside the valid range for secp256k1.
      * <p>
-     * Valid private keys are in the range [{@link PublicKeyBytes#MIN_VALID_PRIVATE_KEY}, {@link PublicKeyBytes#MAX_PRIVATE_KEY}].
+     * Valid private keys are in the range [{@link Secp256k1Constants#MIN_VALID_PRIVATE_KEY}, {@link Secp256k1Constants#MAX_PRIVATE_KEY}].
      *
      * @param secret the private key to check
      * @return true if the key is outside the valid range; false otherwise
      */
     public boolean isOutsidePrivateKeyRange(@NonNull BigInteger secret) {
-        return secret.compareTo(PublicKeyBytes.MIN_VALID_PRIVATE_KEY) < 0
-                || secret.compareTo(PublicKeyBytes.MAX_PRIVATE_KEY) > 0;
+        return secret.compareTo(Secp256k1Constants.MIN_VALID_PRIVATE_KEY) < 0
+                || secret.compareTo(Secp256k1Constants.MAX_PRIVATE_KEY) > 0;
     }
 
     /**
      * Coerces the given private key into the valid secp256k1 range.
      * <p>
      * If the input key is already inside the valid range, it is returned unchanged.
-     * Otherwise the {@link PublicKeyBytes#INVALID_PRIVATE_KEY_REPLACEMENT} sentinel
+     * Otherwise the {@link Secp256k1Constants#INVALID_PRIVATE_KEY_REPLACEMENT} sentinel
      * is returned in its place.
      *
      * @param secret the private key to coerce
@@ -89,7 +90,7 @@ public class PrivateKeyValidator {
      */
     public @NonNull BigInteger coerceToValidPrivateKey(@NonNull BigInteger secret) {
         if (isOutsidePrivateKeyRange(secret)) {
-            return PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT;
+            return Secp256k1Constants.INVALID_PRIVATE_KEY_REPLACEMENT;
         }
         return secret;
     }
@@ -98,7 +99,7 @@ public class PrivateKeyValidator {
      * Replaces invalid private keys in an array with a known replacement value.
      * <p>
      * Each element in the array is checked and, if invalid, replaced with
-     * {@link PublicKeyBytes#INVALID_PRIVATE_KEY_REPLACEMENT}. Valid keys are left unchanged.
+     * {@link Secp256k1Constants#INVALID_PRIVATE_KEY_REPLACEMENT}. Valid keys are left unchanged.
      *
      * @param secrets the array of private keys to validate and correct (modified in-place)
      */

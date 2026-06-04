@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.*;
 
 public class CommonDataProvider {
@@ -45,7 +46,7 @@ public class CommonDataProvider {
             {"2c7419465eaba472fd5ff50055a363e55936567a72995be2788aebb4ae74f3ff"},
             {"a6eaa2a8fa07686f3ef73736ea4668f5dbcc1f7c178b99afcacdadb64f0ce8bf"
             }, // must remain 64 hex chars; don't truncate/pad during conversion
-            {PublicKeyBytes.MAX_PRIVATE_KEY_HEX.toLowerCase()},
+            {Secp256k1Constants.MAX_PRIVATE_KEY_HEX.toLowerCase()},
         };
     }
 
@@ -518,7 +519,7 @@ public class CommonDataProvider {
                 "secretBase as byte array: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000"
             },
             {
-                PublicKeyBytes.MAX_PRIVATE_KEY_HEX.toLowerCase(),
+                Secp256k1Constants.MAX_PRIVATE_KEY_HEX.toLowerCase(),
                 2,
                 "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140",
                 "secretBase: fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140/2",
@@ -612,7 +613,7 @@ public class CommonDataProvider {
             // MAX_PRIVATE_KEY + offset).
             // Since we use grid-based key derivation (e.g., k + i), these values can overflow the valid secp256k1 range
             // and cause failures.
-            // {PublicKeyBytes.MAX_PRIVATE_KEY},
+            // {Secp256k1Constants.MAX_PRIVATE_KEY},
             //
             // Custom crafted BigIntegers with MSB set (highest bit in first byte = 1)
             // These will be encoded with a leading zero byte (i.e., total of 33 bytes)
@@ -708,7 +709,7 @@ public class CommonDataProvider {
     public static Object[][] privateKeysTooLargeWithChunkSize() {
         return new Object[][] {
             {PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY, PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
-            {PublicKeyBytes.MAX_PRIVATE_KEY, PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
+            {Secp256k1Constants.MAX_PRIVATE_KEY, PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
         };
     }
 

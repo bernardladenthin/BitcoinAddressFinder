@@ -211,7 +211,7 @@ public class OpenCLContext implements ReleaseCLObject {
         localOpenClTask.setSrcPrivateKeyChunk(privateKeyBase);
         ByteBuffer dstByteBuffer = localOpenClTask.executeKernel(localKernel, localCommandQueue);
 
-        return new OpenCLGridResult(privateKeyBase, producerOpenCL.getOverallWorkSize(bitHelper), dstByteBuffer);
+        return new OpenCLGridResult(privateKeyBase, producerOpenCL.getOverallWorkSize(), dstByteBuffer);
     }
 
     private static List<String> getResourceNamesContent(Collection<String> resourceNames) throws IOException {

@@ -242,7 +242,7 @@ public class OpenClTask implements ReleaseCLObject {
      * @return the size of the destination buffer in bytes for the current batch
      */
     public long getDstSizeInBytes() {
-        return (long) PublicKeyBytes.CHUNK_SIZE_NUM_BYTES * cProducer.getOverallWorkSize(bitHelper);
+        return (long) PublicKeyBytes.CHUNK_SIZE_NUM_BYTES * cProducer.getOverallWorkSize();
     }
 
     /**

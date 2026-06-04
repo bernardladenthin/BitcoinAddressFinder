@@ -5,8 +5,8 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
 import java.util.Arrays;
-import java.util.Locale;
 import java.util.Objects;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import org.bitcoinj.crypto.ECKey;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -23,68 +23,16 @@ public class PublicKeyBytes {
 
     /** Maximum technically representable 256-bit private key value ({@code 2^256 - 1}). */
     public static final BigInteger MAX_TECHNICALLY_PRIVATE_KEY =
-            BigInteger.valueOf(2).pow(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS).subtract(BigInteger.ONE);
+            BigInteger.valueOf(2).pow(Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS).subtract(BigInteger.ONE);
 
     /** Minimum private key value defined by the secp256k1 specification ({@code 1}). */
     public static final BigInteger MIN_PRIVATE_KEY = BigInteger.ONE;
 
-    /**
-     * The minimum valid private key that can be safely used in this implementation.
-     * <p>
-     * While the secp256k1 specification allows private keys in the range
-     * {@code [0x1, MAX_PRIVATE_KEY]} (i.e., including {@code 1}), this implementation
-     * deliberately excludes {@code 1} for practical safety and compatibility reasons.
-     * The constant {@code MIN_VALID_PRIVATE_KEY} is therefore defined as {@code 2}.
-     * </p>
-     * <p>
-     * This avoids edge cases or known issues in downstream libraries or certain
-     * ECKey handling implementations (e.g., {@link org.bitcoinj.crypto.ECKey#fromPrivate(BigInteger, boolean)})
-     * that may throw exceptions or produce inconsistent results for {@code 1}.
-     * </p>
-     *
-     * @see #MAX_PRIVATE_KEY
-     * @see org.bitcoinj.crypto.ECKey#fromPrivate(BigInteger, boolean)
-     */
-    public static final BigInteger MIN_VALID_PRIVATE_KEY = BigInteger.TWO;
-    /** Uppercase hexadecimal representation of {@link #MIN_VALID_PRIVATE_KEY}. */
-    public static final String MIN_VALID_PRIVATE_KEY_HEX =
-            MIN_VALID_PRIVATE_KEY.toString(BitHelper.RADIX_HEX).toUpperCase(Locale.ROOT);
-
-    /**
-     * Uppercase hexadecimal representation of the secp256k1 group order
-     * (the maximum valid private key).
-     * <p>
-     * This is the public curve parameter {@code n} from
-     * <a href="https://www.secg.org/sec2-v2.pdf">SEC 2 v2</a>, &sect;2.4.1
-     * ("Recommended Parameters secp256k1"). It is the same value in every
-     * secp256k1 implementation (bitcoinj, libsecp256k1, openssl, &hellip;)
-     * and is used as the upper bound for valid-private-key range checks
-     * &mdash; it is not a key, signing material, or secret.
-     */
-    public static final String MAX_PRIVATE_KEY_HEX = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141";
-
-    /**
-     * The maximum valid private key according to the secp256k1 specification.
-     * <p>
-     * The valid range for secp256k1 private keys is technically defined as
-     * {@code 0x1} to {@link #MAX_PRIVATE_KEY_HEX} (inclusive).
-     * This value represents the order of the secp256k1 curve (also called the group order).
-     * </p>
-     * <p>
-     * However, this implementation deliberately defines {@link PublicKeyBytes#MIN_VALID_PRIVATE_KEY} as {@code 0x2},
-     * excluding {@code 0x1} due to its potential to cause inconsistencies or exceptions in certain cryptographic
-     * libraries such as {@link org.bitcoinj.crypto.ECKey#fromPrivate(BigInteger, boolean)}.
-     * </p>
-     *
-     * @see #MIN_VALID_PRIVATE_KEY
-     * @see org.bitcoinj.crypto.ECKey
-     */
-    public static final BigInteger MAX_PRIVATE_KEY = new BigInteger(MAX_PRIVATE_KEY_HEX, BitHelper.RADIX_HEX);
-
-    /**
-     * I choose a random value for a replacement.
-     */
-    public static final BigInteger INVALID_PRIVATE_KEY_REPLACEMENT = BigInteger.valueOf(2);
+    // The secp256k1 spec constants (MIN_VALID_PRIVATE_KEY, MIN_VALID_PRIVATE_KEY_HEX,
+    // MAX_PRIVATE_KEY_HEX, MAX_PRIVATE_KEY, INVALID_PRIVATE_KEY_REPLACEMENT) used to live
+    // here. They were moved to
+    // net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants so the configuration
+    // layer can reference them without depending on this producer-side public-key DTO.
 
     // ==== BEGIN: SYNCHRONIZED WITH OpenCL CONSTANTS (Do not modify without updating OpenCL) ====
     /** Number of bits in a byte. */
@@ -97,10 +45,13 @@ public class PublicKeyBytes {
     public static final int BYTE_SHIFT_TO_U32_MSB = 24;
 
     // === private key ===
-    /** Maximum number of bits in a secp256k1 private key. */
-    public static final int PRIVATE_KEY_MAX_NUM_BITS = 256;
+    // PRIVATE_KEY_MAX_NUM_BITS (256) is the secp256k1 spec bit length; it lives in
+    // Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS so the configuration layer can
+    // reference it without depending on this producer-side public-key DTO. The
+    // BYTES / WORDS derivations below stay here because they are kernel/byte-layout
+    // concerns combined with this project's BITS_PER_BYTE / U32_NUM_BYTES choices.
     /** Maximum number of bytes in a secp256k1 private key. */
-    public static final int PRIVATE_KEY_MAX_NUM_BYTES = PRIVATE_KEY_MAX_NUM_BITS / BITS_PER_BYTE; // 32
+    public static final int PRIVATE_KEY_MAX_NUM_BYTES = Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS / BITS_PER_BYTE; // 32
     /** Maximum number of {@code u32} words in a secp256k1 private key. */
     public static final int PRIVATE_KEY_MAX_NUM_WORDS = PRIVATE_KEY_MAX_NUM_BYTES / U32_NUM_BYTES; // 8
 

@@ -16,6 +16,7 @@ import static org.hamcrest.Matchers.not;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.Arrays;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
 import nl.altindag.log.LogCaptor;
 import org.apache.commons.codec.binary.Hex;
@@ -112,7 +113,7 @@ public class PublicKeyBytesTest {
     public void maxPrivateKeyAsHexString_isEqualToConstant() {
         // arrange
         String maxPrivateKeyAsHexString =
-                Hex.encodeHexString(ByteBufferUtility.bigIntegerToBytes(PublicKeyBytes.MAX_PRIVATE_KEY));
+                Hex.encodeHexString(ByteBufferUtility.bigIntegerToBytes(Secp256k1Constants.MAX_PRIVATE_KEY));
         // act
 
         // assert
@@ -328,7 +329,7 @@ public class PublicKeyBytesTest {
     @Test
     public void fromPrivate_minValidPrivateKey_noExceptionThrown() {
         // arrange
-        BigInteger secretKey = PublicKeyBytes.MIN_VALID_PRIVATE_KEY;
+        BigInteger secretKey = Secp256k1Constants.MIN_VALID_PRIVATE_KEY;
 
         // act
         PublicKeyBytes result = PublicKeyBytes.fromPrivate(secretKey);
@@ -406,7 +407,7 @@ public class PublicKeyBytesTest {
     @Test
     public void isOutsidePrivateKeyRange_keyAboveMax_returnsTrue() {
         // arrange
-        BigInteger secretKey = PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE);
+        BigInteger secretKey = Secp256k1Constants.MAX_PRIVATE_KEY.add(BigInteger.ONE);
         byte[] dummyUncompressed = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
         PublicKeyBytes sut = new PublicKeyBytes(secretKey, dummyUncompressed);
 

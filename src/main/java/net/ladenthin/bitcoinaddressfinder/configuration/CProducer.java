@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
-import net.ladenthin.bitcoinaddressfinder.BitHelper;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -19,7 +17,8 @@ public class CProducer {
     public @Nullable String keyProducerId;
 
     /**
-     * Range: {@code 0} (inclusive) to {@link PublicKeyBytes#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY} (inclusive).
+     * Range: {@code 0} (inclusive) to
+     * {@link net.ladenthin.bitcoinaddressfinder.PublicKeyBytes#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY} (inclusive).
      */
     public int batchSizeInBits = 0;
 
@@ -54,10 +53,9 @@ public class CProducer {
     /**
      * Computes the overall work size implied by {@link #batchSizeInBits}.
      *
-     * @param bitHelper helper used to convert bits to size
      * @return {@code 2^batchSizeInBits}
      */
-    public int getOverallWorkSize(BitHelper bitHelper) {
-        return bitHelper.convertBitsToSize(batchSizeInBits);
+    public int getOverallWorkSize() {
+        return 1 << batchSizeInBits;
     }
 }
