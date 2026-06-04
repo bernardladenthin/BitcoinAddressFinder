@@ -42,7 +42,7 @@ SPDX-License-Identifier: Apache-2.0
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <slf4j.version>2.0.18</slf4j.version>
-        <logback.version>1.5.33</logback.version>
+        <logback.version>1.5.34</logback.version>
         <project.build.outputTimestamp>${git.commit.time}</project.build.outputTimestamp>
         <argLine>-Xmx2g -Xms1g --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED --add-exports=java.base/java.lang=ALL-UNNAMED --add-exports=java.base/java.io=ALL-UNNAMED --add-exports=java.base/java.nio=ALL-UNNAMED --add-exports=java.base/jdk.internal.ref=ALL-UNNAMED --add-exports=java.base/jdk.internal.misc=ALL-UNNAMED --add-exports=java.base/sun.nio.ch=ALL-UNNAMED --add-exports=jdk.management/com.sun.management.internal=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</argLine>
         <jcstress.version>0.16</jcstress.version>
@@ -58,11 +58,11 @@ SPDX-License-Identifier: Apache-2.0
         <jqwik.version>1.9.3</jqwik.version>
         <archunit.version>1.4.2</archunit.version>
         <spotbugs.version>4.9.8.3</spotbugs.version>
-        <fb-contrib.version>7.6.4</fb-contrib.version>
+        <fb-contrib.version>7.7.4</fb-contrib.version>
         <findsecbugs.version>1.14.0</findsecbugs.version>
         <errorprone.version>2.49.0</errorprone.version>
         <nullaway.version>0.13.4</nullaway.version>
-        <checker.version>4.1.0</checker.version>
+        <checker.version>4.2.0</checker.version>
         <java-websocket.version>1.6.0</java-websocket.version>
         <jeromq.version>0.6.0</jeromq.version>
         <jspecify.version>1.0.0</jspecify.version>
@@ -83,8 +83,8 @@ SPDX-License-Identifier: Apache-2.0
         <mockito.version>5.23.0</mockito.version>
         <logcaptor.version>2.12.6</logcaptor.version>
         <jmh.version>1.37</jmh.version>
-        <spotless.version>3.5.1</spotless.version>
-        <palantir-java-format.version>2.66.0</palantir-java-format.version>
+        <spotless.version>3.6.0</spotless.version>
+        <palantir-java-format.version>2.91.0</palantir-java-format.version>
     </properties>
 
     <!--
@@ -219,7 +219,7 @@ SPDX-License-Identifier: Apache-2.0
                 <plugin>
                     <groupId>org.pitest</groupId>
                     <artifactId>pitest-maven</artifactId>
-                    <version>1.25.1</version>
+                    <version>1.25.3</version>
                 </plugin>
                 <plugin>
                     <groupId>org.sonatype.central</groupId>
