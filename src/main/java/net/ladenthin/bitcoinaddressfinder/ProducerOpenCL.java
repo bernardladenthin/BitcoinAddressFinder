@@ -22,15 +22,15 @@ public class ProducerOpenCL extends AbstractProducer {
 
     private final CProducerOpenCL producerOpenCL;
 
-    @VisibleForTesting
-    final ThreadPoolExecutor resultReaderThreadPoolExecutor;
+    private final ThreadPoolExecutor resultReaderThreadPoolExecutor;
 
     @VisibleForTesting
     @Nullable
     OpenCLContext openCLContext;
 
     /**
-     * Creates a new OpenCL producer.
+     * Creates a new OpenCL producer with a default fixed-size result-reader thread pool
+     * sized by {@code producerOpenCL.maxResultReaderThreads}.
      *
      * @param producerOpenCL the OpenCL producer configuration
      * @param consumer       the downstream consumer
@@ -44,10 +44,40 @@ public class ProducerOpenCL extends AbstractProducer {
             KeyUtility keyUtility,
             KeyProducer keyProducer,
             BitHelper bitHelper) {
+        this(
+                producerOpenCL,
+                consumer,
+                keyUtility,
+                keyProducer,
+                bitHelper,
+                (ThreadPoolExecutor) Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads));
+    }
+
+    /**
+     * Test-friendly constructor that injects the result-reader thread pool.
+     *
+     * <p>Production callers should use the 5-arg constructor above; this overload exists
+     * so tests can substitute their own {@link ThreadPoolExecutor} and assert on its
+     * post-shutdown state without reaching into the producer's internal field.
+     *
+     * @param producerOpenCL                  the OpenCL producer configuration
+     * @param consumer                        the downstream consumer
+     * @param keyUtility                      cryptographic helper
+     * @param keyProducer                     the secret supplying strategy
+     * @param bitHelper                       bit/batch-size helper
+     * @param resultReaderThreadPoolExecutor  pool used to drain GPU results back to the host
+     */
+    @VisibleForTesting
+    ProducerOpenCL(
+            CProducerOpenCL producerOpenCL,
+            Consumer consumer,
+            KeyUtility keyUtility,
+            KeyProducer keyProducer,
+            BitHelper bitHelper,
+            ThreadPoolExecutor resultReaderThreadPoolExecutor) {
         super(producerOpenCL, consumer, keyUtility, keyProducer, bitHelper);
         this.producerOpenCL = producerOpenCL;
-        this.resultReaderThreadPoolExecutor =
-                (ThreadPoolExecutor) Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads);
+        this.resultReaderThreadPoolExecutor = resultReaderThreadPoolExecutor;
         if (false) {
             int prestartedThreads = resultReaderThreadPoolExecutor.prestartAllCoreThreads();
             if (prestartedThreads != producerOpenCL.maxResultReaderThreads) {

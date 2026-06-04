@@ -14,6 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Random;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import org.bitcoinj.base.Network;
 import org.junit.jupiter.api.Test;
@@ -54,11 +56,13 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL =
-                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ThreadPoolExecutor injectedReaderPool =
+                (ThreadPoolExecutor) Executors.newFixedThreadPool(cProducerOpenCL.maxResultReaderThreads);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(
+                cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper, injectedReaderPool);
 
         AbstractProducerTest.verifyReleaseProducer(producerOpenCL);
-        assertThat(producerOpenCL.resultReaderThreadPoolExecutor.isShutdown(), is(equalTo(Boolean.TRUE)));
+        assertThat(injectedReaderPool.isShutdown(), is(equalTo(Boolean.TRUE)));
     }
     // </editor-fold>
 
@@ -213,15 +217,17 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL =
-                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ThreadPoolExecutor injectedReaderPool =
+                (ThreadPoolExecutor) Executors.newFixedThreadPool(cProducerOpenCL.maxResultReaderThreads);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(
+                cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper, injectedReaderPool);
 
         producerOpenCL.initProducer();
 
         Duration sleepDuration = Duration.ofSeconds(5L);
 
         for (int i = 0; i < cProducerOpenCL.maxResultReaderThreads; i++) {
-            producerOpenCL.resultReaderThreadPoolExecutor.submit(() -> {
+            injectedReaderPool.submit(() -> {
                 try {
                     Thread.sleep(sleepDuration);
                 } catch (InterruptedException ex) {
