@@ -385,7 +385,7 @@ public class LMDBPersistence implements Persistence, AddressIterable {
     }
 
     @Override
-    public Coin getAllAmountsFromAddresses(List<ByteBuffer> hash160s) {
+    public Coin sumAmountsForAddresses(List<ByteBuffer> hash160s) {
         Coin allAmounts = Coin.ZERO;
         for (ByteBuffer hash160 : hash160s) {
             allAmounts = allAmounts.add(getAmount(hash160));
