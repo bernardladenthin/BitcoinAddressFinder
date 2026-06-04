@@ -235,7 +235,7 @@ public abstract class AbstractProducer implements Producer {
         if (LOGGER.isTraceEnabled()) {
             LOGGER.trace("secret BigInteger: " + secret);
             LOGGER.trace("secret as byte array: " + keyUtility.bigIntegerToFixedLengthHex(secret));
-            LOGGER.trace("killBits: " + Hex.encodeHexString(killBits.toByteArray()));
+            LOGGER.trace("killBits: " + Hex.encodeHexString(lowBitMask.toByteArray()));
             LOGGER.trace("secretBase: " + secretBase);
             LOGGER.trace("secretBase as byte array: " + keyUtility.bigIntegerToFixedLengthHex(secretBase));
         }
