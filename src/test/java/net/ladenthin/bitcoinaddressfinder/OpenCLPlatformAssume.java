@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Assumptions;
 public class OpenCLPlatformAssume implements PlatformAssume {
 
     public void assumeOpenCLLibraryLoadable() {
-        Assumptions.assumeTrue(OpenCLBuilder.isOpenCLnativeLibraryLoadable(), "OpenCL library loadable");
+        Assumptions.assumeTrue(OpenCLBuilder.isOpenClNativeLibraryLoaded(), "OpenCL native library not loaded");
     }
 
     public void assumeOneOpenCL2_0OrGreaterDeviceAvailable(List<OpenCLPlatform> openCLPlatforms) {

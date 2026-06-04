@@ -33,7 +33,7 @@ public class OpenCLBuilderTest {
         assertThat(openCLPlatforms.size(), is(greaterThan(Integer.valueOf(0))));
         assertThat(openCLPlatforms.getFirst().openCLDevices().size(), is(greaterThan(Integer.valueOf(0))));
         System.out.println(openCLPlatforms);
-        System.out.println("isOpenCLnativeLibraryLoadable: " + OpenCLBuilder.isOpenCLnativeLibraryLoadable());
+        System.out.println("isOpenClNativeLibraryLoaded: " + OpenCLBuilder.isOpenClNativeLibraryLoaded());
         System.out.println("isOneOpenCL2DeviceAvailable: "
                 + OpenCLBuilder.isOneOpenCL2_0OrGreaterDeviceAvailable(openCLPlatforms));
     }

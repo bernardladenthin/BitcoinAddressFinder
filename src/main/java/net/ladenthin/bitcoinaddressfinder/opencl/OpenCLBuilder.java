@@ -222,11 +222,17 @@ public class OpenCLBuilder {
     }
 
     /**
-     * Detects whether the JOCL native OpenCL library could be loaded.
+     * Reports whether the JOCL native OpenCL library has been loaded.
      *
-     * @return {@code true} if the native library is loaded and usable
+     * <p>Reflects the internal {@code org.jocl.CL.nativeLibraryLoaded} flag,
+     * which JOCL sets to {@code true} after a successful first call into the
+     * native library and never resets. Treats any
+     * {@link UnsatisfiedLinkError} / {@link NoClassDefFoundError} during
+     * the reflective lookup as "not loaded".
+     *
+     * @return {@code true} if the native library was loaded successfully and is usable
      */
-    public static boolean isOpenCLnativeLibraryLoadable() {
+    public static boolean isOpenClNativeLibraryLoaded() {
         try {
             Class.forName("org.jocl.CL");
             Field field = org.jocl.CL.class.getDeclaredField("nativeLibraryLoaded");

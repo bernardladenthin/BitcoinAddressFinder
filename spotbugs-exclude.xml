@@ -189,7 +189,7 @@ SPDX-License-Identifier: Apache-2.0
             Bech32.Bech32Bytes.witnessProgram / witnessVersion are
             protected; both are needed for SegWit address decoding
             paths that bitcoinj does not expose publicly.
-          - OpenCLBuilder.isOpenCLnativeLibraryLoadable: JOCL exposes
+          - OpenCLBuilder.isOpenClNativeLibraryLoaded: JOCL exposes
             no public probe for whether its native lib loaded.
             Needed for graceful CPU-only fallback on hosts without
             GPU drivers.
@@ -211,7 +211,7 @@ SPDX-License-Identifier: Apache-2.0
             </And>
             <And>
                 <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder"/>
-                <Method name="isOpenCLnativeLibraryLoadable"/>
+                <Method name="isOpenClNativeLibraryLoaded"/>
             </And>
             <And>
                 <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
