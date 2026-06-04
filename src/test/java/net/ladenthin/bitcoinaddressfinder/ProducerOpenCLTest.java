@@ -79,14 +79,14 @@ public class ProducerOpenCLTest {
                 new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
 
         // pre-assert
-        assertThat(producerOpenCL.openCLContext, nullValue());
+        assertThat(producerOpenCL.isInitialized(), is(false));
         assertThat(producerOpenCL.state, is(equalTo(ProducerState.UNINITIALIZED)));
 
         // act
         producerOpenCL.initProducer();
 
         // assert
-        assertThat(producerOpenCL.openCLContext, notNullValue());
+        assertThat(producerOpenCL.isInitialized(), is(true));
         assertThat(producerOpenCL.state, is(equalTo(ProducerState.INITIALIZED)));
     }
     // </editor-fold>
@@ -121,13 +121,13 @@ public class ProducerOpenCLTest {
         producerOpenCL.initProducer();
 
         // pre-assert
-        assertThat(producerOpenCL.openCLContext, notNullValue());
+        assertThat(producerOpenCL.isInitialized(), is(true));
 
         // act
         producerOpenCL.releaseProducer();
 
         // assert
-        assertThat(producerOpenCL.openCLContext, nullValue());
+        assertThat(producerOpenCL.isInitialized(), is(false));
     }
     // </editor-fold>
 

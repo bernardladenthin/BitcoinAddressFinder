@@ -24,9 +24,23 @@ public class ProducerOpenCL extends AbstractProducer {
 
     private final ThreadPoolExecutor resultReaderThreadPoolExecutor;
 
-    @VisibleForTesting
     @Nullable
-    OpenCLContext openCLContext;
+    private OpenCLContext openCLContext;
+
+    /**
+     * Returns whether the OpenCL context has been initialised and not yet released.
+     *
+     * <p>The context is {@code null} both before {@link #initProducer()} and after
+     * {@link #releaseProducer()}; this getter lets callers and tests observe the
+     * initialised/released lifecycle state without needing direct access to the
+     * internal {@code openCLContext} field.
+     *
+     * @return {@code true} when the context has been initialised and is still open;
+     *     {@code false} when not yet initialised or after release
+     */
+    public boolean isInitialized() {
+        return openCLContext != null;
+    }
 
     /**
      * Creates a new OpenCL producer with a default fixed-size result-reader thread pool
