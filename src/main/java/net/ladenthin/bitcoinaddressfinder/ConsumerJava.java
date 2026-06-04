@@ -91,8 +91,7 @@ public class ConsumerJava implements Consumer {
     /** Consumer configuration. */
     protected final CConsumerJava consumerJava;
 
-    @VisibleForTesting
-    ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService scheduledExecutorService;
 
     /**
      * The persistence implementation; initialised in {@link #initLMDB()}. May be set to
@@ -146,27 +145,57 @@ public class ConsumerJava implements Consumer {
         return shouldRun.get();
     }
 
-    @VisibleForTesting
-    final ExecutorService consumeKeysExecutorService;
+    private final ExecutorService consumeKeysExecutorService;
 
     /**
-     * Creates a new consumer.
+     * Creates a new consumer with default executors: a single-thread scheduler for the
+     * stats logger and a fixed-size pool sized by {@code consumerJava.threads} for the
+     * key-consumer workers.
      *
      * @param consumerJava     consumer configuration
      * @param keyUtility       cryptographic helper
      * @param persistenceUtils persistence helper used to construct the LMDB layer
      */
     protected ConsumerJava(CConsumerJava consumerJava, KeyUtility keyUtility, PersistenceUtils persistenceUtils) {
+        this(
+                consumerJava,
+                keyUtility,
+                persistenceUtils,
+                Executors.newSingleThreadScheduledExecutor(),
+                Executors.newFixedThreadPool(consumerJava.threads));
+    }
+
+    /**
+     * Test-friendly constructor that injects both executor services.
+     *
+     * <p>Production callers should use the 3-arg constructor above; this overload exists
+     * so tests can substitute their own executors and assert on post-shutdown state
+     * without reaching into the consumer's internal fields.
+     *
+     * @param consumerJava              consumer configuration
+     * @param keyUtility                cryptographic helper
+     * @param persistenceUtils          persistence helper used to construct the LMDB layer
+     * @param scheduledExecutorService  scheduler used for the periodic stats logger
+     * @param consumeKeysExecutorService pool used for the worker threads that drain the keys queue
+     */
+    @VisibleForTesting
+    ConsumerJava(
+            CConsumerJava consumerJava,
+            KeyUtility keyUtility,
+            PersistenceUtils persistenceUtils,
+            ScheduledExecutorService scheduledExecutorService,
+            ExecutorService consumeKeysExecutorService) {
         this.consumerJava = consumerJava;
         this.keysQueue = new LinkedBlockingQueue<>(consumerJava.queueSize);
         this.keyUtility = keyUtility;
         this.persistenceUtils = persistenceUtils;
+        this.scheduledExecutorService = scheduledExecutorService;
+        this.consumeKeysExecutorService = consumeKeysExecutorService;
         if (consumerJava.enableVanity && consumerJava.vanityPattern != null) {
             this.vanityPattern = Pattern.compile(consumerJava.vanityPattern);
         } else {
             vanityPattern = null;
         }
-        consumeKeysExecutorService = Executors.newFixedThreadPool(consumerJava.threads);
     }
 
     /**

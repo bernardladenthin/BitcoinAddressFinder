@@ -17,6 +17,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
@@ -141,7 +144,10 @@ public class ConsumerJavaTest {
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        ExecutorService consumeKeysExecutor = Executors.newFixedThreadPool(cConsumerJava.threads);
+        ConsumerJava consumerJava = new ConsumerJava(
+                cConsumerJava, keyUtility, persistenceUtils,
+                Executors.newSingleThreadScheduledExecutor(), consumeKeysExecutor);
         consumerJava.initLMDB();
 
         // add keys
@@ -152,7 +158,7 @@ public class ConsumerJavaTest {
         assertThat(consumerJava.shouldRun(), is(equalTo(Boolean.TRUE)));
 
         // add a pseudo thread to the executor to test its eecution duration
-        consumerJava.consumeKeysExecutorService.submit(() -> {
+        consumeKeysExecutor.submit(() -> {
             try {
                 Thread.sleep(ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY);
             } catch (InterruptedException e) {
@@ -185,26 +191,29 @@ public class ConsumerJavaTest {
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         cConsumerJava.printStatisticsEveryNSeconds = 1;
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
+        ExecutorService consumeKeysExecutor = Executors.newFixedThreadPool(cConsumerJava.threads);
+        ConsumerJava consumerJava = new ConsumerJava(
+                cConsumerJava, keyUtility, persistenceUtils, scheduledExecutor, consumeKeysExecutor);
 
         consumerJava.initLMDB();
         // pre-assert
-        assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(equalTo(Boolean.FALSE)));
+        assertThat(scheduledExecutor.isShutdown(), is(equalTo(Boolean.FALSE)));
 
         consumerJava.startStatisticsTimer();
         // wait till the scheduled TimerTask is completed
         Thread.sleep(Duration.ofSeconds(1L));
 
         // pre-assert
-        assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(equalTo(Boolean.FALSE)));
-        assertThat(consumerJava.consumeKeysExecutorService.isShutdown(), is(equalTo(Boolean.FALSE)));
+        assertThat(scheduledExecutor.isShutdown(), is(equalTo(Boolean.FALSE)));
+        assertThat(consumeKeysExecutor.isShutdown(), is(equalTo(Boolean.FALSE)));
 
         // act
         consumerJava.interrupt();
 
         // assert
-        assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(equalTo(Boolean.TRUE)));
-        assertThat(consumerJava.consumeKeysExecutorService.isShutdown(), is(equalTo(Boolean.TRUE)));
+        assertThat(scheduledExecutor.isShutdown(), is(equalTo(Boolean.TRUE)));
+        assertThat(consumeKeysExecutor.isShutdown(), is(equalTo(Boolean.TRUE)));
     }
 
     @Test
