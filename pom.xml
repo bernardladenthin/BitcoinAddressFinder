@@ -310,8 +310,7 @@ SPDX-License-Identifier: Apache-2.0
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
 
-                    <source>21</source>
-                    <target>21</target>
+                    <release>21</release>
                     <parameters>true</parameters>
 
                     <compilerArgs>
@@ -357,31 +356,12 @@ SPDX-License-Identifier: Apache-2.0
                         <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
                         <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
 
-                        <!-- Master JVM-flag list: keep identical (same set + same order) across pom.xml, .mvn/jvm.config, and examples/*.bat -->
-                        <arg>--add-opens</arg><arg>java.base/java.lang=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>java.base/java.io=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>java.base/java.nio=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>java.base/jdk.internal.ref=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>java.base/jdk.internal.misc=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>java.base/sun.nio.ch=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>jdk.management/com.sun.management.internal=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>java.base/java.lang=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>java.base/java.io=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>java.base/java.nio=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>java.base/jdk.internal.ref=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>java.base/jdk.internal.misc=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>java.base/sun.nio.ch=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.management/com.sun.management.internal=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+                        <!-- Runtime system-module access lives in argLine / .mvn/jvm.config /
+                             examples/*.bat. It is intentionally NOT duplicated into compilerArgs:
+                             system-module add-exports/add-opens are forbidden under release
+                             (JEP 247/261) and the main compile no longer needs them now that
+                             ByteBufferUtility uses sun.misc.Unsafe via reflection instead of the
+                             jdk.internal.misc.Unsafe direct import. -->
                     </compilerArgs>
 
                     <annotationProcessorPaths>
@@ -457,7 +437,18 @@ SPDX-License-Identifier: Apache-2.0
 
                                 Also drop -parameters here so JMH / jcstress reflection doesn't pick up
                                 parameter names from MethodParameters.
+
+                                Override the parent release=21 back to source/target=21: tests legitimately
+                                import jdk.internal.ref.Cleaner and sun.nio.ch.DirectBuffer (see
+                                ByteBufferUtilityTest) to assert Cleaner invocation, and release mode
+                                forbids the add-exports that make those packages visible. Production
+                                code no longer touches internal modules (ByteBufferUtility migrated to
+                                reflectively-resolved sun.misc.Unsafe), so the main compile stays at
+                                release 21.
                             -->
+                            <release combine.self="override"></release>
+                            <source>21</source>
+                            <target>21</target>
                             <parameters>false</parameters>
                             <compilerArgs combine.self="override">
                                 <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
