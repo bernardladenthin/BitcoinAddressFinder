@@ -366,7 +366,10 @@ After modifying or creating any `.java` file:
   specific supplement).
 - For production sources, verify rules from
   [`../workspace/guides/CODE_WRITING_GUIDE.md`](../workspace/guides/CODE_WRITING_GUIDE.md)
-  (canonical) **and** this repo's own `CODE_WRITING_GUIDE.md`.
+  (canonical Java 8 baseline), the Java 21 supplement
+  [`../workspace/guides/CODE_WRITING_GUIDE-java21.md`](../workspace/guides/CODE_WRITING_GUIDE-java21.md)
+  (this repo targets Java 21, so the supplement applies), **and** this
+  repo's own `CODE_WRITING_GUIDE.md`.
 - For TDD workflow see [`../workspace/.claude/skills/java-tdd-guide/SKILL.md`](../workspace/.claude/skills/java-tdd-guide/SKILL.md).
 - Apply all fixable violations automatically; report only those that
   cannot be resolved without a large refactor.

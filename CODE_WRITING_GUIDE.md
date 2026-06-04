@@ -1,12 +1,20 @@
 # Code Writing Guide — BitcoinAddressFinder (Project-Specific Supplement)
 
-> **Canonical workspace rules** (named constants, logger injection,
-> records, defensive null checks, helper classes as instance methods,
-> key-indexed definition pattern, license headers) live in
+> **Canonical workspace rules** (named constants, custom domain
+> exceptions, constructor injection, defensive null checks, helper
+> classes as instance methods, `@VisibleForTesting`, SPDX license
+> headers, concurrency primitives) live in
 > [`../workspace/guides/CODE_WRITING_GUIDE.md`](../workspace/guides/CODE_WRITING_GUIDE.md).
+>
+> BAF is the only sibling repo on **Java 21**, so the Java 21 supplement
+> [`../workspace/guides/CODE_WRITING_GUIDE-java21.md`](../workspace/guides/CODE_WRITING_GUIDE-java21.md)
+> (records, switch expressions, text blocks, pattern matching, sealed
+> types, `var`) also applies here.
+>
 > The TDD workflow lives in
 > [`../workspace/.claude/skills/java-tdd-guide/SKILL.md`](../workspace/.claude/skills/java-tdd-guide/SKILL.md)
 > (referenced locally as `.claude/skills/java-tdd-guide/SKILL.pointer.md`).
+>
 > This file contains only **BAF-specific** production-code conventions:
 > the `BitHelper.RADIX_*` constants, C-prefixed configuration POJOs,
 > the named domain exception types, the `Interruptable` contract, and
