@@ -134,14 +134,15 @@ public class ConsumerJavaTest {
     @AwaitTimeTest
     @Test
     public void interrupt_keysQueueNotEmpty_consumerNotRunningWaitedInternallyForTheDuration() throws Exception {
-        // Change await duration
-        ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY = AwaitTimeTests.AWAIT_DURATION;
-
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
         File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
 
         CConsumerJava cConsumerJava = new CConsumerJava();
+        // Shorten the queue-empty await from the production default (60 s) so the test's
+        // wait-then-time-out branch fires in seconds rather than a minute; injected via
+        // config, no static mutation, no test-order coupling.
+        cConsumerJava.awaitQueueEmptySeconds = AwaitTimeTests.AWAIT_DURATION.toSeconds();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         ExecutorService consumeKeysExecutor = Executors.newFixedThreadPool(cConsumerJava.threads);
@@ -160,7 +161,7 @@ public class ConsumerJavaTest {
         // add a pseudo thread to the executor to test its eecution duration
         consumeKeysExecutor.submit(() -> {
             try {
-                Thread.sleep(ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY);
+                Thread.sleep(AwaitTimeTests.AWAIT_DURATION);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -178,7 +179,7 @@ public class ConsumerJavaTest {
 
         // assert the waiting time is over, substract imprecision
         assertThat(
-                waitTime, is(greaterThan(ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY.minus(AwaitTimeTests.IMPRECISION))));
+                waitTime, is(greaterThan(AwaitTimeTests.AWAIT_DURATION.minus(AwaitTimeTests.IMPRECISION))));
     }
 
     @Test

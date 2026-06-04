@@ -5,8 +5,6 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -36,12 +34,6 @@ import org.slf4j.LoggerFactory;
  * manages their life cycle.
  */
 public class Finder implements Interruptable {
-
-    /**
-     * We must define a maximum time to wait for terminate. Wait for 100 thousand years is enough.
-     */
-    @VisibleForTesting
-    static Duration AWAIT_DURATION_TERMINATE = Duration.ofDays(365L * 1000L);
 
     /** SLF4J logger for the {@link Finder}. */
     private static final Logger LOGGER = LoggerFactory.getLogger(Finder.class);
@@ -281,7 +273,7 @@ public class Finder implements Interruptable {
     public void shutdownAndAwaitTermination() throws InterruptedException {
         LOGGER.info("shutdownAndAwaitTermination");
         producerExecutorService.shutdown();
-        producerExecutorService.awaitTermination(AWAIT_DURATION_TERMINATE.get(ChronoUnit.SECONDS), TimeUnit.SECONDS);
+        producerExecutorService.awaitTermination(finder.awaitTerminateSeconds, TimeUnit.SECONDS);
 
         // no producers are running anymore, the consumer can be interrupted
         final ConsumerJava localConsumerJava = consumerJava;

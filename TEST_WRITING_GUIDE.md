@@ -56,16 +56,20 @@ Tests that assert on timing durations must:
 1. Be annotated with `@AwaitTimeTest`.
 2. Use `AwaitTimeTests.AWAIT_DURATION` (20 s) as the configurable duration.
 3. Use `AwaitTimeTests.IMPRECISION` (2 s) as the tolerance.
-4. Override the static constant before the test runs.
+4. Override the corresponding **config field on the POJO** (no static
+   mutation, no test-order coupling). The production timeouts that have
+   been moved to config so far:
+   - `CConsumerJava.awaitQueueEmptySeconds` (default 60)
+   - `CFinder.awaitTerminateSeconds` (default 31 536 000 000 — ~100 k years)
 
 ```java
 @AwaitTimeTest
 @Test
 public void interrupt_keysQueueNotEmpty_waitedForDuration()
         throws IOException, InterruptedException {
-    ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY = AwaitTimeTests.AWAIT_DURATION;
-
-    // ... arrange ...
+    CConsumerJava cConsumerJava = new CConsumerJava();
+    cConsumerJava.awaitQueueEmptySeconds = AwaitTimeTests.AWAIT_DURATION.toSeconds();
+    // ... arrange, including building the ConsumerJava from cConsumerJava ...
 
     long beforeAct = System.currentTimeMillis();
     consumerJava.interrupt();
@@ -74,7 +78,7 @@ public void interrupt_keysQueueNotEmpty_waitedForDuration()
     Duration waitTime = Duration.ofMillis(afterAct - beforeAct);
 
     assertThat(waitTime, is(greaterThan(
-        ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY.minus(AwaitTimeTests.IMPRECISION)
+        AwaitTimeTests.AWAIT_DURATION.minus(AwaitTimeTests.IMPRECISION)
     )));
 }
 ```

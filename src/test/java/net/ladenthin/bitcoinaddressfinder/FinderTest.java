@@ -126,15 +126,16 @@ public class FinderTest {
     @Test
     public void shutdownAndAwaitTermination_producersSetAndInitialized_shutdownCalledAndAwaitTermination()
             throws Exception {
-        // Change await duration
-        Finder.AWAIT_DURATION_TERMINATE = AwaitTimeTests.AWAIT_DURATION;
-
         // Attention: During the long duration, this test produce a lot of debug and warn output, prevent it by set the
         // log details
         new LogLevelChange().turnOff();
 
         // arrange
         CFinder cFinder = new CFinder();
+        // Shorten the await-terminate timeout from the production default (100k years) so the
+        // test's wait-then-time-out branch fires in seconds; injected via config, no static
+        // mutation, no test-order coupling.
+        cFinder.awaitTerminateSeconds = AwaitTimeTests.AWAIT_DURATION.toSeconds();
         String keyProducerId = "exampleId";
         final CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.keyProducerId = keyProducerId;
@@ -159,7 +160,7 @@ public class FinderTest {
         Duration waitTime = Duration.ofMillis(afterAct - beforeAct);
 
         // assert the waiting time is over, substract imprecision
-        assertThat(waitTime, is(greaterThan(Finder.AWAIT_DURATION_TERMINATE.minus(AwaitTimeTests.IMPRECISION))));
+        assertThat(waitTime, is(greaterThan(AwaitTimeTests.AWAIT_DURATION.minus(AwaitTimeTests.IMPRECISION))));
     }
     // </editor-fold>
 

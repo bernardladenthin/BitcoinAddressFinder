@@ -5,7 +5,6 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -39,13 +38,6 @@ import org.slf4j.LoggerFactory;
  * against the LMDB persistence layer.
  */
 public class ConsumerJava implements Consumer {
-
-    /**
-     * We assume a queue might be empty after this amount of time.
-     * If not, some keys in the queue are not checked before shutdow.
-     */
-    @VisibleForTesting
-    static Duration AWAIT_DURATION_QUEUE_EMPTY = Duration.ofMinutes(1);
 
     /**
      * Marker for the {@link #consumeKeysRunner} poll loop's intentional
@@ -503,10 +495,10 @@ public class ConsumerJava implements Consumer {
         LOGGER.info(
                 "Waiting for termination of {} consumer threads (timeout: {} seconds)...",
                 consumers.size(),
-                AWAIT_DURATION_QUEUE_EMPTY.toSeconds());
+                consumerJava.awaitQueueEmptySeconds);
         try {
             boolean terminated = consumeKeysExecutorService.awaitTermination(
-                    AWAIT_DURATION_QUEUE_EMPTY.toSeconds(), TimeUnit.SECONDS);
+                    consumerJava.awaitQueueEmptySeconds, TimeUnit.SECONDS);
             if (!terminated) {
                 LOGGER.warn("Timeout reached. Some consumer threads may not have terminated cleanly.");
             }
