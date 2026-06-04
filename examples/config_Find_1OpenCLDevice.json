@@ -62,7 +62,6 @@
         "useProxyOptimal": true,
         "logStatsOnInit": true,
         "logStatsOnClose": false,
-        "loadToMemoryCacheOnInit" : false,
         "disableAddressLookup" : false
       },
       "printStatisticsEveryNSeconds": 10,

@@ -17,7 +17,6 @@
       "useProxyOptimal": true,
       "logStatsOnInit": true,
       "logStatsOnClose": true,
-      "loadToMemoryCacheOnInit" : false,
       "disableAddressLookup" : false
     }
   }
