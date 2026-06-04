@@ -1,11 +1,18 @@
 # Unit Test Writing Guide — BitcoinAddressFinder (Project-Specific Supplement)
 
-> **Canonical workspace rules** (JUnit Jupiter framework choices, AAA
-> structure with `// pre-assert` semantics, editor folds, naming pattern,
-> Hamcrest assertions, exception testing, parameterized tests via
-> `@MethodSource`, logger mocking with Mockito or LogCaptor, import
-> grouping, DRY constants per fold) live in
-> [`../workspace/guides/TEST_WRITING_GUIDE.md`](../workspace/guides/TEST_WRITING_GUIDE.md).
+> **Canonical workspace rules** follow the versioned chain in
+> `workspace/guides/test/`:
+> [`TEST_WRITING_GUIDE-8.md`](../workspace/guides/test/TEST_WRITING_GUIDE-8.md)
+> (Java 8 baseline — JUnit Jupiter framework choices, AAA structure
+> with `// pre-assert` semantics, both `<editor-fold>` and `@Nested`
+> grouping styles, naming pattern, Hamcrest assertions, exception
+> testing, parameterized tests via `@MethodSource`, logger mocking
+> with Mockito or LogCaptor, import grouping, DRY constants per fold)
+> **then**
+> [`TEST_WRITING_GUIDE-21.md`](../workspace/guides/test/TEST_WRITING_GUIDE-21.md)
+> (Java 21 supplement — records as test fixtures, pattern matching in
+> assertions, text blocks for fixture JSON/Markdown, `var` for test
+> locals). Both apply to BAF.
 > The TDD workflow lives in
 > [`../workspace/.claude/skills/java-tdd-guide/SKILL.md`](../workspace/.claude/skills/java-tdd-guide/SKILL.md)
 > (referenced locally as `.claude/skills/java-tdd-guide/SKILL.pointer.md`).

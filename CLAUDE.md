@@ -360,16 +360,18 @@ Pre-built run scripts exist in `examples/` for each operation mode (`run_*.bat` 
 
 After modifying or creating any `.java` file:
 
-- For `*Test.java` files, verify rules from
-  [`../workspace/guides/TEST_WRITING_GUIDE.md`](../workspace/guides/TEST_WRITING_GUIDE.md)
-  (canonical) **and** this repo's own `TEST_WRITING_GUIDE.md` (BAF-
-  specific supplement).
-- For production sources, verify rules from
-  [`../workspace/guides/CODE_WRITING_GUIDE.md`](../workspace/guides/CODE_WRITING_GUIDE.md)
-  (canonical Java 8 baseline), the Java 21 supplement
-  [`../workspace/guides/CODE_WRITING_GUIDE-java21.md`](../workspace/guides/CODE_WRITING_GUIDE-java21.md)
-  (this repo targets Java 21, so the supplement applies), **and** this
-  repo's own `CODE_WRITING_GUIDE.md`.
+- For `*Test.java` files, follow the workspace version chain:
+  [`../workspace/guides/test/TEST_WRITING_GUIDE-8.md`](../workspace/guides/test/TEST_WRITING_GUIDE-8.md)
+  (baseline) **and**
+  [`TEST_WRITING_GUIDE-21.md`](../workspace/guides/test/TEST_WRITING_GUIDE-21.md)
+  (this repo targets Java 21) **and** this repo's own
+  `TEST_WRITING_GUIDE.md` (BAF-specific supplement).
+- For production sources, follow the workspace version chain:
+  [`../workspace/guides/src/CODE_WRITING_GUIDE-8.md`](../workspace/guides/src/CODE_WRITING_GUIDE-8.md)
+  (baseline) **and**
+  [`CODE_WRITING_GUIDE-21.md`](../workspace/guides/src/CODE_WRITING_GUIDE-21.md)
+  (this repo targets Java 21) **and** this repo's own
+  `CODE_WRITING_GUIDE.md`.
 - For TDD workflow see [`../workspace/.claude/skills/java-tdd-guide/SKILL.md`](../workspace/.claude/skills/java-tdd-guide/SKILL.md).
 - Apply all fixable violations automatically; report only those that
   cannot be resolved without a large refactor.
@@ -467,7 +469,7 @@ See [`../workspace/policies/jqwik-prompt-injection.md`](../workspace/policies/jq
 
 - **Cross-repo code-quality TODOs** — see [`../workspace/policies/code-quality-todos.md`](../workspace/policies/code-quality-todos.md) for the canonical `@VisibleForTesting` design-fit review (BAF has 19 sites; site-by-site audit is captured in [`../workspace/crossrepostatus.md`](../workspace/crossrepostatus.md)), package hierarchy review, and class/method naming review (CRITICAL + MODERATE findings tracked in `crossrepostatus.md`).
 
-- ~~**Abstract the Java and test writing guidelines to a workspace-level shared layer.**~~ **DONE.** Canonical guides at [`../workspace/guides/CODE_WRITING_GUIDE.md`](../workspace/guides/CODE_WRITING_GUIDE.md) and [`../workspace/guides/TEST_WRITING_GUIDE.md`](../workspace/guides/TEST_WRITING_GUIDE.md); canonical TDD skill at [`../workspace/.claude/skills/java-tdd-guide/SKILL.md`](../workspace/.claude/skills/java-tdd-guide/SKILL.md). BAF's `CODE_WRITING_GUIDE.md` / `TEST_WRITING_GUIDE.md` now contain only BAF-specific supplements (BitHelper radix constants, C-prefixed POJOs, custom domain exceptions, Interruptable interface, lambda callbacks, custom marker annotations, OpenCL/LMDB platform assumes, static address constants).
+- ~~**Abstract the Java and test writing guidelines to a workspace-level shared layer.**~~ **DONE.** Canonical guides at [`../workspace/guides/src/CODE_WRITING_GUIDE-8.md`](../workspace/guides/src/CODE_WRITING_GUIDE-8.md) (Java 8 baseline) + [`CODE_WRITING_GUIDE-21.md`](../workspace/guides/src/CODE_WRITING_GUIDE-21.md) (Java 21 supplement, applies to this repo), and [`TEST_WRITING_GUIDE-8.md`](../workspace/guides/test/TEST_WRITING_GUIDE-8.md) + [`TEST_WRITING_GUIDE-21.md`](../workspace/guides/test/TEST_WRITING_GUIDE-21.md); canonical TDD skill at [`../workspace/.claude/skills/java-tdd-guide/SKILL.md`](../workspace/.claude/skills/java-tdd-guide/SKILL.md). BAF's `CODE_WRITING_GUIDE.md` / `TEST_WRITING_GUIDE.md` now contain only BAF-specific supplements.
 
 - ~~**Adopt a standard `CLAUDE.md` template/tool for cross-repo consistency.**~~ **DONE.** Template at [`../workspace/templates/CLAUDE.md.template`](../workspace/templates/CLAUDE.md.template).
 
