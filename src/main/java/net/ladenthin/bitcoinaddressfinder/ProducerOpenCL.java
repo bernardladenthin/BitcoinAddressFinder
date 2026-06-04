@@ -168,9 +168,6 @@ public class ProducerOpenCL extends AbstractProducer {
             try {
                 PublicKeyBytes[] publicKeyBytesArray = openCLGridResult.getPublicKeyBytes();
 
-                final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
-                byteBufferUtility.freeByteBuffer(openCLGridResult.getResult());
-
                 consumer.consumeKeys(publicKeyBytesArray);
             } catch (Throwable e) {
                 abstractProducer.logErrorInProduceKeys(e, secretBase);

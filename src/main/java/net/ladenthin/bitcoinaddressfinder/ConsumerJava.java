@@ -108,8 +108,6 @@ public class ConsumerJava implements Consumer {
     /** Queue of pending public-key batches; bounded by {@code consumerJava.queueSize}. */
     protected final LinkedBlockingQueue<PublicKeyBytes[]> keysQueue;
 
-    private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
-
     /** Total number of vanity-pattern hits found so far. */
     protected final AtomicLong vanityHits = new AtomicLong();
 
@@ -307,8 +305,6 @@ public class ConsumerJava implements Consumer {
                 LOGGER.error("Error in consumeKeysRunner().", e);
             }
         }
-
-        byteBufferUtility.freeByteBuffer(threadLocalReuseableByteBuffer);
 
         LOGGER.info("end consumeKeysRunner");
     }

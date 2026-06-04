@@ -168,7 +168,6 @@ public abstract class AbstractProducer implements Producer {
 
     /**
      * The method fromPrivate can throw an {@link IllegalArgumentException}.
-     * The method {@link ByteBufferUtility#freeByteBuffer} can throw an {@link java.lang.IllegalAccessError}.
      *
      * @param e      the throwable describing the failure
      * @param secret the secret to be able to recover the issue

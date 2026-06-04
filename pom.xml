@@ -316,16 +316,29 @@ SPDX-License-Identifier: Apache-2.0
                     <compilerArgs>
                         <!--
                           -Xlint:all surfaces every category of javac warning at compile time.
-                          -Werror is intentionally NOT set yet. The original 6-item pre-flip
-                          list (deprecated Thread.getId, deprecated jocl CL_DEVICE_QUEUE_PROPERTIES,
-                          two 'this' escapes in KeyProducerJavaSocket/Zmq, Closeable.close
-                          declaring InterruptedException, explicit close on auto-closeable in
-                          OpenClTask) was cleared in commit 6eadc6f. The remaining blocker is
-                          the long tail of Error Prone warnings still at WARNING level; see the
-                          "Make -Werror clean" TODO in CLAUDE.md. Flip this on once that EP
-                          tail is at zero.
+                          -Werror promotes every warning to a compile-time error. Pre-flip
+                          history: the original 6-item warning list (deprecated Thread.getId,
+                          deprecated jocl CL_DEVICE_QUEUE_PROPERTIES, two 'this' escapes in
+                          KeyProducerJavaSocket/Zmq, Closeable.close declaring
+                          InterruptedException, explicit close on auto-closeable in
+                          OpenClTask) was cleared in commit 6eadc6f; 14 Checker Framework
+                          [type.anno.before.modifier] warnings were cleared in commit f37f162;
+                          the last 5 sun.misc.Unsafe proprietary-API warnings were eliminated
+                          by deleting ByteBufferUtility#freeByteBuffer entirely — direct
+                          ByteBuffers are now reclaimed by the JVM's built-in Cleaner when
+                          they become unreachable, which already was the fallback for
+                          OpenJ9 / GraalVM Native Image / Android.
+
+                          -Xlint exclusion list:
+                            -serial   : Serializable without serialVersionUID is not the
+                                        concern of this hot-path / value-object codebase.
+                            -options  : Suppresses release/target informational notes.
+                            -classfile: Suppresses classfile-format notes from third-party deps.
+                            -processing: Suppresses "No processor claimed any of these
+                                         annotations" AP-emitted notes.
                         -->
                         <arg>-Xlint:all,-serial,-options,-classfile,-processing</arg>
+                        <arg>-Werror</arg>
                         <!--
                           Checker Framework Nullness Checker runs as a second nullness pass
                           alongside NullAway. CF is generics-aware and stricter than NullAway,
