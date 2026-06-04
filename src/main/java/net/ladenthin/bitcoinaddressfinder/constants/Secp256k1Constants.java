@@ -13,8 +13,8 @@ import java.util.Locale;
  * configuration layer (wire-format defaults) and the runtime layer
  * (validation, key derivation) need to reference. Living in the
  * {@link net.ladenthin.bitcoinaddressfinder.constants} leaf package keeps
- * the dependency graph one-way: {@code configuration → constants ←
- * eckey / root}, with no cycles.
+ * the dependency graph one-way: {@code configuration → constants ← root},
+ * with no cycles.
  *
  * <p>Values are taken from
  * <a href="https://www.secg.org/sec2-v2.pdf">SEC 2 v2</a>, &sect;2.4.1

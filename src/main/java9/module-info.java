@@ -29,7 +29,7 @@ module net.ladenthin.bitcoinaddressfinder {
     exports net.ladenthin.bitcoinaddressfinder;
     exports net.ladenthin.bitcoinaddressfinder.cli;
     exports net.ladenthin.bitcoinaddressfinder.configuration;
-    exports net.ladenthin.bitcoinaddressfinder.eckey;
+    exports net.ladenthin.bitcoinaddressfinder.constants;
     exports net.ladenthin.bitcoinaddressfinder.keyproducer;
     exports net.ladenthin.bitcoinaddressfinder.opencl;
     exports net.ladenthin.bitcoinaddressfinder.persistence;

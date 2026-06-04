@@ -6,18 +6,20 @@
  *
  * <p>This package is a true architectural leaf: it must have <b>zero
  * internal dependencies</b> on any other {@code net.ladenthin.bitcoinaddressfinder.*}
- * sub-package. Every other layer (configuration, eckey, persistence,
+ * sub-package. Every other layer (configuration, persistence,
  * keyproducer, opencl, cli, the orchestration root) may freely depend on
  * it, which makes it the canonical home for invariants that need to be
  * referenced from multiple layers without inviting back-and-forth
  * cross-package dependencies.
  *
  * <p>Currently holds the secp256k1 spec constants ({@link
- * net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants}).
- * Additional pure-constant types may join later (e.g. a wire-format
- * radix constant, an OpenCL-pipeline byte-layout constant) provided they
- * remain dependency-leaf and represent project-wide invariants rather
- * than layer-specific tuning knobs.
+ * net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants}), the
+ * hex-radix constant ({@link net.ladenthin.bitcoinaddressfinder.constants.Radix}),
+ * and the OpenCL kernel byte-layout constants ({@link
+ * net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants}).
+ * Additional pure-constant types may join later, provided they remain
+ * dependency-leaf and represent project-wide invariants rather than
+ * layer-specific tuning knobs.
  *
  * <p>The {@code argsPackageIsALeaf}-style ArchUnit invariant in {@code
  * BitcoinAddressFinderArchitectureTest} pins the leaf property as a

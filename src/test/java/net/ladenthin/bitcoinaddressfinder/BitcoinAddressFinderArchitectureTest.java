@@ -197,9 +197,9 @@ public class BitcoinAddressFinderArchitectureTest {
      * The {@code constants} sub-package is a true architectural leaf. Pure
      * project-wide invariants (currently the secp256k1 spec values in
      * {@link net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants}) live
-     * there so every layer above ({@code configuration}, {@code eckey},
-     * {@code keyproducer}, root orchestration, &hellip;) can reference them
-     * without inviting back-and-forth cross-package dependencies.
+     * there so every layer above ({@code configuration}, {@code keyproducer},
+     * root orchestration, &hellip;) can reference them without inviting
+     * back-and-forth cross-package dependencies.
      *
      * <p>This rule pins the "leaf" property as a test failure rather than a
      * code-review reminder. The package's own {@code package-info.java} carries
@@ -215,7 +215,6 @@ public class BitcoinAddressFinderArchitectureTest {
                     "net.ladenthin.bitcoinaddressfinder",
                     "net.ladenthin.bitcoinaddressfinder.cli..",
                     "net.ladenthin.bitcoinaddressfinder.configuration..",
-                    "net.ladenthin.bitcoinaddressfinder.eckey..",
                     "net.ladenthin.bitcoinaddressfinder.keyproducer..",
                     "net.ladenthin.bitcoinaddressfinder.opencl..",
                     "net.ladenthin.bitcoinaddressfinder.persistence..");
@@ -223,8 +222,8 @@ public class BitcoinAddressFinderArchitectureTest {
     /**
      * The {@code configuration} sub-package contains Jackson-populated POJOs. They
      * must not pull in runtime behaviour from any sibling layer &mdash; not the
-     * root orchestration package, not {@code cli}, not {@code eckey}, not
-     * {@code keyproducer}, not {@code opencl}, not {@code persistence}. The only
+     * root orchestration package, not {@code cli}, not {@code keyproducer},
+     * not {@code opencl}, not {@code persistence}. The only
      * permitted internal dependencies are on the {@code constants} leaf, which
      * carries pure spec / wire-format values without code.
      *
@@ -248,29 +247,15 @@ public class BitcoinAddressFinderArchitectureTest {
             .resideInAnyPackage(
                     "net.ladenthin.bitcoinaddressfinder",
                     "net.ladenthin.bitcoinaddressfinder.cli..",
-                    "net.ladenthin.bitcoinaddressfinder.eckey..",
                     "net.ladenthin.bitcoinaddressfinder.keyproducer..",
                     "net.ladenthin.bitcoinaddressfinder.opencl..",
                     "net.ladenthin.bitcoinaddressfinder.persistence..");
 
-    /**
-     * Low-level secp256k1 helpers in {@code eckey} must stay a low-level leaf. They may
-     * be consumed by the higher layers (keyproducer, consumer, opencl bridge, persistence,
-     * orchestration), but must not reach back up into {@code cli} (entry point),
-     * {@code opencl} (GPU bridge), or {@code persistence} (LMDB). Coupling pure ECC
-     * math to any of those drags GPU / database / CLI concerns into the cryptographic
-     * core.
-     */
-    @ArchTest
-    static final ArchRule eckeyIsLowLevelCrypto = noClasses()
-            .that()
-            .resideInAPackage("net.ladenthin.bitcoinaddressfinder.eckey..")
-            .should()
-            .dependOnClassesThat()
-            .resideInAnyPackage(
-                    "net.ladenthin.bitcoinaddressfinder.cli..",
-                    "net.ladenthin.bitcoinaddressfinder.opencl..",
-                    "net.ladenthin.bitcoinaddressfinder.persistence..");
+    // eckeyIsLowLevelCrypto rule removed: the eckey package was deleted together with
+    // its sole inhabitant (Secp256k1.java was a development-time reference oracle for
+    // the OpenCL secp256k1 scalar-mul kernel, dead code with no production callers).
+    // If a future low-level crypto helper needs the same guard, restore the rule
+    // verbatim from history alongside the new package.
 
     /**
      * The {@code cli} sub-package is the program entry point ({@code Main} +
@@ -286,7 +271,6 @@ public class BitcoinAddressFinderArchitectureTest {
                     "net.ladenthin.bitcoinaddressfinder",
                     "net.ladenthin.bitcoinaddressfinder.configuration..",
                     "net.ladenthin.bitcoinaddressfinder.constants..",
-                    "net.ladenthin.bitcoinaddressfinder.eckey..",
                     "net.ladenthin.bitcoinaddressfinder.keyproducer..",
                     "net.ladenthin.bitcoinaddressfinder.opencl..",
                     "net.ladenthin.bitcoinaddressfinder.persistence..")
