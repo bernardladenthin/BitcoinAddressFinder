@@ -179,4 +179,88 @@ public class BitcoinAddressFinderArchitectureTest {
     // and CLI inter-action pacing (ConsumerJava, ProducerOpenCL, AbstractProducer,
     // AbstractKeyProducerQueueBuffered, cli.Main). Rewriting them to BlockingQueue.poll(timeout) /
     // Condition.await(timeout) is a real refactor, out of scope for the rule-tightening pass.
+
+    // ---------------------------------------------------------------------------------------
+    // Layered-architecture invariants
+    //
+    // These three rules pin the only CRITICAL layering invariants the current BAF package
+    // structure clearly supports. The full layered design (a real
+    // `Architectures.layeredArchitecture()` with strict top/middle/bottom layers) would
+    // require moving classes — for example splitting the root package's orchestration
+    // classes (Finder, Producer*, Consumer*) into a dedicated package so the layer
+    // boundaries align with packages. That is captured as a cross-repo "package-architecture
+    // improvement" TODO in workspace/policies/code-quality-todos.md; the rules below pin
+    // what is already true today so a future refactor cannot accidentally regress it.
+    // ---------------------------------------------------------------------------------------
+
+    /**
+     * The {@code configuration} sub-package contains Jackson-populated POJOs. They must
+     * not pull in runtime behaviour from the sibling layers ({@code cli},
+     * {@code eckey}, {@code keyproducer}, {@code opencl}, {@code persistence}): a
+     * config POJO that imports a producer / consumer / persistence class couples
+     * the wire format to runtime types and makes the config impossible to evolve
+     * without breaking deserialisation.
+     *
+     * <p>Dependencies on the root package are <b>currently allowed</b> only because
+     * three config classes reach into root for compile-time constants and one helper:
+     * {@code CKeyProducerJava} and {@code CKeyProducerJavaIncremental} read
+     * {@code PublicKeyBytes} static fields as default values, and
+     * {@code CProducer.getOverallWorkSize(BitHelper)} takes a {@code BitHelper}
+     * parameter. Fully-pure POJOs (zero internal dependencies) require moving those
+     * constants / helpers into {@code configuration} or refactoring the helper-call
+     * up to the caller — see the cross-repo "package-architecture refactor" TODO
+     * at {@code workspace/policies/code-quality-todos.md}.
+     */
+    @ArchTest
+    static final ArchRule configurationDoesNotDependOnRuntimeLayers = noClasses()
+            .that()
+            .resideInAPackage("net.ladenthin.bitcoinaddressfinder.configuration..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                    "net.ladenthin.bitcoinaddressfinder.cli..",
+                    "net.ladenthin.bitcoinaddressfinder.eckey..",
+                    "net.ladenthin.bitcoinaddressfinder.keyproducer..",
+                    "net.ladenthin.bitcoinaddressfinder.opencl..",
+                    "net.ladenthin.bitcoinaddressfinder.persistence..");
+
+    /**
+     * Low-level secp256k1 helpers in {@code eckey} must stay a low-level leaf. They may
+     * be consumed by the higher layers (keyproducer, consumer, opencl bridge, persistence,
+     * orchestration), but must not reach back up into {@code cli} (entry point),
+     * {@code opencl} (GPU bridge), or {@code persistence} (LMDB). Coupling pure ECC
+     * math to any of those drags GPU / database / CLI concerns into the cryptographic
+     * core.
+     */
+    @ArchTest
+    static final ArchRule eckeyIsLowLevelCrypto = noClasses()
+            .that()
+            .resideInAPackage("net.ladenthin.bitcoinaddressfinder.eckey..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                    "net.ladenthin.bitcoinaddressfinder.cli..",
+                    "net.ladenthin.bitcoinaddressfinder.opencl..",
+                    "net.ladenthin.bitcoinaddressfinder.persistence..");
+
+    /**
+     * The {@code cli} sub-package is the program entry point ({@code Main} +
+     * {@code FileType}). Nothing else inside the project may import from it: that
+     * would invert the dependency direction (libraries reaching into the
+     * entry-point's argument-parsing / file-loading code) and turn {@code Main}
+     * into shared library code by accident.
+     */
+    @ArchTest
+    static final ArchRule cliIsEntryPointOnly = noClasses()
+            .that()
+            .resideInAnyPackage(
+                    "net.ladenthin.bitcoinaddressfinder",
+                    "net.ladenthin.bitcoinaddressfinder.configuration..",
+                    "net.ladenthin.bitcoinaddressfinder.eckey..",
+                    "net.ladenthin.bitcoinaddressfinder.keyproducer..",
+                    "net.ladenthin.bitcoinaddressfinder.opencl..",
+                    "net.ladenthin.bitcoinaddressfinder.persistence..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("net.ladenthin.bitcoinaddressfinder.cli..");
 }
