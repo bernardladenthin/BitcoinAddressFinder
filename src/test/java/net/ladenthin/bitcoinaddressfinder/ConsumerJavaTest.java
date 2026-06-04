@@ -149,7 +149,7 @@ public class ConsumerJavaTest {
 
         // pre-assert, assert the keys queue is not empty
         assertThat(consumerJava.keysQueueSize(), is(equalTo(1)));
-        assertThat(consumerJava.isRunning(), is(equalTo(Boolean.TRUE)));
+        assertThat(consumerJava.shouldRun(), is(equalTo(Boolean.TRUE)));
 
         // add a pseudo thread to the executor to test its eecution duration
         consumerJava.consumeKeysExecutorService.submit(() -> {
@@ -165,7 +165,7 @@ public class ConsumerJavaTest {
         consumerJava.interrupt();
 
         // assert
-        assertThat(consumerJava.isRunning(), is(equalTo(Boolean.FALSE)));
+        assertThat(consumerJava.shouldRun(), is(equalTo(Boolean.FALSE)));
 
         long afterAct = System.currentTimeMillis();
         Duration waitTime = Duration.ofMillis(afterAct - beforeAct);

@@ -126,17 +126,23 @@ public class ConsumerJava implements Consumer {
     private final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
     /**
-     * Returns whether this consumer is currently in its run loop.
+     * Returns the current value of the cancellation flag — {@code true} as long as no
+     * one has asked this consumer to stop, {@code false} after {@link #interrupt()}.
      *
-     * <p>Returns {@code true} from construction until {@link #interrupt()} is called;
-     * {@code false} thereafter. Exposed primarily so tests can assert the
-     * post-{@code interrupt()} state — see the
-     * {@code interrupt_*_shouldRunSetToFalse} test in
-     * {@code ConsumerJavaTest}.
+     * <p>This is the read side of the cancellation signal documented on the class
+     * (the worker loop body is {@code while (shouldRun()) { ... }}). The return value
+     * is the request/intent state of the flag, NOT a thread-liveness observation:
+     * returning {@code true} does not guarantee the worker thread is currently
+     * executing (it may not be started yet), and returning {@code false} does not
+     * guarantee the worker thread has finished (it may still be mid-iteration). The
+     * flag only reflects whether cancellation has been requested.
      *
-     * @return {@code true} while the consumer is in its run loop
+     * <p>Exposed so tests can assert the pre-/post-{@code interrupt()} flag state.
+     *
+     * @return {@code true} while the cancellation flag is still set to "keep
+     *     running", {@code false} once {@link #interrupt()} has flipped it
      */
-    public boolean isRunning() {
+    public boolean shouldRun() {
         return shouldRun.get();
     }
 
