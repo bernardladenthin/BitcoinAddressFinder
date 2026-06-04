@@ -4,15 +4,13 @@
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import java.math.BigInteger;
+import net.ladenthin.bitcoinaddressfinder.constants.Radix;
 import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 
 /**
  * Configuration for the incremental (sequential range) key producer.
  */
 public class CKeyProducerJavaIncremental extends CKeyProducerJava {
-
-    /** Radix used by hex-encoded private-key bounds in this configuration. */
-    private static final int HEX_RADIX = 16;
 
     /** Creates a new {@link CKeyProducerJavaIncremental}. */
     public CKeyProducerJavaIncremental() {}
@@ -28,7 +26,7 @@ public class CKeyProducerJavaIncremental extends CKeyProducerJava {
      * @return the configured start private key as a {@link BigInteger}
      */
     public BigInteger getStartPrivateKey() {
-        return new BigInteger(startPrivateKey, HEX_RADIX);
+        return new BigInteger(startPrivateKey, Radix.HEX);
     }
 
     /**
@@ -37,6 +35,6 @@ public class CKeyProducerJavaIncremental extends CKeyProducerJava {
      * @return the configured end private key as a {@link BigInteger}
      */
     public BigInteger getEndPrivateKey() {
-        return new BigInteger(endPrivateKey, HEX_RADIX);
+        return new BigInteger(endPrivateKey, Radix.HEX);
     }
 }

@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.*;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
+import net.ladenthin.bitcoinaddressfinder.constants.Radix;
 import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import org.bitcoinj.base.Network;
 import org.junit.jupiter.api.BeforeEach;
@@ -151,7 +152,7 @@ public class KeyProducerJavaIncrementalTest {
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(startHex, endHex);
         BigInteger[] secrets = producer.createSecrets(5, true);
         assertThat(secrets.length, is(equalTo(1)));
-        assertThat(secrets[0], is(equalTo(new BigInteger(startHex, BitHelper.RADIX_HEX))));
+        assertThat(secrets[0], is(equalTo(new BigInteger(startHex, Radix.HEX))));
     }
 
     /**
@@ -165,7 +166,7 @@ public class KeyProducerJavaIncrementalTest {
         BigInteger[] secrets = producer.createSecrets(batchSize, false);
         assertThat(secrets.length, is(equalTo(batchSize)));
 
-        BigInteger expected = new BigInteger(startHex, BitHelper.RADIX_HEX);
+        BigInteger expected = new BigInteger(startHex, Radix.HEX);
         for (int i = 0; i < batchSize; i++) {
             assertThat(secrets[i], is(equalTo(expected)));
             expected = expected.add(BigInteger.ONE);
@@ -205,7 +206,7 @@ public class KeyProducerJavaIncrementalTest {
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(startHex, endHex);
         int batchSize = 3;
 
-        BigInteger expectedFirstBatchStart = new BigInteger(startHex, BitHelper.RADIX_HEX);
+        BigInteger expectedFirstBatchStart = new BigInteger(startHex, Radix.HEX);
 
         BigInteger[] secrets1 = producer.createSecrets(batchSize, false);
         verifySecrets(secrets1, expectedFirstBatchStart);

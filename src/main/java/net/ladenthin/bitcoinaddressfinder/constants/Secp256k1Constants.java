@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.constants;
 
 import java.math.BigInteger;
+import java.util.Locale;
 
 /**
  * Pure secp256k1 specification constants used across the project.
@@ -53,8 +54,13 @@ public final class Secp256k1Constants {
     /**
      * Uppercase hexadecimal representation of {@link #MIN_VALID_PRIVATE_KEY},
      * for the configuration layer's wire-format defaults.
+     *
+     * <p>Derived from {@link #MIN_VALID_PRIVATE_KEY} rather than hard-coded so the
+     * two stay in sync if the spec exclusion ever changes (e.g. excluding {@code 2}
+     * as well in addition to {@code 1}).
      */
-    public static final String MIN_VALID_PRIVATE_KEY_HEX = "2";
+    public static final String MIN_VALID_PRIVATE_KEY_HEX =
+            MIN_VALID_PRIVATE_KEY.toString(Radix.HEX).toUpperCase(Locale.ROOT);
 
     /**
      * Uppercase hexadecimal representation of the secp256k1 group order
@@ -74,21 +80,22 @@ public final class Secp256k1Constants {
      * The maximum valid private key according to the secp256k1
      * specification &mdash; the group order of the curve.
      *
-     * <p>Parsed from {@link #MAX_PRIVATE_KEY_HEX} as a {@link BigInteger}
-     * with the hex literal {@code 16} to keep this leaf package free of
-     * any project-internal dependencies.
+     * <p>Parsed from {@link #MAX_PRIVATE_KEY_HEX} via {@link Radix#HEX} so
+     * the "16" radix is named at the single source of truth in the same
+     * leaf package, never inlined.
      */
-    public static final BigInteger MAX_PRIVATE_KEY = new BigInteger(MAX_PRIVATE_KEY_HEX, 16);
+    public static final BigInteger MAX_PRIVATE_KEY = new BigInteger(MAX_PRIVATE_KEY_HEX, Radix.HEX);
 
     /**
      * Replacement value substituted for private keys that fall outside the
      * valid range during batch sanitisation (see
      * {@code PrivateKeyValidator#coerceToValidPrivateKey}).
      *
-     * <p>The chosen value is {@link BigInteger#TWO}, which is also
-     * {@link #MIN_VALID_PRIVATE_KEY}; the equality is incidental, not
-     * structural. The substitution makes the batch deterministic and avoids
-     * propagating an out-of-range key through the OpenCL pipeline.
+     * <p>Defined as {@link #MIN_VALID_PRIVATE_KEY} so the replacement is
+     * <em>valid by construction</em> &mdash; the substituted key is
+     * guaranteed to fall inside the spec range without further checks.
+     * Deriving the constant also avoids carrying two independent literals
+     * that historically both happened to equal {@code 2}.
      */
-    public static final BigInteger INVALID_PRIVATE_KEY_REPLACEMENT = BigInteger.TWO;
+    public static final BigInteger INVALID_PRIVATE_KEY_REPLACEMENT = MIN_VALID_PRIVATE_KEY;
 }

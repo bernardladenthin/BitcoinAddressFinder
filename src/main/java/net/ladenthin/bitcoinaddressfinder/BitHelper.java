@@ -13,8 +13,10 @@ public class BitHelper {
     /** Creates a new {@link BitHelper}. */
     public BitHelper() {}
 
-    /** Radix used by hexadecimal {@link BigInteger} conversions. */
-    public static final int RADIX_HEX = 16;
+    // RADIX_HEX = 16 used to live here. It has moved to
+    // net.ladenthin.bitcoinaddressfinder.constants.Radix#HEX so the configuration
+    // layer can reference the hex radix without depending on this root-package
+    // helper, and so there is exactly one named "16" in the codebase.
 
     /**
      * Converts a number of bits into the corresponding batch size (2 to the power of {@code bits}).

@@ -8,7 +8,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
 import java.math.BigInteger;
-import net.ladenthin.bitcoinaddressfinder.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.constants.Radix;
 import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import org.junit.jupiter.api.Test;
 
@@ -40,7 +40,7 @@ public class CKeyProducerJavaIncrementalTest {
         BigInteger result = sut.getStartPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(new BigInteger(START_PRIVATE_KEY_CUSTOM_HEX, BitHelper.RADIX_HEX))));
+        assertThat(result, is(equalTo(new BigInteger(START_PRIVATE_KEY_CUSTOM_HEX, Radix.HEX))));
     }
 
     @Test
@@ -53,7 +53,7 @@ public class CKeyProducerJavaIncrementalTest {
         BigInteger result = sut.getStartPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(new BigInteger(START_PRIVATE_KEY_CUSTOM_HEX, BitHelper.RADIX_HEX))));
+        assertThat(result, is(equalTo(new BigInteger(START_PRIVATE_KEY_CUSTOM_HEX, Radix.HEX))));
     }
 
     @Test
@@ -93,7 +93,7 @@ public class CKeyProducerJavaIncrementalTest {
         BigInteger result = sut.getEndPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(new BigInteger(END_PRIVATE_KEY_CUSTOM_HEX, BitHelper.RADIX_HEX))));
+        assertThat(result, is(equalTo(new BigInteger(END_PRIVATE_KEY_CUSTOM_HEX, Radix.HEX))));
     }
 
     @Test
@@ -106,7 +106,7 @@ public class CKeyProducerJavaIncrementalTest {
         BigInteger result = sut.getEndPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(new BigInteger(END_PRIVATE_KEY_CUSTOM_HEX, BitHelper.RADIX_HEX))));
+        assertThat(result, is(equalTo(new BigInteger(END_PRIVATE_KEY_CUSTOM_HEX, Radix.HEX))));
     }
 
     @Test

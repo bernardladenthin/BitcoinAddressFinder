@@ -27,7 +27,9 @@ public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJava
     public KeyProducerJavaIncremental(
             CKeyProducerJavaIncremental cKeyProducerJavaIncremental, KeyUtility keyUtility, BitHelper bitHelper) {
         super(cKeyProducerJavaIncremental);
-        this.currentValue = new BigInteger(cKeyProducerJavaIncremental.startPrivateKey, BitHelper.RADIX_HEX);
+        // Use the config POJO's canonical parser rather than re-parsing the raw string
+        // here, so the radix and any future format tightening live in one place.
+        this.currentValue = cKeyProducerJavaIncremental.getStartPrivateKey();
     }
 
     @Override
