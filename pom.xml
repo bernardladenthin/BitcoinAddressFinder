@@ -325,7 +325,7 @@ SPDX-License-Identifier: Apache-2.0
                           "Make -Werror clean" TODO in CLAUDE.md. Flip this on once that EP
                           tail is at zero.
                         -->
-                        <arg>-Xlint:all,-serial,-options,-classfile</arg>
+                        <arg>-Xlint:all,-serial,-options,-classfile,-processing</arg>
                         <!--
                           Checker Framework Nullness Checker runs as a second nullness pass
                           alongside NullAway. CF is generics-aware and stricter than NullAway,
