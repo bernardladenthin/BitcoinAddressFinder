@@ -232,6 +232,21 @@ See `examples/config_*.json` for all configuration variants.
   ```
 - Test ratio is approximately 1.7:1 (test lines to source lines). New code should have corresponding tests.
 
+### Test execution policy for AI assistants
+
+**A full `mvn test` run takes ~5 minutes on this repo (1 785 tests, forked JVMs, LMDB and OpenCL probe paths).** That is far too slow to invoke after every small edit. Default to the **narrowest meaningful test surface** for the change at hand and only run a full suite when the user explicitly asks for it.
+
+Recommended scoping by change type:
+
+- **Constant / leaf-class extraction** → `mvn test -Dtest=BitcoinAddressFinderArchitectureTest`. The architecture tests catch package-layering regressions in seconds. Pair with `mvn compile` and `mvn test-compile` for compile-clean confirmation.
+- **Refactor inside one class** → `mvn test -Dtest=<ThatClass>Test`. Run sibling tests only if the refactor touches their fixtures.
+- **Configuration-POJO / wire-format change** → `mvn test -Dtest='ConfigFixturesParseTest,<TouchedPojo>Test'` so the example JSON fixtures and the POJO unit tests both run.
+- **Architecture-rule edit** → `mvn test -Dtest=BitcoinAddressFinderArchitectureTest` only.
+- **Cross-cutting code-quality cleanup** (e.g. renaming a widely-used helper) → first run `mvn compile` + `mvn test-compile` to confirm the rename compiles, then a narrowed `-Dtest=` glob (e.g. `'*Test,*ArchitectureTest'`) or whatever surface the change actually touches.
+- **OpenCL / LMDB integration touchups** → run the matching `*OpenCLTest` / `LMDBPersistenceTest` directly. Both are slow and noisy when they are not the target of the change.
+
+**Full `mvn test` is reserved for the user to ask for explicitly** ("run the full tests", "do a full surefire run", or similar). Otherwise: narrow scope, report which tests were exercised, and call out anything that *would* exercise the change but was deliberately skipped so the user can decide whether to widen.
+
 ---
 
 ## Code Conventions
