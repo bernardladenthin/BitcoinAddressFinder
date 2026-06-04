@@ -24,8 +24,7 @@ public class ProducerOpenCL extends AbstractProducer {
 
     private final ThreadPoolExecutor resultReaderThreadPoolExecutor;
 
-    @Nullable
-    private OpenCLContext openCLContext;
+    private @Nullable OpenCLContext openCLContext;
 
     /**
      * Returns whether the OpenCL context has been initialised and not yet released.

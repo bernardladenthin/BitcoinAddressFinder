@@ -36,11 +36,9 @@ import org.jspecify.annotations.NonNull;
  */
 public final class BloomFilterAccelerator implements AddressLookup {
 
-    @NonNull
-    private final BloomFilter<byte[]> bloom;
+    private final @NonNull BloomFilter<byte[]> bloom;
 
-    @NonNull
-    private final AddressLookup delegate;
+    private final @NonNull AddressLookup delegate;
 
     /**
      * Creates a new accelerator.

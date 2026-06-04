@@ -33,8 +33,7 @@ import org.jspecify.annotations.NonNull;
  */
 public final class HashSetAddressPresence implements AddressPresence {
 
-    @NonNull
-    private final Set<ByteBuffer> entries;
+    private final @NonNull Set<ByteBuffer> entries;
 
     private HashSetAddressPresence(@NonNull Set<ByteBuffer> entries) {
         this.entries = entries;

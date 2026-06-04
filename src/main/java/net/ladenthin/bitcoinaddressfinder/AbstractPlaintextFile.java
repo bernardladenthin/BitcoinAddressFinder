@@ -22,14 +22,11 @@ public abstract class AbstractPlaintextFile implements Interruptable {
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractPlaintextFile.class);
 
     /** The file being read. */
-    @NonNull
-    protected final File file;
+    protected final @NonNull File file;
     /** Statistic updated while the file is being processed. */
-    @NonNull
-    protected final ReadStatistic readStatistic;
+    protected final @NonNull ReadStatistic readStatistic;
 
-    @NonNull
-    private final AtomicBoolean shouldRun = new AtomicBoolean(true);
+    private final @NonNull AtomicBoolean shouldRun = new AtomicBoolean(true);
 
     /**
      * Creates a new reader for the given file.

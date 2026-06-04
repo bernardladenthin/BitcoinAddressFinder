@@ -115,8 +115,7 @@ public class AddressTxtLine {
      * @throws AddressFormatNotAcceptedException if the address format is not accepted,
      *         with a reason message describing why
      */
-    @NonNull
-    public AddressToCoin fromLine(String line, KeyUtility keyUtility) throws AddressFormatNotAcceptedException {
+    public @NonNull AddressToCoin fromLine(String line, KeyUtility keyUtility) throws AddressFormatNotAcceptedException {
         // Checked before splitting: "#" is also a SeparatorFormat separator, so splitting first
         // would always produce an empty first token for "#..." lines, masking this reason.
         if (line.trim().startsWith(IGNORE_LINE_PREFIX)) {
@@ -314,8 +313,7 @@ public class AddressTxtLine {
         return new AddressToCoin(hash160AsByteBuffer, DEFAULT_COIN, addressType);
     }
 
-    @NonNull
-    private Coin getCoinIfPossible(@NonNull String[] lineSplitted, @NonNull Coin defaultValue) {
+    private @NonNull Coin getCoinIfPossible(@NonNull String[] lineSplitted, @NonNull Coin defaultValue) {
         if (lineSplitted.length > COLUMN_AMOUNT) {
             String amountString = lineSplitted[COLUMN_AMOUNT];
             try {

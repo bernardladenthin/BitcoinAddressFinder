@@ -14,8 +14,7 @@ import org.jspecify.annotations.NonNull;
  */
 public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJavaIncremental> {
 
-    @NonNull
-    private BigInteger currentValue;
+    private @NonNull BigInteger currentValue;
 
     /**
      * Creates a new incremental key producer.

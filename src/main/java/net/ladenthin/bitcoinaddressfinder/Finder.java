@@ -42,8 +42,7 @@ public class Finder implements Interruptable {
 
     private final Map<String, KeyProducer> keyProducers = new HashMap<>();
 
-    @Nullable
-    private ConsumerJava consumerJava;
+    private @Nullable ConsumerJava consumerJava;
 
     private final List<ProducerOpenCL> openCLProducers = new ArrayList<>();
     private final List<ProducerJava> javaProducers = new ArrayList<>();

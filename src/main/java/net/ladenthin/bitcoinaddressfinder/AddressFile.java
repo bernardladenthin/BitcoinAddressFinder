@@ -13,14 +13,11 @@ import org.jspecify.annotations.NonNull;
  */
 public class AddressFile extends AbstractPlaintextFile {
 
-    @NonNull
-    private final KeyUtility keyUtility;
+    private final @NonNull KeyUtility keyUtility;
 
-    @NonNull
-    private final Consumer<AddressToCoin> addressConsumer;
+    private final @NonNull Consumer<AddressToCoin> addressConsumer;
 
-    @NonNull
-    private final Consumer<String> unsupportedConsumer;
+    private final @NonNull Consumer<String> unsupportedConsumer;
 
     /**
      * Creates a new reader for the given address file.
