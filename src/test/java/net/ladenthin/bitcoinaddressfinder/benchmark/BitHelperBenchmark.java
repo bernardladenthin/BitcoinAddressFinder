@@ -23,7 +23,7 @@ import org.openjdk.jmh.infra.Blackhole;
 /**
  * Throughput benchmark for {@link BitHelper} bit-manipulation operations.
  *
- * <p>{@link BitHelper#getKillBits(int)} and {@link BitHelper#convertBitsToSize(int)} sit
+ * <p>{@link BitHelper#getLowBitMask(int)} and {@link BitHelper#convertBitsToSize(int)} sit
  * on the key-producer hot path: they are called once per producer batch to compute the
  * address-space partition size. This benchmark measures their allocation and computation cost.</p>
  *
@@ -47,16 +47,16 @@ public class BitHelperBenchmark {
     private final BitHelper bitHelper = new BitHelper();
 
     /**
-     * Benchmarks {@link BitHelper#getKillBits(int)} across several bit counts.
+     * Benchmarks {@link BitHelper#getLowBitMask(int)} across several bit counts.
      *
-     * <p>Measures {@link BigInteger} allocation and shift cost for the kill-bits computation
-     * used to mask off the low-order bits of a private key batch start.</p>
+     * <p>Measures {@link BigInteger} allocation and shift cost for the low-bit-mask
+     * computation used to mask off the low-order bits of a private key batch start.</p>
      *
      * @param bh JMH blackhole to prevent dead-code elimination
      */
     @Benchmark
-    public void getKillBits(Blackhole bh) {
-        bh.consume(bitHelper.getKillBits(bits));
+    public void getLowBitMask(Blackhole bh) {
+        bh.consume(bitHelper.getLowBitMask(bits));
     }
 
     /**

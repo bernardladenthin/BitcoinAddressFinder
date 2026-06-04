@@ -146,11 +146,11 @@ public class CommonDataProvider {
     }
 
     /**
-     * For {@link #killBits()}.
+     * For {@link #lowBitMask()}.
      */
-    public static final String DATA_PROVIDER_KILL_BITS = CLASS_NAME + "#killBits";
+    public static final String DATA_PROVIDER_LOW_BIT_MASK = CLASS_NAME + "#lowBitMask";
 
-    public static Object[][] killBits() {
+    public static Object[][] lowBitMask() {
         return new Object[][] {
             {0, BigInteger.valueOf(0L)},
             {1, BigInteger.valueOf(1L)},

@@ -224,8 +224,8 @@ public abstract class AbstractProducer implements Producer {
      * @return the secret base used as the starting point of the next batch
      */
     public BigInteger createSecretBase(BigInteger secret, boolean logSecretBase) {
-        BigInteger killBits = bitHelper.getKillBits(cProducer.batchSizeInBits);
-        BigInteger secretBase = keyUtility.killBits(secret, killBits);
+        BigInteger lowBitMask = bitHelper.getLowBitMask(cProducer.batchSizeInBits);
+        BigInteger secretBase = keyUtility.killBits(secret, lowBitMask);
 
         if (logSecretBase) {
             LOGGER.info("secretBase: " + keyUtility.bigIntegerToFixedLengthHex(secretBase) + "/"

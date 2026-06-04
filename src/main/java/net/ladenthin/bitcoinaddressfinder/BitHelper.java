@@ -27,12 +27,14 @@ public class BitHelper {
     }
 
     /**
-     * Returns a bit mask covering the lowest {@code bits} bits.
+     * Returns a {@link BigInteger} bitmask with the lowest {@code bits} bits set
+     * (i.e. {@code 2^bits - 1}). Used to keep only the low-order {@code bits}
+     * bits of a value via bitwise AND.
      *
-     * @param bits the number of low bits to mask
+     * @param bits the number of low bits to set in the returned mask
      * @return {@code 2^bits - 1} as a {@link BigInteger}
      */
-    public BigInteger getKillBits(int bits) {
+    public BigInteger getLowBitMask(int bits) {
         return BigInteger.valueOf(2).pow(bits).subtract(BigInteger.ONE);
     }
 

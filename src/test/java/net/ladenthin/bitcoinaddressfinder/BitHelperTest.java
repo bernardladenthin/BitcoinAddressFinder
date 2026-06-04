@@ -16,15 +16,15 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 public class BitHelperTest {
 
-    // <editor-fold defaultstate="collapsed" desc="getKillBits">
+    // <editor-fold defaultstate="collapsed" desc="getLowBitMask">
     @ParameterizedTest
-    @MethodSource(CommonDataProvider.DATA_PROVIDER_KILL_BITS)
-    public void getKillBits_bitsGiven_killBitsEqualsExpectation(int bits, BigInteger killBits) throws IOException {
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_LOW_BIT_MASK)
+    public void getLowBitMask_bitsGiven_lowBitMaskEqualsExpectation(int bits, BigInteger lowBitMask) throws IOException {
         // arrange
         BitHelper bitHelper = new BitHelper();
 
         // act, assert
-        assertThat(bitHelper.getKillBits(bits), is(equalTo(killBits)));
+        assertThat(bitHelper.getLowBitMask(bits), is(equalTo(lowBitMask)));
     }
     // </editor-fold>
 
