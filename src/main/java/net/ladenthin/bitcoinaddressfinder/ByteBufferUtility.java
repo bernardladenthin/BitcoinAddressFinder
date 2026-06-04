@@ -3,18 +3,46 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
+import java.lang.reflect.Field;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import jdk.internal.misc.Unsafe;
 import org.bouncycastle.util.encoders.Hex;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import sun.misc.Unsafe;
 
 /**
  * Helper for {@link ByteBuffer} allocation, byte-array conversion and reversal.
  */
 public class ByteBufferUtility {
+
+    /**
+     * Reflectively-obtained {@code sun.misc.Unsafe} handle, or {@code null}
+     * when the running JVM does not expose {@code theUnsafe} (e.g. OpenJ9,
+     * GraalVM Native Image, Android). When {@code null}, {@link #freeByteBuffer}
+     * becomes a no-op and direct-buffer reclamation falls back to the JVM's
+     * built-in {@code Cleaner} machinery.
+     *
+     * <p>{@code sun.misc.Unsafe} is reached via reflection (rather than the
+     * compile-time-only {@code jdk.internal.misc.Unsafe} this class used
+     * previously) so the main compile can run under {@code --release 21}
+     * without requiring {@code --add-exports java.base/jdk.internal.misc} —
+     * a flag that is forbidden in {@code --release} mode (JEP 247 / 261).
+     */
+    @SuppressWarnings("ImmutableMemberCollection")
+    private static final @Nullable Unsafe UNSAFE = resolveUnsafe();
+
+    @SuppressWarnings("nullness:argument") // Field.get(null) is the canonical static-field access pattern
+    private static @Nullable Unsafe resolveUnsafe() {
+        try {
+            Field theUnsafe = Unsafe.class.getDeclaredField("theUnsafe");
+            theUnsafe.setAccessible(true);
+            return (Unsafe) theUnsafe.get(null);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
+        }
+    }
 
     /**
      * Decide between {@link java.nio.DirectByteBuffer} and {@link java.nio.HeapByteBuffer}.
@@ -55,27 +83,33 @@ public class ByteBufferUtility {
     }
 
     /**
-     * ATTENTION: The {@code jdk.internal.misc.Unsafe#getUnsafe()} can throw an {@link java.lang.IllegalAccessError}.
-     * https://stackoverflow.com/questions/8462200/examples-of-forcing-freeing-of-native-memory-direct-bytebuffer-has-allocated-us
-     * https://stackoverflow.com/questions/13003871/how-do-i-get-the-instance-of-sun-misc-unsafe
-     * https://stackoverflow.com/questions/29301755/got-securityexception-in-java
-     * https://bugs.openjdk.org/browse/JDK-8171377
-     * @param byteBuffer the ByteBuffer to free
+     * Eagerly releases the native memory backing a direct {@link ByteBuffer}.
+     * <p>
+     * No-op for {@code null}, heap buffers, and JVMs where {@link #UNSAFE} could
+     * not be resolved — in those cases the JVM's built-in {@code Cleaner}
+     * reclaims the buffer when it becomes unreachable.
+     * <p>
+     * References:
+     * <ul>
+     *   <li>https://stackoverflow.com/questions/8462200/examples-of-forcing-freeing-of-native-memory-direct-bytebuffer-has-allocated-us</li>
+     *   <li>https://stackoverflow.com/questions/13003871/how-do-i-get-the-instance-of-sun-misc-unsafe</li>
+     *   <li>https://bugs.openjdk.org/browse/JDK-8171377</li>
+     *   <li>https://openjdk.org/jeps/8323072</li>
+     * </ul>
+     *
+     * @param byteBuffer the ByteBuffer to free; may be {@code null}
      */
     public void freeByteBuffer(@Nullable ByteBuffer byteBuffer) {
         if (byteBuffer == null) {
             return;
         }
-
         if (!byteBuffer.isDirect()) {
             return;
         }
-
-        Unsafe u = Unsafe.getUnsafe();
-        // https://bugs.openjdk.org/browse/JDK-8171377
-        // https://openjdk.org/jeps/8323072
-        // https://stackoverflow.com/questions/3496508/deallocating-direct-buffer-native-memory-in-java-for-jogl/26777380
-        u.invokeCleaner(byteBuffer);
+        if (UNSAFE == null) {
+            return;
+        }
+        UNSAFE.invokeCleaner(byteBuffer);
     }
 
     // <editor-fold defaultstate="collapsed" desc="ByteBuffer byte array conversion">
