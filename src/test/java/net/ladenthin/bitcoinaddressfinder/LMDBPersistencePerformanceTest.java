@@ -87,7 +87,7 @@ public class LMDBPersistencePerformanceTest {
         consumerJava.interrupt();
 
         assertThat(consumerJava.persistence, is(nullValue()));
-        assertThat(consumerJava.shouldRun.get(), is(false));
+        assertThat(consumerJava.isRunning(), is(false));
         assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(true));
         assertThat(consumerJava.scheduledExecutorService.isTerminated(), is(true));
         assertThat(consumerJava.consumeKeysExecutorService.isShutdown(), is(true));

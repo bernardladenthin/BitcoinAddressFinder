@@ -123,8 +123,22 @@ public class ConsumerJava implements Consumer {
 
     private final @Nullable Pattern vanityPattern;
 
-    @VisibleForTesting
-    final AtomicBoolean shouldRun = new AtomicBoolean(true);
+    private final AtomicBoolean shouldRun = new AtomicBoolean(true);
+
+    /**
+     * Returns whether this consumer is currently in its run loop.
+     *
+     * <p>Returns {@code true} from construction until {@link #interrupt()} is called;
+     * {@code false} thereafter. Exposed primarily so tests can assert the
+     * post-{@code interrupt()} state — see the
+     * {@code interrupt_*_shouldRunSetToFalse} test in
+     * {@code ConsumerJavaTest}.
+     *
+     * @return {@code true} while the consumer is in its run loop
+     */
+    public boolean isRunning() {
+        return shouldRun.get();
+    }
 
     @VisibleForTesting
     final ExecutorService consumeKeysExecutorService;
