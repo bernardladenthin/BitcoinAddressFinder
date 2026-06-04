@@ -212,22 +212,22 @@ public class KeyUtilityTest {
     }
     // </editor-fold>
 
-    // <editor-fold defaultstate="collapsed" desc="killBits">
+    // <editor-fold defaultstate="collapsed" desc="alignDown">
     @Test
-    public void killBits_valueWithAllBitsSetGiven_bitsKilled() throws IOException {
+    public void alignDown_valueWithAllBitsSetGiven_bitsCleared() throws IOException {
         // act
         BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false))
-                .killBits(BigInteger.valueOf(63L), BigInteger.valueOf(5L));
+                .alignDown(BigInteger.valueOf(63L), BigInteger.valueOf(5L));
 
         // assert
         assertThat(secret, is(equalTo(BigInteger.valueOf(58))));
     }
 
     @Test
-    public void killBits_valueWithNotAllBitsSetGiven_bitsKilled() throws IOException {
+    public void alignDown_valueWithNotAllBitsSetGiven_bitsCleared() throws IOException {
         // act
         BigInteger secret = new KeyUtility(network, new ByteBufferUtility(false))
-                .killBits(BigInteger.valueOf(62L), BigInteger.valueOf(5L));
+                .alignDown(BigInteger.valueOf(62L), BigInteger.valueOf(5L));
 
         // assert
         assertThat(secret, is(equalTo(BigInteger.valueOf(58))));

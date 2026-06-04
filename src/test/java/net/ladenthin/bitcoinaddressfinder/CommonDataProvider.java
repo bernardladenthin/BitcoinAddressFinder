@@ -455,7 +455,7 @@ public class CommonDataProvider {
                 "secretBase: 0000000000000000000000000000000000000000000000000000000000abcdec/2",
                 "secret BigInteger: 11259375",
                 "secret as byte array: 0000000000000000000000000000000000000000000000000000000000abcdef",
-                "killBits: 03",
+                "lowBitMask: 03",
                 "secretBase: 11259372",
                 "secretBase as byte array: 0000000000000000000000000000000000000000000000000000000000abcdec"
             },
@@ -466,7 +466,7 @@ public class CommonDataProvider {
                 "secretBase: 0000000000000000000000000000000000000000000000000000000000fedcb8/2",
                 "secret BigInteger: 16702650",
                 "secret as byte array: 0000000000000000000000000000000000000000000000000000000000fedcba",
-                "killBits: 03",
+                "lowBitMask: 03",
                 "secretBase: 16702648",
                 "secretBase as byte array: 0000000000000000000000000000000000000000000000000000000000fedcb8"
             },
@@ -478,7 +478,7 @@ public class CommonDataProvider {
                 "secretBase: 0000000000000000000000000000000000000000000000000000000000a00000/21",
                 "secret BigInteger: 11259375",
                 "secret as byte array: 0000000000000000000000000000000000000000000000000000000000abcdef",
-                "killBits: 1fffff",
+                "lowBitMask: 1fffff",
                 "secretBase: 10485760",
                 "secretBase as byte array: 0000000000000000000000000000000000000000000000000000000000a00000"
             },
@@ -489,7 +489,7 @@ public class CommonDataProvider {
                 "secretBase: 0000000000000000000000000000000000000000000000000000000000e00000/21",
                 "secret BigInteger: 16702650",
                 "secret as byte array: 0000000000000000000000000000000000000000000000000000000000fedcba",
-                "killBits: 1fffff",
+                "lowBitMask: 1fffff",
                 "secretBase: 14680064",
                 "secretBase as byte array: 0000000000000000000000000000000000000000000000000000000000e00000"
             },
@@ -501,7 +501,7 @@ public class CommonDataProvider {
                 "secretBase: 123456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000/21",
                 "secret BigInteger: 8234104123542484900769178205574010627627573691361805720124810878238590820095",
                 "secret as byte array: 123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff",
-                "killBits: 1fffff",
+                "lowBitMask: 1fffff",
                 "secretBase: 8234104123542484900769178205574010627627573691361805720124810878238588928000",
                 "secretBase as byte array: 123456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000"
             },
@@ -513,7 +513,7 @@ public class CommonDataProvider {
                 "secretBase: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000/21",
                 "secret BigInteger: 375168379408231402782670922269509069226925318059052594399906494889018056447",
                 "secret as byte array: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff",
-                "killBits: 1fffff",
+                "lowBitMask: 1fffff",
                 "secretBase: 375168379408231402782670922269509069226925318059052594399906494889016164352",
                 "secretBase as byte array: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000"
             },
@@ -524,7 +524,7 @@ public class CommonDataProvider {
                 "secretBase: fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140/2",
                 "secret BigInteger: 115792089237316195423570985008687907852837564279074904382605163141518161494337",
                 "secret as byte array: fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141",
-                "killBits: 03",
+                "lowBitMask: 03",
                 "secretBase: 115792089237316195423570985008687907852837564279074904382605163141518161494336",
                 "secretBase as byte array: fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140"
             },

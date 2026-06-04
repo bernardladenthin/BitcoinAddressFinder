@@ -33,14 +33,38 @@ import org.jspecify.annotations.NonNull;
 public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility byteBufferUtility) {
 
     /**
-     * Clears the bits set in {@code killBits} from {@code bigInteger}.
+     * Aligns {@code value} DOWN to a {@code 2^N} boundary by clearing the bits
+     * indicated by {@code lowBitMask}.
      *
-     * @param bigInteger the source value
-     * @param killBits   the bit mask of bits to clear
-     * @return {@code bigInteger AND NOT killBits}
+     * <p>The intended input is a contiguous low-bit mask of the form
+     * {@code (2^N) - 1} (as produced by
+     * {@link BitHelper#getLowBitMask(int) BitHelper.getLowBitMask(N)}). When
+     * the mask has that shape, clearing the masked bits is equivalent to
+     * flooring the input to the nearest lower multiple of {@code 2^N}.
+     *
+     * <p>This is the batch-alignment step used by
+     * {@link AbstractProducer#createSecretBase(BigInteger, boolean)
+     * AbstractProducer.createSecretBase} to derive a {@code secretBase} for the
+     * OpenCL kernel. The kernel runs {@code 2^N} parallel GPU threads where
+     * thread {@code i} evaluates {@code secretBase + i}; for the batch to
+     * cover the keyspace cleanly without gap or overlap, {@code secretBase}
+     * must have its low {@code N} bits zeroed.
+     *
+     * <p>Implementation: delegates to {@link BigInteger#andNot(BigInteger)},
+     * which is the fastest {@link BigInteger} bitwise AND-NOT primitive
+     * available &#x2014; faster than the equivalent
+     * {@code value.and(mask.not())}, which allocates an extra
+     * {@link BigInteger} for the negated mask.
+     *
+     * @param value the source value (typically a candidate private key)
+     * @param lowBitMask the bit mask of bits to clear (typically the low-bit
+     *     mask for the configured batch size, as produced by
+     *     {@link BitHelper#getLowBitMask(int)})
+     * @return {@code value} with the bits set in {@code lowBitMask} cleared
+     *     &#x2014; equivalent to {@code value AND NOT lowBitMask}
      */
-    public BigInteger killBits(BigInteger bigInteger, BigInteger killBits) {
-        return bigInteger.andNot(killBits);
+    public BigInteger alignDown(BigInteger value, BigInteger lowBitMask) {
+        return value.andNot(lowBitMask);
     }
 
     /**

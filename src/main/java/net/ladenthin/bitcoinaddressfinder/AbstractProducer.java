@@ -225,7 +225,7 @@ public abstract class AbstractProducer implements Producer {
      */
     public BigInteger createSecretBase(BigInteger secret, boolean logSecretBase) {
         BigInteger lowBitMask = bitHelper.getLowBitMask(cProducer.batchSizeInBits);
-        BigInteger secretBase = keyUtility.killBits(secret, lowBitMask);
+        BigInteger secretBase = keyUtility.alignDown(secret, lowBitMask);
 
         if (logSecretBase) {
             LOGGER.info("secretBase: " + keyUtility.bigIntegerToFixedLengthHex(secretBase) + "/"
@@ -235,7 +235,7 @@ public abstract class AbstractProducer implements Producer {
         if (LOGGER.isTraceEnabled()) {
             LOGGER.trace("secret BigInteger: " + secret);
             LOGGER.trace("secret as byte array: " + keyUtility.bigIntegerToFixedLengthHex(secret));
-            LOGGER.trace("killBits: " + Hex.encodeHexString(lowBitMask.toByteArray()));
+            LOGGER.trace("lowBitMask: " + Hex.encodeHexString(lowBitMask.toByteArray()));
             LOGGER.trace("secretBase: " + secretBase);
             LOGGER.trace("secretBase as byte array: " + keyUtility.bigIntegerToFixedLengthHex(secretBase));
         }

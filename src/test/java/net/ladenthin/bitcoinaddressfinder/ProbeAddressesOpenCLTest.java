@@ -363,7 +363,7 @@ public class ProbeAddressesOpenCLTest {
             openCLContext.init();
             Random sr = new Random(1337);
             BigInteger secret = keyUtility.createSecret(bitSize, sr);
-            BigInteger secretBase = keyUtility.killBits(secret, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
+            BigInteger secretBase = keyUtility.alignDown(secret, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
 
             openCLContext.createKeys(secretBase);
         }
@@ -383,7 +383,7 @@ public class ProbeAddressesOpenCLTest {
             openCLContext.init();
             Random sr = new Random(1337);
             BigInteger secret = keyUtility.createSecret(BITS_FOR_BATCH - 1, sr);
-            BigInteger secretBase = keyUtility.killBits(secret, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
+            BigInteger secretBase = keyUtility.alignDown(secret, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
 
             openCLContext.createKeys(secretBase);
         }
@@ -516,7 +516,7 @@ public class ProbeAddressesOpenCLTest {
             openClTask.setSrcPrivateKeyChunk(privateKey);
 
             BigInteger secretBase =
-                    keyUtility.killBits(privateKey, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
+                    keyUtility.alignDown(privateKey, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
 
             OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
             PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
@@ -546,7 +546,7 @@ public class ProbeAddressesOpenCLTest {
             BigInteger secretKeyBase = keyUtility.createSecret(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS, random);
 
             BigInteger secretBase =
-                    keyUtility.killBits(secretKeyBase, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
+                    keyUtility.alignDown(secretKeyBase, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
 
             OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
             PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
