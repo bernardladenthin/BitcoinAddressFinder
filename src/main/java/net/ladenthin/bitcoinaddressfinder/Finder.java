@@ -57,20 +57,35 @@ public class Finder implements Interruptable {
     private final List<ProducerJava> javaProducers = new ArrayList<>();
     private final List<ProducerJavaSecretsFiles> javaProducersSecretsFiles = new ArrayList<>();
 
-    @VisibleForTesting
-    final ExecutorService producerExecutorService = Executors.newCachedThreadPool();
+    private final ExecutorService producerExecutorService;
 
     private final KeyUtility keyUtility;
     private final PersistenceUtils persistenceUtils;
     private final BitHelper bitHelper = new BitHelper();
 
     /**
-     * Creates a new finder.
+     * Creates a new finder with the default producer executor (a cached thread pool).
      *
      * @param finder the finder configuration
      */
     public Finder(CFinder finder) {
+        this(finder, Executors.newCachedThreadPool());
+    }
+
+    /**
+     * Test-friendly constructor that injects the producer executor service.
+     *
+     * <p>Production callers should use {@link #Finder(CFinder)}; this overload exists
+     * so tests can substitute their own {@link ExecutorService} and assert on its
+     * post-shutdown state without reaching into the finder's internal field.
+     *
+     * @param finder                  the finder configuration
+     * @param producerExecutorService executor used to run registered producers
+     */
+    @VisibleForTesting
+    Finder(CFinder finder, ExecutorService producerExecutorService) {
         this.finder = finder;
+        this.producerExecutorService = producerExecutorService;
         Network network = new NetworkParameterFactory().getNetwork();
         this.keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
         this.persistenceUtils = new PersistenceUtils(network);

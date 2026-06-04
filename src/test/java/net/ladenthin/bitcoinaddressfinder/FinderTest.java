@@ -13,6 +13,8 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
@@ -93,13 +95,14 @@ public class FinderTest {
     public void shutdownAndAwaitTermination_noProducersSet_shutdownCalled() throws Exception {
         // arrange
         CFinder cFinder = new CFinder();
-        Finder finder = new Finder(cFinder);
+        ExecutorService injectedExecutor = Executors.newCachedThreadPool();
+        Finder finder = new Finder(cFinder, injectedExecutor);
         // pre-assert
-        assertThat(finder.producerExecutorService.isTerminated(), is(equalTo(Boolean.FALSE)));
+        assertThat(injectedExecutor.isTerminated(), is(equalTo(Boolean.FALSE)));
         // act
         finder.shutdownAndAwaitTermination();
         // assert
-        assertThat(finder.producerExecutorService.isTerminated(), is(equalTo(Boolean.TRUE)));
+        assertThat(injectedExecutor.isTerminated(), is(equalTo(Boolean.TRUE)));
     }
 
     @Test
@@ -108,14 +111,15 @@ public class FinderTest {
         CFinder cFinder = new CFinder();
         configureProducerWithExamples(cFinder);
         configureConsumerJava(cFinder);
-        Finder finder = new Finder(cFinder);
+        ExecutorService injectedExecutor = Executors.newCachedThreadPool();
+        Finder finder = new Finder(cFinder, injectedExecutor);
         finder.startKeyProducer();
         finder.startConsumer();
         finder.configureProducer();
         // act
         finder.shutdownAndAwaitTermination();
         // assert
-        assertThat(finder.producerExecutorService.isTerminated(), is(equalTo(Boolean.TRUE)));
+        assertThat(injectedExecutor.isTerminated(), is(equalTo(Boolean.TRUE)));
     }
 
     @AwaitTimeTest
