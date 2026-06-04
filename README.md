@@ -563,7 +563,7 @@ If you're missing any information or have questions about usage or content, feel
 > ```json
 > "addressLookupBackend" : "TRUNCATED_LONG_64"
 > ```
-> See [Pluggable Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend) above for the full trade-off matrix and benchmark numbers. `TRUNCATED_LONG_64` loads every hash160 into RAM once at startup as 256 sorted `long[]` buckets (~1.1 GB for the Light DB), then closes the LMDB env and releases its mmap pages — near-`HASHSET` lookup latency at ~10× lower memory cost. If you have memory to spare and prefer exact-bit storage with no probabilistic fallthrough, `HASHSET` (~10 GB for the Light DB) is the next step up; `SORTED_ARRAY` sits between the two; `BLOOM` keeps LMDB open while still skipping it for the overwhelming majority of misses.
+> See [Pluggable Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend) above for the full trade-off matrix and benchmark numbers. `TRUNCATED_LONG_64` loads every hash160 into RAM once at startup as 256 sorted `long[]` buckets (~1.1 GB for the Light DB), then closes the LMDB env and releases its mmap pages — near-`HASHSET` lookup latency at ~10× lower memory cost. If you have memory to spare and prefer exact-bit storage with no probabilistic fallthrough, `HASHSET` (~10 GB for the Light DB) is the next step up; `BLOOM` keeps LMDB open while still skipping it for the overwhelming majority of misses.
 
 <details>
 <summary>Checksums lmdb_light.zip</summary>
@@ -611,6 +611,20 @@ LMDBToAddressFile_Light_HexHash.zip	SHA3-512	29CA44CD666D7B8CF9EAD4B340620FBB7ED
   * Time to create the database: ~54 hours
   * Link (34.3 GiB zip archive): http://ladenthin.net/lmdb_full.zip
   * Link extracted addresses as txt (23.4 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Full_HexHash.zip
+
+> ⚠️ **Backend choice for the full database.** At 1.377 B entries, `HASHSET` requires roughly **~110 GB of RAM** — impractical on almost any consumer hardware. Pick one of the realistic options instead:
+>
+> ```json
+> "addressLookupBackend" : "TRUNCATED_LONG_64"
+> ```
+>
+> | Choice              | RAM needed at Full DB | LMDB stays open? | When to pick |
+> |---------------------|-----------------------|------------------|--------------|
+> | `TRUNCATED_LONG_64` | ~11 GB                | **no**           | recommended if you can spare ~12 GB; closes LMDB and releases its mmap pages |
+> | `BLOOM` (FPP 0.01)  | ~1.6 GB               | yes              | keeps LMDB open as the verifier; skips it for the overwhelming majority of misses |
+> | `LMDB_ONLY`         | minimal (mmap only)   | yes              | fallback when there is essentially no spare RAM and disk-backed mmap is acceptable |
+>
+> Do **not** select `HASHSET` for the full database. See [Pluggable Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend) above for the full trade-off matrix and per-tier memory footprint.
 
 <details>
 <summary>Checksums lmdb_full.zip</summary>
