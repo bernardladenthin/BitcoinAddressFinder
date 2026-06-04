@@ -32,7 +32,7 @@ public class ProducerOpenCLTest {
     @OpenCLTest
     @Test
     public void initProducer_configurationGiven_stateInitializedAndLogged() throws Exception {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
@@ -49,7 +49,7 @@ public class ProducerOpenCLTest {
     @Test
     public void releaseProducer_configurationGiven_stateInitializedAndLoggedAndExecuterServiceShutdown()
             throws Exception {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
@@ -66,7 +66,7 @@ public class ProducerOpenCLTest {
     @OpenCLTest
     @Test
     public void initProducer_configurationGiven_stateInitializedAndOpenCLContextSet() throws Exception {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
@@ -105,7 +105,7 @@ public class ProducerOpenCLTest {
     @Test
     @OpenCLTest
     public void releaseProducers_initialized_noExceptionThrownAndOpenCLContextFreed() throws Exception {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
@@ -148,7 +148,7 @@ public class ProducerOpenCLTest {
     @Test
     @OpenCLTest
     public void getFreeThreads_initialized_numberOfFreeThreadsReturned() throws Exception {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
@@ -187,7 +187,7 @@ public class ProducerOpenCLTest {
     @Test
     @OpenCLTest
     public void waitTillFreeThreadsInPool_initialized_returnImmediately() throws Exception {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
@@ -207,7 +207,7 @@ public class ProducerOpenCLTest {
     @Test
     @OpenCLTest
     public void waitTillFreeThreadsInPool_initializedAndThreadPoolFull_doNotReturn() throws Exception {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();
@@ -261,7 +261,7 @@ public class ProducerOpenCLTest {
     @Test
     @OpenCLTest
     public void produceKeys_initialized_keysInConsumer() throws Exception {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
 
         MockConsumer mockConsumer = new MockConsumer();

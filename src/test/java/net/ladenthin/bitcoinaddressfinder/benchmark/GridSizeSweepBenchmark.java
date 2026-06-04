@@ -43,7 +43,7 @@ import org.openjdk.jmh.annotations.Warmup;
  *       private-key base, not an array, and returns one {@link OpenCLGridResult} per
  *       launch</li>
  *   <li>OpenCL availability is gated via
- *       {@link OpenCLPlatformAssume#assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable()},
+ *       {@link OpenCLPlatformAssume#assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable()},
  *       the existing project convention; if no device is present the JMH trial fails
  *       with {@code AssumptionViolatedException} which JMH reports as {@code ERROR} on
  *       that {@code @Param} combo (a deliberate &quot;asymptote visible&quot; choice rather
@@ -135,7 +135,7 @@ public class GridSizeSweepBenchmark {
      */
     @Setup(Level.Trial)
     public void setUp() throws Exception {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
         final CProducerOpenCL p = new CProducerOpenCL();
         p.batchSizeInBits = batchSizeInBits;

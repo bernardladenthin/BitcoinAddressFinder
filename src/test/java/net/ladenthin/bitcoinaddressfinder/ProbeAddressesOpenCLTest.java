@@ -78,7 +78,7 @@ public class ProbeAddressesOpenCLTest {
     @Test
     @OpenCLTest
     public void joclTest() {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
         /**
          * The source code of the OpenCL program to execute
@@ -352,7 +352,7 @@ public class ProbeAddressesOpenCLTest {
     @OpenCLTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX)
     public void createKeys_bitsLowerThan25_use32BitNevertheless(int bitSize) throws IOException {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
 
@@ -372,7 +372,7 @@ public class ProbeAddressesOpenCLTest {
     @Test
     @OpenCLTest
     public void createKeys_bitsLowerThanGridSize_useMoreNevertheless() throws IOException {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
 
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -426,7 +426,7 @@ public class ProbeAddressesOpenCLTest {
     @MethodSource(CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE)
     public void setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException(BigInteger privateKey, int chunkSize)
             throws IOException {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = chunkSize;
@@ -444,7 +444,7 @@ public class ProbeAddressesOpenCLTest {
     @MethodSource(CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_32_BYTE_REQUIRING_STRIP)
     public void setSrcPrivateKeyChunk_handlesLeadingZero_correctlySerializesTo32Bytes(BigInteger privateKey)
             throws IOException {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
@@ -501,7 +501,7 @@ public class ProbeAddressesOpenCLTest {
     @OpenCLTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_LARGE_PRIVATE_KEYS)
     public void createKeys_fromLargePrivateKey_generatesValidPublicKeys(BigInteger privateKey) throws IOException {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
 
@@ -532,7 +532,7 @@ public class ProbeAddressesOpenCLTest {
     @Test
     @OpenCLTest
     public void createKeys_fromRandomPrivateKey_correctlyHashesAndVerifiesResults() throws IOException {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
 

@@ -21,9 +21,9 @@ public class OpenCLBuilderTest {
     @Test
     @OpenCLTest
     public void build_openCLDeviceExisting_platformsAndDevicesReturned() throws IOException {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailable();
         // arrange
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         OpenCLBuilder openCLBuilder = new OpenCLBuilder();
 
         // act

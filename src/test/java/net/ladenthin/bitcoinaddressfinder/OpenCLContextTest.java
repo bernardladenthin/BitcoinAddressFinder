@@ -34,7 +34,7 @@ public class OpenCLContextTest {
     @OpenCLTest
     @Test
     public void init_defaultConfiguration_logsSelectedDeviceInfo() throws IOException {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // arrange
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
