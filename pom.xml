@@ -317,12 +317,14 @@ SPDX-License-Identifier: Apache-2.0
                     <compilerArgs>
                         <!--
                           -Xlint:all surfaces every category of javac warning at compile time.
-                          -Werror is intentionally NOT set yet; current main compile emits seven
-                          warnings (deprecated Thread.getId, deprecated jocl CL constant, two
-                          'this' escapes in KeyProducerJavaSocket/Zmq, Closeable.close declaring
-                          InterruptedException, explicit close on auto-closeable in OpenClTask).
-                          Captured as the "Make -Werror clean" TODO; flip it on once those are
-                          either fixed or explicitly suppressed.
+                          -Werror is intentionally NOT set yet. The original 6-item pre-flip
+                          list (deprecated Thread.getId, deprecated jocl CL_DEVICE_QUEUE_PROPERTIES,
+                          two 'this' escapes in KeyProducerJavaSocket/Zmq, Closeable.close
+                          declaring InterruptedException, explicit close on auto-closeable in
+                          OpenClTask) was cleared in commit 6eadc6f. The remaining blocker is
+                          the long tail of Error Prone warnings still at WARNING level; see the
+                          "Make -Werror clean" TODO in CLAUDE.md. Flip this on once that EP
+                          tail is at zero.
                         -->
                         <arg>-Xlint:all,-serial,-options,-classfile</arg>
                         <!--

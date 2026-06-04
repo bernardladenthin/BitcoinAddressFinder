@@ -68,8 +68,7 @@ public class Main implements Runnable, Interruptable {
 
     private final CConfiguration configuration;
 
-    @VisibleForTesting
-    final CountDownLatch runLatch = new CountDownLatch(1);
+    private final CountDownLatch runLatch = new CountDownLatch(1);
 
     /**
      * Returns the run-completion latch.
