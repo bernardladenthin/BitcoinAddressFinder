@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.function.Consumer;
 import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.UnknownSecretFormatException;
+import net.ladenthin.bitcoinaddressfinder.constants.Radix;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.DumpedPrivateKey;
@@ -53,10 +54,10 @@ public class SecretsFile extends AbstractPlaintextFile {
                         .hashString(line, StandardCharsets.UTF_8)
                         .asBytes();
                 String hexOfHash = Hex.encodeHexString(sha256);
-                yield new BigInteger(hexOfHash, 16);
+                yield new BigInteger(hexOfHash, Radix.HEX);
             }
             case BIG_INTEGER -> new BigInteger(line);
-            case SHA256 -> new BigInteger(line, 16);
+            case SHA256 -> new BigInteger(line, Radix.HEX);
             case DUMPED_PRIVATE_KEY -> {
                 DumpedPrivateKey dpk = DumpedPrivateKey.fromBase58(network, line);
                 yield dpk.getKey().getPrivKey();

@@ -253,7 +253,7 @@ public class AddressTxtLine {
             version = null;
         }
 
-        byte[] hash160 = new byte[20];
+        byte[] hash160 = new byte[OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES];
         int storedBytes = Math.min(decoded.length - versionBytes, hash160.length);
         {
             // copy hash160

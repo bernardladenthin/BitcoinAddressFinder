@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
+import net.ladenthin.bitcoinaddressfinder.constants.Radix;
 
 /**
  * Exception thrown when a given private key exceeds the safe upper bound
@@ -38,8 +39,8 @@ public class PrivateKeyTooLargeException extends IllegalArgumentException {
 
     private static String buildMessage(BigInteger providedKey, BigInteger maxAllowedKey, int batchSizeInBits) {
         return "Private key exceeds maximum allowed range for chunked grid mode: " + "\nProvided key:        0x"
-                + providedKey.toString(16) + "\nMaximum allowed key: 0x"
-                + maxAllowedKey.toString(16) + "\n(batchSizeInBits = "
+                + providedKey.toString(Radix.HEX) + "\nMaximum allowed key: 0x"
+                + maxAllowedKey.toString(Radix.HEX) + "\n(batchSizeInBits = "
                 + batchSizeInBits + ")"
                 + "\nThe maximum private key is defined in: Secp256k1Constants.MAX_PRIVATE_KEY";
     }
