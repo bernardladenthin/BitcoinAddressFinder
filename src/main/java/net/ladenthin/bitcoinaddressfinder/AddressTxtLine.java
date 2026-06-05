@@ -115,7 +115,8 @@ public class AddressTxtLine {
      * @throws AddressFormatNotAcceptedException if the address format is not accepted,
      *         with a reason message describing why
      */
-    public @NonNull AddressToCoin fromLine(String line, KeyUtility keyUtility) throws AddressFormatNotAcceptedException {
+    public @NonNull AddressToCoin fromLine(String line, KeyUtility keyUtility)
+            throws AddressFormatNotAcceptedException {
         // Checked before splitting: "#" is also a SeparatorFormat separator, so splitting first
         // would always produce an empty first token for "#..." lines, masking this reason.
         if (line.trim().startsWith(IGNORE_LINE_PREFIX)) {

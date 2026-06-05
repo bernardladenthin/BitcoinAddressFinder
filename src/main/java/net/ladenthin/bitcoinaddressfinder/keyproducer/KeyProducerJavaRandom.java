@@ -52,33 +52,36 @@ public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRando
 
         // It is already thread local, no need for ThreadLocalRandom.
         // EXPLOIT for: https://cwe.mitre.org/data/definitions/338
-        Random random = switch (cKeyProducerJavaRandom.keyProducerJavaRandomInstance) {
-            case SECURE_RANDOM -> {
-                try {
-                    yield SecureRandom.getInstanceStrong();
-                } catch (NoSuchAlgorithmException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-            case RANDOM_CURRENT_TIME_MILLIS_SEED -> new Random(System.currentTimeMillis());
-            case RANDOM_CUSTOM_SEED -> cKeyProducerJavaRandom.customSeed != null
-                    ? new Random(cKeyProducerJavaRandom.customSeed)
-                    : new Random();
-            case SHA1_PRNG -> {
-                try {
-                    SecureRandom sha1prng = SecureRandom.getInstance("SHA1PRNG");
-                    // To simulate bug: do NOT set a seed at all
-                    if (cKeyProducerJavaRandom.customSeed != null) {
-                        sha1prng.setSeed(cKeyProducerJavaRandom.customSeed); // only if explicitly configured
+        Random random =
+                switch (cKeyProducerJavaRandom.keyProducerJavaRandomInstance) {
+                    case SECURE_RANDOM -> {
+                        try {
+                            yield SecureRandom.getInstanceStrong();
+                        } catch (NoSuchAlgorithmException e) {
+                            throw new RuntimeException(e);
+                        }
                     }
-                    yield sha1prng;
-                } catch (NoSuchAlgorithmException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-            default -> throw new RuntimeException("Unknown keyProducerJavaRandomInstance: "
-                    + cKeyProducerJavaRandom.keyProducerJavaRandomInstance);
-        };
+                    case RANDOM_CURRENT_TIME_MILLIS_SEED -> new Random(System.currentTimeMillis());
+                    case RANDOM_CUSTOM_SEED ->
+                        cKeyProducerJavaRandom.customSeed != null
+                                ? new Random(cKeyProducerJavaRandom.customSeed)
+                                : new Random();
+                    case SHA1_PRNG -> {
+                        try {
+                            SecureRandom sha1prng = SecureRandom.getInstance("SHA1PRNG");
+                            // To simulate bug: do NOT set a seed at all
+                            if (cKeyProducerJavaRandom.customSeed != null) {
+                                sha1prng.setSeed(cKeyProducerJavaRandom.customSeed); // only if explicitly configured
+                            }
+                            yield sha1prng;
+                        } catch (NoSuchAlgorithmException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                    default ->
+                        throw new RuntimeException("Unknown keyProducerJavaRandomInstance: "
+                                + cKeyProducerJavaRandom.keyProducerJavaRandomInstance);
+                };
         randomSupplier = new RandomSecretSupplier(random);
     }
 

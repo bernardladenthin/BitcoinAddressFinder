@@ -32,25 +32,34 @@ public class ConfigFixturesParseTest {
 
     @Test
     public void allFindExampleConfigs_carryExplicitAwaitTimeouts() throws Exception {
-        for (String name : new String[]{
-                "config_Find_1OpenCLDevice.json",
-                "config_Find_1OpenCLDeviceAnd2CPUProducer.json",
-                "config_Find_8CPUProducer.json",
-                "config_Find_SecretsFile.json"}) {
+        for (String name : new String[] {
+            "config_Find_1OpenCLDevice.json",
+            "config_Find_1OpenCLDeviceAnd2CPUProducer.json",
+            "config_Find_8CPUProducer.json",
+            "config_Find_SecretsFile.json"
+        }) {
             Path file = Path.of("examples", name);
             String raw = Files.readString(file);
-            assertThat(name + " missing awaitTerminateSeconds",
-                    raw.contains("\"awaitTerminateSeconds\""), is(equalTo(true)));
-            assertThat(name + " missing awaitQueueEmptySeconds",
-                    raw.contains("\"awaitQueueEmptySeconds\""), is(equalTo(true)));
+            assertThat(
+                    name + " missing awaitTerminateSeconds",
+                    raw.contains("\"awaitTerminateSeconds\""),
+                    is(equalTo(true)));
+            assertThat(
+                    name + " missing awaitQueueEmptySeconds",
+                    raw.contains("\"awaitQueueEmptySeconds\""),
+                    is(equalTo(true)));
 
             CConfiguration parsed = Main.loadConfiguration(file);
             assertThat(name + " finder", parsed.finder, is(notNullValue()));
-            assertThat(name + " awaitTerminateSeconds",
-                    parsed.finder.awaitTerminateSeconds, is(equalTo(EXPECTED_AWAIT_TERMINATE_SECONDS)));
+            assertThat(
+                    name + " awaitTerminateSeconds",
+                    parsed.finder.awaitTerminateSeconds,
+                    is(equalTo(EXPECTED_AWAIT_TERMINATE_SECONDS)));
             assertThat(name + " consumerJava", parsed.finder.consumerJava, is(notNullValue()));
-            assertThat(name + " awaitQueueEmptySeconds",
-                    parsed.finder.consumerJava.awaitQueueEmptySeconds, is(equalTo(EXPECTED_AWAIT_QUEUE_EMPTY_SECONDS)));
+            assertThat(
+                    name + " awaitQueueEmptySeconds",
+                    parsed.finder.consumerJava.awaitQueueEmptySeconds,
+                    is(equalTo(EXPECTED_AWAIT_QUEUE_EMPTY_SECONDS)));
         }
     }
 }

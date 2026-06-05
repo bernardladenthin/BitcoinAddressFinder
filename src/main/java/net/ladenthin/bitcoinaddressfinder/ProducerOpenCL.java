@@ -57,13 +57,8 @@ public class ProducerOpenCL extends AbstractProducer {
             KeyUtility keyUtility,
             KeyProducer keyProducer,
             BitHelper bitHelper) {
-        this(
-                producerOpenCL,
-                consumer,
-                keyUtility,
-                keyProducer,
-                bitHelper,
-                (ThreadPoolExecutor) Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads));
+        this(producerOpenCL, consumer, keyUtility, keyProducer, bitHelper, (ThreadPoolExecutor)
+                Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads));
     }
 
     /**

@@ -25,7 +25,6 @@ import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.bitcoinj.base.Network;

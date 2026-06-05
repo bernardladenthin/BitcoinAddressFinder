@@ -47,7 +47,8 @@ public final class OpenClKernelConstants {
 
     // === private key ===
     /** Maximum number of bytes in a secp256k1 private key. */
-    public static final int PRIVATE_KEY_MAX_NUM_BYTES = Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS / BITS_PER_BYTE; // 32
+    public static final int PRIVATE_KEY_MAX_NUM_BYTES =
+            Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS / BITS_PER_BYTE; // 32
     /** Maximum number of {@code u32} words in a secp256k1 private key. */
     public static final int PRIVATE_KEY_MAX_NUM_WORDS = PRIVATE_KEY_MAX_NUM_BYTES / U32_NUM_BYTES; // 8
 

@@ -127,8 +127,7 @@ public class OpenCLDeviceTest {
         String output = device.toStringPretty();
 
         // assert
-        final String expectedString =
-                """
+        final String expectedString = """
             --- Info for OpenCL device: NVIDIA GeForce RTX 3070 Laptop GPU ---
             cl_device_id:                          cl_device_id[0x0]
             CL_DEVICE_NAME:                        NVIDIA GeForce RTX 3070 Laptop GPU

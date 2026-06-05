@@ -18,7 +18,10 @@ import org.jspecify.annotations.NonNull;
  * @param coin    the amount associated with the address
  * @param type    the address type
  */
-public record AddressToCoin(@NonNull ByteBuffer hash160, @NonNull Coin coin, @NonNull AddressType type) {
+public record AddressToCoin(
+        @NonNull ByteBuffer hash160,
+        @NonNull Coin coin,
+        @NonNull AddressType type) {
 
     /**
      * Compact constructor validating the {@code hash160} byte length.

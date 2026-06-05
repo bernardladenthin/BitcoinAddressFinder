@@ -320,7 +320,8 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
      */
     public BigInteger bigIntegerFromUnsignedByteArray(byte[] buffer) {
         if (buffer.length != OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES) {
-            throw new IllegalArgumentException("Expected buffer of length " + OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES);
+            throw new IllegalArgumentException(
+                    "Expected buffer of length " + OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES);
         }
         return new BigInteger(1, buffer);
     }

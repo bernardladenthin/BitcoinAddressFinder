@@ -256,8 +256,9 @@ public class Main implements Runnable, Interruptable {
                     List<OpenCLPlatform> openCLPlatforms = openCLBuilder.build();
                     System.out.println(openCLPlatforms);
                 }
-                default -> throw new UnsupportedOperationException(
-                        "Command: " + configuration.command.name() + " currently not supported.");
+                default ->
+                    throw new UnsupportedOperationException(
+                            "Command: " + configuration.command.name() + " currently not supported.");
             }
             LOGGER.info("Main#run end.");
         } catch (Exception e) {

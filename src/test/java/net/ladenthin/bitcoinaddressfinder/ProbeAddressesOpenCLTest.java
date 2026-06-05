@@ -365,7 +365,8 @@ public class ProbeAddressesOpenCLTest {
             openCLContext.init();
             Random sr = new Random(1337);
             BigInteger secret = keyUtility.createSecret(bitSize, sr);
-            BigInteger secretBase = keyUtility.alignDown(secret, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
+            BigInteger secretBase =
+                    keyUtility.alignDown(secret, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
 
             openCLContext.createKeys(secretBase);
         }
@@ -385,7 +386,8 @@ public class ProbeAddressesOpenCLTest {
             openCLContext.init();
             Random sr = new Random(1337);
             BigInteger secret = keyUtility.createSecret(BITS_FOR_BATCH - 1, sr);
-            BigInteger secretBase = keyUtility.alignDown(secret, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
+            BigInteger secretBase =
+                    keyUtility.alignDown(secret, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
 
             openCLContext.createKeys(secretBase);
         }
@@ -708,7 +710,8 @@ public class ProbeAddressesOpenCLTest {
     @Deprecated
     private static final byte[] getPublicKeyFromByteBuffer(ByteBuffer b, int keyOffset) {
         int paddingBytes = 3;
-        int publicKeyByteLength = OpenClKernelConstants.SEC_PUBLIC_KEY_COMPRESSED_WORDS * OpenClKernelConstants.U32_NUM_BYTES;
+        int publicKeyByteLength =
+                OpenClKernelConstants.SEC_PUBLIC_KEY_COMPRESSED_WORDS * OpenClKernelConstants.U32_NUM_BYTES;
         byte[] publicKey = new byte[publicKeyByteLength - paddingBytes];
         // its not inverted because the memory was written in OpenCL
         int offset = publicKeyByteLength * keyOffset;

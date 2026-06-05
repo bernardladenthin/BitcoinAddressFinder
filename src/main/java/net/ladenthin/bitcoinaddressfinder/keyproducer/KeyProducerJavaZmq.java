@@ -5,9 +5,9 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.Startable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,8 +25,7 @@ import org.zeromq.ZMQException;
  * the worker thread the moment the {@code new Thread(() -> ...)} lambda captures
  * {@code this}.</p>
  */
-public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaZmq>
-        implements Startable {
+public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaZmq> implements Startable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KeyProducerJavaZmq.class);
 

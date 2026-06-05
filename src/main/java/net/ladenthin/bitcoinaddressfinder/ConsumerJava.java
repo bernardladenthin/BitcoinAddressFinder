@@ -494,8 +494,8 @@ public class ConsumerJava implements Consumer {
                 consumers.size(),
                 consumerJava.awaitQueueEmptySeconds);
         try {
-            boolean terminated = consumeKeysExecutorService.awaitTermination(
-                    consumerJava.awaitQueueEmptySeconds, TimeUnit.SECONDS);
+            boolean terminated =
+                    consumeKeysExecutorService.awaitTermination(consumerJava.awaitQueueEmptySeconds, TimeUnit.SECONDS);
             if (!terminated) {
                 LOGGER.warn("Timeout reached. Some consumer threads may not have terminated cleanly.");
             }

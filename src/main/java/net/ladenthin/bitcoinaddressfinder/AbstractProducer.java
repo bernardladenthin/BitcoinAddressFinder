@@ -143,8 +143,7 @@ public abstract class AbstractProducer implements Producer {
                 }
             } else {
                 if (secrets.length != cProducer.getOverallWorkSize()) {
-                    throw new RuntimeException(
-                            "secrets.length != cProducer.getOverallWorkSize()");
+                    throw new RuntimeException("secrets.length != cProducer.getOverallWorkSize()");
                 }
             }
             privateKeyValidator.replaceInvalidPrivateKeys(secrets);

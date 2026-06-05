@@ -8,8 +8,8 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaReceiver;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

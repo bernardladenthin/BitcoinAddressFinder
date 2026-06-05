@@ -45,7 +45,7 @@ public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJava
         BigInteger counter = currentValue;
         for (int i = 0; i < length; i++) {
             if (counter.compareTo(endPrivateKey) > 0) {
-                throw new NoMoreSecretsAvailableException(counter + " exceeds end private key " +endPrivateKey);
+                throw new NoMoreSecretsAvailableException(counter + " exceeds end private key " + endPrivateKey);
             }
             secrets[i] = counter;
             counter = counter.add(BigInteger.ONE);

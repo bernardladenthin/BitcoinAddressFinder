@@ -73,8 +73,7 @@ public final class Secp256k1Constants {
      * and is used as the upper bound for valid-private-key range checks
      * &mdash; it is not a key, signing material, or secret.
      */
-    public static final String MAX_PRIVATE_KEY_HEX =
-            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141";
+    public static final String MAX_PRIVATE_KEY_HEX = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141";
 
     /**
      * The maximum valid private key according to the secp256k1

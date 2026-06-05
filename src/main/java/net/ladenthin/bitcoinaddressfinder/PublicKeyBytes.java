@@ -42,8 +42,9 @@ public class PublicKeyBytes {
     private static final Logger LOGGER = LoggerFactory.getLogger(PublicKeyBytes.class);
 
     /** Maximum technically representable 256-bit private key value ({@code 2^256 - 1}). */
-    public static final BigInteger MAX_TECHNICALLY_PRIVATE_KEY =
-            BigInteger.valueOf(2).pow(Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS).subtract(BigInteger.ONE);
+    public static final BigInteger MAX_TECHNICALLY_PRIVATE_KEY = BigInteger.valueOf(2)
+            .pow(Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS)
+            .subtract(BigInteger.ONE);
 
     /** Minimum private key value defined by the secp256k1 specification ({@code 1}). */
     public static final BigInteger MIN_PRIVATE_KEY = BigInteger.ONE;
@@ -96,6 +97,7 @@ public class PublicKeyBytes {
     @ToString.Include
     @EqualsAndHashCode.Include
     private final BigInteger secretKey;
+
     private final PrivateKeyValidator privateKeyValidator;
     private final Hash160 hash160 = new Hash160();
 
@@ -281,11 +283,17 @@ public class PublicKeyBytes {
         // prefix
         uncompressed[0] = OpenClKernelConstants.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT;
         // x
-        System.arraycopy(x, 0, uncompressed,
+        System.arraycopy(
+                x,
+                0,
+                uncompressed,
                 OpenClKernelConstants.SEC_PREFIX_NUM_BYTES,
                 OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES);
         // y
-        System.arraycopy(y, 0, uncompressed,
+        System.arraycopy(
+                y,
+                0,
+                uncompressed,
                 OpenClKernelConstants.SEC_PREFIX_NUM_BYTES + OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES,
                 OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES);
         return uncompressed;

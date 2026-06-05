@@ -148,8 +148,11 @@ public class ConsumerJavaTest {
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         ExecutorService consumeKeysExecutor = Executors.newFixedThreadPool(cConsumerJava.threads);
         ConsumerJava consumerJava = new ConsumerJava(
-                cConsumerJava, keyUtility, persistenceUtils,
-                Executors.newSingleThreadScheduledExecutor(), consumeKeysExecutor);
+                cConsumerJava,
+                keyUtility,
+                persistenceUtils,
+                Executors.newSingleThreadScheduledExecutor(),
+                consumeKeysExecutor);
         consumerJava.initLMDB();
 
         // add keys
@@ -179,8 +182,7 @@ public class ConsumerJavaTest {
         Duration waitTime = Duration.ofMillis(afterAct - beforeAct);
 
         // assert the waiting time is over, substract imprecision
-        assertThat(
-                waitTime, is(greaterThan(AwaitTimeTests.AWAIT_DURATION.minus(AwaitTimeTests.IMPRECISION))));
+        assertThat(waitTime, is(greaterThan(AwaitTimeTests.AWAIT_DURATION.minus(AwaitTimeTests.IMPRECISION))));
     }
 
     @Test
@@ -195,8 +197,8 @@ public class ConsumerJavaTest {
         cConsumerJava.printStatisticsEveryNSeconds = 1;
         ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
         ExecutorService consumeKeysExecutor = Executors.newFixedThreadPool(cConsumerJava.threads);
-        ConsumerJava consumerJava = new ConsumerJava(
-                cConsumerJava, keyUtility, persistenceUtils, scheduledExecutor, consumeKeysExecutor);
+        ConsumerJava consumerJava =
+                new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils, scheduledExecutor, consumeKeysExecutor);
 
         consumerJava.initLMDB();
         // pre-assert
@@ -660,7 +662,8 @@ public class ConsumerJavaTest {
     }
 
     private ByteBuffer createHash160ByteBuffer() {
-        ByteBuffer threadLocalReuseableByteBuffer = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
+        ByteBuffer threadLocalReuseableByteBuffer =
+                ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
         return threadLocalReuseableByteBuffer;
     }
 }

@@ -52,7 +52,8 @@ public class PrivateKeyValidatorTest {
 
         // assert
         BigInteger offset = BigInteger.ONE.shiftLeft(batchSizeInBits);
-        BigInteger expected = Secp256k1Constants.MAX_PRIVATE_KEY.subtract(offset).add(BigInteger.ONE);
+        BigInteger expected =
+                Secp256k1Constants.MAX_PRIVATE_KEY.subtract(offset).add(BigInteger.ONE);
         assertThat(result, is(equalTo(expected)));
     }
 

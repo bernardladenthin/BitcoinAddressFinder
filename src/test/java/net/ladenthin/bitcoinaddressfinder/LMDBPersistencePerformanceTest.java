@@ -67,8 +67,8 @@ public class LMDBPersistencePerformanceTest {
 
         ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
         ExecutorService consumeKeysExecutor = Executors.newFixedThreadPool(cConsumerJava.threads);
-        ConsumerJava consumerJava = new ConsumerJava(
-                cConsumerJava, keyUtility, persistenceUtils, scheduledExecutor, consumeKeysExecutor);
+        ConsumerJava consumerJava =
+                new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils, scheduledExecutor, consumeKeysExecutor);
         // Quiet ConsumerJava's class-level logger down to INFO for this perf test.
         ((ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ConsumerJava.class)).setLevel(Level.INFO);
 

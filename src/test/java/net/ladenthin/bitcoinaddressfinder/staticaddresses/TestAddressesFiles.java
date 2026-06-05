@@ -78,7 +78,26 @@ public class TestAddressesFiles implements AddressesFiles {
      * Note: This address does not collide with any hash160 values in {@link TestAddresses42}.
      */
     public static final byte[] NON_EXISTING_ADDRESS = {
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES
     };
 
     public TestAddressesFiles(boolean compressed) {

@@ -56,8 +56,7 @@ public class BitcoinAddressFinderArchitectureTest {
      * Locks the convention used by the ongoing logger-DI migration.
      */
     @ArchTest
-    static final ArchRule loggersArePrivateStaticFinal = fields()
-            .that()
+    static final ArchRule loggersArePrivateStaticFinal = fields().that()
             .haveRawType(Logger.class)
             .should()
             .bePrivate()
@@ -71,8 +70,7 @@ public class BitcoinAddressFinderArchitectureTest {
      * package starts importing from its parent or sibling.
      */
     @ArchTest
-    static final ArchRule noPackageCycles = slices()
-            .matching("net.ladenthin.bitcoinaddressfinder.(*)..")
+    static final ArchRule noPackageCycles = slices().matching("net.ladenthin.bitcoinaddressfinder.(*)..")
             .should()
             .beFreeOfCycles();
 
@@ -115,8 +113,7 @@ public class BitcoinAddressFinderArchitectureTest {
      * </ul>
      */
     @ArchTest
-    static final ArchRule noPublicMutableFields = fields()
-            .that()
+    static final ArchRule noPublicMutableFields = fields().that()
             .arePublic()
             .and()
             .areNotStatic()

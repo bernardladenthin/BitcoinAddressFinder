@@ -292,22 +292,23 @@ public class LMDBPersistence implements Persistence, AddressIterable {
                             LOGGER.trace("Process address: " + hexFromByteBuffer);
                         }
                         LegacyAddress address = keyUtility.byteBufferToAddress(addressAsByteBuffer);
-                        final String line = switch (addressFileOutputFormat) {
-                            case HexHash ->
-                                Hex.encodeHexString(address.getHash()) + System.lineSeparator();
-                            case FixedWidthBase58BitcoinAddress ->
-                                String.format("%-34s", address.toBase58()) + System.lineSeparator();
-                            case DynamicWidthBase58BitcoinAddressWithAmount -> {
-                                ByteBuffer value = kv.val();
-                                Coin coin = getCoinFromByteBuffer(value);
-                                yield address.toBase58()
-                                        + SeparatorFormat.COMMA.getSymbol()
-                                        + coin.getValue()
-                                        + System.lineSeparator();
-                            }
-                            default -> throw new IllegalArgumentException(
-                                    "Unknown addressFileOutputFormat: " + addressFileOutputFormat);
-                        };
+                        final String line =
+                                switch (addressFileOutputFormat) {
+                                    case HexHash -> Hex.encodeHexString(address.getHash()) + System.lineSeparator();
+                                    case FixedWidthBase58BitcoinAddress ->
+                                        String.format("%-34s", address.toBase58()) + System.lineSeparator();
+                                    case DynamicWidthBase58BitcoinAddressWithAmount -> {
+                                        ByteBuffer value = kv.val();
+                                        Coin coin = getCoinFromByteBuffer(value);
+                                        yield address.toBase58()
+                                                + SeparatorFormat.COMMA.getSymbol()
+                                                + coin.getValue()
+                                                + System.lineSeparator();
+                                    }
+                                    default ->
+                                        throw new IllegalArgumentException(
+                                                "Unknown addressFileOutputFormat: " + addressFileOutputFormat);
+                                };
                         writer.write(line);
                     }
                 }

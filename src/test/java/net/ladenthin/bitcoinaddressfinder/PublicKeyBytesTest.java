@@ -150,7 +150,8 @@ public class PublicKeyBytesTest {
         BigInteger secretKey = new BigInteger("1337");
         ECKey ecKey = ECKey.fromPrivate(secretKey, false);
         byte[] uncompressed = ecKey.getPubKey();
-        byte[] wrongCompressedHash = new byte[OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES]; // all-zero hash (invalid)
+        byte[] wrongCompressedHash =
+                new byte[OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES]; // all-zero hash (invalid)
 
         PublicKeyBytes publicKeyBytes = new PublicKeyBytes(secretKey, uncompressed, wrongCompressedHash);
 
@@ -171,7 +172,8 @@ public class PublicKeyBytesTest {
         ECKey ecKey = ECKey.fromPrivate(secretKey, false);
         byte[] uncompressed = ecKey.getPubKey();
         byte[] compressed = ECKey.fromPrivate(secretKey, true).getPubKey();
-        byte[] wrongUncompressedHash = new byte[OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES]; // all-zero hash (invalid)
+        byte[] wrongUncompressedHash =
+                new byte[OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES]; // all-zero hash (invalid)
 
         PublicKeyBytes publicKeyBytes = new PublicKeyBytes(secretKey, wrongUncompressedHash, compressed);
 
@@ -224,10 +226,15 @@ public class PublicKeyBytesTest {
         assertThat(result[0], is((byte) OpenClKernelConstants.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT));
         for (int i = 0; i < OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES; i++) {
             assertThat(
-                    "X coordinate mismatch at index " + i, result[i + OpenClKernelConstants.SEC_PREFIX_NUM_BYTES], is(x[i]));
+                    "X coordinate mismatch at index " + i,
+                    result[i + OpenClKernelConstants.SEC_PREFIX_NUM_BYTES],
+                    is(x[i]));
             assertThat(
                     "Y coordinate mismatch at index " + i,
-                    result[i + OpenClKernelConstants.SEC_PREFIX_NUM_BYTES + OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES],
+                    result[
+                            i
+                                    + OpenClKernelConstants.SEC_PREFIX_NUM_BYTES
+                                    + OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES],
                     is(y[i]));
         }
     }
