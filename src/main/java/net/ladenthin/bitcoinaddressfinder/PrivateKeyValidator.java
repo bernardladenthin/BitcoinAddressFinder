@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import org.jspecify.annotations.NonNull;
 
@@ -14,7 +15,14 @@ import org.jspecify.annotations.NonNull;
  * valid ranges, and for correcting invalid keys to a known replacement value.
  * It is particularly useful for grid-based key generation where batch sizes must
  * be carefully bounded to avoid exceeding the secp256k1 private key limit.
+ *
+ * <p>{@link ToString} is applied for consistency with the rest of the codebase: this class
+ * has no instance state so the rendered output is {@code PrivateKeyValidator()}, but that
+ * is more useful than the {@code PrivateKeyValidator@hashcode} identity-style form that
+ * would otherwise appear when this helper is logged as a field of
+ * {@code AbstractProducer.toString}.
  */
+@ToString
 public class PrivateKeyValidator {
 
     /** Creates a new {@link PrivateKeyValidator}. */

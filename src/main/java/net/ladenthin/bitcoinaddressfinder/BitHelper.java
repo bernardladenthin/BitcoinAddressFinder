@@ -4,11 +4,18 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 
 /**
  * Helpers for bit-count based batch sizing used by producers.
+ *
+ * <p>{@link ToString} is applied for consistency with the rest of the codebase: this class
+ * has no instance state so the rendered output is {@code BitHelper()}, but that is more
+ * useful than the {@code BitHelper@hashcode} identity-style form that would otherwise
+ * appear when this helper is logged as a field of {@code AbstractProducer.toString}.
  */
+@ToString
 public class BitHelper {
 
     /** Creates a new {@link BitHelper}. */

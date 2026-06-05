@@ -73,7 +73,12 @@ public class ConsumerJavaTest {
     // <editor-fold defaultstate="collapsed" desc="toString">
     @ToStringTest
     @Test
-    public void toString_whenCalled_containsClassNameAndIdentityHash() throws Exception {
+    public void toString_whenCalled_containsClassNameAndConfig() throws Exception {
+        // After migrating ConsumerJava to Lombok @ToString the output becomes
+        // "ConsumerJava(keyUtility=..., checkedKeys=0, ..., consumerJava=CConsumerJava(...), ...)".
+        // The old identity-style "ConsumerJava@<hex>" form is gone — replaced by a
+        // structured state snapshot. We assert on the class name + the consumerJava
+        // configuration carrier since identity is no longer in the contract.
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory =
@@ -84,7 +89,8 @@ public class ConsumerJavaTest {
         String toStringOutput = consumerJava.toString();
 
         assertThat(toStringOutput, not(emptyOrNullString()));
-        assertThat(toStringOutput, matchesPattern("ConsumerJava@\\p{XDigit}+"));
+        assertThat(toStringOutput, containsString("ConsumerJava("));
+        assertThat(toStringOutput, containsString("consumerJava=CConsumerJava("));
     }
     // </editor-fold>
 

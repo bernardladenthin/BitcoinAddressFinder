@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.AddressLookupBackend;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
@@ -38,6 +39,7 @@ import org.slf4j.LoggerFactory;
  * Single-process consumer that pulls candidate public keys from a queue and matches them
  * against the LMDB persistence layer.
  */
+@ToString
 public class ConsumerJava implements Consumer {
 
     /**
@@ -84,6 +86,8 @@ public class ConsumerJava implements Consumer {
     /** Consumer configuration. */
     protected final CConsumerJava consumerJava;
 
+    // ScheduledExecutorService toString is verbose pool internals — not useful in aggregate logs.
+    @ToString.Exclude
     private final ScheduledExecutorService scheduledExecutorService;
 
     /**
@@ -104,8 +108,17 @@ public class ConsumerJava implements Consumer {
 
     private final PersistenceUtils persistenceUtils;
 
+    // List of Future<Void> for the in-flight consumer iterations; toString is identity-style noise.
+    @ToString.Exclude
     private final List<Future<Void>> consumers = new ArrayList<>();
-    /** Queue of pending public-key batches; bounded by {@code consumerJava.queueSize}. */
+
+    /**
+     * Queue of pending public-key batches; bounded by {@code consumerJava.queueSize}.
+     *
+     * <p>Excluded from {@link ToString} — dumping every queued {@code PublicKeyBytes[]}
+     * batch would be log-killing.
+     */
+    @ToString.Exclude
     protected final LinkedBlockingQueue<PublicKeyBytes[]> keysQueue;
 
     /** Total number of vanity-pattern hits found so far. */
@@ -113,6 +126,8 @@ public class ConsumerJava implements Consumer {
 
     private final @Nullable Pattern vanityPattern;
 
+    // Lifecycle flag — uninformative in aggregate toString.
+    @ToString.Exclude
     private final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
     /**
@@ -136,6 +151,8 @@ public class ConsumerJava implements Consumer {
         return shouldRun.get();
     }
 
+    // ExecutorService toString is verbose pool internals — not useful in aggregate logs.
+    @ToString.Exclude
     private final ExecutorService consumeKeysExecutorService;
 
     /**
@@ -519,10 +536,5 @@ public class ConsumerJava implements Consumer {
     @VisibleForTesting
     int keysQueueSize() {
         return keysQueue.size();
-    }
-
-    @Override
-    public String toString() {
-        return "ConsumerJava@" + Integer.toHexString(System.identityHashCode(this));
     }
 }

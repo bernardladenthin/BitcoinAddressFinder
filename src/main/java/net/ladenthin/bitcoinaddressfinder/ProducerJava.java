@@ -4,12 +4,14 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 
 /**
  * CPU-based producer that derives public keys using bitcoinj's {@link PublicKeyBytes#fromPrivate}.
  */
+@ToString(callSuper = true)
 public class ProducerJava extends AbstractProducer {
 
     /** Producer-specific configuration. */
@@ -75,10 +77,5 @@ public class ProducerJava extends AbstractProducer {
             publicKeyBytesArray[i] = PublicKeyBytes.fromPrivate(gridSecret);
         }
         return publicKeyBytesArray;
-    }
-
-    @Override
-    public String toString() {
-        return "ProducerJava@" + Integer.toHexString(System.identityHashCode(this));
     }
 }
