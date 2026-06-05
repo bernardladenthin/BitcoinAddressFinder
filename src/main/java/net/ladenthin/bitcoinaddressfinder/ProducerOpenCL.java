@@ -7,6 +7,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.math.BigInteger;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 import org.jspecify.annotations.Nullable;
@@ -16,14 +17,21 @@ import org.slf4j.LoggerFactory;
 /**
  * GPU-based producer using OpenCL kernels to derive public keys in batches.
  */
+@ToString(callSuper = true)
 public class ProducerOpenCL extends AbstractProducer {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ProducerOpenCL.class);
 
     private final CProducerOpenCL producerOpenCL;
 
+    // ThreadPoolExecutor toString is verbose internal pool state — not useful in logs.
+    @ToString.Exclude
     private final ThreadPoolExecutor resultReaderThreadPoolExecutor;
 
+    // OpenCLContext aggregates JOCL native pointers + own state — exposed via the
+    // isInitialized() getter below instead so callers see "initialized=true/false"
+    // without the heavyweight inner dump.
+    @ToString.Exclude
     private @Nullable OpenCLContext openCLContext;
 
     /**
@@ -37,6 +45,7 @@ public class ProducerOpenCL extends AbstractProducer {
      * @return {@code true} when the context has been initialised and is still open;
      *     {@code false} when not yet initialised or after release
      */
+    @ToString.Include(name = "initialized")
     public boolean isInitialized() {
         return openCLContext != null;
     }

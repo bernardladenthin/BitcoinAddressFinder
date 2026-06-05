@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicBoolean;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
@@ -17,6 +18,7 @@ import org.slf4j.LoggerFactory;
  * Base class for {@link Producer} implementations providing the common state machine,
  * key consumption loop and shutdown handling.
  */
+@ToString
 public abstract class AbstractProducer implements Producer {
 
     private static final int SLEEP_WAIT_TILL_RUNNING = 10;
@@ -47,11 +49,25 @@ public abstract class AbstractProducer implements Producer {
 
     /** Configuration backing this producer. */
     protected final CProducer cProducer;
-    /** Downstream consumer that receives generated keys. */
+
+    /**
+     * Downstream consumer that receives generated keys.
+     *
+     * <p>Excluded from {@link ToString} — stateful coordinator (executors + queue +
+     * lifecycle), recursive/heavy in logs.
+     */
+    @ToString.Exclude
     protected final Consumer consumer;
     /** Cryptographic helper used to encode/decode private keys. */
     protected final KeyUtility keyUtility;
-    /** Strategy that supplies the next secret batch. */
+
+    /**
+     * Strategy that supplies the next secret batch.
+     *
+     * <p>Excluded from {@link ToString} — stateful coordinator covered by its own
+     * {@code toString}; including here would produce recursive output.
+     */
+    @ToString.Exclude
     protected final KeyProducer keyProducer;
     /** Helper for bit-level batch size arithmetic. */
     protected final BitHelper bitHelper;
@@ -61,7 +77,12 @@ public abstract class AbstractProducer implements Producer {
     /** Current life-cycle state. */
     protected volatile ProducerState state = ProducerState.UNINITIALIZED;
 
-    /** Flag controlling the main {@link #run()} loop; cleared via {@link #interrupt()}. */
+    /**
+     * Flag controlling the main {@link #run()} loop; cleared via {@link #interrupt()}.
+     *
+     * <p>Excluded from {@link ToString} — uninformative lifecycle flag.
+     */
+    @ToString.Exclude
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
     /**

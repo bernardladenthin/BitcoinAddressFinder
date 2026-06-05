@@ -18,6 +18,7 @@ import static org.jocl.CL.clSetKernelArg;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.jocl.Pointer;
@@ -36,6 +37,7 @@ import org.slf4j.LoggerFactory;
 // the null values that the OpenCL C ABI accepts (e.g. errcode_ret, event_wait_list,
 // event, global_work_offset). Suppress at class scope to avoid per-call noise.
 @SuppressWarnings({"nullness:argument", "nullness:dereference.of.nullable"})
+@ToString
 public class OpenClTask implements ReleaseCLObject {
 
     /** SLF4J logger for this task. */
@@ -45,8 +47,12 @@ public class OpenClTask implements ReleaseCLObject {
 
     private final CProducerOpenCL cProducer;
 
+    // JOCL cl_context is a native-pointer wrapper — toString is uninformative.
+    @ToString.Exclude
     private final cl_context context;
 
+    // SourceArgument carries its own ByteBuffer payload — heavy and not useful in logs.
+    @ToString.Exclude
     private final SourceArgument privateKeySourceArgument;
 
     private final BitHelper bitHelper;

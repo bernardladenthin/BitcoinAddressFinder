@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
@@ -24,6 +25,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Imports one or more plaintext address files into an LMDB database.
  */
+@ToString
 public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     private static final long PROGRESS_LOG = 100_000;
@@ -36,10 +38,18 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     private final ReadStatistic readStatistic = new ReadStatistic();
 
+    // AtomicReference toString is identity-style and the wrapped value mutates per-file —
+    // the per-file diagnostic belongs in the LOGGER lines, not in this aggregate's toString.
+    @ToString.Exclude
     @NonNull
     AtomicReference<@Nullable AddressFile> currentAddressFile = new AtomicReference<>();
 
-    /** Flag controlling the main import loop; cleared via {@link #interrupt()}. */
+    /**
+     * Flag controlling the main import loop; cleared via {@link #interrupt()}.
+     *
+     * <p>Excluded from {@link ToString} — uninformative lifecycle flag.
+     */
+    @ToString.Exclude
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
     /**

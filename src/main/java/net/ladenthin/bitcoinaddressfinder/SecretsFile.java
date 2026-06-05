@@ -20,7 +20,7 @@ import org.jspecify.annotations.NonNull;
 /**
  * Reads a secrets file line by line, decoding each line according to {@link CSecretFormat}.
  */
-@ToString
+@ToString(callSuper = true)
 public class SecretsFile extends AbstractPlaintextFile {
 
     private final CSecretFormat secretFormat;

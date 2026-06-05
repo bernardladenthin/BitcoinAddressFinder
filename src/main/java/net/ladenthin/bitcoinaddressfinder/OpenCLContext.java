@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
@@ -50,6 +51,7 @@ import org.slf4j.LoggerFactory;
 // errcode_ret). Checker Framework reads those parameters as @NonNull by default and
 // flags every site. Suppress at class scope rather than per call — same justification.
 @SuppressWarnings({"nullness:argument", "nullness:dereference.of.nullable"})
+@ToString
 public class OpenCLContext implements ReleaseCLObject {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OpenCLContext.class);
@@ -97,11 +99,24 @@ public class OpenCLContext implements ReleaseCLObject {
     private final CProducerOpenCL producerOpenCL;
     private final BitHelper bitHelper;
 
+    // JOCL native-pointer wrappers (cl_context / cl_command_queue / cl_program / cl_kernel) —
+    // toString is uninformative for any of them. openClTask is also excluded to avoid
+    // recursive aggregation into this context's snapshot.
+    @ToString.Exclude
     private @Nullable cl_context context;
+
+    @ToString.Exclude
     private @Nullable cl_command_queue commandQueue;
+
+    @ToString.Exclude
     private @Nullable cl_program program;
+
+    @ToString.Exclude
     private @Nullable cl_kernel kernel;
+
+    @ToString.Exclude
     private @Nullable OpenClTask openClTask;
+
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
 
     private boolean closed = false;

@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import org.bitcoinj.crypto.ChildNumber;
 import org.bitcoinj.crypto.DeterministicKey;
@@ -19,7 +20,16 @@ import org.bitcoinj.wallet.DeterministicSeed;
 /**
  * Deterministic key producer based on a BIP39 mnemonic + BIP44 path.
  * Allows sequential derivation of keys like Random.next() from a fixed HD wallet seed.
+ *
+ * <h2>toString contract — security-sensitive exclusion</h2>
+ * <p>The {@code keyChain} field holds the {@link DeterministicKeyChain} seeded from the
+ * mnemonic — printing it to logs would leak derivable key material. It is excluded
+ * from {@link ToString} unconditionally. callSuper is also off because the parent
+ * {@link java.util.Random} produces an identity-style toString that adds noise without
+ * value. The included fields ({@code basePath}, {@code hardened}, {@code counter})
+ * are operationally useful (path identifier + current progress) and carry no secrets.
  */
+@ToString
 public class BIP39KeyProducer extends java.util.Random {
 
     private static final long serialVersionUID = 1L;
@@ -38,6 +48,9 @@ public class BIP39KeyProducer extends java.util.Random {
      * deserialisation); the field is in practice immutable since it is only
      * assigned by the constructor.
      */
+    // SECURITY: DeterministicKeyChain toString can leak derivable key material. NEVER include
+    // in logs — see class-level Javadoc for the toString contract.
+    @ToString.Exclude
     private transient DeterministicKeyChain keyChain;
     /**
      * Parsed BIP44 base derivation path.

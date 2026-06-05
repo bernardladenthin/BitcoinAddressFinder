@@ -5,18 +5,24 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.File;
 import java.util.function.Consumer;
+import lombok.ToString;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.NonNull;
 
 /**
  * Reads an address text file line by line and forwards each entry to address or unsupported consumers.
  */
+@ToString(callSuper = true)
 public class AddressFile extends AbstractPlaintextFile {
 
     private final @NonNull KeyUtility keyUtility;
 
+    // Lambda Consumer — toString is the implementation hash, not useful in logs.
+    @ToString.Exclude
     private final @NonNull Consumer<AddressToCoin> addressConsumer;
 
+    // Lambda Consumer — toString is the implementation hash, not useful in logs.
+    @ToString.Exclude
     private final @NonNull Consumer<String> unsupportedConsumer;
 
     /**

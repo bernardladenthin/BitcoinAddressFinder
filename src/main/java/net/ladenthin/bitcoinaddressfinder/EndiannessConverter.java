@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.nio.ByteOrder;
+import lombok.ToString;
 
 /**
  * Utility class for converting byte arrays between different endianness formats.
@@ -12,6 +13,7 @@ import java.nio.ByteOrder;
  * If they differ, the array is reversed.
  * </p>
  */
+@ToString
 public class EndiannessConverter {
 
     private final ByteOrder sourceOrder;

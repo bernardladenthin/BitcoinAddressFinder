@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.*;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
@@ -33,6 +34,7 @@ import org.slf4j.LoggerFactory;
  * Orchestrator: wires up key producers, producers and the consumer based on the configuration and
  * manages their life cycle.
  */
+@ToString
 public class Finder implements Interruptable {
 
     /** SLF4J logger for the {@link Finder}. */
@@ -42,12 +44,22 @@ public class Finder implements Interruptable {
 
     private final Map<String, KeyProducer> keyProducers = new HashMap<>();
 
+    // ConsumerJava is a stateful coordinator (executors + queue + lifecycle) — recursive/heavy.
+    @ToString.Exclude
     private @Nullable ConsumerJava consumerJava;
 
+    // The three producer lists hold mutable stateful coordinators — recursive/heavy in logs.
+    @ToString.Exclude
     private final List<ProducerOpenCL> openCLProducers = new ArrayList<>();
+
+    @ToString.Exclude
     private final List<ProducerJava> javaProducers = new ArrayList<>();
+
+    @ToString.Exclude
     private final List<ProducerJavaSecretsFiles> javaProducersSecretsFiles = new ArrayList<>();
 
+    // ExecutorService toString is verbose pool internals — not useful in aggregate logs.
+    @ToString.Exclude
     private final ExecutorService producerExecutorService;
 
     private final KeyUtility keyUtility;

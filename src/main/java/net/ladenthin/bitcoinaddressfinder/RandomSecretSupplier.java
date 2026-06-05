@@ -5,10 +5,12 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
 import java.util.Random;
+import lombok.ToString;
 
 /**
  * {@link SecretSupplier} backed by a {@link Random} instance.
  */
+@ToString
 public class RandomSecretSupplier implements SecretSupplier {
     private final Random random;
 
