@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.Startable;
@@ -25,6 +26,7 @@ import org.zeromq.ZMQException;
  * the worker thread the moment the {@code new Thread(() -> ...)} lambda captures
  * {@code this}.</p>
  */
+@ToString(callSuper = true)
 public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaZmq> implements Startable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KeyProducerJavaZmq.class);

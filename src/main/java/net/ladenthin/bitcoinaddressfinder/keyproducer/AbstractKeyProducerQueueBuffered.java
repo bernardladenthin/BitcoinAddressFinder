@@ -7,6 +7,7 @@ import java.math.BigInteger;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaReceiver;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
@@ -19,6 +20,7 @@ import org.slf4j.LoggerFactory;
  *
  * @param <T> the configuration type for this receiver-based key producer
  */
+@ToString(callSuper = true)
 public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJavaReceiver> extends KeyProducerJava<T> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractKeyProducerQueueBuffered.class);
@@ -34,6 +36,8 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
     /** Shared {@link KeyUtility} for converting between byte arrays and {@link BigInteger}. */
     protected final KeyUtility keyUtility;
     /** Queue of pending secrets received from the underlying transport. */
+    // BlockingQueue.toString dumps every queued element — potentially huge.
+    @ToString.Exclude
     protected final BlockingQueue<byte[]> secretQueue;
     /** Flag set to {@code true} once shutdown has been signalled. */
     protected volatile boolean shouldStop = false;

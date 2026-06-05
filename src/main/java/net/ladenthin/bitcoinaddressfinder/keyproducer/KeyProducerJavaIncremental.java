@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import java.math.BigInteger;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
@@ -12,6 +13,7 @@ import org.jspecify.annotations.NonNull;
 /**
  * Key producer that iterates a private-key range sequentially.
  */
+@ToString(callSuper = true)
 public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJavaIncremental> {
 
     private @NonNull BigInteger currentValue;

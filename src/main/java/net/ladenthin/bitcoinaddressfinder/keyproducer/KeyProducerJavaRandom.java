@@ -7,6 +7,7 @@ import java.math.BigInteger;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Random;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.RandomSecretSupplier;
@@ -16,6 +17,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 /**
  * Key producer that draws secrets from a configurable random-number generator.
  */
+@ToString(callSuper = true)
 public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRandom> {
 
     /**

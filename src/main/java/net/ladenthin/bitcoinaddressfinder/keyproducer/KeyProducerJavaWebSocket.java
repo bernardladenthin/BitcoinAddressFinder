@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Executors;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.FireAndForget;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
@@ -29,6 +30,7 @@ import org.slf4j.LoggerFactory;
  * {@code WebSocketServer} subclass captures the outer-class {@code this} and its
  * callbacks call back into {@code addSecret} / read {@code shouldStop}).</p>
  */
+@ToString(callSuper = true)
 public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaWebSocket>
         implements Startable {
 

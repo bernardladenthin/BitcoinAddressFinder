@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJava;
 
 /**
@@ -10,6 +11,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJava;
  *
  * @param <T> the configuration type for the concrete subclass
  */
+@ToString
 public abstract class KeyProducerJava<T extends CKeyProducerJava> extends AbstractKeyProducer {
 
     /** Configuration for the concrete key producer. */
