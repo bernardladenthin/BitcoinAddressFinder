@@ -107,7 +107,9 @@ public class PublicKeyBytesTest {
                 publicKeyBytesUncompressed.toString(),
                 is(
                         equalTo(
-                                "PublicKeyBytes{secretKey=24250429618215260598957696001935175135959229619080974590971174872813112994997}")));
+                                // Lombok @ToString format: Class(field=value); paren-delimited,
+                                // secretKey-only per @ToString(onlyExplicitlyIncluded = true).
+                                "PublicKeyBytes(secretKey=24250429618215260598957696001935175135959229619080974590971174872813112994997)")));
     }
 
     @Test
@@ -284,7 +286,8 @@ public class PublicKeyBytesTest {
         String toStringOutput = publicKeyBytesUncompressed.toString();
 
         assertThat(toStringOutput, not(emptyOrNullString()));
-        assertThat(toStringOutput, matchesPattern("PublicKeyBytes\\{secretKey=\\d+}"));
+        // Lombok @ToString format: Class(field=value); paren-delimited.
+        assertThat(toStringOutput, matchesPattern("PublicKeyBytes\\(secretKey=\\d+\\)"));
     }
     // </editor-fold>
 

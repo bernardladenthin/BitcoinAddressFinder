@@ -346,8 +346,12 @@ SPDX-License-Identifier: Apache-2.0
                           so it acts as a second-opinion verifier on the same JSpecify
                           annotations.
                         -->
+                        <!-- Lombok's two AP classes must be listed alongside the Checker Framework
+                             processor so javac runs all three. Without naming the Lombok processors
+                             here they are silently skipped because the explicit -processor arg
+                             overrides SPI-registered processors. -->
                         <arg>-processor</arg>
-                        <arg>org.checkerframework.checker.nullness.NullnessChecker</arg>
+                        <arg>lombok.launch.AnnotationProcessorHider$AnnotationProcessor,lombok.launch.AnnotationProcessorHider$ClaimingProcessor,org.checkerframework.checker.nullness.NullnessChecker</arg>
                         <!--
                           Override CF 4.1.0's incorrect Objects.requireNonNull stub. The shipped
                           stub annotates obj as @NonNull, the opposite of the JDK contract.
@@ -379,6 +383,16 @@ SPDX-License-Identifier: Apache-2.0
                     </compilerArgs>
 
                     <annotationProcessorPaths>
+                        <!-- Lombok must run FIRST so the equals/hashCode/toString
+                             methods it generates exist when Error Prone, NullAway,
+                             and Checker Framework analyze the compilation unit.
+                             Without this, Lombok annotations are silently ignored
+                             and the methods fall back to java.lang.Object defaults. -->
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
                         <path>
                             <groupId>com.google.errorprone</groupId>
                             <artifactId>error_prone_core</artifactId>
