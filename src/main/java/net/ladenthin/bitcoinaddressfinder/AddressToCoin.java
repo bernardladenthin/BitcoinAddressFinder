@@ -32,11 +32,25 @@ public record AddressToCoin(
         }
     }
 
+    /**
+     * Custom {@code toString} override.
+     *
+     * <p>Java's default record {@code toString} renders {@code hash160} as
+     * {@code java.nio.HeapByteBuffer[pos=0 lim=20 cap=20]} (uninformative). This override
+     * formats the 20-byte hash as a lower-case hex string for log readability, and matches
+     * the standard record-style {@code Class[field=value, ...]} format so the output sits
+     * naturally alongside the other BAF records (KeyUtility, OpenCLDevice, etc.).
+     *
+     * <p>This is the only record in BAF that needs a custom toString; the rest can rely on
+     * the auto-generated record form because their components have informative defaults.
+     * The {@code coin} and {@code type} components delegate to the bitcoinj {@code Coin}
+     * {@code AddressType} {@code toString} implementations respectively.
+     */
     @Override
     public @NonNull String toString() {
-        return "AddressToCoin{" + "hash160="
+        return "AddressToCoin[hash160="
                 + new ByteBufferUtility(false).getHexFromByteBuffer(hash160) + ", coin="
                 + coin + ", type="
-                + type + '}';
+                + type + ']';
     }
 }
