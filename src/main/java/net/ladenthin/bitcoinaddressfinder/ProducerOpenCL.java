@@ -114,7 +114,9 @@ public class ProducerOpenCL extends AbstractProducer {
     public void processSecretBase(BigInteger secretBase) {
         final OpenCLContext localOpenCLContext = openCLContext;
         if (localOpenCLContext == null) {
-            throw new IllegalStateException("ProducerOpenCL not initialized");
+            throw new IllegalStateException(
+                    "ProducerOpenCL.processSecretBase(" + secretBase
+                            + ") called before initProducer(); openCLContext is null");
         }
         try {
             waitTillFreeThreadsInPool();

@@ -106,7 +106,11 @@ public class LMDBPersistence implements Persistence, AddressIterable {
         } else if (lmdbConfigurationReadOnly != null) {
             initReadOnly();
         } else {
-            throw new IllegalArgumentException("Neither write nor read-only configuration provided.");
+            throw new IllegalArgumentException(
+                    getClass().getSimpleName()
+                            + ".init() requires either lmdbConfigurationWrite or"
+                            + " lmdbConfigurationReadOnly to be set; both are null"
+                            + " (check the <persistence> block in your finder configuration JSON)");
         }
 
         logStatsIfConfigured(true);

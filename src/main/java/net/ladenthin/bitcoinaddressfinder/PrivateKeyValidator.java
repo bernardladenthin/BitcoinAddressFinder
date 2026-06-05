@@ -44,7 +44,8 @@ public class PrivateKeyValidator {
     public BigInteger getMaxPrivateKeyForBatchSize(int batchSizeInBits) {
         if (batchSizeInBits < 0 || batchSizeInBits > Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS) {
             throw new IllegalArgumentException(
-                    "batchSizeInBits must be between 0 and " + Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS);
+                    "batchSizeInBits must be in [0, " + Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS
+                            + "] but was " + batchSizeInBits);
         }
 
         // 2^batchSizeInBits represents the maximum offset (grid size)
@@ -55,7 +56,10 @@ public class PrivateKeyValidator {
                 Secp256k1Constants.MAX_PRIVATE_KEY.subtract(maxOffset).add(BigInteger.ONE);
 
         if (maxSafeKey.signum() < 0) {
-            throw new IllegalStateException("batchSizeInBits too large; no valid private keys remain.");
+            throw new IllegalStateException(
+                    "batchSizeInBits=" + batchSizeInBits
+                            + " too large; resulting maxSafeKey=" + maxSafeKey
+                            + " (must be >= 1) — no valid private keys remain");
         }
 
         return maxSafeKey;

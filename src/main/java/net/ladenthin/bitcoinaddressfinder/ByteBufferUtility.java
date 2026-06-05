@@ -167,7 +167,9 @@ public class ByteBufferUtility {
      */
     public ByteBuffer allocateByteBufferDirectStrict(int capacity) {
         if (!allocateDirect) {
-            throw new IllegalStateException("Direct allocation requested, but allocateDirect is false.");
+            throw new IllegalStateException(
+                    "Direct ByteBuffer allocation requested (capacity=" + capacity
+                            + " bytes) but this ByteBufferUtility was constructed with allocateDirect=false");
         }
         return ByteBuffer.allocateDirect(capacity);
     }

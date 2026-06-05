@@ -252,7 +252,8 @@ public class ConsumerJava implements Consumer {
     protected void startStatisticsTimer() {
         long period = consumerJava.printStatisticsEveryNSeconds;
         if (period <= 0) {
-            throw new IllegalArgumentException("period must be greater than 0.");
+            throw new IllegalArgumentException(
+                    "consumerJava.printStatisticsEveryNSeconds must be > 0 but was " + period);
         }
 
         startTime = System.currentTimeMillis();
