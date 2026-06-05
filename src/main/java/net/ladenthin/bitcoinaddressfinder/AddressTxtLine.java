@@ -246,7 +246,7 @@ public class AddressTxtLine {
                     parseBase58Address(address, VERSION_BYTES_REGULAR, CHECKSUM_BYTES_REGULAR, keyUtility);
             return new AddressToCoin(addressToCoin.hash160(), amount, addressToCoin.type());
         } catch (AddressFormatException e) {
-            throw new AddressFormatNotAcceptedException(REASON_INVALID_BASE58, e);
+            throw new AddressFormatNotAcceptedException(REASON_INVALID_BASE58, address, e);
         }
     }
 

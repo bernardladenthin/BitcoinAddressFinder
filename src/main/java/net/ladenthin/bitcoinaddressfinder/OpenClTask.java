@@ -312,7 +312,9 @@ public class OpenClTask implements ReleaseCLObject {
 
             // Validate loopCount constraints
             if (loopCount < 1) {
-                throw new IllegalArgumentException("loopCount must be >= 1.");
+                throw new IllegalArgumentException(
+                        "loopCount must be >= 1 but was " + loopCount
+                                + " (totalResultCount=" + totalResultCount + ")");
             }
             if (loopCount > totalResultCount) {
                 throw new IllegalArgumentException("loopCount must not exceed total result count. Given: " + loopCount
@@ -320,7 +322,10 @@ public class OpenClTask implements ReleaseCLObject {
             }
             if (totalResultCount % loopCount != 0) {
                 throw new IllegalArgumentException(
-                        "batchSizeInBits is not divisible by loopCount; result count would be invalid.");
+                        "totalResultCount=" + totalResultCount
+                                + " is not divisible by loopCount=" + loopCount
+                                + "; result count would be invalid"
+                                + " (cProducer.batchSizeInBits=" + cProducer.batchSizeInBits + ")");
             }
 
             final long[] global_work_size = new long[] {adjustedWorkSize};

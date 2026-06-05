@@ -160,11 +160,15 @@ public abstract class AbstractProducer implements Producer {
             // assert the requested secrets array fulfill its request parameter
             if (cProducer.batchUsePrivateKeyIncrement) {
                 if (secrets.length != 1) {
-                    throw new RuntimeException("secrets.length != 1");
+                    throw new RuntimeException(
+                            "secrets.length=" + secrets.length
+                                    + " but cProducer.batchUsePrivateKeyIncrement=true requires exactly 1");
                 }
             } else {
                 if (secrets.length != cProducer.getOverallWorkSize()) {
-                    throw new RuntimeException("secrets.length != cProducer.getOverallWorkSize()");
+                    throw new RuntimeException(
+                            "secrets.length=" + secrets.length
+                                    + " != cProducer.getOverallWorkSize()=" + cProducer.getOverallWorkSize());
                 }
             }
             privateKeyValidator.replaceInvalidPrivateKeys(secrets);

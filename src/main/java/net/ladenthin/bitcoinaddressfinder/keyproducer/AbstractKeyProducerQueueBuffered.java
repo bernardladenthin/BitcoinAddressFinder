@@ -77,7 +77,8 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
 
         for (int i = 0; i < length; i++) {
             if (shouldStop) {
-                throw new NoMoreSecretsAvailableException("Interrupted while waiting for secrets");
+                throw new NoMoreSecretsAvailableException(
+                        "Interrupted while waiting for secrets at iteration " + i + "/" + length);
             }
 
             try {
@@ -90,12 +91,16 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
                 } else {
                     secret = secretQueue.poll(timeout, TimeUnit.MILLISECONDS);
                     if (secret == null) {
-                        throw new NoMoreSecretsAvailableException("Timeout while waiting for secret");
+                        throw new NoMoreSecretsAvailableException(
+                                "Timeout (" + timeout + " ms) while waiting for secret at iteration "
+                                        + i + "/" + length);
                     }
                 }
 
                 if (secret == SHUTDOWN_SENTINEL) {
-                    throw new NoMoreSecretsAvailableException("Interrupted while waiting for secret");
+                    throw new NoMoreSecretsAvailableException(
+                            "Shutdown sentinel received while waiting for secret at iteration "
+                                    + i + "/" + length);
                 }
 
                 if (secret.length != OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES) {
@@ -110,7 +115,8 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new NoMoreSecretsAvailableException("Interrupted while polling secret", e);
+                throw new NoMoreSecretsAvailableException(
+                        "Interrupted while polling secret at iteration " + i + "/" + length, e);
             }
         }
 

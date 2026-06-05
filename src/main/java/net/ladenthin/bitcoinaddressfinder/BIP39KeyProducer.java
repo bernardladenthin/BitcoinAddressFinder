@@ -116,7 +116,10 @@ public class BIP39KeyProducer extends java.util.Random {
     public DeterministicKey nextKey() throws NoMoreSecretsAvailableException {
         int index = counter.getAndIncrement();
         if (index < 0) {
-            throw new NoMoreSecretsAvailableException("Child index overflow: counter exceeded Integer.MAX_VALUE");
+            throw new NoMoreSecretsAvailableException(
+                    "Child index overflow: AtomicInteger counter wrapped past Integer.MAX_VALUE"
+                            + " (observed wrapped index=" + index + ", basePath=" + basePath
+                            + ", hardened=" + hardened + ")");
         }
         List<ChildNumber> path = append(basePath, new ChildNumber(index, hardened));
         return keyChain.getKeyByPath(path, true);
