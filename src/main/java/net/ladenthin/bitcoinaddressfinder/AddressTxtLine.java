@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder;
 import com.google.common.hash.Hashing;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.bitcoinj.base.Base58;
 import org.bitcoinj.base.Bech32;
@@ -20,7 +21,14 @@ import org.slf4j.LoggerFactory;
 /**
  * Most txt files have a common format which uses Base58 address and separated
  * anmount.
+ *
+ * <p>{@link ToString} is applied for consistency with every other class in the
+ * codebase that gets a Lombok-generated {@code toString}; rendered output is
+ * {@code AddressTxtLine()} (empty parens) today because the class has no
+ * instance fields. If parser flags or other instance state are added later they
+ * will be auto-included.
  */
+@ToString
 public class AddressTxtLine {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AddressTxtLine.class);
