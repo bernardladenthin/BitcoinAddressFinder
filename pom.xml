@@ -66,6 +66,7 @@ SPDX-License-Identifier: Apache-2.0
         <java-websocket.version>1.6.0</java-websocket.version>
         <jeromq.version>0.6.0</jeromq.version>
         <jspecify.version>1.0.0</jspecify.version>
+        <lombok.version>1.18.46</lombok.version>
         <bitcoinj.version>0.17.1</bitcoinj.version>
         <bcprov.version>1.84</bcprov.version>
         <protobuf.version>4.35.0</protobuf.version>
@@ -727,6 +728,12 @@ SPDX-License-Identifier: Apache-2.0
         </plugins>
     </build>
     <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>org.java-websocket</groupId>
             <artifactId>Java-WebSocket</artifactId>

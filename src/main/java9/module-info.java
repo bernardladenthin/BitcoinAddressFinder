@@ -24,6 +24,12 @@
  * -P assembly} runs on the classpath, where the module descriptor is ignored.</p>
  */
 module net.ladenthin.bitcoinaddressfinder {
+    // Lombok is `provided` scope: only used at compile time to generate equals/hashCode/toString.
+    // `requires static` means the runtime does not need the lombok jar on the module path —
+    // the @lombok.Generated annotation carried on generated members has CLASS retention, so it
+    // is present in the .class file but not consulted at runtime by JVM linking.
+    requires static lombok;
+
     opens net.ladenthin.bitcoinaddressfinder.configuration to com.fasterxml.jackson.databind;
 
     exports net.ladenthin.bitcoinaddressfinder;
