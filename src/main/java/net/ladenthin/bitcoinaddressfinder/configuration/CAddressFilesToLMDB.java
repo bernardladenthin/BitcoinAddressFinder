@@ -5,11 +5,13 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import java.util.ArrayList;
 import java.util.List;
+import lombok.ToString;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Configuration for the {@code AddressFilesToLMDB} command.
  */
+@ToString
 public class CAddressFilesToLMDB {
 
     /** Creates a new {@link CAddressFilesToLMDB}. */

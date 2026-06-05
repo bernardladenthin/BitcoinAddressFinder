@@ -3,11 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+import lombok.ToString;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Common configuration shared by all producers.
  */
+@ToString
 public class CProducer {
 
     /** Creates a new {@link CProducer}. */

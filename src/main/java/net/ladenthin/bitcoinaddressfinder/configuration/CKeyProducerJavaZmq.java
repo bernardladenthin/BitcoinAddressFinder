@@ -3,9 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+import lombok.ToString;
+
 /**
  * Configuration for the ZeroMQ-based key producer.
  */
+@ToString(callSuper = true)
 public class CKeyProducerJavaZmq extends CKeyProducerJavaReceiver {
 
     /** Creates a new {@link CKeyProducerJavaZmq}. */

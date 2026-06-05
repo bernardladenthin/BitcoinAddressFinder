@@ -3,11 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+import lombok.ToString;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Root configuration object loaded from the JSON config file.
  */
+@ToString
 public class CConfiguration {
 
     /** Creates a new {@link CConfiguration}. */

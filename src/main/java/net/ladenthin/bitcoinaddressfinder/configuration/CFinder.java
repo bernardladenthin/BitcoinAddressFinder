@@ -5,11 +5,13 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import java.util.ArrayList;
 import java.util.List;
+import lombok.ToString;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Configuration for the {@code Find} command: producers, key producers and consumer.
  */
+@ToString
 public class CFinder {
 
     /** Creates a new {@link CFinder}. */

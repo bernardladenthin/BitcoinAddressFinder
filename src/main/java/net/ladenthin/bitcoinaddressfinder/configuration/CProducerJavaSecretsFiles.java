@@ -5,10 +5,12 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import java.util.ArrayList;
 import java.util.List;
+import lombok.ToString;
 
 /**
  * Configuration for the producer that reads secrets from one or more files.
  */
+@ToString(callSuper = true)
 public class CProducerJavaSecretsFiles extends CProducerJava {
     /** Creates a new {@link CProducerJavaSecretsFiles}. */
     public CProducerJavaSecretsFiles() {}

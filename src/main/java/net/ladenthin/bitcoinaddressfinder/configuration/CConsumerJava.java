@@ -3,12 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+import lombok.ToString;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Configuration for the Java-based consumer that queries the LMDB database.
  */
+@ToString
 public class CConsumerJava {
 
     /** Creates a new {@link CConsumerJava}. */
