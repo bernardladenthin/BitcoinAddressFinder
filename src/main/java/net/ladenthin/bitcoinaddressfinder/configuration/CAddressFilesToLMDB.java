@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import java.util.ArrayList;
 import java.util.List;
+import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.jspecify.annotations.Nullable;
 
@@ -12,6 +13,7 @@ import org.jspecify.annotations.Nullable;
  * Configuration for the {@code AddressFilesToLMDB} command.
  */
 @ToString
+@EqualsAndHashCode
 public class CAddressFilesToLMDB {
 
     /** Creates a new {@link CAddressFilesToLMDB}. */

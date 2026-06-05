@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.jspecify.annotations.Nullable;
 
@@ -10,6 +11,7 @@ import org.jspecify.annotations.Nullable;
  * Configuration for the {@code SecureRandom}-based key producer.
  */
 @ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
 public class CKeyProducerJavaRandom extends CKeyProducerJava {
 
     /** Creates a new {@link CKeyProducerJavaRandom}. */

@@ -5,12 +5,14 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import static org.jocl.CL.CL_DEVICE_TYPE_ALL;
 
+import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
 /**
  * Configuration for the OpenCL (GPU) producer.
  */
 @ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
 public class CProducerOpenCL extends CProducer {
 
     /** Creates a new {@link CProducerOpenCL}. */

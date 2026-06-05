@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import java.time.Instant;
+import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.jspecify.annotations.Nullable;
 
@@ -11,6 +12,7 @@ import org.jspecify.annotations.Nullable;
  * Configuration for the BIP39 mnemonic-based key producer.
  */
 @ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
 public class CKeyProducerJavaBip39 extends CKeyProducerJava {
 
     /** Creates a new {@link CKeyProducerJavaBip39}. */

@@ -3,12 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
 /**
  * Configuration for the {@code LMDBToAddressFile} export command.
  */
 @ToString
+@EqualsAndHashCode
 public class CLMDBToAddressFile {
 
     /** Creates a new {@link CLMDBToAddressFile}. */
