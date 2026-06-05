@@ -485,4 +485,41 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="EXS_EXCEPTION_SOFTENING_HAS_CHECKED"/>
     </Match>
 
+    <!--
+        IMC_IMMATURE_CLASS_NO_EQUALS on three exception types.
+
+        AddressFormatNotAcceptedException, KeyProducerIdIsNotUniqueException,
+        and KeyProducerIdUnknownException are domain exceptions that follow
+        the standard JDK / bitcoinj / junit / jackson / slf4j convention:
+        exceptions are events with identity semantics, not value objects.
+
+        Adding Lombok-generated value-equality on an exception class would:
+          - Surprise readers familiar with the JDK convention (Throwable
+            never overrides equals).
+          - Change the semantics of Set&lt;Exception&gt; / Map&lt;Exception, ?&gt;
+            instances at every call site (a single parse failure with
+            "reason X" would now hash-collide with every other failure
+            sharing the same reason).
+          - Force callers that rely on catch-block reference equality
+            (e.g. "is THIS exception the one we just rethrew?") to migrate
+            to identity comparison even though identity is what they meant.
+
+        Generating an equals that does NOT compare any field (callSuper=true
+        on a Throwable subclass) is a no-op: super.equals is identity, so
+        the generated method always returns false on different instances,
+        which is precisely what NOT overriding equals already gives us.
+
+        Per-class @SuppressFBWarnings annotations would require importing
+        edu.umd.cs.findbugs.annotations.SuppressFBWarnings into 3 production
+        classes for zero functional gain over this central suppression.
+    -->
+    <Match>
+        <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.AddressFormatNotAcceptedException"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdIsNotUniqueException"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdUnknownException"/>
+        </Or>
+        <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
+    </Match>
+
 </FindBugsFilter>

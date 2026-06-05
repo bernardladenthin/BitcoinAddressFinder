@@ -5,12 +5,19 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
 import java.util.Random;
+import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
 /**
  * {@link SecretSupplier} backed by a {@link Random} instance.
+ *
+ * <p>Lombok-generated equals/hashCode compare the wrapped {@link Random} by identity
+ * (Random does not override Object equality). Two suppliers wrapping the same Random
+ * instance therefore compare equal; two suppliers wrapping different Random instances —
+ * even ones seeded identically — do not.
  */
 @ToString
+@EqualsAndHashCode
 public class RandomSecretSupplier implements SecretSupplier {
     private final Random random;
 
