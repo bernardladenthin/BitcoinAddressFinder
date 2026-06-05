@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.Finder;
+import net.ladenthin.bitcoinaddressfinder.InterruptedRuntimeException;
 import net.ladenthin.bitcoinaddressfinder.Interruptable;
 import net.ladenthin.bitcoinaddressfinder.LMDBToAddressFile;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
@@ -270,7 +271,10 @@ public class Main implements Runnable, Interruptable {
         } catch (Exception e) {
             LOGGER.error("Fatal error during Main.run; triggering shutdown of all registered components.", e);
             interrupt();
-            throw new RuntimeException(e);
+            throw new IllegalStateException(
+                    "Main.run() failed on thread " + Thread.currentThread().getName()
+                            + "; shutdown triggered",
+                    e);
         } finally {
             runLatch.countDown();
         }
@@ -331,7 +335,8 @@ public class Main implements Runnable, Interruptable {
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new RuntimeException(e);
+                throw new InterruptedRuntimeException(
+                        "Interrupted while awaiting runLatch during shutdown-hook (30s timeout)", e);
             }
             LOGGER.info("Finish shutdown hook.");
         }));

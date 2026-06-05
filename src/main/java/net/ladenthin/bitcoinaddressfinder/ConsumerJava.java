@@ -520,7 +520,10 @@ public class ConsumerJava implements Consumer {
         } catch (InterruptedException e) {
             LOGGER.error("Interrupted while awaiting consumer termination.", e);
             Thread.currentThread().interrupt();
-            throw new RuntimeException(e);
+            throw new InterruptedRuntimeException(
+                    "Interrupted while awaiting consumer termination on thread "
+                            + Thread.currentThread().getName(),
+                    e);
         }
         try {
             if (persistence != null) {
@@ -529,7 +532,10 @@ public class ConsumerJava implements Consumer {
                 persistence = null;
             }
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new IllegalStateException(
+                    "Failed to close persistence during ConsumerJava shutdown ("
+                            + e.getClass().getSimpleName() + ")",
+                    e);
         }
         LOGGER.debug("Interrupt complete: resources released and persistence closed.");
     }

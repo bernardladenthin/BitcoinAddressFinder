@@ -92,8 +92,8 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
                     secret = secretQueue.poll(timeout, TimeUnit.MILLISECONDS);
                     if (secret == null) {
                         throw new NoMoreSecretsAvailableException(
-                                "Timeout (" + timeout + " ms) while waiting for secret at iteration "
-                                        + i + "/" + length);
+                                "Timeout while waiting for secret ("
+                                        + timeout + " ms, iteration " + i + "/" + length + ")");
                     }
                 }
 

@@ -124,7 +124,11 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
             }
 
             if (!shouldStop && socket == null) {
-                throw new RuntimeException("Unable to establish socket connection", lastException);
+                throw new IllegalStateException(
+                        "Unable to establish socket connection to "
+                                + cKeyProducerJava.getHost() + ":" + cKeyProducerJava.getPort()
+                                + " after " + attempts + " attempts",
+                        lastException);
             }
         });
     }

@@ -60,7 +60,11 @@ public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRando
                         try {
                             yield SecureRandom.getInstanceStrong();
                         } catch (NoSuchAlgorithmException e) {
-                            throw new RuntimeException(e);
+                            throw new IllegalStateException(
+                                    "JDK SecureRandom.getInstanceStrong() unavailable ("
+                                            + e.getMessage()
+                                            + ") — JRE security config broken",
+                                    e);
                         }
                     }
                     case RANDOM_CURRENT_TIME_MILLIS_SEED -> new Random(System.currentTimeMillis());
@@ -77,12 +81,18 @@ public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRando
                             }
                             yield sha1prng;
                         } catch (NoSuchAlgorithmException e) {
-                            throw new RuntimeException(e);
+                            throw new IllegalStateException(
+                                    "JDK SecureRandom.getInstance(\"SHA1PRNG\") unavailable ("
+                                            + e.getMessage()
+                                            + ") — JRE security config broken",
+                                    e);
                         }
                     }
                     default ->
-                        throw new RuntimeException("Unknown keyProducerJavaRandomInstance: "
-                                + cKeyProducerJavaRandom.keyProducerJavaRandomInstance);
+                        throw new IllegalStateException(
+                                "Unknown keyProducerJavaRandomInstance enum value: "
+                                        + cKeyProducerJavaRandom.keyProducerJavaRandomInstance
+                                        + " (KeyProducerJavaRandom switch must be exhaustive)");
                 };
         randomSupplier = new RandomSecretSupplier(random);
     }

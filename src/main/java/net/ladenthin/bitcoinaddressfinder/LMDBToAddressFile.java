@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBToAddressFile;
@@ -56,7 +57,8 @@ public class LMDBToAddressFile implements Runnable, Interruptable {
                     addressesFile, lmdbToAddressFile.addressFileOutputFormat, shouldRun);
             LOGGER.info("writeAllAmounts done");
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new UncheckedIOException(
+                    "Failed to write LMDB dump to " + lmdbToAddressFile.addressesFile, e);
         }
     }
 

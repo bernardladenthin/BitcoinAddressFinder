@@ -188,7 +188,10 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
                 }
                 logMnemonic.append(']');
             } catch (IOException | IllegalArgumentException ex) {
-                throw new RuntimeException(ex);
+                throw new IllegalStateException(
+                        "Failed to format BIP39 mnemonic for diagnostic logging ("
+                                + ex.getClass().getSimpleName() + ")",
+                        ex);
             }
         }
         return logMnemonic.toString();

@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Objects;
@@ -117,7 +118,8 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
                     LOGGER.info("Error in line: " + error);
                 }
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                throw new UncheckedIOException(
+                        "Failed to import address file (file in flight: " + currentAddressFile.get() + ")", e);
             }
         }
     }
