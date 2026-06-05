@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 
@@ -13,6 +14,7 @@ import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
  * Holds the raw OpenCL grid result for a single secret-key base together with helpers to convert
  * it into {@link PublicKeyBytes} objects.
  */
+@ToString
 public class OpenCLGridResult {
 
     /**
@@ -30,6 +32,8 @@ public class OpenCLGridResult {
 
     private final BigInteger secretKeyBase;
     private final int workSize;
+    // ByteBuffer.toString is "HeapByteBuffer[pos=N lim=M cap=K]" — useless in logs.
+    @ToString.Exclude
     private final ByteBuffer result;
 
     OpenCLGridResult(BigInteger secretKeyBase, int workSize, ByteBuffer result) {

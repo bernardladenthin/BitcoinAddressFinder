@@ -6,12 +6,14 @@ package net.ladenthin.bitcoinaddressfinder;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import lombok.ToString;
 import org.bouncycastle.util.encoders.Hex;
 import org.jspecify.annotations.NonNull;
 
 /**
  * Helper for {@link ByteBuffer} allocation, byte-array conversion and reversal.
  */
+@ToString
 public class ByteBufferUtility {
 
     /**

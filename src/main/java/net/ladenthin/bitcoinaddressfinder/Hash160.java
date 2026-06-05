@@ -6,6 +6,7 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import com.google.common.hash.Hashing;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.bitcoinj.crypto.internal.CryptoUtils;
 import org.bouncycastle.crypto.digests.RIPEMD160Digest;
@@ -25,6 +26,7 @@ import org.jspecify.annotations.NonNull;
  *
  * <p>The default constructor uses {@link #DEFAULT_USE_FAST}.</p>
  */
+@ToString
 public class Hash160 {
 
     /**

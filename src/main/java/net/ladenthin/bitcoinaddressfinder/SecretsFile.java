@@ -8,6 +8,7 @@ import java.io.File;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.function.Consumer;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.UnknownSecretFormatException;
 import net.ladenthin.bitcoinaddressfinder.constants.Radix;
@@ -19,10 +20,15 @@ import org.jspecify.annotations.NonNull;
 /**
  * Reads a secrets file line by line, decoding each line according to {@link CSecretFormat}.
  */
+@ToString
 public class SecretsFile extends AbstractPlaintextFile {
 
     private final CSecretFormat secretFormat;
+    // Consumer is a lambda/method-ref; its toString is the implementation class
+    // hash, not useful in logs.
+    @ToString.Exclude
     private final Consumer<BigInteger[]> secretConsumer;
+
     private final Network network;
 
     /**
