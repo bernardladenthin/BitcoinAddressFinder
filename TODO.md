@@ -125,6 +125,20 @@ pluggable-persistence design plan:
 
 - **Cross-repo code-quality TODOs** — see [`../workspace/policies/code-quality-todos.md`](../workspace/policies/code-quality-todos.md) for the canonical `@VisibleForTesting` design-fit review (BAF site-by-site audit captured in [`../workspace/crossrepostatus.md`](../workspace/crossrepostatus.md)), package hierarchy review, and class/method naming review.
 
+- **Drop the catch-rethrow `THROWS_METHOD_THROWS_RUNTIMEEXCEPTION`
+  suppression in `spotbugs-exclude.xml`** once a SpotBugs release
+  ships with [PR #4087](https://github.com/spotbugs/spotbugs/pull/4087)
+  merged. That PR fixes the detector to match the exception-handler
+  ASTORE register against the local variable being thrown, so the
+  catch-then-rethrow-of-the-same-RuntimeException pattern on
+  `AbstractProducer.produceKeys` and `LMDBPersistence.addresses` will
+  stop firing the warning. Tracking issue:
+  [spotbugs/spotbugs#3918](https://github.com/spotbugs/spotbugs/issues/3918).
+  Verification when removing the suppression: run `mvn spotbugs:check`
+  with `<effort>Max</effort>` + `<threshold>Low</threshold>` and
+  confirm zero `THROWS_METHOD_THROWS_RUNTIMEEXCEPTION` findings on
+  those two methods.
+
 ## Done (kept for history)
 
 ### -Werror flip (BAF-specific, completed this session)

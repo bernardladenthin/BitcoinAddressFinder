@@ -615,4 +615,69 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="CRLF_INJECTION_LOGS"/>
     </Match>
 
+    <!--
+        THROWS_METHOD_THROWS_RUNTIMEEXCEPTION — narrow suppression on two
+        catch+cleanup+rethrow sites.
+
+        Both methods follow the pattern
+            try { ... } catch (RuntimeException e) { cleanup(); throw e; }
+        The exception the caller actually sees at runtime is whatever the
+        inner code threw (IllegalStateException, NoMoreSecretsAvailableException,
+        NPE, etc.), NOT a new RuntimeException constructed at the catch site.
+        fb-contrib reads the rethrow as "method throws RuntimeException" from
+        the compile-time catch-variable type only — a known false positive
+        acknowledged upstream:
+
+          - Issue: https://github.com/spotbugs/spotbugs/issues/3918
+            "THROWS_METHOD_THROWS_RUNTIMEEXCEPTION is reported when a
+             RuntimeException is caught and rethrown within the same catch
+             block. This shouldn't trigger the warning, because we are just
+             rethrowing an exception that would have been thrown anyway if
+             we hadn't caught it."
+          - Fix in flight: https://github.com/spotbugs/spotbugs/pull/4087
+            "Matches exception-handler ASTORE registers against the local
+             variable being thrown, and suppresses the warning when the
+             caught type is RuntimeException (or a subtype)."
+
+        Once SpotBugs ships with #4087 merged, drop this suppression — the
+        TODO entry in BAF's TODO.md tracks the lifecycle.
+
+        Alternatives considered and rejected:
+          1. Wrap+rethrow via a new "UncheckedRuntimeException" /
+             "CaughtRuntimeException" class. Rejected because:
+               (a) Changes the runtime type the caller sees, breaking any
+                   caller that catches a specific subtype (e.g.
+                   NoMoreSecretsAvailableException).
+               (b) Adds a "caused by:" frame to every stack trace that goes
+                   through one of these methods.
+               (c) Ironically violates the very SEI CERT ERR07-J rule the
+                   detector enforces — ERR07-J exists so callers can
+                   distinguish typed exceptions for recovery; wrapping hides
+                   the type. The SpotBugs maintainers articulate this
+                   directly in #3918 ("rethrowing an exception that would
+                   have been thrown anyway" is fine; constructing one is
+                   not).
+          2. Narrow the catch to specific subtypes. Drops coverage of
+             unforeseen RuntimeException subtypes (NPE, CCE, …) that the
+             cleanup is meant to handle uniformly.
+          3. try-finally that always runs cleanup. Doesn't fit either site:
+             AbstractProducer.produceKeys logs only on the exception path
+             (not on success); LMDBPersistence.addresses must keep the txn
+             open on the success path so the returned Stream.onClose
+             handler can close it after the caller drains the stream.
+    -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.AbstractProducer"/>
+                <Method name="produceKeys"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
+                <Method name="addresses"/>
+            </And>
+        </Or>
+        <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
+    </Match>
+
 </FindBugsFilter>
