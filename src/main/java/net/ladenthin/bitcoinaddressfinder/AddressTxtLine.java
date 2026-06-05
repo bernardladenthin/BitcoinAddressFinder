@@ -128,7 +128,7 @@ public class AddressTxtLine {
         // Checked before splitting: "#" is also a SeparatorFormat separator, so splitting first
         // would always produce an empty first token for "#..." lines, masking this reason.
         if (line.trim().startsWith(IGNORE_LINE_PREFIX)) {
-            throw new AddressFormatNotAcceptedException(REASON_IGNORE_PREFIX);
+            throw new AddressFormatNotAcceptedException(REASON_IGNORE_PREFIX, line);
         }
         // Remove the Bitcoin Cash prefix (which includes a colon) to avoid incorrect splitting.
         // This ensures the address is recognized properly and not misinterpreted during parsing.
@@ -140,10 +140,10 @@ public class AddressTxtLine {
         Coin amount = getCoinIfPossible(lineSplitted, DEFAULT_COIN);
         address = address.trim();
         if (address.isEmpty()) {
-            throw new AddressFormatNotAcceptedException(REASON_EMPTY);
+            throw new AddressFormatNotAcceptedException(REASON_EMPTY, line);
         }
         if (address.startsWith(ADDRESS_HEADER)) {
-            throw new AddressFormatNotAcceptedException(REASON_ADDRESS_HEADER);
+            throw new AddressFormatNotAcceptedException(REASON_ADDRESS_HEADER, address);
         }
 
         // Riecoin: ScriptPubKey-style encoded address (hex with OP codes)
@@ -164,7 +164,7 @@ public class AddressTxtLine {
 
         // Blockchair Multisig (P2MS) format is not supported
         if (address.startsWith("d-") || address.startsWith("m-") || address.startsWith("s-")) {
-            throw new AddressFormatNotAcceptedException(REASON_P2MS_NOT_SUPPORTED);
+            throw new AddressFormatNotAcceptedException(REASON_P2MS_NOT_SUPPORTED, address);
         }
 
         // BitCore WKH format (Base36-encoded hash160)
@@ -192,7 +192,7 @@ public class AddressTxtLine {
                         ByteBuffer hash160 = keyUtility.byteBufferUtility().byteArrayToByteBuffer(witnessProgram);
                         return new AddressToCoin(hash160, amount, AddressType.P2WPKH); // P2WPKH supported
                     } else if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_SH) {
-                        throw new AddressFormatNotAcceptedException(REASON_P2WSH_NOT_SUPPORTED);
+                        throw new AddressFormatNotAcceptedException(REASON_P2WSH_NOT_SUPPORTED, address);
                     }
                 }
                 case WITNESS_VERSION_1 -> {
@@ -203,10 +203,11 @@ public class AddressTxtLine {
                                     "Rejecting P2TR taproot tweaked public key: {}",
                                     org.apache.commons.codec.binary.Hex.encodeHexString(tweakedPublicKey));
                         }
-                        throw new AddressFormatNotAcceptedException(REASON_P2TR_NOT_SUPPORTED);
+                        throw new AddressFormatNotAcceptedException(REASON_P2TR_NOT_SUPPORTED, address);
                     }
                 }
-                default -> throw new AddressFormatNotAcceptedException(REASON_UNSUPPORTED_WITNESS_VERSION);
+                default -> throw new AddressFormatNotAcceptedException(
+                        REASON_UNSUPPORTED_WITNESS_VERSION, address + " witnessVersion=" + witnessVersion);
             }
         } catch (AddressFormatException | ReflectiveOperationException e) {
             // Bech32 parsing or reflection failed; continue to next format
@@ -236,7 +237,7 @@ public class AddressTxtLine {
         } catch (DecoderException e) {
             throw e;
         } catch (RuntimeException | ReflectiveOperationException e) {
-            throw new AddressFormatNotAcceptedException(REASON_BITCOIN_CASH_Q_ADDRESS_NOT_PARSABLE, e);
+            throw new AddressFormatNotAcceptedException(REASON_BITCOIN_CASH_Q_ADDRESS_NOT_PARSABLE, address, e);
         }
 
         // Fallback: assume Base58 with 1-byte version prefix
