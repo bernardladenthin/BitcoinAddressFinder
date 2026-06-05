@@ -555,4 +555,64 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="USBR_UNNECESSARY_STORE_BEFORE_RETURN"/>
     </Match>
 
+    <!--
+        CRLF_INJECTION_LOGS — project-wide suppression.
+
+        Mitigation lives in the Logback PatternLayout, not at each call site.
+        The bundled src/main/resources/logback.xml uses
+            %replace(%msg){'[\r\n]+', ' | '}
+        on every appender. Any CR/LF in the rendered message body is
+        normalised to " | " before the appender flushes, so untrusted bytes
+        that reach a LOGGER.* argument cannot forge new log lines. This
+        covers every LOGGER.* call in the project — including transitive
+        dependency logs and any sites added by future contributors —
+        without per-site wrapping. Throwables render via %xThrowable / %ex
+        (a separate pattern token), so multi-line stack traces are
+        preserved. The same pattern is documented in
+        examples/logbackConfiguration.xml for operators who supply their
+        own logback.xml override.
+
+        Rationale for choosing native Logback %replace over alternatives:
+          - org.owasp:security-logging-logback (%crlf converter): the
+            "textbook OWASP answer" is effectively unmaintained — latest
+            Maven Central release 1.1.7 published 2021-12-15, no activity
+            since. Equivalent function is ~20 lines of regex wrapped as a
+            CompositeConverter; pulling in three jars for that is not
+            justified when Logback ships the same control natively.
+          - Logback JsonEncoder / logstash-logback-encoder: a stronger
+            answer that escapes CRLF as a side effect of JSON encoding,
+            but requires the operator's log pipeline to consume JSON;
+            loses cat/tail/grep usability for plain-file deployments.
+          - Per-site value.replaceAll("[\r\n]", ""): 68 mechanical edits
+            with no guard against future call sites forgetting the wrap.
+            The control disappears the moment a new contributor adds a
+            LOGGER.info(rawInput) call without re-running the audit.
+
+        Threat-model note: of the 68 sites fb-contrib flagged, most log
+        operator-controlled state (paths and config values from the POM /
+        JSON file the operator wrote; an attacker who can edit those
+        already has full RCE) or locally-computed deterministic state
+        (hex-encoded bytes the code itself just built — CRLF is
+        structurally impossible). The real attack surface is network input
+        flowing into Exception.getMessage() in KeyProducerJavaSocket /
+        WebSocket / Zmq; the layout-layer %replace covers those sites the
+        same way it covers everything else. The fb-contrib detector reads
+        bytecode and cannot inspect logback.xml, so the static finding
+        persists; this Match silences it project-wide with the layout
+        pattern as the documented control.
+
+        Authoritative references:
+          - OWASP Logging Cheat Sheet
+            https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
+          - OWASP Injection Prevention in Java Cheat Sheet
+            https://cheatsheetseries.owasp.org/cheatsheets/Injection_Prevention_in_Java_Cheat_Sheet.html
+          - SEI CERT IDS03-J. Do not log unsanitized user input
+            https://wiki.sei.cmu.edu/confluence/display/java/IDS03-J.+Do+not+log+unsanitized+user+input
+          - find-sec-bugs #425 (false-positive discussion)
+            https://github.com/find-sec-bugs/find-sec-bugs/issues/425
+    -->
+    <Match>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+    </Match>
+
 </FindBugsFilter>
