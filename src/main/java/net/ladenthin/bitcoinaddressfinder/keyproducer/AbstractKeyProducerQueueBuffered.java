@@ -68,8 +68,7 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
     }
 
     @Override
-    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly)
-            throws NoMoreSecretsAvailableException {
+    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) {
         verifyWorkSize(overallWorkSize, cKeyProducerJava.maxWorkSize);
 
         int length = returnStartSecretOnly ? 1 : overallWorkSize;

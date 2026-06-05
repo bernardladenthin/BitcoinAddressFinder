@@ -113,7 +113,7 @@ public class BIP39KeyProducer extends java.util.Random {
      * @return the next {@link DeterministicKey}
      * @throws NoMoreSecretsAvailableException if the internal child-index counter overflows
      */
-    public DeterministicKey nextKey() throws NoMoreSecretsAvailableException {
+    public DeterministicKey nextKey() {
         int index = counter.getAndIncrement();
         if (index < 0) {
             throw new NoMoreSecretsAvailableException(

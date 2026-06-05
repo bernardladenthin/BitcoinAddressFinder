@@ -231,8 +231,7 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
      * @throws NoMoreSecretsAvailableException if the supplier cannot satisfy the request
      */
     public BigInteger[] createSecrets(
-            int overallWorkSize, boolean returnStartSecretOnly, int privateKeyMaxNumBits, SecretSupplier supplier)
-            throws NoMoreSecretsAvailableException {
+            int overallWorkSize, boolean returnStartSecretOnly, int privateKeyMaxNumBits, SecretSupplier supplier) {
         int length = returnStartSecretOnly ? 1 : overallWorkSize;
         BigInteger[] secrets = new BigInteger[length];
         for (int i = 0; i < secrets.length; i++) {

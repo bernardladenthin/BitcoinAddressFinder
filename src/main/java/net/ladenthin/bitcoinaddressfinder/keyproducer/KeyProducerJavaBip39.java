@@ -43,8 +43,7 @@ public class KeyProducerJavaBip39 extends KeyProducerJava<CKeyProducerJavaBip39>
     }
 
     @Override
-    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly)
-            throws NoMoreSecretsAvailableException {
+    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) {
         verifyWorkSize(overallWorkSize, cKeyProducerJava.maxWorkSize);
         return keyUtility.createSecrets(
                 overallWorkSize, returnStartSecretOnly, this.cKeyProducerJava.privateKeyMaxNumBits, randomSupplier);

@@ -234,9 +234,9 @@ public class Finder implements Interruptable {
      *
      * @param cProducer the producer configuration
      * @return the resolved {@link KeyProducer}
-     * @throws RuntimeException if the referenced id is unknown
+     * @throws KeyProducerIdUnknownException if the referenced id is null or unknown
      */
-    public KeyProducer getKeyProducer(CProducer cProducer) throws RuntimeException {
+    public KeyProducer getKeyProducer(CProducer cProducer) {
         final String id = cProducer.keyProducerId;
         if (id == null) {
             throw new KeyProducerIdUnknownException(null);

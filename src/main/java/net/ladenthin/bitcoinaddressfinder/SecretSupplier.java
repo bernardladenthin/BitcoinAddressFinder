@@ -18,5 +18,5 @@ public interface SecretSupplier {
      * @return the next secret
      * @throws NoMoreSecretsAvailableException if the supplier cannot produce more secrets
      */
-    BigInteger nextSecret(int bitLength) throws NoMoreSecretsAvailableException;
+    BigInteger nextSecret(int bitLength);
 }
