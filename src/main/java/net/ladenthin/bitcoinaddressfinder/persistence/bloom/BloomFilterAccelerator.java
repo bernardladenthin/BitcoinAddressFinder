@@ -7,6 +7,7 @@ import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
 import java.nio.ByteBuffer;
 import java.util.stream.Stream;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressLookup;
 import org.bitcoinj.base.Coin;
@@ -34,10 +35,14 @@ import org.jspecify.annotations.NonNull;
  * {@link BloomFilter} are thread-safe. Guava's {@link BloomFilter#mightContain} is safe for
  * concurrent reads.
  */
+@ToString
 public final class BloomFilterAccelerator implements AddressLookup {
 
+    // BloomFilter.toString dumps the full bit array — potentially millions of bits.
+    @ToString.Exclude
     private final @NonNull BloomFilter<byte[]> bloom;
 
+    // Recurses into the wrapped lookup chain; bounded by the wrapped class's own @ToString.
     private final @NonNull AddressLookup delegate;
 
     /**

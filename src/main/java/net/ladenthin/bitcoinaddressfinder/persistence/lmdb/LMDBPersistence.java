@@ -16,6 +16,7 @@ import java.util.Spliterators;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.ByteConversion;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
@@ -49,6 +50,7 @@ import org.slf4j.LoggerFactory;
  * via the {@code populateFrom} factories on each accelerator class, consuming this
  * instance through {@link AddressIterable}.
  */
+@ToString
 public class LMDBPersistence implements Persistence, AddressIterable {
 
     private static final String DB_NAME_HASH160_TO_COINT = "hash160toCoin";
@@ -60,8 +62,14 @@ public class LMDBPersistence implements Persistence, AddressIterable {
     private final @Nullable CLMDBConfigurationWrite lmdbConfigurationWrite;
     private final @Nullable CLMDBConfigurationReadOnly lmdbConfigurationReadOnly;
     private final @NonNull KeyUtility keyUtility;
+
+    // LMDB native handle wrappers — toString is just the native pointer identity.
+    @ToString.Exclude
     private @Nullable Env<ByteBuffer> env;
+
+    @ToString.Exclude
     private @Nullable Dbi<ByteBuffer> lmdb_h160ToAmount;
+
     private final java.util.concurrent.atomic.AtomicLong increasedCounter =
             new java.util.concurrent.atomic.AtomicLong(0);
     private final java.util.concurrent.atomic.AtomicLong increasedSum = new java.util.concurrent.atomic.AtomicLong(0);

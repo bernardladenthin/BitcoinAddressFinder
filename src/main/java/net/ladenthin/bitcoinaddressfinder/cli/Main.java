@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.Finder;
 import net.ladenthin.bitcoinaddressfinder.Interruptable;
@@ -31,6 +32,7 @@ import org.slf4j.LoggerFactory;
  * CLI entry point: loads the configuration file and dispatches to the configured command.
  * <p>VM option: {@code -Dorg.slf4j.simpleLogger.defaultLogLevel=trace}
  */
+@ToString
 public class Main implements Runnable, Interruptable {
 
     /**
@@ -64,10 +66,14 @@ public class Main implements Runnable, Interruptable {
     /** SLF4J logger for the CLI entry point. */
     private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
 
+    // List of registered Interruptables — mutable list of stateful coordinators, recursive/heavy.
+    @ToString.Exclude
     private final List<Interruptable> interruptables = new ArrayList<>();
 
     private final CConfiguration configuration;
 
+    // CountDownLatch toString is uninformative lifecycle state.
+    @ToString.Exclude
     private final CountDownLatch runLatch = new CountDownLatch(1);
 
     /**

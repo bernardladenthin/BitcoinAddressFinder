@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Stream;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
 import org.jspecify.annotations.NonNull;
@@ -31,8 +32,12 @@ import org.jspecify.annotations.NonNull;
  * <p>The class is thread-safe for concurrent reads after construction. It is not
  * thread-safe for concurrent mutation (no mutation API is exposed).
  */
+@ToString
 public final class HashSetAddressPresence implements AddressPresence {
 
+    // Potentially millions of ByteBuffer entries — toString'ing the whole Set would be
+    // log-killing. The size() getter is included instead (see @ToString.Include below).
+    @ToString.Exclude
     private final @NonNull Set<ByteBuffer> entries;
 
     private HashSetAddressPresence(@NonNull Set<ByteBuffer> entries) {
@@ -86,6 +91,7 @@ public final class HashSetAddressPresence implements AddressPresence {
      *
      * @return entry count
      */
+    @ToString.Include
     public int size() {
         return entries.size();
     }
