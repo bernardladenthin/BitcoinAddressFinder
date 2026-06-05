@@ -522,4 +522,37 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
     </Match>
 
+    <!--
+        USBR_UNNECESSARY_STORE_BEFORE_RETURN on Lombok-generated equals / hashCode /
+        canEqual / toString.
+
+        Lombok's @EqualsAndHashCode and @ToString annotation processors inject the
+        textbook polynomial-hash bytecode pattern (and lombok.config already emits
+        @lombok.Generated on every synthetic member via
+        lombok.addLombokGeneratedAnnotation = true):
+
+            int result = 1;
+            result = result * 59 + ($field == null ? 43 : $field.hashCode());
+            ...
+            return result;          // USBR fires here, on the istore_N / iload_N / ireturn triplet
+
+        SpotBugs core honours @lombok.Generated and skips its own detectors on those
+        members, but the fb-contrib plugin's USBR detector does NOT — fb-contrib is
+        a separate plugin family with its own filter pipeline. Suppressing USBR on
+        equals / hashCode / canEqual / toString matches every method name Lombok can
+        emit. The collateral cost is small: any handwritten member of those four
+        names that genuinely stores-then-immediately-returns is either a
+        debugger-friendly local-variable pattern or a micro-optimisation, both of
+        which are considered intentional in this codebase.
+    -->
+    <Match>
+        <Or>
+            <Method name="equals"/>
+            <Method name="hashCode"/>
+            <Method name="canEqual"/>
+            <Method name="toString"/>
+        </Or>
+        <Bug pattern="USBR_UNNECESSARY_STORE_BEFORE_RETURN"/>
+    </Match>
+
 </FindBugsFilter>
