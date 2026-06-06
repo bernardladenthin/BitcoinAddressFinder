@@ -287,6 +287,12 @@ public class Main implements Runnable, Interruptable {
     /**
      * Prints all live thread stack traces after waiting for the given delay.
      *
+     * <p><b>Developer-debug helper only.</b> The sole production call site is
+     * gated by {@code if (false) { ... }} near the end of {@link #run()} — an
+     * "uncomment for local debugging" hook to dump the thread state at the end
+     * of a run. Kept (rather than deleted with the dead {@code if}) so the
+     * debug hook survives for future use. Not part of any public API.
+     *
      * @param delayMillis     how long to wait before sampling, in milliseconds
      * @param includeDaemons  whether daemon threads should be included in the output
      */

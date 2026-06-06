@@ -171,11 +171,18 @@ public class BitcoinAddressFinderArchitectureTest {
             .callConstructor(Random.class, long.class)
             .allowEmptyShould(true);
 
-    // Note: deliberately NO `noThreadSleep` rule. The producer / consumer threading code has
-    // five legitimate `Thread.sleep(...)` call sites for back-pressure, startup synchronisation
-    // and CLI inter-action pacing (ConsumerJava, ProducerOpenCL, AbstractProducer,
-    // AbstractKeyProducerQueueBuffered, cli.Main). Rewriting them to BlockingQueue.poll(timeout) /
-    // Condition.await(timeout) is a real refactor, out of scope for the rule-tightening pass.
+    // Note: deliberately NO `noThreadSleep` rule. The producer / consumer threading code
+    // historically had five Thread.sleep call sites; three were refactored to higher-level
+    // primitives (AbstractProducer → CountDownLatch, ConsumerJava → BlockingQueue.poll(timeout),
+    // ProducerOpenCL → Semaphore — each removing a poll-based latency tax). The two remaining
+    // sites are deliberate and documented:
+    //   - AbstractKeyProducerQueueBuffered.sleep(int): the sleep primitive itself, used by
+    //     KeyProducerJavaSocket for hard-capped bootstrap-retry back-off where exponential
+    //     would add nothing (the loop gives up permanently after connectionRetryCount).
+    //   - cli.Main.printAllStackTracesWithDelay: developer-debug helper behind an
+    //     `if (false)` switch; sleep-then-sample-stacks is the textbook pattern.
+    // Both are suppressed individually in spotbugs-exclude.xml under the MDM_THREAD_YIELD
+    // section with full rationale.
 
     // ---------------------------------------------------------------------------------------
     // Layered-architecture invariants

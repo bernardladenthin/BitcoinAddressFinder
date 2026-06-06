@@ -125,6 +125,14 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
     /**
      * Sleeps for the given duration, restoring the interrupt flag on interruption.
      *
+     * <p>Used by {@link KeyProducerJavaSocket} for the back-off delay between
+     * failed bootstrap connection attempts. The retry loop is hard-capped by
+     * {@code connectionRetryCount} and gives up permanently after that — linear
+     * delay is the right choice (exponential back-off matters only for
+     * reconnect-forever loops). fb-contrib's {@code MDM_THREAD_YIELD} on this
+     * method is suppressed in {@code spotbugs-exclude.xml}; the helper IS the
+     * sleep primitive.
+     *
      * @param millis the duration in milliseconds
      */
     protected void sleep(int millis) {

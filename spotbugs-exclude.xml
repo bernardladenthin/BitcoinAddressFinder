@@ -680,4 +680,56 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
     </Match>
 
+    <!--
+        fb-contrib MDM_THREAD_YIELD ("Method attempts to manually schedule
+        threads") flags every direct call to Thread.sleep(long) and
+        Thread.yield(). The rule's intent is to nudge towards higher-level
+        primitives (BlockingQueue.poll(timeout), CountDownLatch.await,
+        Semaphore.acquire, ScheduledExecutorService).
+
+        After the three structural refactors landed (AbstractProducer →
+        CountDownLatch, ConsumerJava → poll(timeout), ProducerOpenCL →
+        Semaphore), only two Thread.sleep sites remain in production:
+
+        1. AbstractKeyProducerQueueBuffered.sleep(int) — the
+           interrupt-flag-restoring sleep utility. Used by ONE production
+           caller, KeyProducerJavaSocket, for backoff inside its
+           bootstrap retry loop. The loop is hard-capped by
+           connectionRetryCount (default 5); after the cap is hit the
+           producer permanently gives up with IllegalStateException.
+           Exponential backoff is the right tool for reconnect-FOREVER
+           loops where polite back-off avoids hammering a struggling
+           peer; here, with a hard cap and final give-up, linear delay
+           is correct. Cancellation cooperates with shouldStop +
+           readerFuture.cancel(true), which delivers InterruptedException
+           to Thread.sleep and the catch clause restores the flag.
+           Flagging the sleep utility's definition as "manually scheduling
+           threads" is a structural false positive: the helper IS the
+           sleep primitive.
+
+        2. cli.Main.printAllStackTracesWithDelay — a developer-debug
+           diagnostic helper. Its sole production caller is gated by
+           `if (false) { ... }` (Main.java around line 282) — an
+           "uncomment for local debugging" hook. Sleep-then-sample-all-
+           thread-stacks is the textbook pattern; there is no
+           higher-level primitive that improves it. Kept rather than
+           deleted so the debug hook survives for future use.
+
+        Both suppressions are narrowly scoped to the specific method,
+        not pattern-wide.
+    -->
+    <Match>
+        <Bug pattern="MDM_THREAD_YIELD"/>
+        <Or>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.AbstractKeyProducerQueueBuffered"/>
+                <Method name="sleep"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.cli.Main"/>
+                <Method name="printAllStackTracesWithDelay"/>
+            </And>
+        </Or>
+    </Match>
+
 </FindBugsFilter>
