@@ -44,19 +44,12 @@ public class ConsumerJava implements Consumer {
 
     /**
      * Marker for the {@link #consumeKeysRunner} poll loop's intentional
-     * InterruptedException swallow.
-     *
-     * <p>Cancellation of this consumer is signalled via {@link #shouldRun}, not via
-     * {@link Thread#interrupt()}. {@link #interrupt()} sets {@code shouldRun = false}
-     * BEFORE calling {@code shutdown()} on the executor service that interrupts the
-     * worker threads; the worker's outer {@code while (shouldRun.get())} therefore
-     * exits cleanly on the next iteration.
-     *
-     * <p>Restoring the interrupt flag here would make the next
-     * {@link Thread#sleep(long)} call immediately re-throw, producing a tight CPU
-     * loop until {@code shouldRun} also flips. The constant is {@code false} so the
-     * if-branch is dead code (eliminated by the JIT), but the {@code interrupt()}
-     * call site is preserved in source for readers and IDE navigation.
+     * InterruptedException swallow. Cancellation is via {@link #shouldRun}, not via
+     * {@link Thread#interrupt()}. Restoring the flag would make the next
+     * {@link LinkedBlockingQueue#poll(long, TimeUnit)} call immediately re-throw,
+     * producing a tight CPU loop until {@code shouldRun} also flips. The constant
+     * is {@code false} so the if-branch is dead code (eliminated by the JIT) but
+     * kept in source for readers and IDE navigation.
      */
     private static final boolean POLL_LOOP_RESTORES_INTERRUPT_FLAG = false;
 
@@ -308,13 +301,18 @@ public class ConsumerJava implements Consumer {
             }
             try {
                 consumeKeys(threadLocalReuseableByteBuffer);
-                // the consumeKeys method is looped inside, if the method returns it means the queue is empty
                 emptyConsumer.incrementAndGet();
-                Thread.sleep(consumerJava.delayEmptyConsumer);
+                // Wait for the next batch instead of an unconditional sleep — wakes
+                // the instant a producer enqueues, eliminating up-to-
+                // delayEmptyConsumer-ms idle latency. delayEmptyConsumer is now the
+                // max idle wait window rather than a fixed back-off.
+                PublicKeyBytes[] next =
+                        keysQueue.poll(consumerJava.delayEmptyConsumer, TimeUnit.MILLISECONDS);
+                if (next != null) {
+                    processBatch(next, threadLocalReuseableByteBuffer);
+                }
             } catch (InterruptedException e) {
-                // Cancellation is via shouldRun, not Thread.interrupt; see
-                // POLL_LOOP_RESTORES_INTERRUPT_FLAG.
-                LOGGER.warn("Consumer poll loop sleep interrupted; relying on shouldRun for shutdown.", e);
+                LOGGER.warn("Consumer poll loop interrupted; relying on shouldRun for shutdown.", e);
                 if (POLL_LOOP_RESTORES_INTERRUPT_FLAG) {
                     Thread.currentThread().interrupt();
                 }
@@ -331,87 +329,100 @@ public class ConsumerJava implements Consumer {
         LOGGER.trace("consumeKeys");
         PublicKeyBytes[] publicKeyBytesArray = keysQueue.poll();
         while (publicKeyBytesArray != null) {
-            for (PublicKeyBytes publicKeyBytes : publicKeyBytesArray) {
-                if (publicKeyBytes.isOutsidePrivateKeyRange()) {
-                    continue;
-                }
+            processBatch(publicKeyBytesArray, threadLocalReuseableByteBuffer);
+            publicKeyBytesArray = keysQueue.poll();
+        }
+    }
 
-                byte[] hash160Uncompressed = publicKeyBytes.getUncompressedKeyHash();
-                boolean containsAddressUncompressed =
-                        containsAddress(threadLocalReuseableByteBuffer, hash160Uncompressed);
+    /**
+     * Processes a single batch of public keys: address lookup, hit logging, optional
+     * vanity matching. Extracted so {@link #consumeKeysRunner()} can dispatch the
+     * batch returned by its timed wait between drain cycles without re-entering the
+     * non-blocking drain loop in {@link #consumeKeys(ByteBuffer)}.
+     *
+     * @param publicKeyBytesArray              the batch to process
+     * @param threadLocalReuseableByteBuffer   thread-local buffer reused across address lookups
+     */
+    private void processBatch(PublicKeyBytes[] publicKeyBytesArray, ByteBuffer threadLocalReuseableByteBuffer) {
+        for (PublicKeyBytes publicKeyBytes : publicKeyBytesArray) {
+            if (publicKeyBytes.isOutsidePrivateKeyRange()) {
+                continue;
+            }
 
-                byte[] hash160Compressed = publicKeyBytes.getCompressedKeyHash();
-                boolean containsAddressCompressed = containsAddress(threadLocalReuseableByteBuffer, hash160Compressed);
+            byte[] hash160Uncompressed = publicKeyBytes.getUncompressedKeyHash();
+            boolean containsAddressUncompressed =
+                    containsAddress(threadLocalReuseableByteBuffer, hash160Uncompressed);
 
-                if (consumerJava.runtimePublicKeyCalculationCheck) {
-                    publicKeyBytes.runtimePublicKeyCalculationCheck();
-                }
+            byte[] hash160Compressed = publicKeyBytes.getCompressedKeyHash();
+            boolean containsAddressCompressed = containsAddress(threadLocalReuseableByteBuffer, hash160Compressed);
 
-                if (containsAddressUncompressed) {
+            if (consumerJava.runtimePublicKeyCalculationCheck) {
+                publicKeyBytes.runtimePublicKeyCalculationCheck();
+            }
+
+            if (containsAddressUncompressed) {
+                // immediately log the secret
+                safeLog(publicKeyBytes, hash160Uncompressed, hash160Compressed);
+                hits.incrementAndGet();
+                ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(
+                        publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
+                String hitMessageUncompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
+                LOGGER.info(hitMessageUncompressed);
+            }
+
+            if (containsAddressCompressed) {
+                // immediately log the secret
+                safeLog(publicKeyBytes, hash160Uncompressed, hash160Compressed);
+                hits.incrementAndGet();
+                ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(
+                        publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
+                String hitMessageCompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
+                LOGGER.info(hitMessageCompressed);
+            }
+
+            if (consumerJava.enableVanity) {
+                var localVanityPattern = Objects.requireNonNull(vanityPattern);
+                String uncompressedKeyHashAsBase58 = publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility);
+                Matcher uncompressedKeyHashAsBase58Matcher =
+                        localVanityPattern.matcher(uncompressedKeyHashAsBase58);
+                if (uncompressedKeyHashAsBase58Matcher.matches()) {
                     // immediately log the secret
                     safeLog(publicKeyBytes, hash160Uncompressed, hash160Compressed);
-                    hits.incrementAndGet();
+                    vanityHits.incrementAndGet();
                     ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(
                             publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
-                    String hitMessageUncompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
-                    LOGGER.info(hitMessageUncompressed);
+                    String vanityHitMessageUncompressed =
+                            VANITY_HIT_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
+                    LOGGER.info(vanityHitMessageUncompressed);
                 }
 
-                if (containsAddressCompressed) {
+                String compressedKeyHashAsBase58 = publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility);
+                Matcher compressedKeyHashAsBase58Matcher = vanityPattern.matcher(compressedKeyHashAsBase58);
+                if (compressedKeyHashAsBase58Matcher.matches()) {
                     // immediately log the secret
                     safeLog(publicKeyBytes, hash160Uncompressed, hash160Compressed);
-                    hits.incrementAndGet();
+                    vanityHits.incrementAndGet();
                     ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(
                             publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
-                    String hitMessageCompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
-                    LOGGER.info(hitMessageCompressed);
-                }
-
-                if (consumerJava.enableVanity) {
-                    var localVanityPattern = Objects.requireNonNull(vanityPattern);
-                    String uncompressedKeyHashAsBase58 = publicKeyBytes.getUncompressedKeyHashAsBase58(keyUtility);
-                    Matcher uncompressedKeyHashAsBase58Matcher =
-                            localVanityPattern.matcher(uncompressedKeyHashAsBase58);
-                    if (uncompressedKeyHashAsBase58Matcher.matches()) {
-                        // immediately log the secret
-                        safeLog(publicKeyBytes, hash160Uncompressed, hash160Compressed);
-                        vanityHits.incrementAndGet();
-                        ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(
-                                publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
-                        String vanityHitMessageUncompressed =
-                                VANITY_HIT_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
-                        LOGGER.info(vanityHitMessageUncompressed);
-                    }
-
-                    String compressedKeyHashAsBase58 = publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility);
-                    Matcher compressedKeyHashAsBase58Matcher = vanityPattern.matcher(compressedKeyHashAsBase58);
-                    if (compressedKeyHashAsBase58Matcher.matches()) {
-                        // immediately log the secret
-                        safeLog(publicKeyBytes, hash160Uncompressed, hash160Compressed);
-                        vanityHits.incrementAndGet();
-                        ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(
-                                publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
-                        String vanityHitMessageCompressed =
-                                VANITY_HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
-                        LOGGER.info(vanityHitMessageCompressed);
-                    }
-                }
-
-                if (!containsAddressUncompressed && !containsAddressCompressed) {
-                    if (LOGGER.isTraceEnabled()) {
-                        ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(
-                                publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
-                        String missMessageUncompressed = MISS_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
-                        LOGGER.trace(missMessageUncompressed);
-
-                        ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(
-                                publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
-                        String missMessageCompressed = MISS_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
-                        LOGGER.trace(missMessageCompressed);
-                    }
+                    String vanityHitMessageCompressed =
+                            VANITY_HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
+                    LOGGER.info(vanityHitMessageCompressed);
                 }
             }
-            publicKeyBytesArray = keysQueue.poll();
+
+            if (!containsAddressUncompressed && !containsAddressCompressed) {
+                if (LOGGER.isTraceEnabled()) {
+                    ECKey ecKeyUncompressed = ECKey.fromPrivateAndPrecalculatedPublic(
+                            publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
+                    String missMessageUncompressed = MISS_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
+                    LOGGER.trace(missMessageUncompressed);
+
+                    ECKey ecKeyCompressed = ECKey.fromPrivateAndPrecalculatedPublic(
+                            publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
+                    String missMessageCompressed = MISS_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
+                    LOGGER.trace(missMessageCompressed);
+                }
+            }
         }
     }
 
