@@ -32,14 +32,23 @@ module net.ladenthin.bitcoinaddressfinder {
 
     opens net.ladenthin.bitcoinaddressfinder.configuration to com.fasterxml.jackson.databind;
 
-    exports net.ladenthin.bitcoinaddressfinder;
     exports net.ladenthin.bitcoinaddressfinder.cli;
+    exports net.ladenthin.bitcoinaddressfinder.command;
     exports net.ladenthin.bitcoinaddressfinder.configuration;
     exports net.ladenthin.bitcoinaddressfinder.constants;
+    exports net.ladenthin.bitcoinaddressfinder.consumer;
+    exports net.ladenthin.bitcoinaddressfinder.core;
+    exports net.ladenthin.bitcoinaddressfinder.engine;
+    exports net.ladenthin.bitcoinaddressfinder.io;
     exports net.ladenthin.bitcoinaddressfinder.keyproducer;
+    exports net.ladenthin.bitcoinaddressfinder.model;
     exports net.ladenthin.bitcoinaddressfinder.opencl;
     exports net.ladenthin.bitcoinaddressfinder.persistence;
     exports net.ladenthin.bitcoinaddressfinder.persistence.bloom;
     exports net.ladenthin.bitcoinaddressfinder.persistence.inmemory;
     exports net.ladenthin.bitcoinaddressfinder.persistence.lmdb;
+    exports net.ladenthin.bitcoinaddressfinder.producer;
+    exports net.ladenthin.bitcoinaddressfinder.secret;
+    exports net.ladenthin.bitcoinaddressfinder.statistics;
+    exports net.ladenthin.bitcoinaddressfinder.util;
 }

@@ -27,7 +27,16 @@ import java.util.stream.Collectors;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
+import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLGridResult;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenClTask;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
+import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
+import net.ladenthin.bitcoinaddressfinder.util.EndiannessConverter;
+import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
 import org.apache.commons.io.FileUtils;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
@@ -582,7 +591,8 @@ public class ProbeAddressesOpenCLTest {
             if (i % 10_000 == 0) {
                 if (souts) System.out.println("progress: " + i);
             }
-            BigInteger privateKey = AbstractProducer.calculateSecretKey(secretBase, i);
+            BigInteger privateKey =
+                    KeyUtility.calculateSecretKey(secretBase, i, KeyUtility.CALCULATE_SECRET_KEY_USE_OR);
             byte[] privateKeyAsByteArray = privateKey.toByteArray();
 
             if (souts) System.out.println("privateKey: " + Arrays.toString(privateKeyAsByteArray));

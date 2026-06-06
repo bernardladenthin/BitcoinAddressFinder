@@ -12,9 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.LMDBPlatformAssume;
-import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
 import net.ladenthin.bitcoinaddressfinder.configuration.AddressLookupBackend;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
@@ -24,6 +22,8 @@ import net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerat
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.HashSetAddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.TruncatedLong64SortedArrayPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
+import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
+import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
 import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.Network;
 import org.openjdk.jmh.annotations.Benchmark;

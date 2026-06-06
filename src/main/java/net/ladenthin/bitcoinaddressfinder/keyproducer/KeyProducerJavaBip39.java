@@ -5,12 +5,11 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import java.math.BigInteger;
 import lombok.ToString;
-import net.ladenthin.bitcoinaddressfinder.BIP39KeyProducer;
-import net.ladenthin.bitcoinaddressfinder.BitHelper;
-import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.RandomSecretSupplier;
-import net.ladenthin.bitcoinaddressfinder.SecretSupplier;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
+import net.ladenthin.bitcoinaddressfinder.secret.RandomSecretSupplier;
+import net.ladenthin.bitcoinaddressfinder.secret.SecretSupplier;
+import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 
 /**
  * Key producer that derives secrets deterministically from a BIP39 mnemonic.

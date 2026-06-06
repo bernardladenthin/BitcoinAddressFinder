@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 import com.tngtech.archunit.core.importer.ImportOption;
@@ -12,6 +13,7 @@ import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import java.util.Random;
+import net.ladenthin.bitcoinaddressfinder.statistics.ReadStatistic;
 import org.slf4j.Logger;
 
 @AnalyzeClasses(packages = "net.ladenthin.bitcoinaddressfinder", importOptions = ImportOption.DoNotIncludeTests.class)
@@ -187,15 +189,76 @@ public class BitcoinAddressFinderArchitectureTest {
     // ---------------------------------------------------------------------------------------
     // Layered-architecture invariants
     //
-    // These three rules pin the only CRITICAL layering invariants the current BAF package
-    // structure clearly supports. The full layered design (a real
-    // `Architectures.layeredArchitecture()` with strict top/middle/bottom layers) would
-    // require moving classes — for example splitting the root package's orchestration
-    // classes (Finder, Producer*, Consumer*) into a dedicated package so the layer
-    // boundaries align with packages. That is captured as a cross-repo "package-architecture
-    // improvement" TODO in workspace/policies/code-quality-todos.md; the rules below pin
-    // what is already true today so a future refactor cannot accidentally regress it.
+    // The root package's classes were split into dedicated layered packages (engine, command,
+    // producer, consumer, io, model, util, core, statistics, secret) so the layer boundaries
+    // align with packages. The full {@link com.tngtech.archunit.library.Architectures#layeredArchitecture()}
+    // rule below now enforces the strict top-to-bottom dependency direction; the targeted leaf
+    // rules that follow it remain as precise, fast-failing guards for the individual
+    // foundation/entry-point invariants.
     // ---------------------------------------------------------------------------------------
+
+    /**
+     * Strict layered architecture. Each layer may only be accessed by the layers above it,
+     * giving a top-to-bottom dependency direction with no upward edges:
+     *
+     * <pre>
+     *   Entry          cli
+     *   Orchestration  engine, command
+     *   Pipeline       producer, consumer
+     *   Capabilities   keyproducer, opencl, persistence
+     *   InputOutput    io
+     *   Foundation     model, util, core, statistics, secret
+     *   Config         configuration
+     *   Constants      constants
+     * </pre>
+     *
+     * <p>Layers are coarser than packages on purpose: the legitimate
+     * {@code producer -> Consumer} pipeline edge lives inside the {@code Pipeline} layer
+     * rather than crossing a boundary. {@code consideringOnlyDependenciesInLayers()} keeps
+     * the check focused on intra-project edges (external libraries are ignored).
+     */
+    @ArchTest
+    static final ArchRule layeredArchitecture = layeredArchitecture()
+            .consideringOnlyDependenciesInLayers()
+            .layer("Entry")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.cli..")
+            .layer("Orchestration")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.engine..", "net.ladenthin.bitcoinaddressfinder.command..")
+            .layer("Pipeline")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.producer..", "net.ladenthin.bitcoinaddressfinder.consumer..")
+            .layer("Capabilities")
+            .definedBy(
+                    "net.ladenthin.bitcoinaddressfinder.keyproducer..",
+                    "net.ladenthin.bitcoinaddressfinder.opencl..",
+                    "net.ladenthin.bitcoinaddressfinder.persistence..")
+            .layer("InputOutput")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.io..")
+            .layer("Foundation")
+            .definedBy(
+                    "net.ladenthin.bitcoinaddressfinder.model..",
+                    "net.ladenthin.bitcoinaddressfinder.util..",
+                    "net.ladenthin.bitcoinaddressfinder.core..",
+                    "net.ladenthin.bitcoinaddressfinder.statistics..",
+                    "net.ladenthin.bitcoinaddressfinder.secret..")
+            .layer("Config")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.configuration..")
+            .layer("Constants")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.constants..")
+            .whereLayer("Entry")
+            .mayNotBeAccessedByAnyLayer()
+            .whereLayer("Orchestration")
+            .mayOnlyBeAccessedByLayers("Entry")
+            .whereLayer("Pipeline")
+            .mayOnlyBeAccessedByLayers("Entry", "Orchestration")
+            .whereLayer("Capabilities")
+            .mayOnlyBeAccessedByLayers("Entry", "Orchestration", "Pipeline")
+            .whereLayer("InputOutput")
+            .mayOnlyBeAccessedByLayers("Entry", "Orchestration", "Pipeline", "Capabilities")
+            .whereLayer("Foundation")
+            .mayOnlyBeAccessedByLayers("Entry", "Orchestration", "Pipeline", "Capabilities", "InputOutput", "Config")
+            .whereLayer("Config")
+            .mayOnlyBeAccessedByLayers(
+                    "Entry", "Orchestration", "Pipeline", "Capabilities", "InputOutput", "Foundation");
 
     /**
      * The {@code constants} sub-package is a true architectural leaf. Pure

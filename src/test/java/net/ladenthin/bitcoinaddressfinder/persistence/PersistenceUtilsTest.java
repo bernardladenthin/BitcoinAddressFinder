@@ -11,7 +11,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.sameInstance;
 
 import java.nio.ByteBuffer;
-import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
+import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
 import org.bitcoinj.base.Network;
 import org.junit.jupiter.api.Test;
 

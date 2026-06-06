@@ -10,6 +10,7 @@ import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 
+import net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableException;
 import org.junit.jupiter.api.Test;
 
 /**

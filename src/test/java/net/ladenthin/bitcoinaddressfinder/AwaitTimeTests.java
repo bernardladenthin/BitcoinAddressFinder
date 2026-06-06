@@ -6,6 +6,6 @@ package net.ladenthin.bitcoinaddressfinder;
 import java.time.Duration;
 
 public class AwaitTimeTests {
-    static final Duration AWAIT_DURATION = Duration.ofSeconds(20);
-    static final Duration IMPRECISION = Duration.ofSeconds(2);
+    public static final Duration AWAIT_DURATION = Duration.ofSeconds(20);
+    public static final Duration IMPRECISION = Duration.ofSeconds(2);
 }

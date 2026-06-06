@@ -8,12 +8,13 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
 import java.math.BigInteger;
-import net.ladenthin.bitcoinaddressfinder.BitHelper;
-import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
-import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
 import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
+import net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableException;
+import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
+import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
 import org.bitcoinj.base.Network;
 import org.junit.jupiter.api.Test;
 

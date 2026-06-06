@@ -6,9 +6,9 @@
 package net.ladenthin.bitcoinaddressfinder.benchmark;
 
 import java.util.concurrent.TimeUnit;
-import net.ladenthin.bitcoinaddressfinder.Hash160;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
+import net.ladenthin.bitcoinaddressfinder.model.Hash160;
+import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;

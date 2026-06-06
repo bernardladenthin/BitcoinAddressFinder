@@ -5,9 +5,10 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import java.math.BigInteger;
 import lombok.ToString;
-import net.ladenthin.bitcoinaddressfinder.BitHelper;
-import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
+import net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableException;
+import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import org.jspecify.annotations.NonNull;
 
 /**

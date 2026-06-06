@@ -4,11 +4,11 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import lombok.ToString;
-import net.ladenthin.bitcoinaddressfinder.BitHelper;
-import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.Startable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
+import net.ladenthin.bitcoinaddressfinder.core.Startable;
+import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

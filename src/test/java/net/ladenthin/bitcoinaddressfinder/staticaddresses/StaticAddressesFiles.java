@@ -12,6 +12,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.*;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2PKH;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2SH;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2WPKH;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.PublicAddress;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.StaticUnsupportedAddress;
 import org.bitcoinj.base.Coin;
 
 public class StaticAddressesFiles implements AddressesFiles {

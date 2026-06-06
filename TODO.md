@@ -118,8 +118,7 @@ pluggable-persistence design plan:
 
 - **Mutation-testing threshold expansion** — `<targetClasses>` currently narrowed to `net.ladenthin.bitcoinaddressfinder.BitHelper`. Expand incrementally as classes reach 100 % mutation parity (README "Future improvements" tracks this).
 
-- **Additional ArchUnit rules to consider** — public-fields-final, `noTestFrameworksInProduction`, `loggersArePrivateStaticFinal`, `noPackageCycles` are all DONE. Still open:
-  - `layeredArchitecture().consideringAllDependencies()` — needs DTO/orchestration split because it touches public-API class FQNs (`Finder`, `Producer*`, `Consumer*`, etc.).
+- **Additional ArchUnit rules to consider** — public-fields-final, `noTestFrameworksInProduction`, `loggersArePrivateStaticFinal`, `noPackageCycles`, and the full **`layeredArchitecture()`** rule are all DONE (the layered package split landed — see "Done" history below). Still open:
   - Per-module banned-imports lists.
   - No-public-mutable-static-state rule.
 
@@ -138,22 +137,62 @@ pluggable-persistence design plan:
   and confirm zero `THROWS_METHOD_THROWS_RUNTIMEEXCEPTION` findings on
   those two methods.
 
-- **Drop the project-wide `OPM_OVERLY_PERMISSIVE_METHOD` suppression in
-  `spotbugs-exclude.xml`** once the package-architecture refactor lands
-  (see [`../workspace/crossrepostatus.md`](../workspace/crossrepostatus.md)
-  under "Affects BAF + jllama (multi-package repos)"). The single-root
-  package today makes every "method called only by same-package callers
-  → could be package-private" finding correct-but-unstable; once layers
-  split, cross-layer calls will need public, so methods correctly
-  tightened today would need re-widening. Re-enable the rule (delete
-  the project-wide `<Match>`) the week the layered structure
-  stabilises. Snapshot at the moment of suppression: 33 sites grouped
-  into Main CLI internal helpers (~8), test-only public surface (~5),
-  abstract-class constructors (~4), concrete-class constructors needing
-  per-class audit (~5), internal helpers (~9), and one `enum.valueOf`
-  false positive (`BIP39Wordlist`).
+- **(Unblocked, optional) Drop the project-wide `OPM_OVERLY_PERMISSIVE_METHOD`
+  suppression in `spotbugs-exclude.xml`.** The package-architecture refactor it
+  was waiting on has now landed (the single root package was split into the
+  layered packages — see "Done" history below), so cross-layer call sites are
+  now stable and OPM findings would be actionable signals rather than
+  correct-but-unstable noise. Re-enabling is **optional**: visibility
+  minimisation is not a project goal (the original tightening pressure was
+  fb-contrib noise, not a requirement). If re-enabled, delete the project-wide
+  `<Match>` and triage the resulting findings (snapshot at suppression time:
+  ~33 sites — Main CLI internal helpers, test-only public surface,
+  abstract/concrete constructors, internal helpers, one `enum.valueOf` false
+  positive).
 
 ## Done (kept for history)
+
+### Layered package restructure (flat root package → 10-layer hierarchy)
+
+The 48 classes that previously sat flat in the root
+`net.ladenthin.bitcoinaddressfinder` package were split (via `git mv`,
+history preserved) into dedicated layered packages so the package
+boundaries align with the architectural layers:
+
+- **Foundation**: `model` (Hash160, PublicKeyBytes, AddressToCoin, AddressType),
+  `util` (KeyUtility, PrivateKeyValidator, Bech32Helper, Base36Decoder,
+  BitHelper, ByteBufferUtility, NetworkParameterFactory, ByteConversion,
+  EndiannessConverter, PrivateKeyTooLargeException), `core` (Interruptable,
+  Startable, FireAndForget, InterruptedRuntimeException), `secret`
+  (SecretSupplier, RandomSecretSupplier, NoMoreSecretsAvailableException,
+  BIP39Wordlist), `statistics` (Statistics, ReadStatistic).
+- **InputOutput**: `io` (AbstractPlaintextFile, AddressFile, AddressTxtLine,
+  SecretsFile, SeparatorFormat, FileHelper, AddressFormatNotAcceptedException).
+- **Pipeline**: `producer` (Producer, AbstractProducer, ProducerJava,
+  ProducerOpenCL, ProducerJavaSecretsFiles, ProducerState,
+  ProducerStateProvider), `consumer` (Consumer, ConsumerJava).
+- **Orchestration**: `engine` (Finder, Shutdown), `command`
+  (AddressFilesToLMDB, LMDBToAddressFile).
+- Absorbed into existing capability packages: OpenCL runtime
+  (OpenCLContext, OpenClTask, OpenCLGridResult, ReleaseCLObject) → `opencl`;
+  BIP39KeyProducer → `keyproducer`.
+
+Test classes were mirrored into the same packages as their subjects
+(standard Maven layout). The only in-class change was moving the pure
+helper `calculateSecretKey(BigInteger, int)` from `AbstractProducer` to
+`KeyUtility` (foundation) to break the single `opencl → producer`
+back-edge; everything else was package moves + import updates +
+cross-layer `public` promotions. The `secret` foundation package was
+introduced to host the secret/mnemonic primitives that `KeyUtility`
+depends on, breaking the `util ↔ keyproducer` and `producer ↔ keyproducer`
+cycles.
+
+Enforced by the new `layeredArchitecture()` ArchUnit rule in
+`BitcoinAddressFinderArchitectureTest` (strict top-to-bottom: Entry →
+Orchestration → Pipeline → Capabilities → InputOutput → Foundation →
+Config → Constants), alongside the retained `noPackageCycles` and the
+targeted leaf rules. All 13 architecture rules green; `module-info.java`
+exports updated for the new packages.
 
 ### SpotBugs Max+Low concurrency refactors (replaces spin-sleep with event-driven primitives)
 
