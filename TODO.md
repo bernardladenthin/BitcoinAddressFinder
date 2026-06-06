@@ -114,7 +114,7 @@ pluggable-persistence design plan:
 
 - **Null-safety further refinement.** JSpecify + NullAway are enforced at compile time in **strict JSpecify mode** with the extra options `CheckOptionalEmptiness`, `AcknowledgeRestrictiveAnnotations`, `AcknowledgeAndroidRecent`, `AssertsEnabled` (see `pom.xml`). Every package carries an explicit `@NullMarked` via `package-info.java` so the convention is visible to non-NullAway tools (IDEs, Kotlin, Checker Framework). The 50 `@Nullable` sites currently in the codebase are all legitimate. `OpenCLContext.getOpenClTask()` returns `Optional<OpenClTask>` rather than `@Nullable OpenClTask` to surface the lifecycle state in the type. Open follow-up: review any future-added public API surfaces for places where `@Nullable` would be more precise than the implicit non-null default; consider whether further `@Nullable T` returns should migrate to `Optional<T>` on a case-by-case basis (the project's established convention is `@Nullable`; Optional is used selectively for lifecycle-shaped APIs).
 
-- **SpotBugs `effort=Max` + `threshold=Low`** — currently default effort/threshold. Raising both surfaces more findings (and takes longer per build). Worth a one-off experiment to triage what appears before committing. Cross-cutting (tracked in `crossrepostatus.md`).
+- **SpotBugs `effort=Max` + `threshold=Low`** — ✅ **enforced at the gate** (`76fd1a7`). `pom.xml` `<effort>Max</effort>` + `<threshold>Low</threshold>`; `spotbugs:check` is part of `mvn verify` and fails on any unsuppressed finding. The full clearing chain (191 → 0) is recorded in [`../workspace/crossrepostatus.md`](../workspace/crossrepostatus.md) under "SpotBugs Max+Low". `spotbugs-exclude.xml` carries narrow `<Match>` blocks with rationale for every structural false positive (Lombok-USBR, project-wide CRLF mitigation, generic-erasure CHECKCAST in keyproducer, `@FireAndForget` Future-DLS, Producer interface heterogeneous throws, drain-pattern PRMC, CWE-338 demo RNG, secp256k1 curve params, JOCL-spec nulls, preserved-for-revival private helpers, plus the two opt-in lifecycle items below).
 
 - **Mutation-testing threshold expansion** — `<targetClasses>` currently narrowed to `net.ladenthin.bitcoinaddressfinder.BitHelper`. Expand incrementally as classes reach 100 % mutation parity (README "Future improvements" tracks this).
 
@@ -135,11 +135,75 @@ pluggable-persistence design plan:
   stop firing the warning. Tracking issue:
   [spotbugs/spotbugs#3918](https://github.com/spotbugs/spotbugs/issues/3918).
   Verification when removing the suppression: run `mvn spotbugs:check`
-  with `<effort>Max</effort>` + `<threshold>Low</threshold>` and
-  confirm zero `THROWS_METHOD_THROWS_RUNTIMEEXCEPTION` findings on
+  and confirm zero `THROWS_METHOD_THROWS_RUNTIMEEXCEPTION` findings on
   those two methods.
 
+- **Drop the project-wide `OPM_OVERLY_PERMISSIVE_METHOD` suppression in
+  `spotbugs-exclude.xml`** once the package-architecture refactor lands
+  (see [`../workspace/crossrepostatus.md`](../workspace/crossrepostatus.md)
+  under "Affects BAF + jllama (multi-package repos)"). The single-root
+  package today makes every "method called only by same-package callers
+  → could be package-private" finding correct-but-unstable; once layers
+  split, cross-layer calls will need public, so methods correctly
+  tightened today would need re-widening. Re-enable the rule (delete
+  the project-wide `<Match>`) the week the layered structure
+  stabilises. Snapshot at the moment of suppression: 33 sites grouped
+  into Main CLI internal helpers (~8), test-only public surface (~5),
+  abstract-class constructors (~4), concrete-class constructors needing
+  per-class audit (~5), internal helpers (~9), and one `enum.valueOf`
+  false positive (`BIP39Wordlist`).
+
 ## Done (kept for history)
+
+### SpotBugs Max+Low concurrency refactors (replaces spin-sleep with event-driven primitives)
+
+Three structural refactors landed alongside the Max+Low gate flip so the
+remaining `MDM_THREAD_YIELD` sites were resolved at source rather than
+suppressed. The Javadoc on each touched class records the rationale; the
+ArchUnit comment in `BitcoinAddressFinderArchitectureTest` documents the
+two `Thread.sleep` sites that remain (and why they are correct).
+
+- **`AbstractProducer.waitTillProducerNotRunning`** — replaced the
+  spin-on-`state==RUNNING` + 10 ms sleep with a `CountDownLatch`
+  awaited via `cProducer.shutdownTimeoutSeconds`. The new
+  `signalNotRunning()` helper counts down at both `NOT_RUNNING`
+  transitions in `run()` and serves as the test seam. Eliminates
+  up-to-10 ms shutdown-wake-up latency per producer; deletes the
+  17-line apology Javadoc on `WAIT_TILL_NOT_RUNNING_RESTORES_INTERRUPT_FLAG`
+  (commit `892b76a`).
+
+- **`ConsumerJava.consumeKeysRunner`** — extracted the per-batch
+  processing into a private `processBatch` helper, leaving
+  `consumeKeys(ByteBuffer)` as a drain-only utility for tests. The
+  runner now waits on `keysQueue.poll(delayEmptyConsumer, MILLISECONDS)`
+  between drain cycles instead of `Thread.sleep(delayEmptyConsumer)`,
+  so the worker wakes the instant a producer enqueues. Idle-to-active
+  latency drops from up-to-100 ms (default) to ~0; steady-state
+  throughput unchanged (commit `99f390f`).
+
+- **`ProducerOpenCL.processSecretBase`** — replaced the spin on
+  `ThreadPoolExecutor.getActiveCount()` with the JCIP §8.3.3
+  `BoundedExecutor` pattern: a `Semaphore(maxResultReaderThreads)`
+  acquired before `execute()` and released in the runnable's outer
+  `finally`. The release-on-rejection path is wrapped via a `submitted`
+  flag so a shutdown-race `RejectedExecutionException` does not leak a
+  permit. **Important: the spin-wait was the only backpressure on the
+  result-reader pool's unbounded inner `LinkedBlockingQueue` — without
+  the semaphore the GPU would have submitted faster than the readers
+  could drain, holding result buffers in memory indefinitely.** The
+  semaphore is therefore the *only correct* backpressure primitive
+  here, not just a polish. `getFreeThreads()` now returns
+  `submitSlot.availablePermits()` (same semantics).
+  Removes up-to-100 ms GPU-pacing latency (commit `09c5d52`).
+
+  **Config breaking change (acknowledged)**: `delayBlockedReader` was
+  the polling-delay knob feeding the deleted spin. The `Semaphore`
+  wakes immediately, so the field is removed from `CProducerOpenCL`
+  and from the three example JSON configs (`examples/config_Find_1OpenCLDevice.json`,
+  `config_Find_1OpenCLDeviceAnd2CPUProducer.json`,
+  `src/test/resources/testRoundtrip/config_Find_1OpenCLDevice.json`).
+  External configs referencing it will deserialize-fail; users should
+  delete the line.
 
 ### -Werror flip (BAF-specific, completed this session)
 
