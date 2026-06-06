@@ -37,34 +37,38 @@ import org.jspecify.annotations.NonNull;
 public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility byteBufferUtility) {
 
     /**
-     * Combine mode used by the production scan path when calling
-     * {@link #calculateSecretKey(BigInteger, int, boolean)}: {@code true} selects bitwise OR,
-     * {@code false} selects arithmetic ADD.
+     * {@code useOr} value used by the production scan path when calling
+     * {@link #calculateSecretKey(BigInteger, int, boolean)}, i.e. which combine mode the
+     * producers select: {@code true} would select bitwise OR, {@code false} selects arithmetic
+     * ADD.
      *
      * <p>Both modes produce an identical result whenever the {@code secretBase} is aligned so
      * that the low bits covered by {@code keyNumber} are zero &#x2014; which is exactly the
      * contract the producer's {@code createSecretBase} guarantees (it masks those low bits
-     * off). OR is the default because it avoids carry propagation and may be faster; ADD is
-     * retained as a measured, selectable alternative rather than a dead-code hint. The two are
-     * compared by {@code CalculateSecretKeyBenchmark}.
+     * off). The value is {@code false} (ADD) because {@code CalculateSecretKeyBenchmark}
+     * measures ADD as the faster of the two for this shape (~64M vs ~46-50M ops/s, error bars
+     * non-overlapping, each measured in its own JVM). The OR path is retained as a measured,
+     * selectable alternative rather than a dead-code hint.
      */
-    public static final boolean CALCULATE_SECRET_KEY_USE_OR = true;
+    public static final boolean CALCULATE_SECRET_KEY_USE_OR = false;
 
     /**
      * Combines a secret base with the index of a key inside its batch.
      *
+     * <p>For an aligned {@code secretBase} (the {@code createSecretBase} contract) bitwise OR
+     * and arithmetic ADD yield an identical result; {@code CalculateSecretKeyBenchmark} measures
+     * ADD as faster, so production callers pass {@code useOr = false} (see
+     * {@link #CALCULATE_SECRET_KEY_USE_OR}).
+     *
      * @param secretBase the masked secret base for the batch
      * @param keyNumber the zero-based index of the key inside the batch
      * @param useOr {@code true} to combine with bitwise OR, {@code false} to combine with
-     *     arithmetic ADD; equivalent for an aligned base (see
-     *     {@link #CALCULATE_SECRET_KEY_USE_OR}) but may differ in speed
+     *     arithmetic ADD (the measured-faster mode used in production)
      * @return the concrete private-key candidate
      */
     public static BigInteger calculateSecretKey(BigInteger secretBase, int keyNumber, boolean useOr) {
         final BigInteger offset = BigInteger.valueOf(keyNumber);
         if (useOr) {
-            // Works because createSecretBase masks off the low bits that keyNumber occupies,
-            // so OR sets exactly those bits with no carry — may be faster than add.
             return secretBase.or(offset);
         }
         return secretBase.add(offset);

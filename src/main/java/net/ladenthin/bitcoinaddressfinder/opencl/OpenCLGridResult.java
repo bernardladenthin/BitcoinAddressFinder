@@ -142,6 +142,8 @@ public class OpenCLGridResult {
     private static final PublicKeyBytes getPublicKeyFromByteBufferXY(
             ByteBuffer resultBuffer, int keyNumber, BigInteger secretKeyBase) {
         BigInteger secret =
+                // ADD combine mode: CalculateSecretKeyBenchmark measures ADD faster than OR for the aligned base +
+                // offset.
                 KeyUtility.calculateSecretKey(secretKeyBase, keyNumber, KeyUtility.CALCULATE_SECRET_KEY_USE_OR);
         if (BigInteger.ZERO.equals(secret)) {
             // the calculated key is invalid, return a fallback

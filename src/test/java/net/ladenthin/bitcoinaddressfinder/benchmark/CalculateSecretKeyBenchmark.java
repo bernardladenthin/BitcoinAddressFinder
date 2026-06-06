@@ -29,9 +29,12 @@ import org.openjdk.jmh.infra.Blackhole;
  *
  * <p>{@code calculateSecretKey} sits on the key-producer hot path: it is called once per key
  * inside every batch to turn the masked secret base plus the per-key offset into a concrete
- * private-key candidate. OR avoids carry propagation and is expected to be at least as fast as
- * ADD; this benchmark exists to keep that assumption measured rather than assumed, and to keep
- * the ADD alternative permanently exercised so it is never dropped as dead code.</p>
+ * private-key candidate. Contrary to the original "OR may be faster" assumption, measurements
+ * on this shape show <strong>ADD is faster than OR</strong> (~64M vs ~46-50M ops/s, error bars
+ * non-overlapping, each mode measured in its own JVM), which is why the production default
+ * {@link KeyUtility#CALCULATE_SECRET_KEY_USE_OR} is {@code false} (ADD). This benchmark keeps
+ * that result measured rather than assumed, and keeps the OR alternative permanently exercised
+ * so it is never dropped as dead code.</p>
  *
  * <p>The {@code aligned} secret base mirrors the production contract (low bits masked off, so
  * OR and ADD are equivalent); the {@code keyNumber} param sweeps a representative batch index

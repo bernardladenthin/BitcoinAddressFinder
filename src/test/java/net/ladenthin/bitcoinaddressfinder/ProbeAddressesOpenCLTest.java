@@ -592,6 +592,8 @@ public class ProbeAddressesOpenCLTest {
                 if (souts) System.out.println("progress: " + i);
             }
             BigInteger privateKey =
+                    // ADD combine mode: CalculateSecretKeyBenchmark measures ADD faster than OR for the aligned base +
+                    // offset.
                     KeyUtility.calculateSecretKey(secretBase, i, KeyUtility.CALCULATE_SECRET_KEY_USE_OR);
             byte[] privateKeyAsByteArray = privateKey.toByteArray();
 

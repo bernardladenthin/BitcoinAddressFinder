@@ -74,6 +74,8 @@ public class ProducerJava extends AbstractProducer {
         for (int i = 0; i < publicKeyBytesArray.length; i++) {
             // create uncompressed
             BigInteger gridSecret =
+                    // ADD combine mode: CalculateSecretKeyBenchmark measures ADD faster than OR for the aligned base +
+                    // offset.
                     KeyUtility.calculateSecretKey(secretBase, i, KeyUtility.CALCULATE_SECRET_KEY_USE_OR);
             if (privateKeyValidator.isOutsidePrivateKeyRange(gridSecret)) {
                 publicKeyBytesArray[i] = PublicKeyBytes.INVALID_KEY_ONE;
