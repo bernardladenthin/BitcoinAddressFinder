@@ -29,11 +29,6 @@ public class CProducerOpenCL extends CProducer {
     public int maxResultReaderThreads = 4;
 
     /**
-     * Delay in milliseconds before retrying when the reader is blocked.
-     */
-    public int delayBlockedReader = 100;
-
-    /**
      * Number of inner iterations each OpenCL work-item performs on the GPU.
      * <p>
      * Instead of launching one work-item per candidate key, the kernel can loop

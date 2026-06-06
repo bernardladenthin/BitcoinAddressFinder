@@ -65,7 +65,6 @@
         "deviceType": -1,
         "deviceIndex": 0,
         "maxResultReaderThreads": 4,
-        "delayBlockedReader": 50,
         "keyProducerId": "exampleKeyProducerSecureRandomId_1",
         "batchSizeInBits": 18,
         "loopCount" : 4,

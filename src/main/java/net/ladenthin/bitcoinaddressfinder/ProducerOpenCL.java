@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder;
 import com.google.common.annotations.VisibleForTesting;
 import java.math.BigInteger;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
@@ -27,6 +28,21 @@ public class ProducerOpenCL extends AbstractProducer {
     // ThreadPoolExecutor toString is verbose internal pool state — not useful in logs.
     @ToString.Exclude
     private final ThreadPoolExecutor resultReaderThreadPoolExecutor;
+
+    /**
+     * Slot semaphore that gates submission to {@link #resultReaderThreadPoolExecutor}.
+     * Acquired in {@link #processSecretBase(BigInteger)} before {@code execute()},
+     * released in the runnable's {@code finally}. Replaces the previous
+     * {@code Thread.sleep}-based spin on {@code getActiveCount()}, eliminating
+     * idle GPU-pacing latency and giving correct event-driven backpressure on
+     * the otherwise unbounded inner work queue (the default
+     * {@code Executors.newFixedThreadPool} uses an unbounded
+     * {@link java.util.concurrent.LinkedBlockingQueue}; without this semaphore
+     * the GPU would submit faster than result-readers can drain, holding result
+     * buffers in memory indefinitely).
+     */
+    @ToString.Exclude
+    private final Semaphore submitSlot;
 
     // OpenCLContext aggregates JOCL native pointers + own state — exposed via the
     // isInitialized() getter below instead so callers see "initialized=true/false"
@@ -95,6 +111,7 @@ public class ProducerOpenCL extends AbstractProducer {
         super(producerOpenCL, consumer, keyUtility, keyProducer, bitHelper);
         this.producerOpenCL = producerOpenCL;
         this.resultReaderThreadPoolExecutor = resultReaderThreadPoolExecutor;
+        this.submitSlot = new Semaphore(producerOpenCL.maxResultReaderThreads);
         if (false) {
             int prestartedThreads = resultReaderThreadPoolExecutor.prestartAllCoreThreads();
             if (prestartedThreads != producerOpenCL.maxResultReaderThreads) {
@@ -119,22 +136,33 @@ public class ProducerOpenCL extends AbstractProducer {
                             + ") called before initProducer(); openCLContext is null");
         }
         try {
-            waitTillFreeThreadsInPool();
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("openCLContext.createKeys for secretBase: " + secretBase);
-            }
-            OpenCLGridResult openCLGridResult = localOpenCLContext.createKeys(secretBase);
-            ResultReaderRunnable resultReaderRunnable =
-                    new ResultReaderRunnable(openCLGridResult, consumer, secretBase, this);
+            submitSlot.acquire();
+            boolean submitted = false;
+            try {
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("openCLContext.createKeys for secretBase: " + secretBase);
+                }
+                OpenCLGridResult openCLGridResult = localOpenCLContext.createKeys(secretBase);
+                ResultReaderRunnable resultReaderRunnable =
+                        new ResultReaderRunnable(openCLGridResult, consumer, secretBase, this, submitSlot);
 
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("submit resultReaderRunnable for secretBase: " + secretBase);
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("submit resultReaderRunnable for secretBase: " + secretBase);
+                }
+                // Use execute() rather than submit() because we never consume the
+                // returned Future: ResultReaderRunnable reports completion via the
+                // consumer pipeline, and this producer submits in a tight loop
+                // without joining per-task.
+                resultReaderThreadPoolExecutor.execute(resultReaderRunnable);
+                submitted = true;
+            } finally {
+                if (!submitted) {
+                    // Release the permit if createKeys threw or execute rejected
+                    // (e.g. shutdown race); otherwise ownership transfers to the
+                    // runnable, which releases in its own finally.
+                    submitSlot.release();
+                }
             }
-            // Use execute() rather than submit() because we never consume the
-            // returned Future: ResultReaderRunnable reports completion via the
-            // consumer pipeline, and this producer submits in a tight loop
-            // without joining per-task.
-            resultReaderThreadPoolExecutor.execute(resultReaderRunnable);
         } catch (Exception e) {
             logErrorInProduceKeys(e, secretBase);
         }
@@ -156,41 +184,49 @@ public class ProducerOpenCL extends AbstractProducer {
         private final Consumer consumer;
         private final BigInteger secretBase;
         private final AbstractProducer abstractProducer;
+        private final Semaphore submitSlot;
 
         ResultReaderRunnable(
                 OpenCLGridResult openCLGridResult,
                 Consumer consumer,
                 BigInteger secretBase,
-                AbstractProducer abstractProducer) {
+                AbstractProducer abstractProducer,
+                Semaphore submitSlot) {
             this.openCLGridResult = openCLGridResult;
             this.consumer = consumer;
             this.secretBase = secretBase;
             this.abstractProducer = abstractProducer;
+            this.submitSlot = submitSlot;
         }
 
         @Override
         public void run() {
             LOGGER.trace("ResultReaderRunnable started");
             try {
-                PublicKeyBytes[] publicKeyBytesArray = openCLGridResult.getPublicKeyBytes();
-
-                consumer.consumeKeys(publicKeyBytesArray);
-            } catch (Throwable e) {
-                abstractProducer.logErrorInProduceKeys(e, secretBase);
+                try {
+                    PublicKeyBytes[] publicKeyBytesArray = openCLGridResult.getPublicKeyBytes();
+                    consumer.consumeKeys(publicKeyBytesArray);
+                } catch (Throwable e) {
+                    abstractProducer.logErrorInProduceKeys(e, secretBase);
+                }
+            } finally {
+                // Outer finally — survives any task exception or Error so the
+                // submitter unblocks even when the result-reader crashes.
+                submitSlot.release();
             }
             LOGGER.trace("ResultReaderRunnable finished");
         }
     }
 
-    void waitTillFreeThreadsInPool() throws InterruptedException {
-        while (getFreeThreads() < 1) {
-            Thread.sleep(producerOpenCL.delayBlockedReader);
-            LOGGER.trace("No possible free threads to read OpenCL results. May increase maxResultReaderThreads.");
-        }
-    }
-
+    /**
+     * Returns the number of slots currently available for new GPU result-reader
+     * submissions. Backed by {@link Semaphore#availablePermits()} so the
+     * diagnostic value matches the actual backpressure primitive.
+     *
+     * @return number of free submission slots
+     */
     int getFreeThreads() {
-        return resultReaderThreadPoolExecutor.getMaximumPoolSize() - resultReaderThreadPoolExecutor.getActiveCount();
+        return submitSlot.availablePermits();
     }
 
     @Override
