@@ -732,4 +732,38 @@ SPDX-License-Identifier: Apache-2.0
         </Or>
     </Match>
 
+    <!--
+        fb-contrib OPM_OVERLY_PERMISSIVE_METHOD ("Method is declared more
+        permissively than is used in the code base") suppressed PROJECT-WIDE.
+
+        Rationale:
+        - The current BAF package structure groups most production code in a
+          single root package (net.ladenthin.bitcoinaddressfinder), so any
+          method called only from sibling files in the same package is
+          flagged as "could be package-private". That answer is correct
+          today but unstable: once the planned package-architecture refactor
+          (see workspace/policies/code-quality-todos.md + crossrepostatus.md
+          for the cross-repo audit) splits the root package into orchestration
+          / domain / persistence / opencl / keyproducer layers, methods that
+          today are correctly package-private will need to become public to
+          cross the new package boundary. Tightening every site now would
+          produce a large mechanical visibility churn that is highly likely
+          to be reverted by the refactor — noise without lasting value.
+
+        - 33 sites at the time of suppression (Max+Low). Categories: Main CLI
+          internal helpers (~8), test-only public surface (~5), abstract-class
+          constructors (~4), concrete-class constructors needing per-class audit
+          (~5), internal helpers (~9), and one enum.valueOf false positive
+          (BIP39Wordlist). The per-category breakdown lives in the
+          crossrepostatus tracker under the "OPM scope-tightening — after
+          package refactor" row.
+
+        TODO: re-enable this rule (delete this Match block) once the package
+        refactor has settled — at that point genuine "method exposed beyond
+        its actual call site" findings become stable signals worth fixing.
+    -->
+    <Match>
+        <Bug pattern="OPM_OVERLY_PERMISSIVE_METHOD"/>
+    </Match>
+
 </FindBugsFilter>
