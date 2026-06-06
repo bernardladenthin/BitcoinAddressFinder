@@ -317,7 +317,7 @@ public class AbstractProducerTest {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
-            producer.state = ProducerState.NOT_RUNNING;
+            producer.signalNotRunning();
             flipped.countDown();
         });
         flipper.start();

@@ -4,7 +4,8 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
-import java.time.Instant;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
@@ -21,28 +22,16 @@ import org.slf4j.LoggerFactory;
 @ToString
 public abstract class AbstractProducer implements Producer {
 
-    private static final int SLEEP_WAIT_TILL_RUNNING = 10;
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractProducer.class);
 
     /**
-     * Marker for the {@link #waitTillProducerNotRunning} spin-wait's intentional
-     * InterruptedException swallow.
-     *
-     * <p>This wait is uncancellable by design: it is called from
-     * {@link Finder#interrupt()} during shutdown, and the shutdown sequence must
-     * complete (each producer must observe its own
-     * {@link ProducerState#NOT_RUNNING} transition before the orchestrator moves
-     * on). Restoring the interrupt flag would make the next
-     * {@link Thread#sleep(long)} immediately re-throw, producing a tight CPU loop
-     * while the producer is still finishing its current batch.
-     *
-     * <p>The constant is {@code false} so the if-branch is dead code (eliminated by
-     * the JIT), but the {@code interrupt()} call site is preserved in source for
-     * readers and IDE navigation. See also the Open TODO in CLAUDE.md about adding
-     * a timeout to this wait so a stuck producer cannot hang shutdown forever.
+     * Counted down once when {@link #run()} transitions to
+     * {@link ProducerState#NOT_RUNNING}. {@link #waitTillProducerNotRunning()}
+     * awaits this latch with the configured shutdown timeout instead of spinning
+     * on the {@code state} field.
      */
-    private static final boolean WAIT_TILL_NOT_RUNNING_RESTORES_INTERRUPT_FLAG = false;
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractProducer.class);
+    @ToString.Exclude
+    protected final CountDownLatch notRunningLatch = new CountDownLatch(1);
 
     /** Flag indicating whether the producer is currently running. */
     protected final AtomicBoolean running = new AtomicBoolean(false);
@@ -123,7 +112,7 @@ public abstract class AbstractProducer implements Producer {
     public void run() {
         if (!shouldRun.get()) {
             LOGGER.info("Producer was interrupted before it started running.");
-            state = ProducerState.NOT_RUNNING;
+            signalNotRunning();
             return;
         }
         if (state != ProducerState.INITIALIZED) {
@@ -141,7 +130,19 @@ public abstract class AbstractProducer implements Producer {
                 break;
             }
         }
+        signalNotRunning();
+    }
+
+    /**
+     * Transitions the producer to {@link ProducerState#NOT_RUNNING} and releases
+     * any thread parked in {@link #waitTillProducerNotRunning()}.
+     *
+     * <p>Visible to subclasses and tests so a fake producer can simulate the
+     * terminal transition without going through {@link #run()}.
+     */
+    protected void signalNotRunning() {
         state = ProducerState.NOT_RUNNING;
+        notRunningLatch.countDown();
     }
 
     @Override
@@ -218,24 +219,19 @@ public abstract class AbstractProducer implements Producer {
 
     @Override
     public void waitTillProducerNotRunning() {
-        Instant deadline = Instant.now().plusSeconds(cProducer.shutdownTimeoutSeconds);
-        while (state == ProducerState.RUNNING) {
-            if (Instant.now().isAfter(deadline)) {
+        if (state != ProducerState.RUNNING) {
+            return;
+        }
+        try {
+            if (!notRunningLatch.await(cProducer.shutdownTimeoutSeconds, TimeUnit.SECONDS)) {
                 LOGGER.error(
-                        "waitTillProducerNotRunning timed out after {}s; producer state still RUNNING. "
+                        "waitTillProducerNotRunning timed out after {}s; producer state still {}. "
                                 + "Continuing shutdown without confirming this producer stopped.",
-                        cProducer.shutdownTimeoutSeconds);
-                return;
+                        cProducer.shutdownTimeoutSeconds, state);
             }
-            try {
-                Thread.sleep(SLEEP_WAIT_TILL_RUNNING);
-            } catch (InterruptedException e) {
-                LOGGER.warn(
-                        "waitTillProducerNotRunning sleep interrupted; continuing to wait for producer shutdown.", e);
-                if (WAIT_TILL_NOT_RUNNING_RESTORES_INTERRUPT_FLAG) {
-                    Thread.currentThread().interrupt();
-                }
-            }
+        } catch (InterruptedException e) {
+            LOGGER.warn("waitTillProducerNotRunning interrupted; continuing shutdown.", e);
+            Thread.currentThread().interrupt();
         }
     }
 
