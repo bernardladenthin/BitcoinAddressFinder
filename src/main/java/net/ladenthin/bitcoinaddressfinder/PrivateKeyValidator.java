@@ -115,7 +115,7 @@ public class PrivateKeyValidator {
      *
      * @param secrets the array of private keys to validate and correct (modified in-place)
      */
-    public void replaceInvalidPrivateKeys(@NonNull BigInteger[] secrets) {
+    public void replaceInvalidPrivateKeys(@NonNull BigInteger... secrets) {
         for (int i = 0; i < secrets.length; i++) {
             secrets[i] = coerceToValidPrivateKey(secrets[i]);
         }

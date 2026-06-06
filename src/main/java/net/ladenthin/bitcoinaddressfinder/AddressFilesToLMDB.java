@@ -103,11 +103,12 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
                     }
                     AddressFile addressFile = new AddressFile(file, readStatistic, network, supported, unsupported);
 
-                    LOGGER.info("process " + file.getAbsolutePath());
+                    String filePath = file.getAbsolutePath();
+                    LOGGER.info("process " + filePath);
                     currentAddressFile.set(addressFile);
                     addressFile.readFile();
                     currentAddressFile.set(null);
-                    LOGGER.info("finished: " + file.getAbsolutePath());
+                    LOGGER.info("finished: " + filePath);
 
                     logProgress();
                 }

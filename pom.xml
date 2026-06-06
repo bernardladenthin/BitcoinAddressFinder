@@ -666,8 +666,8 @@ SPDX-License-Identifier: Apache-2.0
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
                 <configuration>
-                    <effort>Default</effort>
-                    <threshold>Default</threshold>
+                    <effort>Max</effort>
+                    <threshold>Low</threshold>
                     <failOnError>true</failOnError>
                     <includeTests>false</includeTests>
                     <excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>

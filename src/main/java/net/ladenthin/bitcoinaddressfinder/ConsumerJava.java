@@ -73,8 +73,12 @@ public class ConsumerJava implements Consumer {
     protected final AtomicLong emptyConsumer = new AtomicLong();
     /** Total number of address hits found so far. */
     protected final AtomicLong hits = new AtomicLong();
-    /** Wall-clock start time (epoch ms) of the consumer for statistics. */
-    protected long startTime = 0;
+    /**
+     * Wall-clock start time (epoch ms) of the consumer for statistics. Volatile so the
+     * single write in {@link #startStatisticsTimer()} (caller thread) publishes to the
+     * scheduled-executor task that reads it on every tick (fb-contrib AT_NONATOMIC_64BIT_PRIMITIVE).
+     */
+    protected volatile long startTime = 0;
 
     /** Consumer configuration. */
     protected final CConsumerJava consumerJava;

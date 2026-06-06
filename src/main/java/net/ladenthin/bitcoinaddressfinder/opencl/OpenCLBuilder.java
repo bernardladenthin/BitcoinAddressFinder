@@ -80,7 +80,7 @@ public class OpenCLBuilder {
     public OpenCLBuilder() {}
 
     /** Whether device-info conversions should be formatted for human consumption when querying device info. */
-    public static boolean TRANSFORM_TO_PRINT = true;
+    public static final boolean TRANSFORM_TO_PRINT = true;
 
     /**
      * Discovers and returns every available OpenCL platform with its devices.
@@ -213,7 +213,7 @@ public class OpenCLBuilder {
                 preferredVectorWidthDouble);
     }
 
-    private static ImmutableList<@NonNull Long> longsToImmutableList(long[] array) {
+    private static ImmutableList<@NonNull Long> longsToImmutableList(long... array) {
         ImmutableList.Builder<@NonNull Long> b = ImmutableList.builderWithExpectedSize(array.length);
         for (long l : array) {
             b.add(l);

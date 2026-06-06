@@ -766,4 +766,223 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="OPM_OVERLY_PERMISSIVE_METHOD"/>
     </Match>
 
+    <!--
+        BC_UNCONFIRMED_CAST on the keyproducer package — pure generic-erasure
+        false positive.
+
+        Every keyproducer class extends a generic base:
+            KeyProducerJava<T extends CKeyProducerJava>
+                holds  protected final T cKeyProducerJava
+        Subclasses parameterise T with a specific CKeyProducerJava subtype
+        (CKeyProducerJavaBip39, …Random, …Socket, etc.). At source level
+        every cKeyProducerJava.specificField access is type-checked by the
+        generic bound; at bytecode level erasure forces the JVM to emit a
+        CHECKCAST from CKeyProducerJava to the bound's runtime type. fb-contrib
+        reads the bytecode and flags every such cast as "unconfirmed".
+
+        These nine sites are all the same shape: a subclass accessing a field
+        on its own typed configuration via the erased base field. The cast is
+        introduced by javac, not by the source. Removing it would require
+        deleting the shared cKeyProducerJava field and giving every subclass
+        its own typed copy — a structural change for no behavioural gain.
+    -->
+    <Match>
+        <Package name="~net\.ladenthin\.bitcoinaddressfinder\.keyproducer.*"/>
+        <Bug pattern="BC_UNCONFIRMED_CAST"/>
+    </Match>
+
+    <!--
+        DLS_DEAD_LOCAL_STORE on four deliberate "ignored value" patterns.
+
+        Three are the canonical Error-Prone-compliant "fire-and-forget Future"
+        idiom: when a submit/scheduleAtFixedRate return is intentionally
+        unused, the project assigns it to `Object unused` and applies
+        @FireAndForget("…rationale…") + @SuppressWarnings("FutureReturnValueIgnored")
+        to silence Error Prone's FutureReturnValueIgnored. fb-contrib's DLS
+        reads the same dead store and flags it; honouring DLS by dropping the
+        local would immediately re-trigger FutureReturnValueIgnored, so the
+        two rules are at odds and we accept the DLS finding as the documented
+        tradeoff. Sites: ConsumerJava.startStatisticsTimer (scheduler),
+        Finder.startProducer (producer submit), KeyProducerJavaWebSocket.start
+        (server submit).
+
+        The fourth (LMDBPersistence.count) is the standard "count an Iterable
+        by iterating, discarding each item" pattern:
+            for (KeyVal ignored : iterable) { count++; }
+        The loop variable IS the count's side effect; LMDB's CursorIterable
+        offers no Stream / size() shortcut so the iteration is mandatory.
+    -->
+    <Match>
+        <Bug pattern="DLS_DEAD_LOCAL_STORE"/>
+        <Or>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.ConsumerJava"/>
+                <Method name="startStatisticsTimer"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.Finder"/>
+                <Method name="startProducer"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaWebSocket"/>
+                <Method name="start"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
+                <Method name="count"/>
+            </And>
+        </Or>
+    </Match>
+
+    <!--
+        THROWS_METHOD_THROWS_CLAUSE_BASIC_EXCEPTION on the Producer interface's
+        initProducer/produceKeys and on ConsumerJava.initLMDB.
+
+        Producer is the abstract contract every producer impl honours. Concrete
+        impls throw a heterogeneous mix (LmdbException, JOCL CLException,
+        IOException from socket binds, NoMoreSecretsAvailableException, etc.)
+        with no shared checked-exception supertype. Narrowing the throws clause
+        would require either (a) wrapping every impl's exception into a single
+        domain type at every site — adds a "caused by:" frame to every
+        diagnostic and forces every impl to re-catch its own native exception,
+        or (b) listing every concrete impl's exception family on the interface,
+        coupling the abstract API to every backend's transitive dependency.
+
+        Same reasoning for ConsumerJava.initLMDB: it composes
+        LmdbException (runtime), AddressLookupBackend chain failures, and the
+        IO-level snapshot population — there is no minimal checked supertype.
+
+        Both interface methods are the "fail fatally on init" boundary; their
+        callers (Main.run / Finder.initProducer) already handle
+        Exception broadly and trigger Shutdown.
+    -->
+    <Match>
+        <Bug pattern="THROWS_METHOD_THROWS_CLAUSE_BASIC_EXCEPTION"/>
+        <Or>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.Producer"/>
+                <Or>
+                    <Method name="initProducer"/>
+                    <Method name="produceKeys"/>
+                </Or>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.ConsumerJava"/>
+                <Method name="initLMDB"/>
+            </And>
+        </Or>
+    </Match>
+
+    <!--
+        PRMC_POSSIBLY_REDUNDANT_METHOD_CALLS on ConsumerJava.consumeKeys.
+
+        The flagged pattern is the standard non-blocking BlockingQueue drain:
+            PublicKeyBytes[] batch = keysQueue.poll();   // loop init
+            while (batch != null) {
+                processBatch(batch, buf);
+                batch = keysQueue.poll();                // loop step
+            }
+        Both poll() calls are necessary (drain-until-empty); they are not
+        redundant. fb-contrib pattern-matches the two identical calls
+        regardless of the loop structure.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.ConsumerJava"/>
+        <Method name="consumeKeys"/>
+        <Bug pattern="PRMC_POSSIBLY_REDUNDANT_METHOD_CALLS"/>
+    </Match>
+
+    <!--
+        MDM_RANDOM_SEED on KeyProducerJavaRandom and BIP39KeyProducer — both
+        deliberate, matched and documented in BitcoinAddressFinderArchitectureTest
+        ("noNewRandom" ArchUnit rule) with the same two-class exemption list:
+
+          - KeyProducerJavaRandom constructs weak `new Random(seed)` instances
+            for documented CWE-338 demonstrations (the project's research focus
+            includes scanning addresses derived from weak-RNG wallets).
+          - BIP39KeyProducer extends java.util.Random as a façade pattern; the
+            implicit super() hits the Random() constructor. Random is used as
+            a sequential-iterator surface for deterministic HD-wallet
+            derivation, not as a source of randomness.
+    -->
+    <Match>
+        <Bug pattern="MDM_RANDOM_SEED"/>
+        <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaRandom"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.BIP39KeyProducer"/>
+        </Or>
+    </Match>
+
+    <!--
+        HARD_CODE_KEY on Secp256k1Constants — false positive on a public curve
+        parameter. The flagged constant is the secp256k1 generator point G (and
+        the associated curve order n / field prime p), which are PUBLIC
+        cryptographic parameters defined by SEC 2 / BIP 340 and identical
+        across every secp256k1 implementation. They are not credentials; they
+        are the parameters anyone scanning Bitcoin addresses must use. Static
+        analysis pattern-matches the hex blob as "looks like a key".
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants"/>
+        <Bug pattern="HARD_CODE_KEY"/>
+    </Match>
+
+    <!--
+        NP_LOAD_OF_KNOWN_NULL_VALUE on OpenClTask.executeKernel — false
+        positive on the JOCL API contract. clEnqueueNDRangeKernel takes
+        explicit null arguments for the global_work_offset, event_wait_list,
+        and event return-pointer when the caller has nothing to provide; the
+        nulls are not a defensive omission, they are the JOCL spec.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.OpenClTask"/>
+        <Method name="executeKernel"/>
+        <Bug pattern="NP_LOAD_OF_KNOWN_NULL_VALUE"/>
+    </Match>
+
+    <!--
+        UPM_UNCALLED_PRIVATE_METHOD and URF_UNREAD_FIELD on a documented "preserved
+        for future revival" idiom.
+
+        Each affected site already carries @Deprecated + @SuppressWarnings on
+        the Error Prone counterpart (UnusedMethod / UnusedVariable), with a
+        comment explaining what the helper would be revived for. fb-contrib's
+        UPM/URF are the duplicate analysis path; they read bytecode and have
+        no @SuppressWarnings story. Listing each preserved site keeps the
+        suppression scope auditable rather than silencing the whole detector.
+    -->
+    <Match>
+        <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
+        <Or>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.Bech32Helper"/>
+                <Or>
+                    <Method name="decode5to8"/>
+                    <Method name="encode8to5"/>
+                </Or>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.KeyUtility"/>
+                <Method name="swapIntBytes"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.OpenClTask"/>
+                <Method name="cloneByteBuffer"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils"/>
+                <Or>
+                    <Method name="addressListToByteBufferDirect"/>
+                    <Method name="byteBufferToAddressList"/>
+                    <Method name="hashToByteBufferDirect"/>
+                </Or>
+            </And>
+        </Or>
+    </Match>
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils"/>
+        <Field name="emptyByteBuffer"/>
+        <Bug pattern="URF_UNREAD_FIELD"/>
+    </Match>
+
 </FindBugsFilter>

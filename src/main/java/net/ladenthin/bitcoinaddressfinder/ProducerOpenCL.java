@@ -163,7 +163,10 @@ public class ProducerOpenCL extends AbstractProducer {
                     submitSlot.release();
                 }
             }
-        } catch (Exception e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logErrorInProduceKeys(e, secretBase);
+        } catch (RuntimeException e) {
             logErrorInProduceKeys(e, secretBase);
         }
     }

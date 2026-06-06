@@ -181,7 +181,7 @@ public abstract class AbstractProducer implements Producer {
         }
     }
 
-    void consumeSecrets(BigInteger[] secrets) {
+    void consumeSecrets(BigInteger... secrets) {
         if (cProducer.batchUsePrivateKeyIncrement) {
             BigInteger secret = secrets[0];
             BigInteger secretBase = createSecretBase(secret, cProducer.logSecretBase);
