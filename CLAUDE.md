@@ -420,6 +420,10 @@ See [`../workspace/policies/spotbugs-suppressions.md`](../workspace/policies/spo
 
 See [`../workspace/policies/jqwik-prompt-injection.md`](../workspace/policies/jqwik-prompt-injection.md).
 
+## Lombok Config
+
+See [`../workspace/policies/lombok-config.md`](../workspace/policies/lombok-config.md).
+
 ## Open TODOs
 
 Open TODOs for this repo live in [`TODO.md`](TODO.md). Cross-repo status
