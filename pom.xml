@@ -61,7 +61,7 @@ SPDX-License-Identifier: Apache-2.0
         <fb-contrib.version>7.7.4</fb-contrib.version>
         <findsecbugs.version>1.14.0</findsecbugs.version>
         <errorprone.version>2.49.0</errorprone.version>
-        <nullaway.version>0.13.4</nullaway.version>
+        <nullaway.version>0.13.6</nullaway.version>
         <checker.version>4.2.0</checker.version>
         <java-websocket.version>1.6.0</java-websocket.version>
         <jeromq.version>0.6.0</jeromq.version>
@@ -215,7 +215,7 @@ SPDX-License-Identifier: Apache-2.0
                 <plugin>
                     <groupId>org.jacoco</groupId>
                     <artifactId>jacoco-maven-plugin</artifactId>
-                    <version>0.8.14</version>
+                    <version>0.8.15</version>
                 </plugin>
                 <plugin>
                     <groupId>org.pitest</groupId>
