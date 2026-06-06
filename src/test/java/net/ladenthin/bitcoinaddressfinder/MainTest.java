@@ -84,7 +84,7 @@ public class MainTest {
     @OpenCLTest
     public void testRoundtripOpenCLProducer_configurationsGiven_lmdbCreatedAndRunFindOpenCLDevice()
             throws IOException, InterruptedException {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // arrange
         Main mainAddressFilesToLMDB = new Main(Main.fromJson(Main.readString(config_AddressFilesToLMDB_json)));
         mainAddressFilesToLMDB.logConfigurationTransformation();
@@ -107,7 +107,7 @@ public class MainTest {
     @Test
     @OpenCLTest
     public void testOpenCLInfo_configurationGiven_noExceptionThrown() throws IOException, InterruptedException {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // arrange
         Main mainFind_SecretsFile = new Main(Main.fromJson(Main.readString(config_OpenCLInfo_json)));
         mainFind_SecretsFile.logConfigurationTransformation();
@@ -176,7 +176,7 @@ public class MainTest {
     @Test
     @OpenCLTest
     public void main_jsonExtensionPath_parsesAndRunsConfiguration() throws IOException {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // act
         Main.main(new String[] {config_OpenCLInfo_json.toAbsolutePath().toString()});
     }
@@ -184,7 +184,7 @@ public class MainTest {
     @Test
     @OpenCLTest
     public void main_jsExtensionPath_parsesAndRunsConfiguration() throws IOException {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // act
         Main.main(new String[] {config_OpenCLInfo_js.toAbsolutePath().toString()});
     }
@@ -192,7 +192,7 @@ public class MainTest {
     @Test
     @OpenCLTest
     public void main_yamlExtensionPath_parsesAndRunsConfiguration() throws IOException {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // act
         Main.main(new String[] {config_OpenCLInfo_yaml.toAbsolutePath().toString()});
     }
@@ -200,7 +200,7 @@ public class MainTest {
     @Test
     @OpenCLTest
     public void main_ymlExtensionPath_parsesAndRunsConfiguration() throws IOException {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         // act
         Main.main(new String[] {config_OpenCLInfo_yml.toAbsolutePath().toString()});
     }

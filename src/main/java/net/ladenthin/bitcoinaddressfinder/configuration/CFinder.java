@@ -5,11 +5,15 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import java.util.ArrayList;
 import java.util.List;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Configuration for the {@code Find} command: producers, key producers and consumer.
  */
+@ToString
+@EqualsAndHashCode
 public class CFinder {
 
     /** Creates a new {@link CFinder}. */
@@ -30,6 +34,14 @@ public class CFinder {
 
     /** Consumer configuration. */
     public @Nullable CConsumerJava consumerJava;
+
+    /**
+     * Maximum time (in seconds) {@link net.ladenthin.bitcoinaddressfinder.Finder#shutdownAndAwaitTermination()}
+     * waits for the producer executor to terminate before giving up. Default: ~100,000 years
+     * (effectively unbounded; the call exists as a safety net). Tests override with a small
+     * value (e.g. {@code 20}) to exercise the timeout path in seconds rather than years.
+     */
+    public long awaitTerminateSeconds = 365L * 1000L * 24L * 3600L;
 
     /** Java CPU producer configurations. */
     public List<CProducerJava> producerJava = new ArrayList<>();

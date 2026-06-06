@@ -4,11 +4,25 @@ SPDX-FileCopyrightText: 2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com
 SPDX-License-Identifier: Apache-2.0
 -->
 
+<!--
+    Example Logback configuration. Drop a copy on the classpath or point at
+    it via -Dlogback.configurationFile=<path> to override the bundled
+    src/main/resources/logback.xml.
+
+    The %replace(%msg){'[\r\n]+', ' | '} wrap is the CRLF / log-injection
+    control: any carriage return / line feed in the rendered message body is
+    normalised to " | " before the appender flushes, so untrusted bytes that
+    reach a LOGGER.* argument cannot forge new log lines. Stack traces
+    rendered via %xThrowable / %ex are a separate pattern token and are not
+    affected — multi-line throwables still render correctly.
+
+    Keep the %replace wrap in any custom pattern you derive from this file.
+-->
 <configuration>
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <!-- encoders are assigned the type ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
     <encoder>
-      <pattern>%date{ISO8601} [%thread] %-5level %logger{200} - %msg%n</pattern>
+      <pattern>%date{ISO8601} [%thread] %-5level %logger{200} - %replace(%msg){'[\r\n]+', ' | '}%n</pattern>
     </encoder>
   </appender>
 

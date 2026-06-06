@@ -7,10 +7,29 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.ToString;
 
 /**
  * Mutable statistic populated while reading address or secret files.
+ *
+ * <h2>toString contract</h2>
+ * <p>The {@link ToString} annotation includes every instance field — {@code successful},
+ * {@code unsupportedReasons}, {@code currentFileProgress}, {@code errors} — plus the
+ * derived {@link #getUnsupportedTotal()} getter (marked with {@link ToString.Include} so
+ * Lombok also calls it). The getter is in the output so log lines can show the total
+ * skip count without the reader having to sum {@code unsupportedReasons.values()}
+ * themselves.
+ *
+ * <p>Lombok renders the getter under the {@code name = "unsupportedTotal"} label
+ * (without that override Lombok would emit the raw method name {@code getUnsupportedTotal},
+ * which is less natural for logs and breaks the property-name convention). Derived members
+ * <em>after</em> the regular field set, so the rendered order is
+ * {@code (successful=…, unsupportedReasons=…, currentFileProgress=…, errors=…,
+ * unsupportedTotal=…)}. No test or downstream consumer depends on the field ordering;
+ * if that ever changes, switch the per-member declarations to {@link ToString.Include}
+ * with explicit {@code rank} values.
  */
+@ToString
 public class ReadStatistic {
 
     /** Creates a new {@link ReadStatistic}. */
@@ -43,14 +62,8 @@ public class ReadStatistic {
      *
      * @return sum of all per-reason counts in {@link #unsupportedReasons}
      */
+    @ToString.Include(name = "unsupportedTotal")
     public long getUnsupportedTotal() {
         return unsupportedReasons.values().stream().mapToLong(Long::longValue).sum();
-    }
-
-    @Override
-    public String toString() {
-        return "ReadStatistic{" + "successful=" + successful + ", unsupportedTotal=" + getUnsupportedTotal()
-                + ", unsupportedReasons=" + unsupportedReasons + ", currentFileProgress=" + currentFileProgress
-                + ", errors=" + errors + '}';
     }
 }

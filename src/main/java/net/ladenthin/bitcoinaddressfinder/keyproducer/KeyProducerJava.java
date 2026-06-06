@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJava;
 
 /**
@@ -10,6 +11,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJava;
  *
  * @param <T> the configuration type for the concrete subclass
  */
+@ToString
 public abstract class KeyProducerJava<T extends CKeyProducerJava> extends AbstractKeyProducer {
 
     /** Configuration for the concrete key producer. */
@@ -29,12 +31,12 @@ public abstract class KeyProducerJava<T extends CKeyProducerJava> extends Abstra
      *
      * @param overallWorkSize the requested number of secrets
      * @param maxWorkSize     the configured maximum work size
-     * @throws NoMoreSecretsAvailableException never thrown directly but declared for subclass use
      * @throws IllegalArgumentException if {@code overallWorkSize} is outside the allowed range
      */
-    public void verifyWorkSize(int overallWorkSize, int maxWorkSize) throws NoMoreSecretsAvailableException {
+    public void verifyWorkSize(int overallWorkSize, int maxWorkSize) {
         if (overallWorkSize < 0 || overallWorkSize > maxWorkSize) {
-            throw new IllegalArgumentException("Unreasonable work size: " + overallWorkSize);
+            throw new IllegalArgumentException(
+                    "overallWorkSize=" + overallWorkSize + " out of range [0, " + maxWorkSize + "]");
         }
     }
 }

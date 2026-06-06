@@ -18,7 +18,9 @@ import static org.jocl.CL.clSetKernelArg;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.jocl.Pointer;
 import org.jocl.Sizeof;
 import org.jocl.cl_command_queue;
@@ -35,17 +37,22 @@ import org.slf4j.LoggerFactory;
 // the null values that the OpenCL C ABI accepts (e.g. errcode_ret, event_wait_list,
 // event, global_work_offset). Suppress at class scope to avoid per-call noise.
 @SuppressWarnings({"nullness:argument", "nullness:dereference.of.nullable"})
+@ToString
 public class OpenClTask implements ReleaseCLObject {
 
     /** SLF4J logger for this task. */
     private static final Logger LOGGER = LoggerFactory.getLogger(OpenClTask.class);
 
-    private static final int PRIVATE_KEY_SOURCE_SIZE_IN_BYTES = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES;
+    private static final int PRIVATE_KEY_SOURCE_SIZE_IN_BYTES = OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES;
 
     private final CProducerOpenCL cProducer;
 
+    // JOCL cl_context is a native-pointer wrapper — toString is uninformative.
+    @ToString.Exclude
     private final cl_context context;
 
+    // SourceArgument carries its own ByteBuffer payload — heavy and not useful in logs.
+    @ToString.Exclude
     private final SourceArgument privateKeySourceArgument;
 
     private final BitHelper bitHelper;
@@ -242,7 +249,7 @@ public class OpenClTask implements ReleaseCLObject {
      * @return the size of the destination buffer in bytes for the current batch
      */
     public long getDstSizeInBytes() {
-        return (long) PublicKeyBytes.CHUNK_SIZE_NUM_BYTES * cProducer.getOverallWorkSize(bitHelper);
+        return (long) OpenClKernelConstants.CHUNK_SIZE_NUM_BYTES * cProducer.getOverallWorkSize();
     }
 
     /**
@@ -305,7 +312,9 @@ public class OpenClTask implements ReleaseCLObject {
 
             // Validate loopCount constraints
             if (loopCount < 1) {
-                throw new IllegalArgumentException("loopCount must be >= 1.");
+                throw new IllegalArgumentException(
+                        "loopCount must be >= 1 but was " + loopCount
+                                + " (totalResultCount=" + totalResultCount + ")");
             }
             if (loopCount > totalResultCount) {
                 throw new IllegalArgumentException("loopCount must not exceed total result count. Given: " + loopCount
@@ -313,7 +322,10 @@ public class OpenClTask implements ReleaseCLObject {
             }
             if (totalResultCount % loopCount != 0) {
                 throw new IllegalArgumentException(
-                        "batchSizeInBits is not divisible by loopCount; result count would be invalid.");
+                        "totalResultCount=" + totalResultCount
+                                + " is not divisible by loopCount=" + loopCount
+                                + "; result count would be invalid"
+                                + " (cProducer.batchSizeInBits=" + cProducer.batchSizeInBits + ")");
             }
 
             final long[] global_work_size = new long[] {adjustedWorkSize};

@@ -91,7 +91,7 @@ public interface Persistence extends AddressLookup, AutoCloseable {
      * @param hash160s the address hashes to sum over
      * @return the total amount aggregated across the supplied addresses
      */
-    Coin getAllAmountsFromAddresses(List<ByteBuffer> hash160s);
+    Coin sumAmountsForAddresses(List<ByteBuffer> hash160s);
 
     /**
      * Returns the current on-disk database size.

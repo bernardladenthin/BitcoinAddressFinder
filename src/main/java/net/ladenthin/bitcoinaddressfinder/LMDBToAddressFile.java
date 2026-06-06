@@ -5,7 +5,9 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBToAddressFile;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
@@ -16,6 +18,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Exports the LMDB database to a plaintext address file in one of the supported formats.
  */
+@ToString
 public class LMDBToAddressFile implements Runnable, Interruptable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LMDBToAddressFile.class);
@@ -24,6 +27,8 @@ public class LMDBToAddressFile implements Runnable, Interruptable {
 
     private final CLMDBToAddressFile lmdbToAddressFile;
 
+    // Lifecycle flag — uninformative in aggregate toString.
+    @ToString.Exclude
     private final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
     /**
@@ -52,7 +57,8 @@ public class LMDBToAddressFile implements Runnable, Interruptable {
                     addressesFile, lmdbToAddressFile.addressFileOutputFormat, shouldRun);
             LOGGER.info("writeAllAmounts done");
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new UncheckedIOException(
+                    "Failed to write LMDB dump to " + lmdbToAddressFile.addressesFile, e);
         }
     }
 

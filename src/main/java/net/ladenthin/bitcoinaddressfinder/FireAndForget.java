@@ -44,12 +44,7 @@ import java.lang.annotation.Target;
  */
 @Documented
 @Retention(RetentionPolicy.CLASS)
-@Target({
-    ElementType.LOCAL_VARIABLE,
-    ElementType.METHOD,
-    ElementType.FIELD,
-    ElementType.PARAMETER
-})
+@Target({ElementType.LOCAL_VARIABLE, ElementType.METHOD, ElementType.FIELD, ElementType.PARAMETER})
 public @interface FireAndForget {
     /**
      * Optional site-specific note describing the shutdown path that drives the

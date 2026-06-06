@@ -207,12 +207,15 @@ public class ReadStatisticTest {
         // act
         String result = readStatistic.toString();
 
-        // assert
+        // assert — Lombok @ToString renders Class(field=value); derived @ToString.Include
+        // members (the getUnsupportedTotal getter mapped to label "unsupportedTotal") render
+        // after the regular field set, so the ordering is successful, unsupportedReasons,
+        // currentFileProgress, errors, then unsupportedTotal.
         assertThat(
                 result,
                 is(
                         equalTo(
-                                "ReadStatistic{successful=10, unsupportedTotal=3, unsupportedReasons={address is empty=2, P2TR is not supported=1}, currentFileProgress=75.0, errors=[some error]}")));
+                                "ReadStatistic(successful=10, unsupportedReasons={address is empty=2, P2TR is not supported=1}, currentFileProgress=75.0, errors=[some error], unsupportedTotal=3)")));
     }
 
     private static ReadStatistic createReadStatisticWithAllFieldsSet() {

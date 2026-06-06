@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder.persistence.inmemory;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.stream.Stream;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
 import org.jspecify.annotations.NonNull;
@@ -44,6 +45,7 @@ import org.jspecify.annotations.NonNull;
  * <h2>Concurrency</h2>
  * Thread-safe for concurrent reads after construction. No mutation API is exposed.
  */
+@ToString
 public final class TruncatedLong64SortedArrayPresence implements AddressPresence {
 
     /** Fixed length of a hash160 entry in bytes. */
@@ -56,6 +58,9 @@ public final class TruncatedLong64SortedArrayPresence implements AddressPresence
     static final int BUCKET_COUNT = 256;
 
     /** Sorted primitive arrays, one per first-byte bucket. */
+    // Up to 256 long[] arrays, each potentially holding millions of entries — toString would
+    // be log-killing. The size() getter is included instead (see @ToString.Include below).
+    @ToString.Exclude
     private final long[][] buckets;
 
     private TruncatedLong64SortedArrayPresence(long[][] buckets) {
@@ -140,6 +145,7 @@ public final class TruncatedLong64SortedArrayPresence implements AddressPresence
      *
      * @return total entry count across all buckets
      */
+    @ToString.Include
     public long size() {
         long total = 0L;
         for (long[] b : buckets) {

@@ -4,6 +4,8 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
+import lombok.ToString;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import org.jspecify.annotations.NonNull;
 
 /**
@@ -13,7 +15,14 @@ import org.jspecify.annotations.NonNull;
  * valid ranges, and for correcting invalid keys to a known replacement value.
  * It is particularly useful for grid-based key generation where batch sizes must
  * be carefully bounded to avoid exceeding the secp256k1 private key limit.
+ *
+ * <p>{@link ToString} is applied for consistency with the rest of the codebase: this class
+ * has no instance state so the rendered output is {@code PrivateKeyValidator()}, but that
+ * is more useful than the {@code PrivateKeyValidator@hashcode} identity-style form that
+ * would otherwise appear when this helper is logged as a field of
+ * {@code AbstractProducer.toString}.
  */
+@ToString
 public class PrivateKeyValidator {
 
     /** Creates a new {@link PrivateKeyValidator}. */
@@ -27,15 +36,16 @@ public class PrivateKeyValidator {
      * by up to 2^batchSizeInBits - 1.
      *
      * @param batchSizeInBits The number of bits used for batch size (i.e., the number of keys generated in one grid chunk).
-     *                        Must be in the range [0, {@link PublicKeyBytes#PRIVATE_KEY_MAX_NUM_BITS}].
+     *                        Must be in the range [0, {@link Secp256k1Constants#PRIVATE_KEY_MAX_NUM_BITS}].
      * @return The maximum base private key that will not overflow when incremented by the grid.
      * @throws IllegalArgumentException if batchSizeInBits is outside the valid range
      * @throws IllegalStateException if batchSizeInBits is too large and no valid keys remain
      */
     public BigInteger getMaxPrivateKeyForBatchSize(int batchSizeInBits) {
-        if (batchSizeInBits < 0 || batchSizeInBits > PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS) {
+        if (batchSizeInBits < 0 || batchSizeInBits > Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS) {
             throw new IllegalArgumentException(
-                    "batchSizeInBits must be between 0 and " + PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS);
+                    "batchSizeInBits must be in [0, " + Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS
+                            + "] but was " + batchSizeInBits);
         }
 
         // 2^batchSizeInBits represents the maximum offset (grid size)
@@ -43,10 +53,13 @@ public class PrivateKeyValidator {
 
         // Subtract maxOffset - 1 to ensure that baseKey + (2^bits - 1) ≤ MAX_PRIVATE_KEY
         BigInteger maxSafeKey =
-                PublicKeyBytes.MAX_PRIVATE_KEY.subtract(maxOffset).add(BigInteger.ONE);
+                Secp256k1Constants.MAX_PRIVATE_KEY.subtract(maxOffset).add(BigInteger.ONE);
 
         if (maxSafeKey.signum() < 0) {
-            throw new IllegalStateException("batchSizeInBits too large; no valid private keys remain.");
+            throw new IllegalStateException(
+                    "batchSizeInBits=" + batchSizeInBits
+                            + " too large; resulting maxSafeKey=" + maxSafeKey
+                            + " (must be >= 1) — no valid private keys remain");
         }
 
         return maxSafeKey;
@@ -67,28 +80,29 @@ public class PrivateKeyValidator {
     /**
      * Checks whether a private key falls outside the valid range for secp256k1.
      * <p>
-     * Valid private keys are in the range [{@link PublicKeyBytes#MIN_VALID_PRIVATE_KEY}, {@link PublicKeyBytes#MAX_PRIVATE_KEY}].
+     * Valid private keys are in the range [{@link Secp256k1Constants#MIN_VALID_PRIVATE_KEY}, {@link Secp256k1Constants#MAX_PRIVATE_KEY}].
      *
      * @param secret the private key to check
      * @return true if the key is outside the valid range; false otherwise
      */
     public boolean isOutsidePrivateKeyRange(@NonNull BigInteger secret) {
-        return secret.compareTo(PublicKeyBytes.MIN_VALID_PRIVATE_KEY) < 0
-                || secret.compareTo(PublicKeyBytes.MAX_PRIVATE_KEY) > 0;
+        return secret.compareTo(Secp256k1Constants.MIN_VALID_PRIVATE_KEY) < 0
+                || secret.compareTo(Secp256k1Constants.MAX_PRIVATE_KEY) > 0;
     }
 
     /**
-     * Returns a valid private key, or a replacement value if the input is invalid.
+     * Coerces the given private key into the valid secp256k1 range.
      * <p>
-     * If the input key is outside the valid range, this method returns
-     * {@link PublicKeyBytes#INVALID_PRIVATE_KEY_REPLACEMENT}. Otherwise, it returns the input unchanged.
+     * If the input key is already inside the valid range, it is returned unchanged.
+     * Otherwise the {@link Secp256k1Constants#INVALID_PRIVATE_KEY_REPLACEMENT} sentinel
+     * is returned in its place.
      *
-     * @param secret the private key to validate
-     * @return the input key if valid, or the replacement value if invalid
+     * @param secret the private key to coerce
+     * @return the input key if it is already valid, otherwise the replacement sentinel
      */
-    public @NonNull BigInteger returnValidPrivateKey(@NonNull BigInteger secret) {
+    public @NonNull BigInteger coerceToValidPrivateKey(@NonNull BigInteger secret) {
         if (isOutsidePrivateKeyRange(secret)) {
-            return PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT;
+            return Secp256k1Constants.INVALID_PRIVATE_KEY_REPLACEMENT;
         }
         return secret;
     }
@@ -97,13 +111,13 @@ public class PrivateKeyValidator {
      * Replaces invalid private keys in an array with a known replacement value.
      * <p>
      * Each element in the array is checked and, if invalid, replaced with
-     * {@link PublicKeyBytes#INVALID_PRIVATE_KEY_REPLACEMENT}. Valid keys are left unchanged.
+     * {@link Secp256k1Constants#INVALID_PRIVATE_KEY_REPLACEMENT}. Valid keys are left unchanged.
      *
      * @param secrets the array of private keys to validate and correct (modified in-place)
      */
-    public void replaceInvalidPrivateKeys(@NonNull BigInteger[] secrets) {
+    public void replaceInvalidPrivateKeys(@NonNull BigInteger... secrets) {
         for (int i = 0; i < secrets.length; i++) {
-            secrets[i] = returnValidPrivateKey(secrets[i]);
+            secrets[i] = coerceToValidPrivateKey(secrets[i]);
         }
     }
 }

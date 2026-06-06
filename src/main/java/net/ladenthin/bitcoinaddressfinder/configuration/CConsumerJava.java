@@ -3,12 +3,16 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Configuration for the Java-based consumer that queries the LMDB database.
  */
+@ToString
+@EqualsAndHashCode
 public class CConsumerJava {
 
     /** Creates a new {@link CConsumerJava}. */
@@ -26,6 +30,14 @@ public class CConsumerJava {
     public long delayEmptyConsumer = 100;
     /** Maximum number of pending key batches the consumer queue may hold. */
     public int queueSize = 10;
+
+    /**
+     * Maximum time (in seconds) {@link net.ladenthin.bitcoinaddressfinder.ConsumerJava#interrupt()}
+     * waits for the worker pool to drain the keys queue before giving up and logging a warning.
+     * Default: 60 seconds. Tests override with a small value (e.g. {@code 20}) to keep
+     * the wait-and-assert branch fast.
+     */
+    public long awaitQueueEmptySeconds = 60L;
 
     /**
      * Enables runtime verification of public key calculation.

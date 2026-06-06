@@ -7,6 +7,7 @@
 [![Checker Framework](https://img.shields.io/badge/Checker%20Framework-Nullness-25A162)](https://checkerframework.org)  
 [![Error Prone](https://img.shields.io/badge/Error%20Prone-12%20patterns%20at%20ERROR-25A162)](https://errorprone.info)  
 [![Maven Enforcer](https://img.shields.io/badge/Maven%20Enforcer-strict-25A162)](https://maven.apache.org/enforcer/)  
+[![Lombok](https://img.shields.io/badge/Lombok-1.18.46-bc3f3c)](https://projectlombok.org/)  
 [![jqwik](https://img.shields.io/badge/tested%20with-jqwik-1f6feb)](https://jqwik.net)  
 [![ArchUnit](https://img.shields.io/badge/tested%20with-ArchUnit-c71a36)](https://www.archunit.org)  
 [![SpotBugs](https://img.shields.io/badge/analyzed%20with-SpotBugs-3b5998)](https://spotbugs.github.io)  
@@ -190,6 +191,35 @@ To accelerate **elliptic curve scalar multiplication** (`k·G`, i.e. private key
 
 - **Use of Constant Memory**:  
   Precomputed points are stored in **constant GPU memory** (`__constant` via `CONSTANT_AS`), allowing fast access by all threads in a workgroup.
+
+### 📦 Batch Size per Kernel (`batchSizeInBits`)
+Each Find-mode producer batch covers **`2^batchSizeInBits`** consecutive private keys (the field is a **log₂ exponent**, not a raw key count). For each batch the CPU:
+
+1. Pulls a candidate private key from the configured key producer.
+2. **Aligns** the candidate DOWN to a `2^batchSizeInBits` boundary &#x2014; the low `batchSizeInBits` bits are cleared so the result is a multiple of `2^batchSizeInBits`. This produces the `secretBase`. Source: [`KeyUtility.alignDown`](src/main/java/net/ladenthin/bitcoinaddressfinder/KeyUtility.java) and [`AbstractProducer.createSecretBase`](src/main/java/net/ladenthin/bitcoinaddressfinder/AbstractProducer.java).
+3. Submits `secretBase` (plus the configured `loopCount`) to the GPU.
+
+The OpenCL kernel then evaluates `secretBase + i` for `i &#x2208; [0, 2^batchSizeInBits)` in parallel across all GPU work-items, so the batch covers `2^batchSizeInBits` consecutive keys cleanly without gap or overlap.
+
+#### Typical values
+
+| `batchSizeInBits` | Keys per batch (`2^N`) | Use case |
+|-------------------|------------------------:|----------|
+| `0`               | 1                       | sequential / secrets-file mode (no batching) &#x2014; used by `config_Find_SecretsFile.json` |
+| `14`              | 16,384                  | per-CPU-producer batch &#x2014; used by `config_Find_8CPUProducer.json` and the CPU sides of mixed configs |
+| `18`              | 262,144                 | typical OpenCL device &#x2014; used by `config_Find_1OpenCLDevice.json` |
+| `20`&#x2013;`21`  | 1M&#x2013;2M            | high-end OpenCL device |
+
+**Upper bound**: [`PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY`](src/main/java/net/ladenthin/bitcoinaddressfinder/PublicKeyBytes.java) &#x2014; derived from `Integer.MAX_VALUE / CHUNK_SIZE_NUM_BYTES` so per-batch result arrays cannot exceed Java's 32-bit array-length limit. **Default**: `0` (sequential, no batching).
+
+#### Relation to `loopCount`
+
+`loopCount` does **not** change the batch size. It only changes how the same `2^batchSizeInBits` work is distributed across GPU work-items:
+
+- With `loopCount = 1`: the kernel launches `2^batchSizeInBits` work-items, each computing one key.
+- With `loopCount = 8`: the kernel launches `2^batchSizeInBits / 8` work-items, each computing 8 keys internally via the affine-addition scalar walker described below.
+
+Constraints (enforced by [`CProducerOpenCL`](src/main/java/net/ladenthin/bitcoinaddressfinder/configuration/CProducerOpenCL.java)): `loopCount` must be a power of two, `2^batchSizeInBits` must be divisible by `loopCount`, and the total per-launch result buffer (`workSize &#x00D7; loopCount &#x00D7; chunkSize`) must not exceed `Integer.MAX_VALUE`.
 
 ### 🔄 Scalar Walker per Kernel (`loopCount`)
 The OpenCL kernel supports a **loop-based scalar strategy** controlled by the `loopCount` parameter. Each GPU thread generates multiple EC keys by:
@@ -563,7 +593,7 @@ If you're missing any information or have questions about usage or content, feel
 > ```json
 > "addressLookupBackend" : "TRUNCATED_LONG_64"
 > ```
-> See [Pluggable Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend) above for the full trade-off matrix and benchmark numbers. `TRUNCATED_LONG_64` loads every hash160 into RAM once at startup as 256 sorted `long[]` buckets (~1.1 GB for the Light DB), then closes the LMDB env and releases its mmap pages — near-`HASHSET` lookup latency at ~10× lower memory cost. If you have memory to spare and prefer exact-bit storage with no probabilistic fallthrough, `HASHSET` (~10 GB for the Light DB) is the next step up; `SORTED_ARRAY` sits between the two; `BLOOM` keeps LMDB open while still skipping it for the overwhelming majority of misses.
+> See [Pluggable Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend) above for the full trade-off matrix and benchmark numbers. `TRUNCATED_LONG_64` loads every hash160 into RAM once at startup as 256 sorted `long[]` buckets (~1.1 GB for the Light DB), then closes the LMDB env and releases its mmap pages — near-`HASHSET` lookup latency at ~10× lower memory cost. If you have memory to spare and prefer exact-bit storage with no probabilistic fallthrough, `HASHSET` (~10 GB for the Light DB) is the next step up; `BLOOM` keeps LMDB open while still skipping it for the overwhelming majority of misses.
 
 <details>
 <summary>Checksums lmdb_light.zip</summary>
@@ -611,6 +641,20 @@ LMDBToAddressFile_Light_HexHash.zip	SHA3-512	29CA44CD666D7B8CF9EAD4B340620FBB7ED
   * Time to create the database: ~54 hours
   * Link (34.3 GiB zip archive): http://ladenthin.net/lmdb_full.zip
   * Link extracted addresses as txt (23.4 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Full_HexHash.zip
+
+> ⚠️ **Backend choice for the full database.** At 1.377 B entries, `HASHSET` requires roughly **~110 GB of RAM** — impractical on almost any consumer hardware. Pick one of the realistic options instead:
+>
+> ```json
+> "addressLookupBackend" : "TRUNCATED_LONG_64"
+> ```
+>
+> | Choice              | RAM needed at Full DB | LMDB stays open? | When to pick |
+> |---------------------|-----------------------|------------------|--------------|
+> | `TRUNCATED_LONG_64` | ~11 GB                | **no**           | recommended if you can spare ~12 GB; closes LMDB and releases its mmap pages |
+> | `BLOOM` (FPP 0.01)  | ~1.6 GB               | yes              | keeps LMDB open as the verifier; skips it for the overwhelming majority of misses |
+> | `LMDB_ONLY`         | minimal (mmap only)   | yes              | fallback when there is essentially no spare RAM and disk-backed mmap is acceptable |
+>
+> Do **not** select `HASHSET` for the full database. See [Pluggable Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend) above for the full trade-off matrix and per-tier memory footprint.
 
 <details>
 <summary>Checksums lmdb_full.zip</summary>
@@ -827,13 +871,13 @@ This mode generates private keys **sequentially in batches** within a specified 
 | `endPrivateKey`   | string | `FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141` (secp256k1 group order) | Hex string of the last private key in the range (inclusive)  |
 
 #### How it works
-- Scanning begins **at `startPrivateKey`**, producing sequential private keys in batches of size `batchSize`, up to and including `endPrivateKey`.
-- Each batch contains exactly `batchSize` keys.
+- Scanning begins **at `startPrivateKey`**, producing sequential private keys in batches of `2^batchSizeInBits` keys each, up to and including `endPrivateKey`. See [Batch Size per Kernel (`batchSizeInBits`)](#-batch-size-per-kernel-batchsizeinbits) above for the exponent &#x2192; batch-size mapping and typical values.
+- Each batch contains exactly `2^batchSizeInBits` keys.
 - If the next full batch would go **beyond `endPrivateKey`**, the process stops with an **exception**.
-- The **`endPrivateKey` is inclusive**, but **partial batches are not allowed by default** — batches must fit completely inside the range.
-- For optimal performance, especially with OpenCL, configure `batchSize` and your GPU's grid size so that batches align perfectly within the range. This prevents errors and maximizes throughput.
+- The **`endPrivateKey` is inclusive**, but **partial batches are not allowed by default** &#x2014; batches must fit completely inside the range.
+- For optimal performance, especially with OpenCL, configure `batchSizeInBits` (and the matching `loopCount`) so that batches align perfectly within the range. This prevents errors and maximizes throughput.
 
-> **Note:** If unsure, set the `endPrivateKey` slightly higher to closely match the batch size. This helps avoid exceptions and ensures efficient scanning.
+> **Note:** If unsure, set the `endPrivateKey` slightly higher to match a `2^batchSizeInBits` multiple. This helps avoid exceptions and ensures efficient scanning.
 
 ---
 

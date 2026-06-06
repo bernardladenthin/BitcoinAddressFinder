@@ -5,12 +5,14 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
@@ -24,6 +26,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Imports one or more plaintext address files into an LMDB database.
  */
+@ToString
 public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     private static final long PROGRESS_LOG = 100_000;
@@ -36,10 +39,18 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     private final ReadStatistic readStatistic = new ReadStatistic();
 
+    // AtomicReference toString is identity-style and the wrapped value mutates per-file —
+    // the per-file diagnostic belongs in the LOGGER lines, not in this aggregate's toString.
+    @ToString.Exclude
     @NonNull
     AtomicReference<@Nullable AddressFile> currentAddressFile = new AtomicReference<>();
 
-    /** Flag controlling the main import loop; cleared via {@link #interrupt()}. */
+    /**
+     * Flag controlling the main import loop; cleared via {@link #interrupt()}.
+     *
+     * <p>Excluded from {@link ToString} — uninformative lifecycle flag.
+     */
+    @ToString.Exclude
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
     /**
@@ -92,11 +103,12 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
                     }
                     AddressFile addressFile = new AddressFile(file, readStatistic, network, supported, unsupported);
 
-                    LOGGER.info("process " + file.getAbsolutePath());
+                    String filePath = file.getAbsolutePath();
+                    LOGGER.info("process " + filePath);
                     currentAddressFile.set(addressFile);
                     addressFile.readFile();
                     currentAddressFile.set(null);
-                    LOGGER.info("finished: " + file.getAbsolutePath());
+                    LOGGER.info("finished: " + filePath);
 
                     logProgress();
                 }
@@ -107,7 +119,8 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
                     LOGGER.info("Error in line: " + error);
                 }
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                throw new UncheckedIOException(
+                        "Failed to import address file (file in flight: " + currentAddressFile.get() + ")", e);
             }
         }
     }

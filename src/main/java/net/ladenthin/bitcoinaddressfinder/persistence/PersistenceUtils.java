@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import org.bitcoinj.base.LegacyAddress;
 import org.bitcoinj.base.Network;
@@ -15,15 +16,20 @@ import org.bitcoinj.base.Sha256Hash;
 /**
  * Helper for converting between {@code long}/byte representations used in the LMDB layer.
  */
+@ToString
 public class PersistenceUtils {
 
     // Preserved as a reusable helper for potential future use (see git history). No
     // current production or test caller; UnusedVariable suppressed to keep -Werror clean
     // while leaving the implementation available for revival.
+    // DirectByteBuffer toString is uninformative ("java.nio.DirectByteBufferR[pos=0 lim=0 cap=0]").
     @Deprecated
     @SuppressWarnings("UnusedVariable")
+    @ToString.Exclude
     private final ByteBuffer emptyByteBuffer = ByteBuffer.allocateDirect(0).asReadOnlyBuffer();
 
+    // Same reason as emptyByteBuffer — cached zero-valued buffer for the longToByteBufferDirect hot path.
+    @ToString.Exclude
     private final ByteBuffer zeroByteBuffer = longValueToByteBufferDirectAsReadOnlyBuffer(0L);
 
     /** The {@link Network} associated with the persistence layer. */

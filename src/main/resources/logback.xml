@@ -1,0 +1,42 @@
+<!--
+SPDX-FileCopyrightText: 2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
+<!--
+    BitcoinAddressFinder bundled Logback configuration.
+
+    Logback's classpath lookup order is:
+      1. logback-test.xml on the classpath (test runs only)
+      2. logback.xml on the classpath  <- this file
+      3. BasicConfigurator default (debug to stdout, no sanitization)
+
+    Operators who want to customise can either:
+      - drop their own logback.xml on the classpath, or
+      - point -Dlogback.configurationFile=/path/to/their/logback.xml
+
+    See examples/logbackConfiguration.xml for the same shape as a copy-paste
+    starting point.
+
+    Log-injection (CRLF) protection lives at this layout layer, NOT at every
+    LOGGER.* call site. The pattern wraps %msg in %replace(...){'[\r\n]+', ' | '}
+    so any CR/LF in the rendered message body is normalised to " | " before the
+    appender flushes. Throwables (%xThrowable / %ex) are a separate pattern
+    token and are NOT touched, so stack traces remain multi-line.
+
+    The fb-contrib CRLF_INJECTION_LOGS detector reads bytecode and cannot see
+    this config, so its findings are suppressed project-wide via
+    spotbugs-exclude.xml with the layout pattern as the documented control.
+-->
+<configuration>
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%date{ISO8601} [%thread] %-5level %logger{200} - %replace(%msg){'[\r\n]+', ' | '}%n</pattern>
+    </encoder>
+  </appender>
+
+  <root level="info">
+    <appender-ref ref="STDOUT" />
+  </root>
+</configuration>

@@ -42,7 +42,7 @@ SPDX-License-Identifier: Apache-2.0
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <slf4j.version>2.0.18</slf4j.version>
-        <logback.version>1.5.33</logback.version>
+        <logback.version>1.5.34</logback.version>
         <project.build.outputTimestamp>${git.commit.time}</project.build.outputTimestamp>
         <argLine>-Xmx2g -Xms1g --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED --add-exports=java.base/java.lang=ALL-UNNAMED --add-exports=java.base/java.io=ALL-UNNAMED --add-exports=java.base/java.nio=ALL-UNNAMED --add-exports=java.base/jdk.internal.ref=ALL-UNNAMED --add-exports=java.base/jdk.internal.misc=ALL-UNNAMED --add-exports=java.base/sun.nio.ch=ALL-UNNAMED --add-exports=jdk.management/com.sun.management.internal=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</argLine>
         <jcstress.version>0.16</jcstress.version>
@@ -58,14 +58,15 @@ SPDX-License-Identifier: Apache-2.0
         <jqwik.version>1.9.3</jqwik.version>
         <archunit.version>1.4.2</archunit.version>
         <spotbugs.version>4.9.8.3</spotbugs.version>
-        <fb-contrib.version>7.6.4</fb-contrib.version>
+        <fb-contrib.version>7.7.4</fb-contrib.version>
         <findsecbugs.version>1.14.0</findsecbugs.version>
         <errorprone.version>2.49.0</errorprone.version>
         <nullaway.version>0.13.4</nullaway.version>
-        <checker.version>4.1.0</checker.version>
+        <checker.version>4.2.0</checker.version>
         <java-websocket.version>1.6.0</java-websocket.version>
         <jeromq.version>0.6.0</jeromq.version>
         <jspecify.version>1.0.0</jspecify.version>
+        <lombok.version>1.18.46</lombok.version>
         <bitcoinj.version>0.17.1</bitcoinj.version>
         <bcprov.version>1.84</bcprov.version>
         <protobuf.version>4.35.0</protobuf.version>
@@ -83,8 +84,8 @@ SPDX-License-Identifier: Apache-2.0
         <mockito.version>5.23.0</mockito.version>
         <logcaptor.version>2.12.6</logcaptor.version>
         <jmh.version>1.37</jmh.version>
-        <spotless.version>3.5.1</spotless.version>
-        <palantir-java-format.version>2.66.0</palantir-java-format.version>
+        <spotless.version>3.6.0</spotless.version>
+        <palantir-java-format.version>2.91.0</palantir-java-format.version>
     </properties>
 
     <!--
@@ -219,7 +220,7 @@ SPDX-License-Identifier: Apache-2.0
                 <plugin>
                     <groupId>org.pitest</groupId>
                     <artifactId>pitest-maven</artifactId>
-                    <version>1.25.1</version>
+                    <version>1.25.3</version>
                 </plugin>
                 <plugin>
                     <groupId>org.sonatype.central</groupId>
@@ -310,29 +311,47 @@ SPDX-License-Identifier: Apache-2.0
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
 
-                    <source>21</source>
-                    <target>21</target>
+                    <release>21</release>
                     <parameters>true</parameters>
 
                     <compilerArgs>
                         <!--
                           -Xlint:all surfaces every category of javac warning at compile time.
-                          -Werror is intentionally NOT set yet; current main compile emits seven
-                          warnings (deprecated Thread.getId, deprecated jocl CL constant, two
-                          'this' escapes in KeyProducerJavaSocket/Zmq, Closeable.close declaring
-                          InterruptedException, explicit close on auto-closeable in OpenClTask).
-                          Captured as the "Make -Werror clean" TODO; flip it on once those are
-                          either fixed or explicitly suppressed.
+                          -Werror promotes every warning to a compile-time error. Pre-flip
+                          history: the original 6-item warning list (deprecated Thread.getId,
+                          deprecated jocl CL_DEVICE_QUEUE_PROPERTIES, two 'this' escapes in
+                          KeyProducerJavaSocket/Zmq, Closeable.close declaring
+                          InterruptedException, explicit close on auto-closeable in
+                          OpenClTask) was cleared in commit 6eadc6f; 14 Checker Framework
+                          [type.anno.before.modifier] warnings were cleared in commit f37f162;
+                          the last 5 sun.misc.Unsafe proprietary-API warnings were eliminated
+                          by deleting ByteBufferUtility#freeByteBuffer entirely — direct
+                          ByteBuffers are now reclaimed by the JVM's built-in Cleaner when
+                          they become unreachable, which already was the fallback for
+                          OpenJ9 / GraalVM Native Image / Android.
+
+                          -Xlint exclusion list:
+                            -serial   : Serializable without serialVersionUID is not the
+                                        concern of this hot-path / value-object codebase.
+                            -options  : Suppresses release/target informational notes.
+                            -classfile: Suppresses classfile-format notes from third-party deps.
+                            -processing: Suppresses "No processor claimed any of these
+                                         annotations" AP-emitted notes.
                         -->
-                        <arg>-Xlint:all,-serial,-options,-classfile</arg>
+                        <arg>-Xlint:all,-serial,-options,-classfile,-processing</arg>
+                        <arg>-Werror</arg>
                         <!--
                           Checker Framework Nullness Checker runs as a second nullness pass
                           alongside NullAway. CF is generics-aware and stricter than NullAway,
                           so it acts as a second-opinion verifier on the same JSpecify
                           annotations.
                         -->
+                        <!-- Lombok's two AP classes must be listed alongside the Checker Framework
+                             processor so javac runs all three. Without naming the Lombok processors
+                             here they are silently skipped because the explicit -processor arg
+                             overrides SPI-registered processors. -->
                         <arg>-processor</arg>
-                        <arg>org.checkerframework.checker.nullness.NullnessChecker</arg>
+                        <arg>lombok.launch.AnnotationProcessorHider$AnnotationProcessor,lombok.launch.AnnotationProcessorHider$ClaimingProcessor,org.checkerframework.checker.nullness.NullnessChecker</arg>
                         <!--
                           Override CF 4.1.0's incorrect Objects.requireNonNull stub. The shipped
                           stub annotates obj as @NonNull, the opposite of the JDK contract.
@@ -355,34 +374,25 @@ SPDX-License-Identifier: Apache-2.0
                         <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
                         <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
 
-                        <!-- Master JVM-flag list: keep identical (same set + same order) across pom.xml, .mvn/jvm.config, and examples/*.bat -->
-                        <arg>--add-opens</arg><arg>java.base/java.lang=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>java.base/java.io=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>java.base/java.nio=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>java.base/jdk.internal.ref=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>java.base/jdk.internal.misc=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>java.base/sun.nio.ch=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>jdk.management/com.sun.management.internal=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
-                        <arg>--add-opens</arg><arg>jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>java.base/java.lang=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>java.base/java.io=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>java.base/java.nio=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>java.base/jdk.internal.ref=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>java.base/jdk.internal.misc=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>java.base/sun.nio.ch=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.management/com.sun.management.internal=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg><arg>jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+                        <!-- Runtime system-module access lives in argLine / .mvn/jvm.config /
+                             examples/*.bat. It is intentionally NOT duplicated into compilerArgs:
+                             system-module add-exports/add-opens are forbidden under release
+                             (JEP 247/261) and the main compile no longer needs them now that
+                             ByteBufferUtility uses sun.misc.Unsafe via reflection instead of the
+                             jdk.internal.misc.Unsafe direct import. -->
                     </compilerArgs>
 
                     <annotationProcessorPaths>
+                        <!-- Lombok must run FIRST so the equals/hashCode/toString
+                             methods it generates exist when Error Prone, NullAway,
+                             and Checker Framework analyze the compilation unit.
+                             Without this, Lombok annotations are silently ignored
+                             and the methods fall back to java.lang.Object defaults. -->
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
                         <path>
                             <groupId>com.google.errorprone</groupId>
                             <artifactId>error_prone_core</artifactId>
@@ -455,7 +465,18 @@ SPDX-License-Identifier: Apache-2.0
 
                                 Also drop -parameters here so JMH / jcstress reflection doesn't pick up
                                 parameter names from MethodParameters.
+
+                                Override the parent release=21 back to source/target=21: tests legitimately
+                                import jdk.internal.ref.Cleaner and sun.nio.ch.DirectBuffer (see
+                                ByteBufferUtilityTest) to assert Cleaner invocation, and release mode
+                                forbids the add-exports that make those packages visible. Production
+                                code no longer touches internal modules (ByteBufferUtility migrated to
+                                reflectively-resolved sun.misc.Unsafe), so the main compile stays at
+                                release 21.
                             -->
+                            <release combine.self="override"></release>
+                            <source>21</source>
+                            <target>21</target>
                             <parameters>false</parameters>
                             <compilerArgs combine.self="override">
                                 <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
@@ -645,8 +666,8 @@ SPDX-License-Identifier: Apache-2.0
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
                 <configuration>
-                    <effort>Default</effort>
-                    <threshold>Default</threshold>
+                    <effort>Max</effort>
+                    <threshold>Low</threshold>
                     <failOnError>true</failOnError>
                     <includeTests>false</includeTests>
                     <excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
@@ -721,6 +742,12 @@ SPDX-License-Identifier: Apache-2.0
         </plugins>
     </build>
     <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>org.java-websocket</groupId>
             <artifactId>Java-WebSocket</artifactId>

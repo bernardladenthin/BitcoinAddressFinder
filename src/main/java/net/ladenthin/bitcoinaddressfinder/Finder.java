@@ -5,13 +5,12 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.*;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
@@ -35,13 +34,8 @@ import org.slf4j.LoggerFactory;
  * Orchestrator: wires up key producers, producers and the consumer based on the configuration and
  * manages their life cycle.
  */
+@ToString
 public class Finder implements Interruptable {
-
-    /**
-     * We must define a maximum time to wait for terminate. Wait for 100 thousand years is enough.
-     */
-    @VisibleForTesting
-    static Duration AWAIT_DURATION_TERMINATE = Duration.ofDays(365L * 1000L);
 
     /** SLF4J logger for the {@link Finder}. */
     private static final Logger LOGGER = LoggerFactory.getLogger(Finder.class);
@@ -50,27 +44,51 @@ public class Finder implements Interruptable {
 
     private final Map<String, KeyProducer> keyProducers = new HashMap<>();
 
-    @Nullable
-    private ConsumerJava consumerJava;
+    // ConsumerJava is a stateful coordinator (executors + queue + lifecycle) — recursive/heavy.
+    @ToString.Exclude
+    private @Nullable ConsumerJava consumerJava;
 
+    // The three producer lists hold mutable stateful coordinators — recursive/heavy in logs.
+    @ToString.Exclude
     private final List<ProducerOpenCL> openCLProducers = new ArrayList<>();
+
+    @ToString.Exclude
     private final List<ProducerJava> javaProducers = new ArrayList<>();
+
+    @ToString.Exclude
     private final List<ProducerJavaSecretsFiles> javaProducersSecretsFiles = new ArrayList<>();
 
-    @VisibleForTesting
-    final ExecutorService producerExecutorService = Executors.newCachedThreadPool();
+    // ExecutorService toString is verbose pool internals — not useful in aggregate logs.
+    @ToString.Exclude
+    private final ExecutorService producerExecutorService;
 
     private final KeyUtility keyUtility;
     private final PersistenceUtils persistenceUtils;
     private final BitHelper bitHelper = new BitHelper();
 
     /**
-     * Creates a new finder.
+     * Creates a new finder with the default producer executor (a cached thread pool).
      *
      * @param finder the finder configuration
      */
     public Finder(CFinder finder) {
+        this(finder, Executors.newCachedThreadPool());
+    }
+
+    /**
+     * Test-friendly constructor that injects the producer executor service.
+     *
+     * <p>Production callers should use {@link #Finder(CFinder)}; this overload exists
+     * so tests can substitute their own {@link ExecutorService} and assert on its
+     * post-shutdown state without reaching into the finder's internal field.
+     *
+     * @param finder                  the finder configuration
+     * @param producerExecutorService executor used to run registered producers
+     */
+    @VisibleForTesting
+    Finder(CFinder finder, ExecutorService producerExecutorService) {
         this.finder = finder;
+        this.producerExecutorService = producerExecutorService;
         Network network = new NetworkParameterFactory().getNetwork();
         this.keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
         this.persistenceUtils = new PersistenceUtils(network);
@@ -216,9 +234,9 @@ public class Finder implements Interruptable {
      *
      * @param cProducer the producer configuration
      * @return the resolved {@link KeyProducer}
-     * @throws RuntimeException if the referenced id is unknown
+     * @throws KeyProducerIdUnknownException if the referenced id is null or unknown
      */
-    public KeyProducer getKeyProducer(CProducer cProducer) throws RuntimeException {
+    public KeyProducer getKeyProducer(CProducer cProducer) {
         final String id = cProducer.keyProducerId;
         if (id == null) {
             throw new KeyProducerIdUnknownException(null);
@@ -266,7 +284,7 @@ public class Finder implements Interruptable {
     public void shutdownAndAwaitTermination() throws InterruptedException {
         LOGGER.info("shutdownAndAwaitTermination");
         producerExecutorService.shutdown();
-        producerExecutorService.awaitTermination(AWAIT_DURATION_TERMINATE.get(ChronoUnit.SECONDS), TimeUnit.SECONDS);
+        producerExecutorService.awaitTermination(finder.awaitTerminateSeconds, TimeUnit.SECONDS);
 
         // no producers are running anymore, the consumer can be interrupted
         final ConsumerJava localConsumerJava = consumerJava;

@@ -3,11 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder;
 
-import static net.ladenthin.bitcoinaddressfinder.PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT;
+import static net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants.INVALID_PRIVATE_KEY_REPLACEMENT;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
-import static org.hamcrest.text.MatchesPattern.matchesPattern;
 
 import java.math.BigInteger;
 import java.nio.file.Path;
@@ -43,7 +42,12 @@ public class ProducerJavaTest {
     // <editor-fold defaultstate="collapsed" desc="toString">
     @ToStringTest
     @Test
-    public void toString_whenCalled_containsClassNameAndIdentityHash() {
+    public void toString_whenCalled_containsClassNameAndConfig() {
+        // After migrating ProducerJava to Lombok @ToString(callSuper = true) the output
+        // becomes "ProducerJava(super=AbstractProducer(...), producerJava=CProducerJava(...))".
+        // The old identity-style "ProducerJava@<hex>" form is gone — replaced by a
+        // structured state snapshot. We assert on the class name + the producerJava field
+        // since identity is no longer in the contract.
         CProducerJava cProducerJava = new CProducerJava();
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
@@ -54,7 +58,8 @@ public class ProducerJavaTest {
         String toStringOutput = producerJava.toString();
 
         assertThat(toStringOutput, not(emptyOrNullString()));
-        assertThat(toStringOutput, matchesPattern("ProducerJava@\\p{XDigit}+"));
+        assertThat(toStringOutput, containsString("ProducerJava("));
+        assertThat(toStringOutput, containsString("producerJava=CProducerJava("));
     }
     // </editor-fold>
 

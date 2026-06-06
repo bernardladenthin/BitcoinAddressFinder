@@ -71,7 +71,7 @@ public class AbstractProducerTest {
     // <editor-fold defaultstate="collapsed" desc="createSecretBase">
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_CREATE_SECRET_BASE_LOGGED)
-    public void createSecretBase_secretGiven_bitsKilledAndLogged(
+    public void createSecretBase_secretGiven_alignedDownAndLogged(
             String givenSecret,
             int batchSizeInBits,
             String expectedSecretBase,
@@ -120,7 +120,7 @@ public class AbstractProducerTest {
     }
 
     @Test
-    public void createSecretBase_secretGivenAndLogSecretBaseDisabledTraceEnabled_bitsKilledAndLogged()
+    public void createSecretBase_secretGivenAndLogSecretBaseDisabledTraceEnabled_alignedDownAndLogged()
             throws Exception, DecoderException {
         // arrange
         CProducer cProducer = new CProducer();
@@ -149,7 +149,7 @@ public class AbstractProducerTest {
     }
 
     @Test
-    public void createSecretBase_secretGivenAndLogSecretBaseEnabledTraceDisabled_bitsKilledAndLogged()
+    public void createSecretBase_secretGivenAndLogSecretBaseEnabledTraceDisabled_alignedDownAndLogged()
             throws Exception, DecoderException {
         // arrange
         CProducer cProducer = new CProducer();
@@ -317,7 +317,7 @@ public class AbstractProducerTest {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
-            producer.state = ProducerState.NOT_RUNNING;
+            producer.signalNotRunning();
             flipped.countDown();
         });
         flipper.start();

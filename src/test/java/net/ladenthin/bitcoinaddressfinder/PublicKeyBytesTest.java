@@ -16,6 +16,8 @@ import static org.hamcrest.Matchers.not;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.Arrays;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
 import nl.altindag.log.LogCaptor;
 import org.apache.commons.codec.binary.Hex;
@@ -105,14 +107,16 @@ public class PublicKeyBytesTest {
                 publicKeyBytesUncompressed.toString(),
                 is(
                         equalTo(
-                                "PublicKeyBytes{secretKey=24250429618215260598957696001935175135959229619080974590971174872813112994997}")));
+                                // Lombok @ToString format: Class(field=value); paren-delimited,
+                                // secretKey-only per @ToString(onlyExplicitlyIncluded = true).
+                                "PublicKeyBytes(secretKey=24250429618215260598957696001935175135959229619080974590971174872813112994997)")));
     }
 
     @Test
     public void maxPrivateKeyAsHexString_isEqualToConstant() {
         // arrange
         String maxPrivateKeyAsHexString =
-                Hex.encodeHexString(ByteBufferUtility.bigIntegerToBytes(PublicKeyBytes.MAX_PRIVATE_KEY));
+                Hex.encodeHexString(ByteBufferUtility.bigIntegerToBytes(Secp256k1Constants.MAX_PRIVATE_KEY));
         // act
 
         // assert
@@ -146,7 +150,8 @@ public class PublicKeyBytesTest {
         BigInteger secretKey = new BigInteger("1337");
         ECKey ecKey = ECKey.fromPrivate(secretKey, false);
         byte[] uncompressed = ecKey.getPubKey();
-        byte[] wrongCompressedHash = new byte[PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES]; // all-zero hash (invalid)
+        byte[] wrongCompressedHash =
+                new byte[OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES]; // all-zero hash (invalid)
 
         PublicKeyBytes publicKeyBytes = new PublicKeyBytes(secretKey, uncompressed, wrongCompressedHash);
 
@@ -167,7 +172,8 @@ public class PublicKeyBytesTest {
         ECKey ecKey = ECKey.fromPrivate(secretKey, false);
         byte[] uncompressed = ecKey.getPubKey();
         byte[] compressed = ECKey.fromPrivate(secretKey, true).getPubKey();
-        byte[] wrongUncompressedHash = new byte[PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES]; // all-zero hash (invalid)
+        byte[] wrongUncompressedHash =
+                new byte[OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES]; // all-zero hash (invalid)
 
         PublicKeyBytes publicKeyBytes = new PublicKeyBytes(secretKey, wrongUncompressedHash, compressed);
 
@@ -206,24 +212,29 @@ public class PublicKeyBytesTest {
     @Test
     public void assembleUncompressedPublicKey_validXY_correctlyAssembles() {
         // arrange
-        byte[] x = new byte[PublicKeyBytes.ONE_COORDINATE_NUM_BYTES];
-        byte[] y = new byte[PublicKeyBytes.ONE_COORDINATE_NUM_BYTES];
-        for (int i = 0; i < PublicKeyBytes.ONE_COORDINATE_NUM_BYTES; i++) {
+        byte[] x = new byte[OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES];
+        byte[] y = new byte[OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES];
+        for (int i = 0; i < OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES; i++) {
             x[i] = (byte) i;
-            y[i] = (byte) (i + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+            y[i] = (byte) (i + OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES);
         }
 
         // act
         byte[] result = PublicKeyBytes.assembleUncompressedPublicKey(x, y);
 
         // assert
-        assertThat(result[0], is((byte) PublicKeyBytes.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT));
-        for (int i = 0; i < PublicKeyBytes.ONE_COORDINATE_NUM_BYTES; i++) {
+        assertThat(result[0], is((byte) OpenClKernelConstants.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT));
+        for (int i = 0; i < OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES; i++) {
             assertThat(
-                    "X coordinate mismatch at index " + i, result[i + PublicKeyBytes.SEC_PREFIX_NUM_BYTES], is(x[i]));
+                    "X coordinate mismatch at index " + i,
+                    result[i + OpenClKernelConstants.SEC_PREFIX_NUM_BYTES],
+                    is(x[i]));
             assertThat(
                     "Y coordinate mismatch at index " + i,
-                    result[i + PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES],
+                    result[
+                            i
+                                    + OpenClKernelConstants.SEC_PREFIX_NUM_BYTES
+                                    + OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES],
                     is(y[i]));
         }
     }
@@ -231,15 +242,15 @@ public class PublicKeyBytesTest {
     @Test
     public void assembleUncompressedPublicKey_allZeros_createsValidKey() {
         // arrange
-        byte[] x = new byte[PublicKeyBytes.ONE_COORDINATE_NUM_BYTES];
-        byte[] y = new byte[PublicKeyBytes.ONE_COORDINATE_NUM_BYTES];
+        byte[] x = new byte[OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES];
+        byte[] y = new byte[OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES];
 
         // act
         byte[] result = PublicKeyBytes.assembleUncompressedPublicKey(x, y);
 
         // assert
-        assertThat(result[0], is((byte) PublicKeyBytes.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT));
-        for (int i = PublicKeyBytes.SEC_PREFIX_NUM_BYTES; i < result.length; i++) {
+        assertThat(result[0], is((byte) OpenClKernelConstants.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT));
+        for (int i = OpenClKernelConstants.SEC_PREFIX_NUM_BYTES; i < result.length; i++) {
             assertThat("Expected zero at index " + i, result[i], is((byte) 0x00));
         }
     }
@@ -254,12 +265,12 @@ public class PublicKeyBytesTest {
         // extract X and Y from real ECKey
         byte[] x = Arrays.copyOfRange(
                 pubKey,
-                PublicKeyBytes.SEC_PREFIX_NUM_BYTES,
-                PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+                OpenClKernelConstants.SEC_PREFIX_NUM_BYTES,
+                OpenClKernelConstants.SEC_PREFIX_NUM_BYTES + OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES);
         byte[] y = Arrays.copyOfRange(
                 pubKey,
-                PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES,
-                PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.TWO_COORDINATES_NUM_BYTES);
+                OpenClKernelConstants.SEC_PREFIX_NUM_BYTES + OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES,
+                OpenClKernelConstants.SEC_PREFIX_NUM_BYTES + OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES);
 
         // act
         byte[] assembledUncompressed = PublicKeyBytes.assembleUncompressedPublicKey(x, y);
@@ -282,7 +293,8 @@ public class PublicKeyBytesTest {
         String toStringOutput = publicKeyBytesUncompressed.toString();
 
         assertThat(toStringOutput, not(emptyOrNullString()));
-        assertThat(toStringOutput, matchesPattern("PublicKeyBytes\\{secretKey=\\d+}"));
+        // Lombok @ToString format: Class(field=value); paren-delimited.
+        assertThat(toStringOutput, matchesPattern("PublicKeyBytes\\(secretKey=\\d+\\)"));
     }
     // </editor-fold>
 
@@ -328,7 +340,7 @@ public class PublicKeyBytesTest {
     @Test
     public void fromPrivate_minValidPrivateKey_noExceptionThrown() {
         // arrange
-        BigInteger secretKey = PublicKeyBytes.MIN_VALID_PRIVATE_KEY;
+        BigInteger secretKey = Secp256k1Constants.MIN_VALID_PRIVATE_KEY;
 
         // act
         PublicKeyBytes result = PublicKeyBytes.fromPrivate(secretKey);
@@ -406,7 +418,7 @@ public class PublicKeyBytesTest {
     @Test
     public void isOutsidePrivateKeyRange_keyAboveMax_returnsTrue() {
         // arrange
-        BigInteger secretKey = PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE);
+        BigInteger secretKey = Secp256k1Constants.MAX_PRIVATE_KEY.add(BigInteger.ONE);
         byte[] dummyUncompressed = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
         PublicKeyBytes sut = new PublicKeyBytes(secretKey, dummyUncompressed);
 
@@ -472,7 +484,7 @@ public class PublicKeyBytesTest {
         byte[] result = new Hash160().hash(input);
 
         // assert
-        assertThat(result.length, is(equalTo(PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES)));
+        assertThat(result.length, is(equalTo(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES)));
     }
     // </editor-fold>
 
@@ -492,9 +504,9 @@ public class PublicKeyBytesTest {
 
         // assert
         if (lastByteIsEven) {
-            assertThat(compressed[0], is((byte) PublicKeyBytes.SEC_PREFIX_COMPRESSED_ECDSA_POINT_EVEN_Y));
+            assertThat(compressed[0], is((byte) OpenClKernelConstants.SEC_PREFIX_COMPRESSED_ECDSA_POINT_EVEN_Y));
         } else {
-            assertThat(compressed[0], is((byte) PublicKeyBytes.SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y));
+            assertThat(compressed[0], is((byte) OpenClKernelConstants.SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y));
         }
     }
 
@@ -538,12 +550,12 @@ public class PublicKeyBytesTest {
         // assert
         byte[] xFromUncompressed = Arrays.copyOfRange(
                 uncompressed,
-                PublicKeyBytes.SEC_PREFIX_NUM_BYTES,
-                PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+                OpenClKernelConstants.SEC_PREFIX_NUM_BYTES,
+                OpenClKernelConstants.SEC_PREFIX_NUM_BYTES + OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES);
         byte[] xFromCompressed = Arrays.copyOfRange(
                 compressed,
-                PublicKeyBytes.SEC_PREFIX_NUM_BYTES,
-                PublicKeyBytes.SEC_PREFIX_NUM_BYTES + PublicKeyBytes.ONE_COORDINATE_NUM_BYTES);
+                OpenClKernelConstants.SEC_PREFIX_NUM_BYTES,
+                OpenClKernelConstants.SEC_PREFIX_NUM_BYTES + OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES);
         assertThat(xFromCompressed, is(equalTo(xFromUncompressed)));
     }
     // </editor-fold>
@@ -574,7 +586,7 @@ public class PublicKeyBytesTest {
     public void isAllCoordinateBytesZero_validKey_returnsFalse() {
         // arrange
         byte[] validUncompressedKey = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
-        validUncompressedKey[0] = PublicKeyBytes.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT;
+        validUncompressedKey[0] = OpenClKernelConstants.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT;
         validUncompressedKey[1] = 0x01; // at least one non-zero coordinate byte
 
         // act
@@ -588,7 +600,7 @@ public class PublicKeyBytesTest {
     public void isAllCoordinateBytesZero_allCoordinateBytesZero_returnsTrue() {
         // arrange
         byte[] invalidUncompressedKey = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
-        invalidUncompressedKey[0] = PublicKeyBytes.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT; // prefix byte set
+        invalidUncompressedKey[0] = OpenClKernelConstants.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT; // prefix byte set
 
         // act
         boolean result = PublicKeyBytes.isAllCoordinateBytesZero(invalidUncompressedKey);
@@ -601,7 +613,7 @@ public class PublicKeyBytesTest {
     public void isAllCoordinateBytesZero_validKeyOnlyLastByteNonZero_returnsFalse() {
         // arrange
         byte[] validUncompressedKey = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
-        validUncompressedKey[0] = PublicKeyBytes.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT;
+        validUncompressedKey[0] = OpenClKernelConstants.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT;
         validUncompressedKey[validUncompressedKey.length - 1] = 0x01; // last coordinate byte non-zero
 
         // act

@@ -11,7 +11,9 @@ import ch.qos.logback.classic.Level;
 import java.io.File;
 import java.math.BigInteger;
 import java.nio.file.Path;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
@@ -63,7 +65,10 @@ public class LMDBPersistencePerformanceTest {
         cConsumerJava.runtimePublicKeyCalculationCheck =
                 ManualDebugConstants.ENABLE_RUNTIME_PUBLIC_KEY_CALCULATION_CHECK;
 
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
+        ExecutorService consumeKeysExecutor = Executors.newFixedThreadPool(cConsumerJava.threads);
+        ConsumerJava consumerJava =
+                new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils, scheduledExecutor, consumeKeysExecutor);
         // Quiet ConsumerJava's class-level logger down to INFO for this perf test.
         ((ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ConsumerJava.class)).setLevel(Level.INFO);
 
@@ -87,11 +92,11 @@ public class LMDBPersistencePerformanceTest {
         consumerJava.interrupt();
 
         assertThat(consumerJava.persistence, is(nullValue()));
-        assertThat(consumerJava.shouldRun.get(), is(false));
-        assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(true));
-        assertThat(consumerJava.scheduledExecutorService.isTerminated(), is(true));
-        assertThat(consumerJava.consumeKeysExecutorService.isShutdown(), is(true));
-        assertThat(consumerJava.consumeKeysExecutorService.isTerminated(), is(true));
+        assertThat(consumerJava.shouldRun(), is(false));
+        assertThat(scheduledExecutor.isShutdown(), is(true));
+        assertThat(scheduledExecutor.isTerminated(), is(true));
+        assertThat(consumeKeysExecutor.isShutdown(), is(true));
+        assertThat(consumeKeysExecutor.isTerminated(), is(true));
     }
 
     private void createProducerThreads(

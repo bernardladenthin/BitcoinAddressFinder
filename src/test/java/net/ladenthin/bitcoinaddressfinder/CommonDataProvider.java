@@ -10,6 +10,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.*;
 
 public class CommonDataProvider {
@@ -45,7 +47,7 @@ public class CommonDataProvider {
             {"2c7419465eaba472fd5ff50055a363e55936567a72995be2788aebb4ae74f3ff"},
             {"a6eaa2a8fa07686f3ef73736ea4668f5dbcc1f7c178b99afcacdadb64f0ce8bf"
             }, // must remain 64 hex chars; don't truncate/pad during conversion
-            {PublicKeyBytes.MAX_PRIVATE_KEY_HEX.toLowerCase()},
+            {Secp256k1Constants.MAX_PRIVATE_KEY_HEX.toLowerCase()},
         };
     }
 
@@ -100,7 +102,7 @@ public class CommonDataProvider {
     public static Object[][] keyProducerTypeAndBitSize() {
         return mergeMany(
                 keyProducerTypes(), // e.g., Socket, ZMQ, etc.
-                bitSizesAtMostMax() // e.g., 0 – PublicKeyBytes#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY
+                bitSizesAtMostMax() // e.g., 0 – OpenClKernelConstants#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY
                 );
     }
 
@@ -146,11 +148,11 @@ public class CommonDataProvider {
     }
 
     /**
-     * For {@link #killBits()}.
+     * For {@link #lowBitMask()}.
      */
-    public static final String DATA_PROVIDER_KILL_BITS = CLASS_NAME + "#killBits";
+    public static final String DATA_PROVIDER_LOW_BIT_MASK = CLASS_NAME + "#lowBitMask";
 
-    public static Object[][] killBits() {
+    public static Object[][] lowBitMask() {
         return new Object[][] {
             {0, BigInteger.valueOf(0L)},
             {1, BigInteger.valueOf(1L)},
@@ -249,7 +251,7 @@ public class CommonDataProvider {
     public static final String DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX = CLASS_NAME + "#bitSizesAtMostMax";
 
     public static Object[][] bitSizesAtMostMax() {
-        final int max = PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY;
+        final int max = OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY;
 
         Object[][] data = new Object[max + 1][1];
         for (int i = 0; i <= max; i++) {
@@ -455,7 +457,7 @@ public class CommonDataProvider {
                 "secretBase: 0000000000000000000000000000000000000000000000000000000000abcdec/2",
                 "secret BigInteger: 11259375",
                 "secret as byte array: 0000000000000000000000000000000000000000000000000000000000abcdef",
-                "killBits: 03",
+                "lowBitMask: 03",
                 "secretBase: 11259372",
                 "secretBase as byte array: 0000000000000000000000000000000000000000000000000000000000abcdec"
             },
@@ -466,7 +468,7 @@ public class CommonDataProvider {
                 "secretBase: 0000000000000000000000000000000000000000000000000000000000fedcb8/2",
                 "secret BigInteger: 16702650",
                 "secret as byte array: 0000000000000000000000000000000000000000000000000000000000fedcba",
-                "killBits: 03",
+                "lowBitMask: 03",
                 "secretBase: 16702648",
                 "secretBase as byte array: 0000000000000000000000000000000000000000000000000000000000fedcb8"
             },
@@ -478,7 +480,7 @@ public class CommonDataProvider {
                 "secretBase: 0000000000000000000000000000000000000000000000000000000000a00000/21",
                 "secret BigInteger: 11259375",
                 "secret as byte array: 0000000000000000000000000000000000000000000000000000000000abcdef",
-                "killBits: 1fffff",
+                "lowBitMask: 1fffff",
                 "secretBase: 10485760",
                 "secretBase as byte array: 0000000000000000000000000000000000000000000000000000000000a00000"
             },
@@ -489,7 +491,7 @@ public class CommonDataProvider {
                 "secretBase: 0000000000000000000000000000000000000000000000000000000000e00000/21",
                 "secret BigInteger: 16702650",
                 "secret as byte array: 0000000000000000000000000000000000000000000000000000000000fedcba",
-                "killBits: 1fffff",
+                "lowBitMask: 1fffff",
                 "secretBase: 14680064",
                 "secretBase as byte array: 0000000000000000000000000000000000000000000000000000000000e00000"
             },
@@ -501,7 +503,7 @@ public class CommonDataProvider {
                 "secretBase: 123456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000/21",
                 "secret BigInteger: 8234104123542484900769178205574010627627573691361805720124810878238590820095",
                 "secret as byte array: 123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff",
-                "killBits: 1fffff",
+                "lowBitMask: 1fffff",
                 "secretBase: 8234104123542484900769178205574010627627573691361805720124810878238588928000",
                 "secretBase as byte array: 123456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000"
             },
@@ -513,18 +515,18 @@ public class CommonDataProvider {
                 "secretBase: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000/21",
                 "secret BigInteger: 375168379408231402782670922269509069226925318059052594399906494889018056447",
                 "secret as byte array: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeff",
-                "killBits: 1fffff",
+                "lowBitMask: 1fffff",
                 "secretBase: 375168379408231402782670922269509069226925318059052594399906494889016164352",
                 "secretBase as byte array: 00d456789abcdef0123456789abcdef0123456789abcdef0123456789aa00000"
             },
             {
-                PublicKeyBytes.MAX_PRIVATE_KEY_HEX.toLowerCase(),
+                Secp256k1Constants.MAX_PRIVATE_KEY_HEX.toLowerCase(),
                 2,
                 "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140",
                 "secretBase: fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140/2",
                 "secret BigInteger: 115792089237316195423570985008687907852837564279074904382605163141518161494337",
                 "secret as byte array: fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141",
-                "killBits: 03",
+                "lowBitMask: 03",
                 "secretBase: 115792089237316195423570985008687907852837564279074904382605163141518161494336",
                 "secretBase as byte array: fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140"
             },
@@ -612,7 +614,7 @@ public class CommonDataProvider {
             // MAX_PRIVATE_KEY + offset).
             // Since we use grid-based key derivation (e.g., k + i), these values can overflow the valid secp256k1 range
             // and cause failures.
-            // {PublicKeyBytes.MAX_PRIVATE_KEY},
+            // {Secp256k1Constants.MAX_PRIVATE_KEY},
             //
             // Custom crafted BigIntegers with MSB set (highest bit in first byte = 1)
             // These will be encoded with a leading zero byte (i.e., total of 33 bytes)
@@ -707,8 +709,8 @@ public class CommonDataProvider {
 
     public static Object[][] privateKeysTooLargeWithChunkSize() {
         return new Object[][] {
-            {PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY, PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
-            {PublicKeyBytes.MAX_PRIVATE_KEY, PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
+            {PublicKeyBytes.MAX_TECHNICALLY_PRIVATE_KEY, OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
+            {Secp256k1Constants.MAX_PRIVATE_KEY, OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
         };
     }
 

@@ -9,6 +9,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
 import org.bitcoinj.base.LegacyAddress;
 import org.bitcoinj.base.Network;
@@ -33,14 +34,38 @@ import org.jspecify.annotations.NonNull;
 public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility byteBufferUtility) {
 
     /**
-     * Clears the bits set in {@code killBits} from {@code bigInteger}.
+     * Aligns {@code value} DOWN to a {@code 2^N} boundary by clearing the bits
+     * indicated by {@code lowBitMask}.
      *
-     * @param bigInteger the source value
-     * @param killBits   the bit mask of bits to clear
-     * @return {@code bigInteger AND NOT killBits}
+     * <p>The intended input is a contiguous low-bit mask of the form
+     * {@code (2^N) - 1} (as produced by
+     * {@link BitHelper#getLowBitMask(int) BitHelper.getLowBitMask(N)}). When
+     * the mask has that shape, clearing the masked bits is equivalent to
+     * flooring the input to the nearest lower multiple of {@code 2^N}.
+     *
+     * <p>This is the batch-alignment step used by
+     * {@link AbstractProducer#createSecretBase(BigInteger, boolean)
+     * AbstractProducer.createSecretBase} to derive a {@code secretBase} for the
+     * OpenCL kernel. The kernel runs {@code 2^N} parallel GPU threads where
+     * thread {@code i} evaluates {@code secretBase + i}; for the batch to
+     * cover the keyspace cleanly without gap or overlap, {@code secretBase}
+     * must have its low {@code N} bits zeroed.
+     *
+     * <p>Implementation: delegates to {@link BigInteger#andNot(BigInteger)},
+     * which is the fastest {@link BigInteger} bitwise AND-NOT primitive
+     * available &#x2014; faster than the equivalent
+     * {@code value.and(mask.not())}, which allocates an extra
+     * {@link BigInteger} for the negated mask.
+     *
+     * @param value the source value (typically a candidate private key)
+     * @param lowBitMask the bit mask of bits to clear (typically the low-bit
+     *     mask for the configured batch size, as produced by
+     *     {@link BitHelper#getLowBitMask(int)})
+     * @return {@code value} with the bits set in {@code lowBitMask} cleared
+     *     &#x2014; equivalent to {@code value AND NOT lowBitMask}
      */
-    public BigInteger killBits(BigInteger bigInteger, BigInteger killBits) {
-        return bigInteger.andNot(killBits);
+    public BigInteger alignDown(BigInteger value, BigInteger lowBitMask) {
+        return value.andNot(lowBitMask);
     }
 
     /**
@@ -163,7 +188,10 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
                 }
                 logMnemonic.append(']');
             } catch (IOException | IllegalArgumentException ex) {
-                throw new RuntimeException(ex);
+                throw new IllegalStateException(
+                        "Failed to format BIP39 mnemonic for diagnostic logging ("
+                                + ex.getClass().getSimpleName() + ")",
+                        ex);
             }
         }
         return logMnemonic.toString();
@@ -203,8 +231,7 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
      * @throws NoMoreSecretsAvailableException if the supplier cannot satisfy the request
      */
     public BigInteger[] createSecrets(
-            int overallWorkSize, boolean returnStartSecretOnly, int privateKeyMaxNumBits, SecretSupplier supplier)
-            throws NoMoreSecretsAvailableException {
+            int overallWorkSize, boolean returnStartSecretOnly, int privateKeyMaxNumBits, SecretSupplier supplier) {
         int length = returnStartSecretOnly ? 1 : overallWorkSize;
         BigInteger[] secrets = new BigInteger[length];
         for (int i = 0; i < secrets.length; i++) {
@@ -277,7 +304,7 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
      */
     public String bigIntegerToFixedLengthHex(BigInteger value) {
         byte[] raw = value.toByteArray();
-        byte[] result = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
+        byte[] result = new byte[OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES];
         int srcPos = Math.max(0, raw.length - result.length);
         int length = Math.min(result.length, raw.length);
         System.arraycopy(raw, srcPos, result, result.length - length, length);
@@ -287,15 +314,18 @@ public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility by
     /**
      * Converts a 32-byte array into a positive BigInteger, preserving leading
      * zeros. The array must be exactly
-     * {@link PublicKeyBytes#PRIVATE_KEY_MAX_NUM_BYTES} bytes.
+     * {@link OpenClKernelConstants#PRIVATE_KEY_MAX_NUM_BYTES} bytes.
      *
      * @param buffer a 32-byte array representing the unsigned big-endian
      *               integer
      * @return a positive BigInteger constructed from the buffer
      */
     public BigInteger bigIntegerFromUnsignedByteArray(byte[] buffer) {
-        if (buffer.length != PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES) {
-            throw new IllegalArgumentException("Expected buffer of length " + PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES);
+        if (buffer.length != OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES) {
+            throw new IllegalArgumentException(
+                    "Expected unsigned-byte buffer of length "
+                            + OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES
+                            + " but got " + buffer.length);
         }
         return new BigInteger(1, buffer);
     }

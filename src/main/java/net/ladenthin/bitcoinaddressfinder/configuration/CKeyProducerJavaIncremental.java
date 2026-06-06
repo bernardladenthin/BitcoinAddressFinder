@@ -4,23 +4,25 @@
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import java.math.BigInteger;
-import java.util.Locale;
-import net.ladenthin.bitcoinaddressfinder.BitHelper;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
+import net.ladenthin.bitcoinaddressfinder.constants.Radix;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 
 /**
  * Configuration for the incremental (sequential range) key producer.
  */
+@ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
 public class CKeyProducerJavaIncremental extends CKeyProducerJava {
 
     /** Creates a new {@link CKeyProducerJavaIncremental}. */
     public CKeyProducerJavaIncremental() {}
 
     /** Inclusive lower bound of the scanned private-key range as an uppercase hex string. */
-    public String startPrivateKey =
-            PublicKeyBytes.MIN_VALID_PRIVATE_KEY.toString(BitHelper.RADIX_HEX).toUpperCase(Locale.ROOT);
+    public String startPrivateKey = Secp256k1Constants.MIN_VALID_PRIVATE_KEY_HEX;
     /** Inclusive upper bound of the scanned private-key range as a hex string. */
-    public String endPrivateKey = PublicKeyBytes.MAX_PRIVATE_KEY_HEX;
+    public String endPrivateKey = Secp256k1Constants.MAX_PRIVATE_KEY_HEX;
 
     /**
      * Returns the configured inclusive lower bound of the scanned private-key range.
@@ -28,7 +30,7 @@ public class CKeyProducerJavaIncremental extends CKeyProducerJava {
      * @return the configured start private key as a {@link BigInteger}
      */
     public BigInteger getStartPrivateKey() {
-        return new BigInteger(startPrivateKey, BitHelper.RADIX_HEX);
+        return new BigInteger(startPrivateKey, Radix.HEX);
     }
 
     /**
@@ -37,6 +39,6 @@ public class CKeyProducerJavaIncremental extends CKeyProducerJava {
      * @return the configured end private key as a {@link BigInteger}
      */
     public BigInteger getEndPrivateKey() {
-        return new BigInteger(endPrivateKey, BitHelper.RADIX_HEX);
+        return new BigInteger(endPrivateKey, Radix.HEX);
     }
 }

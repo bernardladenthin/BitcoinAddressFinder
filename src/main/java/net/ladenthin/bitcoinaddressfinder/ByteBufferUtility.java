@@ -6,26 +6,28 @@ package net.ladenthin.bitcoinaddressfinder;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import jdk.internal.misc.Unsafe;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.bouncycastle.util.encoders.Hex;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Helper for {@link ByteBuffer} allocation, byte-array conversion and reversal.
  */
+@ToString
+@EqualsAndHashCode
 public class ByteBufferUtility {
-
-    /**
-     * Decide between {@link java.nio.DirectByteBuffer} and {@link java.nio.HeapByteBuffer}.
-     */
-    private final boolean allocateDirect;
 
     /**
      * Default value for {@link #useXorSwap}: temporary-variable swap.
      * https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java
      */
     private static final boolean DEFAULT_USE_XOR_SWAP = false;
+
+    /**
+     * Decide between {@link java.nio.DirectByteBuffer} and {@link java.nio.HeapByteBuffer}.
+     */
+    private final boolean allocateDirect;
 
     /**
      * Selects the byte-array reversal algorithm used by {@link #reverse(byte[])}.
@@ -52,30 +54,6 @@ public class ByteBufferUtility {
     public ByteBufferUtility(boolean allocateDirect, boolean useXorSwap) {
         this.allocateDirect = allocateDirect;
         this.useXorSwap = useXorSwap;
-    }
-
-    /**
-     * ATTENTION: The {@code jdk.internal.misc.Unsafe#getUnsafe()} can throw an {@link java.lang.IllegalAccessError}.
-     * https://stackoverflow.com/questions/8462200/examples-of-forcing-freeing-of-native-memory-direct-bytebuffer-has-allocated-us
-     * https://stackoverflow.com/questions/13003871/how-do-i-get-the-instance-of-sun-misc-unsafe
-     * https://stackoverflow.com/questions/29301755/got-securityexception-in-java
-     * https://bugs.openjdk.org/browse/JDK-8171377
-     * @param byteBuffer the ByteBuffer to free
-     */
-    public void freeByteBuffer(@Nullable ByteBuffer byteBuffer) {
-        if (byteBuffer == null) {
-            return;
-        }
-
-        if (!byteBuffer.isDirect()) {
-            return;
-        }
-
-        Unsafe u = Unsafe.getUnsafe();
-        // https://bugs.openjdk.org/browse/JDK-8171377
-        // https://openjdk.org/jeps/8323072
-        // https://stackoverflow.com/questions/3496508/deallocating-direct-buffer-native-memory-in-java-for-jogl/26777380
-        u.invokeCleaner(byteBuffer);
     }
 
     // <editor-fold defaultstate="collapsed" desc="ByteBuffer byte array conversion">
@@ -189,7 +167,9 @@ public class ByteBufferUtility {
      */
     public ByteBuffer allocateByteBufferDirectStrict(int capacity) {
         if (!allocateDirect) {
-            throw new IllegalStateException("Direct allocation requested, but allocateDirect is false.");
+            throw new IllegalStateException(
+                    "Direct ByteBuffer allocation requested (capacity=" + capacity
+                            + " bytes) but this ByteBufferUtility was constructed with allocateDirect=false");
         }
         return ByteBuffer.allocateDirect(capacity);
     }

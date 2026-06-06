@@ -10,8 +10,8 @@ import org.junit.jupiter.api.Assumptions;
 
 public class OpenCLPlatformAssume implements PlatformAssume {
 
-    public void assumeOpenCLLibraryLoadable() {
-        Assumptions.assumeTrue(OpenCLBuilder.isOpenCLnativeLibraryLoadable(), "OpenCL library loadable");
+    public void assumeOpenClLibraryAvailable() {
+        Assumptions.assumeTrue(OpenCLBuilder.isOpenClNativeLibraryLoaded(), "OpenCL library not available");
     }
 
     public void assumeOneOpenCL2_0OrGreaterDeviceAvailable(List<OpenCLPlatform> openCLPlatforms) {
@@ -20,8 +20,8 @@ public class OpenCLPlatformAssume implements PlatformAssume {
                 "One OpenCL 2.0 or greater device available");
     }
 
-    public void assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable() {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadable();
+    public void assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable() {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailable();
         OpenCLBuilder openCLBuilder = new OpenCLBuilder();
         List<OpenCLPlatform> openCLPlatforms = openCLBuilder.build();
         new OpenCLPlatformAssume().assumeOneOpenCL2_0OrGreaterDeviceAvailable(openCLPlatforms);

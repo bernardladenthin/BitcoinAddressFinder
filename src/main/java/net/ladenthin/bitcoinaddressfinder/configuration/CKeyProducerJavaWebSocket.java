@@ -3,9 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
+
 /**
  * Configuration for the WebSocket-based key producer.
  */
+@ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
 public class CKeyProducerJavaWebSocket extends CKeyProducerJavaReceiver {
 
     /** Creates a new {@link CKeyProducerJavaWebSocket}. */

@@ -6,12 +6,13 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Executors;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.FireAndForget;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.Startable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
@@ -29,6 +30,7 @@ import org.slf4j.LoggerFactory;
  * {@code WebSocketServer} subclass captures the outer-class {@code this} and its
  * callbacks call back into {@code addSecret} / read {@code shouldStop}).</p>
  */
+@ToString(callSuper = true)
 public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaWebSocket>
         implements Startable {
 
@@ -71,8 +73,8 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
             @Override
             public void onMessage(WebSocket conn, ByteBuffer message) {
                 if (shouldStop) return;
-                if (message.remaining() == PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES) {
-                    byte[] secret = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
+                if (message.remaining() == OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES) {
+                    byte[] secret = new byte[OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES];
                     message.get(secret);
                     addSecret(secret);
                 } else {

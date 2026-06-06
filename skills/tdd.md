@@ -131,7 +131,7 @@ The `PrivateKeyValidator` helper class is a concrete implementation of the refac
 - `getMaxPrivateKeyForBatchSize(int batchSizeInBits)`
 - `isInvalidWithBatchSize(BigInteger, BigInteger)`
 - `isOutsidePrivateKeyRange(BigInteger)`
-- `returnValidPrivateKey(BigInteger)`
+- `coerceToValidPrivateKey(BigInteger)`
 - `replaceInvalidPrivateKeys(BigInteger[])`
 
 **Refactored:** Extracted to `PrivateKeyValidator` as non-static instance methods.

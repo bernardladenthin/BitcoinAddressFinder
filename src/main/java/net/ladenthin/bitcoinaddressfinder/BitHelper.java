@@ -4,17 +4,27 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
+import lombok.ToString;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 
 /**
  * Helpers for bit-count based batch sizing used by producers.
+ *
+ * <p>{@link ToString} is applied for consistency with the rest of the codebase: this class
+ * has no instance state so the rendered output is {@code BitHelper()}, but that is more
+ * useful than the {@code BitHelper@hashcode} identity-style form that would otherwise
+ * appear when this helper is logged as a field of {@code AbstractProducer.toString}.
  */
+@ToString
 public class BitHelper {
 
     /** Creates a new {@link BitHelper}. */
     public BitHelper() {}
 
-    /** Radix used by hexadecimal {@link BigInteger} conversions. */
-    public static final int RADIX_HEX = 16;
+    // RADIX_HEX = 16 used to live here. It has moved to
+    // net.ladenthin.bitcoinaddressfinder.constants.Radix#HEX so the configuration
+    // layer can reference the hex radix without depending on this root-package
+    // helper, and so there is exactly one named "16" in the codebase.
 
     /**
      * Converts a number of bits into the corresponding batch size (2 to the power of {@code bits}).
@@ -27,12 +37,14 @@ public class BitHelper {
     }
 
     /**
-     * Returns a bit mask covering the lowest {@code bits} bits.
+     * Returns a {@link BigInteger} bitmask with the lowest {@code bits} bits set
+     * (i.e. {@code 2^bits - 1}). Used to keep only the low-order {@code bits}
+     * bits of a value via bitwise AND.
      *
-     * @param bits the number of low bits to mask
+     * @param bits the number of low bits to set in the returned mask
      * @return {@code 2^bits - 1} as a {@link BigInteger}
      */
-    public BigInteger getKillBits(int bits) {
+    public BigInteger getLowBitMask(int bits) {
         return BigInteger.valueOf(2).pow(bits).subtract(BigInteger.ONE);
     }
 
@@ -44,11 +56,12 @@ public class BitHelper {
      */
     public void assertBatchSizeInBitsIsInRange(int batchSizeInBits) {
         if (batchSizeInBits < 0) {
-            throw new IllegalArgumentException("batchSizeInBits must be greater than or equal to 0.");
+            throw new IllegalArgumentException(
+                    "batchSizeInBits must be >= 0 but was " + batchSizeInBits);
         }
-        if (batchSizeInBits > PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY) {
+        if (batchSizeInBits > OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY) {
             throw new IllegalArgumentException("batchSizeInBits must be less than or equal to "
-                    + PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY + ".");
+                    + OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY + ".");
         }
     }
 }

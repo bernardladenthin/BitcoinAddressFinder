@@ -3,11 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.Startable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,8 +26,8 @@ import org.zeromq.ZMQException;
  * the worker thread the moment the {@code new Thread(() -> ...)} lambda captures
  * {@code this}.</p>
  */
-public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaZmq>
-        implements Startable {
+@ToString(callSuper = true)
+public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaZmq> implements Startable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KeyProducerJavaZmq.class);
 
@@ -73,7 +74,7 @@ public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyPro
                         try {
                             byte[] msg = socket.recv(0); // blocking up to timeout
                             if (msg != null) {
-                                if (msg.length == PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES) {
+                                if (msg.length == OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES) {
                                     addSecret(msg);
                                 } else {
                                     LOGGER.error("Received invalid secret length: " + msg.length);

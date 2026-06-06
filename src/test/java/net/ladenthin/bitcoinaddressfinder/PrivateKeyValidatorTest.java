@@ -8,6 +8,7 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigInteger;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -26,7 +27,7 @@ public class PrivateKeyValidatorTest {
         BigInteger result = validator.getMaxPrivateKeyForBatchSize(batchSizeInBits);
 
         // assert
-        assertThat(result, is(equalTo(PublicKeyBytes.MAX_PRIVATE_KEY)));
+        assertThat(result, is(equalTo(Secp256k1Constants.MAX_PRIVATE_KEY)));
     }
 
     @Test
@@ -38,20 +39,21 @@ public class PrivateKeyValidatorTest {
         BigInteger result = validator.getMaxPrivateKeyForBatchSize(batchSizeInBits);
 
         // assert
-        assertThat(result.add(BigInteger.ONE), is(equalTo(PublicKeyBytes.MAX_PRIVATE_KEY)));
+        assertThat(result.add(BigInteger.ONE), is(equalTo(Secp256k1Constants.MAX_PRIVATE_KEY)));
     }
 
     @Test
     public void getMaxPrivateKeyForBatchSize_maxAllowedBitSize_returnsMinimumSafeKey() {
         // arrange
-        int batchSizeInBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS - 1;
+        int batchSizeInBits = Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS - 1;
 
         // act
         BigInteger result = validator.getMaxPrivateKeyForBatchSize(batchSizeInBits);
 
         // assert
         BigInteger offset = BigInteger.ONE.shiftLeft(batchSizeInBits);
-        BigInteger expected = PublicKeyBytes.MAX_PRIVATE_KEY.subtract(offset).add(BigInteger.ONE);
+        BigInteger expected =
+                Secp256k1Constants.MAX_PRIVATE_KEY.subtract(offset).add(BigInteger.ONE);
         assertThat(result, is(equalTo(expected)));
     }
 
@@ -66,13 +68,13 @@ public class PrivateKeyValidatorTest {
         // act
         assertThrows(
                 IllegalArgumentException.class,
-                () -> validator.getMaxPrivateKeyForBatchSize(PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS + 1));
+                () -> validator.getMaxPrivateKeyForBatchSize(Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS + 1));
     }
 
     @Test
     public void getMaxPrivateKeyForBatchSize_tooLarge_throwsException() {
         // arrange
-        int batchSizeInBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
+        int batchSizeInBits = Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS;
 
         // act
         assertThrows(IllegalStateException.class, () -> validator.getMaxPrivateKeyForBatchSize(batchSizeInBits));
@@ -121,7 +123,7 @@ public class PrivateKeyValidatorTest {
     @Test
     public void isOutsidePrivateKeyRange_minValidPrivateKey_returnsFalse() {
         // act
-        boolean result = validator.isOutsidePrivateKeyRange(PublicKeyBytes.MIN_VALID_PRIVATE_KEY);
+        boolean result = validator.isOutsidePrivateKeyRange(Secp256k1Constants.MIN_VALID_PRIVATE_KEY);
 
         // assert
         assertThat(result, is(false));
@@ -130,7 +132,7 @@ public class PrivateKeyValidatorTest {
     @Test
     public void isOutsidePrivateKeyRange_maxPrivateKey_returnsFalse() {
         // act
-        boolean result = validator.isOutsidePrivateKeyRange(PublicKeyBytes.MAX_PRIVATE_KEY);
+        boolean result = validator.isOutsidePrivateKeyRange(Secp256k1Constants.MAX_PRIVATE_KEY);
 
         // assert
         assertThat(result, is(false));
@@ -160,7 +162,7 @@ public class PrivateKeyValidatorTest {
     @Test
     public void isOutsidePrivateKeyRange_aboveMax_returnsTrue() {
         // arrange
-        BigInteger invalidKey = PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE);
+        BigInteger invalidKey = Secp256k1Constants.MAX_PRIVATE_KEY.add(BigInteger.ONE);
 
         // act
         boolean result = validator.isOutsidePrivateKeyRange(invalidKey);
@@ -170,41 +172,41 @@ public class PrivateKeyValidatorTest {
     }
     // </editor-fold>
 
-    // <editor-fold defaultstate="collapsed" desc="returnValidPrivateKey">
+    // <editor-fold defaultstate="collapsed" desc="coerceToValidPrivateKey">
     @Test
-    public void returnValidPrivateKey_validKey_returnsSameKey() {
+    public void coerceToValidPrivateKey_validKey_returnsSameKey() {
         // arrange
         BigInteger valid = PublicKeyBytes.MIN_PRIVATE_KEY.add(BigInteger.ONE);
 
         // act
-        BigInteger result = validator.returnValidPrivateKey(valid);
+        BigInteger result = validator.coerceToValidPrivateKey(valid);
 
         // assert
         assertThat(result, is(equalTo(valid)));
     }
 
     @Test
-    public void returnValidPrivateKey_tooSmall_returnsReplacement() {
+    public void coerceToValidPrivateKey_tooSmall_returnsReplacement() {
         // arrange
         BigInteger tooSmall = PublicKeyBytes.MIN_PRIVATE_KEY.subtract(BigInteger.ONE);
 
         // act
-        BigInteger result = validator.returnValidPrivateKey(tooSmall);
+        BigInteger result = validator.coerceToValidPrivateKey(tooSmall);
 
         // assert
-        assertThat(result, is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
+        assertThat(result, is(equalTo(Secp256k1Constants.INVALID_PRIVATE_KEY_REPLACEMENT)));
     }
 
     @Test
-    public void returnValidPrivateKey_tooLarge_returnsReplacement() {
+    public void coerceToValidPrivateKey_tooLarge_returnsReplacement() {
         // arrange
-        BigInteger tooLarge = PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE);
+        BigInteger tooLarge = Secp256k1Constants.MAX_PRIVATE_KEY.add(BigInteger.ONE);
 
         // act
-        BigInteger result = validator.returnValidPrivateKey(tooLarge);
+        BigInteger result = validator.coerceToValidPrivateKey(tooLarge);
 
         // assert
-        assertThat(result, is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
+        assertThat(result, is(equalTo(Secp256k1Constants.INVALID_PRIVATE_KEY_REPLACEMENT)));
     }
     // </editor-fold>
 
@@ -213,8 +215,8 @@ public class PrivateKeyValidatorTest {
     public void replaceInvalidPrivateKeys_mixedArray_replacesInvalids() {
         // arrange
         BigInteger[] secrets = new BigInteger[] {
-            PublicKeyBytes.MIN_VALID_PRIVATE_KEY, // valid
-            PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE), // invalid
+            Secp256k1Constants.MIN_VALID_PRIVATE_KEY, // valid
+            Secp256k1Constants.MAX_PRIVATE_KEY.add(BigInteger.ONE), // invalid
             BigInteger.ZERO // invalid
         };
 
@@ -222,18 +224,18 @@ public class PrivateKeyValidatorTest {
         validator.replaceInvalidPrivateKeys(secrets);
 
         // assert
-        assertThat(secrets[0], is(equalTo(PublicKeyBytes.MIN_VALID_PRIVATE_KEY)));
-        assertThat(secrets[1], is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
-        assertThat(secrets[2], is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
+        assertThat(secrets[0], is(equalTo(Secp256k1Constants.MIN_VALID_PRIVATE_KEY)));
+        assertThat(secrets[1], is(equalTo(Secp256k1Constants.INVALID_PRIVATE_KEY_REPLACEMENT)));
+        assertThat(secrets[2], is(equalTo(Secp256k1Constants.INVALID_PRIVATE_KEY_REPLACEMENT)));
     }
 
     @Test
     public void replaceInvalidPrivateKeys_allValidKeys_keepsOriginalValues() {
         // arrange
         BigInteger[] secrets = new BigInteger[] {
-            PublicKeyBytes.MIN_VALID_PRIVATE_KEY,
-            PublicKeyBytes.MAX_PRIVATE_KEY,
-            PublicKeyBytes.MIN_VALID_PRIVATE_KEY.add(BigInteger.ONE)
+            Secp256k1Constants.MIN_VALID_PRIVATE_KEY,
+            Secp256k1Constants.MAX_PRIVATE_KEY,
+            Secp256k1Constants.MIN_VALID_PRIVATE_KEY.add(BigInteger.ONE)
         };
         BigInteger[] expectedCopy = secrets.clone();
 
@@ -248,16 +250,16 @@ public class PrivateKeyValidatorTest {
     public void replaceInvalidPrivateKeys_allInvalidKeys_replacesAll() {
         // arrange
         BigInteger[] secrets = new BigInteger[] {
-            BigInteger.ZERO, BigInteger.ONE.negate(), PublicKeyBytes.MAX_PRIVATE_KEY.add(BigInteger.ONE)
+            BigInteger.ZERO, BigInteger.ONE.negate(), Secp256k1Constants.MAX_PRIVATE_KEY.add(BigInteger.ONE)
         };
 
         // act
         validator.replaceInvalidPrivateKeys(secrets);
 
         // assert
-        assertThat(secrets[0], is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
-        assertThat(secrets[1], is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
-        assertThat(secrets[2], is(equalTo(PublicKeyBytes.INVALID_PRIVATE_KEY_REPLACEMENT)));
+        assertThat(secrets[0], is(equalTo(Secp256k1Constants.INVALID_PRIVATE_KEY_REPLACEMENT)));
+        assertThat(secrets[1], is(equalTo(Secp256k1Constants.INVALID_PRIVATE_KEY_REPLACEMENT)));
+        assertThat(secrets[2], is(equalTo(Secp256k1Constants.INVALID_PRIVATE_KEY_REPLACEMENT)));
     }
     // </editor-fold>
 }

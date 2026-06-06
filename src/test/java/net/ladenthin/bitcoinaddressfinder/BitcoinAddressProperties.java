@@ -13,8 +13,8 @@ public class BitcoinAddressProperties {
     private final BitHelper bitHelper = new BitHelper();
 
     @Property
-    boolean getKillBitsHasExactlyNBitsSet(@ForAll @IntRange(min = 0, max = 20) int bits) {
-        BigInteger result = bitHelper.getKillBits(bits);
+    boolean getLowBitMaskHasExactlyNBitsSet(@ForAll @IntRange(min = 0, max = 20) int bits) {
+        BigInteger result = bitHelper.getLowBitMask(bits);
         return result.bitCount() == bits;
     }
 

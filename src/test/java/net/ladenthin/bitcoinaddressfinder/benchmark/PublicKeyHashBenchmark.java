@@ -8,6 +8,7 @@ package net.ladenthin.bitcoinaddressfinder.benchmark;
 import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.Hash160;
 import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -75,7 +76,7 @@ public class PublicKeyHashBenchmark {
     public void setUp() {
         hash160 = new Hash160(useFast);
         uncompressedKey = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
-        uncompressedKey[0] = (byte) PublicKeyBytes.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT;
+        uncompressedKey[0] = (byte) OpenClKernelConstants.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT;
         for (int i = 1; i < uncompressedKey.length; i++) {
             uncompressedKey[i] = (byte) i;
         }

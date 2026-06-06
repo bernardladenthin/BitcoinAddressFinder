@@ -17,9 +17,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses1337;
@@ -69,7 +73,12 @@ public class ConsumerJavaTest {
     // <editor-fold defaultstate="collapsed" desc="toString">
     @ToStringTest
     @Test
-    public void toString_whenCalled_containsClassNameAndIdentityHash() throws Exception {
+    public void toString_whenCalled_containsClassNameAndConfig() throws Exception {
+        // After migrating ConsumerJava to Lombok @ToString the output becomes
+        // "ConsumerJava(keyUtility=..., checkedKeys=0, ..., consumerJava=CConsumerJava(...), ...)".
+        // The old identity-style "ConsumerJava@<hex>" form is gone — replaced by a
+        // structured state snapshot. We assert on the class name + the consumerJava
+        // configuration carrier since identity is no longer in the contract.
         CConsumerJava cConsumerJava = new CConsumerJava();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory =
@@ -80,7 +89,8 @@ public class ConsumerJavaTest {
         String toStringOutput = consumerJava.toString();
 
         assertThat(toStringOutput, not(emptyOrNullString()));
-        assertThat(toStringOutput, matchesPattern("ConsumerJava@\\p{XDigit}+"));
+        assertThat(toStringOutput, containsString("ConsumerJava("));
+        assertThat(toStringOutput, containsString("consumerJava=CConsumerJava("));
     }
     // </editor-fold>
 
@@ -131,17 +141,24 @@ public class ConsumerJavaTest {
     @AwaitTimeTest
     @Test
     public void interrupt_keysQueueNotEmpty_consumerNotRunningWaitedInternallyForTheDuration() throws Exception {
-        // Change await duration
-        ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY = AwaitTimeTests.AWAIT_DURATION;
-
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
         File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
 
         CConsumerJava cConsumerJava = new CConsumerJava();
+        // Shorten the queue-empty await from the production default (60 s) so the test's
+        // wait-then-time-out branch fires in seconds rather than a minute; injected via
+        // config, no static mutation, no test-order coupling.
+        cConsumerJava.awaitQueueEmptySeconds = AwaitTimeTests.AWAIT_DURATION.toSeconds();
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        ExecutorService consumeKeysExecutor = Executors.newFixedThreadPool(cConsumerJava.threads);
+        ConsumerJava consumerJava = new ConsumerJava(
+                cConsumerJava,
+                keyUtility,
+                persistenceUtils,
+                Executors.newSingleThreadScheduledExecutor(),
+                consumeKeysExecutor);
         consumerJava.initLMDB();
 
         // add keys
@@ -149,12 +166,12 @@ public class ConsumerJavaTest {
 
         // pre-assert, assert the keys queue is not empty
         assertThat(consumerJava.keysQueueSize(), is(equalTo(1)));
-        assertThat(consumerJava.shouldRun.get(), is(equalTo(Boolean.TRUE)));
+        assertThat(consumerJava.shouldRun(), is(equalTo(Boolean.TRUE)));
 
         // add a pseudo thread to the executor to test its eecution duration
-        consumerJava.consumeKeysExecutorService.submit(() -> {
+        consumeKeysExecutor.submit(() -> {
             try {
-                Thread.sleep(ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY);
+                Thread.sleep(AwaitTimeTests.AWAIT_DURATION);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -165,14 +182,13 @@ public class ConsumerJavaTest {
         consumerJava.interrupt();
 
         // assert
-        assertThat(consumerJava.shouldRun.get(), is(equalTo(Boolean.FALSE)));
+        assertThat(consumerJava.shouldRun(), is(equalTo(Boolean.FALSE)));
 
         long afterAct = System.currentTimeMillis();
         Duration waitTime = Duration.ofMillis(afterAct - beforeAct);
 
         // assert the waiting time is over, substract imprecision
-        assertThat(
-                waitTime, is(greaterThan(ConsumerJava.AWAIT_DURATION_QUEUE_EMPTY.minus(AwaitTimeTests.IMPRECISION))));
+        assertThat(waitTime, is(greaterThan(AwaitTimeTests.AWAIT_DURATION.minus(AwaitTimeTests.IMPRECISION))));
     }
 
     @Test
@@ -185,26 +201,29 @@ public class ConsumerJavaTest {
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         cConsumerJava.printStatisticsEveryNSeconds = 1;
-        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
+        ExecutorService consumeKeysExecutor = Executors.newFixedThreadPool(cConsumerJava.threads);
+        ConsumerJava consumerJava =
+                new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils, scheduledExecutor, consumeKeysExecutor);
 
         consumerJava.initLMDB();
         // pre-assert
-        assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(equalTo(Boolean.FALSE)));
+        assertThat(scheduledExecutor.isShutdown(), is(equalTo(Boolean.FALSE)));
 
         consumerJava.startStatisticsTimer();
         // wait till the scheduled TimerTask is completed
         Thread.sleep(Duration.ofSeconds(1L));
 
         // pre-assert
-        assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(equalTo(Boolean.FALSE)));
-        assertThat(consumerJava.consumeKeysExecutorService.isShutdown(), is(equalTo(Boolean.FALSE)));
+        assertThat(scheduledExecutor.isShutdown(), is(equalTo(Boolean.FALSE)));
+        assertThat(consumeKeysExecutor.isShutdown(), is(equalTo(Boolean.FALSE)));
 
         // act
         consumerJava.interrupt();
 
         // assert
-        assertThat(consumerJava.scheduledExecutorService.isShutdown(), is(equalTo(Boolean.TRUE)));
-        assertThat(consumerJava.consumeKeysExecutorService.isShutdown(), is(equalTo(Boolean.TRUE)));
+        assertThat(scheduledExecutor.isShutdown(), is(equalTo(Boolean.TRUE)));
+        assertThat(consumeKeysExecutor.isShutdown(), is(equalTo(Boolean.TRUE)));
     }
 
     @Test
@@ -649,7 +668,8 @@ public class ConsumerJavaTest {
     }
 
     private ByteBuffer createHash160ByteBuffer() {
-        ByteBuffer threadLocalReuseableByteBuffer = ByteBuffer.allocateDirect(PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES);
+        ByteBuffer threadLocalReuseableByteBuffer =
+                ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
         return threadLocalReuseableByteBuffer;
     }
 }

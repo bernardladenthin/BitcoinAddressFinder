@@ -3,9 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
+
 /**
  * Configuration for opening the LMDB database in read-only mode.
  */
+@ToString
+@EqualsAndHashCode
 public class CLMDBConfigurationReadOnly {
 
     /** Creates a new {@link CLMDBConfigurationReadOnly}. */

@@ -13,9 +13,9 @@ import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomInstance;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -43,7 +43,7 @@ public class KeyProducerJavaRandomTest {
         cKeyProducerJavaRandom.keyProducerId = keyProducerId;
         cKeyProducerJavaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
         cKeyProducerJavaRandom.customSeed = 0L;
-        cKeyProducerJavaRandom.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
+        cKeyProducerJavaRandom.privateKeyMaxNumBits = Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS;
 
         KeyProducerJavaRandom keyProducerJavaRandom = createKeyProducerJavaRandom(cKeyProducerJavaRandom);
 
@@ -66,7 +66,7 @@ public class KeyProducerJavaRandomTest {
         cKeyProducerJavaRandom.keyProducerId = keyProducerId;
         cKeyProducerJavaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
         cKeyProducerJavaRandom.customSeed = 0L;
-        cKeyProducerJavaRandom.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
+        cKeyProducerJavaRandom.privateKeyMaxNumBits = Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS;
 
         KeyProducerJavaRandom keyProducerJavaRandom = createKeyProducerJavaRandom(cKeyProducerJavaRandom);
 
@@ -89,7 +89,7 @@ public class KeyProducerJavaRandomTest {
         cKeyProducerJavaRandom.keyProducerId = keyProducerId;
         cKeyProducerJavaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
         cKeyProducerJavaRandom.customSeed = 0L;
-        cKeyProducerJavaRandom.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
+        cKeyProducerJavaRandom.privateKeyMaxNumBits = Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS;
 
         KeyProducerJavaRandom keyProducerJavaRandom = createKeyProducerJavaRandom(cKeyProducerJavaRandom);
 
@@ -110,7 +110,7 @@ public class KeyProducerJavaRandomTest {
         config.keyProducerId = keyProducerId;
         config.keyProducerJavaRandomInstance = instance;
         config.customSeed = customSeed;
-        config.privateKeyMaxNumBits = PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BITS;
+        config.privateKeyMaxNumBits = Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS;
         KeyProducerJavaRandom producer = createKeyProducerJavaRandom(config);
         return producer.createSecrets(bitHelper.convertBitsToSize(0), true);
     }

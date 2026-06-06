@@ -106,4 +106,109 @@ public class AddressFormatNotAcceptedExceptionTest {
         assertThat(actual, is(equalTo("")));
     }
     // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="constructor(reason, detail)">
+    @Test
+    public void constructor_withReasonAndDetail_messageContainsBoth() {
+        // arrange
+        String reason = "P2TR is not supported";
+        String detail = "bc1pXyZ123Taproot...";
+
+        // act
+        AddressFormatNotAcceptedException exception = new AddressFormatNotAcceptedException(reason, detail);
+
+        // assert
+        assertThat(exception.getMessage(), containsString(reason));
+        assertThat(exception.getMessage(), containsString(detail));
+    }
+
+    @Test
+    public void constructor_withReasonAndDetail_messageEqualsExpected() {
+        // arrange
+        String reason = "address is empty";
+        String detail = "   # commented out line";
+
+        // act
+        AddressFormatNotAcceptedException exception = new AddressFormatNotAcceptedException(reason, detail);
+
+        // assert
+        assertThat(
+                exception.getMessage(),
+                is(equalTo("Address format not accepted: " + reason + " (input: " + detail + ")")));
+    }
+
+    @Test
+    public void constructor_withReasonAndDetail_getReasonReturnsReasonOnly() {
+        // arrange — getReason() must NOT include the detail; aggregation depends on it
+        String reason = "address is empty";
+        String detail = "   # commented out line";
+
+        // act
+        AddressFormatNotAcceptedException exception = new AddressFormatNotAcceptedException(reason, detail);
+
+        // assert
+        assertThat(exception.getReason(), is(equalTo(reason)));
+    }
+
+    @Test
+    public void constructor_withReasonAndDetail_noCause() {
+        // arrange
+        String reason = "unsupported witness version";
+        String detail = "bc1qFoo... witnessVersion=2";
+
+        // act
+        AddressFormatNotAcceptedException exception = new AddressFormatNotAcceptedException(reason, detail);
+
+        // assert
+        assertThat(exception.getCause(), is(nullValue()));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="constructor(reason, detail, cause)">
+    @Test
+    public void constructor_withReasonDetailAndCause_messageContainsAll() {
+        // arrange
+        String reason = "Bitcoin Cash q-address not parsable";
+        String detail = "qpfoo...invalid";
+        Throwable cause = new RuntimeException("base32 decode failed");
+
+        // act
+        AddressFormatNotAcceptedException exception =
+                new AddressFormatNotAcceptedException(reason, detail, cause);
+
+        // assert
+        assertThat(exception.getMessage(), containsString(reason));
+        assertThat(exception.getMessage(), containsString(detail));
+    }
+
+    @Test
+    public void constructor_withReasonDetailAndCause_chainsCause() {
+        // arrange
+        String reason = "invalid base58";
+        String detail = "1NotABase58Address!!!";
+        Throwable cause = new RuntimeException("checksum mismatch");
+
+        // act
+        AddressFormatNotAcceptedException exception =
+                new AddressFormatNotAcceptedException(reason, detail, cause);
+
+        // assert
+        assertThat(exception.getCause(), is(equalTo(cause)));
+    }
+
+    @Test
+    public void constructor_withReasonDetailAndCause_getReasonReturnsReasonOnly() {
+        // arrange — getReason() aggregation invariant holds for the 3-arg form too
+        String reason = "Bitcoin Cash q-address not parsable";
+        String detail = "qpfoo...invalid";
+        Throwable cause = new RuntimeException("base32 decode failed");
+
+        // act
+        AddressFormatNotAcceptedException exception =
+                new AddressFormatNotAcceptedException(reason, detail, cause);
+
+        // assert
+        assertThat(exception.getReason(), is(equalTo(reason)));
+    }
+    // </editor-fold>
 }

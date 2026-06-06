@@ -56,7 +56,7 @@ public class OpenCLDeviceTest {
     @ToStringTest
     public void toStringPretty_openCLDeviceExisting_stringCreated() throws IOException {
         // arrange
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
         OpenCLBuilder openCLBuilder = new OpenCLBuilder();
         List<OpenCLPlatform> openCLPlatforms = openCLBuilder.build();
@@ -76,7 +76,7 @@ public class OpenCLDeviceTest {
     @OpenCLTest
     @ToStringTest
     public void toStringPretty_staticDeviceData_stringCreated() {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailable();
         // arrange
         OpenCLDevice device = new OpenCLDevice(
                 new cl_device_id(),
@@ -127,8 +127,7 @@ public class OpenCLDeviceTest {
         String output = device.toStringPretty();
 
         // assert
-        final String expectedString =
-                """
+        final String expectedString = """
             --- Info for OpenCL device: NVIDIA GeForce RTX 3070 Laptop GPU ---
             cl_device_id:                          cl_device_id[0x0]
             CL_DEVICE_NAME:                        NVIDIA GeForce RTX 3070 Laptop GPU

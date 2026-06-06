@@ -6,12 +6,15 @@ package net.ladenthin.bitcoinaddressfinder;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 
 /**
  * Holds the raw OpenCL grid result for a single secret-key base together with helpers to convert
  * it into {@link PublicKeyBytes} objects.
  */
+@ToString
 public class OpenCLGridResult {
 
     /**
@@ -29,6 +32,8 @@ public class OpenCLGridResult {
 
     private final BigInteger secretKeyBase;
     private final int workSize;
+    // ByteBuffer.toString is "HeapByteBuffer[pos=N lim=M cap=K]" — useless in logs.
+    @ToString.Exclude
     private final ByteBuffer result;
 
     OpenCLGridResult(BigInteger secretKeyBase, int workSize, ByteBuffer result) {
@@ -111,7 +116,7 @@ public class OpenCLGridResult {
      * <p>
      * This method extracts a block of bytes for one key from the given {@link ByteBuffer},
      * based on the work-item index ({@code keyNumber}). The layout of each chunk is defined
-     * by constants in {@link PublicKeyBytes}:
+     * by constants in {@link OpenClKernelConstants}:
      * <ul>
      *   <li>{@code CHUNK_SIZE_00_NUM_BYTES_BIG_ENDIAN_X}: X coordinate (Big-Endian)</li>
      *   <li>{@code CHUNK_SIZE_01_NUM_BYTES_BIG_ENDIAN_Y}: Y coordinate (Big-Endian)</li>
@@ -140,20 +145,20 @@ public class OpenCLGridResult {
             return PublicKeyBytes.INVALID_KEY_ONE;
         }
 
-        final int keyOffsetInByteBuffer = PublicKeyBytes.CHUNK_SIZE_NUM_BYTES * keyNumber;
+        final int keyOffsetInByteBuffer = OpenClKernelConstants.CHUNK_SIZE_NUM_BYTES * keyNumber;
 
         // Get X
-        byte[] xFromBigEndian = new byte[PublicKeyBytes.CHUNK_SIZE_00_NUM_BYTES_BIG_ENDIAN_X];
+        byte[] xFromBigEndian = new byte[OpenClKernelConstants.CHUNK_SIZE_00_NUM_BYTES_BIG_ENDIAN_X];
         resultBuffer.get(
-                keyOffsetInByteBuffer + PublicKeyBytes.CHUNK_OFFSET_00_NUM_BYTES_BIG_ENDIAN_X,
+                keyOffsetInByteBuffer + OpenClKernelConstants.CHUNK_OFFSET_00_NUM_BYTES_BIG_ENDIAN_X,
                 xFromBigEndian,
                 0,
                 xFromBigEndian.length);
 
         // Get Y
-        byte[] yFromBigEndian = new byte[PublicKeyBytes.CHUNK_SIZE_01_NUM_BYTES_BIG_ENDIAN_Y];
+        byte[] yFromBigEndian = new byte[OpenClKernelConstants.CHUNK_SIZE_01_NUM_BYTES_BIG_ENDIAN_Y];
         resultBuffer.get(
-                keyOffsetInByteBuffer + PublicKeyBytes.CHUNK_OFFSET_01_NUM_BYTES_BIG_ENDIAN_Y,
+                keyOffsetInByteBuffer + OpenClKernelConstants.CHUNK_OFFSET_01_NUM_BYTES_BIG_ENDIAN_Y,
                 yFromBigEndian,
                 0,
                 yFromBigEndian.length);
@@ -162,17 +167,17 @@ public class OpenCLGridResult {
         byte[] uncompressedFromBigEndian = PublicKeyBytes.assembleUncompressedPublicKey(xFromBigEndian, yFromBigEndian);
 
         // Get RIPEMD160 for uncompressed key
-        byte[] ripemd160Uncompressed = new byte[PublicKeyBytes.CHUNK_SIZE_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED];
+        byte[] ripemd160Uncompressed = new byte[OpenClKernelConstants.CHUNK_SIZE_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED];
         resultBuffer.get(
-                keyOffsetInByteBuffer + PublicKeyBytes.CHUNK_OFFSET_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED,
+                keyOffsetInByteBuffer + OpenClKernelConstants.CHUNK_OFFSET_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED,
                 ripemd160Uncompressed,
                 0,
                 ripemd160Uncompressed.length);
 
         // Get RIPEMD160 for uncompressed key
-        byte[] ripemd160Compressed = new byte[PublicKeyBytes.CHUNK_SIZE_11_NUM_BYTES_RIPEMD160_COMPRESSED];
+        byte[] ripemd160Compressed = new byte[OpenClKernelConstants.CHUNK_SIZE_11_NUM_BYTES_RIPEMD160_COMPRESSED];
         resultBuffer.get(
-                keyOffsetInByteBuffer + PublicKeyBytes.CHUNK_OFFSET_11_NUM_BYTES_RIPEMD160_COMPRESSED,
+                keyOffsetInByteBuffer + OpenClKernelConstants.CHUNK_OFFSET_11_NUM_BYTES_RIPEMD160_COMPRESSED,
                 ripemd160Compressed,
                 0,
                 ripemd160Compressed.length);

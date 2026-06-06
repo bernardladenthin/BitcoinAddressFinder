@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import java.math.BigInteger;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
@@ -12,10 +13,10 @@ import org.jspecify.annotations.NonNull;
 /**
  * Key producer that iterates a private-key range sequentially.
  */
+@ToString(callSuper = true)
 public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJavaIncremental> {
 
-    @NonNull
-    private BigInteger currentValue;
+    private @NonNull BigInteger currentValue;
 
     /**
      * Creates a new incremental key producer.
@@ -27,12 +28,13 @@ public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJava
     public KeyProducerJavaIncremental(
             CKeyProducerJavaIncremental cKeyProducerJavaIncremental, KeyUtility keyUtility, BitHelper bitHelper) {
         super(cKeyProducerJavaIncremental);
-        this.currentValue = new BigInteger(cKeyProducerJavaIncremental.startPrivateKey, BitHelper.RADIX_HEX);
+        // Use the config POJO's canonical parser rather than re-parsing the raw string
+        // here, so the radix and any future format tightening live in one place.
+        this.currentValue = cKeyProducerJavaIncremental.getStartPrivateKey();
     }
 
     @Override
-    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly)
-            throws NoMoreSecretsAvailableException {
+    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) {
         verifyWorkSize(overallWorkSize, cKeyProducerJava.maxWorkSize);
         final BigInteger endPrivateKey = cKeyProducerJava.getEndPrivateKey();
         if (currentValue.compareTo(endPrivateKey) > 0) {
@@ -44,7 +46,7 @@ public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJava
         BigInteger counter = currentValue;
         for (int i = 0; i < length; i++) {
             if (counter.compareTo(endPrivateKey) > 0) {
-                throw new NoMoreSecretsAvailableException(counter + " exceeds end private key " +endPrivateKey);
+                throw new NoMoreSecretsAvailableException(counter + " exceeds end private key " + endPrivateKey);
             }
             secrets[i] = counter;
             counter = counter.add(BigInteger.ONE);

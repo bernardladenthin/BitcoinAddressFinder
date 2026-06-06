@@ -54,16 +54,17 @@ public class AddressToCoinTest {
                 addressToCoinCompressed2);
         equalHashCodeToStringTestHelper.assertEqualsHashCodeToStringAIsDifferentToB();
 
+        // Format uses Java record-style square brackets — see AddressToCoin#toString Javadoc.
         assertThat(
                 addressToCoinUncompressed.toString(),
                 is(
                         equalTo(
-                                "AddressToCoin{hash160=73d6a3b07f488e12f9175716f95c5e18c265693f, coin=100000000, type=P2PKH_OR_P2SH}")));
+                                "AddressToCoin[hash160=73d6a3b07f488e12f9175716f95c5e18c265693f, coin=100000000, type=P2PKH_OR_P2SH]")));
         assertThat(
                 addressToCoinCompressed.toString(),
                 is(
                         equalTo(
-                                "AddressToCoin{hash160=6970dea35c48e1c78e931117fab833354cddf9b4, coin=100000000, type=P2PKH_OR_P2SH}")));
+                                "AddressToCoin[hash160=6970dea35c48e1c78e931117fab833354cddf9b4, coin=100000000, type=P2PKH_OR_P2SH]")));
     }
 
     @Test

@@ -5,9 +5,14 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import static org.jocl.CL.CL_DEVICE_TYPE_ALL;
 
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
+
 /**
  * Configuration for the OpenCL (GPU) producer.
  */
+@ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
 public class CProducerOpenCL extends CProducer {
 
     /** Creates a new {@link CProducerOpenCL}. */
@@ -22,11 +27,6 @@ public class CProducerOpenCL extends CProducer {
 
     /** Maximum number of threads that read OpenCL kernel results concurrently. */
     public int maxResultReaderThreads = 4;
-
-    /**
-     * Delay in milliseconds before retrying when the reader is blocked.
-     */
-    public int delayBlockedReader = 100;
 
     /**
      * Number of inner iterations each OpenCL work-item performs on the GPU.

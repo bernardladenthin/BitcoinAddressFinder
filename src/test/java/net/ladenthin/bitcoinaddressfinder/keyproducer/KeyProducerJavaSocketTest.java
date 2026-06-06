@@ -25,8 +25,8 @@ import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -86,7 +86,7 @@ public class KeyProducerJavaSocketTest {
                 try (Socket socket = serverSocket.accept();
                         DataInputStream in = new DataInputStream(socket.getInputStream())) {
 
-                    byte[] buffer = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
+                    byte[] buffer = new byte[OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES];
                     in.readFully(buffer); // exactly 32 bytes
                 }
             }

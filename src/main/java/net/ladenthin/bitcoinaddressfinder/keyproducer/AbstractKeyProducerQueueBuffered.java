@@ -7,9 +7,10 @@ import java.math.BigInteger;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaReceiver;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,6 +20,7 @@ import org.slf4j.LoggerFactory;
  *
  * @param <T> the configuration type for this receiver-based key producer
  */
+@ToString(callSuper = true)
 public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJavaReceiver> extends KeyProducerJava<T> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractKeyProducerQueueBuffered.class);
@@ -34,6 +36,8 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
     /** Shared {@link KeyUtility} for converting between byte arrays and {@link BigInteger}. */
     protected final KeyUtility keyUtility;
     /** Queue of pending secrets received from the underlying transport. */
+    // BlockingQueue.toString dumps every queued element — potentially huge.
+    @ToString.Exclude
     protected final BlockingQueue<byte[]> secretQueue;
     /** Flag set to {@code true} once shutdown has been signalled. */
     protected volatile boolean shouldStop = false;
@@ -64,8 +68,7 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
     }
 
     @Override
-    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly)
-            throws NoMoreSecretsAvailableException {
+    public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) {
         verifyWorkSize(overallWorkSize, cKeyProducerJava.maxWorkSize);
 
         int length = returnStartSecretOnly ? 1 : overallWorkSize;
@@ -73,7 +76,8 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
 
         for (int i = 0; i < length; i++) {
             if (shouldStop) {
-                throw new NoMoreSecretsAvailableException("Interrupted while waiting for secrets");
+                throw new NoMoreSecretsAvailableException(
+                        "Interrupted while waiting for secrets at iteration " + i + "/" + length);
             }
 
             try {
@@ -86,15 +90,19 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
                 } else {
                     secret = secretQueue.poll(timeout, TimeUnit.MILLISECONDS);
                     if (secret == null) {
-                        throw new NoMoreSecretsAvailableException("Timeout while waiting for secret");
+                        throw new NoMoreSecretsAvailableException(
+                                "Timeout while waiting for secret ("
+                                        + timeout + " ms, iteration " + i + "/" + length + ")");
                     }
                 }
 
                 if (secret == SHUTDOWN_SENTINEL) {
-                    throw new NoMoreSecretsAvailableException("Interrupted while waiting for secret");
+                    throw new NoMoreSecretsAvailableException(
+                            "Shutdown sentinel received while waiting for secret at iteration "
+                                    + i + "/" + length);
                 }
 
-                if (secret.length != PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES) {
+                if (secret.length != OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES) {
                     throw new NoMoreSecretsAvailableException("Invalid secret length: " + secret.length);
                 }
 
@@ -106,7 +114,8 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new NoMoreSecretsAvailableException("Interrupted while polling secret", e);
+                throw new NoMoreSecretsAvailableException(
+                        "Interrupted while polling secret at iteration " + i + "/" + length, e);
             }
         }
 
@@ -115,6 +124,14 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
 
     /**
      * Sleeps for the given duration, restoring the interrupt flag on interruption.
+     *
+     * <p>Used by {@link KeyProducerJavaSocket} for the back-off delay between
+     * failed bootstrap connection attempts. The retry loop is hard-capped by
+     * {@code connectionRetryCount} and gives up permanently after that — linear
+     * delay is the right choice (exponential back-off matters only for
+     * reconnect-forever loops). fb-contrib's {@code MDM_THREAD_YIELD} on this
+     * method is suppressed in {@code spotbugs-exclude.xml}; the helper IS the
+     * sleep primitive.
      *
      * @param millis the duration in milliseconds
      */

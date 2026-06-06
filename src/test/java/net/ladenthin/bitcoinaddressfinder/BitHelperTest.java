@@ -10,21 +10,23 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 public class BitHelperTest {
 
-    // <editor-fold defaultstate="collapsed" desc="getKillBits">
+    // <editor-fold defaultstate="collapsed" desc="getLowBitMask">
     @ParameterizedTest
-    @MethodSource(CommonDataProvider.DATA_PROVIDER_KILL_BITS)
-    public void getKillBits_bitsGiven_killBitsEqualsExpectation(int bits, BigInteger killBits) throws IOException {
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_LOW_BIT_MASK)
+    public void getLowBitMask_bitsGiven_lowBitMaskEqualsExpectation(int bits, BigInteger lowBitMask)
+            throws IOException {
         // arrange
         BitHelper bitHelper = new BitHelper();
 
         // act, assert
-        assertThat(bitHelper.getKillBits(bits), is(equalTo(killBits)));
+        assertThat(bitHelper.getLowBitMask(bits), is(equalTo(lowBitMask)));
     }
     // </editor-fold>
 
@@ -58,7 +60,8 @@ public class BitHelperTest {
         // act, assert
         assertThrows(
                 IllegalArgumentException.class,
-                () -> bitHelper.assertBatchSizeInBitsIsInRange(PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY + 1));
+                () -> bitHelper.assertBatchSizeInBitsIsInRange(
+                        OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY + 1));
     }
 
     @ParameterizedTest

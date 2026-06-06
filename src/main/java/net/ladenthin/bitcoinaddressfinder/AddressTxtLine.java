@@ -6,6 +6,8 @@ package net.ladenthin.bitcoinaddressfinder;
 import com.google.common.hash.Hashing;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import lombok.ToString;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.bitcoinj.base.Base58;
 import org.bitcoinj.base.Bech32;
 import org.bitcoinj.base.Coin;
@@ -19,7 +21,14 @@ import org.slf4j.LoggerFactory;
 /**
  * Most txt files have a common format which uses Base58 address and separated
  * anmount.
+ *
+ * <p>{@link ToString} is applied for consistency with every other class in the
+ * codebase that gets a Lombok-generated {@code toString}; rendered output is
+ * {@code AddressTxtLine()} (empty parens) today because the class has no
+ * instance fields. If parser flags or other instance state are added later they
+ * will be auto-included.
  */
+@ToString
 public class AddressTxtLine {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AddressTxtLine.class);
@@ -114,12 +123,12 @@ public class AddressTxtLine {
      * @throws AddressFormatNotAcceptedException if the address format is not accepted,
      *         with a reason message describing why
      */
-    @NonNull
-    public AddressToCoin fromLine(String line, KeyUtility keyUtility) throws AddressFormatNotAcceptedException {
+    public @NonNull AddressToCoin fromLine(String line, KeyUtility keyUtility)
+            throws AddressFormatNotAcceptedException {
         // Checked before splitting: "#" is also a SeparatorFormat separator, so splitting first
         // would always produce an empty first token for "#..." lines, masking this reason.
         if (line.trim().startsWith(IGNORE_LINE_PREFIX)) {
-            throw new AddressFormatNotAcceptedException(REASON_IGNORE_PREFIX);
+            throw new AddressFormatNotAcceptedException(REASON_IGNORE_PREFIX, line);
         }
         // Remove the Bitcoin Cash prefix (which includes a colon) to avoid incorrect splitting.
         // This ensures the address is recognized properly and not misinterpreted during parsing.
@@ -131,10 +140,10 @@ public class AddressTxtLine {
         Coin amount = getCoinIfPossible(lineSplitted, DEFAULT_COIN);
         address = address.trim();
         if (address.isEmpty()) {
-            throw new AddressFormatNotAcceptedException(REASON_EMPTY);
+            throw new AddressFormatNotAcceptedException(REASON_EMPTY, line);
         }
         if (address.startsWith(ADDRESS_HEADER)) {
-            throw new AddressFormatNotAcceptedException(REASON_ADDRESS_HEADER);
+            throw new AddressFormatNotAcceptedException(REASON_ADDRESS_HEADER, address);
         }
 
         // Riecoin: ScriptPubKey-style encoded address (hex with OP codes)
@@ -142,7 +151,7 @@ public class AddressTxtLine {
             final String OP_DUP = "76";
             final String OP_HASH160 = "a9";
             final String OP_PUSH_20_BYTES = "14";
-            final int length20Bytes = PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES;
+            final int length20Bytes = OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES;
             final String riecoinP2SHPrefix = OP_DUP + OP_HASH160 + OP_PUSH_20_BYTES;
             final int riecoinScriptPubKeyLengthHex = length20Bytes * 2 + riecoinP2SHPrefix.length();
             if (address.length() >= riecoinScriptPubKeyLengthHex && address.startsWith(riecoinP2SHPrefix)) {
@@ -155,7 +164,7 @@ public class AddressTxtLine {
 
         // Blockchair Multisig (P2MS) format is not supported
         if (address.startsWith("d-") || address.startsWith("m-") || address.startsWith("s-")) {
-            throw new AddressFormatNotAcceptedException(REASON_P2MS_NOT_SUPPORTED);
+            throw new AddressFormatNotAcceptedException(REASON_P2MS_NOT_SUPPORTED, address);
         }
 
         // BitCore WKH format (Base36-encoded hash160)
@@ -163,7 +172,7 @@ public class AddressTxtLine {
             // BitCore (WKH) is base36 encoded hash160
             String addressWKH = address.substring("wkh_".length());
             byte[] hash160 = new Base36Decoder()
-                    .decodeBase36ToFixedLengthBytes(addressWKH, PublicKeyBytes.RIPEMD160_HASH_NUM_BYTES);
+                    .decodeBase36ToFixedLengthBytes(addressWKH, OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
             ByteBuffer hash160AsByteBuffer = keyUtility.byteBufferUtility().byteArrayToByteBuffer(hash160);
             return new AddressToCoin(hash160AsByteBuffer, amount, AddressType.P2WPKH);
         }
@@ -183,7 +192,7 @@ public class AddressTxtLine {
                         ByteBuffer hash160 = keyUtility.byteBufferUtility().byteArrayToByteBuffer(witnessProgram);
                         return new AddressToCoin(hash160, amount, AddressType.P2WPKH); // P2WPKH supported
                     } else if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_SH) {
-                        throw new AddressFormatNotAcceptedException(REASON_P2WSH_NOT_SUPPORTED);
+                        throw new AddressFormatNotAcceptedException(REASON_P2WSH_NOT_SUPPORTED, address);
                     }
                 }
                 case WITNESS_VERSION_1 -> {
@@ -194,10 +203,11 @@ public class AddressTxtLine {
                                     "Rejecting P2TR taproot tweaked public key: {}",
                                     org.apache.commons.codec.binary.Hex.encodeHexString(tweakedPublicKey));
                         }
-                        throw new AddressFormatNotAcceptedException(REASON_P2TR_NOT_SUPPORTED);
+                        throw new AddressFormatNotAcceptedException(REASON_P2TR_NOT_SUPPORTED, address);
                     }
                 }
-                default -> throw new AddressFormatNotAcceptedException(REASON_UNSUPPORTED_WITNESS_VERSION);
+                default -> throw new AddressFormatNotAcceptedException(
+                        REASON_UNSUPPORTED_WITNESS_VERSION, address + " witnessVersion=" + witnessVersion);
             }
         } catch (AddressFormatException | ReflectiveOperationException e) {
             // Bech32 parsing or reflection failed; continue to next format
@@ -227,7 +237,7 @@ public class AddressTxtLine {
         } catch (DecoderException e) {
             throw e;
         } catch (RuntimeException | ReflectiveOperationException e) {
-            throw new AddressFormatNotAcceptedException(REASON_BITCOIN_CASH_Q_ADDRESS_NOT_PARSABLE, e);
+            throw new AddressFormatNotAcceptedException(REASON_BITCOIN_CASH_Q_ADDRESS_NOT_PARSABLE, address, e);
         }
 
         // Fallback: assume Base58 with 1-byte version prefix
@@ -236,7 +246,7 @@ public class AddressTxtLine {
                     parseBase58Address(address, VERSION_BYTES_REGULAR, CHECKSUM_BYTES_REGULAR, keyUtility);
             return new AddressToCoin(addressToCoin.hash160(), amount, addressToCoin.type());
         } catch (AddressFormatException e) {
-            throw new AddressFormatNotAcceptedException(REASON_INVALID_BASE58, e);
+            throw new AddressFormatNotAcceptedException(REASON_INVALID_BASE58, address, e);
         }
     }
 
@@ -252,7 +262,7 @@ public class AddressTxtLine {
             version = null;
         }
 
-        byte[] hash160 = new byte[20];
+        byte[] hash160 = new byte[OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES];
         int storedBytes = Math.min(decoded.length - versionBytes, hash160.length);
         {
             // copy hash160
@@ -313,8 +323,7 @@ public class AddressTxtLine {
         return new AddressToCoin(hash160AsByteBuffer, DEFAULT_COIN, addressType);
     }
 
-    @NonNull
-    private Coin getCoinIfPossible(@NonNull String[] lineSplitted, @NonNull Coin defaultValue) {
+    private @NonNull Coin getCoinIfPossible(@NonNull String[] lineSplitted, @NonNull Coin defaultValue) {
         if (lineSplitted.length > COLUMN_AMOUNT) {
             String amountString = lineSplitted[COLUMN_AMOUNT];
             try {

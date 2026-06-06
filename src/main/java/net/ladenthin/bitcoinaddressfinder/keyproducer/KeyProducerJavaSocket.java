@@ -11,11 +11,12 @@ import java.net.Socket;
 import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.concurrent.ExecutorService;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.Startable;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +36,7 @@ import org.slf4j.LoggerFactory;
 // not a this-escape. The constructor no longer publishes this; start() runs after
 // construction so the receiver is fully initialised when the worker observes it.
 @SuppressWarnings({"nullness:dereference.of.nullable", "nullness:argument"})
+@ToString(callSuper = true)
 public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaSocket>
         implements Startable {
 
@@ -42,9 +44,15 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
 
     private @Nullable ServerSocket serverSocket;
     private @Nullable Socket socket;
+    // DataInputStream toString is the default Object identity hash, not useful.
+    @ToString.Exclude
     private @Nullable DataInputStream inputStream;
+    // Future toString is the default Object identity hash, not useful.
+    @ToString.Exclude
     private @Nullable Future<?> readerFuture;
 
+    // ExecutorService toString includes the pool internals — verbose and unhelpful for logs.
+    @ToString.Exclude
     private final ExecutorService readerExecutor = Executors.newSingleThreadExecutor();
 
     /**
@@ -95,7 +103,7 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
                     localSocket.setSoTimeout(cKeyProducerJava.timeout);
                     inputStream = new DataInputStream(localSocket.getInputStream());
 
-                    byte[] buffer = new byte[PublicKeyBytes.PRIVATE_KEY_MAX_NUM_BYTES];
+                    byte[] buffer = new byte[OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES];
                     while (!shouldStop) {
                         int read = 0;
                         while (read < buffer.length) {
@@ -116,7 +124,11 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
             }
 
             if (!shouldStop && socket == null) {
-                throw new RuntimeException("Unable to establish socket connection", lastException);
+                throw new IllegalStateException(
+                        "Unable to establish socket connection to "
+                                + cKeyProducerJava.getHost() + ":" + cKeyProducerJava.getPort()
+                                + " after " + attempts + " attempts",
+                        lastException);
             }
         });
     }

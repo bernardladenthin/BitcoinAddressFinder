@@ -1,6 +1,24 @@
 # Code Writing Guide — BitcoinAddressFinder (Project-Specific Supplement)
 
-This guide contains **project-specific** production code conventions that supplement the generic Java TDD skill (`.claude/skills/java-tdd-guide.md`). For general Java conventions (named constants, logger injection, null safety, records, concurrency, etc.), refer to the generic guide.
+> **Canonical workspace rules** follow the versioned chain in
+> `workspace/guides/src/`:
+> [`CODE_WRITING_GUIDE-8.md`](../workspace/guides/src/CODE_WRITING_GUIDE-8.md)
+> (Java 8 baseline — named constants, custom domain exceptions,
+> constructor injection, defensive null checks, helper classes as
+> instance methods, `@VisibleForTesting`, SPDX license headers,
+> concurrency primitives) **then**
+> [`CODE_WRITING_GUIDE-21.md`](../workspace/guides/src/CODE_WRITING_GUIDE-21.md)
+> (Java 21 supplement — records, switch expressions, text blocks,
+> pattern matching, sealed types, `var`). Both apply to BAF.
+>
+> The TDD workflow lives in
+> [`../workspace/.claude/skills/java-tdd-guide/SKILL.md`](../workspace/.claude/skills/java-tdd-guide/SKILL.md)
+> (referenced locally as `.claude/skills/java-tdd-guide/SKILL.pointer.md`).
+>
+> This file contains only **BAF-specific** production-code conventions:
+> the `BitHelper.RADIX_*` constants, C-prefixed configuration POJOs,
+> the named domain exception types, the `Interruptable` contract, and
+> the lambda-callback constructor injection pattern.
 
 ---
 

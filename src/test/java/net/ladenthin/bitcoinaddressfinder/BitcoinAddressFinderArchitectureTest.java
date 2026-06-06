@@ -56,8 +56,7 @@ public class BitcoinAddressFinderArchitectureTest {
      * Locks the convention used by the ongoing logger-DI migration.
      */
     @ArchTest
-    static final ArchRule loggersArePrivateStaticFinal = fields()
-            .that()
+    static final ArchRule loggersArePrivateStaticFinal = fields().that()
             .haveRawType(Logger.class)
             .should()
             .bePrivate()
@@ -71,8 +70,7 @@ public class BitcoinAddressFinderArchitectureTest {
      * package starts importing from its parent or sibling.
      */
     @ArchTest
-    static final ArchRule noPackageCycles = slices()
-            .matching("net.ladenthin.bitcoinaddressfinder.(*)..")
+    static final ArchRule noPackageCycles = slices().matching("net.ladenthin.bitcoinaddressfinder.(*)..")
             .should()
             .beFreeOfCycles();
 
@@ -115,8 +113,7 @@ public class BitcoinAddressFinderArchitectureTest {
      * </ul>
      */
     @ArchTest
-    static final ArchRule noPublicMutableFields = fields()
-            .that()
+    static final ArchRule noPublicMutableFields = fields().that()
             .arePublic()
             .and()
             .areNotStatic()
@@ -174,9 +171,114 @@ public class BitcoinAddressFinderArchitectureTest {
             .callConstructor(Random.class, long.class)
             .allowEmptyShould(true);
 
-    // Note: deliberately NO `noThreadSleep` rule. The producer / consumer threading code has
-    // five legitimate `Thread.sleep(...)` call sites for back-pressure, startup synchronisation
-    // and CLI inter-action pacing (ConsumerJava, ProducerOpenCL, AbstractProducer,
-    // AbstractKeyProducerQueueBuffered, cli.Main). Rewriting them to BlockingQueue.poll(timeout) /
-    // Condition.await(timeout) is a real refactor, out of scope for the rule-tightening pass.
+    // Note: deliberately NO `noThreadSleep` rule. The producer / consumer threading code
+    // historically had five Thread.sleep call sites; three were refactored to higher-level
+    // primitives (AbstractProducer → CountDownLatch, ConsumerJava → BlockingQueue.poll(timeout),
+    // ProducerOpenCL → Semaphore — each removing a poll-based latency tax). The two remaining
+    // sites are deliberate and documented:
+    //   - AbstractKeyProducerQueueBuffered.sleep(int): the sleep primitive itself, used by
+    //     KeyProducerJavaSocket for hard-capped bootstrap-retry back-off where exponential
+    //     would add nothing (the loop gives up permanently after connectionRetryCount).
+    //   - cli.Main.printAllStackTracesWithDelay: developer-debug helper behind an
+    //     `if (false)` switch; sleep-then-sample-stacks is the textbook pattern.
+    // Both are suppressed individually in spotbugs-exclude.xml under the MDM_THREAD_YIELD
+    // section with full rationale.
+
+    // ---------------------------------------------------------------------------------------
+    // Layered-architecture invariants
+    //
+    // These three rules pin the only CRITICAL layering invariants the current BAF package
+    // structure clearly supports. The full layered design (a real
+    // `Architectures.layeredArchitecture()` with strict top/middle/bottom layers) would
+    // require moving classes — for example splitting the root package's orchestration
+    // classes (Finder, Producer*, Consumer*) into a dedicated package so the layer
+    // boundaries align with packages. That is captured as a cross-repo "package-architecture
+    // improvement" TODO in workspace/policies/code-quality-todos.md; the rules below pin
+    // what is already true today so a future refactor cannot accidentally regress it.
+    // ---------------------------------------------------------------------------------------
+
+    /**
+     * The {@code constants} sub-package is a true architectural leaf. Pure
+     * project-wide invariants (currently the secp256k1 spec values in
+     * {@link net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants}) live
+     * there so every layer above ({@code configuration}, {@code keyproducer},
+     * root orchestration, &hellip;) can reference them without inviting
+     * back-and-forth cross-package dependencies.
+     *
+     * <p>This rule pins the "leaf" property as a test failure rather than a
+     * code-review reminder. The package's own {@code package-info.java} carries
+     * the rationale and lists the legitimate sibling clients.
+     */
+    @ArchTest
+    static final ArchRule constantsPackageIsALeaf = noClasses()
+            .that()
+            .resideInAPackage("net.ladenthin.bitcoinaddressfinder.constants..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                    "net.ladenthin.bitcoinaddressfinder",
+                    "net.ladenthin.bitcoinaddressfinder.cli..",
+                    "net.ladenthin.bitcoinaddressfinder.configuration..",
+                    "net.ladenthin.bitcoinaddressfinder.keyproducer..",
+                    "net.ladenthin.bitcoinaddressfinder.opencl..",
+                    "net.ladenthin.bitcoinaddressfinder.persistence..");
+
+    /**
+     * The {@code configuration} sub-package contains Jackson-populated POJOs. They
+     * must not pull in runtime behaviour from any sibling layer &mdash; not the
+     * root orchestration package, not {@code cli}, not {@code keyproducer},
+     * not {@code opencl}, not {@code persistence}. The only
+     * permitted internal dependencies are on the {@code constants} leaf, which
+     * carries pure spec / wire-format values without code.
+     *
+     * <p>After this session's leaf extractions the rule is fully strict:
+     * <ul>
+     *   <li>Secp256k1 spec scalars live in {@link
+     *       net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants}.</li>
+     *   <li>The OpenCL chunk-layout block and the derived array-capacity bound
+     *       ({@code MAXIMUM_CHUNK_ELEMENTS}, {@code BIT_COUNT_FOR_MAX_CHUNKS_ARRAY})
+     *       live in {@link
+     *       net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants}.</li>
+     * </ul>
+     * Any reintroduction of a {@code configuration → root} edge fails this test.
+     */
+    @ArchTest
+    static final ArchRule configurationDoesNotDependOnRuntimeLayers = noClasses()
+            .that()
+            .resideInAPackage("net.ladenthin.bitcoinaddressfinder.configuration..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                    "net.ladenthin.bitcoinaddressfinder",
+                    "net.ladenthin.bitcoinaddressfinder.cli..",
+                    "net.ladenthin.bitcoinaddressfinder.keyproducer..",
+                    "net.ladenthin.bitcoinaddressfinder.opencl..",
+                    "net.ladenthin.bitcoinaddressfinder.persistence..");
+
+    // eckeyIsLowLevelCrypto rule removed: the eckey package was deleted together with
+    // its sole inhabitant (Secp256k1.java was a development-time reference oracle for
+    // the OpenCL secp256k1 scalar-mul kernel, dead code with no production callers).
+    // If a future low-level crypto helper needs the same guard, restore the rule
+    // verbatim from history alongside the new package.
+
+    /**
+     * The {@code cli} sub-package is the program entry point ({@code Main} +
+     * {@code FileType}). Nothing else inside the project may import from it: that
+     * would invert the dependency direction (libraries reaching into the
+     * entry-point's argument-parsing / file-loading code) and turn {@code Main}
+     * into shared library code by accident.
+     */
+    @ArchTest
+    static final ArchRule cliIsEntryPointOnly = noClasses()
+            .that()
+            .resideInAnyPackage(
+                    "net.ladenthin.bitcoinaddressfinder",
+                    "net.ladenthin.bitcoinaddressfinder.configuration..",
+                    "net.ladenthin.bitcoinaddressfinder.constants..",
+                    "net.ladenthin.bitcoinaddressfinder.keyproducer..",
+                    "net.ladenthin.bitcoinaddressfinder.opencl..",
+                    "net.ladenthin.bitcoinaddressfinder.persistence..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("net.ladenthin.bitcoinaddressfinder.cli..");
 }

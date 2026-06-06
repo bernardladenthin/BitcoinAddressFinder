@@ -189,7 +189,7 @@ SPDX-License-Identifier: Apache-2.0
             Bech32.Bech32Bytes.witnessProgram / witnessVersion are
             protected; both are needed for SegWit address decoding
             paths that bitcoinj does not expose publicly.
-          - OpenCLBuilder.isOpenCLnativeLibraryLoadable: JOCL exposes
+          - OpenCLBuilder.isOpenClNativeLibraryLoaded: JOCL exposes
             no public probe for whether its native lib loaded.
             Needed for graceful CPU-only fallback on hosts without
             GPU drivers.
@@ -211,7 +211,7 @@ SPDX-License-Identifier: Apache-2.0
             </And>
             <And>
                 <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder"/>
-                <Method name="isOpenCLnativeLibraryLoadable"/>
+                <Method name="isOpenClNativeLibraryLoaded"/>
             </And>
             <And>
                 <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
@@ -483,6 +483,506 @@ SPDX-License-Identifier: Apache-2.0
             </And>
         </Or>
         <Bug pattern="EXS_EXCEPTION_SOFTENING_HAS_CHECKED"/>
+    </Match>
+
+    <!--
+        IMC_IMMATURE_CLASS_NO_EQUALS on three exception types.
+
+        AddressFormatNotAcceptedException, KeyProducerIdIsNotUniqueException,
+        and KeyProducerIdUnknownException are domain exceptions that follow
+        the standard JDK / bitcoinj / junit / jackson / slf4j convention:
+        exceptions are events with identity semantics, not value objects.
+
+        Adding Lombok-generated value-equality on an exception class would:
+          - Surprise readers familiar with the JDK convention (Throwable
+            never overrides equals).
+          - Change the semantics of Set&lt;Exception&gt; / Map&lt;Exception, ?&gt;
+            instances at every call site (a single parse failure with
+            "reason X" would now hash-collide with every other failure
+            sharing the same reason).
+          - Force callers that rely on catch-block reference equality
+            (e.g. "is THIS exception the one we just rethrew?") to migrate
+            to identity comparison even though identity is what they meant.
+
+        Generating an equals that does NOT compare any field (callSuper=true
+        on a Throwable subclass) is a no-op: super.equals is identity, so
+        the generated method always returns false on different instances,
+        which is precisely what NOT overriding equals already gives us.
+
+        Per-class @SuppressFBWarnings annotations would require importing
+        edu.umd.cs.findbugs.annotations.SuppressFBWarnings into 3 production
+        classes for zero functional gain over this central suppression.
+    -->
+    <Match>
+        <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.AddressFormatNotAcceptedException"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdIsNotUniqueException"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdUnknownException"/>
+        </Or>
+        <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
+    </Match>
+
+    <!--
+        USBR_UNNECESSARY_STORE_BEFORE_RETURN on Lombok-generated equals / hashCode /
+        canEqual / toString.
+
+        Lombok's @EqualsAndHashCode and @ToString annotation processors inject the
+        textbook polynomial-hash bytecode pattern (and lombok.config already emits
+        @lombok.Generated on every synthetic member via
+        lombok.addLombokGeneratedAnnotation = true):
+
+            int result = 1;
+            result = result * 59 + ($field == null ? 43 : $field.hashCode());
+            ...
+            return result;          // USBR fires here, on the istore_N / iload_N / ireturn triplet
+
+        SpotBugs core honours @lombok.Generated and skips its own detectors on those
+        members, but the fb-contrib plugin's USBR detector does NOT — fb-contrib is
+        a separate plugin family with its own filter pipeline. Suppressing USBR on
+        equals / hashCode / canEqual / toString matches every method name Lombok can
+        emit. The collateral cost is small: any handwritten member of those four
+        names that genuinely stores-then-immediately-returns is either a
+        debugger-friendly local-variable pattern or a micro-optimisation, both of
+        which are considered intentional in this codebase.
+    -->
+    <Match>
+        <Or>
+            <Method name="equals"/>
+            <Method name="hashCode"/>
+            <Method name="canEqual"/>
+            <Method name="toString"/>
+        </Or>
+        <Bug pattern="USBR_UNNECESSARY_STORE_BEFORE_RETURN"/>
+    </Match>
+
+    <!--
+        CRLF_INJECTION_LOGS — project-wide suppression.
+
+        Mitigation lives in the Logback PatternLayout, not at each call site.
+        The bundled src/main/resources/logback.xml uses
+            %replace(%msg){'[\r\n]+', ' | '}
+        on every appender. Any CR/LF in the rendered message body is
+        normalised to " | " before the appender flushes, so untrusted bytes
+        that reach a LOGGER.* argument cannot forge new log lines. This
+        covers every LOGGER.* call in the project — including transitive
+        dependency logs and any sites added by future contributors —
+        without per-site wrapping. Throwables render via %xThrowable / %ex
+        (a separate pattern token), so multi-line stack traces are
+        preserved. The same pattern is documented in
+        examples/logbackConfiguration.xml for operators who supply their
+        own logback.xml override.
+
+        Rationale for choosing native Logback %replace over alternatives:
+          - org.owasp:security-logging-logback (%crlf converter): the
+            "textbook OWASP answer" is effectively unmaintained — latest
+            Maven Central release 1.1.7 published 2021-12-15, no activity
+            since. Equivalent function is ~20 lines of regex wrapped as a
+            CompositeConverter; pulling in three jars for that is not
+            justified when Logback ships the same control natively.
+          - Logback JsonEncoder / logstash-logback-encoder: a stronger
+            answer that escapes CRLF as a side effect of JSON encoding,
+            but requires the operator's log pipeline to consume JSON;
+            loses cat/tail/grep usability for plain-file deployments.
+          - Per-site value.replaceAll("[\r\n]", ""): 68 mechanical edits
+            with no guard against future call sites forgetting the wrap.
+            The control disappears the moment a new contributor adds a
+            LOGGER.info(rawInput) call without re-running the audit.
+
+        Threat-model note: of the 68 sites fb-contrib flagged, most log
+        operator-controlled state (paths and config values from the POM /
+        JSON file the operator wrote; an attacker who can edit those
+        already has full RCE) or locally-computed deterministic state
+        (hex-encoded bytes the code itself just built — CRLF is
+        structurally impossible). The real attack surface is network input
+        flowing into Exception.getMessage() in KeyProducerJavaSocket /
+        WebSocket / Zmq; the layout-layer %replace covers those sites the
+        same way it covers everything else. The fb-contrib detector reads
+        bytecode and cannot inspect logback.xml, so the static finding
+        persists; this Match silences it project-wide with the layout
+        pattern as the documented control.
+
+        Authoritative references:
+          - OWASP Logging Cheat Sheet
+            https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
+          - OWASP Injection Prevention in Java Cheat Sheet
+            https://cheatsheetseries.owasp.org/cheatsheets/Injection_Prevention_in_Java_Cheat_Sheet.html
+          - SEI CERT IDS03-J. Do not log unsanitized user input
+            https://wiki.sei.cmu.edu/confluence/display/java/IDS03-J.+Do+not+log+unsanitized+user+input
+          - find-sec-bugs #425 (false-positive discussion)
+            https://github.com/find-sec-bugs/find-sec-bugs/issues/425
+    -->
+    <Match>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+    </Match>
+
+    <!--
+        THROWS_METHOD_THROWS_RUNTIMEEXCEPTION — narrow suppression on two
+        catch+cleanup+rethrow sites.
+
+        Both methods follow the pattern
+            try { ... } catch (RuntimeException e) { cleanup(); throw e; }
+        The exception the caller actually sees at runtime is whatever the
+        inner code threw (IllegalStateException, NoMoreSecretsAvailableException,
+        NPE, etc.), NOT a new RuntimeException constructed at the catch site.
+        fb-contrib reads the rethrow as "method throws RuntimeException" from
+        the compile-time catch-variable type only — a known false positive
+        acknowledged upstream:
+
+          - Issue: https://github.com/spotbugs/spotbugs/issues/3918
+            "THROWS_METHOD_THROWS_RUNTIMEEXCEPTION is reported when a
+             RuntimeException is caught and rethrown within the same catch
+             block. This shouldn't trigger the warning, because we are just
+             rethrowing an exception that would have been thrown anyway if
+             we hadn't caught it."
+          - Fix in flight: https://github.com/spotbugs/spotbugs/pull/4087
+            "Matches exception-handler ASTORE registers against the local
+             variable being thrown, and suppresses the warning when the
+             caught type is RuntimeException (or a subtype)."
+
+        Once SpotBugs ships with #4087 merged, drop this suppression — the
+        TODO entry in BAF's TODO.md tracks the lifecycle.
+
+        Alternatives considered and rejected:
+          1. Wrap+rethrow via a new "UncheckedRuntimeException" /
+             "CaughtRuntimeException" class. Rejected because:
+               (a) Changes the runtime type the caller sees, breaking any
+                   caller that catches a specific subtype (e.g.
+                   NoMoreSecretsAvailableException).
+               (b) Adds a "caused by:" frame to every stack trace that goes
+                   through one of these methods.
+               (c) Ironically violates the very SEI CERT ERR07-J rule the
+                   detector enforces — ERR07-J exists so callers can
+                   distinguish typed exceptions for recovery; wrapping hides
+                   the type. The SpotBugs maintainers articulate this
+                   directly in #3918 ("rethrowing an exception that would
+                   have been thrown anyway" is fine; constructing one is
+                   not).
+          2. Narrow the catch to specific subtypes. Drops coverage of
+             unforeseen RuntimeException subtypes (NPE, CCE, …) that the
+             cleanup is meant to handle uniformly.
+          3. try-finally that always runs cleanup. Doesn't fit either site:
+             AbstractProducer.produceKeys logs only on the exception path
+             (not on success); LMDBPersistence.addresses must keep the txn
+             open on the success path so the returned Stream.onClose
+             handler can close it after the caller drains the stream.
+    -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.AbstractProducer"/>
+                <Method name="produceKeys"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
+                <Method name="addresses"/>
+            </And>
+        </Or>
+        <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
+    </Match>
+
+    <!--
+        fb-contrib MDM_THREAD_YIELD ("Method attempts to manually schedule
+        threads") flags every direct call to Thread.sleep(long) and
+        Thread.yield(). The rule's intent is to nudge towards higher-level
+        primitives (BlockingQueue.poll(timeout), CountDownLatch.await,
+        Semaphore.acquire, ScheduledExecutorService).
+
+        After the three structural refactors landed (AbstractProducer →
+        CountDownLatch, ConsumerJava → poll(timeout), ProducerOpenCL →
+        Semaphore), only two Thread.sleep sites remain in production:
+
+        1. AbstractKeyProducerQueueBuffered.sleep(int) — the
+           interrupt-flag-restoring sleep utility. Used by ONE production
+           caller, KeyProducerJavaSocket, for backoff inside its
+           bootstrap retry loop. The loop is hard-capped by
+           connectionRetryCount (default 5); after the cap is hit the
+           producer permanently gives up with IllegalStateException.
+           Exponential backoff is the right tool for reconnect-FOREVER
+           loops where polite back-off avoids hammering a struggling
+           peer; here, with a hard cap and final give-up, linear delay
+           is correct. Cancellation cooperates with shouldStop +
+           readerFuture.cancel(true), which delivers InterruptedException
+           to Thread.sleep and the catch clause restores the flag.
+           Flagging the sleep utility's definition as "manually scheduling
+           threads" is a structural false positive: the helper IS the
+           sleep primitive.
+
+        2. cli.Main.printAllStackTracesWithDelay — a developer-debug
+           diagnostic helper. Its sole production caller is gated by
+           `if (false) { ... }` (Main.java around line 282) — an
+           "uncomment for local debugging" hook. Sleep-then-sample-all-
+           thread-stacks is the textbook pattern; there is no
+           higher-level primitive that improves it. Kept rather than
+           deleted so the debug hook survives for future use.
+
+        Both suppressions are narrowly scoped to the specific method,
+        not pattern-wide.
+    -->
+    <Match>
+        <Bug pattern="MDM_THREAD_YIELD"/>
+        <Or>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.AbstractKeyProducerQueueBuffered"/>
+                <Method name="sleep"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.cli.Main"/>
+                <Method name="printAllStackTracesWithDelay"/>
+            </And>
+        </Or>
+    </Match>
+
+    <!--
+        fb-contrib OPM_OVERLY_PERMISSIVE_METHOD ("Method is declared more
+        permissively than is used in the code base") suppressed PROJECT-WIDE.
+
+        Rationale:
+        - The current BAF package structure groups most production code in a
+          single root package (net.ladenthin.bitcoinaddressfinder), so any
+          method called only from sibling files in the same package is
+          flagged as "could be package-private". That answer is correct
+          today but unstable: once the planned package-architecture refactor
+          (see workspace/policies/code-quality-todos.md + crossrepostatus.md
+          for the cross-repo audit) splits the root package into orchestration
+          / domain / persistence / opencl / keyproducer layers, methods that
+          today are correctly package-private will need to become public to
+          cross the new package boundary. Tightening every site now would
+          produce a large mechanical visibility churn that is highly likely
+          to be reverted by the refactor — noise without lasting value.
+
+        - 33 sites at the time of suppression (Max+Low). Categories: Main CLI
+          internal helpers (~8), test-only public surface (~5), abstract-class
+          constructors (~4), concrete-class constructors needing per-class audit
+          (~5), internal helpers (~9), and one enum.valueOf false positive
+          (BIP39Wordlist). The per-category breakdown lives in the
+          crossrepostatus tracker under the "OPM scope-tightening — after
+          package refactor" row.
+
+        TODO: re-enable this rule (delete this Match block) once the package
+        refactor has settled — at that point genuine "method exposed beyond
+        its actual call site" findings become stable signals worth fixing.
+    -->
+    <Match>
+        <Bug pattern="OPM_OVERLY_PERMISSIVE_METHOD"/>
+    </Match>
+
+    <!--
+        BC_UNCONFIRMED_CAST on the keyproducer package — pure generic-erasure
+        false positive.
+
+        Every keyproducer class extends a generic base:
+            KeyProducerJava<T extends CKeyProducerJava>
+                holds  protected final T cKeyProducerJava
+        Subclasses parameterise T with a specific CKeyProducerJava subtype
+        (CKeyProducerJavaBip39, …Random, …Socket, etc.). At source level
+        every cKeyProducerJava.specificField access is type-checked by the
+        generic bound; at bytecode level erasure forces the JVM to emit a
+        CHECKCAST from CKeyProducerJava to the bound's runtime type. fb-contrib
+        reads the bytecode and flags every such cast as "unconfirmed".
+
+        These nine sites are all the same shape: a subclass accessing a field
+        on its own typed configuration via the erased base field. The cast is
+        introduced by javac, not by the source. Removing it would require
+        deleting the shared cKeyProducerJava field and giving every subclass
+        its own typed copy — a structural change for no behavioural gain.
+    -->
+    <Match>
+        <Package name="~net\.ladenthin\.bitcoinaddressfinder\.keyproducer.*"/>
+        <Bug pattern="BC_UNCONFIRMED_CAST"/>
+    </Match>
+
+    <!--
+        DLS_DEAD_LOCAL_STORE on four deliberate "ignored value" patterns.
+
+        Three are the canonical Error-Prone-compliant "fire-and-forget Future"
+        idiom: when a submit/scheduleAtFixedRate return is intentionally
+        unused, the project assigns it to `Object unused` and applies
+        @FireAndForget("…rationale…") + @SuppressWarnings("FutureReturnValueIgnored")
+        to silence Error Prone's FutureReturnValueIgnored. fb-contrib's DLS
+        reads the same dead store and flags it; honouring DLS by dropping the
+        local would immediately re-trigger FutureReturnValueIgnored, so the
+        two rules are at odds and we accept the DLS finding as the documented
+        tradeoff. Sites: ConsumerJava.startStatisticsTimer (scheduler),
+        Finder.startProducer (producer submit), KeyProducerJavaWebSocket.start
+        (server submit).
+
+        The fourth (LMDBPersistence.count) is the standard "count an Iterable
+        by iterating, discarding each item" pattern:
+            for (KeyVal ignored : iterable) { count++; }
+        The loop variable IS the count's side effect; LMDB's CursorIterable
+        offers no Stream / size() shortcut so the iteration is mandatory.
+    -->
+    <Match>
+        <Bug pattern="DLS_DEAD_LOCAL_STORE"/>
+        <Or>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.ConsumerJava"/>
+                <Method name="startStatisticsTimer"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.Finder"/>
+                <Method name="startProducer"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaWebSocket"/>
+                <Method name="start"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
+                <Method name="count"/>
+            </And>
+        </Or>
+    </Match>
+
+    <!--
+        THROWS_METHOD_THROWS_CLAUSE_BASIC_EXCEPTION on the Producer interface's
+        initProducer/produceKeys and on ConsumerJava.initLMDB.
+
+        Producer is the abstract contract every producer impl honours. Concrete
+        impls throw a heterogeneous mix (LmdbException, JOCL CLException,
+        IOException from socket binds, NoMoreSecretsAvailableException, etc.)
+        with no shared checked-exception supertype. Narrowing the throws clause
+        would require either (a) wrapping every impl's exception into a single
+        domain type at every site — adds a "caused by:" frame to every
+        diagnostic and forces every impl to re-catch its own native exception,
+        or (b) listing every concrete impl's exception family on the interface,
+        coupling the abstract API to every backend's transitive dependency.
+
+        Same reasoning for ConsumerJava.initLMDB: it composes
+        LmdbException (runtime), AddressLookupBackend chain failures, and the
+        IO-level snapshot population — there is no minimal checked supertype.
+
+        Both interface methods are the "fail fatally on init" boundary; their
+        callers (Main.run / Finder.initProducer) already handle
+        Exception broadly and trigger Shutdown.
+    -->
+    <Match>
+        <Bug pattern="THROWS_METHOD_THROWS_CLAUSE_BASIC_EXCEPTION"/>
+        <Or>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.Producer"/>
+                <Or>
+                    <Method name="initProducer"/>
+                    <Method name="produceKeys"/>
+                </Or>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.ConsumerJava"/>
+                <Method name="initLMDB"/>
+            </And>
+        </Or>
+    </Match>
+
+    <!--
+        PRMC_POSSIBLY_REDUNDANT_METHOD_CALLS on ConsumerJava.consumeKeys.
+
+        The flagged pattern is the standard non-blocking BlockingQueue drain:
+            PublicKeyBytes[] batch = keysQueue.poll();   // loop init
+            while (batch != null) {
+                processBatch(batch, buf);
+                batch = keysQueue.poll();                // loop step
+            }
+        Both poll() calls are necessary (drain-until-empty); they are not
+        redundant. fb-contrib pattern-matches the two identical calls
+        regardless of the loop structure.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.ConsumerJava"/>
+        <Method name="consumeKeys"/>
+        <Bug pattern="PRMC_POSSIBLY_REDUNDANT_METHOD_CALLS"/>
+    </Match>
+
+    <!--
+        MDM_RANDOM_SEED on KeyProducerJavaRandom and BIP39KeyProducer — both
+        deliberate, matched and documented in BitcoinAddressFinderArchitectureTest
+        ("noNewRandom" ArchUnit rule) with the same two-class exemption list:
+
+          - KeyProducerJavaRandom constructs weak `new Random(seed)` instances
+            for documented CWE-338 demonstrations (the project's research focus
+            includes scanning addresses derived from weak-RNG wallets).
+          - BIP39KeyProducer extends java.util.Random as a façade pattern; the
+            implicit super() hits the Random() constructor. Random is used as
+            a sequential-iterator surface for deterministic HD-wallet
+            derivation, not as a source of randomness.
+    -->
+    <Match>
+        <Bug pattern="MDM_RANDOM_SEED"/>
+        <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaRandom"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.BIP39KeyProducer"/>
+        </Or>
+    </Match>
+
+    <!--
+        HARD_CODE_KEY on Secp256k1Constants — false positive on a public curve
+        parameter. The flagged constant is the secp256k1 generator point G (and
+        the associated curve order n / field prime p), which are PUBLIC
+        cryptographic parameters defined by SEC 2 / BIP 340 and identical
+        across every secp256k1 implementation. They are not credentials; they
+        are the parameters anyone scanning Bitcoin addresses must use. Static
+        analysis pattern-matches the hex blob as "looks like a key".
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants"/>
+        <Bug pattern="HARD_CODE_KEY"/>
+    </Match>
+
+    <!--
+        NP_LOAD_OF_KNOWN_NULL_VALUE on OpenClTask.executeKernel — false
+        positive on the JOCL API contract. clEnqueueNDRangeKernel takes
+        explicit null arguments for the global_work_offset, event_wait_list,
+        and event return-pointer when the caller has nothing to provide; the
+        nulls are not a defensive omission, they are the JOCL spec.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.OpenClTask"/>
+        <Method name="executeKernel"/>
+        <Bug pattern="NP_LOAD_OF_KNOWN_NULL_VALUE"/>
+    </Match>
+
+    <!--
+        UPM_UNCALLED_PRIVATE_METHOD and URF_UNREAD_FIELD on a documented "preserved
+        for future revival" idiom.
+
+        Each affected site already carries @Deprecated + @SuppressWarnings on
+        the Error Prone counterpart (UnusedMethod / UnusedVariable), with a
+        comment explaining what the helper would be revived for. fb-contrib's
+        UPM/URF are the duplicate analysis path; they read bytecode and have
+        no @SuppressWarnings story. Listing each preserved site keeps the
+        suppression scope auditable rather than silencing the whole detector.
+    -->
+    <Match>
+        <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
+        <Or>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.Bech32Helper"/>
+                <Or>
+                    <Method name="decode5to8"/>
+                    <Method name="encode8to5"/>
+                </Or>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.KeyUtility"/>
+                <Method name="swapIntBytes"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.OpenClTask"/>
+                <Method name="cloneByteBuffer"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils"/>
+                <Or>
+                    <Method name="addressListToByteBufferDirect"/>
+                    <Method name="byteBufferToAddressList"/>
+                    <Method name="hashToByteBufferDirect"/>
+                </Or>
+            </And>
+        </Or>
+    </Match>
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils"/>
+        <Field name="emptyByteBuffer"/>
+        <Bug pattern="URF_UNREAD_FIELD"/>
     </Match>
 
 </FindBugsFilter>

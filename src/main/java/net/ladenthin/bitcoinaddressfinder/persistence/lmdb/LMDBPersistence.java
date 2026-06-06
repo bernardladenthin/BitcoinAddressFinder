@@ -16,6 +16,7 @@ import java.util.Spliterators;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.ByteConversion;
 import net.ladenthin.bitcoinaddressfinder.KeyUtility;
@@ -49,6 +50,7 @@ import org.slf4j.LoggerFactory;
  * via the {@code populateFrom} factories on each accelerator class, consuming this
  * instance through {@link AddressIterable}.
  */
+@ToString
 public class LMDBPersistence implements Persistence, AddressIterable {
 
     private static final String DB_NAME_HASH160_TO_COINT = "hash160toCoin";
@@ -60,8 +62,14 @@ public class LMDBPersistence implements Persistence, AddressIterable {
     private final @Nullable CLMDBConfigurationWrite lmdbConfigurationWrite;
     private final @Nullable CLMDBConfigurationReadOnly lmdbConfigurationReadOnly;
     private final @NonNull KeyUtility keyUtility;
+
+    // LMDB native handle wrappers — toString is just the native pointer identity.
+    @ToString.Exclude
     private @Nullable Env<ByteBuffer> env;
+
+    @ToString.Exclude
     private @Nullable Dbi<ByteBuffer> lmdb_h160ToAmount;
+
     private final java.util.concurrent.atomic.AtomicLong increasedCounter =
             new java.util.concurrent.atomic.AtomicLong(0);
     private final java.util.concurrent.atomic.AtomicLong increasedSum = new java.util.concurrent.atomic.AtomicLong(0);
@@ -98,7 +106,11 @@ public class LMDBPersistence implements Persistence, AddressIterable {
         } else if (lmdbConfigurationReadOnly != null) {
             initReadOnly();
         } else {
-            throw new IllegalArgumentException("Neither write nor read-only configuration provided.");
+            throw new IllegalArgumentException(
+                    getClass().getSimpleName()
+                            + ".init() requires either lmdbConfigurationWrite or"
+                            + " lmdbConfigurationReadOnly to be set; both are null"
+                            + " (check the <persistence> block in your finder configuration JSON)");
         }
 
         logStatsIfConfigured(true);
@@ -292,22 +304,23 @@ public class LMDBPersistence implements Persistence, AddressIterable {
                             LOGGER.trace("Process address: " + hexFromByteBuffer);
                         }
                         LegacyAddress address = keyUtility.byteBufferToAddress(addressAsByteBuffer);
-                        final String line = switch (addressFileOutputFormat) {
-                            case HexHash ->
-                                Hex.encodeHexString(address.getHash()) + System.lineSeparator();
-                            case FixedWidthBase58BitcoinAddress ->
-                                String.format("%-34s", address.toBase58()) + System.lineSeparator();
-                            case DynamicWidthBase58BitcoinAddressWithAmount -> {
-                                ByteBuffer value = kv.val();
-                                Coin coin = getCoinFromByteBuffer(value);
-                                yield address.toBase58()
-                                        + SeparatorFormat.COMMA.getSymbol()
-                                        + coin.getValue()
-                                        + System.lineSeparator();
-                            }
-                            default -> throw new IllegalArgumentException(
-                                    "Unknown addressFileOutputFormat: " + addressFileOutputFormat);
-                        };
+                        final String line =
+                                switch (addressFileOutputFormat) {
+                                    case HexHash -> Hex.encodeHexString(address.getHash()) + System.lineSeparator();
+                                    case FixedWidthBase58BitcoinAddress ->
+                                        String.format("%-34s", address.toBase58()) + System.lineSeparator();
+                                    case DynamicWidthBase58BitcoinAddressWithAmount -> {
+                                        ByteBuffer value = kv.val();
+                                        Coin coin = getCoinFromByteBuffer(value);
+                                        yield address.toBase58()
+                                                + SeparatorFormat.COMMA.getSymbol()
+                                                + coin.getValue()
+                                                + System.lineSeparator();
+                                    }
+                                    default ->
+                                        throw new IllegalArgumentException(
+                                                "Unknown addressFileOutputFormat: " + addressFileOutputFormat);
+                                };
                         writer.write(line);
                     }
                 }
@@ -385,7 +398,7 @@ public class LMDBPersistence implements Persistence, AddressIterable {
     }
 
     @Override
-    public Coin getAllAmountsFromAddresses(List<ByteBuffer> hash160s) {
+    public Coin sumAmountsForAddresses(List<ByteBuffer> hash160s) {
         Coin allAmounts = Coin.ZERO;
         for (ByteBuffer hash160 : hash160s) {
             allAmounts = allAmounts.add(getAmount(hash160));

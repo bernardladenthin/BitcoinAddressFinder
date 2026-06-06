@@ -8,8 +8,8 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
 import java.math.BigInteger;
-import net.ladenthin.bitcoinaddressfinder.BitHelper;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.constants.Radix;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import org.junit.jupiter.api.Test;
 
 public class CKeyProducerJavaIncrementalTest {
@@ -27,7 +27,7 @@ public class CKeyProducerJavaIncrementalTest {
         BigInteger result = sut.getStartPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(PublicKeyBytes.MIN_VALID_PRIVATE_KEY)));
+        assertThat(result, is(equalTo(Secp256k1Constants.MIN_VALID_PRIVATE_KEY)));
     }
 
     @Test
@@ -40,7 +40,7 @@ public class CKeyProducerJavaIncrementalTest {
         BigInteger result = sut.getStartPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(new BigInteger(START_PRIVATE_KEY_CUSTOM_HEX, BitHelper.RADIX_HEX))));
+        assertThat(result, is(equalTo(new BigInteger(START_PRIVATE_KEY_CUSTOM_HEX, Radix.HEX))));
     }
 
     @Test
@@ -53,20 +53,20 @@ public class CKeyProducerJavaIncrementalTest {
         BigInteger result = sut.getStartPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(new BigInteger(START_PRIVATE_KEY_CUSTOM_HEX, BitHelper.RADIX_HEX))));
+        assertThat(result, is(equalTo(new BigInteger(START_PRIVATE_KEY_CUSTOM_HEX, Radix.HEX))));
     }
 
     @Test
     public void getStartPrivateKey_maxPrivateKeyHexStartAddress_returnsMaxPrivateKey() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
-        sut.startPrivateKey = PublicKeyBytes.MAX_PRIVATE_KEY_HEX;
+        sut.startPrivateKey = Secp256k1Constants.MAX_PRIVATE_KEY_HEX;
 
         // act
         BigInteger result = sut.getStartPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(PublicKeyBytes.MAX_PRIVATE_KEY)));
+        assertThat(result, is(equalTo(Secp256k1Constants.MAX_PRIVATE_KEY)));
     }
     // </editor-fold>
 
@@ -80,7 +80,7 @@ public class CKeyProducerJavaIncrementalTest {
         BigInteger result = sut.getEndPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(PublicKeyBytes.MAX_PRIVATE_KEY)));
+        assertThat(result, is(equalTo(Secp256k1Constants.MAX_PRIVATE_KEY)));
     }
 
     @Test
@@ -93,7 +93,7 @@ public class CKeyProducerJavaIncrementalTest {
         BigInteger result = sut.getEndPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(new BigInteger(END_PRIVATE_KEY_CUSTOM_HEX, BitHelper.RADIX_HEX))));
+        assertThat(result, is(equalTo(new BigInteger(END_PRIVATE_KEY_CUSTOM_HEX, Radix.HEX))));
     }
 
     @Test
@@ -106,33 +106,33 @@ public class CKeyProducerJavaIncrementalTest {
         BigInteger result = sut.getEndPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(new BigInteger(END_PRIVATE_KEY_CUSTOM_HEX, BitHelper.RADIX_HEX))));
+        assertThat(result, is(equalTo(new BigInteger(END_PRIVATE_KEY_CUSTOM_HEX, Radix.HEX))));
     }
 
     @Test
     public void getEndPrivateKey_maxPrivateKeyHexEndAddress_returnsMaxPrivateKey() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
-        sut.endPrivateKey = PublicKeyBytes.MAX_PRIVATE_KEY_HEX;
+        sut.endPrivateKey = Secp256k1Constants.MAX_PRIVATE_KEY_HEX;
 
         // act
         BigInteger result = sut.getEndPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(PublicKeyBytes.MAX_PRIVATE_KEY)));
+        assertThat(result, is(equalTo(Secp256k1Constants.MAX_PRIVATE_KEY)));
     }
 
     @Test
     public void getEndPrivateKey_minValidPrivateKeyHexEndAddress_returnsMinValidPrivateKey() {
         // arrange
         CKeyProducerJavaIncremental sut = new CKeyProducerJavaIncremental();
-        sut.endPrivateKey = PublicKeyBytes.MIN_VALID_PRIVATE_KEY_HEX;
+        sut.endPrivateKey = Secp256k1Constants.MIN_VALID_PRIVATE_KEY_HEX;
 
         // act
         BigInteger result = sut.getEndPrivateKey();
 
         // assert
-        assertThat(result, is(equalTo(PublicKeyBytes.MIN_VALID_PRIVATE_KEY)));
+        assertThat(result, is(equalTo(Secp256k1Constants.MIN_VALID_PRIVATE_KEY)));
     }
     // </editor-fold>
 }

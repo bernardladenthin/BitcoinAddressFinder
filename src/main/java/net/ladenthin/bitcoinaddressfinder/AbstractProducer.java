@@ -4,8 +4,10 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import java.math.BigInteger;
-import java.time.Instant;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.NoMoreSecretsAvailableException;
@@ -17,41 +19,44 @@ import org.slf4j.LoggerFactory;
  * Base class for {@link Producer} implementations providing the common state machine,
  * key consumption loop and shutdown handling.
  */
+@ToString
 public abstract class AbstractProducer implements Producer {
 
-    private static final int SLEEP_WAIT_TILL_RUNNING = 10;
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractProducer.class);
 
     /**
-     * Marker for the {@link #waitTillProducerNotRunning} spin-wait's intentional
-     * InterruptedException swallow.
-     *
-     * <p>This wait is uncancellable by design: it is called from
-     * {@link Finder#interrupt()} during shutdown, and the shutdown sequence must
-     * complete (each producer must observe its own
-     * {@link ProducerState#NOT_RUNNING} transition before the orchestrator moves
-     * on). Restoring the interrupt flag would make the next
-     * {@link Thread#sleep(long)} immediately re-throw, producing a tight CPU loop
-     * while the producer is still finishing its current batch.
-     *
-     * <p>The constant is {@code false} so the if-branch is dead code (eliminated by
-     * the JIT), but the {@code interrupt()} call site is preserved in source for
-     * readers and IDE navigation. See also the Open TODO in CLAUDE.md about adding
-     * a timeout to this wait so a stuck producer cannot hang shutdown forever.
+     * Counted down once when {@link #run()} transitions to
+     * {@link ProducerState#NOT_RUNNING}. {@link #waitTillProducerNotRunning()}
+     * awaits this latch with the configured shutdown timeout instead of spinning
+     * on the {@code state} field.
      */
-    private static final boolean WAIT_TILL_NOT_RUNNING_RESTORES_INTERRUPT_FLAG = false;
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractProducer.class);
+    @ToString.Exclude
+    protected final CountDownLatch notRunningLatch = new CountDownLatch(1);
 
     /** Flag indicating whether the producer is currently running. */
     protected final AtomicBoolean running = new AtomicBoolean(false);
 
     /** Configuration backing this producer. */
     protected final CProducer cProducer;
-    /** Downstream consumer that receives generated keys. */
+
+    /**
+     * Downstream consumer that receives generated keys.
+     *
+     * <p>Excluded from {@link ToString} — stateful coordinator (executors + queue +
+     * lifecycle), recursive/heavy in logs.
+     */
+    @ToString.Exclude
     protected final Consumer consumer;
     /** Cryptographic helper used to encode/decode private keys. */
     protected final KeyUtility keyUtility;
-    /** Strategy that supplies the next secret batch. */
+
+    /**
+     * Strategy that supplies the next secret batch.
+     *
+     * <p>Excluded from {@link ToString} — stateful coordinator covered by its own
+     * {@code toString}; including here would produce recursive output.
+     */
+    @ToString.Exclude
     protected final KeyProducer keyProducer;
     /** Helper for bit-level batch size arithmetic. */
     protected final BitHelper bitHelper;
@@ -61,7 +66,12 @@ public abstract class AbstractProducer implements Producer {
     /** Current life-cycle state. */
     protected volatile ProducerState state = ProducerState.UNINITIALIZED;
 
-    /** Flag controlling the main {@link #run()} loop; cleared via {@link #interrupt()}. */
+    /**
+     * Flag controlling the main {@link #run()} loop; cleared via {@link #interrupt()}.
+     *
+     * <p>Excluded from {@link ToString} — uninformative lifecycle flag.
+     */
+    @ToString.Exclude
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
     /**
@@ -102,7 +112,7 @@ public abstract class AbstractProducer implements Producer {
     public void run() {
         if (!shouldRun.get()) {
             LOGGER.info("Producer was interrupted before it started running.");
-            state = ProducerState.NOT_RUNNING;
+            signalNotRunning();
             return;
         }
         if (state != ProducerState.INITIALIZED) {
@@ -120,7 +130,19 @@ public abstract class AbstractProducer implements Producer {
                 break;
             }
         }
+        signalNotRunning();
+    }
+
+    /**
+     * Transitions the producer to {@link ProducerState#NOT_RUNNING} and releases
+     * any thread parked in {@link #waitTillProducerNotRunning()}.
+     *
+     * <p>Visible to subclasses and tests so a fake producer can simulate the
+     * terminal transition without going through {@link #run()}.
+     */
+    protected void signalNotRunning() {
         state = ProducerState.NOT_RUNNING;
+        notRunningLatch.countDown();
     }
 
     @Override
@@ -129,7 +151,7 @@ public abstract class AbstractProducer implements Producer {
             BigInteger[] secrets;
             try {
                 secrets = keyProducer.createSecrets(
-                        cProducer.getOverallWorkSize(bitHelper), cProducer.batchUsePrivateKeyIncrement);
+                        cProducer.getOverallWorkSize(), cProducer.batchUsePrivateKeyIncrement);
             } catch (NoMoreSecretsAvailableException ex) {
                 logNoMoreSecretsInSecretFactory();
                 interrupt();
@@ -139,12 +161,15 @@ public abstract class AbstractProducer implements Producer {
             // assert the requested secrets array fulfill its request parameter
             if (cProducer.batchUsePrivateKeyIncrement) {
                 if (secrets.length != 1) {
-                    throw new RuntimeException("secrets.length != 1");
+                    throw new IllegalStateException(
+                            "secrets.length=" + secrets.length
+                                    + " but cProducer.batchUsePrivateKeyIncrement=true requires exactly 1");
                 }
             } else {
-                if (secrets.length != cProducer.getOverallWorkSize(bitHelper)) {
-                    throw new RuntimeException(
-                            "secrets.length != bitHelper.convertBitsToSize(cProducer.batchSizeInBits)");
+                if (secrets.length != cProducer.getOverallWorkSize()) {
+                    throw new IllegalStateException(
+                            "secrets.length=" + secrets.length
+                                    + " != cProducer.getOverallWorkSize()=" + cProducer.getOverallWorkSize());
                 }
             }
             privateKeyValidator.replaceInvalidPrivateKeys(secrets);
@@ -156,7 +181,7 @@ public abstract class AbstractProducer implements Producer {
         }
     }
 
-    void consumeSecrets(BigInteger[] secrets) {
+    void consumeSecrets(BigInteger... secrets) {
         if (cProducer.batchUsePrivateKeyIncrement) {
             BigInteger secret = secrets[0];
             BigInteger secretBase = createSecretBase(secret, cProducer.logSecretBase);
@@ -168,7 +193,6 @@ public abstract class AbstractProducer implements Producer {
 
     /**
      * The method fromPrivate can throw an {@link IllegalArgumentException}.
-     * The method {@link ByteBufferUtility#freeByteBuffer} can throw an {@link java.lang.IllegalAccessError}.
      *
      * @param e      the throwable describing the failure
      * @param secret the secret to be able to recover the issue
@@ -195,24 +219,19 @@ public abstract class AbstractProducer implements Producer {
 
     @Override
     public void waitTillProducerNotRunning() {
-        Instant deadline = Instant.now().plusSeconds(cProducer.shutdownTimeoutSeconds);
-        while (state == ProducerState.RUNNING) {
-            if (Instant.now().isAfter(deadline)) {
+        if (state != ProducerState.RUNNING) {
+            return;
+        }
+        try {
+            if (!notRunningLatch.await(cProducer.shutdownTimeoutSeconds, TimeUnit.SECONDS)) {
                 LOGGER.error(
-                        "waitTillProducerNotRunning timed out after {}s; producer state still RUNNING. "
+                        "waitTillProducerNotRunning timed out after {}s; producer state still {}. "
                                 + "Continuing shutdown without confirming this producer stopped.",
-                        cProducer.shutdownTimeoutSeconds);
-                return;
+                        cProducer.shutdownTimeoutSeconds, state);
             }
-            try {
-                Thread.sleep(SLEEP_WAIT_TILL_RUNNING);
-            } catch (InterruptedException e) {
-                LOGGER.warn(
-                        "waitTillProducerNotRunning sleep interrupted; continuing to wait for producer shutdown.", e);
-                if (WAIT_TILL_NOT_RUNNING_RESTORES_INTERRUPT_FLAG) {
-                    Thread.currentThread().interrupt();
-                }
-            }
+        } catch (InterruptedException e) {
+            LOGGER.warn("waitTillProducerNotRunning interrupted; continuing shutdown.", e);
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -224,8 +243,8 @@ public abstract class AbstractProducer implements Producer {
      * @return the secret base used as the starting point of the next batch
      */
     public BigInteger createSecretBase(BigInteger secret, boolean logSecretBase) {
-        BigInteger killBits = bitHelper.getKillBits(cProducer.batchSizeInBits);
-        BigInteger secretBase = keyUtility.killBits(secret, killBits);
+        BigInteger lowBitMask = bitHelper.getLowBitMask(cProducer.batchSizeInBits);
+        BigInteger secretBase = keyUtility.alignDown(secret, lowBitMask);
 
         if (logSecretBase) {
             LOGGER.info("secretBase: " + keyUtility.bigIntegerToFixedLengthHex(secretBase) + "/"
@@ -235,7 +254,7 @@ public abstract class AbstractProducer implements Producer {
         if (LOGGER.isTraceEnabled()) {
             LOGGER.trace("secret BigInteger: " + secret);
             LOGGER.trace("secret as byte array: " + keyUtility.bigIntegerToFixedLengthHex(secret));
-            LOGGER.trace("killBits: " + Hex.encodeHexString(killBits.toByteArray()));
+            LOGGER.trace("lowBitMask: " + Hex.encodeHexString(lowBitMask.toByteArray()));
             LOGGER.trace("secretBase: " + secretBase);
             LOGGER.trace("secretBase as byte array: " + keyUtility.bigIntegerToFixedLengthHex(secretBase));
         }

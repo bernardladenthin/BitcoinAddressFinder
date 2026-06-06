@@ -5,22 +5,38 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.io.File;
 import java.util.function.Consumer;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.NonNull;
 
 /**
  * Reads an address text file line by line and forwards each entry to address or unsupported consumers.
+ *
+ * <p>Lombok-generated equals/hashCode use only the {@code keyUtility} field; the two
+ * {@link Consumer} fields are excluded because lambda equality is implementation-defined
+ * (compiler-synthesized class identity), not value-shaped. {@code callSuper} stays at the
+ * lombok.config default of {@code skip} — comparing parent {@code shouldRun}
+ * (an {@link java.util.concurrent.atomic.AtomicBoolean} lifecycle flag) and
+ * {@code readStatistic} (a counter bag mutated during reading) would make equality
+ * dependent on transient runtime state, not on the reader's configuration.
  */
+@ToString(callSuper = true)
+@EqualsAndHashCode
 public class AddressFile extends AbstractPlaintextFile {
 
-    @NonNull
-    private final KeyUtility keyUtility;
+    private final @NonNull KeyUtility keyUtility;
 
-    @NonNull
-    private final Consumer<AddressToCoin> addressConsumer;
+    // Lambda Consumer — toString is the implementation hash, not useful in logs;
+    // equals is compiler-synthesized class identity, not value-shaped.
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private final @NonNull Consumer<AddressToCoin> addressConsumer;
 
-    @NonNull
-    private final Consumer<String> unsupportedConsumer;
+    // Lambda Consumer — same reasoning as addressConsumer.
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private final @NonNull Consumer<String> unsupportedConsumer;
 
     /**
      * Creates a new reader for the given address file.

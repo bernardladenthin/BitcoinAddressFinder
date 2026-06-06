@@ -14,8 +14,10 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.Finder;
+import net.ladenthin.bitcoinaddressfinder.InterruptedRuntimeException;
 import net.ladenthin.bitcoinaddressfinder.Interruptable;
 import net.ladenthin.bitcoinaddressfinder.LMDBToAddressFile;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
@@ -31,6 +33,7 @@ import org.slf4j.LoggerFactory;
  * CLI entry point: loads the configuration file and dispatches to the configured command.
  * <p>VM option: {@code -Dorg.slf4j.simpleLogger.defaultLogLevel=trace}
  */
+@ToString
 public class Main implements Runnable, Interruptable {
 
     /**
@@ -64,12 +67,15 @@ public class Main implements Runnable, Interruptable {
     /** SLF4J logger for the CLI entry point. */
     private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
 
+    // List of registered Interruptables — mutable list of stateful coordinators, recursive/heavy.
+    @ToString.Exclude
     private final List<Interruptable> interruptables = new ArrayList<>();
 
     private final CConfiguration configuration;
 
-    @VisibleForTesting
-    final CountDownLatch runLatch = new CountDownLatch(1);
+    // CountDownLatch toString is uninformative lifecycle state.
+    @ToString.Exclude
+    private final CountDownLatch runLatch = new CountDownLatch(1);
 
     /**
      * Returns the run-completion latch.
@@ -257,14 +263,18 @@ public class Main implements Runnable, Interruptable {
                     List<OpenCLPlatform> openCLPlatforms = openCLBuilder.build();
                     System.out.println(openCLPlatforms);
                 }
-                default -> throw new UnsupportedOperationException(
-                        "Command: " + configuration.command.name() + " currently not supported.");
+                default ->
+                    throw new UnsupportedOperationException(
+                            "Command: " + configuration.command.name() + " currently not supported.");
             }
             LOGGER.info("Main#run end.");
         } catch (Exception e) {
             LOGGER.error("Fatal error during Main.run; triggering shutdown of all registered components.", e);
             interrupt();
-            throw new RuntimeException(e);
+            throw new IllegalStateException(
+                    "Main.run() failed on thread " + Thread.currentThread().getName()
+                            + "; shutdown triggered",
+                    e);
         } finally {
             runLatch.countDown();
         }
@@ -276,6 +286,12 @@ public class Main implements Runnable, Interruptable {
 
     /**
      * Prints all live thread stack traces after waiting for the given delay.
+     *
+     * <p><b>Developer-debug helper only.</b> The sole production call site is
+     * gated by {@code if (false) { ... }} near the end of {@link #run()} — an
+     * "uncomment for local debugging" hook to dump the thread state at the end
+     * of a run. Kept (rather than deleted with the dead {@code if}) so the
+     * debug hook survives for future use. Not part of any public API.
      *
      * @param delayMillis     how long to wait before sampling, in milliseconds
      * @param includeDaemons  whether daemon threads should be included in the output
@@ -325,7 +341,8 @@ public class Main implements Runnable, Interruptable {
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new RuntimeException(e);
+                throw new InterruptedRuntimeException(
+                        "Interrupted while awaiting runLatch during shutdown-hook (30s timeout)", e);
             }
             LOGGER.info("Finish shutdown hook.");
         }));

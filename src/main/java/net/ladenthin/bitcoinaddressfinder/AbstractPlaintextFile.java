@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
+import lombok.ToString;
 import org.jspecify.annotations.NonNull;
 import org.lmdbjava.LmdbException;
 import org.slf4j.Logger;
@@ -17,19 +18,19 @@ import org.slf4j.LoggerFactory;
  * Base class for line-by-line readers of plaintext files that update a {@link ReadStatistic}
  * and can be interrupted gracefully.
  */
+@ToString
 public abstract class AbstractPlaintextFile implements Interruptable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractPlaintextFile.class);
 
     /** The file being read. */
-    @NonNull
-    protected final File file;
+    protected final @NonNull File file;
     /** Statistic updated while the file is being processed. */
-    @NonNull
-    protected final ReadStatistic readStatistic;
+    protected final @NonNull ReadStatistic readStatistic;
 
-    @NonNull
-    private final AtomicBoolean shouldRun = new AtomicBoolean(true);
+    // Lifecycle AtomicBoolean — its value flips on shutdown and the toString form is uninformative.
+    @ToString.Exclude
+    private final @NonNull AtomicBoolean shouldRun = new AtomicBoolean(true);
 
     /**
      * Creates a new reader for the given file.

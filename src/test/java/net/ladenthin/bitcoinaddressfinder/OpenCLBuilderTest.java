@@ -21,9 +21,9 @@ public class OpenCLBuilderTest {
     @Test
     @OpenCLTest
     public void build_openCLDeviceExisting_platformsAndDevicesReturned() throws IOException {
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailable();
         // arrange
-        new OpenCLPlatformAssume().assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         OpenCLBuilder openCLBuilder = new OpenCLBuilder();
 
         // act
@@ -33,7 +33,7 @@ public class OpenCLBuilderTest {
         assertThat(openCLPlatforms.size(), is(greaterThan(Integer.valueOf(0))));
         assertThat(openCLPlatforms.getFirst().openCLDevices().size(), is(greaterThan(Integer.valueOf(0))));
         System.out.println(openCLPlatforms);
-        System.out.println("isOpenCLnativeLibraryLoadable: " + OpenCLBuilder.isOpenCLnativeLibraryLoadable());
+        System.out.println("isOpenClNativeLibraryLoaded: " + OpenCLBuilder.isOpenClNativeLibraryLoaded());
         System.out.println("isOneOpenCL2DeviceAvailable: "
                 + OpenCLBuilder.isOneOpenCL2_0OrGreaterDeviceAvailable(openCLPlatforms));
     }
