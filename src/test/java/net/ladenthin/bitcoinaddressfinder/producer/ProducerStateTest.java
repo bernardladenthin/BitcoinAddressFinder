@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.producer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.arrayContaining;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -23,27 +24,18 @@ public class ProducerStateTest {
     }
 
     @Test
-    public void values_ordinalOfUninitialized_isZero() {
+    public void values_declarationOrder_isUninitializedInitializedRunningNotRunning() {
         // arrange, act, assert
-        assertThat(ProducerState.UNINITIALIZED.ordinal(), is(equalTo(0)));
-    }
-
-    @Test
-    public void values_ordinalOfInitialized_isOne() {
-        // arrange, act, assert
-        assertThat(ProducerState.INITIALIZED.ordinal(), is(equalTo(1)));
-    }
-
-    @Test
-    public void values_ordinalOfRunning_isTwo() {
-        // arrange, act, assert
-        assertThat(ProducerState.RUNNING.ordinal(), is(equalTo(2)));
-    }
-
-    @Test
-    public void values_ordinalOfNotRunning_isThree() {
-        // arrange, act, assert
-        assertThat(ProducerState.NOT_RUNNING.ordinal(), is(equalTo(3)));
+        // Pin the declaration order directly; values() returns constants in
+        // declaration order, so this avoids depending on Enum.ordinal() index
+        // values (Error Prone EnumOrdinal) while still locking the order in.
+        assertThat(
+                ProducerState.values(),
+                is(arrayContaining(
+                        ProducerState.UNINITIALIZED,
+                        ProducerState.INITIALIZED,
+                        ProducerState.RUNNING,
+                        ProducerState.NOT_RUNNING)));
     }
     // </editor-fold>
 

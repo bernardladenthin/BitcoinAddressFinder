@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.model;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.arrayContaining;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
@@ -79,23 +80,14 @@ public class AddressTypeTest {
     }
     // </editor-fold>
 
-    // <editor-fold defaultstate="collapsed" desc="ordinal">
+    // <editor-fold defaultstate="collapsed" desc="declaration order">
     @Test
-    public void ordinal_p2pkhOrP2sh_isZero() {
-        // act
-        int actual = AddressType.P2PKH_OR_P2SH.ordinal();
-
-        // assert
-        assertThat(actual, is(equalTo(0)));
-    }
-
-    @Test
-    public void ordinal_p2wpkh_isOne() {
-        // act
-        int actual = AddressType.P2WPKH.ordinal();
-
-        // assert
-        assertThat(actual, is(equalTo(1)));
+    public void values_declarationOrder_isP2pkhOrP2shThenP2wpkh() {
+        // act, assert
+        // Pin the declaration order directly; values() returns constants in
+        // declaration order, so this avoids depending on Enum.ordinal() index
+        // values (Error Prone EnumOrdinal) while still locking the order in.
+        assertThat(AddressType.values(), is(arrayContaining(AddressType.P2PKH_OR_P2SH, AddressType.P2WPKH)));
     }
     // </editor-fold>
 }
