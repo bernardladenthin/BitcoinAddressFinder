@@ -69,7 +69,8 @@ public class Hash160Test {
 
     @Test
     public void hashFastProducesTwentyBytes() {
-        assertThat(new Hash160().hashFast("hello".getBytes()).length, is(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES));
+        assertThat(
+                new Hash160().hashFast("hello".getBytes()).length, is(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES));
     }
 
     // -------------------------------------------------------------------------

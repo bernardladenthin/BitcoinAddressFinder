@@ -48,7 +48,7 @@ SPDX-License-Identifier: Apache-2.0
     -->
     <Match>
         <Or>
-            <Class name="net.ladenthin.bitcoinaddressfinder.BIP39KeyProducer"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.BIP39KeyProducer"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaRandom"/>
         </Or>
         <Or>
@@ -72,7 +72,7 @@ SPDX-License-Identifier: Apache-2.0
         distinguish a curve parameter from a credential.
     -->
     <Match>
-        <Class name="net.ladenthin.bitcoinaddressfinder.PublicKeyBytes"/>
+        <Class name="net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes"/>
         <Bug pattern="HARD_CODE_KEY"/>
     </Match>
 
@@ -95,7 +95,7 @@ SPDX-License-Identifier: Apache-2.0
         bitcoinj.
     -->
     <Match>
-        <Class name="net.ladenthin.bitcoinaddressfinder.PublicKeyBytes"/>
+        <Class name="net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes"/>
         <Method name="runtimePublicKeyCalculationCheck"/>
         <Bug pattern="UNSAFE_HASH_EQUALS"/>
     </Match>
@@ -158,7 +158,7 @@ SPDX-License-Identifier: Apache-2.0
         carved out for String.split callers.
     -->
     <Match>
-        <Class name="net.ladenthin.bitcoinaddressfinder.AddressTxtLine"/>
+        <Class name="net.ladenthin.bitcoinaddressfinder.io.AddressTxtLine"/>
         <Method name="getCoinIfPossible"/>
         <Bug pattern="CLI_CONSTANT_LIST_INDEX"/>
     </Match>
@@ -203,7 +203,7 @@ SPDX-License-Identifier: Apache-2.0
     <Match>
         <Or>
             <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.Bech32Helper"/>
+                <Class name="net.ladenthin.bitcoinaddressfinder.util.Bech32Helper"/>
                 <Or>
                     <Method name="invokeConvertBitsStatic"/>
                     <Method name="invokeProtectedMethod"/>
@@ -282,7 +282,7 @@ SPDX-License-Identifier: Apache-2.0
         same type" idiom. The behaviour is intentional.
     -->
     <Match>
-        <Class name="net.ladenthin.bitcoinaddressfinder.AddressTxtLine"/>
+        <Class name="net.ladenthin.bitcoinaddressfinder.io.AddressTxtLine"/>
         <Method name="fromLine"/>
         <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
     </Match>
@@ -298,7 +298,7 @@ SPDX-License-Identifier: Apache-2.0
         catch makes the intent explicit.
     -->
     <Match>
-        <Class name="net.ladenthin.bitcoinaddressfinder.AbstractPlaintextFile"/>
+        <Class name="net.ladenthin.bitcoinaddressfinder.io.AbstractPlaintextFile"/>
         <Method name="readFile"/>
         <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
     </Match>
@@ -355,7 +355,7 @@ SPDX-License-Identifier: Apache-2.0
     <Match>
         <Or>
             <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.ConsumerJava"/>
+                <Class name="net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava"/>
                 <Method name="interrupt"/>
             </And>
             <And>
@@ -387,10 +387,10 @@ SPDX-License-Identifier: Apache-2.0
     -->
     <Match>
         <Or>
-            <Class name="net.ladenthin.bitcoinaddressfinder.FileHelper"/>
-            <Class name="net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB"/>
-            <Class name="net.ladenthin.bitcoinaddressfinder.ProducerJavaSecretsFiles"/>
-            <Class name="net.ladenthin.bitcoinaddressfinder.LMDBToAddressFile"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.io.FileHelper"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.command.AddressFilesToLMDB"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.producer.ProducerJavaSecretsFiles"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.command.LMDBToAddressFile"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
         </Or>
         <Bug pattern="PATH_TRAVERSAL_IN"/>
@@ -433,16 +433,16 @@ SPDX-License-Identifier: Apache-2.0
     -->
     <Match>
         <Or>
-            <Class name="net.ladenthin.bitcoinaddressfinder.PublicKeyBytes"/>
-            <Class name="net.ladenthin.bitcoinaddressfinder.AddressToCoin"/>
-            <Class name="net.ladenthin.bitcoinaddressfinder.OpenClTask"/>
-            <Class name="net.ladenthin.bitcoinaddressfinder.OpenClTask$CLByteBufferPointerArgument"/>
-            <Class name="net.ladenthin.bitcoinaddressfinder.OpenCLGridResult"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.model.AddressToCoin"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenClTask"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenClTask$CLByteBufferPointerArgument"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLGridResult"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDeviceSelection"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform"/>
-            <Class name="net.ladenthin.bitcoinaddressfinder.RandomSecretSupplier"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.secret.RandomSecretSupplier"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerator"/>
         </Or>
@@ -474,7 +474,7 @@ SPDX-License-Identifier: Apache-2.0
     <Match>
         <Or>
             <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.AbstractProducer"/>
+                <Class name="net.ladenthin.bitcoinaddressfinder.producer.AbstractProducer"/>
                 <Method name="produceKeys"/>
             </And>
             <And>
@@ -515,7 +515,7 @@ SPDX-License-Identifier: Apache-2.0
     -->
     <Match>
         <Or>
-            <Class name="net.ladenthin.bitcoinaddressfinder.AddressFormatNotAcceptedException"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.io.AddressFormatNotAcceptedException"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdIsNotUniqueException"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdUnknownException"/>
         </Or>
@@ -669,7 +669,7 @@ SPDX-License-Identifier: Apache-2.0
     <Match>
         <Or>
             <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.AbstractProducer"/>
+                <Class name="net.ladenthin.bitcoinaddressfinder.producer.AbstractProducer"/>
                 <Method name="produceKeys"/>
             </And>
             <And>
@@ -816,11 +816,11 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="DLS_DEAD_LOCAL_STORE"/>
         <Or>
             <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.ConsumerJava"/>
+                <Class name="net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava"/>
                 <Method name="startStatisticsTimer"/>
             </And>
             <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.Finder"/>
+                <Class name="net.ladenthin.bitcoinaddressfinder.engine.Finder"/>
                 <Method name="startProducer"/>
             </And>
             <And>
@@ -860,14 +860,14 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="THROWS_METHOD_THROWS_CLAUSE_BASIC_EXCEPTION"/>
         <Or>
             <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.Producer"/>
+                <Class name="net.ladenthin.bitcoinaddressfinder.producer.Producer"/>
                 <Or>
                     <Method name="initProducer"/>
                     <Method name="produceKeys"/>
                 </Or>
             </And>
             <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.ConsumerJava"/>
+                <Class name="net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava"/>
                 <Method name="initLMDB"/>
             </And>
         </Or>
@@ -887,7 +887,7 @@ SPDX-License-Identifier: Apache-2.0
         regardless of the loop structure.
     -->
     <Match>
-        <Class name="net.ladenthin.bitcoinaddressfinder.ConsumerJava"/>
+        <Class name="net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava"/>
         <Method name="consumeKeys"/>
         <Bug pattern="PRMC_POSSIBLY_REDUNDANT_METHOD_CALLS"/>
     </Match>
@@ -909,7 +909,7 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="MDM_RANDOM_SEED"/>
         <Or>
             <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaRandom"/>
-            <Class name="net.ladenthin.bitcoinaddressfinder.BIP39KeyProducer"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.BIP39KeyProducer"/>
         </Or>
     </Match>
 
@@ -935,7 +935,7 @@ SPDX-License-Identifier: Apache-2.0
         nulls are not a defensive omission, they are the JOCL spec.
     -->
     <Match>
-        <Class name="net.ladenthin.bitcoinaddressfinder.OpenClTask"/>
+        <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenClTask"/>
         <Method name="executeKernel"/>
         <Bug pattern="NP_LOAD_OF_KNOWN_NULL_VALUE"/>
     </Match>
@@ -955,18 +955,18 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
         <Or>
             <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.Bech32Helper"/>
+                <Class name="net.ladenthin.bitcoinaddressfinder.util.Bech32Helper"/>
                 <Or>
                     <Method name="decode5to8"/>
                     <Method name="encode8to5"/>
                 </Or>
             </And>
             <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.KeyUtility"/>
+                <Class name="net.ladenthin.bitcoinaddressfinder.util.KeyUtility"/>
                 <Method name="swapIntBytes"/>
             </And>
             <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.OpenClTask"/>
+                <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenClTask"/>
                 <Method name="cloneByteBuffer"/>
             </And>
             <And>
