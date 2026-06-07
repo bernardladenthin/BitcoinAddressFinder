@@ -4,6 +4,11 @@
 package net.ladenthin.bitcoinaddressfinder.io;
 
 import static net.ladenthin.bitcoinaddressfinder.constants.AddressConstants.BITCOIN_CASH_PREFIX;
+import static net.ladenthin.bitcoinaddressfinder.constants.AddressConstants.CHECKSUM_BYTES_REGULAR;
+import static net.ladenthin.bitcoinaddressfinder.constants.AddressConstants.VERSION_BYTES_REGULAR;
+import static net.ladenthin.bitcoinaddressfinder.constants.AddressConstants.VERSION_BYTES_ZCASH;
+import static net.ladenthin.bitcoinaddressfinder.constants.AddressConstants.WITNESS_VERSION_0;
+import static net.ladenthin.bitcoinaddressfinder.constants.AddressConstants.WITNESS_VERSION_1;
 
 import com.google.common.hash.Hashing;
 import java.nio.ByteBuffer;
@@ -53,13 +58,6 @@ public class AddressTxtLine {
     /** Header token marking a column header row that should be skipped. */
     public static final String ADDRESS_HEADER = "address";
 
-    /** Number of version bytes used by regular Base58Check addresses. */
-    public static final int VERSION_BYTES_REGULAR = 1;
-    /** Number of version bytes used by ZCash transparent addresses. */
-    public static final int VERSION_BYTES_ZCASH = 2;
-    /** Number of checksum bytes appended to Base58Check addresses. */
-    public static final int CHECKSUM_BYTES_REGULAR = 4;
-
     /** Reason used when the address field is empty. */
     public static final String REASON_EMPTY = "address is empty";
 
@@ -86,26 +84,6 @@ public class AddressTxtLine {
     public static final String REASON_BITCOIN_CASH_Q_ADDRESS_NOT_PARSABLE = "Bitcoin Cash address is not parsable";
     /** Reason used when a Base58 fallback decoding failed. */
     public static final String REASON_INVALID_BASE58 = "invalid Base58 address";
-
-    /**
-     * Witness version 0, used for SegWit v0 addresses such as:
-     * <ul>
-     *   <li><b>P2WPKH</b> – Pay to Witness Public Key Hash</li>
-     *   <li><b>P2WSH</b> – Pay to Witness Script Hash</li>
-     * </ul>
-     * Defined in <a href="https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki">BIP-173</a>.
-     */
-    private static final int WITNESS_VERSION_0 = 0;
-
-    /**
-     * Witness version 1, introduced with Taproot (SegWit v1):
-     * <ul>
-     *   <li><b>P2TR</b> – Pay to Taproot</li>
-     * </ul>
-     * Defined in <a href="https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki">BIP-341</a> and
-     * encoded using Bech32m as specified in <a href="https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki">BIP-350</a>.
-     */
-    private static final int WITNESS_VERSION_1 = 1;
 
     /** Column index of the address field after {@link SeparatorFormat#split}. */
     private static final int COLUMN_ADDRESS = 0;

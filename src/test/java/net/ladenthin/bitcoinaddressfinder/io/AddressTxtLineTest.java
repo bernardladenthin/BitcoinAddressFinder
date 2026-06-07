@@ -8,6 +8,7 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
+import net.ladenthin.bitcoinaddressfinder.constants.AddressConstants;
 import net.ladenthin.bitcoinaddressfinder.model.AddressToCoin;
 import net.ladenthin.bitcoinaddressfinder.model.AddressType;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticKey;
@@ -332,7 +333,7 @@ public class AddressTxtLineTest {
 
         // act
         AddressToCoin addressToCoin = new AddressTxtLine()
-                .parseBase58Address(encoded, versionBytes, AddressTxtLine.CHECKSUM_BYTES_REGULAR, keyUtility);
+                .parseBase58Address(encoded, versionBytes, AddressConstants.CHECKSUM_BYTES_REGULAR, keyUtility);
 
         // assert
         byte[] hash160 = keyUtility.byteBufferUtility().byteBufferToBytes(addressToCoin.hash160());

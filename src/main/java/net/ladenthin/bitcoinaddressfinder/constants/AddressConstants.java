@@ -26,4 +26,26 @@ public final class AddressConstants {
 
     /** CashAddr URI scheme prefix ({@code "bitcoincash:"}) stripped from Bitcoin Cash addresses. */
     public static final String BITCOIN_CASH_PREFIX = "bitcoincash:";
+
+    /** Number of version (prefix) bytes in a regular Base58Check address. */
+    public static final int VERSION_BYTES_REGULAR = 1;
+
+    /** Number of version (prefix) bytes in a ZCash transparent Base58Check address. */
+    public static final int VERSION_BYTES_ZCASH = 2;
+
+    /** Number of trailing checksum bytes in a Base58Check address. */
+    public static final int CHECKSUM_BYTES_REGULAR = 4;
+
+    /**
+     * SegWit witness version 0 (Bech32) — used by P2WPKH / P2WSH. Defined in
+     * <a href="https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki">BIP-173</a>.
+     */
+    public static final int WITNESS_VERSION_0 = 0;
+
+    /**
+     * SegWit witness version 1 (Bech32m) — used by P2TR (Taproot). Defined in
+     * <a href="https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki">BIP-341</a> /
+     * <a href="https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki">BIP-350</a>.
+     */
+    public static final int WITNESS_VERSION_1 = 1;
 }
