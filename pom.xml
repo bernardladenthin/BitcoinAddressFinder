@@ -744,6 +744,9 @@ SPDX-License-Identifier: Apache-2.0
                         <param>net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdUnknownException</param>
                         <param>net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableException</param>
                         <param>net.ladenthin.bitcoinaddressfinder.configuration.UnknownSecretFormatException</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.statistics.Statistics</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.statistics.ReadStatistic</param>
                     </targetClasses>
                     <targetTests>
                         <param>net.ladenthin.bitcoinaddressfinder.util.BitHelperTest</param>
@@ -758,6 +761,9 @@ SPDX-License-Identifier: Apache-2.0
                         <param>net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdUnknownExceptionTest</param>
                         <param>net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableExceptionTest</param>
                         <param>net.ladenthin.bitcoinaddressfinder.configuration.UnknownSecretFormatExceptionTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncrementalTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.statistics.StatisticsTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.statistics.ReadStatisticTest</param>
                     </targetTests>
                     <mutationThreshold>100</mutationThreshold>
                     <timeoutConstant>30000</timeoutConstant>
