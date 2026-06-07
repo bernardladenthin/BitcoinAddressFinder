@@ -494,6 +494,15 @@ See [`../workspace/policies/jqwik-prompt-injection.md`](../workspace/policies/jq
 
 See [`../workspace/policies/lombok-config.md`](../workspace/policies/lombok-config.md).
 
+## JPMS Module Descriptor
+
+Cross-repo pattern + the Java-bump javadoc trap:
+[`../workspace/policies/jpms-module-descriptor.md`](../workspace/policies/jpms-module-descriptor.md).
+BAF is the worked example; its repo-specific handling (why `module-info.java` lives in
+`src/main/java9`, the `prepare-package` timing vs Surefire module mode, the lmdbjava internal-JDK
+flags) is in the **"JPMS module descriptor (`module-info.java`) handling"** subsection under
+Build System above.
+
 ## Open TODOs
 
 Open TODOs for this repo live in [`TODO.md`](TODO.md). Cross-repo status
