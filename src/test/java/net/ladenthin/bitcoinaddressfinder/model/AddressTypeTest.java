@@ -90,4 +90,33 @@ public class AddressTypeTest {
         assertThat(AddressType.values(), is(arrayContaining(AddressType.P2PKH_OR_P2SH, AddressType.P2WPKH)));
     }
     // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="ordinal (explicit)">
+    // The two assertions below pin AddressType's ordinal mapping
+    // (P2PKH_OR_P2SH = 0, P2WPKH = 1) explicitly, as living documentation and a
+    // defensive guard against an accidental reorder. Nothing in production reads
+    // AddressType.ordinal() today — it is referenced by name only (verified by
+    // grep across src/main and the OpenCL .cl/.h kernels) — so these complement,
+    // rather than replace, the declaration-order test above. Enum.ordinal() is
+    // used here deliberately, hence the localized EnumOrdinal suppression.
+    @Test
+    @SuppressWarnings("EnumOrdinal")
+    public void ordinal_p2pkhOrP2sh_isZero() {
+        // act
+        int actual = AddressType.P2PKH_OR_P2SH.ordinal();
+
+        // assert
+        assertThat(actual, is(equalTo(0)));
+    }
+
+    @Test
+    @SuppressWarnings("EnumOrdinal")
+    public void ordinal_p2wpkh_isOne() {
+        // act
+        int actual = AddressType.P2WPKH.ordinal();
+
+        // assert
+        assertThat(actual, is(equalTo(1)));
+    }
+    // </editor-fold>
 }
