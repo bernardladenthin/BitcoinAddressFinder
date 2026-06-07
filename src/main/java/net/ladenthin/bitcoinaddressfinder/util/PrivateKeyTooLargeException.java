@@ -37,6 +37,22 @@ public class PrivateKeyTooLargeException extends IllegalArgumentException {
         this.batchSizeInBits = batchSizeInBits;
     }
 
+    /**
+     * Creates a new exception with the offending key and bound, chaining a cause.
+     *
+     * @param providedKey      the key that was rejected
+     * @param maxAllowedKey    the configured maximum allowed key
+     * @param batchSizeInBits  the batch size in bits that produced the bound
+     * @param cause            the underlying cause
+     */
+    public PrivateKeyTooLargeException(
+            BigInteger providedKey, BigInteger maxAllowedKey, int batchSizeInBits, Throwable cause) {
+        super(buildMessage(providedKey, maxAllowedKey, batchSizeInBits), cause);
+        this.providedKey = providedKey;
+        this.maxAllowedKey = maxAllowedKey;
+        this.batchSizeInBits = batchSizeInBits;
+    }
+
     private static String buildMessage(BigInteger providedKey, BigInteger maxAllowedKey, int batchSizeInBits) {
         return "Private key exceeds maximum allowed range for chunked grid mode: " + "\nProvided key:        0x"
                 + providedKey.toString(Radix.HEX) + "\nMaximum allowed key: 0x"

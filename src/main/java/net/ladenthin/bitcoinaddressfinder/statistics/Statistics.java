@@ -15,6 +15,17 @@ public class Statistics {
     @Deprecated
     public static final int ONE_SECOND_IN_MILLISECONDS = 1000;
 
+    /**
+     * Builds the periodic human-readable statistics line logged by the consumer.
+     *
+     * @param uptime                       elapsed run time in milliseconds
+     * @param keys                         total number of keys checked so far
+     * @param keysSumOfTimeToCheckContains cumulative time (ms) spent in presence lookups
+     * @param emptyConsumer                number of consumer iterations that found the queue empty
+     * @param keysQueueSize                current number of batches waiting in the queue
+     * @param hits                         total number of address hits found so far
+     * @return the formatted statistics message
+     */
     public String createStatisticsMessage(
             long uptime,
             long keys,

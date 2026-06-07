@@ -9,6 +9,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.sameInstance;
 
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
@@ -83,6 +84,29 @@ public class PrivateKeyTooLargeExceptionTest {
 
         // assert
         assertThat(exception.getCause(), is(nullValue()));
+    }
+
+    @Test
+    public void constructor_withCause_chainsCause() {
+        // arrange
+        Throwable cause = new ArithmeticException("overflow");
+
+        // act
+        PrivateKeyTooLargeException exception =
+                new PrivateKeyTooLargeException(PROVIDED_KEY, MAX_ALLOWED_KEY, BATCH_SIZE_IN_BITS, cause);
+
+        // assert
+        assertThat(exception.getCause(), is(sameInstance(cause)));
+    }
+
+    @Test
+    public void constructor_withCause_preservesProvidedKey() {
+        // act
+        PrivateKeyTooLargeException exception = new PrivateKeyTooLargeException(
+                PROVIDED_KEY, MAX_ALLOWED_KEY, BATCH_SIZE_IN_BITS, new ArithmeticException("overflow"));
+
+        // assert
+        assertThat(exception.getProvidedKey(), is(equalTo(PROVIDED_KEY)));
     }
     // </editor-fold>
 

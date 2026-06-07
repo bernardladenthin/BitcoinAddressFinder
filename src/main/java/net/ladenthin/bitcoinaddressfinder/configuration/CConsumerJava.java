@@ -32,7 +32,7 @@ public class CConsumerJava {
     public int queueSize = 10;
 
     /**
-     * Maximum time (in seconds) {@link net.ladenthin.bitcoinaddressfinder.ConsumerJava#interrupt()}
+     * Maximum time (in seconds) {@link net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava#interrupt()}
      * waits for the worker pool to drain the keys queue before giving up and logging a warning.
      * Default: 60 seconds. Tests override with a small value (e.g. {@code 20}) to keep
      * the wait-and-assert branch fast.

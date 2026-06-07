@@ -4,7 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 /**
- * Thrown by {@link net.ladenthin.bitcoinaddressfinder.Finder} during
+ * Thrown by {@link net.ladenthin.bitcoinaddressfinder.engine.Finder} during
  * producer initialisation when a producer's {@code keyProducerId} is
  * {@code null}. Every producer must carry a non-null identifier so that
  * hits can be attributed to the correct producer.

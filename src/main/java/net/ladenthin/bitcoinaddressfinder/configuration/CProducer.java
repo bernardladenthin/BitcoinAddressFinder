@@ -43,7 +43,7 @@ public class CProducer {
 
     /**
      * Maximum time (seconds) the orchestrator will wait inside
-     * {@link net.ladenthin.bitcoinaddressfinder.Producer#waitTillProducerNotRunning()}
+     * {@link net.ladenthin.bitcoinaddressfinder.producer.Producer#waitTillProducerNotRunning()}
      * for this producer to leave the {@code RUNNING} state during shutdown. After this
      * elapses {@code Finder.interrupt()} logs an error and continues with the rest of
      * the shutdown chain so a hung producer cannot block the whole process.

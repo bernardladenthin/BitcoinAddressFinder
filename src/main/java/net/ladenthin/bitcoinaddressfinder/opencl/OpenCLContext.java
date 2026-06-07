@@ -174,6 +174,12 @@ public class OpenCLContext implements ReleaseCLObject {
         openClTask = new OpenClTask(context, producerOpenCL, bitHelper, byteBufferUtility);
     }
 
+    /**
+     * Returns the current OpenCL task, if one has been initialised.
+     *
+     * @return the active {@link OpenClTask}, or {@link Optional#empty()} before {@code init()}
+     *     has run or after {@code close()}
+     */
     public Optional<OpenClTask> getOpenClTask() {
         return Optional.ofNullable(openClTask);
     }

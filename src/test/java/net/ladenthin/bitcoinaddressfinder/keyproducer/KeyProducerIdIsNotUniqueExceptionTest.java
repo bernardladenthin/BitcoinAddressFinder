@@ -9,6 +9,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.sameInstance;
 
 import org.junit.jupiter.api.Test;
 
@@ -76,6 +77,45 @@ public class KeyProducerIdIsNotUniqueExceptionTest {
 
         // assert
         assertThat(exception.getCause(), is(nullValue()));
+    }
+
+    @Test
+    public void constructor_withIdAndCause_chainsCause() {
+        // arrange
+        String id = "myProducerId";
+        Throwable cause = new IllegalStateException("root");
+
+        // act
+        KeyProducerIdIsNotUniqueException exception = new KeyProducerIdIsNotUniqueException(id, cause);
+
+        // assert
+        assertThat(exception.getCause(), is(sameInstance(cause)));
+    }
+
+    @Test
+    public void constructor_withIdAndCause_messageContainsId() {
+        // arrange
+        String id = "myProducerId";
+
+        // act
+        KeyProducerIdIsNotUniqueException exception =
+                new KeyProducerIdIsNotUniqueException(id, new IllegalStateException("root"));
+
+        // assert
+        assertThat(exception.getMessage(), containsString(id));
+    }
+
+    @Test
+    public void constructor_withIdAndCause_preservesId() {
+        // arrange
+        String id = "producerBeta";
+
+        // act
+        KeyProducerIdIsNotUniqueException exception =
+                new KeyProducerIdIsNotUniqueException(id, new IllegalStateException("root"));
+
+        // assert
+        assertThat(exception.getId(), is(equalTo(id)));
     }
     // </editor-fold>
 

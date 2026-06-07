@@ -36,7 +36,7 @@ public class CFinder {
     public @Nullable CConsumerJava consumerJava;
 
     /**
-     * Maximum time (in seconds) {@link net.ladenthin.bitcoinaddressfinder.Finder#shutdownAndAwaitTermination()}
+     * Maximum time (in seconds) {@link net.ladenthin.bitcoinaddressfinder.engine.Finder#shutdownAndAwaitTermination()}
      * waits for the producer executor to terminate before giving up. Default: ~100,000 years
      * (effectively unbounded; the call exists as a safety net). Tests override with a small
      * value (e.g. {@code 20}) to exercise the timeout path in seconds rather than years.

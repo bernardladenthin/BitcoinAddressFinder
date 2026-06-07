@@ -9,6 +9,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.sameInstance;
 
 import org.junit.jupiter.api.Test;
 
@@ -85,6 +86,32 @@ public class KeyProducerIdUnknownExceptionTest {
 
         // assert
         assertThat(exception.getMessage(), containsString("null"));
+    }
+
+    @Test
+    public void constructor_withIdAndCause_chainsCause() {
+        // arrange
+        String id = "unknownProducer";
+        Throwable cause = new IllegalStateException("root");
+
+        // act
+        KeyProducerIdUnknownException exception = new KeyProducerIdUnknownException(id, cause);
+
+        // assert
+        assertThat(exception.getCause(), is(sameInstance(cause)));
+    }
+
+    @Test
+    public void constructor_withIdAndCause_preservesId() {
+        // arrange
+        String id = "unknownProducer";
+
+        // act
+        KeyProducerIdUnknownException exception =
+                new KeyProducerIdUnknownException(id, new IllegalStateException("root"));
+
+        // assert
+        assertThat(exception.getId(), is(equalTo(id)));
     }
     // </editor-fold>
 
