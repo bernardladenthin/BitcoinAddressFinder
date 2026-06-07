@@ -198,73 +198,88 @@ public class BitcoinAddressFinderArchitectureTest {
     // ---------------------------------------------------------------------------------------
 
     /**
-     * Strict layered architecture. Each layer may only be accessed by the layers above it,
-     * giving a top-to-bottom dependency direction with no upward edges:
+     * Strict layered architecture — <b>one layer per package</b>. Rather than coarse tiers, every
+     * package is its own layer and its {@code mayOnlyBeAccessedByLayers} lists the EXACT set of
+     * packages that reference it today (derived from the compiled bytecode graph via jdeps, then
+     * confirmed by this rule). This governs even intra-tier edges — e.g. {@code model} may use
+     * {@code util} but not vice versa; {@code producer} may use {@code consumer} but not vice
+     * versa; {@code opencl} and {@code persistence} may not reach into each other. Any new
+     * dependency between two packages fails the build unless this rule is updated to intend it.
      *
-     * <pre>
-     *   Entry          cli
-     *   Orchestration  engine, command
-     *   Pipeline       producer, consumer
-     *   Capabilities   keyproducer, opencl, persistence
-     *   InputOutput    io
-     *   Foundation     model, util, core, statistics, secret
-     *   Config         configuration
-     *   Constants      constants
-     * </pre>
-     *
-     * <p>Layers are coarser than packages on purpose: the legitimate
-     * {@code producer -> Consumer} pipeline edge lives inside the {@code Pipeline} layer
-     * rather than crossing a boundary. {@code consideringOnlyDependenciesInLayers()} keeps
-     * the check focused on intra-project edges (external libraries are ignored).
+     * <p>Conceptual top-to-bottom tiers (informational): {@code cli} &gt; {@code engine}/{@code command}
+     * &gt; {@code producer}/{@code consumer} &gt; {@code keyproducer}/{@code opencl}/{@code persistence}
+     * &gt; {@code io} &gt; {@code model}/{@code util}/{@code core}/{@code statistics}/{@code secret}
+     * &gt; {@code configuration} &gt; {@code constants}.
      */
     @ArchTest
     static final ArchRule layeredArchitecture = layeredArchitecture()
             .consideringOnlyDependenciesInLayers()
-            .layer("Entry")
+            .layer("Cli")
             .definedBy("net.ladenthin.bitcoinaddressfinder.cli..")
-            .layer("Orchestration")
-            .definedBy("net.ladenthin.bitcoinaddressfinder.engine..", "net.ladenthin.bitcoinaddressfinder.command..")
-            .layer("Pipeline")
-            .definedBy("net.ladenthin.bitcoinaddressfinder.producer..", "net.ladenthin.bitcoinaddressfinder.consumer..")
-            .layer("Capabilities")
-            .definedBy(
-                    "net.ladenthin.bitcoinaddressfinder.keyproducer..",
-                    "net.ladenthin.bitcoinaddressfinder.opencl..",
-                    "net.ladenthin.bitcoinaddressfinder.persistence..")
-            .layer("InputOutput")
+            .layer("Command")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.command..")
+            .layer("Engine")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.engine..")
+            .layer("Producer")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.producer..")
+            .layer("Consumer")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.consumer..")
+            .layer("Keyproducer")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.keyproducer..")
+            .layer("Opencl")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.opencl..")
+            .layer("Persistence")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.persistence..")
+            .layer("Io")
             .definedBy("net.ladenthin.bitcoinaddressfinder.io..")
-            .layer("Foundation")
-            .definedBy(
-                    "net.ladenthin.bitcoinaddressfinder.model..",
-                    "net.ladenthin.bitcoinaddressfinder.util..",
-                    "net.ladenthin.bitcoinaddressfinder.core..",
-                    "net.ladenthin.bitcoinaddressfinder.statistics..",
-                    "net.ladenthin.bitcoinaddressfinder.secret..")
-            .layer("Config")
+            .layer("Model")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.model..")
+            .layer("Util")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.util..")
+            .layer("Core")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.core..")
+            .layer("Statistics")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.statistics..")
+            .layer("Secret")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.secret..")
+            .layer("Configuration")
             .definedBy("net.ladenthin.bitcoinaddressfinder.configuration..")
             .layer("Constants")
             .definedBy("net.ladenthin.bitcoinaddressfinder.constants..")
-            // Access lists are tightened to the EXACT set of layers that actually reach each
-            // layer today (verified by jdeps on the compiled classes), so any NEW unintended
-            // cross-layer edge fails the build rather than slipping through a permissive bound.
-            .whereLayer("Entry")
+            .whereLayer("Cli")
             .mayNotBeAccessedByAnyLayer()
-            .whereLayer("Orchestration")
-            .mayOnlyBeAccessedByLayers("Entry")
-            .whereLayer("Pipeline")
-            // only the engine (Orchestration) wires producers/consumer; cli does not touch them
-            .mayOnlyBeAccessedByLayers("Orchestration")
-            .whereLayer("Capabilities")
-            .mayOnlyBeAccessedByLayers("Entry", "Orchestration", "Pipeline")
-            .whereLayer("InputOutput")
-            // io is reached by command (Orchestration), producer (Pipeline) and persistence
-            // (Capabilities) — never by cli (Entry) or the Foundation layer
-            .mayOnlyBeAccessedByLayers("Orchestration", "Pipeline", "Capabilities")
-            .whereLayer("Foundation")
-            .mayOnlyBeAccessedByLayers("Entry", "Orchestration", "Pipeline", "Capabilities", "InputOutput")
-            .whereLayer("Config")
-            // configuration is read by every runtime layer but NOT by the Foundation layer
-            .mayOnlyBeAccessedByLayers("Entry", "Orchestration", "Pipeline", "Capabilities", "InputOutput");
+            .whereLayer("Command")
+            .mayOnlyBeAccessedByLayers("Cli")
+            .whereLayer("Engine")
+            .mayOnlyBeAccessedByLayers("Cli")
+            .whereLayer("Producer")
+            .mayOnlyBeAccessedByLayers("Engine")
+            .whereLayer("Consumer")
+            .mayOnlyBeAccessedByLayers("Engine", "Producer")
+            .whereLayer("Keyproducer")
+            .mayOnlyBeAccessedByLayers("Engine", "Producer")
+            .whereLayer("Opencl")
+            .mayOnlyBeAccessedByLayers("Cli", "Producer")
+            .whereLayer("Persistence")
+            .mayOnlyBeAccessedByLayers("Command", "Consumer", "Engine")
+            .whereLayer("Io")
+            .mayOnlyBeAccessedByLayers("Command", "Persistence", "Producer")
+            .whereLayer("Model")
+            .mayOnlyBeAccessedByLayers("Command", "Consumer", "Io", "Opencl", "Producer")
+            .whereLayer("Util")
+            .mayOnlyBeAccessedByLayers(
+                    "Command", "Consumer", "Engine", "Io", "Keyproducer", "Model", "Opencl", "Persistence", "Producer")
+            .whereLayer("Core")
+            .mayOnlyBeAccessedByLayers("Cli", "Command", "Consumer", "Engine", "Io", "Keyproducer", "Producer")
+            .whereLayer("Statistics")
+            .mayOnlyBeAccessedByLayers("Command", "Consumer", "Io", "Producer")
+            .whereLayer("Secret")
+            .mayOnlyBeAccessedByLayers("Keyproducer", "Producer", "Util")
+            .whereLayer("Configuration")
+            .mayOnlyBeAccessedByLayers(
+                    "Cli", "Command", "Consumer", "Engine", "Io", "Keyproducer", "Opencl", "Persistence", "Producer")
+            .whereLayer("Constants")
+            .mayOnlyBeAccessedByLayers("Configuration", "Consumer", "Io", "Keyproducer", "Model", "Opencl", "Util");
 
     /**
      * The {@code constants} sub-package is a true architectural leaf. Pure
