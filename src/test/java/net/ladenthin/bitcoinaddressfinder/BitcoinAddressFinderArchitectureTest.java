@@ -344,4 +344,53 @@ public class BitcoinAddressFinderArchitectureTest {
             .should()
             .dependOnClassesThat()
             .resideInAPackage("net.ladenthin.bitcoinaddressfinder.cli..");
+
+    // ---------------------------------------------------------------------------------------
+    // Per-module banned imports — confine heavy / specific third-party dependencies to the
+    // single layer that owns them, so the rest of the codebase stays decoupled from them.
+    // ---------------------------------------------------------------------------------------
+
+    /**
+     * The JOCL / OpenCL GPU binding ({@code org.jocl..}) may only be referenced from the
+     * {@code opencl} package. No other layer may take a compile dependency on the GPU runtime;
+     * everything above consumes the GPU exclusively through {@code opencl}'s own types.
+     */
+    @ArchTest
+    static final ArchRule joclConfinedToOpencl = noClasses()
+            .that()
+            .resideOutsideOfPackage("net.ladenthin.bitcoinaddressfinder.opencl..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("org.jocl..")
+            .allowEmptyShould(true);
+
+    /**
+     * The network key-input libraries — ZeroMQ ({@code org.zeromq..}) and
+     * Java-WebSocket ({@code org.java_websocket..}) — may only be referenced from the
+     * {@code keyproducer} package (the socket / websocket / zmq key producers live there).
+     */
+    @ArchTest
+    static final ArchRule networkInputLibsConfinedToKeyproducer = noClasses()
+            .that()
+            .resideOutsideOfPackage("net.ladenthin.bitcoinaddressfinder.keyproducer..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("org.zeromq..", "org.java_websocket..")
+            .allowEmptyShould(true);
+
+    /**
+     * The LMDB binding ({@code org.lmdbjava..}) may only be referenced from {@code persistence}
+     * (the database backend) and {@code io} (which catches {@code LmdbException} during address
+     * file ingestion). Runtime/orchestration layers consume LMDB only through the
+     * {@code persistence} abstraction, never the driver directly.
+     */
+    @ArchTest
+    static final ArchRule lmdbConfinedToPersistenceAndIo = noClasses()
+            .that()
+            .resideOutsideOfPackages(
+                    "net.ladenthin.bitcoinaddressfinder.persistence..", "net.ladenthin.bitcoinaddressfinder.io..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("org.lmdbjava..")
+            .allowEmptyShould(true);
 }

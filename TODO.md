@@ -118,8 +118,7 @@ pluggable-persistence design plan:
 
 - **Mutation-testing threshold expansion** — `<targetClasses>` currently narrowed to `net.ladenthin.bitcoinaddressfinder.BitHelper`. Expand incrementally as classes reach 100 % mutation parity (README "Future improvements" tracks this).
 
-- **Additional ArchUnit rules to consider** — public-fields-final, `noTestFrameworksInProduction`, `loggersArePrivateStaticFinal`, `noPackageCycles`, and the full **`layeredArchitecture()`** rule are all DONE (the layered package split landed — see "Done" history below). Still open:
-  - Per-module banned-imports lists.
+- **Additional ArchUnit rules to consider** — public-fields-final, `noTestFrameworksInProduction`, `loggersArePrivateStaticFinal`, `noPackageCycles`, the full **`layeredArchitecture()`** rule, and **per-module banned-imports** (`joclConfinedToOpencl`, `networkInputLibsConfinedToKeyproducer`, `lmdbConfinedToPersistenceAndIo`) are all DONE. Still open:
   - No-public-mutable-static-state rule.
 
 - **Cross-repo code-quality TODOs** — see [`../workspace/policies/code-quality-todos.md`](../workspace/policies/code-quality-todos.md) for the canonical `@VisibleForTesting` design-fit review (BAF site-by-site audit captured in [`../workspace/crossrepostatus.md`](../workspace/crossrepostatus.md)), package hierarchy review, and class/method naming review.
