@@ -5,10 +5,7 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.DataInputStream;
@@ -681,8 +678,8 @@ public class KeyProducerJavaSocketTest {
         future.get(3, TimeUnit.SECONDS);
         executor.shutdownNow();
 
-        assertNotEquals(STATE_UNEXPECTED_SUCCESS, state.get(), "Thread exited without triggering interrupt");
-        assertEquals(STATE_INTERRUPTED_EXIT, state.get(), "Expected interrupt to cause shutdown");
+        assertThat("Thread exited without triggering interrupt", state.get(), is(not(STATE_UNEXPECTED_SUCCESS)));
+        assertThat("Expected interrupt to cause shutdown", state.get(), is(STATE_INTERRUPTED_EXIT));
     }
 
     @Test
@@ -706,10 +703,11 @@ public class KeyProducerJavaSocketTest {
         } catch (NoMoreSecretsAvailableException e) {
             long duration = System.currentTimeMillis() - start;
             // Timeout must be honored within reasonable margin (±200ms)
-            assertTrue(
+            assertThat(
+                    "Timeout did not occur as expected",
                     duration >= TestTimeProvider.SOCKET_ACCEPT_TIMEOUT
                             && duration <= TestTimeProvider.SOCKET_ACCEPT_TIMEOUT + 200,
-                    "Timeout did not occur as expected");
+                    is(true));
             assertThat(e.getMessage(), containsString("Timeout while waiting for secret"));
         } finally {
             server.interrupt();
