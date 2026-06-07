@@ -737,6 +737,7 @@ SPDX-License-Identifier: Apache-2.0
                         <param>net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes</param>
                         <param>net.ladenthin.bitcoinaddressfinder.model.AddressToCoin</param>
                         <param>net.ladenthin.bitcoinaddressfinder.model.AddressType</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.model.Hash160</param>
                         <param>net.ladenthin.bitcoinaddressfinder.io.AddressFormatNotAcceptedException</param>
                         <param>net.ladenthin.bitcoinaddressfinder.core.InterruptedRuntimeException</param>
                         <param>net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdIsNotUniqueException</param>
@@ -754,6 +755,7 @@ SPDX-License-Identifier: Apache-2.0
                         <param>net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytesTest</param>
                         <param>net.ladenthin.bitcoinaddressfinder.model.AddressToCoinTest</param>
                         <param>net.ladenthin.bitcoinaddressfinder.model.AddressTypeTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.model.Hash160Test</param>
                         <param>net.ladenthin.bitcoinaddressfinder.io.AddressFormatNotAcceptedExceptionTest</param>
                         <param>net.ladenthin.bitcoinaddressfinder.core.InterruptedRuntimeExceptionTest</param>
                         <param>net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdIsNotUniqueExceptionTest</param>

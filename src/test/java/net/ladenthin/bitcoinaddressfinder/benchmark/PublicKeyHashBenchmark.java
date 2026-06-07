@@ -26,18 +26,18 @@ import org.openjdk.jmh.infra.Blackhole;
  * Throughput benchmark for the two SHA-256 + RIPEMD-160 implementations
  * encapsulated by {@link Hash160}.
  *
- * <p>{@link Hash160#DEFAULT_USE_FAST} selects between two hash implementations:</p>
+ * <p>{@link Hash160} exposes two hash implementations as distinct methods:</p>
  * <ul>
- *   <li>{@code true} &#x2192; Guava SHA-256 + Bouncy Castle RIPEMD-160
- *       (the fast path)</li>
- *   <li>{@code false} &#x2192; BitcoinJ {@code CryptoUtils.sha256hash160}
- *       (the reference path)</li>
+ *   <li>{@link Hash160#hashFast(byte[])} &#x2192; Guava SHA-256 + Bouncy Castle
+ *       RIPEMD-160 (the fast path, used by {@link Hash160#hash(byte[])})</li>
+ *   <li>{@link Hash160#hashSlow(byte[])} &#x2192; BitcoinJ
+ *       {@code CryptoUtils.sha256hash160} (the reference path)</li>
  * </ul>
  *
- * <p>This benchmark parameterises over {@code useFast = {false, true}} so that
- * both paths are measured side by side. The expected result is that {@code true}
- * yields significantly more ops/sec &#x2014; which is why
- * {@link Hash160#DEFAULT_USE_FAST} defaults to {@code true}.</p>
+ * <p>This benchmark parameterises over {@code useFast = {false, true}} and calls
+ * {@code hashFast} / {@code hashSlow} accordingly so that both paths are measured
+ * side by side. The expected result is that the fast path yields significantly
+ * more ops/sec &#x2014; which is why {@link Hash160#hash(byte[])} uses it.</p>
  *
  * <p>Run locally:</p>
  * <pre>
@@ -57,7 +57,8 @@ public class PublicKeyHashBenchmark {
      * {@code true} &#x2192; Guava + Bouncy Castle,
      * {@code false} &#x2192; BitcoinJ {@code CryptoUtils}.
      *
-     * <p>Corresponds directly to {@link Hash160#DEFAULT_USE_FAST}.</p>
+     * <p>Selects {@link Hash160#hashFast(byte[])} ({@code true}) vs
+     * {@link Hash160#hashSlow(byte[])} ({@code false}).</p>
      */
     @Param({"false", "true"})
     public boolean useFast;
@@ -68,13 +69,13 @@ public class PublicKeyHashBenchmark {
     /** Fixed 33-byte compressed public key ({@code 02/03 || X}) used as hash input. */
     private byte[] compressedKey = new byte[0];
 
-    /** {@link Hash160} instance configured with the selected implementation. */
+    /** {@link Hash160} instance (stateless; the {@code useFast} param picks the method). */
     private Hash160 hash160 = new Hash160();
 
     /** Initializes fixed-content key byte arrays and the {@link Hash160} instance. */
     @Setup
     public void setUp() {
-        hash160 = new Hash160(useFast);
+        hash160 = new Hash160();
         uncompressedKey = new byte[PublicKeyBytes.PUBLIC_KEY_UNCOMPRESSED_BYTES];
         uncompressedKey[0] = (byte) OpenClKernelConstants.SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT;
         for (int i = 1; i < uncompressedKey.length; i++) {
@@ -93,7 +94,7 @@ public class PublicKeyHashBenchmark {
      */
     @Benchmark
     public void hashUncompressed(Blackhole bh) {
-        bh.consume(hash160.hash(uncompressedKey));
+        bh.consume(useFast ? hash160.hashFast(uncompressedKey) : hash160.hashSlow(uncompressedKey));
     }
 
     /**
@@ -106,6 +107,6 @@ public class PublicKeyHashBenchmark {
      */
     @Benchmark
     public void hashCompressed(Blackhole bh) {
-        bh.consume(hash160.hash(compressedKey));
+        bh.consume(useFast ? hash160.hashFast(compressedKey) : hash160.hashSlow(compressedKey));
     }
 }

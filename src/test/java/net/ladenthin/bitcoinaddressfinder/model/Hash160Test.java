@@ -15,10 +15,11 @@ import org.junit.jupiter.api.Test;
 /**
  * Mutation-oriented tests for {@link Hash160}.
  *
- * <p>Both algorithm selections compute the identical standard
- * RIPEMD-160(SHA-256(input)), so they are pinned against the same known vectors
- * and asserted equal to each other. The known-vector bytes were produced by the
- * implementation itself and cross-checked between the two paths.
+ * <p>The two implementations compute the identical standard
+ * RIPEMD-160(SHA-256(input)); each is exercised directly against shared known
+ * vectors and asserted equal to the other. Because {@link Hash160} no longer
+ * branches on a runtime flag, every mutation in the class is killable (no
+ * equivalent selector mutant).</p>
  */
 public class Hash160Test {
 
@@ -48,69 +49,72 @@ public class Hash160Test {
     }
 
     // -------------------------------------------------------------------------
-    // Fast path (Guava SHA-256 + Bouncy Castle RIPEMD-160) — useFast = true
+    // hashFast — Guava SHA-256 + Bouncy Castle RIPEMD-160
     // -------------------------------------------------------------------------
 
     @Test
-    public void fastPathMatchesKnownVectorEmpty() {
-        assertArrayEquals(hex(HASH160_EMPTY), new Hash160(true).hash(new byte[0]));
+    public void hashFastMatchesKnownVectorEmpty() {
+        assertArrayEquals(hex(HASH160_EMPTY), new Hash160().hashFast(new byte[0]));
     }
 
     @Test
-    public void fastPathMatchesKnownVectorHello() {
-        assertArrayEquals(hex(HASH160_HELLO), new Hash160(true).hash("hello".getBytes()));
+    public void hashFastMatchesKnownVectorHello() {
+        assertArrayEquals(hex(HASH160_HELLO), new Hash160().hashFast("hello".getBytes()));
     }
 
     @Test
-    public void fastPathProducesTwentyBytes() {
-        assertThat(new Hash160(true).hash("hello".getBytes()).length, is(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES));
+    public void hashFastMatchesKnownVectorTenBytes() {
+        assertArrayEquals(hex(HASH160_0_TO_9), new Hash160().hashFast(bytes(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)));
+    }
+
+    @Test
+    public void hashFastProducesTwentyBytes() {
+        assertThat(new Hash160().hashFast("hello".getBytes()).length, is(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES));
     }
 
     // -------------------------------------------------------------------------
-    // Slow path (bitcoinj CryptoUtils.sha256hash160) — useFast = false
-    // This is the branch that was previously NO_COVERAGE (kills the
-    // NullReturnVals mutant on `return CryptoUtils.sha256hash160(input)`).
+    // hashSlow — bitcoinj CryptoUtils.sha256hash160
     // -------------------------------------------------------------------------
 
     @Test
-    public void slowPathMatchesKnownVectorEmpty() {
-        assertArrayEquals(hex(HASH160_EMPTY), new Hash160(false).hash(new byte[0]));
+    public void hashSlowMatchesKnownVectorEmpty() {
+        assertArrayEquals(hex(HASH160_EMPTY), new Hash160().hashSlow(new byte[0]));
     }
 
     @Test
-    public void slowPathMatchesKnownVectorHello() {
-        assertArrayEquals(hex(HASH160_HELLO), new Hash160(false).hash("hello".getBytes()));
+    public void hashSlowMatchesKnownVectorHello() {
+        assertArrayEquals(hex(HASH160_HELLO), new Hash160().hashSlow("hello".getBytes()));
     }
 
     @Test
-    public void slowPathMatchesKnownVectorTenBytes() {
-        assertArrayEquals(hex(HASH160_0_TO_9), new Hash160(false).hash(bytes(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)));
+    public void hashSlowMatchesKnownVectorTenBytes() {
+        assertArrayEquals(hex(HASH160_0_TO_9), new Hash160().hashSlow(bytes(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)));
     }
 
     // -------------------------------------------------------------------------
-    // Cross-implementation equivalence + default selection
+    // hash — default entry point (delegates to the fast path)
     // -------------------------------------------------------------------------
+
+    @Test
+    public void hashDelegatesToFastPath() {
+        final byte[] input = "hello".getBytes();
+        assertArrayEquals(hex(HASH160_HELLO), new Hash160().hash(input));
+        assertArrayEquals(new Hash160().hashFast(input), new Hash160().hash(input));
+    }
 
     @Test
     public void bothImplementationsProduceIdenticalOutput() {
         final byte[] input = bytes(0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
-        assertArrayEquals(new Hash160(true).hash(input), new Hash160(false).hash(input));
-    }
-
-    @Test
-    public void defaultConstructorUsesFastPath() {
-        // DEFAULT_USE_FAST is true; the no-arg ctor must match the explicit fast path.
-        assertArrayEquals(new Hash160(Hash160.DEFAULT_USE_FAST).hash("hello".getBytes()), new Hash160().hash("hello".getBytes()));
-        assertThat(Hash160.DEFAULT_USE_FAST, is(true));
+        assertArrayEquals(new Hash160().hashFast(input), new Hash160().hashSlow(input));
     }
 
     // -------------------------------------------------------------------------
-    // Lombok value semantics
+    // Lombok value semantics (stateless)
     // -------------------------------------------------------------------------
 
     @Test
     public void equalsAndHashCodeAreValueBased() {
-        assertThat(new Hash160(true), is(new Hash160(true)));
-        assertThat(new Hash160(true).hashCode(), is(new Hash160(true).hashCode()));
+        assertThat(new Hash160(), is(new Hash160()));
+        assertThat(new Hash160().hashCode(), is(new Hash160().hashCode()));
     }
 }
