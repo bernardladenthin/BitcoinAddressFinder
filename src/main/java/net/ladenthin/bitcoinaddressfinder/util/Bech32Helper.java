@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.util;
 
-import static net.ladenthin.bitcoinaddressfinder.io.AddressTxtLine.BITCOIN_CASH_PREFIX;
+import static net.ladenthin.bitcoinaddressfinder.constants.AddressConstants.BITCOIN_CASH_PREFIX;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;

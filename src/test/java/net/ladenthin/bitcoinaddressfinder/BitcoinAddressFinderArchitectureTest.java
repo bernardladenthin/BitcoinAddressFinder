@@ -244,21 +244,27 @@ public class BitcoinAddressFinderArchitectureTest {
             .definedBy("net.ladenthin.bitcoinaddressfinder.configuration..")
             .layer("Constants")
             .definedBy("net.ladenthin.bitcoinaddressfinder.constants..")
+            // Access lists are tightened to the EXACT set of layers that actually reach each
+            // layer today (verified by jdeps on the compiled classes), so any NEW unintended
+            // cross-layer edge fails the build rather than slipping through a permissive bound.
             .whereLayer("Entry")
             .mayNotBeAccessedByAnyLayer()
             .whereLayer("Orchestration")
             .mayOnlyBeAccessedByLayers("Entry")
             .whereLayer("Pipeline")
-            .mayOnlyBeAccessedByLayers("Entry", "Orchestration")
+            // only the engine (Orchestration) wires producers/consumer; cli does not touch them
+            .mayOnlyBeAccessedByLayers("Orchestration")
             .whereLayer("Capabilities")
             .mayOnlyBeAccessedByLayers("Entry", "Orchestration", "Pipeline")
             .whereLayer("InputOutput")
-            .mayOnlyBeAccessedByLayers("Entry", "Orchestration", "Pipeline", "Capabilities")
+            // io is reached by command (Orchestration), producer (Pipeline) and persistence
+            // (Capabilities) — never by cli (Entry) or the Foundation layer
+            .mayOnlyBeAccessedByLayers("Orchestration", "Pipeline", "Capabilities")
             .whereLayer("Foundation")
-            .mayOnlyBeAccessedByLayers("Entry", "Orchestration", "Pipeline", "Capabilities", "InputOutput", "Config")
+            .mayOnlyBeAccessedByLayers("Entry", "Orchestration", "Pipeline", "Capabilities", "InputOutput")
             .whereLayer("Config")
-            .mayOnlyBeAccessedByLayers(
-                    "Entry", "Orchestration", "Pipeline", "Capabilities", "InputOutput", "Foundation");
+            // configuration is read by every runtime layer but NOT by the Foundation layer
+            .mayOnlyBeAccessedByLayers("Entry", "Orchestration", "Pipeline", "Capabilities", "InputOutput");
 
     /**
      * The {@code constants} sub-package is a true architectural leaf. Pure

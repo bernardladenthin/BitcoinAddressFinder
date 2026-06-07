@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.io;
 
+import static net.ladenthin.bitcoinaddressfinder.constants.AddressConstants.BITCOIN_CASH_PREFIX;
+
 import com.google.common.hash.Hashing;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -50,8 +52,6 @@ public class AddressTxtLine {
     public static final String IGNORE_LINE_PREFIX = "#";
     /** Header token marking a column header row that should be skipped. */
     public static final String ADDRESS_HEADER = "address";
-    /** Prefix used by Bitcoin Cash CashAddr representations. */
-    public static final String BITCOIN_CASH_PREFIX = "bitcoincash:";
 
     /** Number of version bytes used by regular Base58Check addresses. */
     public static final int VERSION_BYTES_REGULAR = 1;

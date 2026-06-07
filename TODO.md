@@ -151,6 +151,24 @@ pluggable-persistence design plan:
 
 ## Done (kept for history)
 
+### Layered-rule tightening + latent upward-edge fix (fact-based jdeps audit)
+
+A bytecode-level (`jdeps`) audit of the compiled package graph found one latent
+upward coupling that the layered rule did not catch: `util.Bech32Helper`
+statically imported `io.AddressTxtLine.BITCOIN_CASH_PREFIX` — a Foundation→io
+edge (latent `util`&harr;`io` cycle) hidden from ArchUnit only because the
+`static final String` constant is inlined at compile time. The constant moved
+to the `constants` leaf (`constants.AddressConstants.BITCOIN_CASH_PREFIX`); both
+`io` and `util` now depend strictly downward on it.
+
+With that edge gone, the `layeredArchitecture()` access lists were tightened to
+the exact set of layers that reach each layer today (verified by jdeps):
+`Pipeline` only by `Orchestration`; `InputOutput` only by
+`Orchestration`/`Pipeline`/`Capabilities` (not `Entry`); `Config` not by
+`Foundation`; `Foundation` not by `Config`. Any new unintended cross-layer edge
+now fails the build. (jllama and plugin were audited the same way and were
+already exact — no slack found.)
+
 ### Layered package restructure (flat root package → 10-layer hierarchy)
 
 The 48 classes that previously sat flat in the root

@@ -10,7 +10,7 @@ import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.ByteBuffer;
-import net.ladenthin.bitcoinaddressfinder.io.AddressTxtLine;
+import net.ladenthin.bitcoinaddressfinder.constants.AddressConstants;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2PKH;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2WPKH;
 import org.bitcoinj.base.Bech32;
@@ -72,7 +72,7 @@ public class Bech32HelperTest {
         P2PKH address = P2PKH.BitcoinCashWithPrefix;
 
         // pre-assert
-        assertThat(address.getPublicAddress(), startsWith(AddressTxtLine.BITCOIN_CASH_PREFIX));
+        assertThat(address.getPublicAddress(), startsWith(AddressConstants.BITCOIN_CASH_PREFIX));
 
         // act
         byte[] hash160 = new Bech32Helper().extractPKHFromBitcoinCashAddress(address.getPublicAddress());
