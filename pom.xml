@@ -308,6 +308,72 @@ SPDX-License-Identifier: Apache-2.0
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <!-- Declared BEFORE maven-compiler-plugin on purpose. The attach-javadocs
+                     execution below and the compiler's module-info-compile execution are both
+                     bound to prepare-package, and Maven runs same-phase executions in plugin
+                     declaration order. Javadoc must run first — while target/classes/ still has
+                     no module-info.class — so it stays in classpath mode. Module mode is
+                     unusable here: the module declares no `requires`, so in module mode javadoc
+                     cannot see classpath dependencies (bitcoinj, jspecify, slf4j) and also
+                     mis-stages module-source-path because module-info.java lives off the source
+                     path in src/main/java9. See the module-info-compile execution for details. -->
+                <configuration>
+                    <source>21</source>
+                    <failOnError>true</failOnError>
+                    <failOnWarnings>true</failOnWarnings>
+                    <doclint>all</doclint>
+                    <additionalJOptions>
+                        <additionalJOption>--add-opens=java.base/java.lang=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-opens=java.base/java.io=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-opens=java.base/java.nio=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-opens=java.base/sun.nio.ch=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=java.base/java.lang=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=java.base/java.io=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=java.base/java.nio=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=java.base/sun.nio.ch=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.management/com.sun.management.internal=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</additionalJOption>
+                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</additionalJOption>
+                    </additionalJOptions>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <!-- Run at prepare-package (after test, before the package phase that
+                             compiles module-info.class) instead of the default package phase.
+                             At prepare-package, target/classes/ holds no module-info.class, so
+                             maven-javadoc-plugin sees a non-modular project and runs javadoc in
+                             classpath mode. If it ran in the package phase it would detect the
+                             freshly compiled descriptor and switch into JPMS module mode, which
+                             — because module-info.java lives in src/main/java9 (off javadoc's
+                             source path) — stages an inconsistent module-source-path and
+                             fails with "No source files for package net.ladenthin...". See the
+                             module-info-compile execution above for the full rationale.
+                             prepare-package is after test in the lifecycle, so `mvn test` (which
+                             does not pass -Dmaven.javadoc.skip) still never triggers javadoc. -->
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
 
@@ -413,14 +479,25 @@ SPDX-License-Identifier: Apache-2.0
                 <executions>
                     <execution>
                         <id>module-info-compile</id>
-                        <!-- Bind to prepare-package (after test-compile, before package) so
+                        <!-- Bind to prepare-package (after test-compile/test, before package) so
                              module-info.class is not present in target/classes/ while the test
                              sources compile or run. If it were, javac/the test JVM would
                              activate module mode and reject the unprefixed add-exports /
                              add-opens flags that the tests rely on for jdk.internal.ref and
                              sun.nio.ch access (ByteBufferUtility). By the time
                              maven-jar-plugin runs in the package phase the descriptor is in
-                             place and ends up at the jar root as expected.
+                             place and ends up at the jar root as expected (binding it to
+                             package itself is NOT reliable: the jar packaging's default-jar
+                             execution runs before an explicitly-declared package-phase
+                             execution, so the descriptor would miss the jar).
+
+                             Ordering vs. javadoc: the maven-javadoc-plugin attach-javadocs
+                             execution is ALSO bound to prepare-package and MUST run before this
+                             execution, so that javadoc sees a module-info-free target/classes
+                             and stays in classpath mode (see that execution's comment for why
+                             module mode breaks here). Same-phase ordering follows plugin
+                             declaration order in <build><plugins>, so the maven-javadoc-plugin
+                             block is declared before this maven-compiler-plugin block.
 
                              Local-dev caveat: running `mvn test` AFTER `mvn package` without
                              an intervening `mvn clean` will fail with IllegalAccessError on
@@ -587,50 +664,6 @@ SPDX-License-Identifier: Apache-2.0
                         <phase>verify</phase>
                         <goals>
                             <goal>jar-no-fork</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <configuration>
-                    <source>21</source>
-                    <failOnError>true</failOnError>
-                    <failOnWarnings>true</failOnWarnings>
-                    <doclint>all</doclint>
-                    <additionalJOptions>
-                        <additionalJOption>--add-opens=java.base/java.lang=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-opens=java.base/java.io=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-opens=java.base/java.nio=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-opens=java.base/sun.nio.ch=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-exports=java.base/java.lang=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-exports=java.base/java.io=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-exports=java.base/java.nio=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-exports=java.base/sun.nio.ch=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-exports=jdk.management/com.sun.management.internal=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</additionalJOption>
-                        <additionalJOption>--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</additionalJOption>
-                    </additionalJOptions>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>attach-javadocs</id>
-                        <goals>
-                            <goal>jar</goal>
                         </goals>
                     </execution>
                 </executions>

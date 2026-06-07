@@ -52,6 +52,29 @@ Tests run with `-Xmx2g -Xms1g` and several `--add-opens` / `--add-exports` to al
 - All code in `net.ladenthin` packages must carry proper `@Nullable` / `@NonNull` annotations.
 - Compilation will fail on potential null-pointer issues unless annotated.
 
+### Verifying Javadoc locally (release builds)
+
+The javadoc jar is attached only by the publish/deploy job (`mvn -P release deploy`);
+the regular build/test jobs pass `-Dmaven.javadoc.skip=true`. So a javadoc break is
+**invisible to `mvn test` and to PR CI** and only fails the snapshot publish on `main`.
+To reproduce the deploy-time javadoc step locally, run the **full lifecycle**:
+
+```bash
+mvn -P release clean package -DskipTests -Dgpg.skip=true \
+    -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true
+# expected: BUILD SUCCESS + target/*-javadoc.jar
+```
+
+Do **not** rely on a standalone `mvn javadoc:jar` — it runs before
+`target/classes/module-info.class` exists, so javadoc takes the classpath-mode path
+and cannot reproduce the JPMS module-mode failure that only appears in the full
+build. `attach-javadocs` is bound to `prepare-package` and the `maven-javadoc-plugin`
+block is declared **before** `maven-compiler-plugin` on purpose, so javadoc runs while
+`target/classes/` is still module-descriptor-free and stays in classpath mode (module
+mode is unusable here — the module declares no `requires` and `module-info.java` lives
+in `src/main/java9`, off javadoc's source path). See the extensive comments on those two
+`pom.xml` executions before touching their phase or ordering.
+
 ---
 
 ## Project Structure
