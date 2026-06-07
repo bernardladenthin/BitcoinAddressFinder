@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 import com.tngtech.archunit.core.importer.ImportOption;
@@ -12,6 +13,7 @@ import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import java.util.Random;
+import net.ladenthin.bitcoinaddressfinder.statistics.ReadStatistic;
 import org.slf4j.Logger;
 
 @AnalyzeClasses(packages = "net.ladenthin.bitcoinaddressfinder", importOptions = ImportOption.DoNotIncludeTests.class)
@@ -187,15 +189,97 @@ public class BitcoinAddressFinderArchitectureTest {
     // ---------------------------------------------------------------------------------------
     // Layered-architecture invariants
     //
-    // These three rules pin the only CRITICAL layering invariants the current BAF package
-    // structure clearly supports. The full layered design (a real
-    // `Architectures.layeredArchitecture()` with strict top/middle/bottom layers) would
-    // require moving classes — for example splitting the root package's orchestration
-    // classes (Finder, Producer*, Consumer*) into a dedicated package so the layer
-    // boundaries align with packages. That is captured as a cross-repo "package-architecture
-    // improvement" TODO in workspace/policies/code-quality-todos.md; the rules below pin
-    // what is already true today so a future refactor cannot accidentally regress it.
+    // The root package's classes were split into dedicated layered packages (engine, command,
+    // producer, consumer, io, model, util, core, statistics, secret) so the layer boundaries
+    // align with packages. The full {@link com.tngtech.archunit.library.Architectures#layeredArchitecture()}
+    // rule below now enforces the strict top-to-bottom dependency direction; the targeted leaf
+    // rules that follow it remain as precise, fast-failing guards for the individual
+    // foundation/entry-point invariants.
     // ---------------------------------------------------------------------------------------
+
+    /**
+     * Strict layered architecture — <b>one layer per package</b>. Rather than coarse tiers, every
+     * package is its own layer and its {@code mayOnlyBeAccessedByLayers} lists the EXACT set of
+     * packages that reference it today (derived from the compiled bytecode graph via jdeps, then
+     * confirmed by this rule). This governs even intra-tier edges — e.g. {@code model} may use
+     * {@code util} but not vice versa; {@code producer} may use {@code consumer} but not vice
+     * versa; {@code opencl} and {@code persistence} may not reach into each other. Any new
+     * dependency between two packages fails the build unless this rule is updated to intend it.
+     *
+     * <p>Conceptual top-to-bottom tiers (informational): {@code cli} &gt; {@code engine}/{@code command}
+     * &gt; {@code producer}/{@code consumer} &gt; {@code keyproducer}/{@code opencl}/{@code persistence}
+     * &gt; {@code io} &gt; {@code model}/{@code util}/{@code core}/{@code statistics}/{@code secret}
+     * &gt; {@code configuration} &gt; {@code constants}.
+     */
+    @ArchTest
+    static final ArchRule layeredArchitecture = layeredArchitecture()
+            .consideringOnlyDependenciesInLayers()
+            .layer("Cli")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.cli..")
+            .layer("Command")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.command..")
+            .layer("Engine")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.engine..")
+            .layer("Producer")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.producer..")
+            .layer("Consumer")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.consumer..")
+            .layer("Keyproducer")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.keyproducer..")
+            .layer("Opencl")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.opencl..")
+            .layer("Persistence")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.persistence..")
+            .layer("Io")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.io..")
+            .layer("Model")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.model..")
+            .layer("Util")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.util..")
+            .layer("Core")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.core..")
+            .layer("Statistics")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.statistics..")
+            .layer("Secret")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.secret..")
+            .layer("Configuration")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.configuration..")
+            .layer("Constants")
+            .definedBy("net.ladenthin.bitcoinaddressfinder.constants..")
+            .whereLayer("Cli")
+            .mayNotBeAccessedByAnyLayer()
+            .whereLayer("Command")
+            .mayOnlyBeAccessedByLayers("Cli")
+            .whereLayer("Engine")
+            .mayOnlyBeAccessedByLayers("Cli")
+            .whereLayer("Producer")
+            .mayOnlyBeAccessedByLayers("Engine")
+            .whereLayer("Consumer")
+            .mayOnlyBeAccessedByLayers("Engine", "Producer")
+            .whereLayer("Keyproducer")
+            .mayOnlyBeAccessedByLayers("Engine", "Producer")
+            .whereLayer("Opencl")
+            .mayOnlyBeAccessedByLayers("Cli", "Producer")
+            .whereLayer("Persistence")
+            .mayOnlyBeAccessedByLayers("Command", "Consumer", "Engine")
+            .whereLayer("Io")
+            .mayOnlyBeAccessedByLayers("Command", "Persistence", "Producer")
+            .whereLayer("Model")
+            .mayOnlyBeAccessedByLayers("Command", "Consumer", "Io", "Opencl", "Producer")
+            .whereLayer("Util")
+            .mayOnlyBeAccessedByLayers(
+                    "Command", "Consumer", "Engine", "Io", "Keyproducer", "Model", "Opencl", "Persistence", "Producer")
+            .whereLayer("Core")
+            .mayOnlyBeAccessedByLayers("Cli", "Command", "Consumer", "Engine", "Io", "Keyproducer", "Producer")
+            .whereLayer("Statistics")
+            .mayOnlyBeAccessedByLayers("Command", "Consumer", "Io", "Producer")
+            .whereLayer("Secret")
+            .mayOnlyBeAccessedByLayers("Keyproducer", "Producer", "Util")
+            .whereLayer("Configuration")
+            .mayOnlyBeAccessedByLayers(
+                    "Cli", "Command", "Consumer", "Engine", "Io", "Keyproducer", "Opencl", "Persistence", "Producer")
+            .whereLayer("Constants")
+            .mayOnlyBeAccessedByLayers("Configuration", "Consumer", "Io", "Keyproducer", "Model", "Opencl", "Util");
 
     /**
      * The {@code constants} sub-package is a true architectural leaf. Pure
@@ -281,4 +365,53 @@ public class BitcoinAddressFinderArchitectureTest {
             .should()
             .dependOnClassesThat()
             .resideInAPackage("net.ladenthin.bitcoinaddressfinder.cli..");
+
+    // ---------------------------------------------------------------------------------------
+    // Per-module banned imports — confine heavy / specific third-party dependencies to the
+    // single layer that owns them, so the rest of the codebase stays decoupled from them.
+    // ---------------------------------------------------------------------------------------
+
+    /**
+     * The JOCL / OpenCL GPU binding ({@code org.jocl..}) may only be referenced from the
+     * {@code opencl} package. No other layer may take a compile dependency on the GPU runtime;
+     * everything above consumes the GPU exclusively through {@code opencl}'s own types.
+     */
+    @ArchTest
+    static final ArchRule joclConfinedToOpencl = noClasses()
+            .that()
+            .resideOutsideOfPackage("net.ladenthin.bitcoinaddressfinder.opencl..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("org.jocl..")
+            .allowEmptyShould(true);
+
+    /**
+     * The network key-input libraries — ZeroMQ ({@code org.zeromq..}) and
+     * Java-WebSocket ({@code org.java_websocket..}) — may only be referenced from the
+     * {@code keyproducer} package (the socket / websocket / zmq key producers live there).
+     */
+    @ArchTest
+    static final ArchRule networkInputLibsConfinedToKeyproducer = noClasses()
+            .that()
+            .resideOutsideOfPackage("net.ladenthin.bitcoinaddressfinder.keyproducer..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("org.zeromq..", "org.java_websocket..")
+            .allowEmptyShould(true);
+
+    /**
+     * The LMDB binding ({@code org.lmdbjava..}) may only be referenced from {@code persistence}
+     * (the database backend) and {@code io} (which catches {@code LmdbException} during address
+     * file ingestion). Runtime/orchestration layers consume LMDB only through the
+     * {@code persistence} abstraction, never the driver directly.
+     */
+    @ArchTest
+    static final ArchRule lmdbConfinedToPersistenceAndIo = noClasses()
+            .that()
+            .resideOutsideOfPackages(
+                    "net.ladenthin.bitcoinaddressfinder.persistence..", "net.ladenthin.bitcoinaddressfinder.io..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("org.lmdbjava..")
+            .allowEmptyShould(true);
 }

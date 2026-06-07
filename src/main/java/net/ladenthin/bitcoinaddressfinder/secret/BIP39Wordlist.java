@@ -1,0 +1,126 @@
+// SPDX-FileCopyrightText: 2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+//
+// SPDX-License-Identifier: Apache-2.0
+package net.ladenthin.bitcoinaddressfinder.secret;
+
+import java.io.InputStream;
+import java.util.Locale;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * Enumerates the official BIP39 wordlists shipped with the project.
+ */
+public enum BIP39Wordlist {
+
+    /** Simplified Chinese BIP39 wordlist. */
+    CHINESE_SIMPLIFIED("chinese_simplified.txt"),
+    /** Traditional Chinese BIP39 wordlist. */
+    CHINESE_TRADITIONAL("chinese_traditional.txt"),
+    /** Czech BIP39 wordlist. */
+    CZECH("czech.txt"),
+    /** English BIP39 wordlist. */
+    ENGLISH("english.txt"),
+    /** French BIP39 wordlist. */
+    FRENCH("french.txt"),
+    /** Italian BIP39 wordlist. */
+    ITALIAN("italian.txt"),
+    /** Japanese BIP39 wordlist. */
+    JAPANESE("japanese.txt"),
+    /** Korean BIP39 wordlist. */
+    KOREAN("korean.txt"),
+    /** Portuguese BIP39 wordlist. */
+    PORTUGUESE("portuguese.txt"),
+    /** Russian BIP39 wordlist. */
+    RUSSIAN("russian.txt"),
+    /** Spanish BIP39 wordlist. */
+    SPANISH("spanish.txt"),
+    /** Turkish BIP39 wordlist. */
+    TURKISH("turkish.txt");
+
+    /**
+     * Unicode character for an ideographic space (U+3000), used in East Asian languages such as Japanese.
+     * This space is wider than a standard space and is required for correct formatting of Japanese mnemonics.
+     */
+    public static final String IDEOGRAPHIC_SPACE = "\u3000";
+
+    /**
+     * Standard ASCII space character (U+0020).
+     * Used as the default separator between words in most BIP39 wordlists, such as English.
+     */
+    public static final String NORMAL_SPACE = " ";
+
+    /**
+     * The name of the wordlist file associated with this BIP39 language.
+     * <p>
+     * This filename is used to locate the corresponding wordlist resource file in the
+     * {@code /mnemonic/wordlist/} directory of the classpath (e.g., {@code english.txt}).
+     */
+    private final String fileName;
+
+    /**
+     * Constructs a BIP39 wordlist enum constant with the associated filename.
+     *
+     * @param fileName the name of the wordlist file (e.g., {@code "english.txt"}), which is used
+     *                 to load the corresponding wordlist resource from the classpath
+     */
+    BIP39Wordlist(String fileName) {
+        this.fileName = fileName;
+    }
+
+    /**
+     * Loads the BIP39 wordlist file as an {@link InputStream} for this language.
+     * <p>
+     * The wordlist file is expected to be located in the resource path:
+     * {@code /mnemonic/wordlist/{fileName}}, where {@code fileName} corresponds
+     * to the file name associated with the enum constant (e.g. {@code english.txt}).
+     * <p>
+     * This method is used to initialize a {@link org.bitcoinj.crypto.MnemonicCode} instance with the correct
+     * wordlist for a given language.
+     *
+     * @return the input stream of the wordlist file for this language, or {@code null}
+     *         if the resource is not found.
+     */
+    public @Nullable InputStream getWordListStream() {
+        return BIP39Wordlist.class.getResourceAsStream("/mnemonic/wordlist/" + fileName);
+    }
+
+    /**
+     * Converts a filename-like language name into the corresponding {@link BIP39Wordlist} enum constant.
+     * <p>
+     * The input typically comes from wordlist filenames in the format {@code mnemonic/wordlist/{language}.txt},
+     * for example:
+     * <ul>
+     *   <li>{@code chinese_simplified.txt} → {@code CHINESE_SIMPLIFIED}</li>
+     *   <li>{@code english.txt} → {@code ENGLISH}</li>
+     * </ul>
+     * <p>
+     * To perform the conversion, this method:
+     * <ul>
+     *   <li>Converts the name to upper case</li>
+     *   <li>Replaces hyphens with underscores (if any)</li>
+     * </ul>
+     * This enables consistent mapping between file-based wordlist identifiers and enum values.
+     *
+     * @param name the lowercase filename-based language identifier, e.g. {@code "english"} or {@code "chinese_simplified"}
+     * @return the corresponding {@link BIP39Wordlist} enum constant
+     * @throws IllegalArgumentException if no matching enum exists
+     */
+    public static BIP39Wordlist fromLanguageName(String name) {
+        return valueOf(name.toUpperCase(Locale.ROOT).replace('-', '_'));
+    }
+
+    /**
+     * Returns the word separator used in the mnemonic phrase for the given language.
+     * <p>
+     * Most languages use a single space (" ") as the separator between words.
+     * However, Japanese uses the IDEOGRAPHIC SPACE (U+3000) to conform with the official BIP39 specification.
+     *
+     * @return the word separator specific to the language
+     */
+    public String getSeparator() {
+        if (this == JAPANESE) {
+            return IDEOGRAPHIC_SPACE;
+        }
+        return NORMAL_SPACE;
+    }
+}

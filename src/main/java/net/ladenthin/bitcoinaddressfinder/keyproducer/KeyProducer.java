@@ -4,7 +4,8 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import java.math.BigInteger;
-import net.ladenthin.bitcoinaddressfinder.Interruptable;
+import net.ladenthin.bitcoinaddressfinder.core.Interruptable;
+import net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableException;
 
 /**
  * Strategy for creating batches of secret scalars used as candidate private keys.

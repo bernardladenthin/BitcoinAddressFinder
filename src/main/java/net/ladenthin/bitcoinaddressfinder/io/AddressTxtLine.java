@@ -1,0 +1,322 @@
+// SPDX-FileCopyrightText: 2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+//
+// SPDX-License-Identifier: Apache-2.0
+package net.ladenthin.bitcoinaddressfinder.io;
+
+import static net.ladenthin.bitcoinaddressfinder.constants.AddressConstants.BITCOIN_CASH_PREFIX;
+import static net.ladenthin.bitcoinaddressfinder.constants.AddressConstants.CHECKSUM_BYTES_REGULAR;
+import static net.ladenthin.bitcoinaddressfinder.constants.AddressConstants.VERSION_BYTES_REGULAR;
+import static net.ladenthin.bitcoinaddressfinder.constants.AddressConstants.VERSION_BYTES_ZCASH;
+import static net.ladenthin.bitcoinaddressfinder.constants.AddressConstants.WITNESS_VERSION_0;
+import static net.ladenthin.bitcoinaddressfinder.constants.AddressConstants.WITNESS_VERSION_1;
+
+import com.google.common.hash.Hashing;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import lombok.ToString;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
+import net.ladenthin.bitcoinaddressfinder.model.AddressToCoin;
+import net.ladenthin.bitcoinaddressfinder.model.AddressType;
+import net.ladenthin.bitcoinaddressfinder.util.Base36Decoder;
+import net.ladenthin.bitcoinaddressfinder.util.Bech32Helper;
+import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
+import org.bitcoinj.base.Base58;
+import org.bitcoinj.base.Bech32;
+import org.bitcoinj.base.Coin;
+import org.bitcoinj.base.SegwitAddress;
+import org.bitcoinj.base.exceptions.AddressFormatException;
+import org.bouncycastle.util.encoders.DecoderException;
+import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Most txt files have a common format which uses Base58 address and separated
+ * anmount.
+ *
+ * <p>{@link ToString} is applied for consistency with every other class in the
+ * codebase that gets a Lombok-generated {@code toString}; rendered output is
+ * {@code AddressTxtLine()} (empty parens) today because the class has no
+ * instance fields. If parser flags or other instance state are added later they
+ * will be auto-included.
+ */
+@ToString
+public class AddressTxtLine {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AddressTxtLine.class);
+
+    /** Creates a new {@link AddressTxtLine}. */
+    public AddressTxtLine() {}
+
+    /**
+     * Should not be {@link Coin#ZERO} because it can't be written to LMDB.
+     */
+    public static final Coin DEFAULT_COIN = Coin.SATOSHI;
+
+    /** Lines starting with this prefix are ignored. */
+    public static final String IGNORE_LINE_PREFIX = "#";
+    /** Header token marking a column header row that should be skipped. */
+    public static final String ADDRESS_HEADER = "address";
+
+    /** Reason used when the address field is empty. */
+    public static final String REASON_EMPTY = "address is empty";
+
+    /**
+     * Reason used when the line starts with {@link #IGNORE_LINE_PREFIX} ({@code "#"}).
+     * <p>
+     * This check is performed on the raw line <em>before</em> {@link SeparatorFormat#split},
+     * because {@code "#"} is also registered as {@link SeparatorFormat#HASH}. Splitting first
+     * would always produce an empty first token for {@code "#..."} lines, masking this reason
+     * with {@link #REASON_EMPTY} instead.
+     */
+    public static final String REASON_IGNORE_PREFIX = "address starts with ignore prefix";
+    /** Reason used when the line starts with the column header word. */
+    public static final String REASON_ADDRESS_HEADER = "address starts with address header";
+    /** Reason used when the line is a Blockchair P2MS Multisig entry. */
+    public static final String REASON_P2MS_NOT_SUPPORTED = "Blockchair Multisig (P2MS) format is not supported";
+    /** Reason used when the line is a P2WSH Bech32 address. */
+    public static final String REASON_P2WSH_NOT_SUPPORTED = "P2WSH is not supported";
+    /** Reason used when the line is a P2TR Bech32m address. */
+    public static final String REASON_P2TR_NOT_SUPPORTED = "P2TR is not supported";
+    /** Reason used when a Bech32 address has an unknown witness version. */
+    public static final String REASON_UNSUPPORTED_WITNESS_VERSION = "unsupported witness version";
+    /** Reason used when a Bitcoin Cash {@code q} address could not be decoded. */
+    public static final String REASON_BITCOIN_CASH_Q_ADDRESS_NOT_PARSABLE = "Bitcoin Cash address is not parsable";
+    /** Reason used when a Base58 fallback decoding failed. */
+    public static final String REASON_INVALID_BASE58 = "invalid Base58 address";
+
+    /** Column index of the address field after {@link SeparatorFormat#split}. */
+    private static final int COLUMN_ADDRESS = 0;
+
+    /** Column index of the (optional) amount field after {@link SeparatorFormat#split}. */
+    private static final int COLUMN_AMOUNT = 1;
+
+    Bech32Helper bech32Helper = new Bech32Helper();
+
+    /**
+     * Parses a line containing an address and optional amount.
+     * Throws {@link AddressFormatNotAcceptedException} if the address is unsupported,
+     * malformed, or marked as ignored.
+     * <p>
+     * If no coin amount is specified in the line, {@link #DEFAULT_COIN} is used as a fallback.
+     *
+     * @param line the line to parse
+     * @param keyUtility the {@link KeyUtility} used for conversions
+     * @return an {@link AddressToCoin} instance — never {@code null}
+     * @throws AddressFormatNotAcceptedException if the address format is not accepted,
+     *         with a reason message describing why
+     */
+    public @NonNull AddressToCoin fromLine(String line, KeyUtility keyUtility)
+            throws AddressFormatNotAcceptedException {
+        // Checked before splitting: "#" is also a SeparatorFormat separator, so splitting first
+        // would always produce an empty first token for "#..." lines, masking this reason.
+        if (line.trim().startsWith(IGNORE_LINE_PREFIX)) {
+            throw new AddressFormatNotAcceptedException(REASON_IGNORE_PREFIX, line);
+        }
+        // Remove the Bitcoin Cash prefix (which includes a colon) to avoid incorrect splitting.
+        // This ensures the address is recognized properly and not misinterpreted during parsing.
+        if (line.contains(BITCOIN_CASH_PREFIX)) {
+            line = line.replace(BITCOIN_CASH_PREFIX, "");
+        }
+        String[] lineSplitted = SeparatorFormat.split(line);
+        String address = lineSplitted[COLUMN_ADDRESS];
+        Coin amount = getCoinIfPossible(lineSplitted, DEFAULT_COIN);
+        address = address.trim();
+        if (address.isEmpty()) {
+            throw new AddressFormatNotAcceptedException(REASON_EMPTY, line);
+        }
+        if (address.startsWith(ADDRESS_HEADER)) {
+            throw new AddressFormatNotAcceptedException(REASON_ADDRESS_HEADER, address);
+        }
+
+        // Riecoin: ScriptPubKey-style encoded address (hex with OP codes)
+        {
+            final String OP_DUP = "76";
+            final String OP_HASH160 = "a9";
+            final String OP_PUSH_20_BYTES = "14";
+            final int length20Bytes = OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES;
+            final String riecoinP2SHPrefix = OP_DUP + OP_HASH160 + OP_PUSH_20_BYTES;
+            final int riecoinScriptPubKeyLengthHex = length20Bytes * 2 + riecoinP2SHPrefix.length();
+            if (address.length() >= riecoinScriptPubKeyLengthHex && address.startsWith(riecoinP2SHPrefix)) {
+                final String hash160Hex =
+                        address.substring(riecoinP2SHPrefix.length(), length20Bytes * 2 + riecoinP2SHPrefix.length());
+                final ByteBuffer hash160 = keyUtility.byteBufferUtility().getByteBufferFromHex(hash160Hex);
+                return new AddressToCoin(hash160, amount, AddressType.P2PKH_OR_P2SH);
+            }
+        }
+
+        // Blockchair Multisig (P2MS) format is not supported
+        if (address.startsWith("d-") || address.startsWith("m-") || address.startsWith("s-")) {
+            throw new AddressFormatNotAcceptedException(REASON_P2MS_NOT_SUPPORTED, address);
+        }
+
+        // BitCore WKH format (Base36-encoded hash160)
+        if (address.startsWith("wkh_")) {
+            // BitCore (WKH) is base36 encoded hash160
+            String addressWKH = address.substring("wkh_".length());
+            byte[] hash160 = new Base36Decoder()
+                    .decodeBase36ToFixedLengthBytes(addressWKH, OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
+            ByteBuffer hash160AsByteBuffer = keyUtility.byteBufferUtility().byteArrayToByteBuffer(hash160);
+            return new AddressToCoin(hash160AsByteBuffer, amount, AddressType.P2WPKH);
+        }
+
+        // Bech32 decoding (P2WPKH, P2WSH, P2TR)
+        try {
+            Bech32.Bech32Data bechData = Bech32.decode(address);
+
+            // protected: bechData.witnessVersion();
+            short witnessVersion = bech32Helper.getWitnessVersion(bechData);
+            // protected: bechData.witnessProgram();
+            byte[] witnessProgram = bech32Helper.getWitnessProgram(bechData);
+
+            switch (witnessVersion) {
+                case WITNESS_VERSION_0 -> {
+                    if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_PKH) {
+                        ByteBuffer hash160 = keyUtility.byteBufferUtility().byteArrayToByteBuffer(witnessProgram);
+                        return new AddressToCoin(hash160, amount, AddressType.P2WPKH); // P2WPKH supported
+                    } else if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_SH) {
+                        throw new AddressFormatNotAcceptedException(REASON_P2WSH_NOT_SUPPORTED, address);
+                    }
+                }
+                case WITNESS_VERSION_1 -> {
+                    if (witnessProgram.length == SegwitAddress.WITNESS_PROGRAM_LENGTH_TR) {
+                        if (LOGGER.isTraceEnabled()) {
+                            byte[] tweakedPublicKey = witnessProgram;
+                            LOGGER.trace(
+                                    "Rejecting P2TR taproot tweaked public key: {}",
+                                    org.apache.commons.codec.binary.Hex.encodeHexString(tweakedPublicKey));
+                        }
+                        throw new AddressFormatNotAcceptedException(REASON_P2TR_NOT_SUPPORTED, address);
+                    }
+                }
+                default ->
+                    throw new AddressFormatNotAcceptedException(
+                            REASON_UNSUPPORTED_WITNESS_VERSION, address + " witnessVersion=" + witnessVersion);
+            }
+        } catch (AddressFormatException | ReflectiveOperationException e) {
+            // Bech32 parsing or reflection failed; continue to next format
+        }
+
+        // ZCash or Peercoin with 2-byte version
+        if (address.startsWith("p") || address.startsWith("t")) {
+            // p: bitcoin cash / CashAddr (P2SH), this is a unique format and does not work
+            // p: peercoin possible
+            // t: ZCash has two version bytes
+            try {
+                AddressToCoin addressToCoin =
+                        parseBase58Address(address, VERSION_BYTES_ZCASH, CHECKSUM_BYTES_REGULAR, keyUtility);
+                return new AddressToCoin(addressToCoin.hash160(), amount, addressToCoin.type());
+            } catch (RuntimeException e) {
+                // Fall through to other format checks
+            }
+        }
+
+        try {
+            // Bitcoin Cash 'q' prefix: convert to legacy address
+            if (address.startsWith("q")) {
+                byte[] payload = bech32Helper.extractPKHFromBitcoinCashAddress(address);
+                ByteBuffer hash160 = keyUtility.byteBufferUtility().byteArrayToByteBuffer(payload);
+                return new AddressToCoin(hash160, amount, AddressType.P2PKH_OR_P2SH);
+            }
+        } catch (DecoderException e) {
+            throw e;
+        } catch (RuntimeException | ReflectiveOperationException e) {
+            throw new AddressFormatNotAcceptedException(REASON_BITCOIN_CASH_Q_ADDRESS_NOT_PARSABLE, address, e);
+        }
+
+        // Fallback: assume Base58 with 1-byte version prefix
+        try {
+            AddressToCoin addressToCoin =
+                    parseBase58Address(address, VERSION_BYTES_REGULAR, CHECKSUM_BYTES_REGULAR, keyUtility);
+            return new AddressToCoin(addressToCoin.hash160(), amount, addressToCoin.type());
+        } catch (AddressFormatException e) {
+            throw new AddressFormatNotAcceptedException(REASON_INVALID_BASE58, address, e);
+        }
+    }
+
+    static AddressToCoin parseBase58Address(String base58, int versionBytes, int checksumBytes, KeyUtility keyUtility) {
+        byte[] decoded = Base58.decode(base58);
+
+        final byte[] version;
+        if (versionBytes > 0) {
+            // copy version bytes
+            version = new byte[versionBytes];
+            System.arraycopy(decoded, 0, version, 0, version.length);
+        } else {
+            version = null;
+        }
+
+        byte[] hash160 = new byte[OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES];
+        int storedBytes = Math.min(decoded.length - versionBytes, hash160.length);
+        {
+            // copy hash160
+            System.arraycopy(decoded, versionBytes, hash160, 0, storedBytes);
+        }
+
+        final byte[] checksum;
+        if (decoded.length >= versionBytes + hash160.length + checksumBytes) {
+            checksum = new byte[checksumBytes];
+            // copy cheksum
+            System.arraycopy(decoded, versionBytes + storedBytes, checksum, 0, checksum.length);
+            if (LOGGER.isTraceEnabled()) {
+                String checksumAsHex = org.apache.commons.codec.binary.Hex.encodeHexString(checksum);
+                LOGGER.trace("Extracted base58 checksum: {}", checksumAsHex);
+            }
+        } else {
+            checksum = null;
+        }
+
+        if (version != null && checksum != null) {
+            byte[] payload = new byte[version.length + hash160.length];
+            System.arraycopy(version, 0, payload, 0, version.length);
+            System.arraycopy(hash160, 0, payload, version.length, hash160.length);
+
+            byte[] firstHash = Hashing.sha256().hashBytes(payload).asBytes();
+            byte[] secondHash = Hashing.sha256().hashBytes(firstHash).asBytes();
+            byte[] calculatedChecksum = Arrays.copyOfRange(secondHash, 0, checksumBytes);
+
+            final boolean checksumMatches = Arrays.equals(calculatedChecksum, checksum);
+            if (!checksumMatches && LOGGER.isDebugEnabled()) {
+                // Bulk-import contract: accept addresses with bad Base58
+                // checksums (data-quality issues are common in scraped /
+                // exported address dumps). Log at DEBUG so operators
+                // investigating import quality can enable detail without
+                // spamming the default INFO log for million-line imports.
+                LOGGER.debug(
+                        "Base58 checksum mismatch for parsed address (accepted anyway): " + "expected={}, got={}",
+                        org.apache.commons.codec.binary.Hex.encodeHexString(checksum),
+                        org.apache.commons.codec.binary.Hex.encodeHexString(calculatedChecksum));
+            }
+            if (LOGGER.isTraceEnabled()) {
+                String versionAsHex = org.apache.commons.codec.binary.Hex.encodeHexString(version);
+                LOGGER.trace("Base58 version byte(s): {}", versionAsHex);
+            }
+        }
+
+        if (LOGGER.isTraceEnabled()) {
+            String decodedAsHex = org.apache.commons.codec.binary.Hex.encodeHexString(decoded);
+            String hash160AsHex = org.apache.commons.codec.binary.Hex.encodeHexString(hash160);
+            LOGGER.trace("Base58 decoded={}, hash160={}", decodedAsHex, hash160AsHex);
+        }
+
+        ByteBuffer hash160AsByteBuffer = keyUtility.byteBufferUtility().byteArrayToByteBuffer(hash160);
+
+        // fallback
+        AddressType addressType = AddressType.P2PKH_OR_P2SH;
+
+        return new AddressToCoin(hash160AsByteBuffer, DEFAULT_COIN, addressType);
+    }
+
+    private @NonNull Coin getCoinIfPossible(@NonNull String[] lineSplitted, @NonNull Coin defaultValue) {
+        if (lineSplitted.length > COLUMN_AMOUNT) {
+            String amountString = lineSplitted[COLUMN_AMOUNT];
+            try {
+                return Coin.valueOf(Long.parseLong(amountString));
+            } catch (NumberFormatException e) {
+                return defaultValue;
+            }
+        } else {
+            return defaultValue;
+        }
+    }
+}

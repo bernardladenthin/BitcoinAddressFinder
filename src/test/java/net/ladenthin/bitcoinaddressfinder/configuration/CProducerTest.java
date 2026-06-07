@@ -4,7 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import java.io.IOException;
-import net.ladenthin.bitcoinaddressfinder.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

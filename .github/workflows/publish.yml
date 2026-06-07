@@ -29,6 +29,25 @@ jobs:
     steps:
       - run: echo "Start gate elapsed — proceeding with pipeline."
 
+  code-style:
+    name: Code style (spotless) + package graph
+    needs: startgate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: temurin
+      - name: Spotless check (fail fast on format violations)
+        run: mvn -B --no-transfer-progress spotless:check
+      - name: Print internal package dependency graph (jdeps, informational)
+        continue-on-error: true
+        run: |
+          mvn -B --no-transfer-progress -DskipTests -Denforcer.skip=true compile
+          echo "=== internal package dependency graph (jdeps, bytecode) ==="
+          jdeps -verbose:package target/classes | grep 'net.ladenthin.bitcoinaddressfinder' || true
+
   build:
     name: Build
     needs: startgate
@@ -130,7 +149,7 @@ jobs:
           format: jacoco
         continue-on-error: true
       - name: Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: target/site/jacoco/jacoco.xml
@@ -158,7 +177,7 @@ jobs:
 
   publish-snapshot:
     name: Publish Snapshot to Central
-    needs: [check-snapshot]
+    needs: [check-snapshot, code-style]
     if: needs.check-snapshot.result == 'success'
     runs-on: ubuntu-latest
     environment: maven-central
@@ -218,7 +237,7 @@ jobs:
 
   publish-release:
     name: Publish Release to Central
-    needs: [check-tag]
+    needs: [check-tag, code-style]
     if: needs.check-tag.result == 'success'
     runs-on: ubuntu-latest
     environment: maven-central

@@ -4,9 +4,9 @@
 package net.ladenthin.bitcoinaddressfinder.staticaddresses.enums;
 
 import java.nio.ByteBuffer;
-import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
-import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
+import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
+import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
 import org.bitcoinj.base.Network;
 import org.bouncycastle.util.encoders.Hex;
 

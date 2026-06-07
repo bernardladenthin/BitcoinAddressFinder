@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 
-import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.COMMA;
-import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.SEMICOLON;
-import static net.ladenthin.bitcoinaddressfinder.SeparatorFormat.TAB_SPLIT;
+import static net.ladenthin.bitcoinaddressfinder.io.SeparatorFormat.COMMA;
+import static net.ladenthin.bitcoinaddressfinder.io.SeparatorFormat.SEMICOLON;
+import static net.ladenthin.bitcoinaddressfinder.io.SeparatorFormat.TAB_SPLIT;
 
 import java.io.File;
 import java.io.IOException;
@@ -14,9 +14,9 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import net.ladenthin.bitcoinaddressfinder.PublicKeyBytes;
-import net.ladenthin.bitcoinaddressfinder.SeparatorFormat;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
+import net.ladenthin.bitcoinaddressfinder.io.SeparatorFormat;
+import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2WPKH;
 import org.bitcoinj.base.Coin;
 

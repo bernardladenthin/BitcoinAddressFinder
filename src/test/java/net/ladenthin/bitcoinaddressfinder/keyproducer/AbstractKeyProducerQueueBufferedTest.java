@@ -7,7 +7,6 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -18,11 +17,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import net.ladenthin.bitcoinaddressfinder.BitHelper;
-import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
-import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.NetworkParameterFactory;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaReceiver;
+import net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableException;
+import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
+import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
 import nl.altindag.log.LogCaptor;
 import org.bitcoinj.base.Network;
 import org.junit.jupiter.api.AfterEach;
@@ -87,8 +87,8 @@ public class AbstractKeyProducerQueueBufferedTest {
 
         BigInteger[] secrets = producer.createSecrets(1, true);
 
-        assertEquals(1, secrets.length);
-        assertEquals(expectedSecret, secrets[0]);
+        assertThat(secrets.length, is(1));
+        assertThat(secrets[0], is(equalTo(expectedSecret)));
     }
 
     @Test
@@ -104,9 +104,9 @@ public class AbstractKeyProducerQueueBufferedTest {
 
         BigInteger[] secrets = producer.createSecrets(2, false);
 
-        assertEquals(2, secrets.length);
+        assertThat(secrets.length, is(2));
         for (BigInteger bi : secrets) {
-            assertEquals(expectedSecret, bi);
+            assertThat(bi, is(equalTo(expectedSecret)));
         }
     }
 

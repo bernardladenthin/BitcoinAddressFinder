@@ -53,7 +53,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
-import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
+import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.jocl.Pointer;
 import org.jocl.Sizeof;

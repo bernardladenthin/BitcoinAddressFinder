@@ -5,7 +5,7 @@ package net.ladenthin.bitcoinaddressfinder.staticaddresses;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
+import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 
 /**
  * Static strings from a random generated address https://www.bitaddress.org

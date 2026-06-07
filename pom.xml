@@ -704,12 +704,13 @@ SPDX-License-Identifier: Apache-2.0
             </plugin>
             <plugin>
                 <!--
-                  PIT mutation testing is INTENTIONALLY scoped to a single class
-                  (BitHelper) so that the wiring is exercised on every CI build
-                  with a 100% mutation threshold gate, without forcing every other
-                  class up to 100% mutation coverage at once. Expand targetClasses
-                  incrementally as classes reach mutation-test parity (see README
-                  TODO).
+                  PIT mutation testing is gated at a 100% threshold on every CI
+                  build over the explicit list of classes that have reached 100%
+                  mutation parity (verified with pitest-maven 1.25.3). Expand the
+                  targetClasses list as more classes reach parity (see README
+                  TODO). The targeted classes are covered by fast, pure-Java unit
+                  tests (no LMDB / OpenCL / GPU needed), kept in lock-step in the
+                  targetTests list.
 
                   CI invocation pattern (matches streambuffer):
                       mvn test-compile org.pitest:pitest-maven:mutationCoverage
@@ -730,10 +731,41 @@ SPDX-License-Identifier: Apache-2.0
                 </dependencies>
                 <configuration>
                     <targetClasses>
-                        <param>net.ladenthin.bitcoinaddressfinder.BitHelper</param>
+                        <!-- Classes verified at 100% PIT mutation parity. Expand as more reach it. -->
+                        <param>net.ladenthin.bitcoinaddressfinder.util.BitHelper</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.util.PrivateKeyTooLargeException</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.model.AddressToCoin</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.model.AddressType</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.model.Hash160</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.io.AddressFormatNotAcceptedException</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.core.InterruptedRuntimeException</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdIsNotUniqueException</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdNullException</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdUnknownException</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableException</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.configuration.UnknownSecretFormatException</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.statistics.Statistics</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.statistics.ReadStatistic</param>
                     </targetClasses>
                     <targetTests>
-                        <param>net.ladenthin.bitcoinaddressfinder.BitHelperTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.util.BitHelperTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.util.PrivateKeyTooLargeExceptionTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytesTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.model.AddressToCoinTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.model.AddressTypeTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.model.Hash160Test</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.io.AddressFormatNotAcceptedExceptionTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.core.InterruptedRuntimeExceptionTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdIsNotUniqueExceptionTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdNullExceptionTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdUnknownExceptionTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableExceptionTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.configuration.UnknownSecretFormatExceptionTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncrementalTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.statistics.StatisticsTest</param>
+                        <param>net.ladenthin.bitcoinaddressfinder.statistics.ReadStatisticTest</param>
                     </targetTests>
                     <mutationThreshold>100</mutationThreshold>
                     <timeoutConstant>30000</timeoutConstant>

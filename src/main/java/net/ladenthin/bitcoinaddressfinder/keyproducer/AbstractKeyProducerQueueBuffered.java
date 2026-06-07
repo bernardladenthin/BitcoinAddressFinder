@@ -8,9 +8,10 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import lombok.ToString;
-import net.ladenthin.bitcoinaddressfinder.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaReceiver;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
+import net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableException;
+import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,16 +91,14 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
                 } else {
                     secret = secretQueue.poll(timeout, TimeUnit.MILLISECONDS);
                     if (secret == null) {
-                        throw new NoMoreSecretsAvailableException(
-                                "Timeout while waiting for secret ("
-                                        + timeout + " ms, iteration " + i + "/" + length + ")");
+                        throw new NoMoreSecretsAvailableException("Timeout while waiting for secret (" + timeout
+                                + " ms, iteration " + i + "/" + length + ")");
                     }
                 }
 
                 if (secret == SHUTDOWN_SENTINEL) {
                     throw new NoMoreSecretsAvailableException(
-                            "Shutdown sentinel received while waiting for secret at iteration "
-                                    + i + "/" + length);
+                            "Shutdown sentinel received while waiting for secret at iteration " + i + "/" + length);
                 }
 
                 if (secret.length != OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES) {

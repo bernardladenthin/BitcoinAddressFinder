@@ -17,16 +17,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import lombok.ToString;
-import net.ladenthin.bitcoinaddressfinder.ByteBufferUtility;
-import net.ladenthin.bitcoinaddressfinder.ByteConversion;
-import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.SeparatorFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFileOutputFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
+import net.ladenthin.bitcoinaddressfinder.io.SeparatorFormat;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
+import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
+import net.ladenthin.bitcoinaddressfinder.util.ByteConversion;
+import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import org.apache.commons.codec.binary.Hex;
 import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.LegacyAddress;
@@ -106,11 +106,10 @@ public class LMDBPersistence implements Persistence, AddressIterable {
         } else if (lmdbConfigurationReadOnly != null) {
             initReadOnly();
         } else {
-            throw new IllegalArgumentException(
-                    getClass().getSimpleName()
-                            + ".init() requires either lmdbConfigurationWrite or"
-                            + " lmdbConfigurationReadOnly to be set; both are null"
-                            + " (check the <persistence> block in your finder configuration JSON)");
+            throw new IllegalArgumentException(getClass().getSimpleName()
+                    + ".init() requires either lmdbConfigurationWrite or"
+                    + " lmdbConfigurationReadOnly to be set; both are null"
+                    + " (check the <persistence> block in your finder configuration JSON)");
         }
 
         logStatsIfConfigured(true);

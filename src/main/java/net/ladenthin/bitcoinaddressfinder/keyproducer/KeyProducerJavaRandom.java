@@ -8,11 +8,11 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Random;
 import lombok.ToString;
-import net.ladenthin.bitcoinaddressfinder.BitHelper;
-import net.ladenthin.bitcoinaddressfinder.KeyUtility;
-import net.ladenthin.bitcoinaddressfinder.RandomSecretSupplier;
-import net.ladenthin.bitcoinaddressfinder.SecretSupplier;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
+import net.ladenthin.bitcoinaddressfinder.secret.RandomSecretSupplier;
+import net.ladenthin.bitcoinaddressfinder.secret.SecretSupplier;
+import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 
 /**
  * Key producer that draws secrets from a configurable random-number generator.
@@ -89,10 +89,9 @@ public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRando
                         }
                     }
                     default ->
-                        throw new IllegalStateException(
-                                "Unknown keyProducerJavaRandomInstance enum value: "
-                                        + cKeyProducerJavaRandom.keyProducerJavaRandomInstance
-                                        + " (KeyProducerJavaRandom switch must be exhaustive)");
+                        throw new IllegalStateException("Unknown keyProducerJavaRandomInstance enum value: "
+                                + cKeyProducerJavaRandom.keyProducerJavaRandomInstance
+                                + " (KeyProducerJavaRandom switch must be exhaustive)");
                 };
         randomSupplier = new RandomSecretSupplier(random);
     }

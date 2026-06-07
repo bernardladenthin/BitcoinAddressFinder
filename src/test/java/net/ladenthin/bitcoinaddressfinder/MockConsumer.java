@@ -5,6 +5,8 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.ladenthin.bitcoinaddressfinder.consumer.Consumer;
+import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
 
 public class MockConsumer implements Consumer {
 

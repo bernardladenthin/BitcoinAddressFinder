@@ -8,7 +8,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
+import net.ladenthin.bitcoinaddressfinder.command.AddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 

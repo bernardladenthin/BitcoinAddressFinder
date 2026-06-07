@@ -60,14 +60,23 @@ Tests run with `-Xmx2g -Xms1g` and several `--add-opens` / `--add-exports` to al
 BitcoinAddressFinder/
 ├── src/
 │   ├── main/
-│   │   ├── java/net/ladenthin/bitcoinaddressfinder/
-│   │   │   ├── cli/                  # CLI entry point (Main.java)
-│   │   │   ├── configuration/        # Config POJOs (C-prefixed)
-│   │   │   ├── keyproducer/          # Key generation strategies
-│   │   │   ├── persistence/          # Persistence abstraction + LMDB impl
-│   │   │   ├── opencl/               # OpenCL device/platform wrappers
-│   │   │   ├── eckey/                # Secp256k1 ECC utilities
-│   │   │   └── *.java                # Core domain classes
+│   │   ├── java/net/ladenthin/bitcoinaddressfinder/   # layered packages (top → bottom)
+│   │   │   ├── cli/                  # Entry: CLI entry point (Main.java)
+│   │   │   ├── engine/              # Orchestration: Finder, Shutdown
+│   │   │   ├── command/            # Orchestration: CCommand impls (LMDB import/export)
+│   │   │   ├── producer/          # Pipeline: runtime key producers (queue feeders)
+│   │   │   ├── consumer/         # Pipeline: ConsumerJava + Consumer contract
+│   │   │   ├── keyproducer/      # Capability: key/secret generation strategies (+ BIP39KeyProducer)
+│   │   │   ├── opencl/           # Capability: OpenCL device/platform + runtime (Context/Task/GridResult)
+│   │   │   ├── persistence/      # Capability: presence backends (+ bloom, inmemory, lmdb)
+│   │   │   ├── io/               # InputOutput: address/secret file reading + parsing
+│   │   │   ├── model/            # Foundation: value/domain types (Hash160, PublicKeyBytes, …)
+│   │   │   ├── util/             # Foundation: stateless crypto/byte helpers (KeyUtility, BitHelper, …)
+│   │   │   ├── core/             # Foundation: lifecycle contracts (Interruptable, Startable, …)
+│   │   │   ├── secret/           # Foundation: secret-supply primitives (SecretSupplier, BIP39Wordlist)
+│   │   │   ├── statistics/       # Foundation: Statistics, ReadStatistic
+│   │   │   ├── configuration/    # Config POJOs (C-prefixed); depends only on constants
+│   │   │   └── constants/        # Constants leaf (secp256k1 spec, kernel layout)
 │   │   └── resources/
 │   │       ├── *.cl / *.h            # OpenCL kernels and headers
 │   │       └── simplelogger.properties

@@ -7,6 +7,7 @@ import java.math.BigInteger;
 import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
 import net.jqwik.api.constraints.IntRange;
+import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 
 public class BitcoinAddressProperties {
 

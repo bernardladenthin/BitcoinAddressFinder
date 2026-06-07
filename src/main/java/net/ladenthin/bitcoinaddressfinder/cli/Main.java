@@ -15,15 +15,15 @@ import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import lombok.ToString;
-import net.ladenthin.bitcoinaddressfinder.AddressFilesToLMDB;
-import net.ladenthin.bitcoinaddressfinder.Finder;
-import net.ladenthin.bitcoinaddressfinder.InterruptedRuntimeException;
-import net.ladenthin.bitcoinaddressfinder.Interruptable;
-import net.ladenthin.bitcoinaddressfinder.LMDBToAddressFile;
+import net.ladenthin.bitcoinaddressfinder.command.AddressFilesToLMDB;
+import net.ladenthin.bitcoinaddressfinder.command.LMDBToAddressFile;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBToAddressFile;
+import net.ladenthin.bitcoinaddressfinder.core.Interruptable;
+import net.ladenthin.bitcoinaddressfinder.core.InterruptedRuntimeException;
+import net.ladenthin.bitcoinaddressfinder.engine.Finder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import org.slf4j.Logger;
@@ -272,9 +272,7 @@ public class Main implements Runnable, Interruptable {
             LOGGER.error("Fatal error during Main.run; triggering shutdown of all registered components.", e);
             interrupt();
             throw new IllegalStateException(
-                    "Main.run() failed on thread " + Thread.currentThread().getName()
-                            + "; shutdown triggered",
-                    e);
+                    "Main.run() failed on thread " + Thread.currentThread().getName() + "; shutdown triggered", e);
         } finally {
             runLatch.countDown();
         }

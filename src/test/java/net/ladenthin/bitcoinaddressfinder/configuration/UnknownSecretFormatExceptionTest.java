@@ -9,6 +9,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.sameInstance;
 
 import org.junit.jupiter.api.Test;
 
@@ -124,6 +125,32 @@ public class UnknownSecretFormatExceptionTest {
 
         // assert
         assertThat(exception.getCause(), is(nullValue()));
+    }
+
+    @Test
+    public void constructor_withFormatAndCause_chainsCause() {
+        // arrange
+        CSecretFormat secretFormat = CSecretFormat.BIG_INTEGER;
+        Throwable cause = new IllegalStateException("root");
+
+        // act
+        UnknownSecretFormatException exception = new UnknownSecretFormatException(secretFormat, cause);
+
+        // assert
+        assertThat(exception.getCause(), is(sameInstance(cause)));
+    }
+
+    @Test
+    public void constructor_withFormatAndCause_preservesFormat() {
+        // arrange
+        CSecretFormat secretFormat = CSecretFormat.SHA256;
+
+        // act
+        UnknownSecretFormatException exception =
+                new UnknownSecretFormatException(secretFormat, new IllegalStateException("root"));
+
+        // assert
+        assertThat(exception.getSecretFormat(), is(equalTo(secretFormat)));
     }
     // </editor-fold>
 

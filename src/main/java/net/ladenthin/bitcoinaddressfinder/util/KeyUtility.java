@@ -1,0 +1,372 @@
+// SPDX-FileCopyrightText: 2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+//
+// SPDX-License-Identifier: Apache-2.0
+package net.ladenthin.bitcoinaddressfinder.util;
+
+import java.io.IOException;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Random;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
+import net.ladenthin.bitcoinaddressfinder.producer.AbstractProducer;
+import net.ladenthin.bitcoinaddressfinder.secret.BIP39Wordlist;
+import net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableException;
+import net.ladenthin.bitcoinaddressfinder.secret.SecretSupplier;
+import org.bitcoinj.base.LegacyAddress;
+import org.bitcoinj.base.Network;
+import org.bitcoinj.crypto.ECKey;
+import org.bitcoinj.crypto.MnemonicCode;
+import org.bouncycastle.util.encoders.Hex;
+import org.jspecify.annotations.NonNull;
+
+/**
+ * Cryptographic helpers for the {@link Network} (address derivation, key conversion).
+ *
+ * <p>References:
+ * <ul>
+ *   <li>https://stackoverflow.com/questions/5399798/byte-array-and-int-conversion-in-java/11419863</li>
+ *   <li>https://stackoverflow.com/questions/21087651/how-to-efficiently-change-endianess-of-byte-array-in-java</li>
+ *   <li>https://stackoverflow.com/questions/7619058/convert-a-byte-array-to-integer-in-java-and-vice-versa</li>
+ * </ul>
+ *
+ * @param network           the Bitcoin/altcoin network used for address derivation
+ * @param byteBufferUtility helper for {@link ByteBuffer} conversions
+ */
+public record KeyUtility(@NonNull Network network, @NonNull ByteBufferUtility byteBufferUtility) {
+
+    /**
+     * {@code useOr} value used by the production scan path when calling
+     * {@link #calculateSecretKey(BigInteger, int, boolean)}, i.e. which combine mode the
+     * producers select: {@code true} would select bitwise OR, {@code false} selects arithmetic
+     * ADD.
+     *
+     * <p>Both modes produce an identical result whenever the {@code secretBase} is aligned so
+     * that the low bits covered by {@code keyNumber} are zero &#x2014; which is exactly the
+     * contract the producer's {@code createSecretBase} guarantees (it masks those low bits
+     * off). The value is {@code false} (ADD) because {@code CalculateSecretKeyBenchmark}
+     * measures ADD as the faster of the two for this shape (~64M vs ~46-50M ops/s, error bars
+     * non-overlapping, each measured in its own JVM). The OR path is retained as a measured,
+     * selectable alternative rather than a dead-code hint.
+     */
+    public static final boolean CALCULATE_SECRET_KEY_USE_OR = false;
+
+    /**
+     * Combines a secret base with the index of a key inside its batch.
+     *
+     * <p>For an aligned {@code secretBase} (the {@code createSecretBase} contract) bitwise OR
+     * and arithmetic ADD yield an identical result; {@code CalculateSecretKeyBenchmark} measures
+     * ADD as faster, so production callers pass {@code useOr = false} (see
+     * {@link #CALCULATE_SECRET_KEY_USE_OR}).
+     *
+     * @param secretBase the masked secret base for the batch
+     * @param keyNumber the zero-based index of the key inside the batch
+     * @param useOr {@code true} to combine with bitwise OR, {@code false} to combine with
+     *     arithmetic ADD (the measured-faster mode used in production)
+     * @return the concrete private-key candidate
+     */
+    public static BigInteger calculateSecretKey(BigInteger secretBase, int keyNumber, boolean useOr) {
+        final BigInteger offset = BigInteger.valueOf(keyNumber);
+        if (useOr) {
+            return secretBase.or(offset);
+        }
+        return secretBase.add(offset);
+    }
+
+    /**
+     * Aligns {@code value} DOWN to a {@code 2^N} boundary by clearing the bits
+     * indicated by {@code lowBitMask}.
+     *
+     * <p>The intended input is a contiguous low-bit mask of the form
+     * {@code (2^N) - 1} (as produced by
+     * {@link BitHelper#getLowBitMask(int) BitHelper.getLowBitMask(N)}). When
+     * the mask has that shape, clearing the masked bits is equivalent to
+     * flooring the input to the nearest lower multiple of {@code 2^N}.
+     *
+     * <p>This is the batch-alignment step used by
+     * {@link AbstractProducer#createSecretBase(BigInteger, boolean)
+     * AbstractProducer.createSecretBase} to derive a {@code secretBase} for the
+     * OpenCL kernel. The kernel runs {@code 2^N} parallel GPU threads where
+     * thread {@code i} evaluates {@code secretBase + i}; for the batch to
+     * cover the keyspace cleanly without gap or overlap, {@code secretBase}
+     * must have its low {@code N} bits zeroed.
+     *
+     * <p>Implementation: delegates to {@link BigInteger#andNot(BigInteger)},
+     * which is the fastest {@link BigInteger} bitwise AND-NOT primitive
+     * available &#x2014; faster than the equivalent
+     * {@code value.and(mask.not())}, which allocates an extra
+     * {@link BigInteger} for the negated mask.
+     *
+     * @param value the source value (typically a candidate private key)
+     * @param lowBitMask the bit mask of bits to clear (typically the low-bit
+     *     mask for the configured batch size, as produced by
+     *     {@link BitHelper#getLowBitMask(int)})
+     * @return {@code value} with the bits set in {@code lowBitMask} cleared
+     *     &#x2014; equivalent to {@code value AND NOT lowBitMask}
+     */
+    public BigInteger alignDown(BigInteger value, BigInteger lowBitMask) {
+        return value.andNot(lowBitMask);
+    }
+
+    /**
+     * Decodes a Base58 address and returns its hash160 as a {@link ByteBuffer}.
+     * <p>Requires {@code networkParameters}.
+     *
+     * @param base58 the Base58-encoded address
+     * @return the hash160 wrapped in a {@link ByteBuffer}
+     */
+    public ByteBuffer getHash160ByteBufferFromBase58String(String base58) {
+        LegacyAddress address = LegacyAddress.fromBase58(base58, network);
+        byte[] hash160 = address.getHash();
+        return byteBufferUtility.byteArrayToByteBuffer(hash160);
+    }
+
+    /**
+     * Encodes a hash160 as a Base58 legacy address.
+     *
+     * @param hash160 the 20-byte address hash
+     * @return the Base58-encoded legacy address
+     */
+    public String toBase58(byte[] hash160) {
+        LegacyAddress address = LegacyAddress.fromPubKeyHash(network, hash160);
+        return address.toBase58();
+    }
+
+    /**
+     * Draws a non-negative random {@link BigInteger} of up to {@code maximumBitLength} bits.
+     *
+     * @param maximumBitLength the maximum bit length of the resulting secret
+     * @param random           the random number generator
+     * @return a random secret
+     */
+    public BigInteger createSecret(int maximumBitLength, Random random) {
+        return new BigInteger(maximumBitLength, random);
+    }
+
+    /**
+     * Creates an {@link ECKey} from a private-key {@link BigInteger}.
+     *
+     * @param bi         the private-key value
+     * @param compressed whether to use the compressed public-key representation
+     * @return the constructed {@link ECKey}
+     */
+    public ECKey createECKey(BigInteger bi, boolean compressed) {
+        return ECKey.fromPrivate(bi, compressed);
+    }
+
+    /**
+     * Builds a verbose, single-line description of all relevant key fields, including BIP39 mnemonics.
+     *
+     * @param key the key to describe
+     * @return the formatted log line
+     */
+    public String createKeyDetails(ECKey key) {
+        BigInteger privateKeyBigInteger = key.getPrivKey();
+        byte[] privateKeyBytes = key.getPrivKeyBytes();
+        String privateKeyHex = key.getPrivateKeyAsHex();
+        String privateKeyAsWiF = key.getPrivateKeyAsWiF(network);
+
+        byte[] hash160 = key.getPubKeyHash();
+        String publicKeyHash160Hex = Hex.toHexString(hash160);
+        String publicKeyHash160Base58 = toBase58(hash160);
+
+        String logprivateKeyBigInteger = "privateKeyBigInteger: [" + privateKeyBigInteger + "]";
+        String logprivateKeyBytes = "privateKeyBytes: [" + Arrays.toString(privateKeyBytes) + "]";
+        String logprivateKeyHex = "privateKeyHex: [" + privateKeyHex + "]";
+        String logWiF = "WiF: [" + privateKeyAsWiF + "]";
+        String logPublicKeyAsHex = "publicKeyAsHex: [" + key.getPublicKeyAsHex() + "]";
+        String logPublicKeyHash160 = "publicKeyHash160Hex: [" + publicKeyHash160Hex + "]";
+        String logPublicKeyHash160Base58 = "publicKeyHash160Base58: [" + publicKeyHash160Base58 + "]";
+        String logCompressed = "Compressed: [" + key.isCompressed() + "]";
+        String logMnemonic = createMnemonics(privateKeyBytes);
+
+        String space = " ";
+        return logprivateKeyBigInteger
+                + space
+                + logprivateKeyBytes
+                + space
+                + logprivateKeyHex
+                + space
+                + logWiF
+                + space
+                + logPublicKeyAsHex
+                + space
+                + logPublicKeyHash160
+                + space
+                + logPublicKeyHash160Base58
+                + space
+                + logCompressed
+                + space
+                + logMnemonic;
+    }
+
+    /**
+     * Generates BIP39 mnemonics from the given private-key bytes for every supported wordlist.
+     *
+     * @param privateKeyBytes the raw private-key bytes
+     * @return a string containing the mnemonic for each {@link BIP39Wordlist}
+     */
+    // MnemonicCode(InputStream, String) accepts null wordListDigest to skip the SHA256
+    // check on the wordlist; bitcoinj is unannotated upstream so CF infers @NonNull.
+    @SuppressWarnings("nullness:argument")
+    public String createMnemonics(byte[] privateKeyBytes) {
+        StringBuilder logMnemonic = new StringBuilder("Mnemonic:");
+        for (BIP39Wordlist wordList : BIP39Wordlist.values()) {
+            try {
+                MnemonicCode mnemonicCode = new MnemonicCode(wordList.getWordListStream(), null);
+                List<String> mnemonics = mnemonicCode.toMnemonic(privateKeyBytes);
+                logMnemonic.append(' ');
+                logMnemonic.append(wordList.name());
+                logMnemonic.append(": [");
+                boolean first = true;
+                for (String mnemonic : mnemonics) {
+                    if (!first) {
+                        logMnemonic.append(wordList.getSeparator());
+                    }
+                    logMnemonic.append(mnemonic);
+                    first = false;
+                }
+                logMnemonic.append(']');
+            } catch (IOException | IllegalArgumentException ex) {
+                throw new IllegalStateException(
+                        "Failed to format BIP39 mnemonic for diagnostic logging ("
+                                + ex.getClass().getSimpleName() + ")",
+                        ex);
+            }
+        }
+        return logMnemonic.toString();
+    }
+
+    // <editor-fold defaultstate="collapsed" desc="ByteBuffer LegacyAddress conversion">
+    /**
+     * Converts a {@link LegacyAddress} into a {@link ByteBuffer} containing its hash160.
+     *
+     * @param address the legacy address
+     * @return a buffer with the address' hash160
+     */
+    public ByteBuffer addressToByteBuffer(LegacyAddress address) {
+        return byteBufferUtility.byteArrayToByteBuffer(address.getHash());
+    }
+
+    /**
+     * Reads a hash160 from {@code byteBuffer} and constructs a {@link LegacyAddress}.
+     * <p>Requires {@code networkParameters}.
+     *
+     * @param byteBuffer the buffer containing the hash160
+     * @return the reconstructed legacy address
+     */
+    public LegacyAddress byteBufferToAddress(ByteBuffer byteBuffer) {
+        return LegacyAddress.fromPubKeyHash(network, byteBufferUtility.byteBufferToBytes(byteBuffer));
+    }
+    // </editor-fold>
+
+    /**
+     * Creates a batch of secrets via the given {@link SecretSupplier}.
+     *
+     * @param overallWorkSize        the requested number of secrets
+     * @param returnStartSecretOnly  if {@code true} only one secret is generated
+     * @param privateKeyMaxNumBits   maximum bit length of each secret
+     * @param supplier               the supplier providing concrete secrets
+     * @return the generated secrets
+     * @throws NoMoreSecretsAvailableException if the supplier cannot satisfy the request
+     */
+    public BigInteger[] createSecrets(
+            int overallWorkSize, boolean returnStartSecretOnly, int privateKeyMaxNumBits, SecretSupplier supplier) {
+        int length = returnStartSecretOnly ? 1 : overallWorkSize;
+        BigInteger[] secrets = new BigInteger[length];
+        for (int i = 0; i < secrets.length; i++) {
+            secrets[i] = supplier.nextSecret(privateKeyMaxNumBits);
+        }
+        return secrets;
+    }
+
+    @Deprecated
+    static int byteArrayToInt(byte[] b) {
+        return byteArrayToInt(b, 0);
+    }
+
+    @Deprecated
+    static int byteArrayToInt(byte[] b, int offsetByteArray) {
+        return (b[3 + offsetByteArray] & 0xFF)
+                | (b[2 + offsetByteArray] & 0xFF) << 8
+                | (b[1 + offsetByteArray] & 0xFF) << 16
+                | (b[offsetByteArray] & 0xFF) << 24;
+    }
+
+    @Deprecated
+    static void byteArrayToIntArray(byte[] b, int offsetByteArray, int[] i, int offsetIntArray) {
+        i[offsetIntArray] = byteArrayToInt(b, offsetByteArray);
+    }
+
+    @Deprecated
+    static byte[] intToByteArray(int a) {
+        byte[] b = new byte[4];
+        intToByteArray(a, b, 0);
+        return b;
+    }
+
+    @Deprecated
+    static void intToByteArray(int a, byte[] b, int offset) {
+        b[offset] = (byte) ((a >> 24) & 0xFF);
+        b[1 + offset] = (byte) ((a >> 16) & 0xFF);
+        b[2 + offset] = (byte) ((a >> 8) & 0xFF);
+        b[3 + offset] = (byte) (a & 0xFF);
+    }
+
+    // Preserved as a reusable helper for potential future big↔little endian word swap
+    // wiring (e.g. native kernel input adapters). No current production or test caller;
+    // UnusedMethod suppressed to keep -Werror clean while leaving the implementation
+    // available for revival.
+    @Deprecated
+    @SuppressWarnings("UnusedMethod")
+    private static void swapIntBytes(byte[] bytes) {
+        assert bytes.length % 4 == 0;
+        for (int i = 0; i < bytes.length; i += 4) {
+            // swap 0 and 3
+            byte tmp = bytes[i];
+            bytes[i] = bytes[i + 3];
+            bytes[i + 3] = tmp;
+            // swap 1 and 2
+            byte tmp2 = bytes[i + 1];
+            bytes[i + 1] = bytes[i + 2];
+            bytes[i + 2] = tmp2;
+        }
+    }
+
+    /**
+     * Converts a BigInteger to a fixed-length 64-character (32-byte) lowercase
+     * hex string. Preserves leading zeros, which are otherwise dropped by
+     * BigInteger.toByteArray().
+     *
+     * @param value The BigInteger to convert.
+     * @return A 64-character hex string representing the value as a 256-bit
+     * number.
+     */
+    public String bigIntegerToFixedLengthHex(BigInteger value) {
+        byte[] raw = value.toByteArray();
+        byte[] result = new byte[OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES];
+        int srcPos = Math.max(0, raw.length - result.length);
+        int length = Math.min(result.length, raw.length);
+        System.arraycopy(raw, srcPos, result, result.length - length, length);
+        return Hex.toHexString(result);
+    }
+
+    /**
+     * Converts a 32-byte array into a positive BigInteger, preserving leading
+     * zeros. The array must be exactly
+     * {@link OpenClKernelConstants#PRIVATE_KEY_MAX_NUM_BYTES} bytes.
+     *
+     * @param buffer a 32-byte array representing the unsigned big-endian
+     *               integer
+     * @return a positive BigInteger constructed from the buffer
+     */
+    public BigInteger bigIntegerFromUnsignedByteArray(byte[] buffer) {
+        if (buffer.length != OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES) {
+            throw new IllegalArgumentException("Expected unsigned-byte buffer of length "
+                    + OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES
+                    + " but got " + buffer.length);
+        }
+        return new BigInteger(1, buffer);
+    }
+}

@@ -116,11 +116,9 @@ pluggable-persistence design plan:
 
 - **SpotBugs `effort=Max` + `threshold=Low`** — ✅ **enforced at the gate** (`76fd1a7`). `pom.xml` `<effort>Max</effort>` + `<threshold>Low</threshold>`; `spotbugs:check` is part of `mvn verify` and fails on any unsuppressed finding. The full clearing chain (191 → 0) is recorded in [`../workspace/crossrepostatus.md`](../workspace/crossrepostatus.md) under "SpotBugs Max+Low". `spotbugs-exclude.xml` carries narrow `<Match>` blocks with rationale for every structural false positive (Lombok-USBR, project-wide CRLF mitigation, generic-erasure CHECKCAST in keyproducer, `@FireAndForget` Future-DLS, Producer interface heterogeneous throws, drain-pattern PRMC, CWE-338 demo RNG, secp256k1 curve params, JOCL-spec nulls, preserved-for-revival private helpers, plus the two opt-in lifecycle items below).
 
-- **Mutation-testing threshold expansion** — `<targetClasses>` currently narrowed to `net.ladenthin.bitcoinaddressfinder.BitHelper`. Expand incrementally as classes reach 100 % mutation parity (README "Future improvements" tracks this).
+- **Mutation-testing threshold expansion** — the gate now covers a verified-100% **15-class** list (`util.BitHelper` + `util.PrivateKeyTooLargeException` + `model.PublicKeyBytes`/`AddressToCoin`/`AddressType` + the 8 custom exceptions + `statistics.Statistics`/`ReadStatistic` + `configuration.CKeyProducerJavaIncremental`; 59 mutations, pitest-maven 1.25.3). The earlier `net.ladenthin.bitcoinaddressfinder.BitHelper` target was stale (BitHelper moved to `util/` in the restructure → gate matched nothing) and has been fixed. `model.Hash160` is deliberately excluded (its fast/slow hash paths are identical, so the `if(useFast)` negate mutant is equivalent). Still open (optional): config getters covered only by producer/keyproducer integration tests, and the larger orchestration classes (producer / consumer / engine / opencl) which need heavier fixtures.
 
-- **Additional ArchUnit rules to consider** — public-fields-final, `noTestFrameworksInProduction`, `loggersArePrivateStaticFinal`, `noPackageCycles` are all DONE. Still open:
-  - `layeredArchitecture().consideringAllDependencies()` — needs DTO/orchestration split because it touches public-API class FQNs (`Finder`, `Producer*`, `Consumer*`, etc.).
-  - Per-module banned-imports lists.
+- **Additional ArchUnit rules to consider** — public-fields-final, `noTestFrameworksInProduction`, `loggersArePrivateStaticFinal`, `noPackageCycles`, the full **`layeredArchitecture()`** rule, and **per-module banned-imports** (`joclConfinedToOpencl`, `networkInputLibsConfinedToKeyproducer`, `lmdbConfinedToPersistenceAndIo`) are all DONE. Still open:
   - No-public-mutable-static-state rule.
 
 - **Cross-repo code-quality TODOs** — see [`../workspace/policies/code-quality-todos.md`](../workspace/policies/code-quality-todos.md) for the canonical `@VisibleForTesting` design-fit review (BAF site-by-site audit captured in [`../workspace/crossrepostatus.md`](../workspace/crossrepostatus.md)), package hierarchy review, and class/method naming review.
@@ -138,22 +136,80 @@ pluggable-persistence design plan:
   and confirm zero `THROWS_METHOD_THROWS_RUNTIMEEXCEPTION` findings on
   those two methods.
 
-- **Drop the project-wide `OPM_OVERLY_PERMISSIVE_METHOD` suppression in
-  `spotbugs-exclude.xml`** once the package-architecture refactor lands
-  (see [`../workspace/crossrepostatus.md`](../workspace/crossrepostatus.md)
-  under "Affects BAF + jllama (multi-package repos)"). The single-root
-  package today makes every "method called only by same-package callers
-  → could be package-private" finding correct-but-unstable; once layers
-  split, cross-layer calls will need public, so methods correctly
-  tightened today would need re-widening. Re-enable the rule (delete
-  the project-wide `<Match>`) the week the layered structure
-  stabilises. Snapshot at the moment of suppression: 33 sites grouped
-  into Main CLI internal helpers (~8), test-only public surface (~5),
-  abstract-class constructors (~4), concrete-class constructors needing
-  per-class audit (~5), internal helpers (~9), and one `enum.valueOf`
-  false positive (`BIP39Wordlist`).
+- **(Unblocked, optional) Drop the project-wide `OPM_OVERLY_PERMISSIVE_METHOD`
+  suppression in `spotbugs-exclude.xml`.** The package-architecture refactor it
+  was waiting on has now landed (the single root package was split into the
+  layered packages — see "Done" history below), so cross-layer call sites are
+  now stable and OPM findings would be actionable signals rather than
+  correct-but-unstable noise. Re-enabling is **optional**: visibility
+  minimisation is not a project goal (the original tightening pressure was
+  fb-contrib noise, not a requirement). If re-enabled, delete the project-wide
+  `<Match>` and triage the resulting findings (snapshot at suppression time:
+  ~33 sites — Main CLI internal helpers, test-only public surface,
+  abstract/concrete constructors, internal helpers, one `enum.valueOf` false
+  positive).
 
 ## Done (kept for history)
+
+### Layered-rule tightening + latent upward-edge fix (fact-based jdeps audit)
+
+A bytecode-level (`jdeps`) audit of the compiled package graph found one latent
+upward coupling that the layered rule did not catch: `util.Bech32Helper`
+statically imported `io.AddressTxtLine.BITCOIN_CASH_PREFIX` — a Foundation→io
+edge (latent `util`&harr;`io` cycle) hidden from ArchUnit only because the
+`static final String` constant is inlined at compile time. The constant moved
+to the `constants` leaf (`constants.AddressConstants.BITCOIN_CASH_PREFIX`); both
+`io` and `util` now depend strictly downward on it.
+
+With that edge gone, the `layeredArchitecture()` access lists were tightened to
+the exact set of layers that reach each layer today (verified by jdeps):
+`Pipeline` only by `Orchestration`; `InputOutput` only by
+`Orchestration`/`Pipeline`/`Capabilities` (not `Entry`); `Config` not by
+`Foundation`; `Foundation` not by `Config`. Any new unintended cross-layer edge
+now fails the build. (jllama and plugin were audited the same way and were
+already exact — no slack found.)
+
+### Layered package restructure (flat root package → 10-layer hierarchy)
+
+The 48 classes that previously sat flat in the root
+`net.ladenthin.bitcoinaddressfinder` package were split (via `git mv`,
+history preserved) into dedicated layered packages so the package
+boundaries align with the architectural layers:
+
+- **Foundation**: `model` (Hash160, PublicKeyBytes, AddressToCoin, AddressType),
+  `util` (KeyUtility, PrivateKeyValidator, Bech32Helper, Base36Decoder,
+  BitHelper, ByteBufferUtility, NetworkParameterFactory, ByteConversion,
+  EndiannessConverter, PrivateKeyTooLargeException), `core` (Interruptable,
+  Startable, FireAndForget, InterruptedRuntimeException), `secret`
+  (SecretSupplier, RandomSecretSupplier, NoMoreSecretsAvailableException,
+  BIP39Wordlist), `statistics` (Statistics, ReadStatistic).
+- **InputOutput**: `io` (AbstractPlaintextFile, AddressFile, AddressTxtLine,
+  SecretsFile, SeparatorFormat, FileHelper, AddressFormatNotAcceptedException).
+- **Pipeline**: `producer` (Producer, AbstractProducer, ProducerJava,
+  ProducerOpenCL, ProducerJavaSecretsFiles, ProducerState,
+  ProducerStateProvider), `consumer` (Consumer, ConsumerJava).
+- **Orchestration**: `engine` (Finder, Shutdown), `command`
+  (AddressFilesToLMDB, LMDBToAddressFile).
+- Absorbed into existing capability packages: OpenCL runtime
+  (OpenCLContext, OpenClTask, OpenCLGridResult, ReleaseCLObject) → `opencl`;
+  BIP39KeyProducer → `keyproducer`.
+
+Test classes were mirrored into the same packages as their subjects
+(standard Maven layout). The only in-class change was moving the pure
+helper `calculateSecretKey(BigInteger, int)` from `AbstractProducer` to
+`KeyUtility` (foundation) to break the single `opencl → producer`
+back-edge; everything else was package moves + import updates +
+cross-layer `public` promotions. The `secret` foundation package was
+introduced to host the secret/mnemonic primitives that `KeyUtility`
+depends on, breaking the `util ↔ keyproducer` and `producer ↔ keyproducer`
+cycles.
+
+Enforced by the new `layeredArchitecture()` ArchUnit rule in
+`BitcoinAddressFinderArchitectureTest` (strict top-to-bottom: Entry →
+Orchestration → Pipeline → Capabilities → InputOutput → Foundation →
+Config → Constants), alongside the retained `noPackageCycles` and the
+targeted leaf rules. All 13 architecture rules green; `module-info.java`
+exports updated for the new packages.
 
 ### SpotBugs Max+Low concurrency refactors (replaces spin-sleep with event-driven primitives)
 
@@ -218,7 +274,7 @@ All blockers cleared and `<arg>-Werror</arg>` is on in `pom.xml`:
 - **Error Prone bug-pattern promotions to `ERROR`** — 12 high-confidence patterns at `pom.xml:344`.
 - **`-parameters` javac arg** — `pom.xml:315`.
 - **`--release N`** — main compile `<release>21</release>` (`pom.xml:313`); `module-info-compile` execution stays at `--release 9`; `default-testCompile` overrides back to `<source>/<target>` because tests legitimately import `jdk.internal.ref.Cleaner` and `sun.nio.ch.DirectBuffer`.
-- **Mutation-testing threshold enforcement (PIT)** — "single class, full plumbing" pattern; runs every CI build with `<mutationThreshold>100</mutationThreshold>`, `<targetClasses>` narrowed to `net.ladenthin.bitcoinaddressfinder.BitHelper`.
+- **Mutation-testing threshold enforcement (PIT)** — runs every CI build with `<mutationThreshold>100</mutationThreshold>`; `<targetClasses>` now an explicit 15-class verified-100% list (was the stale `BitHelper` target — see the open "Mutation-testing threshold expansion" item above for the current list and exclusions).
 - **Checker Framework as a second static-nullness pass** — Nullness Checker (4.1.0) alongside NullAway. `src/etc/checker/objects.astub` overrides the CF 4.1.0 `Objects.requireNonNull` stub. JOCL-wrapping classes (`OpenCLContext`, `OpenClTask`, `opencl/OpenCLBuilder`) carry class-level `@SuppressWarnings({"nullness:argument", "nullness:dereference.of.nullable"})`. `KeyProducerJavaWebSocket` carries the documented this-escape suppression (Socket / Zmq were refactored to the `Startable` lifecycle so no suppression is needed there). `PublicKeyBytes.equals(Object)` takes `@Nullable Object`; `BIP39Wordlist.getWordListStream()` returns `@Nullable InputStream`.
 - **JPMS `module-info.java`** — lives in `src/main/java9/` (a separate source root) so javac at source/target 21 does not auto-activate module mode on the test sources. The `module-info-compile` execution is bound to `prepare-package` rather than `compile` so `module-info.class` is not present in `target/classes/` while the test sources compile or run. The module opens `net.ladenthin.bitcoinaddressfinder.configuration` to `com.fasterxml.jackson.databind` so Jackson can populate the configuration POJOs reflectively on any non-public members added later. Module-level `@NullMarked` was intentionally NOT added — the per-package annotation covers the same scope and avoids pulling JSpecify into the module's `requires` graph. Local-dev caveat: `mvn test` after `mvn package` without an intervening `mvn clean` fails with `IllegalAccessError`; CI is unaffected because the Build and Test jobs run in separate runners with fresh checkouts.
 - **Banned-API enforcement** — Maven Enforcer `bannedDependencies` + `dependencyConvergence` (`pom.xml:268-283`); ArchUnit `noSystemExit` / `noNewRandom` / `noThreadSleep` rules (`BitcoinAddressFinderArchitectureTest:137,164,178`); `sun.*` / `com.sun.*` / `jdk.internal.*` import ban (`BitcoinAddressFinderArchitectureTest:90-97`).
