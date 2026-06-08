@@ -364,6 +364,9 @@ public class ProbeAddressesOpenCLTest {
     @MethodSource(CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX)
     public void createKeys_bitsLowerThan25_use32BitNevertheless(int bitSize) throws IOException {
         new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        // GPU runs the full 0..BIT_COUNT_FOR_MAX_CHUNKS_ARRAY sweep; on a CPU OpenCL device
+        // (e.g. pocl in CI) skip grids too large to finish within the per-fork test timeout.
+        new OpenCLPlatformAssume().assumeGridBitsRunnableOnAvailableDevice(bitSize);
 
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
 

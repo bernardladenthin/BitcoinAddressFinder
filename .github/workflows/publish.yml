@@ -126,32 +126,34 @@ jobs:
         with: { name: pit-reports, path: target/pit-reports/ }
 
   # ---------------------------------------------------------------------------
-  # Bonus OpenCL coverage on a real CPU OpenCL device (pocl), kept fully
-  # separate from the `test` matrix above and marked non-blocking.
+  # Emulated-OpenCL coverage on a real CPU OpenCL device (pocl), kept separate
+  # from the `test` matrix above. This is a REQUIRED gate — both Ubuntu pipelines
+  # (the CPU-only `test` matrix where @OpenCLTest self-skips, and this emulated
+  # OpenCL run) must stay green.
   #
-  # Why a separate, allowed-to-fail job instead of adding pocl to the `test`
-  # matrix:
+  # Why a separate job rather than adding pocl to the `test` matrix:
   #   * The main matrix stays exactly as before — no OpenCL ICD installed there,
   #     so the @OpenCLTest suite self-skips via OpenCLPlatformAssume and those
   #     jobs remain green. The existing config is untouched.
   #   * pocl is a conformant OpenCL 3.0 CPU implementation; its device clears
   #     BAF's `CL_DEVICE_VERSION >= 2.0` gate, so here the @OpenCLTest suite
-  #     actually executes (OpenCLBuilder/Context/Device/Platform/GridResult +
-  #     ProducerOpenCL all pass — real kernel compile + run on CPU).
-  #   * ProbeAddressesOpenCLTest currently crashes the forked JVM with SIGSEGV:
-  #     a data-dependent out-of-bounds read in the secp256k1 kernel
-  #     (`point_mul_xy`, unguarded first-window table read when the scalar is 0).
-  #     GPUs mask the bad read; pocl's CPU device traps it. A JVM SIGSEGV cannot
-  #     be ignored per-test by surefire, so this whole job is `continue-on-error`
-  #     and nothing `needs:` it — the crash never reds the pipeline or blocks the
-  #     PR. The hs_err / dumpstream are echoed below for diagnosis.
-  # Nothing depends on this job, so its result is purely informational.
+  #     actually executes (real kernel compile + run on a CPU device).
+  #
+  # Reliability notes (why this is now safe to gate on):
+  #   * The secp256k1 kernel's zero-scalar out-of-bounds read in `point_mul_xy`
+  #     (which a CPU device traps as SIGSEGV while GPUs mask it) is fixed by an
+  #     in-kernel guard.
+  #   * ProbeAddressesOpenCLTest's grid-size sweep is device-aware: on a CPU-only
+  #     device it caps the grid via OpenCLPlatformAssume (default 2^8) so the run
+  #     stays well within the per-fork test timeout; a GPU still runs the full
+  #     sweep. Override with
+  #     -Dnet.ladenthin.bitcoinaddressfinder.test.opencl.cpu.maxGridBits=N.
+  # The hs_err / dumpstream are echoed on failure for diagnosis.
   # ---------------------------------------------------------------------------
   test-opencl:
-    name: Test OpenCL (pocl CPU, non-blocking)
+    name: Test OpenCL (pocl CPU)
     needs: [build]
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
@@ -165,7 +167,7 @@ jobs:
           sudo apt-get install -y pocl-opencl-icd ocl-icd-libopencl1 clinfo
           # Log the platform/device + CL_DEVICE_VERSION for the build record.
           clinfo || true
-      - name: OpenCL tests (allowed to fail)
+      - name: OpenCL tests
         shell: bash
         run: mvn --batch-mode -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true --update-snapshots test -Dtest='*OpenCL*'
       # A forked test JVM that aborts (the known pocl SIGSEGV in the secp256k1
@@ -193,7 +195,7 @@ jobs:
 
   report:
     name: Report
-    needs: [test]
+    needs: [test, test-opencl]
     runs-on: ubuntu-latest
     permissions:
       contents: write
