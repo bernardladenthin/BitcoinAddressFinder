@@ -262,8 +262,7 @@ public class ByteBufferUtilityTest {
         final int width = OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES;
         final BigInteger tooLarge = BigInteger.ONE.shiftLeft(256); // needs 33 bytes
         assertThrows(
-                IllegalArgumentException.class,
-                () -> ByteBufferUtility.bigIntegerToFixedLengthBytes(tooLarge, width));
+                IllegalArgumentException.class, () -> ByteBufferUtility.bigIntegerToFixedLengthBytes(tooLarge, width));
     }
     // </editor-fold>
 
