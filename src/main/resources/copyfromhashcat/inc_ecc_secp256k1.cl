@@ -797,8 +797,14 @@ DECLSPEC void sqrt_mod (PRIVATE_AS u32 *r)
 
 DECLSPEC void inv_mod (PRIVATE_AS u32 *a)
 {
-  // How often does this really happen? it should "almost" never happen (but would be safer)
-  // if ((a[0] | a[1] | a[2] | a[3] | a[4] | a[5] | a[6] | a[7]) == 0) return;
+  // Guard against a == 0 (the z-coordinate of the point at infinity, produced by
+  // point_add of P + (-P) or the P == Q doubling case in the loopCount>1 path).
+  // Without this the binary-GCD loop below never terminates: t0 = 0 is always even,
+  // so shifting keeps it 0 and the exit condition (t0 == p) is never reached. On a
+  // CPU OpenCL device (pocl) the work-item then spins forever and clFinish hangs;
+  // GPUs happen to mask it. Cheap, branch-predictable early-out (7 ORs + 1 compare).
+  const u32 a_is_zero = (a[0] | a[1] | a[2] | a[3] | a[4] | a[5] | a[6] | a[7]) == 0;
+  if (a_is_zero) return;
 
   u32 t0[8];
 
@@ -1858,7 +1864,13 @@ DECLSPEC void point_mul_xy (PRIVATE_AS u32 *x1, PRIVATE_AS u32 *y1, PRIVATE_AS c
 
   // first set:
 
-  const u32 multiplier = (naf[loop_start >> 3] >> ((loop_start & 7) << 2)) & 0x0f; // or use u8 ?
+  const u32 multiplier_raw = (naf[loop_start >> 3] >> ((loop_start & 7) << 2)) & 0x0f; // or use u8 ?
+
+  // Guard the first-window read against a zero digit (happens when the scalar k reduces to 0).
+  // Without this, (multiplier - 1) underflows and x_pos below indexes ~3.2e9 words past tmps->xy[]
+  // — an out-of-bounds read (CPU OpenCL devices fault with SIGSEGV; GPUs silently read garbage).
+  // k == 0 is not a valid private key, so clamping to 1 (the base point G) just keeps it in bounds.
+  const u32 multiplier = (multiplier_raw == 0) ? 1 : multiplier_raw;
 
   const u32 odd = multiplier & 1;
 

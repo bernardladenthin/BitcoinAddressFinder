@@ -9,6 +9,7 @@ import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.jocl.CL.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.io.Resources;
 import java.io.File;
@@ -37,6 +38,7 @@ import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.EndiannessConverter;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
+import net.ladenthin.bitcoinaddressfinder.util.PrivateKeyTooLargeException;
 import org.apache.commons.io.FileUtils;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
@@ -364,6 +366,9 @@ public class ProbeAddressesOpenCLTest {
     @MethodSource(CommonDataProvider.DATA_PROVIDER_BIT_SIZES_AT_MOST_MAX)
     public void createKeys_bitsLowerThan25_use32BitNevertheless(int bitSize) throws IOException {
         new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        // GPU runs the full 0..BIT_COUNT_FOR_MAX_CHUNKS_ARRAY sweep; on a CPU OpenCL device
+        // (e.g. pocl in CI) skip grids too large to finish within the per-fork test timeout.
+        new OpenCLPlatformAssume().assumeGridBitsRunnableOnAvailableDevice(bitSize);
 
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
 
@@ -447,8 +452,10 @@ public class ProbeAddressesOpenCLTest {
             openCLContext.init();
             OpenClTask openClTask = openCLContext.getOpenClTask().orElseThrow();
 
-            // Force a key that exceeds the limit
-            openClTask.setSrcPrivateKeyChunk(privateKey);
+            // The validator must reject a key whose grid would exceed the maximum private key.
+            // (JUnit 5 equivalent of the original JUnit 4 @Test(expected = PrivateKeyTooLargeException.class),
+            // lost in the JUnit 4 -> 5 migration.)
+            assertThrows(PrivateKeyTooLargeException.class, () -> openClTask.setSrcPrivateKeyChunk(privateKey));
         }
     }
 
@@ -510,10 +517,9 @@ public class ProbeAddressesOpenCLTest {
         }
     }
 
-    @ParameterizedTest
+    @Test
     @OpenCLTest
-    @MethodSource(CommonDataProvider.DATA_PROVIDER_LARGE_PRIVATE_KEYS)
-    public void createKeys_fromLargePrivateKey_generatesValidPublicKeys(BigInteger privateKey) throws IOException {
+    public void createKeys_fromLargePrivateKey_generatesValidPublicKeys() throws IOException {
         new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
@@ -521,21 +527,31 @@ public class ProbeAddressesOpenCLTest {
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
         producerOpenCL.loopCount = LOOP_COUNT;
+        // Reuse a single OpenCLContext across every large private key. The producer
+        // configuration is identical for each key, so a fresh context per key would
+        // recompile the secp256k1 kernel every time; that compile dominates the runtime
+        // and, on a CPU OpenCL device (pocl), is slow enough that one-context-per-key
+        // exceeds the per-fork test timeout. This mirrors production: ProducerOpenCL
+        // builds one context and calls createKeys in a loop.
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
             openCLContext.init();
-            // Perform the actual OpenCL buffer population
             OpenClTask openClTask = openCLContext.getOpenClTask().orElseThrow();
 
-            openClTask.setSrcPrivateKeyChunk(privateKey);
-
-            BigInteger secretBase =
-                    keyUtility.alignDown(privateKey, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
-
-            OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
-            PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
-
             final boolean souts = false;
-            assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
+            for (Object[] row : CommonDataProvider.largePrivateKeys()) {
+                BigInteger privateKey = (BigInteger) row[0];
+
+                // Perform the actual OpenCL buffer population
+                openClTask.setSrcPrivateKeyChunk(privateKey);
+
+                BigInteger secretBase =
+                        keyUtility.alignDown(privateKey, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
+
+                OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
+                PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
+
+                assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
+            }
         }
     }
 

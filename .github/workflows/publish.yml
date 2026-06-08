@@ -125,9 +125,77 @@ jobs:
         if: always() && matrix.os == 'ubuntu-latest'
         with: { name: pit-reports, path: target/pit-reports/ }
 
+  # ---------------------------------------------------------------------------
+  # Emulated-OpenCL coverage on a real CPU OpenCL device (pocl), kept separate
+  # from the `test` matrix above. This is a REQUIRED gate — both Ubuntu pipelines
+  # (the CPU-only `test` matrix where @OpenCLTest self-skips, and this emulated
+  # OpenCL run) must stay green.
+  #
+  # Why a separate job rather than adding pocl to the `test` matrix:
+  #   * The main matrix stays exactly as before — no OpenCL ICD installed there,
+  #     so the @OpenCLTest suite self-skips via OpenCLPlatformAssume and those
+  #     jobs remain green. The existing config is untouched.
+  #   * pocl is a conformant OpenCL 3.0 CPU implementation; its device clears
+  #     BAF's `CL_DEVICE_VERSION >= 2.0` gate, so here the @OpenCLTest suite
+  #     actually executes (real kernel compile + run on a CPU device).
+  #
+  # Reliability notes (why this is now safe to gate on):
+  #   * The secp256k1 kernel's zero-scalar out-of-bounds read in `point_mul_xy`
+  #     (which a CPU device traps as SIGSEGV while GPUs mask it) is fixed by an
+  #     in-kernel guard.
+  #   * ProbeAddressesOpenCLTest's grid-size sweep is device-aware: on a CPU-only
+  #     device it caps the grid via OpenCLPlatformAssume (default 2^4) so the run
+  #     stays within the per-fork test timeout; a GPU still runs the full sweep.
+  #     Override with
+  #     -Dnet.ladenthin.bitcoinaddressfinder.test.opencl.cpu.maxGridBits=N.
+  # The hs_err / dumpstream are echoed on failure for diagnosis.
+  # ---------------------------------------------------------------------------
+  test-opencl:
+    name: Test OpenCL (pocl CPU)
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+      - name: Install pocl (CPU OpenCL 3.0 ICD)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pocl-opencl-icd ocl-icd-libopencl1 clinfo
+          # Log the platform/device + CL_DEVICE_VERSION for the build record.
+          clinfo || true
+      - name: OpenCL tests
+        shell: bash
+        run: mvn --batch-mode -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true --update-snapshots test -Dtest='*OpenCL*'
+      # A forked test JVM that aborts (the known pocl SIGSEGV in the secp256k1
+      # kernel) leaves an hs_err_pid log + a surefire dumpstream that are
+      # otherwise only inside the uploaded artifact. Echo them into the job log
+      # on failure so the native frame is readable directly.
+      - name: Dump native crash logs (on failure)
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          echo "===== hs_err_pid*.log ====="
+          for f in hs_err_pid*.log; do [ -e "$f" ] && { echo "----- $f -----"; cat "$f"; }; done
+          echo "===== surefire dumpstream / dump ====="
+          for f in target/surefire-reports/*.dumpstream target/surefire-reports/*.dump; do [ -e "$f" ] && { echo "----- $f -----"; cat "$f"; }; done
+          echo "===== OpenCL surefire reports ====="
+          for f in target/surefire-reports/*OpenCL*.txt; do [ -e "$f" ] && { echo "----- $f -----"; cat "$f"; }; done
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: surefire-and-crash-logs-opencl
+          path: |
+            target/surefire-reports/**
+            hs_err_pid*.log
+          if-no-files-found: ignore
+
   report:
     name: Report
-    needs: [test]
+    needs: [test, test-opencl]
     runs-on: ubuntu-latest
     permissions:
       contents: write

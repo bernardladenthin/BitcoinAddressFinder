@@ -283,7 +283,13 @@ public class OpenClTask implements ReleaseCLObject {
         // BigInteger.toByteArray() always returns a big-endian (MSB-first) representation,
         // meaning the most significant byte (MSB) comes first.
         // Therefore, the source format is always Big Endian.
-        final byte[] byteArray = ByteBufferUtility.bigIntegerToBytes(privateKeyBase);
+        //
+        // Use a fixed-width (left zero-padded) array so the full key buffer is overwritten. The
+        // source buffer is reused across createKeys() calls (one OpenCLContext per producer), so
+        // a shorter (leading-zero) key must not leave stale high-order bytes from a previous,
+        // longer key — that would corrupt the scalar fed to the kernel.
+        final byte[] byteArray =
+                ByteBufferUtility.bigIntegerToFixedLengthBytes(privateKeyBase, PRIVATE_KEY_SOURCE_SIZE_IN_BYTES);
         EndiannessConverter endiannessConverter =
                 new EndiannessConverter(ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN, byteBufferUtility);
         endiannessConverter.convertEndian(byteArray);
