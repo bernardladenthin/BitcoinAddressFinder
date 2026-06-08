@@ -17,10 +17,10 @@ public class OpenCLPlatformAssume implements PlatformAssume {
      * Default upper bound (in bits) for the grid size when only a CPU OpenCL device is available
      * (e.g. pocl in CI). A CPU device evaluates the secp256k1 grid kernel orders of magnitude
      * slower than a GPU, so large grids ({@code 2^bitSize}) exceed the per-fork test timeout.
-     * {@code 2^8 = 256} work-items keeps the CPU run short. A GPU runs the full
+     * {@code 2^4 = 16} work-items keeps the CPU run short. A GPU runs the full
      * {@link OpenClKernelConstants#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY} sweep unchanged.
      */
-    public static final int CPU_DEVICE_MAX_GRID_BITS_DEFAULT = 8;
+    public static final int CPU_DEVICE_MAX_GRID_BITS_DEFAULT = 4;
 
     /**
      * System property to override {@link #CPU_DEVICE_MAX_GRID_BITS_DEFAULT}, e.g.
