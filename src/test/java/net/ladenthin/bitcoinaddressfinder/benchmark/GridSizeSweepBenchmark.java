@@ -92,9 +92,34 @@ import org.openjdk.jmh.annotations.Warmup;
 @Measurement(iterations = 5, time = 10)
 @Fork(
         value = 1,
+        // Master JVM-flag list — keep identical (same set + same order) to the pom.xml
+        // <argLine>, .mvn/jvm.config and examples/*.bat so the JMH fork matches the JVM
+        // Surefire uses (lmdbjava reflects into sun.nio.ch / jdk.internal.ref).
         jvmArgsAppend = {
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.io=ALL-UNNAMED",
+            "--add-opens=java.base/java.nio=ALL-UNNAMED",
+            "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
+            "--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED",
             "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
-            "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED"
+            "--add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED",
+            "--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
+            "--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED",
+            "--add-exports=java.base/java.lang=ALL-UNNAMED",
+            "--add-exports=java.base/java.io=ALL-UNNAMED",
+            "--add-exports=java.base/java.nio=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
+            "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
+            "--add-exports=jdk.management/com.sun.management.internal=ALL-UNNAMED",
+            "--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
+            "--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
+            "--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED",
+            "--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED",
+            "--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED",
+            "--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED",
+            "--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
+            "--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED"
         })
 public class GridSizeSweepBenchmark {
 

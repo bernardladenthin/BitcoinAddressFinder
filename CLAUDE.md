@@ -52,6 +52,67 @@ Tests run with `-Xmx2g -Xms1g` and several `--add-opens` / `--add-exports` to al
 - All code in `net.ladenthin` packages must carry proper `@Nullable` / `@NonNull` annotations.
 - Compilation will fail on potential null-pointer issues unless annotated.
 
+### Verifying Javadoc locally (release builds)
+
+The javadoc jar is attached only by the publish/deploy job (`mvn -P release deploy`);
+the regular build/test jobs pass `-Dmaven.javadoc.skip=true`. So a javadoc break is
+**invisible to `mvn test` and to PR CI** and only fails the snapshot publish on `main`.
+To reproduce the deploy-time javadoc step locally, run the **full lifecycle**:
+
+```bash
+mvn -P release clean package -DskipTests -Dgpg.skip=true \
+    -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true
+# expected: BUILD SUCCESS + target/*-javadoc.jar
+```
+
+Do **not** rely on a standalone `mvn javadoc:jar` — it runs before
+`target/classes/module-info.class` exists, so javadoc takes the classpath-mode path
+and cannot reproduce the JPMS module-mode failure that only appears in the full
+build. `attach-javadocs` is bound to `prepare-package` and the `maven-javadoc-plugin`
+block is declared **before** `maven-compiler-plugin` on purpose, so javadoc runs while
+`target/classes/` is still module-descriptor-free and stays in classpath mode (module
+mode is unusable here — the module declares no `requires` and `module-info.java` lives
+in `src/main/java9`, off javadoc's source path). See the extensive comments on those two
+`pom.xml` executions before touching their phase or ordering.
+
+### JPMS module descriptor (`module-info.java`) handling — why it's hidden until the end
+
+BAF ships a JPMS module descriptor (module `net.ladenthin.bitcoinaddressfinder`, exports
+every package, `requires static lombok`, opens `configuration` to Jackson) **but goes to
+unusual lengths to keep `module-info` invisible to every build tool until the last moment.**
+This is the single most surprising part of the build; the authoritative rationale lives in
+the `pom.xml` comments on the `module-info-compile` and `default-testCompile` executions and
+the `maven-javadoc-plugin` block — read those before touching any of it. Summary:
+
+- **`module-info.java` lives in `src/main/java9`, not `src/main/java`.** If it were on the
+  main source path, `javac` would auto-flip the *whole* main compile into module mode, which
+  (a) breaks Error Prone / NullAway / Checker Framework and (b) forbids the system-module
+  `--add-exports`/`--add-opens` the build relies on. It is compiled alone, at `release 9`, in
+  a dedicated `module-info-compile` execution — purely an informational descriptor for
+  module-path consumers. (This is **not** a Java-8 leftover; BAF is Java 21. The Java-8 sibling
+  repos keep `module-info.java` in `src/main/java`, which is why they don't hit the javadoc bug.)
+- **`module-info-compile` is bound to `prepare-package` (after `test`).** If
+  `target/classes/module-info.class` exists during tests, Maven Surefire runs them in **JPMS
+  module mode** (main code as the *named* module on the module path) instead of on the
+  classpath (the *unnamed* module). The test JVM's `add-opens java.base/{sun.nio.ch,
+  jdk.internal.ref,java.nio}=ALL-UNNAMED` flags (see `<argLine>`) only open those packages to
+  the **unnamed** module, and **lmdbjava** (`LMDBPersistence` → `org.lmdbjava.ByteBufferProxy`)
+  reflectively reaches `sun.nio.ch.DirectBuffer` / `jdk.internal.ref.Cleaner` — so in module
+  mode they stop applying and LMDB tests fail with `IllegalAccessError` on
+  `sun.nio.ch.DirectBuffer`. Local-dev caveat: `mvn test` after `mvn package` without an
+  intervening `mvn clean` fails this way (the package phase left `module-info.class` behind).
+- **`attach-javadocs` runs at `prepare-package`, before `module-info-compile`** (the
+  `maven-javadoc-plugin` block is declared before `maven-compiler-plugin` so it wins the
+  same-phase ordering). Javadoc must see a module-descriptor-free `target/classes` so it stays
+  in classpath mode — see the "Verifying Javadoc locally" section above.
+- **The internal-JDK `--add-opens`/`--add-exports` are for lmdbjava, not project code.** The
+  only former internal-JDK user, `ByteBufferUtility#freeByteBuffer`, was deleted (direct
+  buffers are reclaimed by the JVM's built-in Cleaner); no project source imports
+  `jdk.internal.ref` or `sun.nio.ch`. The `jdk.compiler/*` opens are for Error Prone.
+
+**Invariant to preserve:** never let `module-info.class` reach `target/classes` before tests
+*and* before the javadoc jar is built. Both consumers (Surefire, javadoc) break in module mode.
+
 ---
 
 ## Project Structure
@@ -432,6 +493,15 @@ See [`../workspace/policies/jqwik-prompt-injection.md`](../workspace/policies/jq
 ## Lombok Config
 
 See [`../workspace/policies/lombok-config.md`](../workspace/policies/lombok-config.md).
+
+## JPMS Module Descriptor
+
+Cross-repo pattern + the Java-bump javadoc trap:
+[`../workspace/policies/jpms-module-descriptor.md`](../workspace/policies/jpms-module-descriptor.md).
+BAF is the worked example; its repo-specific handling (why `module-info.java` lives in
+`src/main/java9`, the `prepare-package` timing vs Surefire module mode, the lmdbjava internal-JDK
+flags) is in the **"JPMS module descriptor (`module-info.java`) handling"** subsection under
+Build System above.
 
 ## Open TODOs
 
