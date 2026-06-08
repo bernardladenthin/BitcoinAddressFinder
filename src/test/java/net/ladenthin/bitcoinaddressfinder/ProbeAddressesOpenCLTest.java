@@ -8,8 +8,8 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.jocl.CL.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.io.Resources;
 import java.io.File;
@@ -455,9 +455,7 @@ public class ProbeAddressesOpenCLTest {
             // The validator must reject a key whose grid would exceed the maximum private key.
             // (JUnit 5 equivalent of the original JUnit 4 @Test(expected = PrivateKeyTooLargeException.class),
             // lost in the JUnit 4 -> 5 migration.)
-            assertThrows(
-                    PrivateKeyTooLargeException.class,
-                    () -> openClTask.setSrcPrivateKeyChunk(privateKey));
+            assertThrows(PrivateKeyTooLargeException.class, () -> openClTask.setSrcPrivateKeyChunk(privateKey));
         }
     }
 
