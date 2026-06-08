@@ -1858,7 +1858,13 @@ DECLSPEC void point_mul_xy (PRIVATE_AS u32 *x1, PRIVATE_AS u32 *y1, PRIVATE_AS c
 
   // first set:
 
-  const u32 multiplier = (naf[loop_start >> 3] >> ((loop_start & 7) << 2)) & 0x0f; // or use u8 ?
+  u32 multiplier = (naf[loop_start >> 3] >> ((loop_start & 7) << 2)) & 0x0f; // or use u8 ?
+
+  // Guard the first-window read against multiplier == 0 (happens when the scalar k reduces to 0).
+  // Without this, (multiplier - 1) underflows and x_pos below indexes ~3.2e9 words past tmps->xy[]
+  // — an out-of-bounds read (CPU OpenCL devices fault with SIGSEGV; GPUs silently read garbage).
+  // k == 0 is not a valid private key, so clamping to 1 (the base point G) just keeps it in bounds.
+  if (multiplier == 0) multiplier = 1;
 
   const u32 odd = multiplier & 1;
 
