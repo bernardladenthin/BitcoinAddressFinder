@@ -513,10 +513,9 @@ public class ProbeAddressesOpenCLTest {
         }
     }
 
-    @ParameterizedTest
+    @Test
     @OpenCLTest
-    @MethodSource(CommonDataProvider.DATA_PROVIDER_LARGE_PRIVATE_KEYS)
-    public void createKeys_fromLargePrivateKey_generatesValidPublicKeys(BigInteger privateKey) throws IOException {
+    public void createKeys_fromLargePrivateKey_generatesValidPublicKeys() throws IOException {
         new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
         KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
@@ -524,21 +523,31 @@ public class ProbeAddressesOpenCLTest {
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
         producerOpenCL.loopCount = LOOP_COUNT;
+        // Reuse a single OpenCLContext across every large private key. The producer
+        // configuration is identical for each key, so a fresh context per key would
+        // recompile the secp256k1 kernel every time; that compile dominates the runtime
+        // and, on a CPU OpenCL device (pocl), is slow enough that one-context-per-key
+        // exceeds the per-fork test timeout. This mirrors production: ProducerOpenCL
+        // builds one context and calls createKeys in a loop.
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
             openCLContext.init();
-            // Perform the actual OpenCL buffer population
             OpenClTask openClTask = openCLContext.getOpenClTask().orElseThrow();
 
-            openClTask.setSrcPrivateKeyChunk(privateKey);
-
-            BigInteger secretBase =
-                    keyUtility.alignDown(privateKey, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
-
-            OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
-            PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
-
             final boolean souts = false;
-            assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
+            for (Object[] row : CommonDataProvider.largePrivateKeys()) {
+                BigInteger privateKey = (BigInteger) row[0];
+
+                // Perform the actual OpenCL buffer population
+                openClTask.setSrcPrivateKeyChunk(privateKey);
+
+                BigInteger secretBase =
+                        keyUtility.alignDown(privateKey, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
+
+                OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
+                PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
+
+                assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
+            }
         }
     }
 
