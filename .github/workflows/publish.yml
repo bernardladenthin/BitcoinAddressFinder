@@ -91,6 +91,19 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: temurin
           cache: maven
+      # Provide a CPU OpenCL device so the @OpenCLTest suite actually executes
+      # instead of self-skipping via OpenCLPlatformAssume. pocl is a conformant
+      # OpenCL 3.0 CPU implementation (x86_64 passes 100% of the CTS), so its
+      # device clears BAF's `CL_DEVICE_VERSION >= 2.0` gate
+      # (OpenCLBuilder.isOneOpenCL2_0OrGreaterDeviceAvailable). Linux only —
+      # Windows has no comparable apt-style ICD and macOS OpenCL is capped at 1.2.
+      - name: Install pocl (CPU OpenCL 3.0 ICD)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pocl-opencl-icd ocl-icd-libopencl1 clinfo
+          # Log the platform/device + CL_DEVICE_VERSION for the build record.
+          clinfo || true
       - name: Test
         shell: bash
         run: mvn --batch-mode -P jcstress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=${{ matrix.disable-lmdb }} --update-snapshots test jacoco:report
