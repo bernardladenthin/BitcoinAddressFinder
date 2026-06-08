@@ -588,7 +588,7 @@ SPDX-License-Identifier: Apache-2.0
                                 <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
                                 <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
 
-                                <!-- Master JVM-flag list: keep identical (same set + same order) across pom.xml, .mvn/jvm.config, and examples/*.bat -->
+                                <!-- Master JVM-flag list: keep identical (same set + same order) across pom.xml (this list + <argLine> + the javadoc additionalJOptions), .mvn/jvm.config, examples/*.bat, and the JMH @Fork jvmArgsAppend in src/test/.../benchmark/*.java -->
                                 <arg>--add-opens</arg><arg>java.base/java.lang=ALL-UNNAMED</arg>
                                 <arg>--add-opens</arg><arg>java.base/java.io=ALL-UNNAMED</arg>
                                 <arg>--add-opens</arg><arg>java.base/java.nio=ALL-UNNAMED</arg>
