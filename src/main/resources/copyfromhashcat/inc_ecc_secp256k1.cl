@@ -797,8 +797,14 @@ DECLSPEC void sqrt_mod (PRIVATE_AS u32 *r)
 
 DECLSPEC void inv_mod (PRIVATE_AS u32 *a)
 {
-  // How often does this really happen? it should "almost" never happen (but would be safer)
-  // if ((a[0] | a[1] | a[2] | a[3] | a[4] | a[5] | a[6] | a[7]) == 0) return;
+  // Guard against a == 0 (the z-coordinate of the point at infinity, produced by
+  // point_add of P + (-P) or the P == Q doubling case in the loopCount>1 path).
+  // Without this the binary-GCD loop below never terminates: t0 = 0 is always even,
+  // so shifting keeps it 0 and the exit condition (t0 == p) is never reached. On a
+  // CPU OpenCL device (pocl) the work-item then spins forever and clFinish hangs;
+  // GPUs happen to mask it. Cheap, branch-predictable early-out (7 ORs + 1 compare).
+  const u32 a_is_zero = (a[0] | a[1] | a[2] | a[3] | a[4] | a[5] | a[6] | a[7]) == 0;
+  if (a_is_zero) return;
 
   u32 t0[8];
 
