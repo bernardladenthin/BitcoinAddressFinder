@@ -107,6 +107,20 @@ jobs:
       - name: Test
         shell: bash
         run: mvn --batch-mode -P jcstress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=${{ matrix.disable-lmdb }} --update-snapshots test jacoco:report
+      # Native-crash diagnostics: a forked test JVM that aborts (e.g. an OpenCL
+      # driver SIGABRT under pocl) leaves an hs_err_pid log + a surefire
+      # dumpstream that are otherwise only in the uploaded artifact. Echo them
+      # into the job log on failure so the native frame is readable directly.
+      - name: Dump native crash logs (on failure)
+        if: ${{ failure() && runner.os == 'Linux' }}
+        shell: bash
+        run: |
+          echo "===== hs_err_pid*.log ====="
+          for f in hs_err_pid*.log; do [ -e "$f" ] && { echo "----- $f -----"; cat "$f"; }; done
+          echo "===== surefire dumpstream / dump ====="
+          for f in target/surefire-reports/*.dumpstream target/surefire-reports/*.dump; do [ -e "$f" ] && { echo "----- $f -----"; cat "$f"; }; done
+          echo "===== OpenCL surefire reports ====="
+          for f in target/surefire-reports/*OpenCL*.txt; do [ -e "$f" ] && { echo "----- $f -----"; cat "$f"; }; done
       - uses: actions/upload-artifact@v7
         if: always()
         with:
