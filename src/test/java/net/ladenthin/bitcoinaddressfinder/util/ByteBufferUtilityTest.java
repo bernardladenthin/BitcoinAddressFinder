@@ -14,6 +14,7 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -235,6 +236,34 @@ public class ByteBufferUtilityTest {
         if (actualBytes.length > 0) {
             assertThat(actualBytes[0], is(equalTo(expectedFirstByte)));
         }
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="bigIntegerToFixedLengthBytes">
+    @Test
+    public void bigIntegerToFixedLengthBytes_leadingZeroKey_zeroPadsToFullWidthWithoutStaleBytes() {
+        final int width = OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES;
+        // 0xF0 << 240 (== 0x00F0..00) strips to only 31 bytes; written into the reused 32-byte
+        // key buffer without zero-padding, the missing high byte stays stale from the previous
+        // key and corrupts the scalar fed to the kernel (the OpenCL leading-zero-key regression).
+        final BigInteger leadingZeroKey = new BigInteger("F0", 16).shiftLeft(240);
+
+        final byte[] fixed = ByteBufferUtility.bigIntegerToFixedLengthBytes(leadingZeroKey, width);
+
+        // full width, big-endian 0x00 0xF0 0x00 ... 0x00 (high byte explicitly 0, not stale)
+        final byte[] expected = new byte[width];
+        expected[1] = (byte) 0xF0;
+        assertThat(fixed.length, is(equalTo(width)));
+        assertThat(Arrays.equals(fixed, expected), is(true));
+    }
+
+    @Test
+    public void bigIntegerToFixedLengthBytes_valueTooLargeForLength_throwsIllegalArgumentException() {
+        final int width = OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES;
+        final BigInteger tooLarge = BigInteger.ONE.shiftLeft(256); // needs 33 bytes
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> ByteBufferUtility.bigIntegerToFixedLengthBytes(tooLarge, width));
     }
     // </editor-fold>
 

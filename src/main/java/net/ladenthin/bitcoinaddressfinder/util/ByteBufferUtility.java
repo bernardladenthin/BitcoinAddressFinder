@@ -193,6 +193,29 @@ public class ByteBufferUtility {
     }
 
     /**
+     * Converts a {@link BigInteger} to a fixed-length big-endian byte array, left-padded with
+     * leading zero bytes. Unlike {@link #bigIntegerToBytes(BigInteger)} (which returns a
+     * minimal, variable-length array), this always returns exactly {@code byteLength} bytes.
+     * Callers that write into a fixed-size, reused buffer must use this, so a shorter
+     * (leading-zero) value cannot leave stale high-order bytes from a previous, longer write.
+     *
+     * @param bigInteger the non-negative value to convert; must not be null
+     * @param byteLength the exact length of the returned array
+     * @return a big-endian array of exactly {@code byteLength} bytes, left-padded with zeros
+     * @throws IllegalArgumentException if the value does not fit into {@code byteLength} bytes
+     */
+    public static byte[] bigIntegerToFixedLengthBytes(final BigInteger bigInteger, final int byteLength) {
+        final byte[] minimal = bigIntegerToBytes(bigInteger);
+        if (minimal.length > byteLength) {
+            throw new IllegalArgumentException(
+                    "value does not fit into " + byteLength + " bytes (needs " + minimal.length + ")");
+        }
+        final byte[] fixed = new byte[byteLength];
+        System.arraycopy(minimal, 0, fixed, byteLength - minimal.length, minimal.length);
+        return fixed;
+    }
+
+    /**
      * Reverses the given byte array in place.
      * <p>See https://stackoverflow.com/questions/12893758/how-to-reverse-the-byte-array-in-java.
      *
