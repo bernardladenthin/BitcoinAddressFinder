@@ -12,7 +12,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
-import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomInstance;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomAlgorithm;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
@@ -142,7 +142,7 @@ public class KeyProducerJavaTest {
     private CKeyProducerJavaRandom configureKeyProducerJavaRandom(String keyProducerId, int maxWorkSize) {
         CKeyProducerJavaRandom cKeyProducerJavaRandom = new CKeyProducerJavaRandom();
         cKeyProducerJavaRandom.keyProducerId = keyProducerId;
-        cKeyProducerJavaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
+        cKeyProducerJavaRandom.randomAlgorithm = CKeyProducerJavaRandomAlgorithm.RANDOM_CUSTOM_SEED;
         cKeyProducerJavaRandom.customSeed = 0L;
         cKeyProducerJavaRandom.maxWorkSize = maxWorkSize;
         return cKeyProducerJavaRandom;

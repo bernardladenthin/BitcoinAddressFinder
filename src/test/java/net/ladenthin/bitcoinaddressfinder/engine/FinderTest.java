@@ -24,7 +24,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
-import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomInstance;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomAlgorithm;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
@@ -387,7 +387,7 @@ public class FinderTest {
         // 1. JavaRandom
         CKeyProducerJavaRandom javaRandom = new CKeyProducerJavaRandom();
         javaRandom.keyProducerId = "randomId";
-        javaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
+        javaRandom.randomAlgorithm = CKeyProducerJavaRandomAlgorithm.RANDOM_CUSTOM_SEED;
         javaRandom.customSeed = 123L;
         cFinder.keyProducerJavaRandom.add(javaRandom);
 
@@ -466,7 +466,7 @@ public class FinderTest {
     private void configureKeyProducerJavaRandom(@Nullable String keyProducerId, CFinder cFinder) {
         CKeyProducerJavaRandom cKeyProducerJavaRandom = new CKeyProducerJavaRandom();
         cKeyProducerJavaRandom.keyProducerId = keyProducerId;
-        cKeyProducerJavaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
+        cKeyProducerJavaRandom.randomAlgorithm = CKeyProducerJavaRandomAlgorithm.RANDOM_CUSTOM_SEED;
         cKeyProducerJavaRandom.customSeed = 0L;
         cFinder.keyProducerJavaRandom.add(cKeyProducerJavaRandom);
     }

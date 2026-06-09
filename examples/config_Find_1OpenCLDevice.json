@@ -21,7 +21,7 @@
     "keyProducerJavaRandom": [
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId",
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "randomAlgorithm": "SECURE_RANDOM",
         "customSeed": 0,
         "privateKeyMaxNumBits": 256
       }

@@ -702,7 +702,7 @@ LMDBToAddressFile_Full_HexHash.zip	SHA3-512	A1419AFFE869B18973D499439E7EA90A94C4
 ## Find Addresses
 ### 🔢 Key Generation Configuration  
 BitcoinAddressFinder supports multiple pseudorandom number generators (PRNGs) for private-key creation.
-Pick one in your JSON via the `keyProducerJavaRandomInstance` field, e.g. `"keyProducerJavaRandomInstance": "SECURE_RANDOM"`.
+Pick one in your JSON via the `randomAlgorithm` field, e.g. `"randomAlgorithm": "SECURE_RANDOM"`.
 This flexibility lets you switch between **production-grade entropy** and **deterministic or deliberately weak sources** for audits and research.
 
 #### Key producer Use Cases
@@ -735,7 +735,7 @@ Best choice for real wallet generation – uses system CSPRNG (e.g. `/dev/urando
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
-    "keyProducerJavaRandomInstance": "SECURE_RANDOM"
+    "randomAlgorithm": "SECURE_RANDOM"
   }
 ],
 ...
@@ -748,7 +748,7 @@ Recreates time-based vulnerabilities using `java.util.Random` seeded with the cu
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
-    "keyProducerJavaRandomInstance": "RANDOM_CURRENT_TIME_MILLIS_SEED"
+    "randomAlgorithm": "RANDOM_CURRENT_TIME_MILLIS_SEED"
   }
 ],
 ...
@@ -764,7 +764,7 @@ Without explicit seed:
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
-    "keyProducerJavaRandomInstance": "RANDOM_CUSTOM_SEED"
+    "randomAlgorithm": "RANDOM_CUSTOM_SEED"
   }
 ],
 ...
@@ -776,7 +776,7 @@ With custom deterministic seed:
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
-    "keyProducerJavaRandomInstance": "RANDOM_CUSTOM_SEED",
+    "randomAlgorithm": "RANDOM_CUSTOM_SEED",
     "customSeed": 123456789
   }
 ],
@@ -793,7 +793,7 @@ Without seed:
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
-    "keyProducerJavaRandomInstance": "SHA1_PRNG"
+    "randomAlgorithm": "SHA1_PRNG"
   }
 ],
 ...
@@ -805,7 +805,7 @@ With custom seed:
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
-    "keyProducerJavaRandomInstance": "SHA1_PRNG",
+    "randomAlgorithm": "SHA1_PRNG",
     "customSeed": 987654321
   }
 ],
