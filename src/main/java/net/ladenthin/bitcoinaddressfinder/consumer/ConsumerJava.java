@@ -75,22 +75,23 @@ public class ConsumerJava implements Consumer {
     /** Cumulative time spent inside the persistence's {@code containsAddress} calls (ms). */
     protected final AtomicLong checkedKeysSumOfTimeToCheckContains = new AtomicLong();
     /**
-     * Number of consume cycles in which the consumer did no work because the keys queue
-     * was empty for the entire wait window (nothing drained and the timed {@code poll}
-     * timed out).
+     * Number of consume cycles in which the consumer found no work and was therefore ready
+     * for more — the keys queue was empty for the entire wait window (nothing drained and
+     * the timed {@code poll} timed out).
      *
      * <p><b>A rising value is normal and healthy</b>, not a problem: an empty queue means
-     * the CPU drains everything the producers generate and has spare capacity. For GPU
-     * scanning this counter climbing (with {@code keysQueue} near empty) is the expected
-     * operating point. It is only worth attention if you expected the producers to
-     * saturate the CPU and they do not, or if <b>nothing</b> is producing (a stalled or
-     * misconfigured producer also shows up as a starved consumer, alongside zero
-     * throughput). The genuine bottleneck warning is {@link #producerBlockedCount}.
+     * the CPU drains everything the producers generate and has spare capacity, ready to
+     * consume the next batch immediately. For GPU scanning this counter climbing (with
+     * {@code keysQueue} near empty) is the expected operating point. It is only worth
+     * attention if you expected the producers to saturate the CPU and they do not, or if
+     * <b>nothing</b> is producing (a stalled or misconfigured producer also shows up as a
+     * consistently ready consumer, alongside zero throughput). The genuine bottleneck
+     * warning is {@link #producerBlockedCount}.
      *
      * <p>Counted per consumer thread; with multiple threads this is a heuristic gauge,
      * not exact accounting.
      */
-    protected final AtomicLong consumerStarvedCount = new AtomicLong();
+    protected final AtomicLong consumerReadyCount = new AtomicLong();
     /**
      * Number of times a producer reached a <b>full</b> keys queue when enqueuing a batch
      * (the bounded queue had no remaining capacity, so {@code put} must block until a
@@ -295,7 +296,7 @@ public class ConsumerJava implements Consumer {
                                     uptime,
                                     checkedKeys.get(),
                                     checkedKeysSumOfTimeToCheckContains.get(),
-                                    consumerStarvedCount.get(),
+                                    consumerReadyCount.get(),
                                     producerBlockedCount.get(),
                                     keysQueue.size(),
                                     hits.get());
@@ -348,15 +349,17 @@ public class ConsumerJava implements Consumer {
     /**
      * Runs a single drain-and-wait cycle of {@link #consumeKeysRunner()}: first drains
      * every batch already queued, then waits up to {@code queuePollTimeoutMillis} for one
-     * more. A cycle is counted as <b>starved</b> (see {@link #consumerStarvedCount}) when
-     * it did no work at all — nothing was drained and the timed wait returned nothing —
-     * which means the producer/GPU side could not keep this consumer busy.
+     * more. A cycle is counted as <b>ready</b> (see {@link #consumerReadyCount}) when it
+     * did no work at all — nothing was drained and the timed wait returned nothing — which
+     * means the consumer emptied the queue and is ready for more work (normal/healthy; the
+     * CPU is keeping up with the producers).
      *
-     * <p>Extracted from the run loop so the starvation accounting can be unit-tested
+     * <p>Extracted from the run loop so the ready/idle accounting can be unit-tested
      * directly with a pre-filled or empty queue, without spawning the consumer threads.
      *
      * @param threadLocalReuseableByteBuffer thread-local buffer reused across address lookups
-     * @return {@code true} if this cycle was starved (no work done), {@code false} otherwise
+     * @return {@code true} if this cycle was ready for work (queue empty, no work done),
+     *     {@code false} otherwise
      * @throws InterruptedException if the timed wait is interrupted (shutdown)
      */
     @VisibleForTesting
@@ -370,11 +373,11 @@ public class ConsumerJava implements Consumer {
         if (next != null) {
             processBatch(next, threadLocalReuseableByteBuffer);
         }
-        boolean starved = drained == 0 && next == null;
-        if (starved) {
-            consumerStarvedCount.incrementAndGet();
+        boolean readyForWork = drained == 0 && next == null;
+        if (readyForWork) {
+            consumerReadyCount.incrementAndGet();
         }
-        return starved;
+        return readyForWork;
     }
 
     /**

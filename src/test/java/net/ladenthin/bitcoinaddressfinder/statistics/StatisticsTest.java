@@ -26,7 +26,7 @@ public class StatisticsTest {
                 result,
                 is(
                         equalTo(
-                                "Statistics: [Checked 999 M keys in 3 minutes] [4269 k keys/second] [333 M keys/minute] [Consumer starved (empty queue): 4567] [Producer blocked (queue full): 1234] [Average contains time: 345 ms] [keys queue size: 5678] [Hits: 6789]")));
+                                "Statistics: [Checked 999 M keys in 3 minutes] [4269 k keys/second] [333 M keys/minute] [Consumer ready for work (queue empty): 4567] [Producer blocked (queue full): 1234] [Average contains time: 345 ms] [keys queue size: 5678] [Hits: 6789]")));
     }
     // </editor-fold>
 

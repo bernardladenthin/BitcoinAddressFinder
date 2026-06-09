@@ -86,24 +86,24 @@ public class ConsumerJavaTest {
 
     // <editor-fold defaultstate="collapsed" desc="runtime health counters">
     @Test
-    public void consumeOneCycle_emptyQueue_marksStarvedAndIncrementsStarvedCount() throws Exception {
+    public void consumeOneCycle_emptyQueue_marksReadyAndIncrementsReadyCount() throws Exception {
         CConsumerJava cConsumerJava = new CConsumerJava();
-        // keep the idle wait window tiny so the starved cycle returns fast
+        // keep the idle wait window tiny so the ready (empty-queue) cycle returns fast
         cConsumerJava.queuePollTimeoutMillis = 1;
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         ByteBuffer buffer = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
 
         // act: nothing was ever enqueued, so the cycle drains nothing and the timed poll times out
-        boolean starved = consumerJava.consumeOneCycle(buffer);
+        boolean readyForWork = consumerJava.consumeOneCycle(buffer);
 
         // assert
-        assertThat(starved, is(equalTo(true)));
-        assertThat(consumerJava.consumerStarvedCount.get(), is(equalTo(1L)));
+        assertThat(readyForWork, is(equalTo(true)));
+        assertThat(consumerJava.consumerReadyCount.get(), is(equalTo(1L)));
         assertThat(consumerJava.producerBlockedCount.get(), is(equalTo(0L)));
     }
 
     @Test
-    public void consumeOneCycle_queueHasBatch_processesBatchAndIsNotStarved() throws Exception {
+    public void consumeOneCycle_queueHasBatch_processesBatchAndIsNotReady() throws Exception {
         new LMDBPlatformAssume().assumeLMDBExecution();
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
@@ -121,11 +121,11 @@ public class ConsumerJavaTest {
         ByteBuffer buffer = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
 
         // act
-        boolean starved = consumerJava.consumeOneCycle(buffer);
+        boolean readyForWork = consumerJava.consumeOneCycle(buffer);
 
-        // assert: work was done, so the cycle is not starved and the queue is drained
-        assertThat(starved, is(equalTo(false)));
-        assertThat(consumerJava.consumerStarvedCount.get(), is(equalTo(0L)));
+        // assert: work was done, so the cycle is not a ready (idle) cycle and the queue is drained
+        assertThat(readyForWork, is(equalTo(false)));
+        assertThat(consumerJava.consumerReadyCount.get(), is(equalTo(0L)));
         assertThat(consumerJava.keysQueueSize(), is(equalTo(0)));
     }
 
@@ -218,7 +218,7 @@ public class ConsumerJavaTest {
                     arguments,
                     hasItem(
                             equalTo(
-                                    "Statistics: [Checked 0 M keys in 0 minutes] [0 k keys/second] [0 M keys/minute] [Consumer starved (empty queue): 0] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
+                                    "Statistics: [Checked 0 M keys in 0 minutes] [0 k keys/second] [0 M keys/minute] [Consumer ready for work (queue empty): 0] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
         }
     }
 

@@ -1205,14 +1205,14 @@ are fully configurable (see [Customizing Log Output](#customizing-log-output)).
 A statistics line looks like this:
 
 ```
-Statistics: [Checked 1234 M keys in 5 minutes] [4100 k keys/second] [246 M keys/minute] [Consumer starved (empty queue): 5012] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
+Statistics: [Checked 1234 M keys in 5 minutes] [4100 k keys/second] [246 M keys/minute] [Consumer ready for work (queue empty): 5012] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
 ```
 
 | Field | Meaning |
 |---|---|
 | `Checked N M keys in M minutes` | Total candidate keys checked so far (millions) and elapsed minutes. |
 | `k keys/second` / `M keys/minute` | Throughput — **the headline performance number.** |
-| `Consumer starved (empty queue): N` | **Runtime health counter — rising is normal/healthy.** Consume cycles that found the queue empty and waited. An empty queue is the *desired* state: it means the CPU drains everything the producers generate and has headroom. See below. |
+| `Consumer ready for work (queue empty): N` | **Runtime health counter — rising is normal/healthy.** Consume cycles that found the queue empty and waited. An empty queue is the *desired* state: it means the CPU drains everything the producers generate and has headroom. See below. |
 | `Producer blocked (queue full): N` | **Runtime health counter — rising is the warning sign.** Times a producer hit a full queue and had to wait, i.e. the CPU can't keep up (CPU-bound). See below. |
 | `Average contains time: N ms` | Mean time spent per address-presence lookup. Large values point at a slow lookup backend (see [Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend)). |
 | `keys queue size: N` | Instantaneous depth of the producer→consumer queue (bounded by `consumerJava.queueSize`). |
@@ -1231,22 +1231,22 @@ problem signal:
   generate batches faster than the consumer can check them, so the queue fills and producers
   must wait in `put()`. **A sustained rise means the consumer/CPU is the bottleneck
   (CPU-bound).** This is the counter to watch if throughput is lower than expected.
-- **`Consumer starved (empty queue)` — rising is normal and expected, not a problem.** It
+- **`Consumer ready for work (queue empty)` — rising is normal and expected, not a problem.** It
   rises when the consumer drains the queue and waits for more work. You *want* the queue as
   empty as possible: it means the CPU comfortably keeps up with the producers and has spare
   capacity. For GPU scanning this counter rising steadily (with `keys queue size` near 0) is
   exactly the healthy operating point. It is only worth a second look if you *expected* the
   producers to saturate the CPU and they don't, or if **nothing** is producing (a stalled or
-  misconfigured producer also shows as a starved consumer with zero throughput).
+  misconfigured producer also shows as a perpetually ready consumer with zero throughput).
 
-| `Producer blocked` | `Consumer starved` | `keys queue size` | Interpretation |
+| `Producer blocked` | `Consumer ready` | `keys queue size` | Interpretation |
 |---|---|---|---|
 | ~0 | rising | ~0 | **Healthy** (the normal GPU-scanning state) — the CPU keeps up easily. If throughput is below expectations, the limit is the producer/GPU side, not the consumer. |
 | rising | ~0 | near `queueSize` | **CPU-bound — the warning state.** The consumer can't keep up. Use a faster [lookup backend](#-pluggable-address-lookup-backends-addresslookupbackend), raise `consumerJava.threads`, or reduce the producer rate. |
 | ~0 | ~0 | mid-range | **Balanced** — neither side waits; watch `keys/second`. |
 | ~0 | rising | ~0 | with `keys/second` ≈ 0 → **nothing is producing** — check the producer/key-producer configuration. |
 
-Rule of thumb: **`Producer blocked` climbing = act (CPU too slow); `Consumer starved` climbing = fine.**
+Rule of thumb: **`Producer blocked` climbing = act (CPU too slow); `Consumer ready` climbing = fine.**
 
 ### Hit Logging
 
@@ -1281,7 +1281,7 @@ Typical customizations:
   the JSON config (this controls *when* the line is emitted; Logback controls *how/where*).
 - **Machine-readable output** — the single-line, fixed-field statistics format is intentionally
   stable so an external supervisor or GUI can parse it (e.g. via an inter-process pipe) to plot
-  throughput and the starved/blocked health counters over time.
+  throughput and the ready/blocked health counters over time.
 
 > **Keep the CRLF guard.** The bundled pattern wraps the message in
 > `%replace(%msg){'[\r\n]+', ' | '}`, which neutralizes carriage returns / line feeds in
