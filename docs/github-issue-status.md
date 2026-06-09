@@ -37,29 +37,33 @@ in this pass)** and the GitHub issue then closed with a pointer.
 | 25 | `--illegal-access=permit` error | help wanted, question | ✅ Solved | The `--illegal-access=permit` JVM flag was removed in Java 17; the project is now **Java 21** and the shipped `examples/run_*.bat` files no longer contain that flag (verified: zero matches). Reporter already self-resolved by upgrading the JDK. **Action:** confirm resolved, close. |
 | 24 | not generating key | help wanted, question | ❓ Needs info (stale) | Statistics shows 0 keys checked / empty consumer — producer not feeding the queue (likely OpenCL not producing or misconfigured `keyProducerId` linkage). 14-comment thread, last 2024. **Action:** reply that producer↔`keyProducerId` wiring must match; close as stale unless reporter returns. |
 | 23 | "work is necessary to change life." | *(none)* | 🗑 Spam / invalid | Collaboration/"make money" solicitation, not an issue. **Action:** close. |
-| 22 | Can jogamp be used to improve OpenCL handling? | enhancement | 🌱 Enhancement → TODO | Owner's idea to evaluate JogAmp JOCL (`com.jogamp.opencl.CLDevice`) as a replacement for the current JOCL-based `OpenCLDevice`. Still valid, not done. **Action:** migrate to `TODO.md` (later), close. |
-| 18 | Statistics: add CPU/GPU batches + running counts | enhancement | 🌱 Enhancement → TODO | Owner's enhancement: surface created CPU/GPU batches and currently-running producer/consumer counts in the statistics line. Not implemented. **Action:** migrate to `TODO.md` (later), close. |
+| 22 | Can jogamp be used to improve OpenCL handling? | enhancement | ✅ **Done — migrated & closed** | Refined into a backend-abstraction task: step 1 define a small OpenCL device/lib API over the existing JOCL impl, step 2 wire JogAmp (`com.jogamp.opencl`) behind it as a switchable backend. **Migrated to `TODO.md`** ("OpenCL backend abstraction & multi-device coverage") and the GitHub issue **closed as completed** (2026-06-09). |
+| 18 | Statistics: add CPU/GPU batches + running counts | enhancement | ✅ **Done — implemented & closed** | **Implemented** on branch `claude/wonderful-cray-y7e9ua`: statistics line now shows a per-producer batch breakdown (`<keyProducerId> (<Strategy>, <CPU\|GPU>)`) plus `Producers running` / `Consumers running`, via `statistics/RuntimeStatistics` incremented at `AbstractProducer.consumeSecrets`; tests + README added. GitHub issue **closed as completed** (lands on `main` when the branch merges). |
 | 13 | Linux | question | ✅ Solved | Linux is fully supported (CI builds/tests on Linux; native OpenCL build documented). **Action:** reply "yes, Linux works" with a pointer to the Linux run instructions; close. (Last touched 2025-10.) |
 | 10 | Producer should log its info to allow verification | enhancement | ✅ Solved (largely) | Implemented via `logSecretBase` (logs `secretBase`/hex via `AbstractProducer.createSecretBase`), `logReceivedSecret` on receiver producers, and `runtimePublicKeyCalculationCheck` for full verification. **Action:** confirm coverage is sufficient; close (or fold any remainder into `TODO.md`). |
-| 6 | Unit test: 2 OpenCL devices simultaneously | enhancement | 🌱 Enhancement → TODO | Owner's test-coverage item; not present. **Action:** migrate to `TODO.md` (later), close. |
+| 6 | Unit test: 2 OpenCL devices simultaneously | enhancement | ✅ **Done — migrated & closed** | Scope fixed: a test running two `producerOpenCL` on **two physical OpenCL devices** (2 GPUs, or 1 GPU + 1 CPU-OpenCL), self-skipping unless ≥2 distinct devices are enumerated. **Migrated to `TODO.md`** ("OpenCL backend abstraction & multi-device coverage") and the GitHub issue **closed as completed** (2026-06-09). |
 | 5 | Print used OpenCL device info on usage | enhancement | ✅ Solved | Implemented: `OpenCLContext` logs `"Selected OpenCL device:\n{}"` via `OpenCLDevice.toStringPretty()`, and the `OpenCLInfo` command prints full device info (`CL_DEVICE_NAME`, etc.). **Action:** reply with the log/command pointer; close. |
 
 ## Summary counts
 
 | Disposition | Issues | Count |
 |---|---|---|
+| ✅ **Closed this pass** (#18 implemented; #22, #6 migrated to `TODO.md`) | #22, #18, #6 | 3 |
 | ✅ Solved (close w/ explanation) | #49, #25, #13, #10, #5 | 5 |
 | 💬 Answer & close (feature exists) | #63, #41, #29 | 3 |
 | ❓ Needs info (then close stale) | #57, #50, #39, #36, #24 | 5 |
-| 🌱 Enhancement → `TODO.md` later | #22, #18, #6 | 3 |
 | 🗑 Spam / invalid | #23 | 1 |
+
+> **Update 2026-06-09:** #22, #18 and #6 are now **closed on GitHub** (open-issue
+> count 17 → 14). The remaining 14 still need replies/closures per the table above.
 
 ## Recommended next pass (NOT this pass)
 
-1. Migrate **#22, #18, #6** (and any residual of **#10**) into `TODO.md` as
-   tracked work items, then close those GitHub issues with a "moved to
-   `TODO.md`" comment.
-2. Post the prepared replies for the ✅ / 💬 issues and close them.
-3. Post info requests for the ❓ issues; close as stale after a grace period.
-4. Close **#23** as spam.
-5. Optionally add `examples/config_Find_*Bip39*.json` to make **#63** self-serve.
+1. ✅ **Done:** #22, #18, #6 migrated to `TODO.md` and closed on GitHub. Residual
+   of **#10** still open (its enhancement is largely covered; close or fold into
+   `TODO.md` when convenient).
+2. ✅ **Done:** `examples/config_Find_1CPUProducerBip39.json` added, making **#63**
+   self-serve.
+3. Post the prepared replies for the ✅ / 💬 issues and close them.
+4. Post info requests for the ❓ issues; close as stale after a grace period.
+5. Close **#23** as spam.
