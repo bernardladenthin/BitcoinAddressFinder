@@ -1212,8 +1212,8 @@ Statistics: [Checked 1234 M keys in 5 minutes] [4100 k keys/second] [246 M keys/
 |---|---|
 | `Checked N M keys in M minutes` | Total candidate keys checked so far (millions) and elapsed minutes. |
 | `k keys/second` / `M keys/minute` | Throughput — **the headline performance number.** |
-| `Consumer starved (empty queue): N` | **Runtime health counter.** How many consume cycles found the queue empty and did no work — see below. |
-| `Producer blocked (queue full): N` | **Runtime health counter.** How many times a producer hit a full queue and had to wait — see below. |
+| `Consumer starved (empty queue): N` | **Runtime health counter — rising is normal/healthy.** Consume cycles that found the queue empty and waited. An empty queue is the *desired* state: it means the CPU drains everything the producers generate and has headroom. See below. |
+| `Producer blocked (queue full): N` | **Runtime health counter — rising is the warning sign.** Times a producer hit a full queue and had to wait, i.e. the CPU can't keep up (CPU-bound). See below. |
 | `Average contains time: N ms` | Mean time spent per address-presence lookup. Large values point at a slow lookup backend (see [Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend)). |
 | `keys queue size: N` | Instantaneous depth of the producer→consumer queue (bounded by `consumerJava.queueSize`). |
 | `Hits: N` | Number of address matches found so far (see [Hit Logging](#hit-logging)). |
@@ -1223,25 +1223,30 @@ Statistics: [Checked 1234 M keys in 5 minutes] [4100 k keys/second] [246 M keys/
 
 ### Diagnosing Bottlenecks
 
-The pipeline is `Producers → bounded queue → Consumer (CPU address checks)`. The two health
-counters pinpoint which side is the limiting factor:
+The pipeline is `Producers → bounded queue → Consumer (CPU address checks)`. The queue is
+the pressure gauge, and the two counters have **opposite polarity** — only one of them is a
+problem signal:
 
-- **`Consumer starved (empty queue)`** rises when the consumer repeatedly empties the queue
-  and waits for more work. **A rising value means the consumer/CPU is faster than the
-  producers** — the GPU/producer side (or its configuration) is the limit, *or* nothing is
-  producing. For pure GPU scanning this is normal and healthy: it confirms the CPU keeps up
-  with the GPU's output.
-- **`Producer blocked (queue full)`** rises when producers generate batches faster than the
-  consumer can check them, so the queue fills and producers must wait. **A rising value means
-  the consumer/CPU is the bottleneck (CPU-bound).**
+- **`Producer blocked (queue full)` — this is the warning sign.** It rises when producers
+  generate batches faster than the consumer can check them, so the queue fills and producers
+  must wait in `put()`. **A sustained rise means the consumer/CPU is the bottleneck
+  (CPU-bound).** This is the counter to watch if throughput is lower than expected.
+- **`Consumer starved (empty queue)` — rising is normal and expected, not a problem.** It
+  rises when the consumer drains the queue and waits for more work. You *want* the queue as
+  empty as possible: it means the CPU comfortably keeps up with the producers and has spare
+  capacity. For GPU scanning this counter rising steadily (with `keys queue size` near 0) is
+  exactly the healthy operating point. It is only worth a second look if you *expected* the
+  producers to saturate the CPU and they don't, or if **nothing** is producing (a stalled or
+  misconfigured producer also shows as a starved consumer with zero throughput).
 
 | `Producer blocked` | `Consumer starved` | `keys queue size` | Interpretation |
 |---|---|---|---|
-| rising | ~0 | near `queueSize` | **CPU-bound** — the consumer can't keep up. Use a faster [lookup backend](#-pluggable-address-lookup-backends-addresslookupbackend), raise `consumerJava.threads`, or reduce producer rate. |
-| ~0 | rising | ~0 | **Producer/GPU-bound** (or idle) — the CPU is keeping up easily. For GPU scanning this is the expected healthy state; if you expected more throughput, the GPU/producer config is the limit. |
-| ~0 | ~0 | mid-range | **Balanced** — neither side is starved or blocked; watch `keys/second`. |
+| ~0 | rising | ~0 | **Healthy** (the normal GPU-scanning state) — the CPU keeps up easily. If throughput is below expectations, the limit is the producer/GPU side, not the consumer. |
+| rising | ~0 | near `queueSize` | **CPU-bound — the warning state.** The consumer can't keep up. Use a faster [lookup backend](#-pluggable-address-lookup-backends-addresslookupbackend), raise `consumerJava.threads`, or reduce the producer rate. |
+| ~0 | ~0 | mid-range | **Balanced** — neither side waits; watch `keys/second`. |
+| ~0 | rising | ~0 | with `keys/second` ≈ 0 → **nothing is producing** — check the producer/key-producer configuration. |
 
-Both counters staying near zero while throughput is high is the ideal balanced state.
+Rule of thumb: **`Producer blocked` climbing = act (CPU too slow); `Consumer starved` climbing = fine.**
 
 ### Hit Logging
 

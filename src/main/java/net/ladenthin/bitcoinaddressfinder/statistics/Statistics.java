@@ -22,9 +22,9 @@ public class Statistics {
      * @param keys                         total number of keys checked so far
      * @param keysSumOfTimeToCheckContains cumulative time (ms) spent in presence lookups
      * @param consumerStarved              number of consume cycles starved (empty queue, no work);
-     *                                     rising means the producer/GPU side cannot keep the consumer busy
+     *                                     rising is normal/healthy (the CPU keeps up; an empty queue is desired)
      * @param producerBlocked              number of times a producer hit a full queue on enqueue;
-     *                                     rising means the consumer/CPU is too slow to drain (CPU-bound)
+     *                                     rising is the warning sign — the consumer/CPU is too slow (CPU-bound)
      * @param keysQueueSize                current number of batches waiting in the queue
      * @param hits                         total number of address hits found so far
      * @return the formatted statistics message

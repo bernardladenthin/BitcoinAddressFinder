@@ -77,10 +77,18 @@ public class ConsumerJava implements Consumer {
     /**
      * Number of consume cycles in which the consumer did no work because the keys queue
      * was empty for the entire wait window (nothing drained and the timed {@code poll}
-     * timed out). A rising value means the consumer is <b>starved</b>: the producer/GPU
-     * side is the bottleneck, is blocked, or nothing is producing. Stays near zero when
-     * the consumer is fed steadily. Counted per consumer thread; with multiple threads
-     * this is a heuristic gauge, not exact accounting.
+     * timed out).
+     *
+     * <p><b>A rising value is normal and healthy</b>, not a problem: an empty queue means
+     * the CPU drains everything the producers generate and has spare capacity. For GPU
+     * scanning this counter climbing (with {@code keysQueue} near empty) is the expected
+     * operating point. It is only worth attention if you expected the producers to
+     * saturate the CPU and they do not, or if <b>nothing</b> is producing (a stalled or
+     * misconfigured producer also shows up as a starved consumer, alongside zero
+     * throughput). The genuine bottleneck warning is {@link #producerBlockedCount}.
+     *
+     * <p>Counted per consumer thread; with multiple threads this is a heuristic gauge,
+     * not exact accounting.
      */
     protected final AtomicLong consumerStarvedCount = new AtomicLong();
     /**
