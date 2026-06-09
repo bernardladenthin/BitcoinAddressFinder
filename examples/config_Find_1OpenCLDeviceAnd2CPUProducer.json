@@ -32,7 +32,7 @@
       },
       "printStatisticsEveryNSeconds": 10,
       "threads": 8,
-      "delayEmptyConsumer": 50,
+      "queuePollTimeoutMillis": 50,
       "queueSize": 4,
       "awaitQueueEmptySeconds": 60,
       "runtimePublicKeyCalculationCheck": false,

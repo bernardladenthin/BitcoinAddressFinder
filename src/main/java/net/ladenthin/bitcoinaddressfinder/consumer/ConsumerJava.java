@@ -313,9 +313,9 @@ public class ConsumerJava implements Consumer {
                 emptyConsumer.incrementAndGet();
                 // Wait for the next batch instead of an unconditional sleep — wakes
                 // the instant a producer enqueues, eliminating up-to-
-                // delayEmptyConsumer-ms idle latency. delayEmptyConsumer is now the
+                // queuePollTimeoutMillis-ms idle latency. queuePollTimeoutMillis is now the
                 // max idle wait window rather than a fixed back-off.
-                PublicKeyBytes[] next = keysQueue.poll(consumerJava.delayEmptyConsumer, TimeUnit.MILLISECONDS);
+                PublicKeyBytes[] next = keysQueue.poll(consumerJava.queuePollTimeoutMillis, TimeUnit.MILLISECONDS);
                 if (next != null) {
                     processBatch(next, threadLocalReuseableByteBuffer);
                 }

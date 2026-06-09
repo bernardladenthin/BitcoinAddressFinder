@@ -64,7 +64,7 @@ public class LMDBPersistencePerformanceTest {
         cConsumerJava.threads = CONSUMER_THREADS;
         cConsumerJava.queueSize = KEYS_QUEUE_SIZE;
         cConsumerJava.printStatisticsEveryNSeconds = 1;
-        cConsumerJava.delayEmptyConsumer = 1;
+        cConsumerJava.queuePollTimeoutMillis = 1;
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         cConsumerJava.lmdbConfigurationReadOnly.addressLookupBackend = useBloomFilter

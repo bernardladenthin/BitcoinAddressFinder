@@ -231,8 +231,8 @@ two `Thread.sleep` sites that remain (and why they are correct).
 - **`ConsumerJava.consumeKeysRunner`** — extracted the per-batch
   processing into a private `processBatch` helper, leaving
   `consumeKeys(ByteBuffer)` as a drain-only utility for tests. The
-  runner now waits on `keysQueue.poll(delayEmptyConsumer, MILLISECONDS)`
-  between drain cycles instead of `Thread.sleep(delayEmptyConsumer)`,
+  runner now waits on `keysQueue.poll(queuePollTimeoutMillis, MILLISECONDS)`
+  between drain cycles instead of `Thread.sleep(queuePollTimeoutMillis)`,
   so the worker wakes the instant a producer enqueues. Idle-to-active
   latency drops from up-to-100 ms (default) to ~0; steady-state
   throughput unchanged (commit `99f390f`).
