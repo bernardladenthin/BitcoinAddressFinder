@@ -858,6 +858,12 @@ Full:
 ...
 ```
 
+> 🧪 **Runnable example:** [`examples/config_Find_1CPUProducerBip39.json`](examples/config_Find_1CPUProducerBip39.json)
+> is a complete single-CPU-producer + single-consumer `Find` config that walks the BIP39
+> derivation **sequence** (`batchUsePrivateKeyIncrement: false`). Note: with
+> `batchUsePrivateKeyIncrement: true` only the first derived key is used as an LSB-increment
+> base (see the [batch-mode limitation](#-bip-39-deterministic-keys-and-batch-mode-limitation)).
+
 #### 🔢 incremental scanning (key producer java incremental)
 This mode generates private keys **sequentially in batches** within a specified key range. It is especially useful for:
 

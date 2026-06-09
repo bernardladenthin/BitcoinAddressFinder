@@ -36,6 +36,7 @@ public class ConfigFixturesParseTest {
             "config_Find_1OpenCLDevice.json",
             "config_Find_1OpenCLDeviceAnd2CPUProducer.json",
             "config_Find_8CPUProducer.json",
+            "config_Find_1CPUProducerBip39.json",
             "config_Find_SecretsFile.json"
         }) {
             Path file = Path.of("examples", name);
