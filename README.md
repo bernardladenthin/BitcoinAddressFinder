@@ -195,7 +195,7 @@ Each Find-mode producer batch covers **`2^batchSizeInBits`** consecutive private
 
 1. Pulls a candidate private key from the configured key producer.
 2. **Aligns** the candidate DOWN to a `2^batchSizeInBits` boundary &#x2014; the low `batchSizeInBits` bits are cleared so the result is a multiple of `2^batchSizeInBits`. This produces the `secretBase`. Source: [`KeyUtility.alignDown`](src/main/java/net/ladenthin/bitcoinaddressfinder/KeyUtility.java) and [`AbstractProducer.createSecretBase`](src/main/java/net/ladenthin/bitcoinaddressfinder/AbstractProducer.java).
-3. Submits `secretBase` (plus the configured `loopCount`) to the GPU.
+3. Submits `secretBase` (plus the configured `keysPerWorkItem`) to the GPU.
 
 The OpenCL kernel then evaluates `secretBase + i` for `i &#x2208; [0, 2^batchSizeInBits)` in parallel across all GPU work-items, so the batch covers `2^batchSizeInBits` consecutive keys cleanly without gap or overlap.
 
@@ -210,30 +210,30 @@ The OpenCL kernel then evaluates `secretBase + i` for `i &#x2208; [0, 2^batchSiz
 
 **Upper bound**: [`PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY`](src/main/java/net/ladenthin/bitcoinaddressfinder/PublicKeyBytes.java) &#x2014; derived from `Integer.MAX_VALUE / CHUNK_SIZE_NUM_BYTES` so per-batch result arrays cannot exceed Java's 32-bit array-length limit. **Default**: `0` (sequential, no batching).
 
-#### Relation to `loopCount`
+#### Relation to `keysPerWorkItem`
 
-`loopCount` does **not** change the batch size. It only changes how the same `2^batchSizeInBits` work is distributed across GPU work-items:
+`keysPerWorkItem` does **not** change the batch size. It only changes how the same `2^batchSizeInBits` work is distributed across GPU work-items:
 
-- With `loopCount = 1`: the kernel launches `2^batchSizeInBits` work-items, each computing one key.
-- With `loopCount = 8`: the kernel launches `2^batchSizeInBits / 8` work-items, each computing 8 keys internally via the affine-addition scalar walker described below.
+- With `keysPerWorkItem = 1`: the kernel launches `2^batchSizeInBits` work-items, each computing one key.
+- With `keysPerWorkItem = 8`: the kernel launches `2^batchSizeInBits / 8` work-items, each computing 8 keys internally via the affine-addition scalar walker described below.
 
-Constraints (enforced by [`CProducerOpenCL`](src/main/java/net/ladenthin/bitcoinaddressfinder/configuration/CProducerOpenCL.java)): `loopCount` must be a power of two, `2^batchSizeInBits` must be divisible by `loopCount`, and the total per-launch result buffer (`workSize &#x00D7; loopCount &#x00D7; chunkSize`) must not exceed `Integer.MAX_VALUE`.
+Constraints (enforced by [`CProducerOpenCL`](src/main/java/net/ladenthin/bitcoinaddressfinder/configuration/CProducerOpenCL.java)): `keysPerWorkItem` must be a power of two, `2^batchSizeInBits` must be divisible by `keysPerWorkItem`, and the total per-launch result buffer (`workSize &#x00D7; keysPerWorkItem &#x00D7; chunkSize`) must not exceed `Integer.MAX_VALUE`.
 
-### 🔄 Scalar Walker per Kernel (`loopCount`)
-The OpenCL kernel supports a **loop-based scalar strategy** controlled by the `loopCount` parameter. Each GPU thread generates multiple EC keys by:
+### 🔄 Scalar Walker per Kernel (`keysPerWorkItem`)
+The OpenCL kernel supports a **loop-based scalar strategy** controlled by the `keysPerWorkItem` parameter. Each GPU thread generates multiple EC keys by:
 
 - Computing the first key via full scalar multiplication: `P₀ = k₀·G` (using `point_mul_xy`)  
 - Computing subsequent keys via efficient affine additions: `Pₙ₊₁ = Pₙ + G` (using `point_add_xy`)
 
 This enables high-throughput, grid-parallel **linear keyspace traversal** like:  
-`k₀·G, (k₀ + 1)·G, ..., (k₀ + loopCount - 1)·G`
+`k₀·G, (k₀ + 1)·G, ..., (k₀ + keysPerWorkItem - 1)·G`
 
 Example:  
-- If `loopCount = 8`, each thread generates 8 keys  
+- If `keysPerWorkItem = 8`, each thread generates 8 keys  
 - Grid size is reduced by a factor of 8  
 - All results are written to global memory
 
-> ✅ Lower `loopCount` values like 4 or 8 are often ideal.  
+> ✅ Lower `keysPerWorkItem` values like 4 or 8 are often ideal.  
 > ❌ Higher values may reduce GPU occupancy due to fewer active threads.
 
 ### 🚀 MSB-Zero Optimization
@@ -873,7 +873,7 @@ This mode generates private keys **sequentially in batches** within a specified 
 - Each batch contains exactly `2^batchSizeInBits` keys.
 - If the next full batch would go **beyond `endPrivateKey`**, the process stops with an **exception**.
 - The **`endPrivateKey` is inclusive**, but **partial batches are not allowed by default** &#x2014; batches must fit completely inside the range.
-- For optimal performance, especially with OpenCL, configure `batchSizeInBits` (and the matching `loopCount`) so that batches align perfectly within the range. This prevents errors and maximizes throughput.
+- For optimal performance, especially with OpenCL, configure `batchSizeInBits` (and the matching `keysPerWorkItem`) so that batches align perfectly within the range. This prevents errors and maximizes throughput.
 
 > **Note:** If unsure, set the `endPrivateKey` slightly higher to match a `2^batchSizeInBits` multiple. This helps avoid exceptions and ensures efficient scanning.
 

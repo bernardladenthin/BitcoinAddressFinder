@@ -32,31 +32,31 @@ public class CProducerOpenCL extends CProducer {
      * Number of inner iterations each OpenCL work-item performs on the GPU.
      * <p>
      * Instead of launching one work-item per candidate key, the kernel can loop
-     * {@code loopCount} times per work-item to reduce the total number of threads
+     * {@code keysPerWorkItem} times per work-item to reduce the total number of threads
      * and avoid exceeding GPU or host memory limits.
      * <p>
-     * This directly reduces the number of launched work-items by a factor of {@code loopCount},
-     * and each work-item will compute and write {@code loopCount} results.
+     * This directly reduces the number of launched work-items by a factor of {@code keysPerWorkItem},
+     * and each work-item will compute and write {@code keysPerWorkItem} results.
      * <p>
      * Requirements:
      * <ul>
-     *   <li>{@code loopCount} must be a power of two (e.g. 1, 2, 4, 8, 16, ...)</li>
-     *   <li>The total result size (workSize &#x00D7; loopCount &#x00D7; chunkSize) must not exceed {@code Integer.MAX_VALUE}</li>
-     *   <li>{@code batchSizeInBits} must be divisible by {@code loopCount}</li>
+     *   <li>{@code keysPerWorkItem} must be a power of two (e.g. 1, 2, 4, 8, 16, ...)</li>
+     *   <li>The total result size (workSize &#x00D7; keysPerWorkItem &#x00D7; chunkSize) must not exceed {@code Integer.MAX_VALUE}</li>
+     *   <li>{@code batchSizeInBits} must be divisible by {@code keysPerWorkItem}</li>
      * </ul>
      * <p>
      * <b>Performance notes:</b>
      * <ul>
      *   <li>Lower values (e.g. 4 or 8) are often sufficient to reduce launch overhead and register pressure.</li>
-     *   <li>Using too high a {@code loopCount} can underutilize the GPU, as fewer total work-items are launched,
+     *   <li>Using too high a {@code keysPerWorkItem} can underutilize the GPU, as fewer total work-items are launched,
      *       which may reduce occupancy and throughput on highly parallel architectures.</li>
      *   <li>This optimization is especially useful when using point addition in the kernel instead of full scalar multiplication.</li>
      * </ul>
      * <p>
      * Example:
-     * If {@code batchSizeInBits} = 20 (&#x2248;1 million keys) and {@code loopCount} = 8,
+     * If {@code batchSizeInBits} = 20 (&#x2248;1 million keys) and {@code keysPerWorkItem} = 8,
      * the kernel is launched with only 131,072 work-items (1,048,576 &#x00F7; 8),
      * each performing 8 iterations internally.
      */
-    public int loopCount = 1;
+    public int keysPerWorkItem = 1;
 }

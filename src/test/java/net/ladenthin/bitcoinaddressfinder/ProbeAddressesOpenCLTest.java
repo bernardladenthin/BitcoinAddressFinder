@@ -66,7 +66,7 @@ public class ProbeAddressesOpenCLTest {
      */
     private static final int BITS_FOR_BATCH = 8;
 
-    private static final int LOOP_COUNT = BITS_FOR_BATCH >> 1;
+    private static final int KEYS_PER_WORK_ITEM = BITS_FOR_BATCH >> 1;
 
     private final BitHelper bitHelper = new BitHelper();
 
@@ -395,7 +395,7 @@ public class ProbeAddressesOpenCLTest {
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
-        producerOpenCL.loopCount = LOOP_COUNT;
+        producerOpenCL.keysPerWorkItem = KEYS_PER_WORK_ITEM;
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
             openCLContext.init();
             Random sr = new Random(1337);
@@ -468,7 +468,7 @@ public class ProbeAddressesOpenCLTest {
 
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
-        producerOpenCL.loopCount = LOOP_COUNT;
+        producerOpenCL.keysPerWorkItem = KEYS_PER_WORK_ITEM;
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
             openCLContext.init();
             byte[] encoded = privateKey.toByteArray();
@@ -526,7 +526,7 @@ public class ProbeAddressesOpenCLTest {
 
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
-        producerOpenCL.loopCount = LOOP_COUNT;
+        producerOpenCL.keysPerWorkItem = KEYS_PER_WORK_ITEM;
         // Reuse a single OpenCLContext across every large private key. The producer
         // configuration is identical for each key, so a fresh context per key would
         // recompile the secp256k1 kernel every time; that compile dominates the runtime
@@ -565,7 +565,7 @@ public class ProbeAddressesOpenCLTest {
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         CProducerOpenCL producerOpenCL = new CProducerOpenCL();
         producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
-        producerOpenCL.loopCount = LOOP_COUNT;
+        producerOpenCL.keysPerWorkItem = KEYS_PER_WORK_ITEM;
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
             openCLContext.init();
             Random random = new Random(1337);

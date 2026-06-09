@@ -798,7 +798,7 @@ DECLSPEC void sqrt_mod (PRIVATE_AS u32 *r)
 DECLSPEC void inv_mod (PRIVATE_AS u32 *a)
 {
   // Guard against a == 0 (the z-coordinate of the point at infinity, produced by
-  // point_add of P + (-P) or the P == Q doubling case in the loopCount>1 path).
+  // point_add of P + (-P) or the P == Q doubling case in the keysPerWorkItem>1 path).
   // Without this the binary-GCD loop below never terminates: t0 = 0 is always even,
   // so shifting keeps it 0 and the exit condition (t0 == p) is never reached. On a
   // CPU OpenCL device (pocl) the work-item then spins forever and clFinish hangs;

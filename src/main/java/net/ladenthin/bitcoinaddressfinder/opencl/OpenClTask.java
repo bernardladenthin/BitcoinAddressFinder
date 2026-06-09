@@ -318,21 +318,21 @@ public class OpenClTask implements ReleaseCLObject {
         try (final DestinationArgument destinationArgument = DestinationArgument.create(context, dstSizeInBytes)) {
             // Set the work-item dimensions
             final long totalResultCount = bitHelper.convertBitsToSize(cProducer.batchSizeInBits);
-            final int loopCount = cProducer.loopCount;
-            final long adjustedWorkSize = totalResultCount / loopCount;
+            final int keysPerWorkItem = cProducer.keysPerWorkItem;
+            final long adjustedWorkSize = totalResultCount / keysPerWorkItem;
 
-            // Validate loopCount constraints
-            if (loopCount < 1) {
+            // Validate keysPerWorkItem constraints
+            if (keysPerWorkItem < 1) {
                 throw new IllegalArgumentException(
-                        "loopCount must be >= 1 but was " + loopCount + " (totalResultCount=" + totalResultCount + ")");
+                        "keysPerWorkItem must be >= 1 but was " + keysPerWorkItem + " (totalResultCount=" + totalResultCount + ")");
             }
-            if (loopCount > totalResultCount) {
-                throw new IllegalArgumentException("loopCount must not exceed total result count. Given: " + loopCount
+            if (keysPerWorkItem > totalResultCount) {
+                throw new IllegalArgumentException("keysPerWorkItem must not exceed total result count. Given: " + keysPerWorkItem
                         + ", max: " + totalResultCount);
             }
-            if (totalResultCount % loopCount != 0) {
+            if (totalResultCount % keysPerWorkItem != 0) {
                 throw new IllegalArgumentException("totalResultCount=" + totalResultCount
-                        + " is not divisible by loopCount=" + loopCount
+                        + " is not divisible by keysPerWorkItem=" + keysPerWorkItem
                         + "; result count would be invalid"
                         + " (cProducer.batchSizeInBits=" + cProducer.batchSizeInBits + ")");
             }
@@ -344,7 +344,7 @@ public class OpenClTask implements ReleaseCLObject {
             // Set the arguments for the kernel
             clSetKernelArg(kernel, 0, Sizeof.cl_mem, destinationArgument.getClMemPointer());
             clSetKernelArg(kernel, 1, Sizeof.cl_mem, privateKeySourceArgument.getClMemPointer());
-            clSetKernelArg(kernel, 2, Sizeof.cl_uint, Pointer.to(new int[] {loopCount}));
+            clSetKernelArg(kernel, 2, Sizeof.cl_uint, Pointer.to(new int[] {keysPerWorkItem}));
 
             {
                 // write src buffer
