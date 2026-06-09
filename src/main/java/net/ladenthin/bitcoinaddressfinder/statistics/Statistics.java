@@ -21,7 +21,10 @@ public class Statistics {
      * @param uptime                       elapsed run time in milliseconds
      * @param keys                         total number of keys checked so far
      * @param keysSumOfTimeToCheckContains cumulative time (ms) spent in presence lookups
-     * @param emptyConsumer                number of consumer iterations that found the queue empty
+     * @param consumerStarved              number of consume cycles starved (empty queue, no work);
+     *                                     rising means the producer/GPU side cannot keep the consumer busy
+     * @param producerBlocked              number of times a producer hit a full queue on enqueue;
+     *                                     rising means the consumer/CPU is too slow to drain (CPU-bound)
      * @param keysQueueSize                current number of batches waiting in the queue
      * @param hits                         total number of address hits found so far
      * @return the formatted statistics message
@@ -30,7 +33,8 @@ public class Statistics {
             long uptime,
             long keys,
             long keysSumOfTimeToCheckContains,
-            long emptyConsumer,
+            long consumerStarved,
+            long producerBlocked,
             long keysQueueSize,
             long hits) {
         // calculate uptime
@@ -44,7 +48,8 @@ public class Statistics {
 
         return "Statistics: [Checked " + (keys / 1_000_000L) + " M keys in " + uptimeInMinutes + " minutes] ["
                 + (keysPerSecond / 1_000L) + " k keys/second] [" + (keysPerMinute / 1_000_000L)
-                + " M keys/minute] [Times an empty consumer: " + emptyConsumer + "] [Average contains time: "
+                + " M keys/minute] [Consumer starved (empty queue): " + consumerStarved
+                + "] [Producer blocked (queue full): " + producerBlocked + "] [Average contains time: "
                 + averageContainsTime + " ms] [keys queue size: " + keysQueueSize + "] [Hits: " + hits + "]";
     }
 }

@@ -74,8 +74,23 @@ public class ConsumerJava implements Consumer {
     protected final AtomicLong checkedKeys = new AtomicLong();
     /** Cumulative time spent inside the persistence's {@code containsAddress} calls (ms). */
     protected final AtomicLong checkedKeysSumOfTimeToCheckContains = new AtomicLong();
-    /** Number of consumer iterations that found the queue empty. */
-    protected final AtomicLong emptyConsumer = new AtomicLong();
+    /**
+     * Number of consume cycles in which the consumer did no work because the keys queue
+     * was empty for the entire wait window (nothing drained and the timed {@code poll}
+     * timed out). A rising value means the consumer is <b>starved</b>: the producer/GPU
+     * side is the bottleneck, is blocked, or nothing is producing. Stays near zero when
+     * the consumer is fed steadily. Counted per consumer thread; with multiple threads
+     * this is a heuristic gauge, not exact accounting.
+     */
+    protected final AtomicLong consumerStarvedCount = new AtomicLong();
+    /**
+     * Number of times a producer reached a <b>full</b> keys queue when enqueuing a batch
+     * (the bounded queue had no remaining capacity, so {@code put} must block until a
+     * slot frees). A rising value means the consumer/CPU is too slow to drain what the
+     * producers generate (CPU-bound). Stays near zero when the consumer keeps up. Sampled
+     * at enqueue time across all producer threads; a heuristic gauge, not exact accounting.
+     */
+    protected final AtomicLong producerBlockedCount = new AtomicLong();
     /** Total number of address hits found so far. */
     protected final AtomicLong hits = new AtomicLong();
     /**
@@ -272,7 +287,8 @@ public class ConsumerJava implements Consumer {
                                     uptime,
                                     checkedKeys.get(),
                                     checkedKeysSumOfTimeToCheckContains.get(),
-                                    emptyConsumer.get(),
+                                    consumerStarvedCount.get(),
+                                    producerBlockedCount.get(),
                                     keysQueue.size(),
                                     hits.get());
 
@@ -305,20 +321,8 @@ public class ConsumerJava implements Consumer {
                 ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
 
         while (shouldRun.get()) {
-            if (keysQueue.size() >= consumerJava.queueSize) {
-                LOGGER.warn("Attention, queue is full. Please increase queue size.");
-            }
             try {
-                consumeKeys(threadLocalReuseableByteBuffer);
-                emptyConsumer.incrementAndGet();
-                // Wait for the next batch instead of an unconditional sleep — wakes
-                // the instant a producer enqueues, eliminating up-to-
-                // queuePollTimeoutMillis-ms idle latency. queuePollTimeoutMillis is now the
-                // max idle wait window rather than a fixed back-off.
-                PublicKeyBytes[] next = keysQueue.poll(consumerJava.queuePollTimeoutMillis, TimeUnit.MILLISECONDS);
-                if (next != null) {
-                    processBatch(next, threadLocalReuseableByteBuffer);
-                }
+                consumeOneCycle(threadLocalReuseableByteBuffer);
             } catch (InterruptedException e) {
                 LOGGER.warn("Consumer poll loop interrupted; relying on shouldRun for shutdown.", e);
                 if (POLL_LOOP_RESTORES_INTERRUPT_FLAG) {
@@ -333,13 +337,55 @@ public class ConsumerJava implements Consumer {
         LOGGER.info("end consumeKeysRunner");
     }
 
-    void consumeKeys(ByteBuffer threadLocalReuseableByteBuffer) {
+    /**
+     * Runs a single drain-and-wait cycle of {@link #consumeKeysRunner()}: first drains
+     * every batch already queued, then waits up to {@code queuePollTimeoutMillis} for one
+     * more. A cycle is counted as <b>starved</b> (see {@link #consumerStarvedCount}) when
+     * it did no work at all — nothing was drained and the timed wait returned nothing —
+     * which means the producer/GPU side could not keep this consumer busy.
+     *
+     * <p>Extracted from the run loop so the starvation accounting can be unit-tested
+     * directly with a pre-filled or empty queue, without spawning the consumer threads.
+     *
+     * @param threadLocalReuseableByteBuffer thread-local buffer reused across address lookups
+     * @return {@code true} if this cycle was starved (no work done), {@code false} otherwise
+     * @throws InterruptedException if the timed wait is interrupted (shutdown)
+     */
+    @VisibleForTesting
+    boolean consumeOneCycle(ByteBuffer threadLocalReuseableByteBuffer) throws InterruptedException {
+        long drained = consumeKeys(threadLocalReuseableByteBuffer);
+        // Wait for the next batch instead of an unconditional sleep — wakes the instant a
+        // producer enqueues, so queuePollTimeoutMillis is the max idle wait window per
+        // cycle, not a fixed back-off.
+        PublicKeyBytes[] next =
+                keysQueue.poll(consumerJava.queuePollTimeoutMillis, TimeUnit.MILLISECONDS);
+        if (next != null) {
+            processBatch(next, threadLocalReuseableByteBuffer);
+        }
+        boolean starved = drained == 0 && next == null;
+        if (starved) {
+            consumerStarvedCount.incrementAndGet();
+        }
+        return starved;
+    }
+
+    /**
+     * Drains and processes every batch currently in the keys queue using non-blocking
+     * polls, returning once the queue is momentarily empty.
+     *
+     * @param threadLocalReuseableByteBuffer thread-local buffer reused across address lookups
+     * @return the number of batches drained and processed in this call
+     */
+    long consumeKeys(ByteBuffer threadLocalReuseableByteBuffer) {
         LOGGER.trace("consumeKeys");
+        long drained = 0;
         PublicKeyBytes[] publicKeyBytesArray = keysQueue.poll();
         while (publicKeyBytesArray != null) {
             processBatch(publicKeyBytesArray, threadLocalReuseableByteBuffer);
+            drained++;
             publicKeyBytesArray = keysQueue.poll();
         }
+        return drained;
     }
 
     /**
@@ -499,6 +545,12 @@ public class ConsumerJava implements Consumer {
             LOGGER.debug("keysQueue.put(publicKeyBytes) with length: " + publicKeyBytes.length);
         }
 
+        if (keysQueue.remainingCapacity() == 0) {
+            // The bounded queue is full, so the following put() will block this producer
+            // until the consumer frees a slot. A rising count means the consumer/CPU is
+            // the bottleneck (cannot drain as fast as producers generate).
+            producerBlockedCount.incrementAndGet();
+        }
         keysQueue.put(publicKeyBytes);
 
         if (LOGGER.isDebugEnabled()) {

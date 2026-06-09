@@ -18,15 +18,15 @@ public class StatisticsTest {
         Statistics statistics = new Statistics();
 
         // act
-        String result =
-                statistics.createStatisticsMessage(234_000L, 999_000_000L, 345_000_000_000L, 4567L, 5678L, 6789L);
+        String result = statistics.createStatisticsMessage(
+                234_000L, 999_000_000L, 345_000_000_000L, 4567L, 1234L, 5678L, 6789L);
 
         // assert
         assertThat(
                 result,
                 is(
                         equalTo(
-                                "Statistics: [Checked 999 M keys in 3 minutes] [4269 k keys/second] [333 M keys/minute] [Times an empty consumer: 4567] [Average contains time: 345 ms] [keys queue size: 5678] [Hits: 6789]")));
+                                "Statistics: [Checked 999 M keys in 3 minutes] [4269 k keys/second] [333 M keys/minute] [Consumer starved (empty queue): 4567] [Producer blocked (queue full): 1234] [Average contains time: 345 ms] [keys queue size: 5678] [Hits: 6789]")));
     }
     // </editor-fold>
 

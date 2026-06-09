@@ -23,6 +23,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import net.ladenthin.bitcoinaddressfinder.AwaitTimeTest;
 import net.ladenthin.bitcoinaddressfinder.AwaitTimeTests;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
+import net.ladenthin.bitcoinaddressfinder.LMDBPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.ManualDebugConstants;
 import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
 import net.ladenthin.bitcoinaddressfinder.ToStringTest;
@@ -83,6 +84,85 @@ public class ConsumerJavaTest {
         assertThrows(org.lmdbjava.LmdbNativeException.class, () -> consumerJava.initLMDB());
     }
 
+    // <editor-fold defaultstate="collapsed" desc="runtime health counters">
+    @Test
+    public void consumeOneCycle_emptyQueue_marksStarvedAndIncrementsStarvedCount() throws Exception {
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        // keep the idle wait window tiny so the starved cycle returns fast
+        cConsumerJava.queuePollTimeoutMillis = 1;
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        ByteBuffer buffer = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
+
+        // act: nothing was ever enqueued, so the cycle drains nothing and the timed poll times out
+        boolean starved = consumerJava.consumeOneCycle(buffer);
+
+        // assert
+        assertThat(starved, is(equalTo(true)));
+        assertThat(consumerJava.consumerStarvedCount.get(), is(equalTo(1L)));
+        assertThat(consumerJava.producerBlockedCount.get(), is(equalTo(0L)));
+    }
+
+    @Test
+    public void consumeOneCycle_queueHasBatch_processesBatchAndIsNotStarved() throws Exception {
+        new LMDBPlatformAssume().assumeLMDBExecution();
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+        TestAddressesFiles testAddresses = new TestAddressesFiles(false);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
+
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.queuePollTimeoutMillis = 1;
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        consumerJava.initLMDB();
+
+        // enqueue one batch the cycle must drain and process
+        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
+        ByteBuffer buffer = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
+
+        // act
+        boolean starved = consumerJava.consumeOneCycle(buffer);
+
+        // assert: work was done, so the cycle is not starved and the queue is drained
+        assertThat(starved, is(equalTo(false)));
+        assertThat(consumerJava.consumerStarvedCount.get(), is(equalTo(0L)));
+        assertThat(consumerJava.keysQueueSize(), is(equalTo(0)));
+    }
+
+    @Test
+    public void consumeKeys_queueFull_incrementsProducerBlockedCount() throws Exception {
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        // single-slot queue so the second enqueue finds it full
+        cConsumerJava.queueSize = 1;
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+
+        // first enqueue fills the only slot; remaining capacity was 1 beforehand -> not counted
+        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
+        assertThat(consumerJava.producerBlockedCount.get(), is(equalTo(0L)));
+
+        // a second producer finds the queue full -> counts the block, then parks in put()
+        ExecutorService producer = Executors.newSingleThreadExecutor();
+        try {
+            producer.submit(() -> {
+                consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
+                return null;
+            });
+
+            // the block is counted before put() parks, so await the increment
+            long deadline = System.currentTimeMillis() + Duration.ofSeconds(10).toMillis();
+            while (consumerJava.producerBlockedCount.get() == 0L && System.currentTimeMillis() < deadline) {
+                Thread.sleep(5);
+            }
+            assertThat(consumerJava.producerBlockedCount.get(), is(equalTo(1L)));
+
+            // release the parked producer so the executor can terminate cleanly
+            consumerJava.keysQueue.poll();
+        } finally {
+            producer.shutdownNow();
+        }
+    }
+    // </editor-fold>
+
     // <editor-fold defaultstate="collapsed" desc="toString">
     @ToStringTest
     @Test
@@ -138,7 +218,7 @@ public class ConsumerJavaTest {
                     arguments,
                     hasItem(
                             equalTo(
-                                    "Statistics: [Checked 0 M keys in 0 minutes] [0 k keys/second] [0 M keys/minute] [Times an empty consumer: 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
+                                    "Statistics: [Checked 0 M keys in 0 minutes] [0 k keys/second] [0 M keys/minute] [Consumer starved (empty queue): 0] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
         }
     }
 

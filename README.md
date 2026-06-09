@@ -90,6 +90,11 @@ using the assigned ID:
   - [OpenCL Acceleration](#opencl-acceleration)
     - [Built-in Self-Test (BIST)](#built-in-self-test-bist)
     - [Performance Benchmarks](#performance-benchmarks)
+- [Logging and Runtime Statistics](#logging-and-runtime-statistics)
+  - [Reading the Statistics Line](#reading-the-statistics-line)
+  - [Diagnosing Bottlenecks](#diagnosing-bottlenecks)
+  - [Hit Logging](#hit-logging)
+  - [Customizing Log Output](#customizing-log-output)
 - [Collision Probability and Security Considerations](#collision-probability-and-security-considerations)
 - [Similar Projects](#similar-projects)
   - [Deep Learning Private Key Prediction](#deep-learning-private-key-prediction)
@@ -1187,6 +1192,96 @@ For technical details, see:
 | AMD Radeon 8060S            | AMD AI MAX+ 395     | 256              | 16               |  9,200,000 keys/s      |
 | AMD Radeon 8060S            | AMD AI MAX+ 395     | 160              | 16               | 11,000,000 keys/s      |
 
+
+## Logging and Runtime Statistics
+
+In `Find` mode the consumer logs a periodic, single-line statistics snapshot at `INFO`
+level. The interval is controlled by `consumerJava.printStatisticsEveryNSeconds`
+(default `60`). All logging goes through **SLF4J / Logback**, so format and destinations
+are fully configurable (see [Customizing Log Output](#customizing-log-output)).
+
+### Reading the Statistics Line
+
+A statistics line looks like this:
+
+```
+Statistics: [Checked 1234 M keys in 5 minutes] [4100 k keys/second] [246 M keys/minute] [Consumer starved (empty queue): 5012] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
+```
+
+| Field | Meaning |
+|---|---|
+| `Checked N M keys in M minutes` | Total candidate keys checked so far (millions) and elapsed minutes. |
+| `k keys/second` / `M keys/minute` | Throughput — **the headline performance number.** |
+| `Consumer starved (empty queue): N` | **Runtime health counter.** How many consume cycles found the queue empty and did no work — see below. |
+| `Producer blocked (queue full): N` | **Runtime health counter.** How many times a producer hit a full queue and had to wait — see below. |
+| `Average contains time: N ms` | Mean time spent per address-presence lookup. Large values point at a slow lookup backend (see [Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend)). |
+| `keys queue size: N` | Instantaneous depth of the producer→consumer queue (bounded by `consumerJava.queueSize`). |
+| `Hits: N` | Number of address matches found so far (see [Hit Logging](#hit-logging)). |
+
+> All counters are **cumulative since startup**. What matters for diagnosis is how fast a
+> counter *rises between two statistics lines*, not its absolute value.
+
+### Diagnosing Bottlenecks
+
+The pipeline is `Producers → bounded queue → Consumer (CPU address checks)`. The two health
+counters pinpoint which side is the limiting factor:
+
+- **`Consumer starved (empty queue)`** rises when the consumer repeatedly empties the queue
+  and waits for more work. **A rising value means the consumer/CPU is faster than the
+  producers** — the GPU/producer side (or its configuration) is the limit, *or* nothing is
+  producing. For pure GPU scanning this is normal and healthy: it confirms the CPU keeps up
+  with the GPU's output.
+- **`Producer blocked (queue full)`** rises when producers generate batches faster than the
+  consumer can check them, so the queue fills and producers must wait. **A rising value means
+  the consumer/CPU is the bottleneck (CPU-bound).**
+
+| `Producer blocked` | `Consumer starved` | `keys queue size` | Interpretation |
+|---|---|---|---|
+| rising | ~0 | near `queueSize` | **CPU-bound** — the consumer can't keep up. Use a faster [lookup backend](#-pluggable-address-lookup-backends-addresslookupbackend), raise `consumerJava.threads`, or reduce producer rate. |
+| ~0 | rising | ~0 | **Producer/GPU-bound** (or idle) — the CPU is keeping up easily. For GPU scanning this is the expected healthy state; if you expected more throughput, the GPU/producer config is the limit. |
+| ~0 | ~0 | mid-range | **Balanced** — neither side is starved or blocked; watch `keys/second`. |
+
+Both counters staying near zero while throughput is high is the ideal balanced state.
+
+### Hit Logging
+
+When a generated address matches the database, the consumer logs it at `INFO` with a clear
+prefix and the full key material needed to recover the wallet:
+
+- `hit: Found the address: …` — the match, including the private key in **WIF**, the public
+  address, and related key details.
+- `hit: safe log: …` — an additional, separately formatted record written immediately on a
+  hit so the finding survives even if later formatting fails.
+- `vanity pattern match: …` — emitted when optional vanity-pattern matching
+  (`consumerJava.enableVanity` / `vanityPattern`) is enabled and a generated address matches.
+
+The running `Hits:` field in the statistics line reflects the total count. To persist hits to
+their own file, route these messages with a dedicated appender (next section).
+
+### Customizing Log Output
+
+Logging is backed by Logback. A ready-to-edit configuration ships at
+[`examples/logbackConfiguration.xml`](examples/logbackConfiguration.xml). Point the
+application at a custom file with:
+
+```bash
+java -Dlogback.configurationFile=/path/to/logbackConfiguration.xml -jar bitcoinaddressfinder-<version>-jar-with-dependencies.jar config.json
+```
+
+Typical customizations:
+
+- **Write hits to their own file** — add a `FileAppender` and route the `ConsumerJava` logger
+  (or filter on the `hit:` prefix) to it, so matches are never lost in console scrollback.
+- **Adjust the statistics cadence** — change `consumerJava.printStatisticsEveryNSeconds` in
+  the JSON config (this controls *when* the line is emitted; Logback controls *how/where*).
+- **Machine-readable output** — the single-line, fixed-field statistics format is intentionally
+  stable so an external supervisor or GUI can parse it (e.g. via an inter-process pipe) to plot
+  throughput and the starved/blocked health counters over time.
+
+> **Keep the CRLF guard.** The bundled pattern wraps the message in
+> `%replace(%msg){'[\r\n]+', ' | '}`, which neutralizes carriage returns / line feeds in
+> rendered messages so untrusted input cannot forge extra log lines. Preserve this wrap in any
+> derived pattern.
 
 ## Collision Probability and Security Considerations
 
