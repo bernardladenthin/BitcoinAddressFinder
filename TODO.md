@@ -113,9 +113,9 @@ pluggable-persistence design plan:
   - **Step 2 — wire a second backend behind the same API.** Add **JogAmp JOCL** (`com.jogamp.opencl`, OO `CLPlatform`/`CLDevice`/`CLContext`) as an alternative implementation selectable at runtime/config, so the two bindings can be A/B'd (device enumeration, kernel build/run, native-lib packaging). Decide based on results whether JogAmp simplifies the layer enough to become the default or stays optional.
   - Open questions to settle when picked up: where the backend is selected (new `configuration` field vs auto-detect), how kernel source/args map across the two APIs, and the native-library/packaging impact of adding JogAmp.
 
-- **Add a test exercising two OpenCL devices simultaneously** (migrated from GitHub issue #6). Current OpenCL coverage drives a **single** device (`ProbeAddressesOpenCLTest`, gated by `OpenCLPlatformAssume`). Add a test that runs **two `producerOpenCL` instances concurrently** (the multi-GPU / multi-device path the project supports via multiple `producerOpenCL` entries) and asserts both produce and feed the consumer correctly at the same time.
-  - Availability gate: the test must self-skip unless **≥ 2 OpenCL devices** are present (extend the `OpenCLPlatformAssume` pattern) — most CI has 0–1 GPU, so it will usually skip, like the existing OpenCL tests.
-  - Open question: whether "2 devices" should mean two physical GPUs only, or any two OpenCL devices from the enumerated platforms (e.g. a GPU + a CPU-OpenCL device), which would let it actually run on more hosts.
+- **Add a test exercising two OpenCL devices simultaneously** (migrated from GitHub issue #6). Current OpenCL coverage drives a **single** device (`ProbeAddressesOpenCLTest`, gated by `OpenCLPlatformAssume`). Add a test that runs **two `producerOpenCL` instances concurrently** (the multi-device path the project supports via multiple `producerOpenCL` entries) and asserts both produce and feed the consumer correctly at the same time.
+  - **Scope: two _physical_ OpenCL devices** — e.g. a machine with two GPUs, or one GPU plus a CPU that exposes an OpenCL device. (Not two logical handles to the same device.) Each `producerOpenCL` targets a distinct `(platformIndex, deviceIndex)`.
+  - Availability gate: the test must self-skip unless **≥ 2 distinct physical OpenCL devices** are enumerated (extend the `OpenCLPlatformAssume` pattern). Most CI has 0–1 device, so it will usually skip, like the existing OpenCL tests; it is meant to run on a real dual-device host.
 
 ## Open — cross-cutting (slice for this repo)
 
