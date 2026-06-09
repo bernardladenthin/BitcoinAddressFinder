@@ -5,7 +5,7 @@ package net.ladenthin.bitcoinaddressfinder.producer;
 
 import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.BIG_INTEGER;
 import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.SHA256;
-import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.STRING_DO_SHA256;
+import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.STRING_SHA256;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -141,7 +141,7 @@ public class ProducerJavaSecretsFilesTest {
         List<File> secretsFiles = createSecretsFiles(cSecretFormat);
         List<String> secretsFilesAsStringList =
                 secretsFiles.stream().map(file -> file.getAbsolutePath()).collect(Collectors.toList());
-        cProducerJavaSecretsFiles.files = secretsFilesAsStringList;
+        cProducerJavaSecretsFiles.secretsFiles = secretsFilesAsStringList;
         cProducerJavaSecretsFiles.secretFormat = cSecretFormat;
         cProducerJavaSecretsFiles.batchSizeInBits = 0;
 
@@ -210,7 +210,7 @@ public class ProducerJavaSecretsFilesTest {
         StringBuilder sb = new StringBuilder();
         for (PrivateKey secret : secrets) {
             switch (secretFormat) {
-                case STRING_DO_SHA256:
+                case STRING_SHA256:
                     sb.append(secret.string);
                     break;
                 case BIG_INTEGER:

@@ -18,12 +18,14 @@ public class CProducerJavaSecretsFiles extends CProducerJava {
     public CProducerJavaSecretsFiles() {}
 
     /**
-     * The list of strings files which should be read.
+     * The list of secrets files to read. Each entry is a file path resolved relative to the
+     * working directory; every line in a file is one secret, parsed according to
+     * {@link #secretFormat}.
      */
-    public List<String> files = new ArrayList<>();
+    public List<String> secretsFiles = new ArrayList<>();
 
     /**
-     * The format of each line in the files.
+     * The line format of every file in {@link #secretsFiles}.
      */
-    public CSecretFormat secretFormat = CSecretFormat.STRING_DO_SHA256;
+    public CSecretFormat secretFormat = CSecretFormat.STRING_SHA256;
 }

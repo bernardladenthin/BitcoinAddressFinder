@@ -46,20 +46,20 @@ public class CKeyProducerJavaSocket extends CKeyProducerJavaReceiver {
      * </ul>
      *
      * <p>Must be a non-negative value. Unlike
-     * {@code CKeyProducerJavaZmq.timeout} and {@code CKeyProducerJavaWebSocket.timeout},
+     * {@code CKeyProducerJavaZmq.timeoutMillis} and {@code CKeyProducerJavaWebSocket.timeoutMillis},
      * negative values (e.g. {@code -1} for &quot;block forever&quot;) are NOT
      * supported here: the underlying {@code java.net} APIs throw
      * {@code IllegalArgumentException} on negative SO_TIMEOUT, so any negative
      * value would prevent the producer from initialising. Use a large positive
      * value if you need a near-unbounded wait.
      */
-    public int timeout = 3000;
+    public int timeoutMillis = 3000;
 
     /** Number of attempts to reconnect if connection fails */
-    public int connectionRetryCount = 5;
+    public int connectRetryCount = 5;
 
     /** Delay in milliseconds between retry attempts */
-    public int retryDelayMillisConnect = 1000;
+    public int connectRetryDelayMillis = 1000;
 
     /**
      * Returns the configured host name.

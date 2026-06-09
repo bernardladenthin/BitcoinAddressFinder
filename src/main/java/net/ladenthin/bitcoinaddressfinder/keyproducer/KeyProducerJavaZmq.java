@@ -57,7 +57,7 @@ public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyPro
             socket.connect(cKeyProducerJava.address);
         }
 
-        socket.setReceiveTimeOut(cKeyProducerJava.timeout);
+        socket.setReceiveTimeOut(cKeyProducerJava.timeoutMillis);
     }
 
     /**
@@ -96,7 +96,7 @@ public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyPro
 
     @Override
     protected int getReadTimeout() {
-        return cKeyProducerJava.timeout;
+        return cKeyProducerJava.timeoutMillis;
     }
 
     @Override

@@ -926,14 +926,10 @@ Useful for piping externally generated secrets (e.g., from Python, Go, etc.) dir
 | `mode`                        | string enum (`CLIENT`, `SERVER`) | `"SERVER"`    | Whether to connect to a remote socket (`CLIENT`) or wait for connections (`SERVER`) |
 | `host`                        | string                           | `"localhost"` | Remote host to connect to (used only in `CLIENT` mode)                              |
 | `port`                        | number                           | `12345`       | TCP port to connect to or bind on                                                   |
-| `timeout`                     | number                           | `3000`        | Socket read timeout in milliseconds                                                 |
+| `timeoutMillis`               | number                           | `3000`        | Socket timeout in milliseconds, applied to accept (server), connect (client) and per-read. Must be non-negative |
 | `logReceivedSecret`           | boolean                          | `false`       | Whether to log each received private key as a hex string                            |
-| `connectionRetryCount`        | number                           | `5`           | Number of times to retry establishing a socket connection                           |
-| `retryDelayMillisConnect`     | number                           | `1000`        | Delay between connection retry attempts (in milliseconds)                           |
-| `readRetryCount`              | number                           | `3`           | Number of attempts to retry reading a full secret after I/O failure                 |
-| `retryDelayMillisRead`        | number                           | `1000`        | Delay between read retry attempts (in milliseconds)                                 |
-| `readPartialRetryCount`       | number                           | `5`           | Number of retries when partially reading a single 32-byte secret                    |
-| `readPartialRetryDelayMillis` | number                           | `20`          | Delay between partial read retries (in milliseconds)                                |
+| `connectRetryCount`           | number                           | `5`           | Number of times to retry establishing a socket connection (client mode)             |
+| `connectRetryDelayMillis`     | number                           | `1000`        | Delay between connection retry attempts (in milliseconds)                           |
 | `maxWorkSize`                 | number                           | `16777216`    | Maximum number of secrets to request in a single call                               |
 
 
@@ -960,14 +956,10 @@ Full:
         "host": "localhost",
         "port": 12345,
         "mode": "SERVER",
-        "timeout": 3000,
+        "timeoutMillis": 3000,
         "logReceivedSecret": true,
-        "connectionRetryCount": 5,
-        "retryDelayMillisConnect": 1000,
-        "readRetryCount": 5,
-        "retryDelayMillisRead": 1000,
-        "readPartialRetryCount": 5,
-        "readPartialRetryDelayMillis": 20,
+        "connectRetryCount": 5,
+        "connectRetryDelayMillis": 1000,
         "maxWorkSize": 16777216
     }
 ],
@@ -1016,7 +1008,7 @@ Ideal for decoupled key streaming where producers push keys using ZeroMQ `PUSH` 
 | keyProducerId      | string                       | —                      | Unique identifier for this key producer     |
 | address            | string                       | tcp://localhost:5555   | The ZeroMQ address to bind or connect to    |
 | mode               | string enum (BIND, CONNECT)  | BIND                   | Whether this socket binds to or connects    |
-| timeout            | number                       | `-1`                   | Receive timeout in milliseconds:<br> `0` = non-blocking,<br> `-1` = infinite,<br> `>0` = wait that long |
+| timeoutMillis      | number                       | `-1`                   | Receive timeout in milliseconds:<br> `0` = non-blocking,<br> `-1` = infinite,<br> `>0` = wait that long |
 | logReceivedSecret  | boolean                      | false                  | Whether to log each received secret in hex  |
 
 Minimal:
@@ -1039,7 +1031,7 @@ Full:
         "keyProducerId": "exampleKeyProducerId",
         "address": "tcp://localhost:5555",
         "mode": "BIND",
-        "timeout": -1,
+        "timeoutMillis": -1,
         "logReceivedSecret": true
     }
 ],
@@ -1102,6 +1094,40 @@ while True:
 * No framing or delimiters needed—ZeroMQ handles message boundaries.
 * Messages larger or smaller than 32 bytes will be discarded or raise errors.
 
+
+#### 📄 Secrets File Producer (`producerJavaSecretsFiles`)
+
+Read pre-generated secrets from one or more text files instead of generating them at runtime.
+Unlike the entries above (which are *key producers* nested in a producer), this is a top-level
+producer placed directly under `finder.producerJavaSecretsFiles`. One secret per line; the line
+format is selected with `secretFormat`. See [`config_Find_SecretsFile.json`](examples/config_Find_SecretsFile.json).
+
+| JSON field      | Type                  | Default          | Description                                              |
+|-----------------|-----------------------|------------------|----------------------------------------------------------|
+| `keyProducerId` | string                | —                | Unique identifier for this producer                      |
+| `secretsFiles`  | array of string       | `[]`             | Paths of the files to read (relative to the working dir) |
+| `secretFormat`  | string enum           | `STRING_SHA256`  | Line format of every file (see below)                    |
+
+Supported `secretFormat` values:
+
+| Value                 | Meaning                                                                              |
+|-----------------------|--------------------------------------------------------------------------------------|
+| `BIG_INTEGER`         | Decimal big integer per line (the raw private key as a base-10 number)               |
+| `DUMPED_PRIVATE_KEY`  | WiF (Wallet Import Format), e.g. `5K2YUVmWfxbmvsNxCsfvArXdGXm7d5DC9pn4yD75k2UaSYgkXTh` |
+| `SHA256`              | Hex-encoded SHA-256 digest used directly as the private key                          |
+| `STRING_SHA256`       | Brainwallet: the line is hashed with SHA-256 and that digest is the private key      |
+
+```json
+...
+"producerJavaSecretsFiles": [
+    {
+        "keyProducerId": "exampleKeyProducerId",
+        "secretsFiles": [ "secrets/fileContainingSecrets.txt" ],
+        "secretFormat": "STRING_SHA256"
+    }
+],
+...
+```
 
 ### Mixed Modes
 You can combine **vanity address generation** with **database lookups** to enhance functionality and efficiency.

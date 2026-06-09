@@ -59,5 +59,5 @@ public class CKeyProducerJavaZmq extends CKeyProducerJavaReceiver {
      *
      * <p>Default: {@code 1000} ms
      */
-    public int timeout = 1000;
+    public int timeoutMillis = 1000;
 }

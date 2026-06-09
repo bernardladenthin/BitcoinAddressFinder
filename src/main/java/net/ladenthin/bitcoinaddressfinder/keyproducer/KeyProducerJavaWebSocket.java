@@ -106,7 +106,7 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
 
     @Override
     protected int getReadTimeout() {
-        return cKeyProducerJava.timeout;
+        return cKeyProducerJava.timeoutMillis;
     }
 
     @Override

@@ -50,7 +50,7 @@ public class KeyProducerJavaWebSocketTest {
         // The JUnit per-test timeout (60s) is the upper bound when something is
         // genuinely wrong &#x2014; far more reliable than racing against a fixed receiver
         // timeout under loaded CI conditions.
-        config.timeout = -1;
+        config.timeoutMillis = -1;
         return config;
     }
 
@@ -100,7 +100,7 @@ public class KeyProducerJavaWebSocketTest {
     @Test
     public void createSecrets_timeoutWithoutMessage_throwsException() throws Exception {
         CKeyProducerJavaWebSocket config = createConfig();
-        config.timeout = TestTimeProvider.DEFAULT_TIMEOUT;
+        config.timeoutMillis = TestTimeProvider.DEFAULT_TIMEOUT;
         KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
         producer.start();
 
@@ -111,7 +111,7 @@ public class KeyProducerJavaWebSocketTest {
     public void createSecrets_negativeTimeout_blocksUntilMessageArrives() throws Exception {
         // arrange
         CKeyProducerJavaWebSocket config = createConfig();
-        config.timeout = -1; // explicit: block indefinitely
+        config.timeoutMillis = -1; // explicit: block indefinitely
         KeyProducerJavaWebSocket producer = new KeyProducerJavaWebSocket(config, keyUtility, bitHelper);
         producer.start();
 

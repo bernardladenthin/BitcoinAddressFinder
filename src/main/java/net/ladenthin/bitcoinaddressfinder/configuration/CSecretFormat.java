@@ -50,5 +50,5 @@ public enum CSecretFormat {
      * 1337
      * </pre>
      */
-    STRING_DO_SHA256
+    STRING_SHA256
 }

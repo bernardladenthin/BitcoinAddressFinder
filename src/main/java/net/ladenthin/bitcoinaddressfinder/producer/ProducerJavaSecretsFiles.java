@@ -61,7 +61,7 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
     @Override
     public void produceKeys() throws IOException {
         FileHelper fileHelper = new FileHelper();
-        List<File> files = fileHelper.stringsToFiles(producerJavaSecretsFiles.files);
+        List<File> files = fileHelper.stringsToFiles(producerJavaSecretsFiles.secretsFiles);
         fileHelper.assertFilesExists(files);
 
         LOGGER.info("Starting secrets file processing...");

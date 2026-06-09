@@ -487,7 +487,7 @@ public class FinderTest {
     private void configureKeyProducerJavaSocket(String keyProducerId, CFinder cFinder) {
         CKeyProducerJavaSocket socket = new CKeyProducerJavaSocket();
         socket.port = KeyProducerJavaSocketTest.findFreePort();
-        socket.timeout = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
+        socket.timeoutMillis = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
         socket.keyProducerId = keyProducerId;
         cFinder.keyProducerJavaSocket.add(socket);
     }
@@ -495,7 +495,7 @@ public class FinderTest {
     private void configureKeyProducerJavaWebSocket(String keyProducerId, CFinder cFinder) {
         CKeyProducerJavaWebSocket socket = new CKeyProducerJavaWebSocket();
         socket.port = KeyProducerJavaSocketTest.findFreePort();
-        socket.timeout = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
+        socket.timeoutMillis = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
         socket.keyProducerId = keyProducerId;
         cFinder.keyProducerJavaWebSocket.add(socket);
     }
@@ -503,7 +503,7 @@ public class FinderTest {
     private void configureKeyProducerJavaZmq(String keyProducerId, CFinder cFinder) {
         CKeyProducerJavaZmq zmq = new CKeyProducerJavaZmq();
         zmq.address = KeyProducerJavaZmqTest.findFreeZmqAddress();
-        zmq.timeout = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
+        zmq.timeoutMillis = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
         zmq.keyProducerId = keyProducerId;
         cFinder.keyProducerJavaZmq.add(zmq);
     }

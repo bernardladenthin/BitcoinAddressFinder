@@ -111,9 +111,9 @@ public class KeyProducerJavaSocketTest {
 
         // Set up server
         CKeyProducerJavaSocket serverConfig = createServerConfig(port);
-        serverConfig.timeout = TestTimeProvider.DEFAULT_SOCKET_TIMEOUT;
-        serverConfig.connectionRetryCount = TestTimeProvider.DEFAULT_CONNECTION_RETRY_COUNT;
-        serverConfig.retryDelayMillisConnect = TestTimeProvider.SHORT_DELAY;
+        serverConfig.timeoutMillis = TestTimeProvider.DEFAULT_SOCKET_TIMEOUT;
+        serverConfig.connectRetryCount = TestTimeProvider.DEFAULT_CONNECTION_RETRY_COUNT;
+        serverConfig.connectRetryDelayMillis = TestTimeProvider.SHORT_DELAY;
         KeyProducerJavaSocket serverKeyProducer = new KeyProducerJavaSocket(serverConfig, keyUtility, bitHelper);
         serverKeyProducer.start();
 
@@ -263,7 +263,7 @@ public class KeyProducerJavaSocketTest {
 
         // Configure client socket with read timeout
         CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        clientConfig.timeout = clientSocketTimeout;
+        clientConfig.timeoutMillis = clientSocketTimeout;
         KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
         client.start();
 
@@ -316,7 +316,7 @@ public class KeyProducerJavaSocketTest {
         });
 
         CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        clientConfig.timeout = clientSocketTimeout;
+        clientConfig.timeoutMillis = clientSocketTimeout;
         KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
         client.start();
 
@@ -446,9 +446,9 @@ public class KeyProducerJavaSocketTest {
         });
 
         CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        clientConfig.connectionRetryCount = TestTimeProvider.DEFAULT_CONNECTION_RETRY_COUNT;
-        clientConfig.retryDelayMillisConnect = TestTimeProvider.DEFAULT_RETRY_DELAY;
-        clientConfig.timeout = TestTimeProvider.LONG_SOCKET_TIMEOUT;
+        clientConfig.connectRetryCount = TestTimeProvider.DEFAULT_CONNECTION_RETRY_COUNT;
+        clientConfig.connectRetryDelayMillis = TestTimeProvider.DEFAULT_RETRY_DELAY;
+        clientConfig.timeoutMillis = TestTimeProvider.LONG_SOCKET_TIMEOUT;
         KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
         client.start();
 
@@ -595,7 +595,7 @@ public class KeyProducerJavaSocketTest {
         });
 
         CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
-        clientConfig.timeout = TestTimeProvider.SOCKET_ACCEPT_TIMEOUT;
+        clientConfig.timeoutMillis = TestTimeProvider.SOCKET_ACCEPT_TIMEOUT;
 
         KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
         client.start();
@@ -645,10 +645,10 @@ public class KeyProducerJavaSocketTest {
         ServerSocket dummyServer = hangServer(port); // <-- make sure something accepts
 
         CKeyProducerJavaSocket config = createClientConfig("localhost", port);
-        config.connectionRetryCount = 3;
-        config.timeout =
+        config.connectRetryCount = 3;
+        config.timeoutMillis =
                 TestTimeProvider.DEFAULT_SOCKET_TIMEOUT; // make connection attempt long enough to interrupt mid-way
-        config.retryDelayMillisConnect = 0;
+        config.connectRetryDelayMillis = 0;
 
         KeyProducerJavaSocket client = new KeyProducerJavaSocket(config, keyUtility, bitHelper);
         client.start();
@@ -688,9 +688,9 @@ public class KeyProducerJavaSocketTest {
         int port = findFreePort();
 
         CKeyProducerJavaSocket config = createServerConfig(port);
-        config.timeout = TestTimeProvider.SOCKET_ACCEPT_TIMEOUT;
-        config.connectionRetryCount = 1;
-        config.retryDelayMillisConnect = 0;
+        config.timeoutMillis = TestTimeProvider.SOCKET_ACCEPT_TIMEOUT;
+        config.connectRetryCount = 1;
+        config.connectRetryDelayMillis = 0;
 
         KeyProducerJavaSocket server = new KeyProducerJavaSocket(config, keyUtility, bitHelper);
         server.start();
