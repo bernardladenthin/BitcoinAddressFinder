@@ -735,28 +735,28 @@ For generated vanity addresses or private keys, consider storing them safely usi
 #### Examples
 ##### 🔐 `SECURE_RANDOM`  
 Best choice for real wallet generation – uses system CSPRNG (e.g. `/dev/urandom`, Windows CNG).
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
     "randomAlgorithm": "SECURE_RANDOM"
   }
 ],
-...
+// ...
 ```
 
 ##### 🕰️ `RANDOM_CURRENT_TIME_MILLIS_SEED`  
 Recreates time-based vulnerabilities using `java.util.Random` seeded with the current system time.
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
     "randomAlgorithm": "RANDOM_CURRENT_TIME_MILLIS_SEED"
   }
 ],
-...
+// ...
 ```
 
 ##### 🧪 `RANDOM_CUSTOM_SEED`
@@ -764,20 +764,20 @@ Fully deterministic PRNG using `java.util.Random` with a user-defined seed. Usef
 
 Fully deterministic output. Useful for reproducible tests or fixed keyspace scans.
 Without explicit seed:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
     "randomAlgorithm": "RANDOM_CUSTOM_SEED"
   }
 ],
-...
+// ...
 ```
 
 With custom deterministic seed:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
@@ -785,7 +785,7 @@ With custom deterministic seed:
     "customSeed": 123456789
   }
 ],
-...
+// ...
 ```
 
 ##### ⚠️ `SHA1_PRNG`
@@ -793,20 +793,20 @@ Legacy deterministic PRNG using `"SHA1PRNG"`. Used to reproduce the 2013 Android
 
 Simulates old Android bug. May produce the same keys if seeded poorly or not at all.
 Without seed:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
     "randomAlgorithm": "SHA1_PRNG"
   }
 ],
-...
+// ...
 ```
 
 With custom seed:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
@@ -814,7 +814,7 @@ With custom seed:
     "customSeed": 987654321
   }
 ],
-...
+// ...
 ```
 
 #### 🔐 `BIP39_SEED` (key producer java bip 39)
@@ -831,20 +831,20 @@ Hierarchical deterministic key generator using a BIP39 mnemonic and optional pas
 | `creationTimeSeconds` | number | `0` | Epoch-seconds creation timestamp; fed to `DeterministicSeed.ofMnemonic` |
 
 Minimal:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaBip39": [
     {
       "keyProducerId": "exampleKeyProducerId",
       "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
     }
 ],
-...
+// ...
 ```
 
 Full:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaBip39": [
     {
       "keyProducerId": "exampleKeyProducerId",
@@ -855,7 +855,7 @@ Full:
       "creationTimeSeconds": 1650000000
     }
 ],
-...
+// ...
 ```
 
 > 🧪 **Runnable example:** [`examples/config_Find_1CPUProducerBip39.json`](examples/config_Find_1CPUProducerBip39.json)
@@ -893,8 +893,8 @@ This mode generates private keys **sequentially in batches** within a specified 
 #### Example JSON Configuration
 Example minimal configuration:
 
-```json
-...
+```jsonc
+// ...
 {
   "keyProducerJavaIncremental": [
     {
@@ -904,14 +904,14 @@ Example minimal configuration:
     }
   ]
 }
-...
+// ...
 ```
 
 🧩 This configuration incrementally searches a defined range of private keys. It is particularly suited for brute-force challenges, such as the [71st Bitcoin puzzle transaction](https://privatekeys.pw/puzzles/bitcoin-puzzle-tx?status=unsolved#p71).  
 The private key range is specified by two 64-character hex strings: `startPrivateKey` and `endPrivateKey`.
 
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaIncremental": [
     {
       "keyProducerId": "exampleKeyProducerJavaIncremental",
@@ -919,7 +919,7 @@ The private key range is specified by two 64-character hex strings: `startPrivat
       "endPrivateKey":   "00000000000000000000000000000000000000000000007fffffffffffffffff"
     }
 ],
-...
+// ...
 ```
 
 #### 🌐 `SOCKET_STREAM` (key producer java socket)  
@@ -940,8 +940,8 @@ Useful for piping externally generated secrets (e.g., from Python, Go, etc.) dir
 
 
 Minimal:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaSocket": [
     {
         "keyProducerId": "exampleKeyProducerId",
@@ -950,12 +950,12 @@ Minimal:
         "mode": "SERVER"
     }
 ],
-...
+// ...
 ```
 
 Full:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaSocket": [
     {
         "keyProducerId": "exampleKeyProducerId",
@@ -969,7 +969,7 @@ Full:
         "maxWorkSize": 16777216
     }
 ],
-...
+// ...
 ```
 
 ##### Example: Python Socket Stream Server:
@@ -1018,20 +1018,20 @@ Ideal for decoupled key streaming where producers push keys using ZeroMQ `PUSH` 
 | logReceivedSecret  | boolean                      | false                  | Whether to log each received secret in hex  |
 
 Minimal:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaZmq": [
     {
         "keyProducerId": "exampleKeyProducerId",
         "address": "tcp://localhost:5555"
     }
 ],
-...
+// ...
 ```
 
 Full:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaZmq": [
     {
         "keyProducerId": "exampleKeyProducerId",
@@ -1041,7 +1041,7 @@ Full:
         "logReceivedSecret": true
     }
 ],
-...
+// ...
 ```
 
 
@@ -1123,8 +1123,8 @@ Supported `secretFormat` values:
 | `SHA256`              | Hex-encoded SHA-256 digest used directly as the private key                          |
 | `STRING_SHA256`       | Brainwallet: the line is hashed with SHA-256 and that digest is the private key      |
 
-```json
-...
+```jsonc
+// ...
 "producerJavaSecretsFiles": [
     {
         "keyProducerId": "exampleKeyProducerId",
@@ -1132,7 +1132,7 @@ Supported `secretFormat` values:
         "secretFormat": "STRING_SHA256"
     }
 ],
-...
+// ...
 ```
 
 ### Mixed Modes
