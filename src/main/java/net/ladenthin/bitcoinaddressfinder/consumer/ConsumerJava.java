@@ -32,6 +32,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerat
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.HashSetAddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.TruncatedLong64SortedArrayPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
+import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.statistics.Statistics;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import org.apache.commons.codec.binary.Hex;
@@ -100,6 +101,13 @@ public class ConsumerJava implements Consumer {
      * at enqueue time across all producer threads; a heuristic gauge, not exact accounting.
      */
     protected final AtomicLong producerBlockedCount = new AtomicLong();
+    /**
+     * Shared runtime metrics sink. Producers write per-producer batch counts here and the
+     * statistics line reads them; also exposes the live running-producer gauge. Excluded
+     * from {@link ToString} — shared aggregate, not part of this consumer's identity.
+     */
+    @ToString.Exclude
+    protected final RuntimeStatistics runtimeStatistics;
     /** Total number of address hits found so far. */
     protected final AtomicLong hits = new AtomicLong();
     /**
@@ -191,24 +199,43 @@ public class ConsumerJava implements Consumer {
      * @param persistenceUtils persistence helper used to construct the LMDB layer
      */
     public ConsumerJava(CConsumerJava consumerJava, KeyUtility keyUtility, PersistenceUtils persistenceUtils) {
+        this(consumerJava, keyUtility, persistenceUtils, new RuntimeStatistics());
+    }
+
+    /**
+     * Production constructor that injects the shared {@link RuntimeStatistics} so the
+     * statistics line can report per-producer batch counts and the running-producer gauge.
+     *
+     * @param consumerJava     consumer configuration
+     * @param keyUtility       cryptographic helper
+     * @param persistenceUtils persistence helper used to construct the LMDB layer
+     * @param runtimeStatistics shared runtime metrics sink (also written by the producers)
+     */
+    public ConsumerJava(
+            CConsumerJava consumerJava,
+            KeyUtility keyUtility,
+            PersistenceUtils persistenceUtils,
+            RuntimeStatistics runtimeStatistics) {
         this(
                 consumerJava,
                 keyUtility,
                 persistenceUtils,
+                runtimeStatistics,
                 Executors.newSingleThreadScheduledExecutor(),
                 Executors.newFixedThreadPool(consumerJava.threads));
     }
 
     /**
-     * Test-friendly constructor that injects both executor services.
+     * Test-friendly constructor that injects the runtime metrics and both executor services.
      *
-     * <p>Production callers should use the 3-arg constructor above; this overload exists
-     * so tests can substitute their own executors and assert on post-shutdown state
+     * <p>Production callers should use the 3- or 4-arg constructors above; this overload
+     * exists so tests can substitute their own executors and assert on post-shutdown state
      * without reaching into the consumer's internal fields.
      *
      * @param consumerJava              consumer configuration
      * @param keyUtility                cryptographic helper
      * @param persistenceUtils          persistence helper used to construct the LMDB layer
+     * @param runtimeStatistics         shared runtime metrics sink
      * @param scheduledExecutorService  scheduler used for the periodic stats logger
      * @param consumeKeysExecutorService pool used for the worker threads that drain the keys queue
      */
@@ -217,12 +244,14 @@ public class ConsumerJava implements Consumer {
             CConsumerJava consumerJava,
             KeyUtility keyUtility,
             PersistenceUtils persistenceUtils,
+            RuntimeStatistics runtimeStatistics,
             ScheduledExecutorService scheduledExecutorService,
             ExecutorService consumeKeysExecutorService) {
         this.consumerJava = consumerJava;
         this.keysQueue = new LinkedBlockingQueue<>(consumerJava.queueSize);
         this.keyUtility = keyUtility;
         this.persistenceUtils = persistenceUtils;
+        this.runtimeStatistics = runtimeStatistics;
         this.scheduledExecutorService = scheduledExecutorService;
         this.consumeKeysExecutorService = consumeKeysExecutorService;
         if (consumerJava.enableVanity && consumerJava.vanityPattern != null) {
@@ -296,6 +325,9 @@ public class ConsumerJava implements Consumer {
                                     uptime,
                                     checkedKeys.get(),
                                     checkedKeysSumOfTimeToCheckContains.get(),
+                                    runtimeStatistics.batchesByProducerSnapshot(),
+                                    runtimeStatistics.getRunningProducers(),
+                                    runningConsumerCount(),
                                     consumerReadyCount.get(),
                                     producerBlockedCount.get(),
                                     keysQueue.size(),
@@ -623,5 +655,16 @@ public class ConsumerJava implements Consumer {
     @VisibleForTesting
     int keysQueueSize() {
         return keysQueue.size();
+    }
+
+    /**
+     * Counts the consumer worker threads that are still running (their {@link Future} has
+     * not completed). Surfaced in the statistics line as "Consumers running".
+     *
+     * @return the number of consumer worker threads currently running
+     */
+    @VisibleForTesting
+    long runningConsumerCount() {
+        return consumers.stream().filter(future -> !future.isDone()).count();
     }
 }

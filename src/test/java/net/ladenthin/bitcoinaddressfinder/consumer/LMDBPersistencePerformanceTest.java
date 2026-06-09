@@ -16,6 +16,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
 import net.ladenthin.bitcoinaddressfinder.LMDBPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.ManualDebugConstants;
@@ -76,7 +77,7 @@ public class LMDBPersistencePerformanceTest {
         ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
         ExecutorService consumeKeysExecutor = Executors.newFixedThreadPool(cConsumerJava.threads);
         ConsumerJava consumerJava =
-                new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils, scheduledExecutor, consumeKeysExecutor);
+                new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils, new RuntimeStatistics(), scheduledExecutor, consumeKeysExecutor);
         // Quiet ConsumerJava's class-level logger down to INFO for this perf test.
         ((ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ConsumerJava.class)).setLevel(Level.INFO);
 

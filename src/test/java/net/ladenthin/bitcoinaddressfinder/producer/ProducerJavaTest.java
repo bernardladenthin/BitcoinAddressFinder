@@ -11,6 +11,7 @@ import static org.hamcrest.Matchers.*;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.Random;
+import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.MockConsumer;
 import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
 import net.ladenthin.bitcoinaddressfinder.ToStringTest;
@@ -41,7 +42,7 @@ public class ProducerJavaTest {
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
         ProducerJava producerJava =
-                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         AbstractProducerTest.verifyInitProducer(producerJava);
     }
@@ -61,7 +62,7 @@ public class ProducerJavaTest {
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
         ProducerJava producerJava =
-                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         String toStringOutput = producerJava.toString();
 
@@ -79,7 +80,7 @@ public class ProducerJavaTest {
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
         ProducerJava producerJava =
-                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         AbstractProducerTest.verifyReleaseProducer(producerJava);
     }
@@ -97,7 +98,7 @@ public class ProducerJavaTest {
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         ProducerJava producerJava =
-                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         // act
         producerJava.produceKeys();
@@ -129,7 +130,7 @@ public class ProducerJavaTest {
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         ProducerJava producerJava =
-                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         // act
         producerJava.produceKeys();
@@ -197,7 +198,7 @@ public class ProducerJavaTest {
         Random random = new Random(0);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         ProducerJava producerJava =
-                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         // act
         producerJava.produceKeys();
@@ -226,7 +227,7 @@ public class ProducerJavaTest {
         Random random = new Random(0);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         ProducerJava producerJava =
-                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         // act
         producerJava.produceKeys();
@@ -297,7 +298,7 @@ public class ProducerJavaTest {
         Random random = new Random(2);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random, maximumBitLength);
         ProducerJava producerJava =
-                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+                new ProducerJava(cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         // act
         producerJava.produceKeys();

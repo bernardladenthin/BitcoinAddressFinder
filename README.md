@@ -1231,13 +1231,16 @@ are fully configurable (see [Customizing Log Output](#customizing-log-output)).
 A statistics line looks like this:
 
 ```
-Statistics: [Checked 1234 M keys in 5 minutes] [4100 k keys/second] [246 M keys/minute] [Consumer ready for work (queue empty): 5012] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
+Statistics: [Checked 1234 M keys in 5 minutes] [4100 k keys/second] [246 M keys/minute] [Batches per producer: exampleOpenCL (Random, GPU)=5012, exampleRandom (Random, CPU)=480] [Producers running: 2] [Consumers running: 4] [Consumer ready for work (queue empty): 5012] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
 ```
 
 | Field | Meaning |
 |---|---|
 | `Checked N M keys in M minutes` | Total candidate keys checked so far (millions) and elapsed minutes. |
 | `k keys/second` / `M keys/minute` | Throughput — **the headline performance number.** |
+| `Batches per producer: <label>=N, …` | Dispatched-batch count per running producer, keyed by `<keyProducerId> (<Strategy>, <CPU\|GPU>)` so concurrently running producers are told apart. The **strategy** (`Random`, `Bip39`, `Incremental`, `Socket`, `WebSocket`, `Zmq`) is derived from the key producer; the **backend** (`CPU` for `producerJava`/`producerJavaSecretsFiles`, `GPU` for `producerOpenCL`) from the producer. `none` until the first batch. |
+| `Producers running: N` | Number of producers currently in the `RUNNING` state. |
+| `Consumers running: N` | Number of consumer worker threads currently running (≤ `consumerJava.threads`). |
 | `Consumer ready for work (queue empty): N` | **Runtime health counter — rising is normal/healthy.** Consume cycles that found the queue empty and waited. An empty queue is the *desired* state: it means the CPU drains everything the producers generate and has headroom. See below. |
 | `Producer blocked (queue full): N` | **Runtime health counter — rising is the warning sign.** Times a producer hit a full queue and had to wait, i.e. the CPU can't keep up (CPU-bound). See below. |
 | `Average contains time: N ms` | Mean time spent per address-presence lookup. Large values point at a slow lookup backend (see [Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend)). |

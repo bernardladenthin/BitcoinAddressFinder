@@ -272,7 +272,7 @@ public class BitcoinAddressFinderArchitectureTest {
             .whereLayer("Core")
             .mayOnlyBeAccessedByLayers("Cli", "Command", "Consumer", "Engine", "Io", "Keyproducer", "Producer")
             .whereLayer("Statistics")
-            .mayOnlyBeAccessedByLayers("Command", "Consumer", "Io", "Producer")
+            .mayOnlyBeAccessedByLayers("Command", "Consumer", "Engine", "Io", "Producer")
             .whereLayer("Secret")
             .mayOnlyBeAccessedByLayers("Keyproducer", "Producer", "Util")
             .whereLayer("Configuration")

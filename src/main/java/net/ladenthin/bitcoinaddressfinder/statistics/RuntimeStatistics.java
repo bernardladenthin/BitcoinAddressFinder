@@ -1,0 +1,78 @@
+// @formatter:off
+// SPDX-FileCopyrightText: 2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+//
+// SPDX-License-Identifier: Apache-2.0
+// @formatter:on
+package net.ladenthin.bitcoinaddressfinder.statistics;
+
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
+
+/**
+ * Shared, thread-safe runtime metrics written by the producers and read by the consumer's
+ * periodic statistics line. A single instance is created by the orchestrator
+ * ({@code Finder}) and injected into every producer (which increment their batch counters)
+ * and into the consumer (which renders them).
+ *
+ * <p>Batch counts are keyed by a per-producer label
+ * ({@code "<keyProducerId> (<Strategy>, <CPU|GPU>)"}) so that multiple producers running
+ * concurrently can be told apart in the log.
+ */
+public class RuntimeStatistics {
+
+    /** Creates a new, empty {@link RuntimeStatistics}. */
+    public RuntimeStatistics() {}
+
+    /** Dispatched-batch counts keyed by producer label. */
+    private final ConcurrentMap<String, AtomicLong> batchesByProducer = new ConcurrentHashMap<>();
+
+    /**
+     * Late-bound gauge returning the number of producers currently in the {@code RUNNING}
+     * state. Defaults to {@code 0} until the orchestrator wires the real supplier, because
+     * the consumer's statistics timer starts before the producers are constructed.
+     */
+    private volatile LongSupplier runningProducersGauge = () -> 0L;
+
+    /**
+     * Records one dispatched batch for the given producer label.
+     *
+     * @param producerLabel the producer label, e.g. {@code "exampleRandom (Random, GPU)"}
+     */
+    public void incrementBatches(String producerLabel) {
+        batchesByProducer.computeIfAbsent(producerLabel, key -> new AtomicLong()).incrementAndGet();
+    }
+
+    /**
+     * Returns an ordered, immutable snapshot of the dispatched-batch counts per producer
+     * label. Sorted by label so the rendered statistics line is stable across ticks.
+     *
+     * @return a sorted snapshot of batch counts keyed by producer label
+     */
+    public Map<String, Long> batchesByProducerSnapshot() {
+        Map<String, Long> snapshot = new TreeMap<>();
+        batchesByProducer.forEach((label, count) -> snapshot.put(label, count.get()));
+        return snapshot;
+    }
+
+    /**
+     * Wires the late-bound gauge used to report the number of currently-running producers.
+     *
+     * @param gauge supplier returning the count of producers in the {@code RUNNING} state
+     */
+    public void setRunningProducersGauge(LongSupplier gauge) {
+        this.runningProducersGauge = gauge;
+    }
+
+    /**
+     * Returns the current number of running producers.
+     *
+     * @return the running-producer count, or {@code 0} if the gauge has not been wired yet
+     */
+    public long getRunningProducers() {
+        return runningProducersGauge.getAsLong();
+    }
+}

@@ -15,6 +15,7 @@ import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLGridResult;
+import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import org.jspecify.annotations.Nullable;
@@ -87,9 +88,15 @@ public class ProducerOpenCL extends AbstractProducer {
             Consumer consumer,
             KeyUtility keyUtility,
             KeyProducer keyProducer,
-            BitHelper bitHelper) {
-        this(producerOpenCL, consumer, keyUtility, keyProducer, bitHelper, (ThreadPoolExecutor)
+            BitHelper bitHelper,
+            RuntimeStatistics runtimeStatistics) {
+        this(producerOpenCL, consumer, keyUtility, keyProducer, bitHelper, runtimeStatistics, (ThreadPoolExecutor)
                 Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads));
+    }
+
+    @Override
+    protected ProducerType producerType() {
+        return ProducerType.GPU;
     }
 
     /**
@@ -104,6 +111,7 @@ public class ProducerOpenCL extends AbstractProducer {
      * @param keyUtility                      cryptographic helper
      * @param keyProducer                     the secret supplying strategy
      * @param bitHelper                       bit/batch-size helper
+     * @param runtimeStatistics               shared runtime metrics sink for per-producer batch counts
      * @param resultReaderThreadPoolExecutor  pool used to drain GPU results back to the host
      */
     @VisibleForTesting
@@ -113,8 +121,9 @@ public class ProducerOpenCL extends AbstractProducer {
             KeyUtility keyUtility,
             KeyProducer keyProducer,
             BitHelper bitHelper,
+            RuntimeStatistics runtimeStatistics,
             ThreadPoolExecutor resultReaderThreadPoolExecutor) {
-        super(producerOpenCL, consumer, keyUtility, keyProducer, bitHelper);
+        super(producerOpenCL, consumer, keyUtility, keyProducer, bitHelper, runtimeStatistics);
         this.producerOpenCL = producerOpenCL;
         this.resultReaderThreadPoolExecutor = resultReaderThreadPoolExecutor;
         this.submitSlot = new Semaphore(producerOpenCL.maxResultReaderThreads);

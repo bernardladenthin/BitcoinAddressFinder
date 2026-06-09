@@ -7,6 +7,7 @@ import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import net.ladenthin.bitcoinaddressfinder.consumer.Consumer;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
+import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 
@@ -17,8 +18,14 @@ public class AbstractProducerTestImpl extends AbstractProducer {
             Consumer consumer,
             KeyUtility keyUtility,
             KeyProducer keyProducer,
-            BitHelper bitHelper) {
-        super(cProducer, consumer, keyUtility, keyProducer, bitHelper);
+            BitHelper bitHelper,
+            RuntimeStatistics runtimeStatistics) {
+        super(cProducer, consumer, keyUtility, keyProducer, bitHelper, runtimeStatistics);
+    }
+
+    @Override
+    protected ProducerType producerType() {
+        return ProducerType.CPU;
     }
 
     @Override
