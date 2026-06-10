@@ -1,0 +1,305 @@
+// SPDX-FileCopyrightText: 2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+//
+// SPDX-License-Identifier: Apache-2.0
+package net.ladenthin.bitcoinaddressfinder.persistence.inmemory;
+
+import java.nio.ByteBuffer;
+import java.util.stream.Stream;
+import lombok.ToString;
+import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
+import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
+import org.jspecify.annotations.NonNull;
+
+/**
+ * Self-contained presence-only snapshot backed by a Binary Fuse Filter with 16-bit
+ * fingerprints implementing {@link AddressPresence}.
+ *
+ * <h2>Algorithm</h2>
+ * Identical to {@link BinaryFuse8AddressPresence} except that fingerprints are stored as
+ * {@code short} values (16 bits) instead of {@code byte} values (8 bits). Three positions
+ * are derived per key using independent MurmurHash3 invocations with rotated seeds.
+ * The XOR invariant and peeling-based construction are the same; only the fingerprint
+ * width differs.
+ *
+ * <h2>Hash design</h2>
+ * Three independent positions are derived per key:
+ * <ul>
+ *   <li>{@code h0 = reduce(hash64(key, seed),           segSize) + 0 * segSize}</li>
+ *   <li>{@code h1 = reduce(hash64(key, rotl(seed, 21)), segSize) + 1 * segSize}</li>
+ *   <li>{@code h2 = reduce(hash64(key, rotl(seed, 42)), segSize) + 2 * segSize}</li>
+ * </ul>
+ * The fingerprint is {@code (short)(primaryHash ^ (primaryHash >>> 32))} where
+ * {@code primaryHash = hash64(key, seed)}.
+ *
+ * <h2>False-positive rate</h2>
+ * With 16-bit fingerprints the theoretical FPR is approximately 1/65536 &#x2248; 0.0015&nbsp;%.
+ * Use this variant when the 0.4&nbsp;% FPR of {@link BinaryFuse8AddressPresence} causes
+ * measurable LMDB fallback overhead on high-throughput workloads.
+ *
+ * <h2>Memory cost</h2>
+ * Approximately 2.60&nbsp;bytes per entry (one {@code short} slot per fingerprint position,
+ * with the segment allocation overhead). Peak construction memory is approximately
+ * 29&nbsp;bytes per entry (working arrays during the peeling algorithm).
+ *
+ * <h2>No false negatives</h2>
+ * Every key that was inserted during {@link #populateFrom(AddressIterable)} will always be
+ * found by {@link #containsAddress(ByteBuffer)}.
+ *
+ * <h2>Lifecycle</h2>
+ * Once populated this class holds no reference to its source.
+ * {@link #requiresBackend()} returns {@code false}; the backing storage can be
+ * closed and garbage collected after population.
+ *
+ * <h2>Concurrency</h2>
+ * Thread-safe for concurrent reads after construction. No mutation API is exposed.
+ */
+@ToString
+public final class BinaryFuse16AddressPresence implements AddressPresence {
+
+    /** Fixed length of a hash160 entry in bytes. */
+    static final int BYTES_PER_ADDRESS = 20;
+
+    /** Initial seed value used for the first construction attempt. */
+    static final long INITIAL_SEED = 0xBEEF_CAFE_1234_5678L;
+
+    /** Maximum number of seed attempts before giving up construction. */
+    private static final int MAX_SEED_ATTEMPTS = 100;
+
+    /** Number of segments in the fused layout. */
+    private static final int SEGMENT_COUNT = 3;
+
+    private final long seed;
+    private final int segSize;
+
+    // May be large — toString would be log-killing. slotCount() is included instead.
+    @ToString.Exclude
+    private final short[] fingerprints;
+
+    private BinaryFuse16AddressPresence(long seed, int segSize, short[] fingerprints) {
+        this.seed = seed;
+        this.segSize = segSize;
+        this.fingerprints = fingerprints;
+    }
+
+    /**
+     * Builds a Binary Fuse Filter snapshot with 16-bit fingerprints from {@code source}.
+     *
+     * @param source the address set to materialise
+     * @return a fully populated, self-contained presence lookup
+     * @throws IllegalStateException if filter construction fails after {@value #MAX_SEED_ATTEMPTS} seed attempts
+     */
+    public static BinaryFuse16AddressPresence populateFrom(@NonNull AddressIterable source) {
+        long[] keys = collectKeys(source);
+        int n = keys.length;
+
+        if (n == 0) {
+            return new BinaryFuse16AddressPresence(INITIAL_SEED, 2, new short[0]);
+        }
+
+        int segSize = Math.max(2, (int) Math.ceil(n * 1.3 / 3.0) + 3);
+        int m = segSize * SEGMENT_COUNT;
+
+        long seed = INITIAL_SEED;
+
+        for (int attempt = 0; attempt < MAX_SEED_ATTEMPTS; attempt++) {
+            short[] table = tryBuild(keys, n, seed, segSize, m);
+            if (table.length != 0) {
+                return new BinaryFuse16AddressPresence(seed, segSize, table);
+            }
+            seed = hash64(seed, INITIAL_SEED);
+        }
+
+        throw new IllegalStateException(
+                "BinaryFuse16 construction failed after " + MAX_SEED_ATTEMPTS + " seed attempts for n=" + n);
+    }
+
+    @Override
+    public boolean containsAddress(ByteBuffer hash160) {
+        if (hash160.remaining() != BYTES_PER_ADDRESS) {
+            return false;
+        }
+        if (fingerprints.length == 0) {
+            return false;
+        }
+        long key = hash160.getLong(hash160.position());
+        long ph = hash64(key, seed);
+        int h0 = reduce((int) hash64(key, seed),               segSize);
+        int h1 = reduce((int) hash64(key, rotl(seed, 21)),     segSize) + segSize;
+        int h2 = reduce((int) hash64(key, rotl(seed, 42)),     segSize) + 2 * segSize;
+        short fp = fingerprint16(ph);
+        return (short) (fingerprints[h0] ^ fingerprints[h1] ^ fingerprints[h2]) == fp;
+    }
+
+    @Override
+    public boolean requiresBackend() {
+        return false;
+    }
+
+    /**
+     * Returns the total number of fingerprint slots in the filter array.
+     * Each slot is 2 bytes, so total memory is {@code 2 * slotCount()} bytes.
+     *
+     * @return the number of slots (approximately 1.30 &#x00d7; the inserted key count)
+     */
+    @ToString.Include
+    public int slotCount() {
+        return fingerprints.length;
+    }
+
+    /**
+     * MurmurHash3 64-bit finaliser seeded by XOR with {@code seed}.
+     *
+     * @param key  the 64-bit key extracted from the hash160
+     * @param seed the per-segment seed (main seed or a rotation of it)
+     * @return the 64-bit hash value
+     */
+    static long hash64(long key, long seed) {
+        long h = key ^ seed;
+        h ^= h >>> 33;
+        h *= 0xff51afd7ed558ccdL;
+        h ^= h >>> 33;
+        h *= 0xc4ceb9fe1a85ec53L;
+        h ^= h >>> 33;
+        return h;
+    }
+
+    /**
+     * 16-bit fingerprint extracted from a 64-bit hash value by XOR-folding the two 32-bit halves.
+     *
+     * @param h the primary hash value
+     * @return the fingerprint short
+     */
+    static short fingerprint16(long h) {
+        return (short) (h ^ (h >>> 32));
+    }
+
+    /**
+     * Maps a 32-bit hash value into the range {@code [0, m)} using a multiply-high trick
+     * that avoids modulo division.
+     *
+     * @param h the 32-bit hash (treated as unsigned)
+     * @param m the range upper bound (exclusive)
+     * @return a value in {@code [0, m)}
+     */
+    static int reduce(int h, int m) {
+        return (int) ((Integer.toUnsignedLong(h) * (long) m) >>> 32);
+    }
+
+    private static long rotl(long v, int r) {
+        return (v << r) | (v >>> (64 - r));
+    }
+
+    private static long[] collectKeys(AddressIterable source) {
+        long count = source.count();
+        if (count > Integer.MAX_VALUE) {
+            throw new IllegalStateException("Source contains more than Integer.MAX_VALUE entries: " + count);
+        }
+        long[] keys = new long[(int) count];
+        int[] idx = {0};
+        try (Stream<ByteBuffer> stream = source.addresses()) {
+            stream.forEach(bb -> {
+                if (bb.remaining() == BYTES_PER_ADDRESS && idx[0] < keys.length) {
+                    keys[idx[0]++] = bb.getLong(bb.position());
+                }
+            });
+        }
+        return keys;
+    }
+
+    private static short[] tryBuild(long[] keys, int n, long seed, int segSize, int m) {
+        long seed1 = rotl(seed, 21);
+        long seed2 = rotl(seed, 42);
+
+        long[] primaryHashes = new long[n];
+        int[] count = new int[m];
+        int[] xorIdx = new int[m];
+
+        for (int i = 0; i < n; i++) {
+            long ph = hash64(keys[i], seed);
+            primaryHashes[i] = ph;
+            int h0 = reduce((int) ph,                     segSize);
+            int h1 = reduce((int) hash64(keys[i], seed1), segSize) + segSize;
+            int h2 = reduce((int) hash64(keys[i], seed2), segSize) + 2 * segSize;
+            count[h0]++;
+            count[h1]++;
+            count[h2]++;
+            xorIdx[h0] ^= i;
+            xorIdx[h1] ^= i;
+            xorIdx[h2] ^= i;
+        }
+
+        // Build initial queue of singleton positions.
+        // Maximum writes: m initial + 3*n from peeling (up to 3 positions per key peeled).
+        int[] queue = new int[m + 3 * n];
+        int qHead = 0;
+        int qTail = 0;
+        for (int pos = 0; pos < m; pos++) {
+            if (count[pos] == 1) {
+                queue[qTail++] = pos;
+            }
+        }
+
+        int[] order = new int[n];
+        int[] alone = new int[n];
+        int done = 0;
+
+        // Peeling loop: peel one singleton at a time
+        while (qHead < qTail) {
+            int pos = queue[qHead++];
+            if (count[pos] != 1) {
+                continue;
+            }
+            int keyIdx = xorIdx[pos];
+            order[done] = keyIdx;
+            alone[done] = pos;
+            done++;
+
+            long key = keys[keyIdx];
+            int h0 = reduce((int) hash64(key, seed),  segSize);
+            int h1 = reduce((int) hash64(key, seed1), segSize) + segSize;
+            int h2 = reduce((int) hash64(key, seed2), segSize) + 2 * segSize;
+
+            count[h0]--;
+            xorIdx[h0] ^= keyIdx;
+            if (count[h0] == 1) {
+                queue[qTail++] = h0;
+            }
+
+            count[h1]--;
+            xorIdx[h1] ^= keyIdx;
+            if (count[h1] == 1) {
+                queue[qTail++] = h1;
+            }
+
+            count[h2]--;
+            xorIdx[h2] ^= keyIdx;
+            if (count[h2] == 1) {
+                queue[qTail++] = h2;
+            }
+        }
+
+        if (done < n) {
+            return new short[0];
+        }
+
+        // Reverse assignment: fill fingerprints from last peeled to first
+        short[] table = new short[m];
+        for (int j = done - 1; j >= 0; j--) {
+            long key = keys[order[j]];
+            int h0 = reduce((int) hash64(key, seed),  segSize);
+            int h1 = reduce((int) hash64(key, seed1), segSize) + segSize;
+            int h2 = reduce((int) hash64(key, seed2), segSize) + 2 * segSize;
+            int pos = alone[j];
+            short fp = fingerprint16(primaryHashes[order[j]]);
+            if (pos == h0) {
+                table[h0] = (short) (fp ^ table[h1] ^ table[h2]);
+            } else if (pos == h1) {
+                table[h1] = (short) (fp ^ table[h0] ^ table[h2]);
+            } else {
+                table[h2] = (short) (fp ^ table[h0] ^ table[h1]);
+            }
+        }
+
+        return table;
+    }
+}

@@ -29,6 +29,14 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
  *       {@code long} binary search uses the JDK intrinsic and is typically the fastest
  *       lookup of any backend (~10&#x00d7; more compact than HASHSET at near-HASHSET
  *       latency).</li>
+ *   <li>{@link #BINARY_FUSE_8} - Binary Fuse Filter snapshot with 8-bit fingerprints.
+ *       ~1.14 B/entry, FPR &#x2248; 0.4&nbsp;%. No false negatives. LMDB env closed and
+ *       GC'd after population. Recommended for most workloads — fits Full DB (~1.6 GB)
+ *       on any modern workstation.</li>
+ *   <li>{@link #BINARY_FUSE_16} - Binary Fuse Filter snapshot with 16-bit fingerprints.
+ *       ~2.28 B/entry, FPR &#x2248; 0.0015&nbsp;%. No false negatives. LMDB env closed
+ *       and GC'd after population. Use when the 0.4&nbsp;% false-positive rate of
+ *       {@link #BINARY_FUSE_8} causes measurable LMDB overhead.</li>
  * </ul>
  */
 public enum AddressLookupBackend {
@@ -43,5 +51,19 @@ public enum AddressLookupBackend {
      * as the next 8 bytes of the hash160 as a primitive {@code long}). Probabilistic
      * with negligible FPR; LMDB closed and GC'd after population.
      */
-    TRUNCATED_LONG_64
+    TRUNCATED_LONG_64,
+
+    /**
+     * Binary Fuse Filter snapshot with 8-bit fingerprints. ~1.14 B/entry, FPR &#x2248; 0.4 %.
+     * No false negatives. LMDB env closed and GC'd after population.
+     * Recommended for most workloads — fits Full DB (~1.6 GB) on any modern workstation.
+     */
+    BINARY_FUSE_8,
+
+    /**
+     * Binary Fuse Filter snapshot with 16-bit fingerprints. ~2.28 B/entry, FPR &#x2248; 0.0015 %.
+     * No false negatives. LMDB env closed and GC'd after population.
+     * Use when the 0.4 % false-positive rate of BINARY_FUSE_8 causes measurable LMDB overhead.
+     */
+    BINARY_FUSE_16
 }
