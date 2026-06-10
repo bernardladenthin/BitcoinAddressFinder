@@ -85,6 +85,37 @@ public class ConsumerJavaTest {
         assertThrows(org.lmdbjava.LmdbNativeException.class, () -> consumerJava.initLMDB());
     }
 
+    @Test
+    public void initLMDB_lmdbOnlyBackend_keepsEnvOpenForDirectLookups() throws Exception {
+        // Regression: LMDB_ONLY uses the LMDBPersistence itself as the lookup. initLMDB must
+        // NOT close its env (it would if LMDBPersistence.requiresBackend() returned false),
+        // otherwise every containsAddress throws Env$AlreadyClosedException. See the
+        // consumer-thread spin that floods the log when the env is closed under live readers.
+        new LMDBPlatformAssume().assumeLMDBExecution();
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+        TestAddressesFiles testAddresses = new TestAddressesFiles(false);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
+
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        cConsumerJava.lmdbConfigurationReadOnly.addressLookupBackend =
+                net.ladenthin.bitcoinaddressfinder.configuration.AddressLookupBackend.LMDB_ONLY;
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        try {
+            consumerJava.initLMDB();
+
+            // env must stay open: persistence is retained (not nulled) and a lookup succeeds
+            // through the live env rather than throwing Env$AlreadyClosedException.
+            assertThat(consumerJava.persistence, is(notNullValue()));
+            ByteBuffer buffer = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
+            consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
+            consumerJava.consumeOneCycle(buffer);
+        } finally {
+            consumerJava.interrupt();
+        }
+    }
+
     // <editor-fold defaultstate="collapsed" desc="runtime health counters">
     @Test
     public void consumeOneCycle_emptyQueue_marksReadyAndIncrementsReadyCount() throws Exception {

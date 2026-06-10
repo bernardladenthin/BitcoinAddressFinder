@@ -245,14 +245,16 @@ public class LMDBPersistence implements Persistence, AddressIterable {
     }
 
     /**
-     * LMDB is the backing storage itself, not a decorator. It does not require any
-     * further delegate.
+     * LMDB is queried directly on every {@code containsAddress} call through its live
+     * {@code Env}, so the env (and its mmap) must stay open for as long as this instance
+     * is used as the lookup. It is the backing storage itself, not a self-contained
+     * in-memory snapshot, so it must not be closed after the lookup chain is wired.
      *
-     * @return always {@code false}
+     * @return always {@code true}
      */
     @Override
     public boolean requiresBackend() {
-        return false;
+        return true;
     }
 
     /**
