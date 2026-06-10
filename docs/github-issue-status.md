@@ -39,23 +39,23 @@ in this pass)** and the GitHub issue then closed with a pointer.
 | 23 | "work is necessary to change life." | *(none)* | ✅ **Done — closed (not planned)** | Collaboration/"make money" solicitation, out of scope. **Commented** ("tracker is for bug reports and feature requests; closing as out of scope") and **closed as not planned** (2026-06-09). |
 | 22 | Can jogamp be used to improve OpenCL handling? | enhancement | ✅ **Done — migrated & closed** | Refined into a backend-abstraction task: step 1 define a small OpenCL device/lib API over the existing JOCL impl, step 2 wire JogAmp (`com.jogamp.opencl`) behind it as a switchable backend. **Migrated to `TODO.md`** ("OpenCL backend abstraction & multi-device coverage") and the GitHub issue **closed as completed** (2026-06-09). |
 | 18 | Statistics: add CPU/GPU batches + running counts | enhancement | ✅ **Done — implemented & closed** | **Implemented** on branch `claude/wonderful-cray-y7e9ua`: statistics line now shows a per-producer batch breakdown (`<keyProducerId> (<Strategy>, <CPU\|GPU>)`) plus `Producers running` / `Consumers running`, via `statistics/RuntimeStatistics` incremented at `AbstractProducer.consumeSecrets`; tests + README added. GitHub issue **closed as completed** (lands on `main` when the branch merges). |
-| 13 | Linux | question | ✅ Solved | Linux is fully supported (CI builds/tests on Linux; native OpenCL build documented). **Action:** reply "yes, Linux works" with a pointer to the Linux run instructions; close. (Last touched 2025-10.) |
-| 10 | Producer should log its info to allow verification | enhancement | ✅ Solved (largely) | Implemented via `logSecretBase` (logs `secretBase`/hex via `AbstractProducer.createSecretBase`), `logReceivedSecret` on receiver producers, and `runtimePublicKeyCalculationCheck` for full verification. **Action:** confirm coverage is sufficient; close (or fold any remainder into `TODO.md`). |
+| 13 | Linux | question | ✅ **Done — answered & closed** | Linux is fully supported (CI builds/tests on Linux; native OpenCL build documented). **Replied** ("yes, run the same `java -jar … config.json` as the `.bat` launchers") and closed as completed (2026-06-09). |
+| 10 | Producer should log its info to allow verification | enhancement | ✅ **Done — closed** | Implemented via `logSecretBase`, `logReceivedSecret` (socket/websocket/zmq), `runtimePublicKeyCalculationCheck`, plus the new #18 per-producer statistics line. **Replied** and closed as completed (2026-06-09). |
 | 6 | Unit test: 2 OpenCL devices simultaneously | enhancement | ✅ **Done — migrated & closed** | Scope fixed: a test running two `producerOpenCL` on **two physical OpenCL devices** (2 GPUs, or 1 GPU + 1 CPU-OpenCL), self-skipping unless ≥2 distinct devices are enumerated. **Migrated to `TODO.md`** ("OpenCL backend abstraction & multi-device coverage") and the GitHub issue **closed as completed** (2026-06-09). |
-| 5 | Print used OpenCL device info on usage | enhancement | ✅ Solved | Implemented: `OpenCLContext` logs `"Selected OpenCL device:\n{}"` via `OpenCLDevice.toStringPretty()`, and the `OpenCLInfo` command prints full device info (`CL_DEVICE_NAME`, etc.). **Action:** reply with the log/command pointer; close. |
+| 5 | Print used OpenCL device info on usage | enhancement | ✅ **Done — closed** | Implemented: `OpenCLContext` logs `"Selected OpenCL device:\n{}"` via `OpenCLDevice.toStringPretty()`, and the `OpenCLInfo` command prints full device info (`CL_DEVICE_NAME`, etc.). **Replied** and closed as completed (2026-06-09). |
 
 ## Summary counts
 
 | Disposition | Issues | Count |
 |---|---|---|
-| ✅ **Closed on GitHub this pass** | #22, #18, #6, #63, #41, #29, #23, #57, #49, #25 | 10 |
-| ✅ Solved — still to reply + close | #13, #10, #5 | 3 |
+| ✅ **Closed on GitHub this pass** | #22, #18, #6, #63, #41, #29, #23, #57, #49, #25, #13, #10, #5 | 13 |
 | ❓ Needs info (then close stale) | #50, #39, #36, #24 | 4 |
 
-> **Update 2026-06-09:** **10 issues closed** — #22/#6 migrated to `TODO.md`, #18
-> implemented, #63/#41/#29/#49/#25 answered, #23 closed as spam, and #57 closed as
-> an external NVIDIA-driver crash. Open-issue count **17 → 7**. Remaining **7**:
-> the ✅ solved set (#13, #10, #5) and the ❓ needs-info set (#50, #39, #36, #24).
+> **Update 2026-06-09:** **13 issues closed** — #22/#6 migrated to `TODO.md`, #18
+> implemented, #63/#41/#29/#49/#25/#13/#10/#5 answered/implemented, #23 closed as
+> spam, and #57 closed as an external NVIDIA-driver crash. Open-issue count
+> **17 → 4**. Remaining **4** are all the ❓ needs-info set: #50 (LMDB/CI flake),
+> #39, #36, #24 — each needs reporter/CI input before closing.
 
 ## Recommended next pass (NOT this pass)
 
