@@ -146,7 +146,8 @@ BitcoinAddressFinder/
 │           └── *.java                # JUnit 6 (Jupiter) tests
 ├── examples/                         # Sample JSON configs and run scripts
 │   ├── config_*.json
-│   ├── run_*.bat
+│   ├── run_*.bat                     # Windows launchers
+│   ├── run_*.sh                      # Linux/macOS launchers (mirror the .bat flags)
 │   ├── logbackConfiguration.xml
 │   ├── addresses/                    # Sample address files
 │   └── secrets/                      # Sample secrets files

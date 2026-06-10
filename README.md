@@ -145,7 +145,9 @@ Copyright (c) 2017-2025 Bernard Ladenthin
 3. Download a configuration set like:
 - [`logbackConfiguration.xml`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/logbackConfiguration.xml)
 - [`config_Find_1OpenCLDevice.json`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/config_Find_1OpenCLDevice.json)
-- [`run_Find_1OpenCLDevice.bat`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/run_Find_1OpenCLDevice.bat)
+- a launcher for your OS:
+  - **Windows:** [`run_Find_1OpenCLDevice.bat`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/run_Find_1OpenCLDevice.bat)
+  - **Linux / macOS:** [`run_Find_1OpenCLDevice.sh`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/run_Find_1OpenCLDevice.sh)
 4. Put all in one directory like the following structure
   * Downloads
     * lmdb
@@ -154,8 +156,12 @@ Copyright (c) 2017-2025 Bernard Ladenthin
     * bitcoinaddressfinder-1.4.0-jar-with-dependencies.jar
     * logbackConfiguration.xml
     * config_Find_1OpenCLDevice.js
-    * run_Find_1OpenCLDevice.bat
-5. Run the file run_Find_1OpenCLDevice.bat
+    * run_Find_1OpenCLDevice.bat  *(Windows)* / run_Find_1OpenCLDevice.sh *(Linux/macOS)*
+5. Run the launcher for your OS:
+  - **Windows:** double-click / run `run_Find_1OpenCLDevice.bat`
+  - **Linux / macOS:** `chmod +x run_Find_1OpenCLDevice.sh && ./run_Find_1OpenCLDevice.sh`
+
+Every `examples/run_*.bat` has a matching `examples/run_*.sh` (same JVM flags); use the `.sh` on Linux/macOS and the `.bat` on Windows.
 
 ## ✨ Features
 * 📐 Supports blockchain addresses based on [secp256k1](https://en.bitcoin.it/wiki/Secp256k1)
