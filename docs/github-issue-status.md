@@ -27,7 +27,7 @@ in this pass)** and the GitHub issue then closed with a pointer.
 | # | Title | Label(s) | Disposition | Actual status / what to reply |
 |---|---|---|---|---|
 | 63 | Change key generation method (BIP39) | question | ✅ **Done — answered & closed** | Not a bug: BIP39 is a separate key producer (`keyProducerJavaBip39` with `keyProducerId` + `mnemonic`, referenced by a producer), not a value of the random producer; the JVM exited on the invalid config. **Replied with a correct config snippet** and closed as completed (2026-06-09); `examples/config_Find_1CPUProducerBip39.json` ships next release. |
-| 57 | OpenCL / Nvidia Segmentation Fault at startup | bug, help wanted | ❓ Needs info (likely external) | Crash is inside `libnvidia-nvvm.so` / `NvCliCompileBitcode` during `clBuildProgram` — i.e. in the **NVIDIA driver's OpenCL→PTX compiler**, not in project code. Stacktrace shows `libJOCL_2_0_5`; repo is now on **JOCL 2.0.6**. CPU path works for the reporter. **Action:** ask reporter to retry on current release, report exact driver/CUDA version; document the known NVIDIA-OpenCL JIT-compile crash as environment-specific. Not directly fixable in Java. |
+| 57 | OpenCL / Nvidia Segmentation Fault at startup | bug, help wanted | ✅ **Done — closed (not planned)** | Crash is inside `libnvidia-nvvm.so` / `NvCliCompileBitcode` during `clBuildProgram` — the **NVIDIA driver's OpenCL→PTX compiler**, not project code (CPU path works). Not fixable in Java. **Replied** (retry on JOCL 2.0.6 / update driver+CUDA, attach `hs_err`) and **closed as not planned with a reopen-if-still-present note** (2026-06-09). |
 | 50 | JVM Crash in LMDB Native Code via lmdbjava | bug | ❓ Needs info (CI flake) | Owner's own tracking issue. Sporadic `SIGSEGV` in `mdb_txn_renew0` in **forked Surefire JVMs**, suspected JaCoCo interaction. Related to the JPMS/`--add-opens` lmdbjava handling now documented in `CLAUDE.md`. **Action:** verify whether it still reproduces on current CI; if not seen for N runs, close as not-reproducible. Mitigation idea: JaCoCo offline instrumentation / disable on the LMDB fork. |
 | 49 | create log for hits | help wanted | ✅ Solved | Hits **are** logged. `ConsumerJava` logs each hit at INFO with prefix `hit: Found the address: ` plus full key details (incl. WIF) via `keyUtility.createKeyDetails(...)`; the periodic `Statistics` line shows `[Hits: N]`. **Action:** reply explaining the `hit:` log line and that `examples/logbackConfiguration.xml` can route it to a file appender; then close. |
 | 41 | Create address DB + private-key range | question | ✅ **Done — answered & closed** | Both exist. **DB:** `AddressFilesToLMDB` command (`examples/config_AddressFilesToLMDB.json`). **Range:** `keyProducerJavaIncremental` with `startPrivateKey`/`endPrivateKey` (hex), or cap entropy with `privateKeyMaxNumBits`. **Replied with both pointers** and closed as completed (2026-06-09). |
@@ -48,14 +48,15 @@ in this pass)** and the GitHub issue then closed with a pointer.
 
 | Disposition | Issues | Count |
 |---|---|---|
-| ✅ **Closed on GitHub this pass** | #22, #18, #6, #63, #41, #29, #23 | 7 |
+| ✅ **Closed on GitHub this pass** | #22, #18, #6, #63, #41, #29, #23, #57 | 8 |
 | ✅ Solved — still to reply + close | #49, #25, #13, #10, #5 | 5 |
-| ❓ Needs info (then close stale) | #57, #50, #39, #36, #24 | 5 |
+| ❓ Needs info (then close stale) | #50, #39, #36, #24 | 4 |
 
-> **Update 2026-06-09:** **7 issues closed** — #22/#6 migrated to `TODO.md`, #18
-> implemented, #63/#41/#29 answered, and #23 closed as spam (not planned).
-> Open-issue count **17 → 10**. Remaining **10** still need replies/closures per
-> the table above (the ✅ solved set and the ❓ needs-info set).
+> **Update 2026-06-09:** **8 issues closed** — #22/#6 migrated to `TODO.md`, #18
+> implemented, #63/#41/#29 answered, #23 closed as spam, and #57 closed as an
+> external NVIDIA-driver crash (reopen-if-still-present). Open-issue count
+> **17 → 9**. Remaining **9** still need replies/closures per the table above
+> (the ✅ solved set and the ❓ needs-info set).
 
 ## Recommended next pass (NOT this pass)
 
