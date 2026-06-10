@@ -116,18 +116,23 @@ public class ConsumerJavaTest {
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         consumerJava.initLMDB();
+        try {
+            // enqueue one batch the cycle must drain and process
+            consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
+            ByteBuffer buffer = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
 
-        // enqueue one batch the cycle must drain and process
-        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
-        ByteBuffer buffer = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
+            // act
+            boolean readyForWork = consumerJava.consumeOneCycle(buffer);
 
-        // act
-        boolean readyForWork = consumerJava.consumeOneCycle(buffer);
-
-        // assert: work was done, so the cycle is not a ready (idle) cycle and the queue is drained
-        assertThat(readyForWork, is(equalTo(false)));
-        assertThat(consumerJava.consumerReadyCount.get(), is(equalTo(0L)));
-        assertThat(consumerJava.keysQueueSize(), is(equalTo(0)));
+            // assert: work was done, so the cycle is not a ready (idle) cycle and the queue is drained
+            assertThat(readyForWork, is(equalTo(false)));
+            assertThat(consumerJava.consumerReadyCount.get(), is(equalTo(0L)));
+            assertThat(consumerJava.keysQueueSize(), is(equalTo(0)));
+        } finally {
+            // close the LMDB env so the memory-mapped file handle is released; on Windows an
+            // open env blocks @TempDir deletion ("JUnit Failed to close extension context").
+            consumerJava.interrupt();
+        }
     }
 
     @Test
