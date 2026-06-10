@@ -323,12 +323,12 @@ public class OpenClTask implements ReleaseCLObject {
 
             // Validate keysPerWorkItem constraints
             if (keysPerWorkItem < 1) {
-                throw new IllegalArgumentException(
-                        "keysPerWorkItem must be >= 1 but was " + keysPerWorkItem + " (totalResultCount=" + totalResultCount + ")");
+                throw new IllegalArgumentException("keysPerWorkItem must be >= 1 but was " + keysPerWorkItem
+                        + " (totalResultCount=" + totalResultCount + ")");
             }
             if (keysPerWorkItem > totalResultCount) {
-                throw new IllegalArgumentException("keysPerWorkItem must not exceed total result count. Given: " + keysPerWorkItem
-                        + ", max: " + totalResultCount);
+                throw new IllegalArgumentException("keysPerWorkItem must not exceed total result count. Given: "
+                        + keysPerWorkItem + ", max: " + totalResultCount);
             }
             if (totalResultCount % keysPerWorkItem != 0) {
                 throw new IllegalArgumentException("totalResultCount=" + totalResultCount

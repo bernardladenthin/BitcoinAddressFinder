@@ -214,24 +214,24 @@ public class Finder implements Interruptable {
                 finder.producerJava,
                 bitHelper::assertBatchSizeInBitsIsInRange,
                 this::getKeyProducer,
-                (config, keyProducer) ->
-                        new ProducerJava(config, localConsumerJava, keyUtility, keyProducer, bitHelper, runtimeStatistics),
+                (config, keyProducer) -> new ProducerJava(
+                        config, localConsumerJava, keyUtility, keyProducer, bitHelper, runtimeStatistics),
                 javaProducers);
 
         processProducers(
                 finder.producerJavaSecretsFiles,
                 bitHelper::assertBatchSizeInBitsIsInRange,
                 this::getKeyProducer,
-                (config, keyProducer) ->
-                        new ProducerJavaSecretsFiles(config, localConsumerJava, keyUtility, keyProducer, bitHelper, runtimeStatistics),
+                (config, keyProducer) -> new ProducerJavaSecretsFiles(
+                        config, localConsumerJava, keyUtility, keyProducer, bitHelper, runtimeStatistics),
                 javaProducersSecretsFiles);
 
         processProducers(
                 finder.producerOpenCL,
                 bitHelper::assertBatchSizeInBitsIsInRange,
                 this::getKeyProducer,
-                (config, keyProducer) ->
-                        new ProducerOpenCL(config, localConsumerJava, keyUtility, keyProducer, bitHelper, runtimeStatistics),
+                (config, keyProducer) -> new ProducerOpenCL(
+                        config, localConsumerJava, keyUtility, keyProducer, bitHelper, runtimeStatistics),
                 openCLProducers);
     }
 
@@ -291,10 +291,9 @@ public class Finder implements Interruptable {
         LOGGER.info("startProducer");
         // Late-bind the running-producer gauge now that the producers exist (the consumer's
         // statistics timer started earlier, before configureProducer()).
-        runtimeStatistics.setRunningProducersGauge(
-                () -> getAllProducers().stream()
-                        .filter(producer -> producer.getState() == ProducerState.RUNNING)
-                        .count());
+        runtimeStatistics.setRunningProducersGauge(() -> getAllProducers().stream()
+                .filter(producer -> producer.getState() == ProducerState.RUNNING)
+                .count());
         for (Producer producer : getAllProducers()) {
             @FireAndForget("lifecycle via Producer.interrupt() and Finder.interrupt() shutdown")
             @SuppressWarnings("FutureReturnValueIgnored")

@@ -20,7 +20,6 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.AwaitTimeTest;
 import net.ladenthin.bitcoinaddressfinder.AwaitTimeTests;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
@@ -41,6 +40,7 @@ import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses1337;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
+import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
@@ -298,8 +298,13 @@ public class ConsumerJavaTest {
         cConsumerJava.printStatisticsEveryNSeconds = 1;
         ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
         ExecutorService consumeKeysExecutor = Executors.newFixedThreadPool(cConsumerJava.threads);
-        ConsumerJava consumerJava =
-                new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils, new RuntimeStatistics(), scheduledExecutor, consumeKeysExecutor);
+        ConsumerJava consumerJava = new ConsumerJava(
+                cConsumerJava,
+                keyUtility,
+                persistenceUtils,
+                new RuntimeStatistics(),
+                scheduledExecutor,
+                consumeKeysExecutor);
 
         consumerJava.initLMDB();
         // pre-assert
@@ -389,8 +394,8 @@ public class ConsumerJavaTest {
 
         CProducerJava cProducerJava = new CProducerJava();
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, randomForProducer);
-        ProducerJava producerJava =
-                new ProducerJava(cProducerJava, consumerJava, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
+        ProducerJava producerJava = new ProducerJava(
+                cProducerJava, consumerJava, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         try (LogCaptor logCaptor = LogCaptor.forClass(ConsumerJava.class)) {
             producerJava.produceKeys();
@@ -458,8 +463,8 @@ public class ConsumerJavaTest {
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.batchSizeInBits = 0;
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, randomForProducer);
-        ProducerJava producerJava =
-                new ProducerJava(cProducerJava, consumerJava, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
+        ProducerJava producerJava = new ProducerJava(
+                cProducerJava, consumerJava, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         try (LogCaptor logCaptor = LogCaptor.forClass(ConsumerJava.class)) {
             logCaptor.setLogLevelToTrace();

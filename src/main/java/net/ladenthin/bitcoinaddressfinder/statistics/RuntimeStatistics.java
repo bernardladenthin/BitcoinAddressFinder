@@ -49,7 +49,9 @@ public class RuntimeStatistics {
      * @param producerLabel the producer label, e.g. {@code "exampleRandom (Random, GPU)"}
      */
     public void incrementBatches(String producerLabel) {
-        batchesByProducer.computeIfAbsent(producerLabel, key -> new AtomicLong()).incrementAndGet();
+        batchesByProducer
+                .computeIfAbsent(producerLabel, key -> new AtomicLong())
+                .incrementAndGet();
     }
 
     /**

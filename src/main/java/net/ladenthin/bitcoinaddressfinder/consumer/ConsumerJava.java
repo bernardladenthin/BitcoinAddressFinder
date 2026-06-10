@@ -400,8 +400,7 @@ public class ConsumerJava implements Consumer {
         // Wait for the next batch instead of an unconditional sleep — wakes the instant a
         // producer enqueues, so queuePollTimeoutMillis is the max idle wait window per
         // cycle, not a fixed back-off.
-        PublicKeyBytes[] next =
-                keysQueue.poll(consumerJava.queuePollTimeoutMillis, TimeUnit.MILLISECONDS);
+        PublicKeyBytes[] next = keysQueue.poll(consumerJava.queuePollTimeoutMillis, TimeUnit.MILLISECONDS);
         if (next != null) {
             processBatch(next, threadLocalReuseableByteBuffer);
         }

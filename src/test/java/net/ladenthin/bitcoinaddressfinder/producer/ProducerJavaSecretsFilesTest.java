@@ -22,7 +22,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
-import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
 import net.ladenthin.bitcoinaddressfinder.MockConsumer;
 import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
@@ -30,6 +29,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFile
 import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.UnknownSecretFormatException;
 import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
@@ -97,7 +97,12 @@ public class ProducerJavaSecretsFilesTest {
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
         ProducerJava producerJava = new ProducerJavaSecretsFiles(
-                cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
+                cProducerJavaSecretsFiles,
+                mockConsumer,
+                keyUtility,
+                mockKeyProducer,
+                bitHelper,
+                new RuntimeStatistics());
 
         AbstractProducerTest.verifyInitProducer(producerJava);
     }
@@ -111,7 +116,12 @@ public class ProducerJavaSecretsFilesTest {
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
         ProducerJava producerJava = new ProducerJavaSecretsFiles(
-                cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
+                cProducerJavaSecretsFiles,
+                mockConsumer,
+                keyUtility,
+                mockKeyProducer,
+                bitHelper,
+                new RuntimeStatistics());
 
         AbstractProducerTest.verifyReleaseProducer(producerJava);
     }
@@ -126,7 +136,12 @@ public class ProducerJavaSecretsFilesTest {
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
         ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(
-                cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
+                cProducerJavaSecretsFiles,
+                mockConsumer,
+                keyUtility,
+                mockKeyProducer,
+                bitHelper,
+                new RuntimeStatistics());
 
         // act
         producerJavaSecretsFiles.produceKeys();
@@ -150,7 +165,12 @@ public class ProducerJavaSecretsFilesTest {
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
         ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(
-                cProducerJavaSecretsFiles, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
+                cProducerJavaSecretsFiles,
+                mockConsumer,
+                keyUtility,
+                mockKeyProducer,
+                bitHelper,
+                new RuntimeStatistics());
 
         // act
         producerJavaSecretsFiles.produceKeys();

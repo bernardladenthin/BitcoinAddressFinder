@@ -44,8 +44,8 @@ public class JvmModuleFlagConsistencyTest {
      * and the {@code <arg>--add-opens</arg><arg>X</arg>} XML pair), capturing the directive
      * and the {@code module/package} target.
      */
-    private static final Pattern FLAG = Pattern.compile(
-            "--add-(opens|exports)[\\s=\"</arg>]*([A-Za-z0-9_.]+/[A-Za-z0-9_.]+)=ALL-UNNAMED");
+    private static final Pattern FLAG =
+            Pattern.compile("--add-(opens|exports)[\\s=\"</arg>]*([A-Za-z0-9_.]+/[A-Za-z0-9_.]+)=ALL-UNNAMED");
 
     /** Number of flags in the canonical set (9 {@code --add-opens} + 15 {@code --add-exports}). */
     private static final int EXPECTED_FLAG_COUNT = 24;

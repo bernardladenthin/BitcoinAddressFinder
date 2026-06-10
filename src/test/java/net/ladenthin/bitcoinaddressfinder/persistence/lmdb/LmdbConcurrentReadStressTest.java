@@ -78,6 +78,7 @@ public class LmdbConcurrentReadStressTest {
 
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final PersistenceUtils persistenceUtils = new PersistenceUtils(network);
+
     @SuppressWarnings("unused")
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
 
@@ -116,8 +117,7 @@ public class LmdbConcurrentReadStressTest {
                 pool.submit(() -> {
                     // Each thread uses its own direct key buffer and opens its own read txn
                     // per lookup (the same pattern ConsumerJava uses).
-                    final ByteBuffer key =
-                            ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
+                    final ByteBuffer key = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
                     final Random random = new Random(seed);
                     try {
                         while (keepRunning.get()) {
@@ -150,7 +150,8 @@ public class LmdbConcurrentReadStressTest {
                 seconds,
                 errors.size());
 
-        assertThat("concurrent LMDB reads raised Java-level throwables: " + errors, errors.isEmpty(), is(equalTo(true)));
+        assertThat(
+                "concurrent LMDB reads raised Java-level throwables: " + errors, errors.isEmpty(), is(equalTo(true)));
         assertThat("expected the stress loop to perform reads", totalReads.get() > 0L, is(equalTo(true)));
     }
 

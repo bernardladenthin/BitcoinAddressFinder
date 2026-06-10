@@ -44,8 +44,12 @@ public class ProducerStatisticsLabelTest {
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.keyProducerId = "exampleRandom";
         ProducerJava producer = new ProducerJava(
-                cProducerJava, new MockConsumer(), keyUtility, randomKeyProducer("exampleRandom"),
-                bitHelper, new RuntimeStatistics());
+                cProducerJava,
+                new MockConsumer(),
+                keyUtility,
+                randomKeyProducer("exampleRandom"),
+                bitHelper,
+                new RuntimeStatistics());
 
         assertThat(producer.producerLabel(), is(equalTo("exampleRandom (Random, CPU)")));
     }
@@ -57,8 +61,13 @@ public class ProducerStatisticsLabelTest {
         ThreadPoolExecutor pool = (ThreadPoolExecutor) Executors.newFixedThreadPool(1);
         try {
             ProducerOpenCL producer = new ProducerOpenCL(
-                    cProducerOpenCL, new MockConsumer(), keyUtility, randomKeyProducer("exampleRandom"),
-                    bitHelper, new RuntimeStatistics(), pool);
+                    cProducerOpenCL,
+                    new MockConsumer(),
+                    keyUtility,
+                    randomKeyProducer("exampleRandom"),
+                    bitHelper,
+                    new RuntimeStatistics(),
+                    pool);
 
             assertThat(producer.producerLabel(), is(equalTo("exampleRandom (Random, GPU)")));
         } finally {
@@ -72,13 +81,15 @@ public class ProducerStatisticsLabelTest {
         cProducerJava.keyProducerId = "exampleRandom";
         RuntimeStatistics runtimeStatistics = new RuntimeStatistics();
         ProducerJava producer = new ProducerJava(
-                cProducerJava, new MockConsumer(), keyUtility, randomKeyProducer("exampleRandom"),
-                bitHelper, runtimeStatistics);
+                cProducerJava,
+                new MockConsumer(),
+                keyUtility,
+                randomKeyProducer("exampleRandom"),
+                bitHelper,
+                runtimeStatistics);
 
         producer.consumeSecrets(BigInteger.ONE);
 
-        assertThat(
-                runtimeStatistics.batchesByProducerSnapshot().get("exampleRandom (Random, CPU)"),
-                is(equalTo(1L)));
+        assertThat(runtimeStatistics.batchesByProducerSnapshot().get("exampleRandom (Random, CPU)"), is(equalTo(1L)));
     }
 }
