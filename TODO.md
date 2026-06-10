@@ -66,6 +66,54 @@ pluggable-persistence design plan:
   - **What pre-computed hash does *not* help.** Cache misses on the bucket array at scale (the table is 8× L3 at Light DB and out-of-cache entirely at Full DB); `ByteBuffer.equals(other)` byte compare on the matched node (~15-25 ns); GC pressure if `ConsumerJava.java:367-371`'s "thread-local reusable ByteBuffer" turns out to allocate per call rather than reuse (verify before benchmarking — at 188 M ops/sec a per-call `ByteBuffer.wrap()` would be ~9 GB/sec of allocation pressure).
   - **What needs to be designed first** (before any kernel changes): the canonical reference of `HeapByteBuffer.hashCode()` semantics that the JMH guard will pin against (capture the bytecode of `java.nio.HeapByteBuffer#hashCode` for the running JDK and assert it matches a known-good copy at build time, so a JDK upgrade can't silently corrupt the GPU formula); whether `ConsumerJava` carries the precomputed hash through `AbstractProducer`/`AbstractKeyProducerQueueBuffered` as a parallel `int[]`/`IntBuffer` next to the existing hash160 buffers, or extends the per-candidate result struct in place; whether the `HashSet_PrecomputedHash` map should fall back to JDK `HashSet<ByteBuffer>` semantics on CPU-only paths (e.g. `ProducerJava` producers that don't go through OpenCL) by computing the same hash on the CPU side using the same reference formula — yes, for consistency across producers.
 
+- **Implement `BinaryFuse8AddressPresence` and `BinaryFuse16AddressPresence` — CPU-side Binary Fuse Filters for hash160 lookups.** ❌ **Not yet implemented.** No XOR / fuse filter backend exists in the codebase today. The JMH benchmark (`AddressLookupBenchmark`) already covers the four existing backends via `@Param({"LMDB_ONLY","BLOOM","HASHSET","TRUNCATED_LONG_64"})`; adding two more entries is the whole benchmark change. This is the **right first step** before the GPU-side filter — both variants are purely Java, prove the FPR/memory trade-off with real JMH numbers, and their construction logic (`populateFrom(LMDB)`) produces the same flat array the GPU will upload. Implementing **both 8-bit and 16-bit** now is deliberate: each serves a distinct use case (VRAM-constrained vs precision-required), and both must exist in the benchmark to let JMH pick the winner.
+
+  **What is a Binary Fuse Filter?** A static probabilistic membership filter (no inserts after construction). Lookup: 3 array reads + XOR of fingerprints — branchless, no division. Memory: ~1.14 bytes/entry (8-bit) or ~2.28 bytes/entry (16-bit). No false negatives by construction — every stored key is always found. FPR ≈ 1/256 ≈ 0.4 % (8-bit) or 1/65536 ≈ 0.0015 % (16-bit). This is exactly the no-FN / FP-ok contract the GPU filter requires. Reference: *"Binary Fuse Filters: Fast and Smaller Than Xor Filters"* (Graf & Lemire, 2022).
+
+  **Memory comparison for this project:**
+
+  | Backend | Bytes/entry | Light DB (~132 M) | Full DB (~1.4 B) | FPR |
+  |---|:---:|---:|---:|---|
+  | `HASHSET` | ~80 | ~10.5 GB | ~112 GB | exact |
+  | `TRUNCATED_LONG_64` | 8 | ~1.1 GB | ~11 GB | ~7.5 × 10⁻¹¹ |
+  | **`BINARY_FUSE_8` (new)** | **1.14** | **~150 MB** | **~1.6 GB** | **~0.4 %** |
+  | **`BINARY_FUSE_16` (new)** | **2.28** | **~300 MB** | **~3.2 GB** | **~0.0015 %** |
+
+  For the Full DB: `BINARY_FUSE_8` fits in the RAM of any modern workstation; `TRUNCATED_LONG_64` requires ~11 GB. The 0.4 % FPR means ~2 M false-positive LMDB verifications per 500 M candidates — at 108 ns each that is ~216 ms/s of LMDB overhead, entirely negligible compared to the key-derivation cost. `BINARY_FUSE_16` trades ~2× more RAM for a ~270× lower FPR, which matters when LMDB I/O is the bottleneck.
+
+  **OpenCL portability design.** Both variants must use a hash function that translates directly to OpenCL C without 128-bit arithmetic. The chosen kernel:
+
+  ```
+  // Java (identical logic to the OpenCL kernel below)
+  long h   = murmur64(key ^ seed);        // Murmur3 finalizer (3 multiplies + shifts)
+  byte fp  = (byte)(h ^ (h >>> 32));      // 8-bit fingerprint
+  int  h0  = reduce((int)h,         seg); // reduce(x,m) = (uint)(x * (ulong)m >>> 32)
+  int  h1  = reduce((int)(h >> 21), seg) + seg;
+  int  h2  = reduce((int)(h >> 42), seg) + 2 * seg;
+  return (table[h0] ^ table[h1] ^ table[h2]) == fp;
+  ```
+
+  The same three lines translate verbatim to OpenCL C with `ulong` / `uchar` / `ushort`. The construction algorithm (Java-only) generates the `table[]` array that the GPU will receive as a `__global uchar[]` or `__global ushort[]` buffer.
+
+  **Implementation plan — all steps are purely Java, no native code:**
+
+  1. **Add `BinaryFuse8AddressPresence` and `BinaryFuse16AddressPresence` to `persistence/inmemory/`.**
+     Implement each algorithm inline (~250 lines each); do NOT add an external library dependency (BAF's `dependencyConvergence` + `bannedDependencies` enforcement makes transitive deps expensive, and the algorithm is compact enough to own). Both classes implement `AddressPresence` and mirror the static-factory pattern of `TruncatedLong64SortedArrayPresence`. The only difference between the two implementations is the fingerprint array type (`byte[]` vs `short[]`) and the comparison width.
+
+     Construction uses the standard iterative-peeling XOR-filter algorithm: populate count and XOR-accumulator arrays, extract singleton positions into a peeling queue, record the reverse topological order, then walk back assigning fingerprints.
+
+  2. **Add `BINARY_FUSE_8` and `BINARY_FUSE_16` to `AddressLookupBackend` enum.** Add Javadoc entries describing bytes/entry, FPR, no-FN guarantee, LMDB closed after population.
+
+  3. **Wire into `ConsumerJava` dispatch.** Add `case BINARY_FUSE_8` and `case BINARY_FUSE_16` in the same switch that handles `TRUNCATED_LONG_64`; no other `ConsumerJava` changes needed.
+
+  4. **Add to `AddressLookupBenchmark`.** Add `"BINARY_FUSE_8"` and `"BINARY_FUSE_16"` to the `@Param({…})` list and the matching `case` arms in `buildLookup()`.
+
+  5. **Unit tests + mutation coverage.**
+     - `BinaryFuse8AddressPresenceTest` and `BinaryFuse16AddressPresenceTest`: populate from a small fixed set; verify every member returns `true` (no-FN); verify FPR over a large random miss set is within expected bounds; verify `requiresBackend() == false`; verify buffer is not mutated by `containsAddress`; verify wrong-length buffer returns false.
+     - Add both classes to the PIT `<targetClasses>` list once 100 % mutation coverage is reached.
+
+  **After this TODO is done:** the GPU-side filter (see next TODO) reuses the same `murmur64` / `reduce` / fingerprint formula verbatim in OpenCL C. The Java and GPU lookup paths are verifiable against each other with identical test inputs.
+
 - **GPU-side no-false-negatives address filter with per-variant flag bitmask.** Today the GPU kernel returns raw hash160 bytes for every candidate key and the CPU calls `lookup.containsAddress(...)` twice per candidate (once for the uncompressed address, once for compressed). For large workgroup sizes this serialises the most expensive part of the pipeline on a single CPU thread. The goal is to move the address-presence filter onto the GPU so that the CPU only receives — and only queries LMDB for — the tiny subset of candidates that the GPU marked as "possibly found". The filter must satisfy the **no-false-negatives invariant**: if an address IS in the database, the GPU must always set its flag bit. False positives are acceptable — the CPU verifies any flagged candidate against LMDB and discards false positives there. This is exactly the bloom-filter contract: zero false negatives, bounded false positives.
   - **Upload the snapshot once at startup.** Right after `TruncatedLong64SortedArrayPresence.populateFrom(lmdb)` builds the 256 sorted `long[]` buckets in host RAM, copy each bucket into device global memory (`cl_mem` buffer per bucket, plus a small offset/length index). At ~8 B/entry this fits comfortably in modern GPU VRAM for any practical database size (~1.1 GB for the Light DB, ~11 GB for the Full DB; the latter may need streaming on smaller cards).
   - **Filter semantics and VRAM trade-offs.** The TRUNCATED_LONG_64 snapshot (sorted 64-bit truncated values, binary search per work-item) gives a near-zero false-positive rate (~7.5 × 10⁻¹¹ per query for the Full DB) and satisfies no-FN by construction — no entry is ever omitted. This is stronger than the filter contract strictly requires. For VRAM-constrained GPUs (8 GB cards with Full DB), alternative probabilistic structures use less memory at the cost of a higher but still acceptable FP rate:
