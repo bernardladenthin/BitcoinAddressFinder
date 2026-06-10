@@ -26,14 +26,14 @@ in this pass)** and the GitHub issue then closed with a pointer.
 
 | # | Title | Label(s) | Disposition | Actual status / what to reply |
 |---|---|---|---|---|
-| 63 | Change key generation method (BIP39) | question | 💬 Answer & close | **User config is wrong, not a bug.** BIP39 is *not* a `randomAlgorithm` value. It is a separate key producer: add a `keyProducerJavaBip39` entry under `finder` with `keyProducerId` + `mnemonic` (+ optional `passphrase`, `bip32Path`, `hardened`, `creationTimeSeconds`) and reference that `keyProducerId` from a producer. The "cmd window closed" is the JVM exiting on the invalid-config exception. **Action:** reply with a correct snippet; consider adding an `examples/config_Find_*Bip39*.json` (none exists today). |
+| 63 | Change key generation method (BIP39) | question | ✅ **Done — answered & closed** | Not a bug: BIP39 is a separate key producer (`keyProducerJavaBip39` with `keyProducerId` + `mnemonic`, referenced by a producer), not a value of the random producer; the JVM exited on the invalid config. **Replied with a correct config snippet** and closed as completed (2026-06-09); `examples/config_Find_1CPUProducerBip39.json` ships next release. |
 | 57 | OpenCL / Nvidia Segmentation Fault at startup | bug, help wanted | ❓ Needs info (likely external) | Crash is inside `libnvidia-nvvm.so` / `NvCliCompileBitcode` during `clBuildProgram` — i.e. in the **NVIDIA driver's OpenCL→PTX compiler**, not in project code. Stacktrace shows `libJOCL_2_0_5`; repo is now on **JOCL 2.0.6**. CPU path works for the reporter. **Action:** ask reporter to retry on current release, report exact driver/CUDA version; document the known NVIDIA-OpenCL JIT-compile crash as environment-specific. Not directly fixable in Java. |
 | 50 | JVM Crash in LMDB Native Code via lmdbjava | bug | ❓ Needs info (CI flake) | Owner's own tracking issue. Sporadic `SIGSEGV` in `mdb_txn_renew0` in **forked Surefire JVMs**, suspected JaCoCo interaction. Related to the JPMS/`--add-opens` lmdbjava handling now documented in `CLAUDE.md`. **Action:** verify whether it still reproduces on current CI; if not seen for N runs, close as not-reproducible. Mitigation idea: JaCoCo offline instrumentation / disable on the LMDB fork. |
 | 49 | create log for hits | help wanted | ✅ Solved | Hits **are** logged. `ConsumerJava` logs each hit at INFO with prefix `hit: Found the address: ` plus full key details (incl. WIF) via `keyUtility.createKeyDetails(...)`; the periodic `Statistics` line shows `[Hits: N]`. **Action:** reply explaining the `hit:` log line and that `examples/logbackConfiguration.xml` can route it to a file appender; then close. |
-| 41 | Create address DB + private-key range | question | 💬 Answer & close | Both exist. **DB:** run the `AddressFilesToLMDB` command (`examples/config_AddressFilesToLMDB.json`). **Range:** use `keyProducerJavaIncremental` with `startPrivateKey`/`endPrivateKey` (hex), or limit entropy with `privateKeyMaxNumBits` (puzzle-tx style). **Action:** reply with both config pointers; close. |
+| 41 | Create address DB + private-key range | question | ✅ **Done — answered & closed** | Both exist. **DB:** `AddressFilesToLMDB` command (`examples/config_AddressFilesToLMDB.json`). **Range:** `keyProducerJavaIncremental` with `startPrivateKey`/`endPrivateKey` (hex), or cap entropy with `privateKeyMaxNumBits`. **Replied with both pointers** and closed as completed (2026-06-09). |
 | 39 | EXCEPTION_ACCESS_VIOLATION (Win11) | help wanted, question | ❓ Needs info | No config, no `hs_err` log, crash after ~1h. Almost certainly the same native OpenCL/driver class as #57 or a GPU memory issue. **Action:** ask for config JSON + the `hs_err_pidXXXX.log`; otherwise close as stale (2024, single comment). |
 | 36 | Nothing happens on startup | help wanted, question | ❓ Needs info (likely user setup) | Reporter ran the `.bat`, a `.txt` log was created, then nothing. Typical cause: missing/empty LMDB database, or default command `OpenCLInfo` chosen, or no GPU. **Action:** ask for the generated `.txt` log contents and the config used; otherwise close as stale (2024). |
-| 29 | Output settings (logbackConfiguration.xml) | question | 💬 Answer & close | User wants only WIF + Base58 address on a match. The hit line format is produced in code (`createKeyDetails`), so logback can change *routing/format of the line* but the **content fields are fixed**. **Action:** explain logback pattern customization + that hit messages already contain WIF and address; close (2023, stale). |
+| 29 | Output settings (logbackConfiguration.xml) | question | ✅ **Done — answered & closed** | The hit line is built in code (`createKeyDetails`) and already contains WIF + address; Logback can change the line layout and route hits to their own file, but can't strip the message to *only* WIF+address (that would be a code change). **Replied** accordingly and closed as completed (2026-06-09). |
 | 25 | `--illegal-access=permit` error | help wanted, question | ✅ Solved | The `--illegal-access=permit` JVM flag was removed in Java 17; the project is now **Java 21** and the shipped `examples/run_*.bat` files no longer contain that flag (verified: zero matches). Reporter already self-resolved by upgrading the JDK. **Action:** confirm resolved, close. |
 | 24 | not generating key | help wanted, question | ❓ Needs info (stale) | Statistics shows 0 keys checked / empty consumer — producer not feeding the queue (likely OpenCL not producing or misconfigured `keyProducerId` linkage). 14-comment thread, last 2024. **Action:** reply that producer↔`keyProducerId` wiring must match; close as stale unless reporter returns. |
 | 23 | "work is necessary to change life." | *(none)* | 🗑 Spam / invalid | Collaboration/"make money" solicitation, not an issue. **Action:** close. |
@@ -48,14 +48,15 @@ in this pass)** and the GitHub issue then closed with a pointer.
 
 | Disposition | Issues | Count |
 |---|---|---|
-| ✅ **Closed this pass** (#18 implemented; #22, #6 migrated to `TODO.md`) | #22, #18, #6 | 3 |
-| ✅ Solved (close w/ explanation) | #49, #25, #13, #10, #5 | 5 |
-| 💬 Answer & close (feature exists) | #63, #41, #29 | 3 |
+| ✅ **Closed on GitHub this pass** | #22, #18, #6, #63, #41, #29 | 6 |
+| ✅ Solved — still to reply + close | #49, #25, #13, #10, #5 | 5 |
 | ❓ Needs info (then close stale) | #57, #50, #39, #36, #24 | 5 |
-| 🗑 Spam / invalid | #23 | 1 |
+| 🗑 Spam / invalid (still to close) | #23 | 1 |
 
-> **Update 2026-06-09:** #22, #18 and #6 are now **closed on GitHub** (open-issue
-> count 17 → 14). The remaining 14 still need replies/closures per the table above.
+> **Update 2026-06-09:** **6 issues closed** — #22/#6 migrated to `TODO.md`, #18
+> implemented, and #63/#41/#29 answered. Open-issue count **17 → 11**. Remaining
+> **11** still need replies/closures per the table above (the ✅ solved set, the
+> ❓ needs-info set, and spam #23).
 
 ## Recommended next pass (NOT this pass)
 
