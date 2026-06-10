@@ -75,4 +75,10 @@ public class RuntimeStatistics {
     public long getRunningProducers() {
         return runningProducersGauge.getAsLong();
     }
+
+    @Override
+    public String toString() {
+        return "RuntimeStatistics{batchesByProducer=" + batchesByProducerSnapshot()
+                + ", runningProducers=" + getRunningProducers() + "}";
+    }
 }

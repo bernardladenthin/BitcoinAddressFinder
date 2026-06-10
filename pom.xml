@@ -57,7 +57,7 @@ SPDX-License-Identifier: Apache-2.0
              section "jqwik prompt-injection in test output" for full context. -->
         <jqwik.version>1.9.3</jqwik.version>
         <archunit.version>1.4.2</archunit.version>
-        <spotbugs.version>4.9.8.3</spotbugs.version>
+        <spotbugs.version>4.9.8.4</spotbugs.version>
         <fb-contrib.version>7.7.4</fb-contrib.version>
         <findsecbugs.version>1.14.0</findsecbugs.version>
         <errorprone.version>2.49.0</errorprone.version>
@@ -220,7 +220,7 @@ SPDX-License-Identifier: Apache-2.0
                 <plugin>
                     <groupId>org.pitest</groupId>
                     <artifactId>pitest-maven</artifactId>
-                    <version>1.25.3</version>
+                    <version>1.25.4</version>
                 </plugin>
                 <plugin>
                     <groupId>org.sonatype.central</groupId>
@@ -754,7 +754,7 @@ SPDX-License-Identifier: Apache-2.0
                 <!--
                   PIT mutation testing is gated at a 100% threshold on every CI
                   build over the explicit list of classes that have reached 100%
-                  mutation parity (verified with pitest-maven 1.25.3). Expand the
+                  mutation parity (verified with pitest-maven 1.25.4). Expand the
                   targetClasses list as more classes reach parity (see README
                   TODO). The targeted classes are covered by fast, pure-Java unit
                   tests (no LMDB / OpenCL / GPU needed), kept in lock-step in the

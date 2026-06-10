@@ -30,6 +30,12 @@ public abstract class AbstractProducer implements Producer {
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractProducer.class);
 
     /**
+     * Class-name prefix shared by all built-in key producers; stripped to derive the short
+     * strategy label (e.g. {@code KeyProducerJavaRandom} &rarr; {@code Random}).
+     */
+    private static final String KEY_PRODUCER_CLASS_PREFIX = "KeyProducerJava";
+
+    /**
      * Counted down once when {@link #run()} transitions to
      * {@link ProducerState#NOT_RUNNING}. {@link #waitTillProducerNotRunning()}
      * awaits this latch with the configured shutdown timeout instead of spinning
@@ -86,12 +92,6 @@ public abstract class AbstractProducer implements Producer {
      */
     @ToString.Exclude
     protected final RuntimeStatistics runtimeStatistics;
-
-    /**
-     * Class-name prefix shared by all built-in key producers; stripped to derive the short
-     * strategy label (e.g. {@code KeyProducerJavaRandom} &rarr; {@code Random}).
-     */
-    private static final String KEY_PRODUCER_CLASS_PREFIX = "KeyProducerJava";
 
     /**
      * Creates a new producer with the given collaborators.

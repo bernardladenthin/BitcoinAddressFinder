@@ -428,11 +428,17 @@ SPDX-License-Identifier: Apache-2.0
            RandomSecretSupplier.random must share state across calls
            (PRNG progression / seeded reproducibility);
            LMDBPersistence.persistenceUtils is a stateless helper
-           owned by the caller. Copying either would break the
-           contract.
+           owned by the caller. The shared RuntimeStatistics metrics
+           sink is intentionally injected into AbstractProducer (every
+           producer increments its per-producer batch counter) and into
+           ConsumerJava (which renders it); it MUST be the same instance
+           across all of them, so a defensive copy would defeat its
+           purpose. Copying any of these would break the contract.
     -->
     <Match>
         <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.producer.AbstractProducer"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.model.AddressToCoin"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenClTask"/>
@@ -519,6 +525,22 @@ SPDX-License-Identifier: Apache-2.0
             <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdIsNotUniqueException"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdUnknownException"/>
         </Or>
+        <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
+    </Match>
+
+    <!--
+        IMC_IMMATURE_CLASS_NO_EQUALS on RuntimeStatistics.
+
+        RuntimeStatistics is a shared, mutable runtime-metrics sink (a
+        ConcurrentMap of per-producer batch counters plus a live gauge supplier),
+        not a value object. It has a toString() for logging/debugging, which trips
+        the IMC "immature class" heuristic into also demanding equals()/hashCode().
+        Value equality is meaningless for a mutable, identity-shared metrics holder
+        (two distinct instances are never "equal", and it is used by identity as a
+        single injected instance), so equals()/hashCode() are intentionally omitted.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics"/>
         <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
     </Match>
 
