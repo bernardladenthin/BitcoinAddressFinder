@@ -9,6 +9,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.consumer.Consumer;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 
@@ -29,15 +30,22 @@ public class ProducerJava extends AbstractProducer {
      * @param keyUtility   cryptographic helper
      * @param keyProducer  the secret supplying strategy
      * @param bitHelper    bit/batch-size helper
+     * @param runtimeStatistics shared runtime metrics sink for per-producer batch counts
      */
     public ProducerJava(
             CProducerJava producerJava,
             Consumer consumer,
             KeyUtility keyUtility,
             KeyProducer keyProducer,
-            BitHelper bitHelper) {
-        super(producerJava, consumer, keyUtility, keyProducer, bitHelper);
+            BitHelper bitHelper,
+            RuntimeStatistics runtimeStatistics) {
+        super(producerJava, consumer, keyUtility, keyProducer, bitHelper, runtimeStatistics);
         this.producerJava = producerJava;
+    }
+
+    @Override
+    protected ProducerType producerType() {
+        return ProducerType.CPU;
     }
 
     @Override

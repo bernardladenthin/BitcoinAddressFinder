@@ -12,7 +12,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
-import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomInstance;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomAlgorithm;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
@@ -142,7 +142,7 @@ public class KeyProducerJavaTest {
     private CKeyProducerJavaRandom configureKeyProducerJavaRandom(String keyProducerId, int maxWorkSize) {
         CKeyProducerJavaRandom cKeyProducerJavaRandom = new CKeyProducerJavaRandom();
         cKeyProducerJavaRandom.keyProducerId = keyProducerId;
-        cKeyProducerJavaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
+        cKeyProducerJavaRandom.randomAlgorithm = CKeyProducerJavaRandomAlgorithm.RANDOM_CUSTOM_SEED;
         cKeyProducerJavaRandom.customSeed = 0L;
         cKeyProducerJavaRandom.maxWorkSize = maxWorkSize;
         return cKeyProducerJavaRandom;
@@ -166,7 +166,7 @@ public class KeyProducerJavaTest {
     private CKeyProducerJavaSocket configureKeyProducerJavaSocket(String keyProducerId, int maxWorkSize) {
         CKeyProducerJavaSocket socket = new CKeyProducerJavaSocket();
         socket.port = KeyProducerJavaSocketTest.findFreePort();
-        socket.timeout = TIMEOUT_FOR_TERMINATE;
+        socket.timeoutMillis = TIMEOUT_FOR_TERMINATE;
         socket.keyProducerId = keyProducerId;
         socket.maxWorkSize = maxWorkSize;
         return socket;
@@ -175,7 +175,7 @@ public class KeyProducerJavaTest {
     private CKeyProducerJavaWebSocket configureKeyProducerJavaWebSocket(String keyProducerId, int maxWorkSize) {
         CKeyProducerJavaWebSocket webSocket = new CKeyProducerJavaWebSocket();
         webSocket.port = KeyProducerJavaSocketTest.findFreePort();
-        webSocket.timeout = TIMEOUT_FOR_TERMINATE;
+        webSocket.timeoutMillis = TIMEOUT_FOR_TERMINATE;
         webSocket.keyProducerId = keyProducerId;
         webSocket.maxWorkSize = maxWorkSize;
         return webSocket;
@@ -184,7 +184,7 @@ public class KeyProducerJavaTest {
     private CKeyProducerJavaZmq configureKeyProducerJavaZmq(String keyProducerId, int maxWorkSize) {
         CKeyProducerJavaZmq zmq = new CKeyProducerJavaZmq();
         zmq.address = KeyProducerJavaZmqTest.findFreeZmqAddress();
-        zmq.timeout = TIMEOUT_FOR_TERMINATE;
+        zmq.timeoutMillis = TIMEOUT_FOR_TERMINATE;
         zmq.keyProducerId = keyProducerId;
         zmq.maxWorkSize = maxWorkSize;
         return zmq;

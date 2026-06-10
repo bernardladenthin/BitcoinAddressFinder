@@ -36,7 +36,7 @@ import org.openjdk.jmh.annotations.Warmup;
  * <ul>
  *   <li>the &quot;grid size&quot; lever is {@code CProducer.batchSizeInBits} (work size
  *       = {@code 1 << batchSizeInBits}); there is no {@code gridNumBits} field</li>
- *   <li>the second lever is {@link CProducerOpenCL#loopCount} (inner iterations per
+ *   <li>the second lever is {@link CProducerOpenCL#keysPerWorkItem} (inner iterations per
  *       work-item, default 1)</li>
  *   <li>there is no {@code chunkMode} or {@code kernelMode} field today</li>
  *   <li>kernel entry is {@link OpenCLContext#createKeys(BigInteger)}; it takes a single
@@ -51,17 +51,17 @@ import org.openjdk.jmh.annotations.Warmup;
  * </ul>
  *
  * <p>What is measured: the steady-state number of kernel launches per second at
- * each {@code (batchSizeInBits, loopCount)} corner. The number of candidate keys
+ * each {@code (batchSizeInBits, keysPerWorkItem)} corner. The number of candidate keys
  * produced per launch is {@code 1 << batchSizeInBits}, so candidates/sec at a
  * given data point = JMH-reported ops/sec &#x00D7; {@code (1 << batchSizeInBits)}.
  * Note: JMH's {@code @OperationsPerInvocation} would normalize this automatically
  * but only accepts a compile-time constant and therefore cannot vary with
  * {@code @Param} &#x2014; intentional limitation.</p>
  *
- * <p>Validity constraint: {@link CProducerOpenCL#loopCount}'s Javadoc requires
- * {@code batchSizeInBits % loopCount == 0}. The default {@code @Param} corners
+ * <p>Validity constraint: {@link CProducerOpenCL#keysPerWorkItem}'s Javadoc requires
+ * {@code batchSizeInBits % keysPerWorkItem == 0}. The default {@code @Param} corners
  * below are all valid; if you override the parameter sets via JMH CLI
- * ({@code -p batchSizeInBits=...,-p loopCount=...}) the OpenCL kernel build will
+ * ({@code -p batchSizeInBits=...,-p keysPerWorkItem=...}) the OpenCL kernel build will
  * fail loudly at the {@code @Setup} step rather than silently produce wrong data.</p>
  *
  * <p>Companion benchmark to implement later: context-reuse amortisation
@@ -75,7 +75,7 @@ import org.openjdk.jmh.annotations.Warmup;
  *
  * # narrower sweep
  * mvn test-compile exec:java \
- *   -Dexec.args=&quot;GridSizeSweepBenchmark -p batchSizeInBits=18,20 -p loopCount=1,2&quot;
+ *   -Dexec.args=&quot;GridSizeSweepBenchmark -p batchSizeInBits=18,20 -p keysPerWorkItem=1,2&quot;
  *
  * # allocation profile
  * mvn test-compile exec:java -Dexec.args=&quot;GridSizeSweepBenchmark -prof gc&quot;
@@ -132,11 +132,11 @@ public class GridSizeSweepBenchmark {
 
     /**
      * Inner iterations per OpenCL work-item. Must be a power of two, and
-     * {@code batchSizeInBits} must be divisible by {@code loopCount}
-     * (per {@link CProducerOpenCL#loopCount} Javadoc).
+     * {@code batchSizeInBits} must be divisible by {@code keysPerWorkItem}
+     * (per {@link CProducerOpenCL#keysPerWorkItem} Javadoc).
      */
     @Param({"1", "2"})
-    public int loopCount;
+    public int keysPerWorkItem;
 
     private OpenCLContext ctx;
     private BigInteger privateKeyBase;
@@ -164,7 +164,7 @@ public class GridSizeSweepBenchmark {
 
         final CProducerOpenCL p = new CProducerOpenCL();
         p.batchSizeInBits = batchSizeInBits;
-        p.loopCount = loopCount;
+        p.keysPerWorkItem = keysPerWorkItem;
 
         ctx = new OpenCLContext(p, new BitHelper());
         ctx.init();

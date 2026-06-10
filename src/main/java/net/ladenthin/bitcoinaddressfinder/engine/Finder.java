@@ -34,6 +34,8 @@ import net.ladenthin.bitcoinaddressfinder.producer.Producer;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerJava;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerJavaSecretsFiles;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.producer.ProducerState;
+import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
@@ -56,6 +58,12 @@ public class Finder implements Interruptable {
     private final CFinder finder;
 
     private final Map<String, KeyProducer> keyProducers = new HashMap<>();
+
+    /**
+     * Shared runtime metrics sink wired into the consumer (which renders the statistics
+     * line) and every producer (which increment their per-producer batch counters).
+     */
+    private final RuntimeStatistics runtimeStatistics = new RuntimeStatistics();
 
     // ConsumerJava is a stateful coordinator (executors + queue + lifecycle) — recursive/heavy.
     @ToString.Exclude
@@ -188,7 +196,8 @@ public class Finder implements Interruptable {
         LOGGER.info("startConsumer");
         CConsumerJava localCConsumerJava = Objects.requireNonNull(finder.consumerJava);
 
-        final ConsumerJava localConsumerJava = new ConsumerJava(localCConsumerJava, keyUtility, persistenceUtils);
+        final ConsumerJava localConsumerJava =
+                new ConsumerJava(localCConsumerJava, keyUtility, persistenceUtils, runtimeStatistics);
         consumerJava = localConsumerJava;
         localConsumerJava.initLMDB();
         localConsumerJava.startConsumer();
@@ -205,24 +214,24 @@ public class Finder implements Interruptable {
                 finder.producerJava,
                 bitHelper::assertBatchSizeInBitsIsInRange,
                 this::getKeyProducer,
-                (config, keyProducer) ->
-                        new ProducerJava(config, localConsumerJava, keyUtility, keyProducer, bitHelper),
+                (config, keyProducer) -> new ProducerJava(
+                        config, localConsumerJava, keyUtility, keyProducer, bitHelper, runtimeStatistics),
                 javaProducers);
 
         processProducers(
                 finder.producerJavaSecretsFiles,
                 bitHelper::assertBatchSizeInBitsIsInRange,
                 this::getKeyProducer,
-                (config, keyProducer) ->
-                        new ProducerJavaSecretsFiles(config, localConsumerJava, keyUtility, keyProducer, bitHelper),
+                (config, keyProducer) -> new ProducerJavaSecretsFiles(
+                        config, localConsumerJava, keyUtility, keyProducer, bitHelper, runtimeStatistics),
                 javaProducersSecretsFiles);
 
         processProducers(
                 finder.producerOpenCL,
                 bitHelper::assertBatchSizeInBitsIsInRange,
                 this::getKeyProducer,
-                (config, keyProducer) ->
-                        new ProducerOpenCL(config, localConsumerJava, keyUtility, keyProducer, bitHelper),
+                (config, keyProducer) -> new ProducerOpenCL(
+                        config, localConsumerJava, keyUtility, keyProducer, bitHelper, runtimeStatistics),
                 openCLProducers);
     }
 
@@ -280,6 +289,11 @@ public class Finder implements Interruptable {
      */
     public void startProducer() {
         LOGGER.info("startProducer");
+        // Late-bind the running-producer gauge now that the producers exist (the consumer's
+        // statistics timer started earlier, before configureProducer()).
+        runtimeStatistics.setRunningProducersGauge(() -> getAllProducers().stream()
+                .filter(producer -> producer.getState() == ProducerState.RUNNING)
+                .count());
         for (Producer producer : getAllProducers()) {
             @FireAndForget("lifecycle via Producer.interrupt() and Finder.interrupt() shutdown")
             @SuppressWarnings("FutureReturnValueIgnored")

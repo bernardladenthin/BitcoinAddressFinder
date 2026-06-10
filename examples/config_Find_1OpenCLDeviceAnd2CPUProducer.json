@@ -4,19 +4,19 @@
     "keyProducerJavaRandom": [
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_1",
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "randomAlgorithm": "SECURE_RANDOM",
         "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_2",
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "randomAlgorithm": "SECURE_RANDOM",
         "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_3",
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "randomAlgorithm": "SECURE_RANDOM",
         "customSeed": 0,
         "privateKeyMaxNumBits": 256
       }
@@ -32,7 +32,7 @@
       },
       "printStatisticsEveryNSeconds": 10,
       "threads": 8,
-      "delayEmptyConsumer": 50,
+      "queuePollTimeoutMillis": 50,
       "queueSize": 4,
       "awaitQueueEmptySeconds": 60,
       "runtimePublicKeyCalculationCheck": false,
@@ -67,7 +67,7 @@
         "maxResultReaderThreads": 4,
         "keyProducerId": "exampleKeyProducerSecureRandomId_1",
         "batchSizeInBits": 18,
-        "loopCount" : 4,
+        "keysPerWorkItem" : 4,
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
         "runOnce": false,

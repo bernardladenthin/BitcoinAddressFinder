@@ -13,7 +13,7 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
  * - Secure wallet generation (using strong entropy sources)
  * - Wallet cracking or forensic analysis (by replicating weak/random key generation)
  */
-public enum CKeyProducerJavaRandomInstance {
+public enum CKeyProducerJavaRandomAlgorithm {
 
     /**
      * Cryptographically secure PRNG provided by the OS.

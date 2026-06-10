@@ -57,7 +57,7 @@ public class SecretsFile extends AbstractPlaintextFile {
     public void processLine(String line) {
         final BigInteger secret =
                 switch (secretFormat) {
-                    case STRING_DO_SHA256 -> {
+                    case STRING_SHA256 -> {
                         byte[] sha256 = Hashing.sha256()
                                 .hashString(line, StandardCharsets.UTF_8)
                                 .asBytes();

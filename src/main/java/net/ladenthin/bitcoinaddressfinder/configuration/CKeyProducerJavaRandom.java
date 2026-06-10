@@ -19,15 +19,15 @@ public class CKeyProducerJavaRandom extends CKeyProducerJava {
 
     /**
      * Selects the pseudo-random number generator (PRNG) used for private-key creation.
-     * See {@link CKeyProducerJavaRandomInstance} for the available implementations.
-     * Defaults to {@link CKeyProducerJavaRandomInstance#SECURE_RANDOM} to prefer security
+     * See {@link CKeyProducerJavaRandomAlgorithm} for the available implementations.
+     * Defaults to {@link CKeyProducerJavaRandomAlgorithm#SECURE_RANDOM} to prefer security
      * over convenience.
      */
-    public CKeyProducerJavaRandomInstance keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.SECURE_RANDOM;
+    public CKeyProducerJavaRandomAlgorithm randomAlgorithm = CKeyProducerJavaRandomAlgorithm.SECURE_RANDOM;
 
     /**
-     * Used for {@link CKeyProducerJavaRandomInstance#RANDOM_CUSTOM_SEED}.
-     * Also optionally used by {@link CKeyProducerJavaRandomInstance#SHA1_PRNG}
+     * Used for {@link CKeyProducerJavaRandomAlgorithm#RANDOM_CUSTOM_SEED}.
+     * Also optionally used by {@link CKeyProducerJavaRandomAlgorithm#SHA1_PRNG}
      * if deterministic output is desired.
      * Nullable to simulate unset seed.
      */

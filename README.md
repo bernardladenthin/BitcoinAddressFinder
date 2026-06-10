@@ -88,8 +88,14 @@ using the assigned ID:
   - [Mixed Modes](#mixed-modes)
   - [Key Range](#key-range)
   - [OpenCL Acceleration](#opencl-acceleration)
+    - [PoCL (Portable Computing Language) support](#pocl-portable-computing-language-support)
     - [Built-in Self-Test (BIST)](#built-in-self-test-bist)
     - [Performance Benchmarks](#performance-benchmarks)
+- [Logging and Runtime Statistics](#logging-and-runtime-statistics)
+  - [Reading the Statistics Line](#reading-the-statistics-line)
+  - [Diagnosing Bottlenecks](#diagnosing-bottlenecks)
+  - [Hit Logging](#hit-logging)
+  - [Customizing Log Output](#customizing-log-output)
 - [Collision Probability and Security Considerations](#collision-probability-and-security-considerations)
 - [Similar Projects](#similar-projects)
   - [Deep Learning Private Key Prediction](#deep-learning-private-key-prediction)
@@ -140,7 +146,9 @@ Copyright (c) 2017-2025 Bernard Ladenthin
 3. Download a configuration set like:
 - [`logbackConfiguration.xml`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/logbackConfiguration.xml)
 - [`config_Find_1OpenCLDevice.json`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/config_Find_1OpenCLDevice.json)
-- [`run_Find_1OpenCLDevice.bat`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/run_Find_1OpenCLDevice.bat)
+- a launcher for your OS:
+  - **Windows:** [`run_Find_1OpenCLDevice.bat`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/run_Find_1OpenCLDevice.bat)
+  - **Linux / macOS:** [`run_Find_1OpenCLDevice.sh`](https://github.com/bernardladenthin/BitcoinAddressFinder/blob/main/examples/run_Find_1OpenCLDevice.sh)
 4. Put all in one directory like the following structure
   * Downloads
     * lmdb
@@ -149,8 +157,12 @@ Copyright (c) 2017-2025 Bernard Ladenthin
     * bitcoinaddressfinder-1.4.0-jar-with-dependencies.jar
     * logbackConfiguration.xml
     * config_Find_1OpenCLDevice.js
-    * run_Find_1OpenCLDevice.bat
-5. Run the file run_Find_1OpenCLDevice.bat
+    * run_Find_1OpenCLDevice.bat  *(Windows)* / run_Find_1OpenCLDevice.sh *(Linux/macOS)*
+5. Run the launcher for your OS:
+  - **Windows:** double-click / run `run_Find_1OpenCLDevice.bat`
+  - **Linux / macOS:** `chmod +x run_Find_1OpenCLDevice.sh && ./run_Find_1OpenCLDevice.sh`
+
+Every `examples/run_*.bat` has a matching `examples/run_*.sh` (same JVM flags); use the `.sh` on Linux/macOS and the `.bat` on Windows.
 
 ## ✨ Features
 * 📐 Supports blockchain addresses based on [secp256k1](https://en.bitcoin.it/wiki/Secp256k1)
@@ -195,7 +207,7 @@ Each Find-mode producer batch covers **`2^batchSizeInBits`** consecutive private
 
 1. Pulls a candidate private key from the configured key producer.
 2. **Aligns** the candidate DOWN to a `2^batchSizeInBits` boundary &#x2014; the low `batchSizeInBits` bits are cleared so the result is a multiple of `2^batchSizeInBits`. This produces the `secretBase`. Source: [`KeyUtility.alignDown`](src/main/java/net/ladenthin/bitcoinaddressfinder/KeyUtility.java) and [`AbstractProducer.createSecretBase`](src/main/java/net/ladenthin/bitcoinaddressfinder/AbstractProducer.java).
-3. Submits `secretBase` (plus the configured `loopCount`) to the GPU.
+3. Submits `secretBase` (plus the configured `keysPerWorkItem`) to the GPU.
 
 The OpenCL kernel then evaluates `secretBase + i` for `i &#x2208; [0, 2^batchSizeInBits)` in parallel across all GPU work-items, so the batch covers `2^batchSizeInBits` consecutive keys cleanly without gap or overlap.
 
@@ -210,30 +222,30 @@ The OpenCL kernel then evaluates `secretBase + i` for `i &#x2208; [0, 2^batchSiz
 
 **Upper bound**: [`PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY`](src/main/java/net/ladenthin/bitcoinaddressfinder/PublicKeyBytes.java) &#x2014; derived from `Integer.MAX_VALUE / CHUNK_SIZE_NUM_BYTES` so per-batch result arrays cannot exceed Java's 32-bit array-length limit. **Default**: `0` (sequential, no batching).
 
-#### Relation to `loopCount`
+#### Relation to `keysPerWorkItem`
 
-`loopCount` does **not** change the batch size. It only changes how the same `2^batchSizeInBits` work is distributed across GPU work-items:
+`keysPerWorkItem` does **not** change the batch size. It only changes how the same `2^batchSizeInBits` work is distributed across GPU work-items:
 
-- With `loopCount = 1`: the kernel launches `2^batchSizeInBits` work-items, each computing one key.
-- With `loopCount = 8`: the kernel launches `2^batchSizeInBits / 8` work-items, each computing 8 keys internally via the affine-addition scalar walker described below.
+- With `keysPerWorkItem = 1`: the kernel launches `2^batchSizeInBits` work-items, each computing one key.
+- With `keysPerWorkItem = 8`: the kernel launches `2^batchSizeInBits / 8` work-items, each computing 8 keys internally via the affine-addition scalar walker described below.
 
-Constraints (enforced by [`CProducerOpenCL`](src/main/java/net/ladenthin/bitcoinaddressfinder/configuration/CProducerOpenCL.java)): `loopCount` must be a power of two, `2^batchSizeInBits` must be divisible by `loopCount`, and the total per-launch result buffer (`workSize &#x00D7; loopCount &#x00D7; chunkSize`) must not exceed `Integer.MAX_VALUE`.
+Constraints (enforced by [`CProducerOpenCL`](src/main/java/net/ladenthin/bitcoinaddressfinder/configuration/CProducerOpenCL.java)): `keysPerWorkItem` must be a power of two, `2^batchSizeInBits` must be divisible by `keysPerWorkItem`, and the total per-launch result buffer (`workSize &#x00D7; keysPerWorkItem &#x00D7; chunkSize`) must not exceed `Integer.MAX_VALUE`.
 
-### 🔄 Scalar Walker per Kernel (`loopCount`)
-The OpenCL kernel supports a **loop-based scalar strategy** controlled by the `loopCount` parameter. Each GPU thread generates multiple EC keys by:
+### 🔄 Scalar Walker per Kernel (`keysPerWorkItem`)
+The OpenCL kernel supports a **loop-based scalar strategy** controlled by the `keysPerWorkItem` parameter. Each GPU thread generates multiple EC keys by:
 
 - Computing the first key via full scalar multiplication: `P₀ = k₀·G` (using `point_mul_xy`)  
 - Computing subsequent keys via efficient affine additions: `Pₙ₊₁ = Pₙ + G` (using `point_add_xy`)
 
 This enables high-throughput, grid-parallel **linear keyspace traversal** like:  
-`k₀·G, (k₀ + 1)·G, ..., (k₀ + loopCount - 1)·G`
+`k₀·G, (k₀ + 1)·G, ..., (k₀ + keysPerWorkItem - 1)·G`
 
 Example:  
-- If `loopCount = 8`, each thread generates 8 keys  
+- If `keysPerWorkItem = 8`, each thread generates 8 keys  
 - Grid size is reduced by a factor of 8  
 - All results are written to global memory
 
-> ✅ Lower `loopCount` values like 4 or 8 are often ideal.  
+> ✅ Lower `keysPerWorkItem` values like 4 or 8 are often ideal.  
 > ❌ Higher values may reduce GPU occupancy due to fewer active threads.
 
 ### 🚀 MSB-Zero Optimization
@@ -702,7 +714,7 @@ LMDBToAddressFile_Full_HexHash.zip	SHA3-512	A1419AFFE869B18973D499439E7EA90A94C4
 ## Find Addresses
 ### 🔢 Key Generation Configuration  
 BitcoinAddressFinder supports multiple pseudorandom number generators (PRNGs) for private-key creation.
-Pick one in your JSON via the `keyProducerJavaRandomInstance` field, e.g. `"keyProducerJavaRandomInstance": "SECURE_RANDOM"`.
+Pick one in your JSON via the `randomAlgorithm` field, e.g. `"randomAlgorithm": "SECURE_RANDOM"`.
 This flexibility lets you switch between **production-grade entropy** and **deterministic or deliberately weak sources** for audits and research.
 
 #### Key producer Use Cases
@@ -730,28 +742,28 @@ For generated vanity addresses or private keys, consider storing them safely usi
 #### Examples
 ##### 🔐 `SECURE_RANDOM`  
 Best choice for real wallet generation – uses system CSPRNG (e.g. `/dev/urandom`, Windows CNG).
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
-    "keyProducerJavaRandomInstance": "SECURE_RANDOM"
+    "randomAlgorithm": "SECURE_RANDOM"
   }
 ],
-...
+// ...
 ```
 
 ##### 🕰️ `RANDOM_CURRENT_TIME_MILLIS_SEED`  
 Recreates time-based vulnerabilities using `java.util.Random` seeded with the current system time.
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
-    "keyProducerJavaRandomInstance": "RANDOM_CURRENT_TIME_MILLIS_SEED"
+    "randomAlgorithm": "RANDOM_CURRENT_TIME_MILLIS_SEED"
   }
 ],
-...
+// ...
 ```
 
 ##### 🧪 `RANDOM_CUSTOM_SEED`
@@ -759,28 +771,28 @@ Fully deterministic PRNG using `java.util.Random` with a user-defined seed. Usef
 
 Fully deterministic output. Useful for reproducible tests or fixed keyspace scans.
 Without explicit seed:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
-    "keyProducerJavaRandomInstance": "RANDOM_CUSTOM_SEED"
+    "randomAlgorithm": "RANDOM_CUSTOM_SEED"
   }
 ],
-...
+// ...
 ```
 
 With custom deterministic seed:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
-    "keyProducerJavaRandomInstance": "RANDOM_CUSTOM_SEED",
+    "randomAlgorithm": "RANDOM_CUSTOM_SEED",
     "customSeed": 123456789
   }
 ],
-...
+// ...
 ```
 
 ##### ⚠️ `SHA1_PRNG`
@@ -788,28 +800,28 @@ Legacy deterministic PRNG using `"SHA1PRNG"`. Used to reproduce the 2013 Android
 
 Simulates old Android bug. May produce the same keys if seeded poorly or not at all.
 Without seed:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
-    "keyProducerJavaRandomInstance": "SHA1_PRNG"
+    "randomAlgorithm": "SHA1_PRNG"
   }
 ],
-...
+// ...
 ```
 
 With custom seed:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaRandom": [
   {
     "keyProducerId": "exampleKeyProducerId",
-    "keyProducerJavaRandomInstance": "SHA1_PRNG",
+    "randomAlgorithm": "SHA1_PRNG",
     "customSeed": 987654321
   }
 ],
-...
+// ...
 ```
 
 #### 🔐 `BIP39_SEED` (key producer java bip 39)
@@ -826,20 +838,20 @@ Hierarchical deterministic key generator using a BIP39 mnemonic and optional pas
 | `creationTimeSeconds` | number | `0` | Epoch-seconds creation timestamp; fed to `DeterministicSeed.ofMnemonic` |
 
 Minimal:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaBip39": [
     {
       "keyProducerId": "exampleKeyProducerId",
       "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
     }
 ],
-...
+// ...
 ```
 
 Full:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaBip39": [
     {
       "keyProducerId": "exampleKeyProducerId",
@@ -850,8 +862,14 @@ Full:
       "creationTimeSeconds": 1650000000
     }
 ],
-...
+// ...
 ```
+
+> 🧪 **Runnable example:** [`examples/config_Find_1CPUProducerBip39.json`](examples/config_Find_1CPUProducerBip39.json)
+> is a complete single-CPU-producer + single-consumer `Find` config that walks the BIP39
+> derivation **sequence** (`batchUsePrivateKeyIncrement: false`). Note: with
+> `batchUsePrivateKeyIncrement: true` only the first derived key is used as an LSB-increment
+> base (see the [batch-mode limitation](#-bip-39-deterministic-keys-and-batch-mode-limitation)).
 
 #### 🔢 incremental scanning (key producer java incremental)
 This mode generates private keys **sequentially in batches** within a specified key range. It is especially useful for:
@@ -873,7 +891,7 @@ This mode generates private keys **sequentially in batches** within a specified 
 - Each batch contains exactly `2^batchSizeInBits` keys.
 - If the next full batch would go **beyond `endPrivateKey`**, the process stops with an **exception**.
 - The **`endPrivateKey` is inclusive**, but **partial batches are not allowed by default** &#x2014; batches must fit completely inside the range.
-- For optimal performance, especially with OpenCL, configure `batchSizeInBits` (and the matching `loopCount`) so that batches align perfectly within the range. This prevents errors and maximizes throughput.
+- For optimal performance, especially with OpenCL, configure `batchSizeInBits` (and the matching `keysPerWorkItem`) so that batches align perfectly within the range. This prevents errors and maximizes throughput.
 
 > **Note:** If unsure, set the `endPrivateKey` slightly higher to match a `2^batchSizeInBits` multiple. This helps avoid exceptions and ensures efficient scanning.
 
@@ -882,8 +900,8 @@ This mode generates private keys **sequentially in batches** within a specified 
 #### Example JSON Configuration
 Example minimal configuration:
 
-```json
-...
+```jsonc
+// ...
 {
   "keyProducerJavaIncremental": [
     {
@@ -893,14 +911,14 @@ Example minimal configuration:
     }
   ]
 }
-...
+// ...
 ```
 
 🧩 This configuration incrementally searches a defined range of private keys. It is particularly suited for brute-force challenges, such as the [71st Bitcoin puzzle transaction](https://privatekeys.pw/puzzles/bitcoin-puzzle-tx?status=unsolved#p71).  
 The private key range is specified by two 64-character hex strings: `startPrivateKey` and `endPrivateKey`.
 
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaIncremental": [
     {
       "keyProducerId": "exampleKeyProducerJavaIncremental",
@@ -908,7 +926,7 @@ The private key range is specified by two 64-character hex strings: `startPrivat
       "endPrivateKey":   "00000000000000000000000000000000000000000000007fffffffffffffffff"
     }
 ],
-...
+// ...
 ```
 
 #### 🌐 `SOCKET_STREAM` (key producer java socket)  
@@ -921,20 +939,16 @@ Useful for piping externally generated secrets (e.g., from Python, Go, etc.) dir
 | `mode`                        | string enum (`CLIENT`, `SERVER`) | `"SERVER"`    | Whether to connect to a remote socket (`CLIENT`) or wait for connections (`SERVER`) |
 | `host`                        | string                           | `"localhost"` | Remote host to connect to (used only in `CLIENT` mode)                              |
 | `port`                        | number                           | `12345`       | TCP port to connect to or bind on                                                   |
-| `timeout`                     | number                           | `3000`        | Socket read timeout in milliseconds                                                 |
+| `timeoutMillis`               | number                           | `3000`        | Socket timeout in milliseconds, applied to accept (server), connect (client) and per-read. Must be non-negative |
 | `logReceivedSecret`           | boolean                          | `false`       | Whether to log each received private key as a hex string                            |
-| `connectionRetryCount`        | number                           | `5`           | Number of times to retry establishing a socket connection                           |
-| `retryDelayMillisConnect`     | number                           | `1000`        | Delay between connection retry attempts (in milliseconds)                           |
-| `readRetryCount`              | number                           | `3`           | Number of attempts to retry reading a full secret after I/O failure                 |
-| `retryDelayMillisRead`        | number                           | `1000`        | Delay between read retry attempts (in milliseconds)                                 |
-| `readPartialRetryCount`       | number                           | `5`           | Number of retries when partially reading a single 32-byte secret                    |
-| `readPartialRetryDelayMillis` | number                           | `20`          | Delay between partial read retries (in milliseconds)                                |
+| `connectRetryCount`           | number                           | `5`           | Number of times to retry establishing a socket connection (client mode)             |
+| `connectRetryDelayMillis`     | number                           | `1000`        | Delay between connection retry attempts (in milliseconds)                           |
 | `maxWorkSize`                 | number                           | `16777216`    | Maximum number of secrets to request in a single call                               |
 
 
 Minimal:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaSocket": [
     {
         "keyProducerId": "exampleKeyProducerId",
@@ -943,30 +957,26 @@ Minimal:
         "mode": "SERVER"
     }
 ],
-...
+// ...
 ```
 
 Full:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaSocket": [
     {
         "keyProducerId": "exampleKeyProducerId",
         "host": "localhost",
         "port": 12345,
         "mode": "SERVER",
-        "timeout": 3000,
+        "timeoutMillis": 3000,
         "logReceivedSecret": true,
-        "connectionRetryCount": 5,
-        "retryDelayMillisConnect": 1000,
-        "readRetryCount": 5,
-        "retryDelayMillisRead": 1000,
-        "readPartialRetryCount": 5,
-        "readPartialRetryDelayMillis": 20,
+        "connectRetryCount": 5,
+        "connectRetryDelayMillis": 1000,
         "maxWorkSize": 16777216
     }
 ],
-...
+// ...
 ```
 
 ##### Example: Python Socket Stream Server:
@@ -1011,34 +1021,34 @@ Ideal for decoupled key streaming where producers push keys using ZeroMQ `PUSH` 
 | keyProducerId      | string                       | —                      | Unique identifier for this key producer     |
 | address            | string                       | tcp://localhost:5555   | The ZeroMQ address to bind or connect to    |
 | mode               | string enum (BIND, CONNECT)  | BIND                   | Whether this socket binds to or connects    |
-| timeout            | number                       | `-1`                   | Receive timeout in milliseconds:<br> `0` = non-blocking,<br> `-1` = infinite,<br> `>0` = wait that long |
+| timeoutMillis      | number                       | `-1`                   | Receive timeout in milliseconds:<br> `0` = non-blocking,<br> `-1` = infinite,<br> `>0` = wait that long |
 | logReceivedSecret  | boolean                      | false                  | Whether to log each received secret in hex  |
 
 Minimal:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaZmq": [
     {
         "keyProducerId": "exampleKeyProducerId",
         "address": "tcp://localhost:5555"
     }
 ],
-...
+// ...
 ```
 
 Full:
-```json
-...
+```jsonc
+// ...
 "keyProducerJavaZmq": [
     {
         "keyProducerId": "exampleKeyProducerId",
         "address": "tcp://localhost:5555",
         "mode": "BIND",
-        "timeout": -1,
+        "timeoutMillis": -1,
         "logReceivedSecret": true
     }
 ],
-...
+// ...
 ```
 
 
@@ -1098,6 +1108,40 @@ while True:
 * Messages larger or smaller than 32 bytes will be discarded or raise errors.
 
 
+#### 📄 Secrets File Producer (`producerJavaSecretsFiles`)
+
+Read pre-generated secrets from one or more text files instead of generating them at runtime.
+Unlike the entries above (which are *key producers* nested in a producer), this is a top-level
+producer placed directly under `finder.producerJavaSecretsFiles`. One secret per line; the line
+format is selected with `secretFormat`. See [`config_Find_SecretsFile.json`](examples/config_Find_SecretsFile.json).
+
+| JSON field      | Type                  | Default          | Description                                              |
+|-----------------|-----------------------|------------------|----------------------------------------------------------|
+| `keyProducerId` | string                | —                | Unique identifier for this producer                      |
+| `secretsFiles`  | array of string       | `[]`             | Paths of the files to read (relative to the working dir) |
+| `secretFormat`  | string enum           | `STRING_SHA256`  | Line format of every file (see below)                    |
+
+Supported `secretFormat` values:
+
+| Value                 | Meaning                                                                              |
+|-----------------------|--------------------------------------------------------------------------------------|
+| `BIG_INTEGER`         | Decimal big integer per line (the raw private key as a base-10 number)               |
+| `DUMPED_PRIVATE_KEY`  | WiF (Wallet Import Format), e.g. `5K2YUVmWfxbmvsNxCsfvArXdGXm7d5DC9pn4yD75k2UaSYgkXTh` |
+| `SHA256`              | Hex-encoded SHA-256 digest used directly as the private key                          |
+| `STRING_SHA256`       | Brainwallet: the line is hashed with SHA-256 and that digest is the private key      |
+
+```jsonc
+// ...
+"producerJavaSecretsFiles": [
+    {
+        "keyProducerId": "exampleKeyProducerId",
+        "secretsFiles": [ "secrets/fileContainingSecrets.txt" ],
+        "secretFormat": "STRING_SHA256"
+    }
+],
+// ...
+```
+
 ### Mixed Modes
 You can combine **vanity address generation** with **database lookups** to enhance functionality and efficiency.
 
@@ -1124,6 +1168,10 @@ To significantly boost the performance of EC key generation, the software suppor
 A shared secret (base key) is transferred to the OpenCL device along with a predefined grid size. Each OpenCL thread independently derives a unique EC key by incrementing the base key with its thread ID. This allows the generation of a batch of EC keys in a single execution cycle. Once generated, the keys are transferred back to the host (CPU) memory for further processing.
 
 The CPU then hashes the X and Y coordinates of the public keys to derive the corresponding (Bitcoin/Altcoin) addresses. This division of labor offloads the computationally expensive elliptic curve operations to the GPU, allowing the CPU to focus on faster address hashing and database lookup operations—resulting in improved overall throughput.
+
+#### PoCL (Portable Computing Language) support
+
+The OpenCL code is compatible with and tested against [PoCL](https://github.com/pocl/pocl), an open-source, portable OpenCL implementation. PoCL lets you run the kernels without a vendor GPU driver and exposes a range of **specialized targets** (backends) that PoCL supports — for example CPU (host), CUDA, and other device backends — so you can pick the device that best fits your hardware. Select the desired PoCL device through the usual `producerOpenCL` `platformIndex` / `deviceIndex` settings (use the `OpenCLInfo` command to list the platforms and devices PoCL exposes).
 
 #### Built-in Self-Test (BIST)
 
@@ -1187,6 +1235,104 @@ For technical details, see:
 | AMD Radeon 8060S            | AMD AI MAX+ 395     | 256              | 16               |  9,200,000 keys/s      |
 | AMD Radeon 8060S            | AMD AI MAX+ 395     | 160              | 16               | 11,000,000 keys/s      |
 
+
+## Logging and Runtime Statistics
+
+In `Find` mode the consumer logs a periodic, single-line statistics snapshot at `INFO`
+level. The interval is controlled by `consumerJava.printStatisticsEveryNSeconds`
+(default `60`). All logging goes through **SLF4J / Logback**, so format and destinations
+are fully configurable (see [Customizing Log Output](#customizing-log-output)).
+
+### Reading the Statistics Line
+
+A statistics line looks like this:
+
+```
+Statistics: [Checked 1234 M keys in 5 minutes] [4100 k keys/second] [246 M keys/minute] [Batches per producer: exampleOpenCL (Random, GPU)=5012, exampleRandom (Random, CPU)=480] [Producers running: 2] [Consumers running: 4] [Consumer ready for work (queue empty): 5012] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
+```
+
+| Field | Meaning |
+|---|---|
+| `Checked N M keys in M minutes` | Total candidate keys checked so far (millions) and elapsed minutes. |
+| `k keys/second` / `M keys/minute` | Throughput — **the headline performance number.** |
+| `Batches per producer: <label>=N, …` | Dispatched-batch count per running producer, keyed by `<keyProducerId> (<Strategy>, <CPU\|GPU>)` so concurrently running producers are told apart. The **strategy** (`Random`, `Bip39`, `Incremental`, `Socket`, `WebSocket`, `Zmq`) is derived from the key producer; the **backend** (`CPU` for `producerJava`/`producerJavaSecretsFiles`, `GPU` for `producerOpenCL`) from the producer. `none` until the first batch. |
+| `Producers running: N` | Number of producers currently in the `RUNNING` state. |
+| `Consumers running: N` | Number of consumer worker threads currently running (≤ `consumerJava.threads`). |
+| `Consumer ready for work (queue empty): N` | **Runtime health counter — rising is normal/healthy.** Consume cycles that found the queue empty and waited. An empty queue is the *desired* state: it means the CPU drains everything the producers generate and has headroom. See below. |
+| `Producer blocked (queue full): N` | **Runtime health counter — rising is the warning sign.** Times a producer hit a full queue and had to wait, i.e. the CPU can't keep up (CPU-bound). See below. |
+| `Average contains time: N ms` | Mean time spent per address-presence lookup. Large values point at a slow lookup backend (see [Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend)). |
+| `keys queue size: N` | Instantaneous depth of the producer→consumer queue (bounded by `consumerJava.queueSize`). |
+| `Hits: N` | Number of address matches found so far (see [Hit Logging](#hit-logging)). |
+
+> All counters are **cumulative since startup**. What matters for diagnosis is how fast a
+> counter *rises between two statistics lines*, not its absolute value.
+
+### Diagnosing Bottlenecks
+
+The pipeline is `Producers → bounded queue → Consumer (CPU address checks)`. The queue is
+the pressure gauge, and the two counters have **opposite polarity** — only one of them is a
+problem signal:
+
+- **`Producer blocked (queue full)` — this is the warning sign.** It rises when producers
+  generate batches faster than the consumer can check them, so the queue fills and producers
+  must wait in `put()`. **A sustained rise means the consumer/CPU is the bottleneck
+  (CPU-bound).** This is the counter to watch if throughput is lower than expected.
+- **`Consumer ready for work (queue empty)` — rising is normal and expected, not a problem.** It
+  rises when the consumer drains the queue and waits for more work. You *want* the queue as
+  empty as possible: it means the CPU comfortably keeps up with the producers and has spare
+  capacity. For GPU scanning this counter rising steadily (with `keys queue size` near 0) is
+  exactly the healthy operating point. It is only worth a second look if you *expected* the
+  producers to saturate the CPU and they don't, or if **nothing** is producing (a stalled or
+  misconfigured producer also shows as a perpetually ready consumer with zero throughput).
+
+| `Producer blocked` | `Consumer ready` | `keys queue size` | Interpretation |
+|---|---|---|---|
+| ~0 | rising | ~0 | **Healthy** (the normal GPU-scanning state) — the CPU keeps up easily. If throughput is below expectations, the limit is the producer/GPU side, not the consumer. |
+| rising | ~0 | near `queueSize` | **CPU-bound — the warning state.** The consumer can't keep up. Use a faster [lookup backend](#-pluggable-address-lookup-backends-addresslookupbackend), raise `consumerJava.threads`, or reduce the producer rate. |
+| ~0 | ~0 | mid-range | **Balanced** — neither side waits; watch `keys/second`. |
+| ~0 | rising | ~0 | with `keys/second` ≈ 0 → **nothing is producing** — check the producer/key-producer configuration. |
+
+Rule of thumb: **`Producer blocked` climbing = act (CPU too slow); `Consumer ready` climbing = fine.**
+
+### Hit Logging
+
+When a generated address matches the database, the consumer logs it at `INFO` with a clear
+prefix and the full key material needed to recover the wallet:
+
+- `hit: Found the address: …` — the match, including the private key in **WIF**, the public
+  address, and related key details.
+- `hit: safe log: …` — an additional, separately formatted record written immediately on a
+  hit so the finding survives even if later formatting fails.
+- `vanity pattern match: …` — emitted when optional vanity-pattern matching
+  (`consumerJava.enableVanity` / `vanityPattern`) is enabled and a generated address matches.
+
+The running `Hits:` field in the statistics line reflects the total count. To persist hits to
+their own file, route these messages with a dedicated appender (next section).
+
+### Customizing Log Output
+
+Logging is backed by Logback. A ready-to-edit configuration ships at
+[`examples/logbackConfiguration.xml`](examples/logbackConfiguration.xml). Point the
+application at a custom file with:
+
+```bash
+java -Dlogback.configurationFile=/path/to/logbackConfiguration.xml -jar bitcoinaddressfinder-<version>-jar-with-dependencies.jar config.json
+```
+
+Typical customizations:
+
+- **Write hits to their own file** — add a `FileAppender` and route the `ConsumerJava` logger
+  (or filter on the `hit:` prefix) to it, so matches are never lost in console scrollback.
+- **Adjust the statistics cadence** — change `consumerJava.printStatisticsEveryNSeconds` in
+  the JSON config (this controls *when* the line is emitted; Logback controls *how/where*).
+- **Machine-readable output** — the single-line, fixed-field statistics format is intentionally
+  stable so an external supervisor or GUI can parse it (e.g. via an inter-process pipe) to plot
+  throughput and the ready/blocked health counters over time.
+
+> **Keep the CRLF guard.** The bundled pattern wraps the message in
+> `%replace(%msg){'[\r\n]+', ' | '}`, which neutralizes carriage returns / line feeds in
+> rendered messages so untrusted input cannot forge extra log lines. Preserve this wrap in any
+> derived pattern.
 
 ## Collision Probability and Security Considerations
 

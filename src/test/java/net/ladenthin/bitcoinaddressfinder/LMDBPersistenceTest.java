@@ -86,6 +86,28 @@ public class LMDBPersistenceTest {
     }
     // </editor-fold>
 
+    // <editor-fold defaultstate="collapsed" desc="requiresBackend">
+    @Test
+    public void requiresBackend_isTrue_becauseLmdbIsQueriedDirectlyThroughItsLiveEnv() throws IOException {
+        // arrange
+        File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
+
+        CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
+        cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
+        cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
+
+        try (LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils)) {
+            lmdbPersistence.init();
+
+            // assert: LMDB is the backing storage and is read on every containsAddress call,
+            // so the orchestrator must keep its env open (must NOT close it as if it were a
+            // self-contained in-memory snapshot). Returning false here closes the env that
+            // LMDB_ONLY reads from -> Env$AlreadyClosedException on every lookup.
+            assertThat(lmdbPersistence.requiresBackend(), is(true));
+        }
+    }
+    // </editor-fold>
+
     // <editor-fold defaultstate="collapsed" desc="getDatabaseSize initial and filled">
     @Test
     public void getDatabaseSize_initialLMDBSetTo1MiB_returnInitialDatabaseSize() throws IOException {

@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.statistics;
 
+import java.util.Map;
+import java.util.stream.Collectors;
+
 /**
  * Builds the human-readable statistics line printed by the consumer.
  */
@@ -21,7 +24,16 @@ public class Statistics {
      * @param uptime                       elapsed run time in milliseconds
      * @param keys                         total number of keys checked so far
      * @param keysSumOfTimeToCheckContains cumulative time (ms) spent in presence lookups
-     * @param emptyConsumer                number of consumer iterations that found the queue empty
+     * @param batchesByProducer            dispatched-batch counts keyed by producer label
+     *                                     ({@code "<keyProducerId> (<Strategy>, <CPU|GPU>)"}); lets
+     *                                     concurrently running producers be told apart
+     * @param producersRunning             number of producers currently in the RUNNING state
+     * @param consumersRunning             number of consumer worker threads currently running
+     * @param consumerReady               number of consume cycles the consumer was ready for work
+     *                                     (empty queue, nothing to do); rising is normal/healthy — the
+     *                                     CPU keeps up and an empty queue is the desired state
+     * @param producerBlocked              number of times a producer hit a full queue on enqueue;
+     *                                     rising is the warning sign — the consumer/CPU is too slow (CPU-bound)
      * @param keysQueueSize                current number of batches waiting in the queue
      * @param hits                         total number of address hits found so far
      * @return the formatted statistics message
@@ -30,7 +42,11 @@ public class Statistics {
             long uptime,
             long keys,
             long keysSumOfTimeToCheckContains,
-            long emptyConsumer,
+            Map<String, Long> batchesByProducer,
+            long producersRunning,
+            long consumersRunning,
+            long consumerReady,
+            long producerBlocked,
             long keysQueueSize,
             long hits) {
         // calculate uptime
@@ -41,10 +57,19 @@ public class Statistics {
         long keysPerMinute = keys / Math.max(uptimeInMinutes, 1);
         // calculate average contains time
         long averageContainsTime = keysSumOfTimeToCheckContains / Math.max(keys, 1);
+        // per-producer batch breakdown, rendered as "label=count, label=count" (or "none")
+        String batches = batchesByProducer.isEmpty()
+                ? "none"
+                : batchesByProducer.entrySet().stream()
+                        .map(entry -> entry.getKey() + "=" + entry.getValue())
+                        .collect(Collectors.joining(", "));
 
         return "Statistics: [Checked " + (keys / 1_000_000L) + " M keys in " + uptimeInMinutes + " minutes] ["
                 + (keysPerSecond / 1_000L) + " k keys/second] [" + (keysPerMinute / 1_000_000L)
-                + " M keys/minute] [Times an empty consumer: " + emptyConsumer + "] [Average contains time: "
+                + " M keys/minute] [Batches per producer: " + batches
+                + "] [Producers running: " + producersRunning + "] [Consumers running: " + consumersRunning
+                + "] [Consumer ready for work (queue empty): " + consumerReady
+                + "] [Producer blocked (queue full): " + producerBlocked + "] [Average contains time: "
                 + averageContainsTime + " ms] [keys queue size: " + keysQueueSize + "] [Hits: " + hits + "]";
     }
 }

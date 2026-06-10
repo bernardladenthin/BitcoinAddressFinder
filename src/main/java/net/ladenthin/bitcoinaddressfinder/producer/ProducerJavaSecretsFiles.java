@@ -14,6 +14,7 @@ import net.ladenthin.bitcoinaddressfinder.io.FileHelper;
 import net.ladenthin.bitcoinaddressfinder.io.SecretsFile;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 import net.ladenthin.bitcoinaddressfinder.statistics.ReadStatistic;
+import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
@@ -47,21 +48,23 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
      * @param keyUtility               cryptographic helper
      * @param keyProducer              the secret supplying strategy (unused in this producer)
      * @param bitHelper                bit/batch-size helper
+     * @param runtimeStatistics        shared runtime metrics sink for per-producer batch counts
      */
     public ProducerJavaSecretsFiles(
             CProducerJavaSecretsFiles producerJavaSecretsFiles,
             Consumer consumer,
             KeyUtility keyUtility,
             KeyProducer keyProducer,
-            BitHelper bitHelper) {
-        super(producerJavaSecretsFiles, consumer, keyUtility, keyProducer, bitHelper);
+            BitHelper bitHelper,
+            RuntimeStatistics runtimeStatistics) {
+        super(producerJavaSecretsFiles, consumer, keyUtility, keyProducer, bitHelper, runtimeStatistics);
         this.producerJavaSecretsFiles = producerJavaSecretsFiles;
     }
 
     @Override
     public void produceKeys() throws IOException {
         FileHelper fileHelper = new FileHelper();
-        List<File> files = fileHelper.stringsToFiles(producerJavaSecretsFiles.files);
+        List<File> files = fileHelper.stringsToFiles(producerJavaSecretsFiles.secretsFiles);
         fileHelper.assertFilesExists(files);
 
         LOGGER.info("Starting secrets file processing...");

@@ -25,9 +25,14 @@ public class CConsumerJava {
     /** Number of consumer worker threads. */
     public int threads = 4;
     /**
-     * Delay in milliseconds when the queue is empty before polling again.
+     * Maximum time, in milliseconds, the consumer blocks per loop cycle waiting for
+     * the next batch from the keys queue (the {@code poll} timeout). After draining
+     * all immediately-available batches, the worker waits at most this long for more
+     * work; it returns as soon as a batch arrives, so this is an upper bound on idle
+     * wait per cycle, not a fixed delay. Only fully elapses when the queue stays
+     * empty for the whole window. Default: {@code 100}.
      */
-    public long delayEmptyConsumer = 100;
+    public long queuePollTimeoutMillis = 100;
     /** Maximum number of pending key batches the consumer queue may hold. */
     public int queueSize = 10;
 

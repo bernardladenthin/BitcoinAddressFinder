@@ -62,7 +62,7 @@ public class KeyProducerJavaZmqTest {
         // The JUnit per-test timeout (60s) is the upper bound when something is
         // genuinely wrong — far more reliable than racing against a fixed receiver
         // timeout under loaded CI conditions.
-        config.timeout = -1;
+        config.timeoutMillis = -1;
         return config;
     }
 
@@ -70,7 +70,7 @@ public class KeyProducerJavaZmqTest {
         CKeyProducerJavaZmq config = new CKeyProducerJavaZmq();
         config.address = address;
         config.mode = CKeyProducerJavaZmq.Mode.CONNECT;
-        config.timeout = -1;
+        config.timeoutMillis = -1;
         return config;
     }
 
@@ -149,7 +149,7 @@ public class KeyProducerJavaZmqTest {
         String address = findFreeZmqAddress();
 
         CKeyProducerJavaZmq config = createBindConfig(address);
-        config.timeout = TestTimeProvider.DEFAULT_TIMEOUT;
+        config.timeoutMillis = TestTimeProvider.DEFAULT_TIMEOUT;
 
         KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
 
@@ -165,7 +165,7 @@ public class KeyProducerJavaZmqTest {
         BigInteger expected = new BigInteger(1, secretBytes);
 
         CKeyProducerJavaZmq config = createBindConfig(address);
-        config.timeout = -1; // explicit: block indefinitely
+        config.timeoutMillis = -1; // explicit: block indefinitely
         KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
 
         // act
@@ -281,7 +281,7 @@ public class KeyProducerJavaZmqTest {
 
         // Setup ZMQ PULL socket that will wait for messages
         CKeyProducerJavaZmq config = createBindConfig(address);
-        config.timeout = -1; // block indefinitely
+        config.timeoutMillis = -1; // block indefinitely
         KeyProducerJavaZmq producer = createKeyProducerJavaZmq(config);
 
         try (LogCaptor logCaptor = LogCaptor.forClass(KeyProducerJavaZmq.class)) {

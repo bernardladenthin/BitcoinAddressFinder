@@ -180,7 +180,7 @@ public class BitcoinAddressFinderArchitectureTest {
     // sites are deliberate and documented:
     //   - AbstractKeyProducerQueueBuffered.sleep(int): the sleep primitive itself, used by
     //     KeyProducerJavaSocket for hard-capped bootstrap-retry back-off where exponential
-    //     would add nothing (the loop gives up permanently after connectionRetryCount).
+    //     would add nothing (the loop gives up permanently after connectRetryCount).
     //   - cli.Main.printAllStackTracesWithDelay: developer-debug helper behind an
     //     `if (false)` switch; sleep-then-sample-stacks is the textbook pattern.
     // Both are suppressed individually in spotbugs-exclude.xml under the MDM_THREAD_YIELD
@@ -272,7 +272,7 @@ public class BitcoinAddressFinderArchitectureTest {
             .whereLayer("Core")
             .mayOnlyBeAccessedByLayers("Cli", "Command", "Consumer", "Engine", "Io", "Keyproducer", "Producer")
             .whereLayer("Statistics")
-            .mayOnlyBeAccessedByLayers("Command", "Consumer", "Io", "Producer")
+            .mayOnlyBeAccessedByLayers("Command", "Consumer", "Engine", "Io", "Producer")
             .whereLayer("Secret")
             .mayOnlyBeAccessedByLayers("Keyproducer", "Producer", "Util")
             .whereLayer("Configuration")

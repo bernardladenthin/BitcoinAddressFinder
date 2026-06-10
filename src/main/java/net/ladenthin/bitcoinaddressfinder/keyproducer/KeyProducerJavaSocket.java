@@ -81,12 +81,12 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
             int attempts = 0;
             Exception lastException = null;
 
-            while (!shouldStop && attempts < cKeyProducerJava.connectionRetryCount) {
+            while (!shouldStop && attempts < cKeyProducerJava.connectRetryCount) {
                 try {
                     if (cKeyProducerJava.mode == CKeyProducerJavaSocket.Mode.SERVER) {
                         if (serverSocket == null) {
                             serverSocket = new ServerSocket(cKeyProducerJava.getPort());
-                            serverSocket.setSoTimeout(cKeyProducerJava.timeout);
+                            serverSocket.setSoTimeout(cKeyProducerJava.timeoutMillis);
                         }
                         socket = serverSocket.accept();
                         LOGGER.info("Accepted client connection at port {}", cKeyProducerJava.getPort());
@@ -94,13 +94,13 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
                         socket = new Socket();
                         socket.connect(
                                 new InetSocketAddress(cKeyProducerJava.getHost(), cKeyProducerJava.getPort()),
-                                cKeyProducerJava.timeout);
+                                cKeyProducerJava.timeoutMillis);
                         LOGGER.info(
                                 "Connected to server at {}:{}", cKeyProducerJava.getHost(), cKeyProducerJava.getPort());
                     }
 
                     Socket localSocket = Objects.requireNonNull(socket);
-                    localSocket.setSoTimeout(cKeyProducerJava.timeout);
+                    localSocket.setSoTimeout(cKeyProducerJava.timeoutMillis);
                     inputStream = new DataInputStream(localSocket.getInputStream());
 
                     byte[] buffer = new byte[OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES];
@@ -119,7 +119,7 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
                     LOGGER.warn("Connection attempt {} failed: {}", attempts + 1, e.getMessage());
                     attempts++;
                     closeConnections();
-                    sleep(cKeyProducerJava.retryDelayMillisConnect);
+                    sleep(cKeyProducerJava.connectRetryDelayMillis);
                 }
             }
 
@@ -161,7 +161,7 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
 
     @Override
     protected int getReadTimeout() {
-        return cKeyProducerJava.timeout;
+        return cKeyProducerJava.timeoutMillis;
     }
 
     @Override

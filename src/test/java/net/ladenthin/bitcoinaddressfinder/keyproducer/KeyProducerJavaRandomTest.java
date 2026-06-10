@@ -10,7 +10,7 @@ import static org.hamcrest.Matchers.is;
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
-import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomInstance;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomAlgorithm;
 import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableException;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
@@ -42,7 +42,7 @@ public class KeyProducerJavaRandomTest {
         // arrange
         CKeyProducerJavaRandom cKeyProducerJavaRandom = new CKeyProducerJavaRandom();
         cKeyProducerJavaRandom.keyProducerId = keyProducerId;
-        cKeyProducerJavaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
+        cKeyProducerJavaRandom.randomAlgorithm = CKeyProducerJavaRandomAlgorithm.RANDOM_CUSTOM_SEED;
         cKeyProducerJavaRandom.customSeed = 0L;
         cKeyProducerJavaRandom.privateKeyMaxNumBits = Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS;
 
@@ -65,7 +65,7 @@ public class KeyProducerJavaRandomTest {
         // arrange
         CKeyProducerJavaRandom cKeyProducerJavaRandom = new CKeyProducerJavaRandom();
         cKeyProducerJavaRandom.keyProducerId = keyProducerId;
-        cKeyProducerJavaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
+        cKeyProducerJavaRandom.randomAlgorithm = CKeyProducerJavaRandomAlgorithm.RANDOM_CUSTOM_SEED;
         cKeyProducerJavaRandom.customSeed = 0L;
         cKeyProducerJavaRandom.privateKeyMaxNumBits = Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS;
 
@@ -88,7 +88,7 @@ public class KeyProducerJavaRandomTest {
         // arrange
         CKeyProducerJavaRandom cKeyProducerJavaRandom = new CKeyProducerJavaRandom();
         cKeyProducerJavaRandom.keyProducerId = keyProducerId;
-        cKeyProducerJavaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
+        cKeyProducerJavaRandom.randomAlgorithm = CKeyProducerJavaRandomAlgorithm.RANDOM_CUSTOM_SEED;
         cKeyProducerJavaRandom.customSeed = 0L;
         cKeyProducerJavaRandom.privateKeyMaxNumBits = Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS;
 
@@ -105,11 +105,11 @@ public class KeyProducerJavaRandomTest {
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="testAllRNGs">
-    private BigInteger[] generateSecrets(CKeyProducerJavaRandomInstance instance, @Nullable Long customSeed)
+    private BigInteger[] generateSecrets(CKeyProducerJavaRandomAlgorithm instance, @Nullable Long customSeed)
             throws NoMoreSecretsAvailableException {
         CKeyProducerJavaRandom config = new CKeyProducerJavaRandom();
         config.keyProducerId = keyProducerId;
-        config.keyProducerJavaRandomInstance = instance;
+        config.randomAlgorithm = instance;
         config.customSeed = customSeed;
         config.privateKeyMaxNumBits = Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS;
         KeyProducerJavaRandom producer = createKeyProducerJavaRandom(config);
@@ -118,37 +118,37 @@ public class KeyProducerJavaRandomTest {
 
     @Test
     public void testSecureRandom() throws NoMoreSecretsAvailableException {
-        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomInstance.SECURE_RANDOM, null);
+        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomAlgorithm.SECURE_RANDOM, null);
         assertThat(result.length, is(equalTo(1)));
     }
 
     @Test
     public void testRandomSeedCurrentTimeMillis() throws NoMoreSecretsAvailableException {
-        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomInstance.RANDOM_CURRENT_TIME_MILLIS_SEED, null);
+        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomAlgorithm.RANDOM_CURRENT_TIME_MILLIS_SEED, null);
         assertThat(result.length, is(equalTo(1)));
     }
 
     @Test
     public void testRandomCustomSeed_default() throws NoMoreSecretsAvailableException {
-        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED, null);
+        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomAlgorithm.RANDOM_CUSTOM_SEED, null);
         assertThat(result.length, is(equalTo(1)));
     }
 
     @Test
     public void testRandomCustomSeed_fixed() throws NoMoreSecretsAvailableException {
-        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED, 123456789L);
+        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomAlgorithm.RANDOM_CUSTOM_SEED, 123456789L);
         assertThat(result.length, is(equalTo(1)));
     }
 
     @Test
     public void testSha1Prng_default() throws NoMoreSecretsAvailableException {
-        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomInstance.SHA1_PRNG, null);
+        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomAlgorithm.SHA1_PRNG, null);
         assertThat(result.length, is(equalTo(1)));
     }
 
     @Test
     public void testSha1Prng_fixed() throws NoMoreSecretsAvailableException {
-        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomInstance.SHA1_PRNG, 987654321L);
+        BigInteger[] result = generateSecrets(CKeyProducerJavaRandomAlgorithm.SHA1_PRNG, 987654321L);
         assertThat(result.length, is(equalTo(1)));
     }
     // </editor-fold>

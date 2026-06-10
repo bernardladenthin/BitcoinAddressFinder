@@ -563,7 +563,7 @@ inline void build_ripemd160_block_from_sha256(const u32 *sha256_hash, u32 *ripem
  *          Each thread writes CHUNK_SIZE_NUM_WORDS u32 values.
  * @param k Input buffer (global const u32*) representing a single base private key (8 words, little-endian).
  */
-__kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k, const u32 loopCount)
+__kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k, const u32 keysPerWorkItem)
 {
     // Little Endian format
     u32 k_littleEndian_local[PRIVATE_KEY_LENGTH];
@@ -630,7 +630,7 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k, co
     // The above call is equivalent to get_local_size(dim)*get_group_id(dim) + get_local_id(dim)
     // size_t global_id = get_global_id(0);
     u32 global_id = get_global_id(0);
-    u32 base_offset = global_id * loopCount;
+    u32 base_offset = global_id * keysPerWorkItem;
 
     //int local_id = get_local_id(0);
     //int local_size = get_local_size(0);
@@ -644,7 +644,7 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k, co
     copy_constant_u32_array_private_u32(x1_local, &g_precomputed.xy[G_OFFSET_X1], ONE_COORDINATE_NUM_WORDS);
     copy_constant_u32_array_private_u32(y1_local, &g_precomputed.xy[G_OFFSET_Y1], ONE_COORDINATE_NUM_WORDS);
 
-    for (u32 i = 0; i < loopCount; i++) {
+    for (u32 i = 0; i < keysPerWorkItem; i++) {
         u32 loop_index = base_offset + i;
         u32 r_offset = loop_index * CHUNK_SIZE_NUM_WORDS;
 

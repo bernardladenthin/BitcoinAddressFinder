@@ -23,6 +23,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import net.ladenthin.bitcoinaddressfinder.AwaitTimeTest;
 import net.ladenthin.bitcoinaddressfinder.AwaitTimeTests;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
+import net.ladenthin.bitcoinaddressfinder.LMDBPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.ManualDebugConstants;
 import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
 import net.ladenthin.bitcoinaddressfinder.ToStringTest;
@@ -39,6 +40,7 @@ import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses1337;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
+import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
@@ -82,6 +84,121 @@ public class ConsumerJavaTest {
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         assertThrows(org.lmdbjava.LmdbNativeException.class, () -> consumerJava.initLMDB());
     }
+
+    @Test
+    public void initLMDB_lmdbOnlyBackend_keepsEnvOpenForDirectLookups() throws Exception {
+        // Regression: LMDB_ONLY uses the LMDBPersistence itself as the lookup. initLMDB must
+        // NOT close its env (it would if LMDBPersistence.requiresBackend() returned false),
+        // otherwise every containsAddress throws Env$AlreadyClosedException. See the
+        // consumer-thread spin that floods the log when the env is closed under live readers.
+        new LMDBPlatformAssume().assumeLMDBExecution();
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+        TestAddressesFiles testAddresses = new TestAddressesFiles(false);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
+
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        cConsumerJava.lmdbConfigurationReadOnly.addressLookupBackend =
+                net.ladenthin.bitcoinaddressfinder.configuration.AddressLookupBackend.LMDB_ONLY;
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        try {
+            consumerJava.initLMDB();
+
+            // env must stay open: persistence is retained (not nulled) and a lookup succeeds
+            // through the live env rather than throwing Env$AlreadyClosedException.
+            assertThat(consumerJava.persistence, is(notNullValue()));
+            ByteBuffer buffer = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
+            consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
+            consumerJava.consumeOneCycle(buffer);
+        } finally {
+            consumerJava.interrupt();
+        }
+    }
+
+    // <editor-fold defaultstate="collapsed" desc="runtime health counters">
+    @Test
+    public void consumeOneCycle_emptyQueue_marksReadyAndIncrementsReadyCount() throws Exception {
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        // keep the idle wait window tiny so the ready (empty-queue) cycle returns fast
+        cConsumerJava.queuePollTimeoutMillis = 1;
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        ByteBuffer buffer = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
+
+        // act: nothing was ever enqueued, so the cycle drains nothing and the timed poll times out
+        boolean readyForWork = consumerJava.consumeOneCycle(buffer);
+
+        // assert
+        assertThat(readyForWork, is(equalTo(true)));
+        assertThat(consumerJava.consumerReadyCount.get(), is(equalTo(1L)));
+        assertThat(consumerJava.producerBlockedCount.get(), is(equalTo(0L)));
+    }
+
+    @Test
+    public void consumeOneCycle_queueHasBatch_processesBatchAndIsNotReady() throws Exception {
+        new LMDBPlatformAssume().assumeLMDBExecution();
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+        TestAddressesFiles testAddresses = new TestAddressesFiles(false);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
+
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.queuePollTimeoutMillis = 1;
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        consumerJava.initLMDB();
+        try {
+            // enqueue one batch the cycle must drain and process
+            consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
+            ByteBuffer buffer = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
+
+            // act
+            boolean readyForWork = consumerJava.consumeOneCycle(buffer);
+
+            // assert: work was done, so the cycle is not a ready (idle) cycle and the queue is drained
+            assertThat(readyForWork, is(equalTo(false)));
+            assertThat(consumerJava.consumerReadyCount.get(), is(equalTo(0L)));
+            assertThat(consumerJava.keysQueueSize(), is(equalTo(0)));
+        } finally {
+            // close the LMDB env so the memory-mapped file handle is released; on Windows an
+            // open env blocks @TempDir deletion ("JUnit Failed to close extension context").
+            consumerJava.interrupt();
+        }
+    }
+
+    @Test
+    public void consumeKeys_queueFull_incrementsProducerBlockedCount() throws Exception {
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        // single-slot queue so the second enqueue finds it full
+        cConsumerJava.queueSize = 1;
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+
+        // first enqueue fills the only slot; remaining capacity was 1 beforehand -> not counted
+        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
+        assertThat(consumerJava.producerBlockedCount.get(), is(equalTo(0L)));
+
+        // a second producer finds the queue full -> counts the block, then parks in put()
+        ExecutorService producer = Executors.newSingleThreadExecutor();
+        try {
+            producer.submit(() -> {
+                consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
+                return null;
+            });
+
+            // the block is counted before put() parks, so await the increment
+            long deadline = System.currentTimeMillis() + Duration.ofSeconds(10).toMillis();
+            while (consumerJava.producerBlockedCount.get() == 0L && System.currentTimeMillis() < deadline) {
+                Thread.sleep(5);
+            }
+            assertThat(consumerJava.producerBlockedCount.get(), is(equalTo(1L)));
+
+            // release the parked producer so the executor can terminate cleanly
+            consumerJava.keysQueue.poll();
+        } finally {
+            producer.shutdownNow();
+        }
+    }
+    // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="toString">
     @ToStringTest
@@ -138,7 +255,7 @@ public class ConsumerJavaTest {
                     arguments,
                     hasItem(
                             equalTo(
-                                    "Statistics: [Checked 0 M keys in 0 minutes] [0 k keys/second] [0 M keys/minute] [Times an empty consumer: 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
+                                    "Statistics: [Checked 0 M keys in 0 minutes] [0 k keys/second] [0 M keys/minute] [Batches per producer: none] [Producers running: 0] [Consumers running: 0] [Consumer ready for work (queue empty): 0] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
         }
     }
 
@@ -170,6 +287,7 @@ public class ConsumerJavaTest {
                 cConsumerJava,
                 keyUtility,
                 persistenceUtils,
+                new RuntimeStatistics(),
                 Executors.newSingleThreadScheduledExecutor(),
                 consumeKeysExecutor);
         consumerJava.initLMDB();
@@ -216,8 +334,13 @@ public class ConsumerJavaTest {
         cConsumerJava.printStatisticsEveryNSeconds = 1;
         ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
         ExecutorService consumeKeysExecutor = Executors.newFixedThreadPool(cConsumerJava.threads);
-        ConsumerJava consumerJava =
-                new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils, scheduledExecutor, consumeKeysExecutor);
+        ConsumerJava consumerJava = new ConsumerJava(
+                cConsumerJava,
+                keyUtility,
+                persistenceUtils,
+                new RuntimeStatistics(),
+                scheduledExecutor,
+                consumeKeysExecutor);
 
         consumerJava.initLMDB();
         // pre-assert
@@ -307,8 +430,8 @@ public class ConsumerJavaTest {
 
         CProducerJava cProducerJava = new CProducerJava();
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, randomForProducer);
-        ProducerJava producerJava =
-                new ProducerJava(cProducerJava, consumerJava, keyUtility, mockKeyProducer, bitHelper);
+        ProducerJava producerJava = new ProducerJava(
+                cProducerJava, consumerJava, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         try (LogCaptor logCaptor = LogCaptor.forClass(ConsumerJava.class)) {
             producerJava.produceKeys();
@@ -376,8 +499,8 @@ public class ConsumerJavaTest {
         CProducerJava cProducerJava = new CProducerJava();
         cProducerJava.batchSizeInBits = 0;
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, randomForProducer);
-        ProducerJava producerJava =
-                new ProducerJava(cProducerJava, consumerJava, keyUtility, mockKeyProducer, bitHelper);
+        ProducerJava producerJava = new ProducerJava(
+                cProducerJava, consumerJava, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         try (LogCaptor logCaptor = LogCaptor.forClass(ConsumerJava.class)) {
             logCaptor.setLogLevelToTrace();

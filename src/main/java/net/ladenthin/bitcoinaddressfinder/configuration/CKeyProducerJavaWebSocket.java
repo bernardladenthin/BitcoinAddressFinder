@@ -36,7 +36,7 @@ public class CKeyProducerJavaWebSocket extends CKeyProducerJavaReceiver {
      *
      * <p>Default: {@code 1000} ms
      */
-    public int timeout = 1000;
+    public int timeoutMillis = 1000;
     /** TCP port the WebSocket server binds to. */
     public int port = 8080;
 

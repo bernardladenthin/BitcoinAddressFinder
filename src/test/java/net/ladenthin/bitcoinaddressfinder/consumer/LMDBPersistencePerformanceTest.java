@@ -25,6 +25,7 @@ import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
+import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.statistics.Statistics;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
@@ -64,7 +65,7 @@ public class LMDBPersistencePerformanceTest {
         cConsumerJava.threads = CONSUMER_THREADS;
         cConsumerJava.queueSize = KEYS_QUEUE_SIZE;
         cConsumerJava.printStatisticsEveryNSeconds = 1;
-        cConsumerJava.delayEmptyConsumer = 1;
+        cConsumerJava.queuePollTimeoutMillis = 1;
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
         cConsumerJava.lmdbConfigurationReadOnly.addressLookupBackend = useBloomFilter
@@ -75,8 +76,13 @@ public class LMDBPersistencePerformanceTest {
 
         ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
         ExecutorService consumeKeysExecutor = Executors.newFixedThreadPool(cConsumerJava.threads);
-        ConsumerJava consumerJava =
-                new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils, scheduledExecutor, consumeKeysExecutor);
+        ConsumerJava consumerJava = new ConsumerJava(
+                cConsumerJava,
+                keyUtility,
+                persistenceUtils,
+                new RuntimeStatistics(),
+                scheduledExecutor,
+                consumeKeysExecutor);
         // Quiet ConsumerJava's class-level logger down to INFO for this perf test.
         ((ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ConsumerJava.class)).setLevel(Level.INFO);
 

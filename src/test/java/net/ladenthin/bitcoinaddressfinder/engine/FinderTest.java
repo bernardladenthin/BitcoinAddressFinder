@@ -24,7 +24,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
-import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomInstance;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandomAlgorithm;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
@@ -387,7 +387,7 @@ public class FinderTest {
         // 1. JavaRandom
         CKeyProducerJavaRandom javaRandom = new CKeyProducerJavaRandom();
         javaRandom.keyProducerId = "randomId";
-        javaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
+        javaRandom.randomAlgorithm = CKeyProducerJavaRandomAlgorithm.RANDOM_CUSTOM_SEED;
         javaRandom.customSeed = 123L;
         cFinder.keyProducerJavaRandom.add(javaRandom);
 
@@ -466,7 +466,7 @@ public class FinderTest {
     private void configureKeyProducerJavaRandom(@Nullable String keyProducerId, CFinder cFinder) {
         CKeyProducerJavaRandom cKeyProducerJavaRandom = new CKeyProducerJavaRandom();
         cKeyProducerJavaRandom.keyProducerId = keyProducerId;
-        cKeyProducerJavaRandom.keyProducerJavaRandomInstance = CKeyProducerJavaRandomInstance.RANDOM_CUSTOM_SEED;
+        cKeyProducerJavaRandom.randomAlgorithm = CKeyProducerJavaRandomAlgorithm.RANDOM_CUSTOM_SEED;
         cKeyProducerJavaRandom.customSeed = 0L;
         cFinder.keyProducerJavaRandom.add(cKeyProducerJavaRandom);
     }
@@ -487,7 +487,7 @@ public class FinderTest {
     private void configureKeyProducerJavaSocket(String keyProducerId, CFinder cFinder) {
         CKeyProducerJavaSocket socket = new CKeyProducerJavaSocket();
         socket.port = KeyProducerJavaSocketTest.findFreePort();
-        socket.timeout = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
+        socket.timeoutMillis = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
         socket.keyProducerId = keyProducerId;
         cFinder.keyProducerJavaSocket.add(socket);
     }
@@ -495,7 +495,7 @@ public class FinderTest {
     private void configureKeyProducerJavaWebSocket(String keyProducerId, CFinder cFinder) {
         CKeyProducerJavaWebSocket socket = new CKeyProducerJavaWebSocket();
         socket.port = KeyProducerJavaSocketTest.findFreePort();
-        socket.timeout = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
+        socket.timeoutMillis = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
         socket.keyProducerId = keyProducerId;
         cFinder.keyProducerJavaWebSocket.add(socket);
     }
@@ -503,7 +503,7 @@ public class FinderTest {
     private void configureKeyProducerJavaZmq(String keyProducerId, CFinder cFinder) {
         CKeyProducerJavaZmq zmq = new CKeyProducerJavaZmq();
         zmq.address = KeyProducerJavaZmqTest.findFreeZmqAddress();
-        zmq.timeout = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
+        zmq.timeoutMillis = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
         zmq.keyProducerId = keyProducerId;
         cFinder.keyProducerJavaZmq.add(zmq);
     }

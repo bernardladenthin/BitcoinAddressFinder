@@ -19,6 +19,7 @@ import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
 import net.ladenthin.bitcoinaddressfinder.OpenCLPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.OpenCLTest;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
@@ -45,8 +46,8 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL =
-                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(
+                cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         AbstractProducerTest.verifyInitProducer(producerOpenCL);
     }
@@ -65,7 +66,13 @@ public class ProducerOpenCLTest {
         ThreadPoolExecutor injectedReaderPool =
                 (ThreadPoolExecutor) Executors.newFixedThreadPool(cProducerOpenCL.maxResultReaderThreads);
         ProducerOpenCL producerOpenCL = new ProducerOpenCL(
-                cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper, injectedReaderPool);
+                cProducerOpenCL,
+                mockConsumer,
+                keyUtility,
+                mockKeyProducer,
+                bitHelper,
+                new RuntimeStatistics(),
+                injectedReaderPool);
 
         AbstractProducerTest.verifyReleaseProducer(producerOpenCL);
         assertThat(injectedReaderPool.isShutdown(), is(equalTo(Boolean.TRUE)));
@@ -81,8 +88,8 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL =
-                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(
+                cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         // pre-assert
         assertThat(producerOpenCL.isInitialized(), is(false));
@@ -105,8 +112,8 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL =
-                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(
+                cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         // act
         producerOpenCL.releaseProducer();
@@ -121,8 +128,8 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL =
-                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(
+                cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         producerOpenCL.initProducer();
 
@@ -145,8 +152,8 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL =
-                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(
+                cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         // act
         int freeThreads = producerOpenCL.getFreeThreads();
@@ -164,8 +171,8 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL =
-                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(
+                cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         producerOpenCL.initProducer();
 
@@ -185,8 +192,8 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL =
-                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(
+                cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         // act
         assertThrows(IllegalStateException.class, () -> producerOpenCL.produceKeys());
@@ -203,8 +210,8 @@ public class ProducerOpenCLTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        ProducerOpenCL producerOpenCL =
-                new ProducerOpenCL(cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(
+                cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         producerOpenCL.initProducer();
 

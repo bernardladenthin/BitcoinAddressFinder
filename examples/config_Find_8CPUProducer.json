@@ -4,49 +4,49 @@
     "keyProducerJavaRandom": [
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_1",
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "randomAlgorithm": "SECURE_RANDOM",
         "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_2",
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "randomAlgorithm": "SECURE_RANDOM",
         "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_3",
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "randomAlgorithm": "SECURE_RANDOM",
         "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_4",
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "randomAlgorithm": "SECURE_RANDOM",
         "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_5",
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "randomAlgorithm": "SECURE_RANDOM",
         "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_6",
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "randomAlgorithm": "SECURE_RANDOM",
         "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_7",
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "randomAlgorithm": "SECURE_RANDOM",
         "customSeed": 0,
         "privateKeyMaxNumBits": 256
       },
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId_8",
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "randomAlgorithm": "SECURE_RANDOM",
         "customSeed": 0,
         "privateKeyMaxNumBits": 256
       }
@@ -60,7 +60,7 @@
       },
       "printStatisticsEveryNSeconds": 10,
       "threads": 4,
-      "delayEmptyConsumer": 50,
+      "queuePollTimeoutMillis": 50,
       "queueSize": 4,
       "awaitQueueEmptySeconds": 60,
       "runtimePublicKeyCalculationCheck": false,

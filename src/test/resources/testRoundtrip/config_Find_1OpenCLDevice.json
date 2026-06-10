@@ -3,7 +3,7 @@
   "finder": {
     "keyProducerJavaRandom": [
       {
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "randomAlgorithm": "SECURE_RANDOM",
         "customSeed": 0,
         "keyProducerId": "exampleKeyProducerSecureRandomId",
         "privateKeyMaxNumBits": 256
@@ -18,7 +18,7 @@
       },
       "printStatisticsEveryNSeconds": 10,
       "threads": 8,
-      "delayEmptyConsumer": 50,
+      "queuePollTimeoutMillis": 50,
       "queueSize": 4,
       "runtimePublicKeyCalculationCheck": false,
       "enableVanity": false,

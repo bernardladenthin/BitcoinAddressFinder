@@ -21,7 +21,7 @@
     "keyProducerJavaRandom": [
       {
         "keyProducerId": "exampleKeyProducerSecureRandomId",
-        "keyProducerJavaRandomInstance": "SECURE_RANDOM",
+        "randomAlgorithm": "SECURE_RANDOM",
         "customSeed": 0,
         "privateKeyMaxNumBits": 256
       }
@@ -34,9 +34,9 @@
             "host": "localhost",
             "port": 5555,
             "mode": "SERVER",
-            "timeout": 3000,
-            "connectionRetryCount": 5,
-            "retryDelayMillisConnect": 1000
+            "timeoutMillis": 3000,
+            "connectRetryCount": 5,
+            "connectRetryDelayMillis": 1000
         }
     ],
 	"keyProducerJavaWebSocket": [
@@ -44,7 +44,7 @@
 			"keyProducerId": "exampleKeyProducerJavaWebSocket",
 			"logReceivedSecret": true,
 			"port": 8080,
-			"timeout": 1000
+			"timeoutMillis": 1000
 		}
 	],
 	"keyProducerJavaZmq": [
@@ -53,7 +53,7 @@
 			"logReceivedSecret": true,
 			"address": "tcp://127.0.0.1:5557",
 			"mode": "BIND",
-			"timeout": -1
+			"timeoutMillis": -1
 		}
 	],
     "consumerJava": {
@@ -67,7 +67,7 @@
       },
       "printStatisticsEveryNSeconds": 10,
       "threads": 8,
-      "delayEmptyConsumer": 50,
+      "queuePollTimeoutMillis": 50,
       "queueSize": 4,
       "awaitQueueEmptySeconds": 60,
       "runtimePublicKeyCalculationCheck": false,
@@ -85,7 +85,7 @@
         "maxResultReaderThreads": 4,
         "keyProducerId": "exampleKeyProducerSecureRandomId",
         "batchSizeInBits": 18,
-        "loopCount" : 4,
+        "keysPerWorkItem" : 4,
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
         "runOnce": false,

@@ -32,6 +32,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerat
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.HashSetAddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.TruncatedLong64SortedArrayPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
+import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.statistics.Statistics;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import org.apache.commons.codec.binary.Hex;
@@ -74,8 +75,39 @@ public class ConsumerJava implements Consumer {
     protected final AtomicLong checkedKeys = new AtomicLong();
     /** Cumulative time spent inside the persistence's {@code containsAddress} calls (ms). */
     protected final AtomicLong checkedKeysSumOfTimeToCheckContains = new AtomicLong();
-    /** Number of consumer iterations that found the queue empty. */
-    protected final AtomicLong emptyConsumer = new AtomicLong();
+    /**
+     * Number of consume cycles in which the consumer found no work and was therefore ready
+     * for more — the keys queue was empty for the entire wait window (nothing drained and
+     * the timed {@code poll} timed out).
+     *
+     * <p><b>A rising value is normal and healthy</b>, not a problem: an empty queue means
+     * the CPU drains everything the producers generate and has spare capacity, ready to
+     * consume the next batch immediately. For GPU scanning this counter climbing (with
+     * {@code keysQueue} near empty) is the expected operating point. It is only worth
+     * attention if you expected the producers to saturate the CPU and they do not, or if
+     * <b>nothing</b> is producing (a stalled or misconfigured producer also shows up as a
+     * consistently ready consumer, alongside zero throughput). The genuine bottleneck
+     * warning is {@link #producerBlockedCount}.
+     *
+     * <p>Counted per consumer thread; with multiple threads this is a heuristic gauge,
+     * not exact accounting.
+     */
+    protected final AtomicLong consumerReadyCount = new AtomicLong();
+    /**
+     * Number of times a producer reached a <b>full</b> keys queue when enqueuing a batch
+     * (the bounded queue had no remaining capacity, so {@code put} must block until a
+     * slot frees). A rising value means the consumer/CPU is too slow to drain what the
+     * producers generate (CPU-bound). Stays near zero when the consumer keeps up. Sampled
+     * at enqueue time across all producer threads; a heuristic gauge, not exact accounting.
+     */
+    protected final AtomicLong producerBlockedCount = new AtomicLong();
+    /**
+     * Shared runtime metrics sink. Producers write per-producer batch counts here and the
+     * statistics line reads them; also exposes the live running-producer gauge. Excluded
+     * from {@link ToString} — shared aggregate, not part of this consumer's identity.
+     */
+    @ToString.Exclude
+    protected final RuntimeStatistics runtimeStatistics;
     /** Total number of address hits found so far. */
     protected final AtomicLong hits = new AtomicLong();
     /**
@@ -167,24 +199,43 @@ public class ConsumerJava implements Consumer {
      * @param persistenceUtils persistence helper used to construct the LMDB layer
      */
     public ConsumerJava(CConsumerJava consumerJava, KeyUtility keyUtility, PersistenceUtils persistenceUtils) {
+        this(consumerJava, keyUtility, persistenceUtils, new RuntimeStatistics());
+    }
+
+    /**
+     * Production constructor that injects the shared {@link RuntimeStatistics} so the
+     * statistics line can report per-producer batch counts and the running-producer gauge.
+     *
+     * @param consumerJava     consumer configuration
+     * @param keyUtility       cryptographic helper
+     * @param persistenceUtils persistence helper used to construct the LMDB layer
+     * @param runtimeStatistics shared runtime metrics sink (also written by the producers)
+     */
+    public ConsumerJava(
+            CConsumerJava consumerJava,
+            KeyUtility keyUtility,
+            PersistenceUtils persistenceUtils,
+            RuntimeStatistics runtimeStatistics) {
         this(
                 consumerJava,
                 keyUtility,
                 persistenceUtils,
+                runtimeStatistics,
                 Executors.newSingleThreadScheduledExecutor(),
                 Executors.newFixedThreadPool(consumerJava.threads));
     }
 
     /**
-     * Test-friendly constructor that injects both executor services.
+     * Test-friendly constructor that injects the runtime metrics and both executor services.
      *
-     * <p>Production callers should use the 3-arg constructor above; this overload exists
-     * so tests can substitute their own executors and assert on post-shutdown state
+     * <p>Production callers should use the 3- or 4-arg constructors above; this overload
+     * exists so tests can substitute their own executors and assert on post-shutdown state
      * without reaching into the consumer's internal fields.
      *
      * @param consumerJava              consumer configuration
      * @param keyUtility                cryptographic helper
      * @param persistenceUtils          persistence helper used to construct the LMDB layer
+     * @param runtimeStatistics         shared runtime metrics sink
      * @param scheduledExecutorService  scheduler used for the periodic stats logger
      * @param consumeKeysExecutorService pool used for the worker threads that drain the keys queue
      */
@@ -193,12 +244,14 @@ public class ConsumerJava implements Consumer {
             CConsumerJava consumerJava,
             KeyUtility keyUtility,
             PersistenceUtils persistenceUtils,
+            RuntimeStatistics runtimeStatistics,
             ScheduledExecutorService scheduledExecutorService,
             ExecutorService consumeKeysExecutorService) {
         this.consumerJava = consumerJava;
         this.keysQueue = new LinkedBlockingQueue<>(consumerJava.queueSize);
         this.keyUtility = keyUtility;
         this.persistenceUtils = persistenceUtils;
+        this.runtimeStatistics = runtimeStatistics;
         this.scheduledExecutorService = scheduledExecutorService;
         this.consumeKeysExecutorService = consumeKeysExecutorService;
         if (consumerJava.enableVanity && consumerJava.vanityPattern != null) {
@@ -272,7 +325,11 @@ public class ConsumerJava implements Consumer {
                                     uptime,
                                     checkedKeys.get(),
                                     checkedKeysSumOfTimeToCheckContains.get(),
-                                    emptyConsumer.get(),
+                                    runtimeStatistics.batchesByProducerSnapshot(),
+                                    runtimeStatistics.getRunningProducers(),
+                                    runningConsumerCount(),
+                                    consumerReadyCount.get(),
+                                    producerBlockedCount.get(),
                                     keysQueue.size(),
                                     hits.get());
 
@@ -305,20 +362,8 @@ public class ConsumerJava implements Consumer {
                 ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
 
         while (shouldRun.get()) {
-            if (keysQueue.size() >= consumerJava.queueSize) {
-                LOGGER.warn("Attention, queue is full. Please increase queue size.");
-            }
             try {
-                consumeKeys(threadLocalReuseableByteBuffer);
-                emptyConsumer.incrementAndGet();
-                // Wait for the next batch instead of an unconditional sleep — wakes
-                // the instant a producer enqueues, eliminating up-to-
-                // delayEmptyConsumer-ms idle latency. delayEmptyConsumer is now the
-                // max idle wait window rather than a fixed back-off.
-                PublicKeyBytes[] next = keysQueue.poll(consumerJava.delayEmptyConsumer, TimeUnit.MILLISECONDS);
-                if (next != null) {
-                    processBatch(next, threadLocalReuseableByteBuffer);
-                }
+                consumeOneCycle(threadLocalReuseableByteBuffer);
             } catch (InterruptedException e) {
                 LOGGER.warn("Consumer poll loop interrupted; relying on shouldRun for shutdown.", e);
                 if (POLL_LOOP_RESTORES_INTERRUPT_FLAG) {
@@ -333,13 +378,56 @@ public class ConsumerJava implements Consumer {
         LOGGER.info("end consumeKeysRunner");
     }
 
-    void consumeKeys(ByteBuffer threadLocalReuseableByteBuffer) {
+    /**
+     * Runs a single drain-and-wait cycle of {@link #consumeKeysRunner()}: first drains
+     * every batch already queued, then waits up to {@code queuePollTimeoutMillis} for one
+     * more. A cycle is counted as <b>ready</b> (see {@link #consumerReadyCount}) when it
+     * did no work at all — nothing was drained and the timed wait returned nothing — which
+     * means the consumer emptied the queue and is ready for more work (normal/healthy; the
+     * CPU is keeping up with the producers).
+     *
+     * <p>Extracted from the run loop so the ready/idle accounting can be unit-tested
+     * directly with a pre-filled or empty queue, without spawning the consumer threads.
+     *
+     * @param threadLocalReuseableByteBuffer thread-local buffer reused across address lookups
+     * @return {@code true} if this cycle was ready for work (queue empty, no work done),
+     *     {@code false} otherwise
+     * @throws InterruptedException if the timed wait is interrupted (shutdown)
+     */
+    @VisibleForTesting
+    boolean consumeOneCycle(ByteBuffer threadLocalReuseableByteBuffer) throws InterruptedException {
+        long drained = consumeKeys(threadLocalReuseableByteBuffer);
+        // Wait for the next batch instead of an unconditional sleep — wakes the instant a
+        // producer enqueues, so queuePollTimeoutMillis is the max idle wait window per
+        // cycle, not a fixed back-off.
+        PublicKeyBytes[] next = keysQueue.poll(consumerJava.queuePollTimeoutMillis, TimeUnit.MILLISECONDS);
+        if (next != null) {
+            processBatch(next, threadLocalReuseableByteBuffer);
+        }
+        boolean readyForWork = drained == 0 && next == null;
+        if (readyForWork) {
+            consumerReadyCount.incrementAndGet();
+        }
+        return readyForWork;
+    }
+
+    /**
+     * Drains and processes every batch currently in the keys queue using non-blocking
+     * polls, returning once the queue is momentarily empty.
+     *
+     * @param threadLocalReuseableByteBuffer thread-local buffer reused across address lookups
+     * @return the number of batches drained and processed in this call
+     */
+    long consumeKeys(ByteBuffer threadLocalReuseableByteBuffer) {
         LOGGER.trace("consumeKeys");
+        long drained = 0;
         PublicKeyBytes[] publicKeyBytesArray = keysQueue.poll();
         while (publicKeyBytesArray != null) {
             processBatch(publicKeyBytesArray, threadLocalReuseableByteBuffer);
+            drained++;
             publicKeyBytesArray = keysQueue.poll();
         }
+        return drained;
     }
 
     /**
@@ -499,6 +587,12 @@ public class ConsumerJava implements Consumer {
             LOGGER.debug("keysQueue.put(publicKeyBytes) with length: " + publicKeyBytes.length);
         }
 
+        if (keysQueue.remainingCapacity() == 0) {
+            // The bounded queue is full, so the following put() will block this producer
+            // until the consumer frees a slot. A rising count means the consumer/CPU is
+            // the bottleneck (cannot drain as fast as producers generate).
+            producerBlockedCount.incrementAndGet();
+        }
         keysQueue.put(publicKeyBytes);
 
         if (LOGGER.isDebugEnabled()) {
@@ -560,5 +654,16 @@ public class ConsumerJava implements Consumer {
     @VisibleForTesting
     int keysQueueSize() {
         return keysQueue.size();
+    }
+
+    /**
+     * Counts the consumer worker threads that are still running (their {@link Future} has
+     * not completed). Surfaced in the statistics line as "Consumers running".
+     *
+     * @return the number of consumer worker threads currently running
+     */
+    @VisibleForTesting
+    long runningConsumerCount() {
+        return consumers.stream().filter(future -> !future.isDone()).count();
     }
 }

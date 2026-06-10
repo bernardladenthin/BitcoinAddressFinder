@@ -25,6 +25,7 @@ import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
 import net.ladenthin.bitcoinaddressfinder.MockConsumer;
 import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
+import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
@@ -54,8 +55,8 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl =
-                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(
+                cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         verifyInitProducer(abstractProducerTestImpl);
     }
@@ -68,8 +69,8 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl =
-                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(
+                cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         verifyReleaseProducer(abstractProducerTestImpl);
     }
@@ -96,8 +97,8 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl =
-                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(
+                cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         BigInteger secret = new BigInteger(1, Hex.decodeHex(givenSecret));
         boolean logSecretBase = true;
@@ -136,8 +137,8 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl =
-                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(
+                cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         BigInteger secret = new BigInteger(Hex.decodeHex("ABCDEF"));
         boolean logSecretBase = false;
@@ -165,8 +166,8 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl =
-                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(
+                cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         BigInteger secret = new BigInteger(Hex.decodeHex("ABCDEF"));
         boolean logSecretBase = true;
@@ -225,8 +226,8 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl =
-                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(
+                cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         // act
         assertThrows(IllegalStateException.class, () -> abstractProducerTestImpl.run());
@@ -239,8 +240,8 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        AbstractProducerTestImpl abstractProducerTestImpl =
-                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        AbstractProducerTestImpl abstractProducerTestImpl = new AbstractProducerTestImpl(
+                cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         try (LogCaptor logCaptor = LogCaptor.forClass(AbstractProducer.class)) {
             abstractProducerTestImpl.initProducer();
@@ -266,7 +267,8 @@ public class AbstractProducerTest {
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
 
         AbstractProducerTestImpl abstractProducerTestImpl =
-                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper) {
+                new AbstractProducerTestImpl(
+                        cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics()) {
                     @Override
                     public void produceKeys() {
                         throw new RuntimeException("Test exception");
@@ -295,8 +297,8 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        AbstractProducerTestImpl producer =
-                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        AbstractProducerTestImpl producer = new AbstractProducerTestImpl(
+                cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
         producer.state = ProducerState.NOT_RUNNING;
 
         Instant start = Instant.now();
@@ -313,8 +315,8 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        AbstractProducerTestImpl producer =
-                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        AbstractProducerTestImpl producer = new AbstractProducerTestImpl(
+                cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
         producer.state = ProducerState.RUNNING;
 
         CountDownLatch flipped = new CountDownLatch(1);
@@ -345,8 +347,8 @@ public class AbstractProducerTest {
         MockConsumer mockConsumer = new MockConsumer();
         Random random = new Random(1);
         MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
-        AbstractProducerTestImpl producer =
-                new AbstractProducerTestImpl(cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper);
+        AbstractProducerTestImpl producer = new AbstractProducerTestImpl(
+                cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
         producer.state = ProducerState.RUNNING;
 
         try (LogCaptor logCaptor = LogCaptor.forClass(AbstractProducer.class)) {

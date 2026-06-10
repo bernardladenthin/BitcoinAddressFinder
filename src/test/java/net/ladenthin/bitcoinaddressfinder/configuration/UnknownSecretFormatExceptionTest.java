@@ -46,13 +46,13 @@ public class UnknownSecretFormatExceptionTest {
     @Test
     public void constructor_withStringDoSha256_messageContainsFormatName() {
         // arrange
-        CSecretFormat secretFormat = CSecretFormat.STRING_DO_SHA256;
+        CSecretFormat secretFormat = CSecretFormat.STRING_SHA256;
 
         // act
         UnknownSecretFormatException exception = new UnknownSecretFormatException(secretFormat);
 
         // assert
-        assertThat(exception.getMessage(), containsString("STRING_DO_SHA256"));
+        assertThat(exception.getMessage(), containsString("STRING_SHA256"));
     }
 
     @Test

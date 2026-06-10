@@ -12,6 +12,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import net.ladenthin.bitcoinaddressfinder.consumer.Consumer;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 import net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableException;
+import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.util.PrivateKeyValidator;
@@ -27,6 +28,12 @@ import org.slf4j.LoggerFactory;
 public abstract class AbstractProducer implements Producer {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractProducer.class);
+
+    /**
+     * Class-name prefix shared by all built-in key producers; stripped to derive the short
+     * strategy label (e.g. {@code KeyProducerJavaRandom} &rarr; {@code Random}).
+     */
+    private static final String KEY_PRODUCER_CLASS_PREFIX = "KeyProducerJava";
 
     /**
      * Counted down once when {@link #run()} transitions to
@@ -79,26 +86,60 @@ public abstract class AbstractProducer implements Producer {
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
     /**
+     * Shared runtime metrics sink. Producers increment their per-producer batch counter
+     * here; the consumer's statistics line reads it. Excluded from {@link ToString} — it
+     * is a shared, mutable aggregate, not part of this producer's own identity.
+     */
+    @ToString.Exclude
+    protected final RuntimeStatistics runtimeStatistics;
+
+    /**
      * Creates a new producer with the given collaborators.
      *
-     * @param cProducer   the producer configuration
-     * @param consumer    the downstream consumer
-     * @param keyUtility  the cryptographic helper
-     * @param keyProducer the secret supplying strategy
-     * @param bitHelper   the bit/batch-size helper
+     * @param cProducer        the producer configuration
+     * @param consumer         the downstream consumer
+     * @param keyUtility       the cryptographic helper
+     * @param keyProducer      the secret supplying strategy
+     * @param bitHelper        the bit/batch-size helper
+     * @param runtimeStatistics shared runtime metrics sink for per-producer batch counts
      */
     public AbstractProducer(
             CProducer cProducer,
             Consumer consumer,
             KeyUtility keyUtility,
             KeyProducer keyProducer,
-            BitHelper bitHelper) {
+            BitHelper bitHelper,
+            RuntimeStatistics runtimeStatistics) {
         this.cProducer = cProducer;
         this.consumer = consumer;
         this.keyUtility = keyUtility;
         this.keyProducer = keyProducer;
         this.bitHelper = bitHelper;
         this.privateKeyValidator = new PrivateKeyValidator();
+        this.runtimeStatistics = runtimeStatistics;
+    }
+
+    /**
+     * Returns the compute backend of this producer, used to label its runtime statistics.
+     *
+     * @return {@link ProducerType#CPU} or {@link ProducerType#GPU}
+     */
+    protected abstract ProducerType producerType();
+
+    /**
+     * Builds the per-producer statistics label
+     * ({@code "<keyProducerId> (<Strategy>, <CPU|GPU>)"}), e.g.
+     * {@code "exampleRandom (Random, GPU)"}. The strategy is derived from the bound
+     * {@link KeyProducer} class; the backend from {@link #producerType()}.
+     *
+     * @return the label distinguishing this producer in the runtime statistics
+     */
+    protected String producerLabel() {
+        String simpleName = keyProducer.getClass().getSimpleName();
+        String strategy = simpleName.startsWith(KEY_PRODUCER_CLASS_PREFIX)
+                ? simpleName.substring(KEY_PRODUCER_CLASS_PREFIX.length())
+                : simpleName;
+        return String.valueOf(cProducer.keyProducerId) + " (" + strategy + ", " + producerType() + ")";
     }
 
     @Override
@@ -184,6 +225,7 @@ public abstract class AbstractProducer implements Producer {
     }
 
     void consumeSecrets(BigInteger... secrets) {
+        runtimeStatistics.incrementBatches(producerLabel());
         if (cProducer.batchUsePrivateKeyIncrement) {
             BigInteger secret = secrets[0];
             BigInteger secretBase = createSecretBase(secret, cProducer.logSecretBase);

@@ -93,7 +93,7 @@ public class SecretsFileTest {
         ReadStatistic readStatistic = new ReadStatistic();
         List<BigInteger[]> captured = new ArrayList<>();
         SecretsFile secretsFile =
-                new SecretsFile(network, file, CSecretFormat.STRING_DO_SHA256, readStatistic, captured::add);
+                new SecretsFile(network, file, CSecretFormat.STRING_SHA256, readStatistic, captured::add);
         // SHA256("test") = 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
         BigInteger expectedSecret =
                 new BigInteger("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", 16);

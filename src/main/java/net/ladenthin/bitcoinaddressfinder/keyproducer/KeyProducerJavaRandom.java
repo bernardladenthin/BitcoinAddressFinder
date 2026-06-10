@@ -55,7 +55,7 @@ public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRando
         // It is already thread local, no need for ThreadLocalRandom.
         // EXPLOIT for: https://cwe.mitre.org/data/definitions/338
         Random random =
-                switch (cKeyProducerJavaRandom.keyProducerJavaRandomInstance) {
+                switch (cKeyProducerJavaRandom.randomAlgorithm) {
                     case SECURE_RANDOM -> {
                         try {
                             yield SecureRandom.getInstanceStrong();
@@ -89,8 +89,8 @@ public class KeyProducerJavaRandom extends KeyProducerJava<CKeyProducerJavaRando
                         }
                     }
                     default ->
-                        throw new IllegalStateException("Unknown keyProducerJavaRandomInstance enum value: "
-                                + cKeyProducerJavaRandom.keyProducerJavaRandomInstance
+                        throw new IllegalStateException("Unknown randomAlgorithm enum value: "
+                                + cKeyProducerJavaRandom.randomAlgorithm
                                 + " (KeyProducerJavaRandom switch must be exhaustive)");
                 };
         randomSupplier = new RandomSecretSupplier(random);
