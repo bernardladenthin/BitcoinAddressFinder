@@ -106,6 +106,72 @@ pluggable-persistence design plan:
   - **Configuration shift implied.** Today `addressLookupBackend` selects the in-RAM CPU accelerator. After this work it should add a value like `GPU_ONLY` (or be replaced by a richer `consumerJava.lookupChain: [...]` config) where the operator declares "the GPU filter is the front-line; the CPU pipeline only verifies the flagged candidates against LMDB". `BLOOM` / `HASHSET` / `TRUNCATED_LONG_64` remain available for CPU-only setups or as a fallback while the GPU pipeline is still being commissioned.
   - **Why this is the right end-state.** The CPU's address-check budget today (~108 ns/op for `TRUNCATED_LONG_64`) is the only synchronisation point between the GPU's parallelism and the verification path. Moving that check to the GPU collapses the CPU contribution to "follow up on the small flagged subset" — at typical false-positive rates this is a few candidates per million derivations, well below any conceivable CPU bottleneck. The CPU then truly becomes the orchestrator (start kernels, read flagged results, verify against LMDB, log hits) rather than the rate-limiting step.
 
+### Standalone consumer (checker) service — network-fed key checking
+
+Today BAF couples key generation and address checking in one process. The idea here is the **inverse**: a dedicated checker service that owns the LMDB database, exposes a network endpoint (socket / WebSocket / ZeroMQ), and receives batches of raw private keys (or hash160 values) from external producers — which may run on a different machine, a cluster of GPUs, or a completely separate codebase.
+
+This is architecturally the mirror image of the existing `KeyProducerJavaSocket` / `KeyProducerJavaWebSocket` / `KeyProducerJavaZmq` inputs, which let external sources feed keys *into* BAF. What is missing is a mode where BAF acts purely as a **checking endpoint** — no key generation at all, just receive → derive addresses → LMDB lookup → report hits.
+
+**Why it makes sense:**
+- Separation of concerns: key generation (GPU-heavy) and address checking (DB-heavy) have different hardware profiles. Running them on separate machines lets each be optimised independently.
+- Horizontal scaling: multiple GPU nodes can feed a single checker, or a single GPU node can fan out to multiple checker replicas with sharded databases.
+- Interoperability: third-party key generators (hashcat, custom FPGA tooling, cloud spot instances) can contribute to a scan without being aware of BAF internals — they just push key bytes to a socket.
+
+**Sketch of the design:**
+- New `CCommand` value `CheckerService` (or `ConsumerService`) that starts a `ConsumerJava` wired to a network-facing key receiver instead of a local producer queue.
+- The network receiver implements `Producer` (or a new `KeySource` abstraction) and enqueues received key batches into the existing `LinkedBlockingQueue<byte[]>`. From `ConsumerJava`'s perspective nothing changes.
+- Protocol: raw binary frames of packed private keys (same layout as the existing queue entries) over TCP/WebSocket/ZMQ — no new serialisation format needed.
+- Hit reporting: existing log output is sufficient for a first version; a structured hit-callback endpoint (HTTP POST, ZMQ PUB) can be added later.
+- Configuration: `CProducerCheckerService` (mirrors `CProducerJavaSocket` shape); the checker service is just another producer config entry with `listenAddress` + `listenPort` + protocol selector.
+
+**What this is NOT:** this is not the GPU-side presence-check optimisation (pushing `TRUNCATED_LONG_64` into the OpenCL kernel). That optimisation keeps everything in one process and moves the lookup to the GPU. The checker service idea moves the lookup to a *separate process/machine*, which is the opposite trade-off — more network overhead, but full decoupling of key generation hardware from database hardware.
+
+**Prerequisite before implementing:** define the wire format for key batches (size, byte order, compressed vs uncompressed flag) so that non-BAF producers can implement it without reading BAF source. Document it in `docs/wire-protocol.md`.
+
+### Cross-platform GUI (desktop + mobile) — beginner-friendly launcher
+
+BAF is currently a CLI + JSON-config tool. Adding a minimal GUI would make it accessible to users who are not comfortable with JSON configuration files. The target experience: download one file, double-click, pick a GPU or CPU, point at the Light DB, click Start — and see a live counter of keys/second and any hits.
+
+**Scope for a first version (desktop only):**
+- 1-GPU or 1-CPU random key generator (single `producerOpenCL` or `producerJava` with `keyProducerJavaRandom`)
+- Light DB read-only check (`TRUNCATED_LONG_64` or `BLOOM` backend)
+- Live statistics panel: keys/sec, total scanned, uptime, hits
+- Start / Pause / Stop controls
+- No LMDB import/export UI — the CLI covers that; the GUI is scan-only
+
+**Cross-platform UI framework investigation (must settle this before implementing):**
+
+The choice of UI toolkit determines whether the same codebase can later reach Android.
+
+| Framework | Desktop (Win/Mac/Linux) | Android | Notes |
+|---|:---:|:---:|---|
+| **JavaFX (OpenJFX)** | ✅ | ❌ (not natively) | Standard Java desktop toolkit; good styling via CSS; ships as Maven dep (`org.openjfx`); well-documented |
+| **JavaFX + Gluon Mobile** | ✅ | ✅ | Gluon's `client-maven-plugin` cross-compiles JavaFX to Android/iOS via GraalVM Native Image; complex build matrix but same Java/JavaFX codebase throughout |
+| **Compose Multiplatform (JetBrains)** | ✅ | ✅ | Kotlin-first; supports Desktop + Android + iOS + Web from one codebase; modern declarative UI; BAF's Java core would be called from a Kotlin UI module — interop is clean |
+| **Swing** | ✅ | ❌ | Still works; ugly by default; no path to mobile; not recommended for new work |
+| **SWT** | ✅ | ❌ | Eclipse toolkit; native widgets; no mobile path |
+
+**Recommended investigation order:**
+1. **JavaFX (desktop only first)** — lowest friction: pure Java, Maven dep, no Kotlin, no native build. Delivers the desktop goal immediately. Prototype this first.
+2. **Compose Multiplatform** — if Android is a real goal, evaluate whether the Kotlin UI layer calling the Java BAF core (via a thin adapter module) is maintainable. The BAF library itself stays Java 21; only the UI module is Kotlin. This is the cleanest path to a single-source desktop + Android app.
+3. **Gluon Mobile** — only investigate if JavaFX is chosen for desktop and Android is required without rewriting the UI in Kotlin. The GraalVM Native Image build for Android is heavyweight to maintain.
+
+**Android considerations:**
+- BAF uses Java 21 features (records, sealed types, text blocks, pattern matching) which are not available on all Android versions via `d8`/`r8`. The GPU pipeline (JOCL) has no Android equivalent — the Android version would be CPU-only (`KeyProducerJavaRandom` + `ConsumerJava` with `TRUNCATED_LONG_64`).
+- A pragmatic split: ship the desktop GUI as a standalone JavaFX module; ship the Android app as a separate Kotlin + Compose module that uses a stripped-down BAF core (CPU-only, no JOCL dependency, Java 8–compatible subset or a dedicated `baf-core-android` artifact).
+- The checker-service TODO above would let the Android app act as a *remote viewer* — the heavy scanning runs on a desktop/server and the Android app displays live stats and hits over a WebSocket, without running the scan itself.
+
+**Module layout when implemented:**
+```
+BitcoinAddressFinder/
+├── baf-core/          # existing library code (producer/consumer/persistence/…)
+├── baf-cli/           # existing Main.java entry point
+├── baf-gui-desktop/   # JavaFX desktop app (new)
+└── baf-gui-android/   # Android / Compose module (new, later)
+```
+
+Until the investigation settles on a toolkit, no UI code should be added to the existing modules. Record the toolkit decision and its rationale in `docs/gui-toolkit-decision.md` before starting implementation.
+
 ### OpenCL backend abstraction & multi-device coverage (migrated from GitHub issues)
 
 - **Pluggable OpenCL backend behind a small device/library abstraction** (migrated from GitHub issue #22 "Can jogamp be used to improve OpenCL handling?"). Today the GPU layer is bound directly to **JOCL** (`org.jocl`, `jocl 2.0.6`): `opencl/OpenCLBuilder` enumerates platforms/devices via raw `org.jocl.CL` calls, `opencl/OpenCLContext` compiles/runs the kernel, `opencl/OpenClTask` sets kernel args, and `opencl/OpenCLDevice` is a hand-written value type. The goal is a **tiny internal API** (interface) for "list platforms/devices" + "build a context / run the kernel grid" so the OpenCL implementation can be **switched between backends** without touching producers/config.
