@@ -640,8 +640,13 @@ SPDX-License-Identifier: Apache-2.0
                         <reuseForks>false</reuseForks>
                         <!-- Properly include JaCoCo agent and any other injected argLine -->
                         <argLine>@{argLine}</argLine>
-                        <!-- Increase timeout to ensure long-running tests don't break -->
-                        <forkedProcessTimeoutInSeconds>60</forkedProcessTimeoutInSeconds>
+                        <!-- Whole-fork budget: with reuseForks=false this must cover JVM
+                             startup + EVERY method of one test class + JVM shutdown.
+                             60s was sporadically exceeded by socket-heavy classes
+                             (e.g. KeyProducerJavaZmqTest) on loaded Windows runners,
+                             killing the fork with "There was a timeout in the fork"
+                             even though all tests passed. -->
+                        <forkedProcessTimeoutInSeconds>180</forkedProcessTimeoutInSeconds>
                 </configuration>
             </plugin>
             <plugin>

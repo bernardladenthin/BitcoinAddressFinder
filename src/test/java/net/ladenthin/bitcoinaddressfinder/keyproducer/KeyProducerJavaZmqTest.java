@@ -8,6 +8,8 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -33,19 +35,32 @@ public class KeyProducerJavaZmqTest {
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
     private ExecutorService executorService;
+    private List<KeyProducerJavaZmq> createdProducers;
 
     @BeforeEach
     public void setup() {
         executorService = Executors.newCachedThreadPool();
+        createdProducers = new ArrayList<>();
     }
 
     @AfterEach
     public void teardown() {
         executorService.shutdownNow();
+        // Interrupt every producer created by this test — including those a test
+        // deliberately leaves un-interrupted (e.g. the timeout scenario). A leaked
+        // ZContext keeps its internal I/O threads and a bound TCP port alive, which
+        // can stall the forked JVM's shutdown and trip the Surefire fork timeout on
+        // loaded CI runners. Double-interrupting producers a test already interrupted
+        // is safe: jeromq guards Socket.close()/ZContext.close() with closed-state
+        // flags, and signalShutdown()/join() are no-ops the second time.
+        for (KeyProducerJavaZmq producer : createdProducers) {
+            producer.interrupt();
+        }
     }
 
     private KeyProducerJavaZmq createKeyProducerJavaZmq(CKeyProducerJavaZmq config) {
         KeyProducerJavaZmq producer = new KeyProducerJavaZmq(config, keyUtility, bitHelper);
+        createdProducers.add(producer);
         producer.start();
         return producer;
     }
@@ -59,9 +74,11 @@ public class KeyProducerJavaZmqTest {
         config.address = address;
         config.mode = CKeyProducerJavaZmq.Mode.BIND;
         // Block until a message arrives (or signalShutdown via interrupt() wakes us).
-        // The JUnit per-test timeout (60s) is the upper bound when something is
-        // genuinely wrong — far more reliable than racing against a fixed receiver
-        // timeout under loaded CI conditions.
+        // There is no JUnit per-test timeout in this project; the only hard upper
+        // bound is the Surefire whole-fork timeout (forkedProcessTimeoutInSeconds in
+        // pom.xml), which must cover JVM startup + ALL methods of this class +
+        // shutdown. The @AfterEach teardown interrupts every producer, so a wedged
+        // receive cannot outlive its own test.
         config.timeoutMillis = -1;
         return config;
     }

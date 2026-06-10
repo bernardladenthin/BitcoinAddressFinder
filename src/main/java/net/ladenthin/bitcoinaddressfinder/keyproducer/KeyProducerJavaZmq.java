@@ -58,6 +58,10 @@ public class KeyProducerJavaZmq extends AbstractKeyProducerQueueBuffered<CKeyPro
         }
 
         socket.setReceiveTimeOut(cKeyProducerJava.timeoutMillis);
+        // A PULL socket never has pending outbound data, but its linger value still
+        // participates in context termination. Zero guarantees the context.close()
+        // in interrupt() can never stall on linger during shutdown.
+        socket.setLinger(0);
     }
 
     /**

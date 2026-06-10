@@ -96,7 +96,7 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
                     }
                 }
 
-                if (secret == SHUTDOWN_SENTINEL) {
+                if (isShutdownSentinel(secret)) {
                     throw new NoMoreSecretsAvailableException(
                             "Shutdown sentinel received while waiting for secret at iteration " + i + "/" + length);
                 }
@@ -119,6 +119,21 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
         }
 
         return secrets;
+    }
+
+    /**
+     * Checks whether the given secret is the {@link #SHUTDOWN_SENTINEL}.
+     *
+     * <p>The sentinel is detected by reference equality (==) by design: it is a
+     * private instance that {@link #addSecret(byte[])} can never enqueue, so no
+     * received message can be mistaken for it (see the field Javadoc).
+     *
+     * @param secret the dequeued secret to check
+     * @return {@code true} if the secret is the shutdown sentinel instance
+     */
+    @SuppressWarnings("ReferenceEquality") // identity check IS the sentinel contract
+    private static boolean isShutdownSentinel(byte[] secret) {
+        return secret == SHUTDOWN_SENTINEL;
     }
 
     /**
