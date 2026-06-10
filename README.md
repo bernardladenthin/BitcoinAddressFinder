@@ -88,6 +88,7 @@ using the assigned ID:
   - [Mixed Modes](#mixed-modes)
   - [Key Range](#key-range)
   - [OpenCL Acceleration](#opencl-acceleration)
+    - [PoCL (Portable Computing Language) support](#pocl-portable-computing-language-support)
     - [Built-in Self-Test (BIST)](#built-in-self-test-bist)
     - [Performance Benchmarks](#performance-benchmarks)
 - [Logging and Runtime Statistics](#logging-and-runtime-statistics)
@@ -1167,6 +1168,10 @@ To significantly boost the performance of EC key generation, the software suppor
 A shared secret (base key) is transferred to the OpenCL device along with a predefined grid size. Each OpenCL thread independently derives a unique EC key by incrementing the base key with its thread ID. This allows the generation of a batch of EC keys in a single execution cycle. Once generated, the keys are transferred back to the host (CPU) memory for further processing.
 
 The CPU then hashes the X and Y coordinates of the public keys to derive the corresponding (Bitcoin/Altcoin) addresses. This division of labor offloads the computationally expensive elliptic curve operations to the GPU, allowing the CPU to focus on faster address hashing and database lookup operations—resulting in improved overall throughput.
+
+#### PoCL (Portable Computing Language) support
+
+The OpenCL code is compatible with and tested against [PoCL](https://github.com/pocl/pocl), an open-source, portable OpenCL implementation. PoCL lets you run the kernels without a vendor GPU driver and exposes a range of **specialized targets** (backends) that PoCL supports — for example CPU (host), CUDA, and other device backends — so you can pick the device that best fits your hardware. Select the desired PoCL device through the usual `producerOpenCL` `platformIndex` / `deviceIndex` settings (use the `OpenCLInfo` command to list the platforms and devices PoCL exposes).
 
 #### Built-in Self-Test (BIST)
 
