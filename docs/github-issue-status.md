@@ -31,11 +31,11 @@ in this pass)** and the GitHub issue then closed with a pointer.
 | 50 | JVM Crash in LMDB Native Code via lmdbjava | bug | ❓ Needs info (CI flake) | Owner's own tracking issue. Sporadic `SIGSEGV` in `mdb_txn_renew0` in **forked Surefire JVMs**, suspected JaCoCo interaction. Related to the JPMS/`--add-opens` lmdbjava handling now documented in `CLAUDE.md`. **Action:** verify whether it still reproduces on current CI; if not seen for N runs, close as not-reproducible. Mitigation idea: JaCoCo offline instrumentation / disable on the LMDB fork. |
 | 49 | create log for hits | help wanted | ✅ **Done — answered & closed** | Hits **are** logged: INFO `hit: Found the address: ` + key details (WIF) via `keyUtility.createKeyDetails(...)`, plus `hit: safe log:` and `[Hits: N]` in the statistics line; `[Hits: 0]` for weeks is expected. **Replied** (incl. routing hits to a file appender) and closed as completed (2026-06-09). |
 | 41 | Create address DB + private-key range | question | ✅ **Done — answered & closed** | Both exist. **DB:** `AddressFilesToLMDB` command (`examples/config_AddressFilesToLMDB.json`). **Range:** `keyProducerJavaIncremental` with `startPrivateKey`/`endPrivateKey` (hex), or cap entropy with `privateKeyMaxNumBits`. **Replied with both pointers** and closed as completed (2026-06-09). |
-| 39 | EXCEPTION_ACCESS_VIOLATION (Win11) | help wanted, question | ❓ Needs info | No config, no `hs_err` log, crash after ~1h. Almost certainly the same native OpenCL/driver class as #57 or a GPU memory issue. **Action:** ask for config JSON + the `hs_err_pidXXXX.log`; otherwise close as stale (2024, single comment). |
-| 36 | Nothing happens on startup | help wanted, question | ❓ Needs info (likely user setup) | Reporter ran the `.bat`, a `.txt` log was created, then nothing. Typical cause: missing/empty LMDB database, or default command `OpenCLInfo` chosen, or no GPU. **Action:** ask for the generated `.txt` log contents and the config used; otherwise close as stale (2024). |
+| 39 | EXCEPTION_ACCESS_VIOLATION (Win11) | help wanted, question | ✅ **Done — closed (assume fixed)** | Native crash (GPU/OpenCL driver, same class as #57), not Java. **Replied** (retest on current release + updated drivers; attach config + `hs_err_pid*.log` and reopen if it recurs) and closed as completed (2026-06-09). |
+| 36 | Nothing happens on startup | help wanted, question | ✅ **Done — closed (assume fixed)** | Likely still loading (LMDB stats iteration on init looks frozen on a large DB) or too little memory (`-Xmx`), or missing LMDB. **Replied** (retest; share config + `.txt` log and reopen if it persists) and closed as completed (2026-06-09). |
 | 29 | Output settings (logbackConfiguration.xml) | question | ✅ **Done — answered & closed** | The hit line is built in code (`createKeyDetails`) and already contains WIF + address; Logback can change the line layout and route hits to their own file, but can't strip the message to *only* WIF+address (that would be a code change). **Replied** accordingly and closed as completed (2026-06-09). |
 | 25 | `--illegal-access=permit` error | help wanted, question | ✅ **Done — answered & closed** | `--illegal-access=permit` was removed in Java 17; project is now **Java 21** and the shipped `run_*.bat` no longer contain it (reporter self-resolved by upgrading the JDK). **Replied** (incl. "how to tell it's working") and closed as completed (2026-06-09). |
-| 24 | not generating key | help wanted, question | ❓ Needs info (stale) | Statistics shows 0 keys checked / empty consumer — producer not feeding the queue (likely OpenCL not producing or misconfigured `keyProducerId` linkage). 14-comment thread, last 2024. **Action:** reply that producer↔`keyProducerId` wiring must match; close as stale unless reporter returns. |
+| 24 | not generating key | help wanted, question | ✅ **Done — closed (assume fixed)** | `Checked 0 M keys` + high empty-consumer count = producer not feeding the queue (producer↔`keyProducerId` mismatch, or OpenCL not producing). **Replied** (retest with corrected wiring; share config and reopen if it persists) and closed as completed (2026-06-09). |
 | 23 | "work is necessary to change life." | *(none)* | ✅ **Done — closed (not planned)** | Collaboration/"make money" solicitation, out of scope. **Commented** ("tracker is for bug reports and feature requests; closing as out of scope") and **closed as not planned** (2026-06-09). |
 | 22 | Can jogamp be used to improve OpenCL handling? | enhancement | ✅ **Done — migrated & closed** | Refined into a backend-abstraction task: step 1 define a small OpenCL device/lib API over the existing JOCL impl, step 2 wire JogAmp (`com.jogamp.opencl`) behind it as a switchable backend. **Migrated to `TODO.md`** ("OpenCL backend abstraction & multi-device coverage") and the GitHub issue **closed as completed** (2026-06-09). |
 | 18 | Statistics: add CPU/GPU batches + running counts | enhancement | ✅ **Done — implemented & closed** | **Implemented** on branch `claude/wonderful-cray-y7e9ua`: statistics line now shows a per-producer batch breakdown (`<keyProducerId> (<Strategy>, <CPU\|GPU>)`) plus `Producers running` / `Consumers running`, via `statistics/RuntimeStatistics` incremented at `AbstractProducer.consumeSecrets`; tests + README added. GitHub issue **closed as completed** (lands on `main` when the branch merges). |
@@ -48,14 +48,15 @@ in this pass)** and the GitHub issue then closed with a pointer.
 
 | Disposition | Issues | Count |
 |---|---|---|
-| ✅ **Closed on GitHub this pass** | #22, #18, #6, #63, #41, #29, #23, #57, #49, #25, #13, #10, #5 | 13 |
-| ❓ Needs info (then close stale) | #50, #39, #36, #24 | 4 |
+| ✅ **Closed on GitHub this pass** | #22, #18, #6, #63, #41, #29, #23, #57, #49, #25, #13, #10, #5, #39, #36, #24 | 16 |
+| ❓ Needs info (then close stale) | #50 | 1 |
 
-> **Update 2026-06-09:** **13 issues closed** — #22/#6 migrated to `TODO.md`, #18
-> implemented, #63/#41/#29/#49/#25/#13/#10/#5 answered/implemented, #23 closed as
-> spam, and #57 closed as an external NVIDIA-driver crash. Open-issue count
-> **17 → 4**. Remaining **4** are all the ❓ needs-info set: #50 (LMDB/CI flake),
-> #39, #36, #24 — each needs reporter/CI input before closing.
+> **Update 2026-06-09:** **16 of the 17 issues closed.** #22/#6 migrated to
+> `TODO.md`; #18 implemented; #63/#41/#29/#49/#25/#13/#10/#5 answered/implemented;
+> #23 closed as spam; #57 closed as an external NVIDIA-driver crash; #39/#36/#24
+> closed assume-fixed with retest/reopen guidance. Open-issue count **17 → 1**.
+> The only remaining issue is **#50** (owner's own LMDB/CI-flake tracking issue),
+> left open as a CI judgement call (verify whether it still reproduces).
 
 ## Recommended next pass (NOT this pass)
 
