@@ -36,7 +36,7 @@ in this pass)** and the GitHub issue then closed with a pointer.
 | 29 | Output settings (logbackConfiguration.xml) | question | ✅ **Done — answered & closed** | The hit line is built in code (`createKeyDetails`) and already contains WIF + address; Logback can change the line layout and route hits to their own file, but can't strip the message to *only* WIF+address (that would be a code change). **Replied** accordingly and closed as completed (2026-06-09). |
 | 25 | `--illegal-access=permit` error | help wanted, question | ✅ Solved | The `--illegal-access=permit` JVM flag was removed in Java 17; the project is now **Java 21** and the shipped `examples/run_*.bat` files no longer contain that flag (verified: zero matches). Reporter already self-resolved by upgrading the JDK. **Action:** confirm resolved, close. |
 | 24 | not generating key | help wanted, question | ❓ Needs info (stale) | Statistics shows 0 keys checked / empty consumer — producer not feeding the queue (likely OpenCL not producing or misconfigured `keyProducerId` linkage). 14-comment thread, last 2024. **Action:** reply that producer↔`keyProducerId` wiring must match; close as stale unless reporter returns. |
-| 23 | "work is necessary to change life." | *(none)* | 🗑 Spam / invalid | Collaboration/"make money" solicitation, not an issue. **Action:** close. |
+| 23 | "work is necessary to change life." | *(none)* | ✅ **Done — closed (not planned)** | Collaboration/"make money" solicitation, out of scope. **Commented** ("tracker is for bug reports and feature requests; closing as out of scope") and **closed as not planned** (2026-06-09). |
 | 22 | Can jogamp be used to improve OpenCL handling? | enhancement | ✅ **Done — migrated & closed** | Refined into a backend-abstraction task: step 1 define a small OpenCL device/lib API over the existing JOCL impl, step 2 wire JogAmp (`com.jogamp.opencl`) behind it as a switchable backend. **Migrated to `TODO.md`** ("OpenCL backend abstraction & multi-device coverage") and the GitHub issue **closed as completed** (2026-06-09). |
 | 18 | Statistics: add CPU/GPU batches + running counts | enhancement | ✅ **Done — implemented & closed** | **Implemented** on branch `claude/wonderful-cray-y7e9ua`: statistics line now shows a per-producer batch breakdown (`<keyProducerId> (<Strategy>, <CPU\|GPU>)`) plus `Producers running` / `Consumers running`, via `statistics/RuntimeStatistics` incremented at `AbstractProducer.consumeSecrets`; tests + README added. GitHub issue **closed as completed** (lands on `main` when the branch merges). |
 | 13 | Linux | question | ✅ Solved | Linux is fully supported (CI builds/tests on Linux; native OpenCL build documented). **Action:** reply "yes, Linux works" with a pointer to the Linux run instructions; close. (Last touched 2025-10.) |
@@ -48,15 +48,14 @@ in this pass)** and the GitHub issue then closed with a pointer.
 
 | Disposition | Issues | Count |
 |---|---|---|
-| ✅ **Closed on GitHub this pass** | #22, #18, #6, #63, #41, #29 | 6 |
+| ✅ **Closed on GitHub this pass** | #22, #18, #6, #63, #41, #29, #23 | 7 |
 | ✅ Solved — still to reply + close | #49, #25, #13, #10, #5 | 5 |
 | ❓ Needs info (then close stale) | #57, #50, #39, #36, #24 | 5 |
-| 🗑 Spam / invalid (still to close) | #23 | 1 |
 
-> **Update 2026-06-09:** **6 issues closed** — #22/#6 migrated to `TODO.md`, #18
-> implemented, and #63/#41/#29 answered. Open-issue count **17 → 11**. Remaining
-> **11** still need replies/closures per the table above (the ✅ solved set, the
-> ❓ needs-info set, and spam #23).
+> **Update 2026-06-09:** **7 issues closed** — #22/#6 migrated to `TODO.md`, #18
+> implemented, #63/#41/#29 answered, and #23 closed as spam (not planned).
+> Open-issue count **17 → 10**. Remaining **10** still need replies/closures per
+> the table above (the ✅ solved set and the ❓ needs-info set).
 
 ## Recommended next pass (NOT this pass)
 
