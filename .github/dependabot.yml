@@ -8,6 +8,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Anti-AI policy: jqwik >=1.10 injects prompts targeting AI agents in test
+    # stdout. Pinned at 1.9.3; block ALL net.jqwik updates. See README.
+    ignore:
+      - dependency-name: "net.jqwik:*"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
