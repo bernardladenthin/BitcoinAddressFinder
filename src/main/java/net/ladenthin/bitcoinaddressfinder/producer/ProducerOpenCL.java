@@ -58,6 +58,44 @@ public class ProducerOpenCL extends AbstractProducer {
     private @Nullable OpenCLContext openCLContext;
 
     /**
+     * Binary Fuse 8 filter fingerprints staged for GPU upload, or {@code null} when no GPU
+     * filter is configured for this producer. Set by the engine ({@code Finder}) via
+     * {@link #setGpuFilter} after the consumer has built the filter, and uploaded to VRAM in
+     * {@link #initProducer()} once the {@link OpenCLContext} is initialised.
+     */
+    @ToString.Exclude
+    private byte @Nullable [] gpuFilterFingerprints;
+
+    private int gpuFilterSeedLo;
+    private int gpuFilterSeedHi;
+    private int gpuFilterSegLen;
+    private int gpuFilterSegLenMask;
+    private int gpuFilterSegCountLen;
+
+    /**
+     * Stages a Binary Fuse 8 filter for upload to this producer's GPU at {@link #initProducer()}.
+     *
+     * <p>The OpenCL layer accepts only primitives, so the engine decomposes the filter's payload
+     * (seed split into low/high {@code int}s) before calling this method &mdash; the producer
+     * never depends on the persistence filter type.
+     *
+     * @param fingerprints the fingerprint slot array
+     * @param seedLo       low 32 bits of the construction seed
+     * @param seedHi       high 32 bits of the construction seed
+     * @param segLen       per-segment {@code reduce} length
+     * @param segLenMask   {@code segLen - 1}
+     * @param segCountLen  total fingerprint slot count
+     */
+    public void setGpuFilter(byte[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
+        this.gpuFilterFingerprints = fingerprints;
+        this.gpuFilterSeedLo = seedLo;
+        this.gpuFilterSeedHi = seedHi;
+        this.gpuFilterSegLen = segLen;
+        this.gpuFilterSegLenMask = segLenMask;
+        this.gpuFilterSegCountLen = segCountLen;
+    }
+
+    /**
      * Returns whether the OpenCL context has been initialised and not yet released.
      *
      * <p>The context is {@code null} both before {@link #initProducer()} and after
@@ -138,8 +176,19 @@ public class ProducerOpenCL extends AbstractProducer {
     @Override
     public void initProducer() throws Exception {
         super.initProducer();
-        openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
-        openCLContext.init();
+        OpenCLContext localOpenCLContext = new OpenCLContext(producerOpenCL, bitHelper);
+        localOpenCLContext.init();
+        final byte[] localFingerprints = gpuFilterFingerprints;
+        if (localFingerprints != null) {
+            localOpenCLContext.uploadGpuFilter(
+                    localFingerprints,
+                    gpuFilterSeedLo,
+                    gpuFilterSeedHi,
+                    gpuFilterSegLen,
+                    gpuFilterSegLenMask,
+                    gpuFilterSegCountLen);
+        }
+        openCLContext = localOpenCLContext;
     }
 
     @Override

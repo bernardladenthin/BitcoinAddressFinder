@@ -116,6 +116,53 @@ public class ConsumerJavaTest {
         }
     }
 
+    // <editor-fold defaultstate="collapsed" desc="getGpuFilterData (Step H)">
+    @Test
+    public void getGpuFilterData_binaryFuse8Backend_returnsPayload() throws Exception {
+        new LMDBPlatformAssume().assumeLMDBExecution();
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+        TestAddressesFiles testAddresses = new TestAddressesFiles(false);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
+
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        cConsumerJava.lmdbConfigurationReadOnly.addressLookupBackend =
+                net.ladenthin.bitcoinaddressfinder.configuration.AddressLookupBackend.BINARY_FUSE_8;
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        try {
+            consumerJava.initLMDB();
+            // the Binary Fuse 8 backend builds a filter, so the GPU-upload payload is present
+            assertThat(consumerJava.getGpuFilterData().isPresent(), is(true));
+            assertThat(consumerJava.getGpuFilterData().get().fingerprints().length > 0, is(true));
+        } finally {
+            consumerJava.interrupt();
+        }
+    }
+
+    @Test
+    public void getGpuFilterData_lmdbOnlyBackend_returnsEmpty() throws Exception {
+        new LMDBPlatformAssume().assumeLMDBExecution();
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+        TestAddressesFiles testAddresses = new TestAddressesFiles(false);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
+
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        cConsumerJava.lmdbConfigurationReadOnly.addressLookupBackend =
+                net.ladenthin.bitcoinaddressfinder.configuration.AddressLookupBackend.LMDB_ONLY;
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        try {
+            consumerJava.initLMDB();
+            // a non-Fuse8 backend has no GPU filter payload
+            assertThat(consumerJava.getGpuFilterData().isPresent(), is(false));
+        } finally {
+            consumerJava.interrupt();
+        }
+    }
+    // </editor-fold>
+
     // <editor-fold defaultstate="collapsed" desc="runtime health counters">
     @Test
     public void consumeOneCycle_emptyQueue_marksReadyAndIncrementsReadyCount() throws Exception {

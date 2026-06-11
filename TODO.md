@@ -246,11 +246,11 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
   - `readCompact_invalidSecretZero_returnsInvalidKeyOne` — compact entry with `work_item_index` that makes `secret = 0`; assert result is `PublicKeyBytes.INVALID_KEY_ONE`.
   - `getPublicKeyBytes_sentinelDispatch_doesNotCallCompactPath` — sentinel count must not be treated as a compact entry count.
 
-  **Step H — Integration wiring** (`consumer/ConsumerJava.java`, `engine/Finder.java`)
-  `ConsumerJava.buildLookupChain()` calls `openCLContext.uploadGpuFilter(filter)` when `enableGpuFilter = true` and backend is `BINARY_FUSE_8`. `Finder` forces `producerOpenCL.transferAll = true` when `consumerJava.enableVanity = true`, logging a warning that compact mode is disabled.
+  **Step H — Integration wiring** ✅ (`consumer/ConsumerJava.java`, `producer/ProducerOpenCL.java`, `engine/Finder.java`)
+  **Architecture note (revised wiring).** Routed through the producer instead of the consumer (the layered architecture forbids `consumer → opencl`). `ConsumerJava.getGpuFilterData()` returns the `BinaryFuse8GpuFilterData` payload when the backend is `BINARY_FUSE_8`. `Finder.configureProducer()` then (1) calls `applyVanityFullTransferOverride()` — forces `transferAll = true` on every OpenCL producer config when `consumerJava.enableVanity = true`, with a warning that compact mode is disabled — and (2) calls `uploadGpuFilterToProducers()`, which for each `enableGpuFilter` producer not in full-transfer mode reads the consumer payload, decomposes it into primitives, and calls `ProducerOpenCL.setGpuFilter(...)`. `ProducerOpenCL.initProducer()` uploads the staged filter to VRAM right after `OpenCLContext.init()`.
   Tests:
-  - `ConsumerJavaTest`: mock `OpenCLContext`; verify `uploadGpuFilter` is called when `enableGpuFilter = true`.
-  - `FinderTest`: verify `producerOpenCL.transferAll` is set to `true` when `consumerJava.enableVanity = true`, and `false` otherwise.
+  - `FinderTest`: `applyVanityFullTransferOverride` forces `transferAll = true` under vanity and leaves it `false` otherwise.
+  - `ConsumerJavaTest` (LMDB-gated): `getGpuFilterData()` returns a payload for the `BINARY_FUSE_8` backend and empty for `LMDB_ONLY`.
 
   **Step I — End-to-end integration test + example config**
   Add `OpenCLCompactOutputIntegrationTest` (skip unless GPU present via `OpenCLPlatformAssume`). All assertions are **exact** — no ± tolerances — because the test controls every address in both the filter and the batch.

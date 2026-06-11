@@ -14,6 +14,7 @@ import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.consumer.Consumer;
 import net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.core.FireAndForget;
@@ -30,6 +31,7 @@ import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocket;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaZmq;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8GpuFilterData;
 import net.ladenthin.bitcoinaddressfinder.producer.Producer;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerJava;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerJavaSecretsFiles;
@@ -233,6 +235,77 @@ public class Finder implements Interruptable {
                 (config, keyProducer) -> new ProducerOpenCL(
                         config, localConsumerJava, keyUtility, keyProducer, bitHelper, runtimeStatistics),
                 openCLProducers);
+
+        // Vanity scanning needs every derived address on the CPU, so it is mutually exclusive
+        // with the GPU compact filter mode; force full transfer first, then upload the filter
+        // only to the producers that remain in compact mode.
+        applyVanityFullTransferOverride();
+        uploadGpuFilterToProducers();
+    }
+
+    /**
+     * Forces {@code transferAll = true} on every OpenCL producer when vanity scanning is enabled,
+     * logging a warning that GPU compact filter mode is disabled.
+     *
+     * <p>Operates purely on configuration objects (it does not need the constructed producers),
+     * so it is unit-testable in isolation.
+     */
+    @VisibleForTesting
+    void applyVanityFullTransferOverride() {
+        CConsumerJava cConsumer = finder.consumerJava;
+        if (cConsumer == null || !cConsumer.enableVanity) {
+            return;
+        }
+        for (CProducerOpenCL cProducerOpenCL : finder.producerOpenCL) {
+            if (!cProducerOpenCL.transferAll) {
+                LOGGER.warn("consumerJava.enableVanity is true; forcing producerOpenCL.transferAll=true. "
+                        + "GPU compact filter mode is disabled because vanity scanning needs every derived "
+                        + "address on the CPU.");
+                cProducerOpenCL.transferAll = true;
+            }
+        }
+    }
+
+    /**
+     * Stages the consumer's Binary Fuse 8 filter on each compact-mode OpenCL producer.
+     *
+     * <p>Routed through the producer (not the consumer) to respect the layered architecture: the
+     * engine reads the filter payload from the consumer ({@code engine -> consumer/persistence}),
+     * decomposes it into primitives, and hands them to the producer
+     * ({@code engine -> producer -> opencl}). Producers with {@code enableGpuFilter = false}, or
+     * forced to full transfer (e.g. by vanity), are skipped, as is the case where the configured
+     * lookup backend did not build a Binary Fuse 8 filter.
+     */
+    private void uploadGpuFilterToProducers() {
+        ConsumerJava localConsumer = consumerJava;
+        if (localConsumer == null) {
+            return;
+        }
+        List<CProducerOpenCL> configs = finder.producerOpenCL;
+        for (int i = 0; i < openCLProducers.size(); i++) {
+            CProducerOpenCL config = configs.get(i);
+            if (!config.enableGpuFilter || config.transferAll) {
+                continue;
+            }
+            Optional<BinaryFuse8GpuFilterData> payload = localConsumer.getGpuFilterData();
+            if (payload.isEmpty()) {
+                LOGGER.warn("producerOpenCL.enableGpuFilter is true but the consumer's address-lookup backend "
+                        + "did not build a Binary Fuse 8 filter (backend must be BINARY_FUSE_8); running full "
+                        + "transfer.");
+                continue;
+            }
+            BinaryFuse8GpuFilterData data = payload.get();
+            long seed = data.seed();
+            openCLProducers
+                    .get(i)
+                    .setGpuFilter(
+                            data.fingerprints(),
+                            (int) seed,
+                            (int) (seed >>> 32),
+                            data.segmentLength(),
+                            data.segmentLengthMask(),
+                            data.segmentCountLength());
+        }
     }
 
     private <T extends CProducer, P> void processProducers(

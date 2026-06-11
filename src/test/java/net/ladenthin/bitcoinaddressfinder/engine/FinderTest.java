@@ -529,4 +529,45 @@ public class FinderTest {
             assertThat(producerStateProvider.getState(), is(equalTo(expectedProducerState)));
         }
     }
+
+    // <editor-fold defaultstate="collapsed" desc="vanity forces transferAll (Step H)">
+    @Test
+    public void applyVanityFullTransferOverride_vanityEnabled_forcesTransferAllTrue() {
+        // arrange
+        CFinder cFinder = new CFinder();
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.enableVanity = true;
+        cFinder.consumerJava = cConsumerJava;
+        CProducerOpenCL alreadyFull = new CProducerOpenCL();
+        alreadyFull.transferAll = true;
+        CProducerOpenCL compactByDefault = new CProducerOpenCL();
+        cFinder.producerOpenCL = List.of(alreadyFull, compactByDefault);
+        Finder finder = new Finder(cFinder);
+
+        // act
+        finder.applyVanityFullTransferOverride();
+
+        // assert — both producers run full transfer; compact mode is disabled under vanity
+        assertThat(alreadyFull.transferAll, is(true));
+        assertThat(compactByDefault.transferAll, is(true));
+    }
+
+    @Test
+    public void applyVanityFullTransferOverride_vanityDisabled_leavesTransferAllFalse() {
+        // arrange
+        CFinder cFinder = new CFinder();
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.enableVanity = false;
+        cFinder.consumerJava = cConsumerJava;
+        CProducerOpenCL producer = new CProducerOpenCL();
+        cFinder.producerOpenCL = List.of(producer);
+        Finder finder = new Finder(cFinder);
+
+        // act
+        finder.applyVanityFullTransferOverride();
+
+        // assert — without vanity the producer keeps its default (compact-capable) transferAll
+        assertThat(producer.transferAll, is(false));
+    }
+    // </editor-fold>
 }
