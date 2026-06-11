@@ -181,7 +181,7 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
   Add `OUTPUT_HEADER_SIZE_BYTES = 4`, `OUTPUT_COUNT_FULL_TRANSFER_SENTINEL = 0xFFFF_FFFF`, `COMPACT_ENTRY_SIZE_BYTES = 108` and per-field byte offsets (`COMPACT_ENTRY_INDEX_BYTE_OFFSET = 0`, `_X_BYTE_OFFSET = 4`, `_Y_BYTE_OFFSET = 36`, `_HASH160_UNCOMPRESSED_BYTE_OFFSET = 68`, `_HASH160_COMPRESSED_BYTE_OFFSET = 88`).
   Tests: `mvn test -Dtest=BitcoinAddressFinderArchitectureTest` (constants-only change).
 
-  **Step B — Config flags** (`configuration/CProducerOpenCL.java`)
+  **Step B — Config flags** ✅ (`configuration/CProducerOpenCL.java`)
   Add `boolean enableGpuFilter = false` and `boolean transferAll = false` with Javadoc.
   Tests: JSON round-trip test in `CProducerOpenCLTest` verifying both fields default to `false` and survive a Jackson serialise/deserialise cycle.
 
