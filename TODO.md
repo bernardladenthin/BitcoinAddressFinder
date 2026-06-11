@@ -207,7 +207,7 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
   - `isInitialized_falseBeforeInit_trueAfterInit_falseAfterRelease` — lifecycle state test including the filter upload path.
   - Plus non-GPU `toGpuFilterData_*` tests pinning the payload mirrors the getters and the empty-filter case.
 
-  **Step E — Unified output buffer: count header + per-entry work_item_index** (kernel `.cl` + `OpenClTask` + `OpenCLGridResult`)
+  **Step E — Unified output buffer: count header + per-entry work_item_index** ✅ (kernel `.cl` + `OpenClTask` + `OpenCLGridResult`)
   Migrate the existing kernel output to the single unified 108-byte entry layout. `getDstSizeInBytes()` becomes `OUTPUT_HEADER_SIZE_BYTES + OUTPUT_ENTRY_SIZE_BYTES × overallWorkSize`. Work-item 0 writes `0xFFFFFFFFu` (the full-transfer sentinel) to output[0..3]. Each work-item writes its `work_item_index` at entry offset 0, then X/Y/hash160s at the unified entry offsets (shifted by the 4-byte index field). `getPublicKeyFromByteBufferXY` reads from `OUTPUT_HEADER_SIZE_BYTES + entry × OUTPUT_ENTRY_SIZE_BYTES` using the unified `OUTPUT_ENTRY_*` offsets. `getPublicKeyBytes()` reads the count word and asserts the sentinel (compact path not yet live).
   Tests (no GPU needed — hand-crafted `ByteBuffer`):
   - `getPublicKeyBytes_sentinelCount_dispatchesToFullTransfer` — ByteBuffer with `0xFFFFFFFF` at offset 0 followed by correct 108-byte unified entries; assert correct `PublicKeyBytes` array returned.

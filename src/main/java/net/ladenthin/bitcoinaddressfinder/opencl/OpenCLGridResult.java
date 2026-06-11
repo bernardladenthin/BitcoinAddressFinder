@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder.opencl;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
@@ -92,9 +93,22 @@ public class OpenCLGridResult {
      * @return an array of {@link PublicKeyBytes} containing the reconstructed public keys.
      */
     public PublicKeyBytes[] getPublicKeyBytes() {
-        ByteBuffer readOnlyResult = result.asReadOnlyBuffer();
-        PublicKeyBytes[] publicKeys = new PublicKeyBytes[workSize];
+        // OpenCL writes u32 words (the count header and per-entry work_item_index) in the
+        // device's native little-endian order; read the view as little-endian. The X/Y/hash
+        // byte slots are copied verbatim (the kernel already produced big-endian coordinates),
+        // so the buffer order does not affect those absolute byte-range reads.
+        ByteBuffer readOnlyResult = result.asReadOnlyBuffer().order(ByteOrder.LITTLE_ENDIAN);
 
+        final int count = readOnlyResult.getInt(0);
+        if (count != OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL) {
+            // Compact mode is wired in Step G. Until then the kernel only emits the
+            // full-transfer sentinel; any other count means a layout/contract mismatch.
+            throw new IllegalStateException("Unexpected GPU output count word 0x" + Integer.toHexString(count)
+                    + "; expected full-transfer sentinel 0x"
+                    + Integer.toHexString(OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL));
+        }
+
+        PublicKeyBytes[] publicKeys = new PublicKeyBytes[workSize];
         for (int i = 0; i < workSize; i++) {
             PublicKeyBytes publicKeyBytes = getPublicKeyFromByteBufferXY(readOnlyResult, i, secretKeyBase);
             publicKeys[i] = publicKeyBytes;
@@ -150,12 +164,15 @@ public class OpenCLGridResult {
             return PublicKeyBytes.INVALID_KEY_ONE;
         }
 
-        final int keyOffsetInByteBuffer = OpenClKernelConstants.CHUNK_SIZE_NUM_BYTES * keyNumber;
+        // Unified entry: a leading 4-byte count header, then 108-byte entries whose first 4
+        // bytes are the work_item_index, followed by X/Y/hash160 at the OUTPUT_ENTRY_* offsets.
+        final int entryBaseInByteBuffer = OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES
+                + OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES * keyNumber;
 
         // Get X
         byte[] xFromBigEndian = new byte[OpenClKernelConstants.CHUNK_SIZE_00_NUM_BYTES_BIG_ENDIAN_X];
         resultBuffer.get(
-                keyOffsetInByteBuffer + OpenClKernelConstants.CHUNK_OFFSET_00_NUM_BYTES_BIG_ENDIAN_X,
+                entryBaseInByteBuffer + OpenClKernelConstants.OUTPUT_ENTRY_X_BYTE_OFFSET,
                 xFromBigEndian,
                 0,
                 xFromBigEndian.length);
@@ -163,7 +180,7 @@ public class OpenCLGridResult {
         // Get Y
         byte[] yFromBigEndian = new byte[OpenClKernelConstants.CHUNK_SIZE_01_NUM_BYTES_BIG_ENDIAN_Y];
         resultBuffer.get(
-                keyOffsetInByteBuffer + OpenClKernelConstants.CHUNK_OFFSET_01_NUM_BYTES_BIG_ENDIAN_Y,
+                entryBaseInByteBuffer + OpenClKernelConstants.OUTPUT_ENTRY_Y_BYTE_OFFSET,
                 yFromBigEndian,
                 0,
                 yFromBigEndian.length);
@@ -174,15 +191,15 @@ public class OpenCLGridResult {
         // Get RIPEMD160 for uncompressed key
         byte[] ripemd160Uncompressed = new byte[OpenClKernelConstants.CHUNK_SIZE_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED];
         resultBuffer.get(
-                keyOffsetInByteBuffer + OpenClKernelConstants.CHUNK_OFFSET_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED,
+                entryBaseInByteBuffer + OpenClKernelConstants.OUTPUT_ENTRY_HASH160_UNCOMPRESSED_BYTE_OFFSET,
                 ripemd160Uncompressed,
                 0,
                 ripemd160Uncompressed.length);
 
-        // Get RIPEMD160 for uncompressed key
+        // Get RIPEMD160 for compressed key
         byte[] ripemd160Compressed = new byte[OpenClKernelConstants.CHUNK_SIZE_11_NUM_BYTES_RIPEMD160_COMPRESSED];
         resultBuffer.get(
-                keyOffsetInByteBuffer + OpenClKernelConstants.CHUNK_OFFSET_11_NUM_BYTES_RIPEMD160_COMPRESSED,
+                entryBaseInByteBuffer + OpenClKernelConstants.OUTPUT_ENTRY_HASH160_COMPRESSED_BYTE_OFFSET,
                 ripemd160Compressed,
                 0,
                 ripemd160Compressed.length);

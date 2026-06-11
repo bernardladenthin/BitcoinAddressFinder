@@ -101,6 +101,21 @@ k_local[0] = 0x929f72dc;
 
 // ==== Total Chunk Size ====
 #define CHUNK_SIZE_NUM_WORDS                                         CHUNK_OFFSET_99_NUM_WORDS_END_OF_CHUNK
+
+// ==== Unified output buffer (ONE physical layout, two write modes) ====
+// Mirrors Java OpenClKernelConstants OUTPUT_* constants. The buffer begins with a
+// single-word count header, then fixed-stride entries that ALWAYS carry the work_item_index
+// as their first word (redundant in full-transfer mode, where entry i sits at slot i, but it
+// keeps the stride identical to compact mode). Word offsets here equal the Java byte offsets / 4.
+#define OUTPUT_HEADER_NUM_WORDS                                      1   // 4-byte count word at r[0]
+#define OUTPUT_COUNT_FULL_TRANSFER_SENTINEL                          0xFFFFFFFF
+#define OUTPUT_ENTRY_INDEX_NUM_WORDS                                 1   // work_item_index (u32)
+#define OUTPUT_ENTRY_OFFSET_INDEX                                    0
+#define OUTPUT_ENTRY_OFFSET_X                                        (OUTPUT_ENTRY_OFFSET_INDEX + OUTPUT_ENTRY_INDEX_NUM_WORDS)
+#define OUTPUT_ENTRY_OFFSET_Y                                        (OUTPUT_ENTRY_OFFSET_X + CHUNK_SIZE_00_NUM_WORDS_BIG_ENDIAN_X)
+#define OUTPUT_ENTRY_OFFSET_RIPEMD160_UNCOMPRESSED                   (OUTPUT_ENTRY_OFFSET_Y + CHUNK_SIZE_01_NUM_WORDS_BIG_ENDIAN_Y)
+#define OUTPUT_ENTRY_OFFSET_RIPEMD160_COMPRESSED                     (OUTPUT_ENTRY_OFFSET_RIPEMD160_UNCOMPRESSED + CHUNK_SIZE_10_NUM_WORDS_RIPEMD160_UNCOMPRESSED)
+#define OUTPUT_ENTRY_NUM_WORDS                                       (OUTPUT_ENTRY_OFFSET_RIPEMD160_COMPRESSED + CHUNK_SIZE_11_NUM_WORDS_RIPEMD160_COMPRESSED)
 // ==== END: SYNCHRONIZED WITH JAVA CONSTANTS ====
 
 /**
@@ -644,9 +659,20 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k, co
     copy_constant_u32_array_private_u32(x1_local, &g_precomputed.xy[G_OFFSET_X1], ONE_COORDINATE_NUM_WORDS);
     copy_constant_u32_array_private_u32(y1_local, &g_precomputed.xy[G_OFFSET_Y1], ONE_COORDINATE_NUM_WORDS);
 
+    // Full-transfer mode: work-item 0 stamps the count header with the sentinel. Every
+    // work-item writes its own entry densely at its slot below, so the reader walks workSize
+    // entries (the count is implicit). Compact mode (Step F) overwrites this header via atomic.
+    if (global_id == 0) {
+        r[0] = OUTPUT_COUNT_FULL_TRANSFER_SENTINEL;
+    }
+
     for (u32 i = 0; i < keysPerWorkItem; i++) {
         u32 loop_index = base_offset + i;
-        u32 r_offset = loop_index * CHUNK_SIZE_NUM_WORDS;
+        u32 r_offset = OUTPUT_HEADER_NUM_WORDS + loop_index * OUTPUT_ENTRY_NUM_WORDS;
+
+        // work_item_index is the first word of every entry (used by the CPU reader to derive
+        // the secret); in full-transfer mode it equals the dense slot index loop_index.
+        r[r_offset + OUTPUT_ENTRY_OFFSET_INDEX] = loop_index;
 
         // Apply variation (global_id) to LSB part of key (k[0])
         // We use bitwise OR (|) instead of addition (+) to modify the key,
@@ -673,10 +699,10 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k, co
         // create big endian
         // x
         copy_and_reverse_endianness_u32_array(x_bigEndian_local, 0, x_littleEndian_local, ONE_COORDINATE_NUM_WORDS);
-        copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_00_NUM_WORDS_BIG_ENDIAN_X],      x_bigEndian_local, CHUNK_SIZE_00_NUM_WORDS_BIG_ENDIAN_X);
+        copy_private_u32_array_global_u32(&r[r_offset + OUTPUT_ENTRY_OFFSET_X],      x_bigEndian_local, CHUNK_SIZE_00_NUM_WORDS_BIG_ENDIAN_X);
         // y
         copy_and_reverse_endianness_u32_array(y_bigEndian_local, 0, y_littleEndian_local, ONE_COORDINATE_NUM_WORDS);
-        copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_01_NUM_WORDS_BIG_ENDIAN_Y],      y_bigEndian_local, CHUNK_SIZE_01_NUM_WORDS_BIG_ENDIAN_Y);
+        copy_private_u32_array_global_u32(&r[r_offset + OUTPUT_ENTRY_OFFSET_Y],      y_bigEndian_local, CHUNK_SIZE_01_NUM_WORDS_BIG_ENDIAN_Y);
 
         // === Hash uncompressed key ===
         get_sec_bytes_uncompressed(x_bigEndian_local, y_bigEndian_local, sec_uncompressed);
@@ -688,7 +714,7 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k, co
         ripemd160_init(&ripemd_ctx_uncompressed);
         ripemd160_update_swap(&ripemd_ctx_uncompressed, ripemd160_input_uncompressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
 
-        copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_10_NUM_WORDS_RIPEMD160_UNCOMPRESSED], ripemd_ctx_uncompressed.h, RIPEMD160_HASH_NUM_WORDS);
+        copy_private_u32_array_global_u32(&r[r_offset + OUTPUT_ENTRY_OFFSET_RIPEMD160_UNCOMPRESSED], ripemd_ctx_uncompressed.h, RIPEMD160_HASH_NUM_WORDS);
 
         // === Hash compressed key ===
         #ifdef REUSE_FOR_COMPRESSED
@@ -704,6 +730,6 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k, co
         ripemd160_init(&ripemd_ctx_compressed);
         ripemd160_update_swap(&ripemd_ctx_compressed, ripemd160_input_compressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
 
-        copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_11_NUM_WORDS_RIPEMD160_COMPRESSED], ripemd_ctx_compressed.h, RIPEMD160_HASH_NUM_WORDS);
+        copy_private_u32_array_global_u32(&r[r_offset + OUTPUT_ENTRY_OFFSET_RIPEMD160_COMPRESSED], ripemd_ctx_compressed.h, RIPEMD160_HASH_NUM_WORDS);
     }
 }
