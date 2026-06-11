@@ -206,9 +206,28 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
   - `getPublicKeyFromByteBufferXY_offsetShiftedByFourBytes` — verify the first key's X bytes are at byte 4, not byte 0.
 
   **Step F — In-kernel Fuse8 check + compact output path** (kernel `.cl` file + `OpenClTask`)
-  Add 7 new kernel arguments: `fuse8_fp` buffer, `fuse8_seed_lo/hi`, `fuse8_seg_len`, `fuse8_seg_len_mask`, `fuse8_seg_count_len`, `transfer_all`. Implement `fuse8_contains()` in OpenCL C (MurmurHash3 finaliser, reduce, 3 × array reads + XOR compare). In compact mode: `atomic_add` to claim output slot; write 108-byte compact entry (X+Y+hash160s+index). Java zero-initialises counter via `clEnqueueWriteBuffer` before kernel launch.
-  **Critical**: `hash160_to_u64` in the kernel must replicate `BinaryFuse8AddressPresence.containsAddress()` key extraction exactly (`hash160.getLong(hash160.position())`). Any mismatch produces false negatives (missed balance hits).
-  Tests: GPU-only, guarded by `OpenCLPlatformAssume`; a pure-Java unit test verifying the `hash64` OpenCL C formula matches `BinaryFuse8AddressPresence.hash64()` at the Java level is feasible and should be added as a standalone `Fuse8KernelHashParity` test class.
+  Add 7 new kernel arguments: `fuse8_fp` buffer, `fuse8_seed_lo/hi`, `fuse8_seg_len`, `fuse8_seg_len_mask`, `fuse8_seg_count_len`, `transfer_all`. In compact mode: `atomic_add` to claim output slot; write 108-byte compact entry (X+Y+hash160s+index). Java zero-initialises counter via `clEnqueueWriteBuffer` before kernel launch.
+
+  **Hash strategy — MurmurHash3 finalizer (standard for XOR/fuse filters, ~20 lines total):**
+  ```c
+  static ulong murmur64(ulong h) {       // 5 lines — the entire hash primitive
+      h ^= h >> 33;
+      h *= 0xff51afd7ed558ccdUL;
+      h ^= h >> 33;
+      h *= 0xc4ceb9fe1a85ec53UL;
+      h ^= h >> 33;
+      return h;
+  }
+  // Key extraction: first 8 bytes of hash160 as big-endian uint64 — matches Java ByteBuffer.getLong(pos)
+  // h0/h1/h2 via reduce = (uint)(((ulong)(uint)ph * (ulong)seg) >> 32)  [no division]
+  // seed rotations: rotl(seed,21) and rotl(seed,42) for h1/h2 independence
+  // fingerprint: (uchar)(ph ^ (ph >> 32))
+  // XOR invariant: fp[h0]^fp[h1]^fp[h2] == fingerprint → hit
+  ```
+  **Critical**: key extraction in the kernel (`first 8 bytes of hash160 as big-endian ulong`) must match `BinaryFuse8AddressPresence.containsAddress()` exactly (`hash160.getLong(hash160.position())`). Any mismatch → false negatives (missed balance hits).
+
+  Tests:
+  - `Fuse8GpuHashParityTest` (no GPU needed — pure Java): reimplements the GPU hash logic in Java (`key = ByteBuffer.wrap(h160).getLong(0); ph = hash64(key, seed); h0 = reduce((int)ph, seg); h1 = reduce((int)hash64(key, rotl(seed,21)), seg) + seg; ...`). For 1 000 distinct hash160 inputs, asserts that this Java reimplementation agrees with `BinaryFuse8AddressPresence.containsAddress()` on every hit/miss answer. This pins the exact key-extraction + hash formula in a runnable test before any OpenCL code is written — if the formulas drift, this test fails.
 
   **Step G — Java compact-mode reader** (`opencl/OpenCLGridResult.java`)
   `getPublicKeyBytes()` dispatches on the count word: `0xFFFFFFFF` → `readFullTransfer()` (existing loop), otherwise → `readCompact(count)`. `readCompact` for each entry reads `work_item_index`, derives secret via `KeyUtility.calculateSecretKey(secretBase, index, USE_OR)`, reads X/Y/hash160u/hash160c, assembles `PublicKeyBytes` via `PublicKeyBytes.assembleUncompressedPublicKey(x, y)`.
@@ -225,7 +244,28 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
   - `FinderTest`: verify `producerOpenCL.transferAll` is set to `true` when `consumerJava.enableVanity = true`, and `false` otherwise.
 
   **Step I — End-to-end integration test + example config**
-  Add `OpenCLCompactOutputIntegrationTest` (skip unless GPU present via `OpenCLPlatformAssume`): builds Fuse8 from 5 known hash160s, runs one `createKeys()` batch whose `secretBase` produces 2 known hits, asserts `getPublicKeyBytes().length` ≈ 2 (within ±5 for FP), both returned entries pass `runtimePublicKeyCalculationCheck()`. Add `examples/config_Find_GPUFilterCompact.json`. Mark each step ✅ in this TODO as it lands.
+  Add `OpenCLCompactOutputIntegrationTest` (skip unless GPU present via `OpenCLPlatformAssume`). All assertions are **exact** — no ± tolerances — because the test controls every address in both the filter and the batch.
+
+  **Test setup (shared):** choose a fixed `secretBase` and `workSize = N` (e.g. N = 256). CPU-side, derive all N secrets `secretBase + i` for `i = 0 .. N-1` and compute their `hash160_uncompressed` + `hash160_compressed` via `KeyUtility`.
+
+  *Full-batch test — count_out == N exactly:*
+  1. Populate `BinaryFuse8AddressPresence` with all 2N hash160s (both variants for every key in the range).
+  2. Upload filter to GPU. Run kernel with `secretBase`, `workSize = N`, `transfer_all = 0`.
+  3. Assert `compact_count_out == N` — zero misses in the batch → zero false positives possible → count is provably exact, not approximate.
+  4. Assert all N returned `PublicKeyBytes` pass `runtimePublicKeyCalculationCheck()`.
+
+  *Partial-batch test — count_out is provably in [K, K+1]:*
+  1. Choose a small K (e.g. K = 3) and populate the filter with only those K hash160_uncompressed values from the range (indices 0, N/2, N-1 — spread across the batch).
+  2. Upload filter. Run same batch (workSize = N).
+  3. Assert `compact_count_out >= K` — no-FN guarantee: every inserted address must be found.
+  4. Assert `compact_count_out < N` — the batch is mostly misses.
+  5. The K returned entries whose `work_item_index` matches an inserted key must each pass `runtimePublicKeyCalculationCheck()`.
+
+  *Empty-filter test — count_out == 0:*
+  1. Upload an empty filter (0 entries). Run the batch.
+  2. Assert `compact_count_out == 0`.
+
+  Add `examples/config_Find_GPUFilterCompact.json`. Mark each step ✅ in this TODO as it lands.
 
 - **GPU-side no-false-negatives address filter with per-variant flag bitmask.** Today the GPU kernel returns raw hash160 bytes for every candidate key and the CPU calls `lookup.containsAddress(...)` twice per candidate (once for the uncompressed address, once for compressed). For large workgroup sizes this serialises the most expensive part of the pipeline on a single CPU thread. The goal is to move the address-presence filter onto the GPU so that the CPU only receives — and only queries LMDB for — the tiny subset of candidates that the GPU marked as "possibly found". The filter must satisfy the **no-false-negatives invariant**: if an address IS in the database, the GPU must always set its flag bit. False positives are acceptable — the CPU verifies any flagged candidate against LMDB and discards false positives there. This is exactly the bloom-filter contract: zero false negatives, bounded false positives.
   - **Upload the snapshot once at startup.** Right after `TruncatedLong64SortedArrayPresence.populateFrom(lmdb)` builds the 256 sorted `long[]` buckets in host RAM, copy each bucket into device global memory (`cl_mem` buffer per bucket, plus a small offset/length index). At ~8 B/entry this fits comfortably in modern GPU VRAM for any practical database size (~1.1 GB for the Light DB, ~11 GB for the Full DB; the latter may need streaming on smaller cards).
