@@ -120,7 +120,10 @@ public class OpenClKernelConstantsTest {
 
     @Test
     public void byteExact_derivedArrayCapacityBounds() {
-        assertThat(OpenClKernelConstants.MAXIMUM_CHUNK_ELEMENTS, is(20_648_881));
+        // Bound derived from the unified 108-byte entry stride minus the 4-byte header word.
+        assertThat(OpenClKernelConstants.MAXIMUM_CHUNK_ELEMENTS, is(19_884_107));
+        // BIT_COUNT must remain 24 (the grid-size cap used across the project); the unified
+        // stride does not change it.
         assertThat(OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY, is(24));
     }
 
@@ -128,11 +131,11 @@ public class OpenClKernelConstantsTest {
     public void byteExact_unifiedOutputBufferFormat() {
         assertThat(OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES, is(4));
         assertThat(OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL, is(0xFFFF_FFFF));
-        assertThat(OpenClKernelConstants.COMPACT_ENTRY_INDEX_BYTE_OFFSET, is(0));
-        assertThat(OpenClKernelConstants.COMPACT_ENTRY_X_BYTE_OFFSET, is(4));
-        assertThat(OpenClKernelConstants.COMPACT_ENTRY_Y_BYTE_OFFSET, is(36));
-        assertThat(OpenClKernelConstants.COMPACT_ENTRY_HASH160_UNCOMPRESSED_BYTE_OFFSET, is(68));
-        assertThat(OpenClKernelConstants.COMPACT_ENTRY_HASH160_COMPRESSED_BYTE_OFFSET, is(88));
-        assertThat(OpenClKernelConstants.COMPACT_ENTRY_SIZE_BYTES, is(108));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_INDEX_BYTE_OFFSET, is(0));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_X_BYTE_OFFSET, is(4));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_Y_BYTE_OFFSET, is(36));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_HASH160_UNCOMPRESSED_BYTE_OFFSET, is(68));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_HASH160_COMPRESSED_BYTE_OFFSET, is(88));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES, is(108));
     }
 }

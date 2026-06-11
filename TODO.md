@@ -171,14 +171,20 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
 
 - **GPU-side Binary Fuse 8 filter — Part 2 implementation plan (atomic steps).** Uses the CPU-side `BinaryFuse8AddressPresence` (✅ done) uploaded to GPU VRAM so the kernel checks the filter inline and transmits only hits over PCIe. Controlled by two new config flags: `enableGpuFilter` (default `false`) and `transferAll` (default `false`; forced `true` automatically when `ConsumerJava.enableVanity = true`, since vanity scanning requires all results on the CPU). Each of the 9 steps below is independently committable and must compile + pass existing tests before the next step begins.
 
-  **Unified output buffer format.** Every GPU output buffer starts with a 4-byte unsigned count word at byte offset 0. Interpretation:
-  - Count = `0xFFFFFFFF` (sentinel): full-transfer mode — N work-items follow at offsets `4 + i × 104` (existing stride, unchanged semantics).
-  - Count = K (any other value): compact mode — K entries follow at `4 + j × 108`, each `[work_item_index:4][X:32][Y:32][hash160_u:20][hash160_c:20]`.
+  **Unified output buffer format (ONE physical layout, two write modes).** There is a *single* physical output layout, used unchanged by every kernel launch — there is **not** a separate full-transfer stride. This is deliberate: two different strides (104 vs 108) would make the destination-buffer sizing bound (`MAXIMUM_CHUNK_ELEMENTS` / `BIT_COUNT_FOR_MAX_CHUNKS_ARRAY`) depend on which format is active. With one stride the bound is computed off a single true entry size and the buffer is always `OUTPUT_HEADER_SIZE_BYTES + N × OUTPUT_ENTRY_SIZE_BYTES`, which is also exactly compact mode's worst case (every candidate is a filter hit), so one allocation safely covers both modes.
 
-  CPU reconstructs `secret = KeyUtility.calculateSecretKey(secretBase, work_item_index, USE_OR)`. PCIe saving at Fuse8 FPR 0.4%: ≈ 99.6 % bandwidth reduction. The mode flag `transfer_all` is a uniform kernel argument → zero branch divergence from mode selection; only the `if (hit)` branch inside compact mode may diverge (≈ 0.4 % of work-items enter it).
+  Layout:
+  - Byte 0: a 4-byte unsigned **count word**.
+  - Byte `4 + j × 108`: entry `j`, always `[work_item_index:4][X:32][Y:32][hash160_u:20][hash160_c:20]` (108 bytes). The `work_item_index` is present in **every** entry. It is redundant in full-transfer mode (entry `i` is written at slot `i`), but carrying it keeps the stride identical to compact mode. The +4 bytes/entry costs ≈ 3.8 % PCIe in full-transfer mode only — the rare vanity/regex path, where the CPU regex dominates and the GPU is not the bottleneck.
+
+  The count word selects how the reader walks the entries:
+  - Count = `0xFFFFFFFF` (`OUTPUT_COUNT_FULL_TRANSFER_SENTINEL`): **full-transfer mode**. Every work-item is present; entry `i` is written densely at slot `i` with `work_item_index = i` (no atomics). The reader walks exactly `workSize` entries. Used when the GPU filter is disabled, or when `transfer_all` is forced (vanity/regex scanning needs every derived address on the CPU).
+  - Count = K (any other value): **compact mode**. Only the work-items whose hash160 passed the GPU Binary Fuse 8 filter wrote an entry, each claiming its slot via `atomic_add`, so the K entries appear in nondeterministic order and `work_item_index` is essential. The reader walks exactly K entries. K cannot collide with the sentinel: the grid is capped at `2^BIT_COUNT_FOR_MAX_CHUNKS_ARRAY` (= 2²⁴) work-items, far below `0xFFFFFFFF`, so even an all-hit batch (K == workSize) stays under it.
+
+  Both modes share the entry parser; they differ only in the loop bound (`workSize` vs K) and in how the count is produced (constant sentinel vs atomic counter). CPU reconstructs `secret = KeyUtility.calculateSecretKey(secretBase, work_item_index, USE_OR)` for every entry in both modes. PCIe saving at Fuse8 FPR 0.4 % (compact mode): ≈ 99.6 % bandwidth reduction. The mode flag `transfer_all` is a uniform kernel argument → zero branch divergence from mode selection; only the `if (hit)` branch inside compact mode may diverge (≈ 0.4 % of work-items enter it).
 
   **Step A — Layout constants** ✅ (`constants/OpenClKernelConstants.java`)
-  Add `OUTPUT_HEADER_SIZE_BYTES = 4`, `OUTPUT_COUNT_FULL_TRANSFER_SENTINEL = 0xFFFF_FFFF`, `COMPACT_ENTRY_SIZE_BYTES = 108` and per-field byte offsets (`COMPACT_ENTRY_INDEX_BYTE_OFFSET = 0`, `_X_BYTE_OFFSET = 4`, `_Y_BYTE_OFFSET = 36`, `_HASH160_UNCOMPRESSED_BYTE_OFFSET = 68`, `_HASH160_COMPRESSED_BYTE_OFFSET = 88`).
+  Added `OUTPUT_HEADER_SIZE_BYTES = 4`, `OUTPUT_COUNT_FULL_TRANSFER_SENTINEL = 0xFFFF_FFFF`, the unified-entry offsets (`OUTPUT_ENTRY_INDEX_BYTE_OFFSET = 0`, `_X_BYTE_OFFSET = 4`, `_Y_BYTE_OFFSET = 36`, `_HASH160_UNCOMPRESSED_BYTE_OFFSET = 68`, `_HASH160_COMPRESSED_BYTE_OFFSET = 88`) and `OUTPUT_ENTRY_SIZE_BYTES = OUTPUT_HEADER_SIZE_BYTES + CHUNK_SIZE_NUM_BYTES = 108`. `MAXIMUM_CHUNK_ELEMENTS` is derived from the unified stride (`(Integer.MAX_VALUE − 4) / 108 = 19 884 107`); `BIT_COUNT_FOR_MAX_CHUNKS_ARRAY` is unchanged at 24. (Design note: the unified single-stride layout — full transfer also carries `work_item_index` — replaces the original dual-stride 104/108 plan, so the capacity bound has a single true entry size.)
   Tests: `mvn test -Dtest=BitcoinAddressFinderArchitectureTest` (constants-only change).
 
   **Step B — Config flags** ✅ (`configuration/CProducerOpenCL.java`)
@@ -199,14 +205,14 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
   - `uploadGpuFilter_andClose_doesNotThrow` — upload a 5-entry filter, call `close()`, assert no exception.
   - `isInitialized_falseBeforeInit_trueAfterInit_falseAfterRelease` — lifecycle state test (already partially covered; extend for the filter upload path).
 
-  **Step E — 4-byte count header in output buffer** (kernel `.cl` + `OpenClTask` + `OpenCLGridResult`)
-  `getDstSizeInBytes()` grows by `OUTPUT_HEADER_SIZE_BYTES`. Work-item 0 writes `0xFFFFFFFFu` to output[0..3]. All per-work-item write offsets shift by 4. `getPublicKeyFromByteBufferXY` adds `OUTPUT_HEADER_SIZE_BYTES` to `keyOffsetInByteBuffer`. `getPublicKeyBytes()` reads count word and asserts sentinel (compact path not yet live).
+  **Step E — Unified output buffer: count header + per-entry work_item_index** (kernel `.cl` + `OpenClTask` + `OpenCLGridResult`)
+  Migrate the existing kernel output to the single unified 108-byte entry layout. `getDstSizeInBytes()` becomes `OUTPUT_HEADER_SIZE_BYTES + OUTPUT_ENTRY_SIZE_BYTES × overallWorkSize`. Work-item 0 writes `0xFFFFFFFFu` (the full-transfer sentinel) to output[0..3]. Each work-item writes its `work_item_index` at entry offset 0, then X/Y/hash160s at the unified entry offsets (shifted by the 4-byte index field). `getPublicKeyFromByteBufferXY` reads from `OUTPUT_HEADER_SIZE_BYTES + entry × OUTPUT_ENTRY_SIZE_BYTES` using the unified `OUTPUT_ENTRY_*` offsets. `getPublicKeyBytes()` reads the count word and asserts the sentinel (compact path not yet live).
   Tests (no GPU needed — hand-crafted `ByteBuffer`):
-  - `getPublicKeyBytes_sentinelCount_dispatchesToFullTransfer` — ByteBuffer with `0xFFFFFFFF` at offset 0 followed by correct 104-byte entries; assert correct `PublicKeyBytes` array returned.
-  - `getPublicKeyFromByteBufferXY_offsetShiftedByFourBytes` — verify the first key's X bytes are at byte 4, not byte 0.
+  - `getPublicKeyBytes_sentinelCount_dispatchesToFullTransfer` — ByteBuffer with `0xFFFFFFFF` at offset 0 followed by correct 108-byte unified entries; assert correct `PublicKeyBytes` array returned.
+  - `getPublicKeyFromByteBufferXY_offsetShiftedByHeaderAndIndex` — verify the first key's X bytes are at byte `4 + 4 = 8` (header + index field), not byte 0.
 
   **Step F — In-kernel Fuse8 check + compact output path** (kernel `.cl` file + `OpenClTask`)
-  Add 7 new kernel arguments: `fuse8_fp` buffer, `fuse8_seed_lo/hi`, `fuse8_seg_len`, `fuse8_seg_len_mask`, `fuse8_seg_count_len`, `transfer_all`. In compact mode: `atomic_add` to claim output slot; write 108-byte compact entry (X+Y+hash160s+index). Java zero-initialises counter via `clEnqueueWriteBuffer` before kernel launch.
+  Add 7 new kernel arguments: `fuse8_fp` buffer, `fuse8_seed_lo/hi`, `fuse8_seg_len`, `fuse8_seg_len_mask`, `fuse8_seg_count_len`, `transfer_all`. The physical entry layout is unchanged from Step E (the unified 108-byte entry); only the *write decision* changes: in compact mode (`transfer_all == 0`) a work-item writes its entry **only if** its hash160 passed the filter, claiming the slot via `atomic_add` on the count word (which starts at 0). In full-transfer mode (`transfer_all != 0`) every work-item writes its entry at its own index and work-item 0 stamps the sentinel, exactly as Step E. Java zero-initialises the count word via `clEnqueueWriteBuffer` before each kernel launch.
 
   **Hash strategy — MurmurHash3 finalizer (standard for XOR/fuse filters, ~20 lines total):**
   ```c
@@ -230,7 +236,7 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
   - `Fuse8GpuHashParityTest` (no GPU needed — pure Java): reimplements the GPU hash logic in Java (`key = ByteBuffer.wrap(h160).getLong(0); ph = hash64(key, seed); h0 = reduce((int)ph, seg); h1 = reduce((int)hash64(key, rotl(seed,21)), seg) + seg; ...`). For 1 000 distinct hash160 inputs, asserts that this Java reimplementation agrees with `BinaryFuse8AddressPresence.containsAddress()` on every hit/miss answer. This pins the exact key-extraction + hash formula in a runnable test before any OpenCL code is written — if the formulas drift, this test fails.
 
   **Step G — Java compact-mode reader** (`opencl/OpenCLGridResult.java`)
-  `getPublicKeyBytes()` dispatches on the count word: `0xFFFFFFFF` → `readFullTransfer()` (existing loop), otherwise → `readCompact(count)`. `readCompact` for each entry reads `work_item_index`, derives secret via `KeyUtility.calculateSecretKey(secretBase, index, USE_OR)`, reads X/Y/hash160u/hash160c, assembles `PublicKeyBytes` via `PublicKeyBytes.assembleUncompressedPublicKey(x, y)`.
+  `getPublicKeyBytes()` dispatches on the count word: `0xFFFFFFFF` → `readFullTransfer()` (walk `workSize` entries), otherwise → `readCompact(count)` (walk K entries). Because the entry layout is unified, both paths share the same per-entry parser: read `work_item_index` (entry offset 0), derive secret via `KeyUtility.calculateSecretKey(secretBase, index, USE_OR)`, read X/Y/hash160u/hash160c at the unified `OUTPUT_ENTRY_*` offsets, assemble `PublicKeyBytes` via `PublicKeyBytes.assembleUncompressedPublicKey(x, y)`.
   Tests (no GPU needed — hand-crafted `ByteBuffer`):
   - `readCompact_countZero_returnsEmptyArray`
   - `readCompact_countTwo_returnsCorrectSecretsAndHashes` — encode two known compact entries; assert both `PublicKeyBytes` have the expected secrets, uncompressed keys, and hash160s.
