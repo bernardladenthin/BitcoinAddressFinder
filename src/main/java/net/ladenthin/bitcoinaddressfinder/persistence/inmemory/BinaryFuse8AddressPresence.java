@@ -149,6 +149,21 @@ public final class BinaryFuse8AddressPresence implements AddressPresence {
     }
 
     /**
+     * Returns an immutable payload describing this filter for GPU VRAM upload.
+     * <p>
+     * Public bridge accessor: the engine layer reads this single object (instead of the
+     * package-private getters, which are not visible across packages) and decomposes it into
+     * the primitive arguments accepted by the OpenCL upload path. This keeps the OpenCL layer
+     * free of any dependency on this persistence type.
+     *
+     * @return the GPU-upload payload (fingerprints reference plus seed and segment metadata)
+     */
+    public BinaryFuse8GpuFilterData toGpuFilterData() {
+        return new BinaryFuse8GpuFilterData(
+                getFingerprints(), getSeed(), getSegmentLength(), getSegmentLengthMask(), getSegmentCountLength());
+    }
+
+    /**
      * Returns the fingerprint slot array, exposed for GPU VRAM upload and tests.
      * <p>
      * The reference (not a defensive copy) is returned deliberately: the array can be large

@@ -199,11 +199,13 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
   - `getFingerprints_lengthEqualsSlotCount` — assert `getFingerprints().length == slotCount()`.
   - `getters_doNotMutateFilter` — call all getters, then verify `containsAddress` still returns the same answers.
 
-  **Step D — GPU VRAM upload** (`opencl/OpenCLContext.java`)
-  New `void uploadGpuFilter(BinaryFuse8AddressPresence filter)`: extracts fingerprints + 5-int metadata (seed_lo, seed_hi, segLen, segLenMask, segCountLen) and allocates two `cl_mem` buffers with `CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR`. `close()` releases both. `ConsumerJava` calls this after `openCLContext.init()` when `enableGpuFilter = true`.
+  **Step D — GPU VRAM upload** ✅ (`opencl/OpenCLContext.java`)
+  **Architecture note (revised wiring).** The enforced layered-architecture test forbids `consumer → opencl` and `opencl → persistence`. So the upload is routed cleanly through the producer rather than the consumer: `OpenCLContext.uploadGpuFilter` takes **primitives only** (`byte[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen`) — the OpenCL layer never references the persistence filter type. `BinaryFuse8AddressPresence.toGpuFilterData()` (public) returns a `BinaryFuse8GpuFilterData` record (a persistence-package carrier) that the **engine** (`Finder`, which may access both persistence and producer) reads and decomposes into those primitives, handing them to `ProducerOpenCL`, which uploads after its `OpenCLContext.init()` (Step H).
+  `uploadGpuFilter` allocates two `cl_mem` buffers with `CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR` (the fingerprint slot array + a 5-int metadata buffer `[seedLo, seedHi, segLen, segLenMask, segCountLen]`) and retains them for kernel binding; an empty filter pads to a 1-byte fingerprint buffer (zero-size device buffers are invalid) and is detected via `segCountLen == 0`. `close()` releases both. Adds `isInitialized()`.
   Tests (skip if no OpenCL device):
-  - `uploadGpuFilter_andClose_doesNotThrow` — upload a 5-entry filter, call `close()`, assert no exception.
-  - `isInitialized_falseBeforeInit_trueAfterInit_falseAfterRelease` — lifecycle state test (already partially covered; extend for the filter upload path).
+  - `uploadGpuFilter_andClose_doesNotThrow` — build a 5-entry filter, upload its payload, call `close()`, assert no exception.
+  - `isInitialized_falseBeforeInit_trueAfterInit_falseAfterRelease` — lifecycle state test including the filter upload path.
+  - Plus non-GPU `toGpuFilterData_*` tests pinning the payload mirrors the getters and the empty-filter case.
 
   **Step E — Unified output buffer: count header + per-entry work_item_index** (kernel `.cl` + `OpenClTask` + `OpenCLGridResult`)
   Migrate the existing kernel output to the single unified 108-byte entry layout. `getDstSizeInBytes()` becomes `OUTPUT_HEADER_SIZE_BYTES + OUTPUT_ENTRY_SIZE_BYTES × overallWorkSize`. Work-item 0 writes `0xFFFFFFFFu` (the full-transfer sentinel) to output[0..3]. Each work-item writes its `work_item_index` at entry offset 0, then X/Y/hash160s at the unified entry offsets (shifted by the 4-byte index field). `getPublicKeyFromByteBufferXY` reads from `OUTPUT_HEADER_SIZE_BYTES + entry × OUTPUT_ENTRY_SIZE_BYTES` using the unified `OUTPUT_ENTRY_*` offsets. `getPublicKeyBytes()` reads the count word and asserts the sentinel (compact path not yet live).

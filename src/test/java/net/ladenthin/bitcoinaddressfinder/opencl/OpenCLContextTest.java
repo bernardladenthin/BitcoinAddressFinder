@@ -7,9 +7,16 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Stream;
 import net.ladenthin.bitcoinaddressfinder.OpenCLPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.OpenCLTest;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8AddressPresence;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8GpuFilterData;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import nl.altindag.log.LogCaptor;
 import nl.altindag.log.model.LogEvent;
@@ -18,6 +25,43 @@ import org.junit.jupiter.api.Test;
 public class OpenCLContextTest {
 
     private final BitHelper bitHelper = new BitHelper();
+
+    /** Minimal in-memory {@link AddressIterable} of 20-byte hash160 snapshots for filter builds. */
+    private static AddressIterable iterableOf(List<byte[]> entries) {
+        return new AddressIterable() {
+            @Override
+            public Stream<ByteBuffer> addresses() {
+                return entries.stream().map(ByteBuffer::wrap);
+            }
+
+            @Override
+            public long count() {
+                return entries.size();
+            }
+        };
+    }
+
+    private static AddressIterable fiveEntryFilterSource() {
+        List<byte[]> entries = new ArrayList<>();
+        for (int i = 1; i <= 5; i++) {
+            byte[] h = new byte[20];
+            h[0] = (byte) i;
+            h[4] = (byte) (i * 7);
+            entries.add(h);
+        }
+        return iterableOf(entries);
+    }
+
+    private static void uploadPayload(OpenCLContext context, BinaryFuse8GpuFilterData data) {
+        long seed = data.seed();
+        context.uploadGpuFilter(
+                data.fingerprints(),
+                (int) seed,
+                (int) (seed >>> 32),
+                data.segmentLength(),
+                data.segmentLengthMask(),
+                data.segmentCountLength());
+    }
 
     // <editor-fold defaultstate="collapsed" desc="constructor">
     @Test
@@ -57,6 +101,48 @@ public class OpenCLContextTest {
         } finally {
             openCLContext.close();
         }
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="uploadGpuFilter / isInitialized (Step D)">
+    @OpenCLTest
+    @Test
+    public void uploadGpuFilter_andClose_doesNotThrow() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+        BinaryFuse8GpuFilterData data =
+                BinaryFuse8AddressPresence.populateFrom(fiveEntryFilterSource()).toGpuFilterData();
+
+        // act + assert (no exception)
+        openCLContext.init();
+        uploadPayload(openCLContext, data);
+        openCLContext.close();
+    }
+
+    @OpenCLTest
+    @Test
+    public void isInitialized_falseBeforeInit_trueAfterInit_falseAfterRelease() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+        BinaryFuse8GpuFilterData data =
+                BinaryFuse8AddressPresence.populateFrom(fiveEntryFilterSource()).toGpuFilterData();
+
+        // assert: false before init
+        assertThat(openCLContext.isInitialized(), is(false));
+
+        // act: init + upload
+        openCLContext.init();
+        assertThat(openCLContext.isInitialized(), is(true));
+        uploadPayload(openCLContext, data);
+        assertThat(openCLContext.isInitialized(), is(true));
+
+        // act: release
+        openCLContext.close();
+        assertThat(openCLContext.isInitialized(), is(false));
     }
     // </editor-fold>
 }

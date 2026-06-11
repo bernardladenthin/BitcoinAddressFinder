@@ -273,5 +273,29 @@ class BinaryFuse8AddressPresenceTest {
     private static long rotl(long v, int r) {
         return (v << r) | (v >>> (64 - r));
     }
+
+    @Test
+    void toGpuFilterData_mirrorsGettersForGpuUpload() {
+        ListIterable src = new ListIterable();
+        for (int i = 1; i <= 15; i++) {
+            src.add(hash20(0x60, i));
+        }
+        BinaryFuse8AddressPresence presence = BinaryFuse8AddressPresence.populateFrom(src);
+
+        BinaryFuse8GpuFilterData data = presence.toGpuFilterData();
+        assertThat(data.fingerprints(), is(equalTo(presence.getFingerprints())));
+        assertThat(data.seed(), is(equalTo(presence.getSeed())));
+        assertThat(data.segmentLength(), is(equalTo(presence.getSegmentLength())));
+        assertThat(data.segmentLengthMask(), is(equalTo(presence.getSegmentLengthMask())));
+        assertThat(data.segmentCountLength(), is(equalTo(presence.getSegmentCountLength())));
+    }
+
+    @Test
+    void toGpuFilterData_emptyFilter_hasEmptyFingerprintsAndZeroCount() {
+        BinaryFuse8AddressPresence presence = BinaryFuse8AddressPresence.populateFrom(new ListIterable());
+        BinaryFuse8GpuFilterData data = presence.toGpuFilterData();
+        assertThat(data.fingerprints().length, is(equalTo(0)));
+        assertThat(data.segmentCountLength(), is(equalTo(0)));
+    }
     // </editor-fold>
 }
