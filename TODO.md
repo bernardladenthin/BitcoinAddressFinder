@@ -177,7 +177,7 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
 
   CPU reconstructs `secret = KeyUtility.calculateSecretKey(secretBase, work_item_index, USE_OR)`. PCIe saving at Fuse8 FPR 0.4%: ≈ 99.6 % bandwidth reduction. The mode flag `transfer_all` is a uniform kernel argument → zero branch divergence from mode selection; only the `if (hit)` branch inside compact mode may diverge (≈ 0.4 % of work-items enter it).
 
-  **Step A — Layout constants** (`constants/OpenClKernelConstants.java`)
+  **Step A — Layout constants** ✅ (`constants/OpenClKernelConstants.java`)
   Add `OUTPUT_HEADER_SIZE_BYTES = 4`, `OUTPUT_COUNT_FULL_TRANSFER_SENTINEL = 0xFFFF_FFFF`, `COMPACT_ENTRY_SIZE_BYTES = 108` and per-field byte offsets (`COMPACT_ENTRY_INDEX_BYTE_OFFSET = 0`, `_X_BYTE_OFFSET = 4`, `_Y_BYTE_OFFSET = 36`, `_HASH160_UNCOMPRESSED_BYTE_OFFSET = 68`, `_HASH160_COMPRESSED_BYTE_OFFSET = 88`).
   Tests: `mvn test -Dtest=BitcoinAddressFinderArchitectureTest` (constants-only change).
 

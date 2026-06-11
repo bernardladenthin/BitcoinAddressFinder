@@ -214,4 +214,42 @@ public final class OpenClKernelConstants {
      */
     public static final int BIT_COUNT_FOR_MAX_CHUNKS_ARRAY =
             MAXIMUM_CHUNK_ELEMENTS == 0 ? 0 : 32 - Integer.numberOfLeadingZeros(MAXIMUM_CHUNK_ELEMENTS - 1) - 1;
+
+    // ==== Unified GPU output buffer format (full-transfer vs compact mode) ====
+    // SYNCHRONIZED WITH OpenCL CONSTANTS — see the GPU filter kernel.
+    //
+    // Every GPU output buffer starts with a 4-byte unsigned count word at byte offset 0:
+    //   - 0xFFFFFFFF (sentinel) -> full-transfer mode: N work-items follow at
+    //     offsets OUTPUT_HEADER_SIZE_BYTES + i * CHUNK_SIZE_NUM_BYTES (the legacy 104-byte
+    //     stride, shifted by the 4-byte header).
+    //   - any other value K     -> compact mode: K entries follow at
+    //     offsets OUTPUT_HEADER_SIZE_BYTES + j * COMPACT_ENTRY_SIZE_BYTES, each entry laid
+    //     out as [work_item_index:4][X:32][Y:32][hash160_uncompressed:20][hash160_compressed:20].
+
+    /** Size in bytes of the leading unsigned count word present in every GPU output buffer. */
+    public static final int OUTPUT_HEADER_SIZE_BYTES = 4;
+
+    /**
+     * Count-word value (written as an unsigned {@code u32} on the GPU) that flags
+     * full-transfer mode. Stored here as the signed {@code int} {@code 0xFFFFFFFF}
+     * (which is {@code -1}); compare against the buffer's count word read as an {@code int}.
+     */
+    public static final int OUTPUT_COUNT_FULL_TRANSFER_SENTINEL = 0xFFFF_FFFF;
+
+    /** Byte offset of the work-item index field inside a compact-mode entry. */
+    public static final int COMPACT_ENTRY_INDEX_BYTE_OFFSET = 0;
+    /** Byte offset of the big-endian X coordinate inside a compact-mode entry. */
+    public static final int COMPACT_ENTRY_X_BYTE_OFFSET = 4;
+    /** Byte offset of the big-endian Y coordinate inside a compact-mode entry. */
+    public static final int COMPACT_ENTRY_Y_BYTE_OFFSET = 36;
+    /** Byte offset of the uncompressed-key RIPEMD-160 hash inside a compact-mode entry. */
+    public static final int COMPACT_ENTRY_HASH160_UNCOMPRESSED_BYTE_OFFSET = 68;
+    /** Byte offset of the compressed-key RIPEMD-160 hash inside a compact-mode entry. */
+    public static final int COMPACT_ENTRY_HASH160_COMPRESSED_BYTE_OFFSET = 88;
+
+    /**
+     * Total size in bytes of one compact-mode entry:
+     * {@code [work_item_index:4][X:32][Y:32][hash160_uncompressed:20][hash160_compressed:20]}.
+     */
+    public static final int COMPACT_ENTRY_SIZE_BYTES = 108;
 }
