@@ -252,8 +252,8 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
   - `FinderTest`: `applyVanityFullTransferOverride` forces `transferAll = true` under vanity and leaves it `false` otherwise.
   - `ConsumerJavaTest` (LMDB-gated): `getGpuFilterData()` returns a payload for the `BINARY_FUSE_8` backend and empty for `LMDB_ONLY`.
 
-  **Step I — End-to-end integration test + example config**
-  Add `OpenCLCompactOutputIntegrationTest` (skip unless GPU present via `OpenCLPlatformAssume`). All assertions are **exact** — no ± tolerances — because the test controls every address in both the filter and the batch.
+  **Step I — End-to-end integration test + example config** ✅
+  Added `OpenCLCompactOutputIntegrationTest`. All assertions are **exact** — no ± tolerances — because the test derives every candidate on the CPU and controls exactly which are inserted into the filter. It runs on any OpenCL 2.0+ device (the grid size is capped to the device's safe range, so a CPU OpenCL runtime such as pocl exercises the same compact path on a small batch and a GPU runs the full 256-wide batch); it self-skips when no OpenCL 2.0+ device is present. Three sub-tests: full-batch (all 2N hash160s inserted → `count == N` exactly, every returned key passes `runtimePublicKeyCalculationCheck()`); partial-batch (K=3 uncompressed hashes at indices 0/N·½/N−1 inserted → `count >= K` from the no-FN guarantee and `count < N`, with each inserted index present among the returned work-items); empty-filter (`count == 0`). Added `examples/config_Find_GPUFilterCompact.json` (BINARY_FUSE_8 backend + `enableGpuFilter: true`, `transferAll: false`).
 
   **Test setup (shared):** choose a fixed `secretBase` and `workSize = N` (e.g. N = 256). CPU-side, derive all N secrets `secretBase + i` for `i = 0 .. N-1` and compute their `hash160_uncompressed` + `hash160_compressed` via `KeyUtility`.
 
