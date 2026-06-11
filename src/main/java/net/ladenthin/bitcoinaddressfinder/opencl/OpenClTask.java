@@ -312,11 +312,22 @@ public class OpenClTask implements ReleaseCLObject {
     /**
      * Runs the OpenCL kernel for the configured batch and returns the result buffer.
      *
-     * @param kernel       the compiled OpenCL kernel
-     * @param commandQueue the OpenCL command queue
+     * <p>Binds the two GPU Binary Fuse 8 filter buffers and the {@code transfer_all} mode flag
+     * as kernel arguments, zero-initialises the output buffer's leading count word (so compact
+     * mode's {@code atomic_add} starts from zero), runs the kernel, then reads back only the
+     * bytes the kernel actually produced: in full-transfer mode the whole grid
+     * ({@code overallWorkSize} entries), in compact mode just the {@code K} hit entries the
+     * count word reports &mdash; realising the PCIe bandwidth saving.
+     *
+     * @param kernel        the compiled OpenCL kernel
+     * @param commandQueue  the OpenCL command queue
+     * @param fuse8FpMem    the GPU fingerprint slot buffer (a dummy empty filter when none is uploaded)
+     * @param fuse8MetaMem  the GPU 5-int metadata buffer {@code [seedLo, seedHi, segLen, segLenMask, segCountLen]}
+     * @param transferAll   {@code 0} for compact (filter) mode, non-zero to force full transfer
      * @return the destination buffer containing kernel results
      */
-    public ByteBuffer executeKernel(cl_kernel kernel, cl_command_queue commandQueue) {
+    public ByteBuffer executeKernel(
+            cl_kernel kernel, cl_command_queue commandQueue, cl_mem fuse8FpMem, cl_mem fuse8MetaMem, int transferAll) {
         final long dstSizeInBytes = getDstSizeInBytes();
         // Allocate a new destination buffer so that cloning after kernel execution is unnecessary
         try (final DestinationArgument destinationArgument = DestinationArgument.create(context, dstSizeInBytes)) {
@@ -349,6 +360,9 @@ public class OpenClTask implements ReleaseCLObject {
             clSetKernelArg(kernel, 0, Sizeof.cl_mem, destinationArgument.getClMemPointer());
             clSetKernelArg(kernel, 1, Sizeof.cl_mem, privateKeySourceArgument.getClMemPointer());
             clSetKernelArg(kernel, 2, Sizeof.cl_uint, Pointer.to(new int[] {keysPerWorkItem}));
+            clSetKernelArg(kernel, 3, Sizeof.cl_mem, Pointer.to(fuse8FpMem));
+            clSetKernelArg(kernel, 4, Sizeof.cl_mem, Pointer.to(fuse8MetaMem));
+            clSetKernelArg(kernel, 5, Sizeof.cl_uint, Pointer.to(new int[] {transferAll}));
 
             {
                 // write src buffer
@@ -359,6 +373,22 @@ public class OpenClTask implements ReleaseCLObject {
                         0,
                         PRIVATE_KEY_SOURCE_SIZE_IN_BYTES,
                         privateKeySourceArgument.getHostMemoryPointer(),
+                        0,
+                        null,
+                        null);
+                clFinish(commandQueue);
+            }
+            {
+                // zero-initialise the leading count word so compact mode's atomic_add starts at
+                // 0 (full mode's work-item 0 overwrites it with the sentinel).
+                final ByteBuffer zeroHeader = ByteBuffer.allocateDirect(OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES);
+                clEnqueueWriteBuffer(
+                        commandQueue,
+                        destinationArgument.getMem(),
+                        CL_TRUE,
+                        0,
+                        OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES,
+                        Pointer.to(zeroHeader),
                         0,
                         null,
                         null);
@@ -378,15 +408,36 @@ public class OpenClTask implements ReleaseCLObject {
                 }
             }
             {
-                // read the dst buffer
-                final long beforeRead = System.currentTimeMillis();
-
+                // Read back the count word first, then only the bytes the kernel produced:
+                // full mode -> overallWorkSize entries; compact mode -> K hit entries.
+                final ByteBuffer countHeader = ByteBuffer.allocateDirect(OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES)
+                        .order(ByteOrder.LITTLE_ENDIAN);
                 clEnqueueReadBuffer(
                         commandQueue,
                         destinationArgument.getMem(),
                         CL_TRUE,
                         0,
-                        dstSizeInBytes,
+                        OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES,
+                        Pointer.to(countHeader),
+                        0,
+                        null,
+                        null);
+                clFinish(commandQueue);
+
+                final int count = countHeader.getInt(0);
+                final long entriesToRead = count == OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL
+                        ? cProducer.getOverallWorkSize()
+                        : Integer.toUnsignedLong(count);
+                final long bytesToRead = OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES
+                        + entriesToRead * OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES;
+
+                final long beforeRead = System.currentTimeMillis();
+                clEnqueueReadBuffer(
+                        commandQueue,
+                        destinationArgument.getMem(),
+                        CL_TRUE,
+                        0,
+                        bytesToRead,
                         destinationArgument.getHostMemoryPointer(),
                         0,
                         null,
@@ -395,7 +446,7 @@ public class OpenClTask implements ReleaseCLObject {
 
                 final long afterRead = System.currentTimeMillis();
                 if (LOGGER.isTraceEnabled()) {
-                    LOGGER.trace("Read OpenCL data " + ((dstSizeInBytes / 1024) / 1024) + "Mb in "
+                    LOGGER.trace("Read OpenCL data " + ((bytesToRead / 1024) / 1024) + "Mb in "
                             + (afterRead - beforeRead) + "ms");
                 }
             }

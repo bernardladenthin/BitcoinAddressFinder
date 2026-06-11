@@ -138,6 +138,13 @@ public class OpenCLContext implements ReleaseCLObject {
     @ToString.Exclude
     private @Nullable cl_mem fuse8MetadataMem;
 
+    /**
+     * Whether a real GPU filter has been uploaded via {@link #uploadGpuFilter}. {@code false}
+     * means the buffers hold a dummy empty filter (allocated in {@link #init()} so the kernel
+     * arguments are always bindable) and the kernel must run in full-transfer mode.
+     */
+    private boolean gpuFilterUploaded = false;
+
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
 
     private boolean closed = false;
@@ -196,6 +203,12 @@ public class OpenCLContext implements ReleaseCLObject {
         kernel = clCreateKernel(program, KERNEL_NAME, null);
 
         openClTask = new OpenClTask(context, producerOpenCL, bitHelper, byteBufferUtility);
+
+        // Allocate a dummy empty filter so the kernel's fuse8 arguments are always bindable.
+        // uploadGpuFilter() replaces it with the real filter; until then the kernel runs in
+        // full-transfer mode (see createKeys()).
+        allocateFilterBuffers(new byte[0], 0, 0, 2, 1, 0);
+        gpuFilterUploaded = false;
     }
 
     /**
@@ -247,6 +260,12 @@ public class OpenCLContext implements ReleaseCLObject {
      * @throws IllegalStateException if the context has not been initialised
      */
     public void uploadGpuFilter(
+            byte[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
+        allocateFilterBuffers(fingerprints, seedLo, seedHi, segLen, segLenMask, segCountLen);
+        gpuFilterUploaded = true;
+    }
+
+    private void allocateFilterBuffers(
             byte[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
         final cl_context localContext = context;
         if (localContext == null || closed) {
@@ -328,9 +347,16 @@ public class OpenCLContext implements ReleaseCLObject {
         OpenClTask localOpenClTask = Objects.requireNonNull(openClTask);
         cl_kernel localKernel = Objects.requireNonNull(kernel);
         cl_command_queue localCommandQueue = Objects.requireNonNull(commandQueue);
+        cl_mem localFuse8FingerprintsMem = Objects.requireNonNull(fuse8FingerprintsMem);
+        cl_mem localFuse8MetadataMem = Objects.requireNonNull(fuse8MetadataMem);
+
+        // Compact (filter) mode only when a real filter is uploaded AND the caller did not force
+        // full transfer; otherwise run full transfer (no filter, or vanity forced transferAll).
+        final int transferAll = (producerOpenCL.transferAll || !gpuFilterUploaded) ? 1 : 0;
 
         localOpenClTask.setSrcPrivateKeyChunk(privateKeyBase);
-        ByteBuffer dstByteBuffer = localOpenClTask.executeKernel(localKernel, localCommandQueue);
+        ByteBuffer dstByteBuffer = localOpenClTask.executeKernel(
+                localKernel, localCommandQueue, localFuse8FingerprintsMem, localFuse8MetadataMem, transferAll);
 
         return new OpenCLGridResult(privateKeyBase, producerOpenCL.getOverallWorkSize(), dstByteBuffer);
     }
