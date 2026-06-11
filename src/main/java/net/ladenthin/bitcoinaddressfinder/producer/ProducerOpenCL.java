@@ -115,11 +115,12 @@ public class ProducerOpenCL extends AbstractProducer {
      * Creates a new OpenCL producer with a default fixed-size result-reader thread pool
      * sized by {@code producerOpenCL.maxResultReaderThreads}.
      *
-     * @param producerOpenCL the OpenCL producer configuration
-     * @param consumer       the downstream consumer
-     * @param keyUtility     cryptographic helper
-     * @param keyProducer    the secret supplying strategy
-     * @param bitHelper      bit/batch-size helper
+     * @param producerOpenCL    the OpenCL producer configuration
+     * @param consumer          the downstream consumer
+     * @param keyUtility        cryptographic helper
+     * @param keyProducer       the secret supplying strategy
+     * @param bitHelper         bit/batch-size helper
+     * @param runtimeStatistics shared runtime metrics sink for per-producer batch counts
      */
     public ProducerOpenCL(
             CProducerOpenCL producerOpenCL,
