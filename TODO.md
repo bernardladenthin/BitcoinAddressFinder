@@ -185,7 +185,7 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
   Add `boolean enableGpuFilter = false` and `boolean transferAll = false` with Javadoc.
   Tests: JSON round-trip test in `CProducerOpenCLTest` verifying both fields default to `false` and survive a Jackson serialise/deserialise cycle.
 
-  **Step C — BinaryFuse8 getter exposure** (`persistence/inmemory/BinaryFuse8AddressPresence.java`)
+  **Step C — BinaryFuse8 getter exposure** ✅ (`persistence/inmemory/BinaryFuse8AddressPresence.java`)
   Add package-private getters: `getFingerprints()`, `getSeed()`, `getSegmentLength()`, `getSegmentLengthMask()`, `getSegmentCountLength()`.
   Tests (new, no GPU needed):
   - `getSeed_returnsInitialSeedForFirstSuccessfulBuild` — build a small filter, verify `getSeed()` is non-zero and matches the value `containsAddress` uses internally (cross-check by building an equivalent key manually).
