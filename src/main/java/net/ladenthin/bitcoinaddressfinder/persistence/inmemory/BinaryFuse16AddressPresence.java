@@ -123,9 +123,9 @@ public final class BinaryFuse16AddressPresence implements AddressPresence {
         }
         long key = hash160.getLong(hash160.position());
         long ph = hash64(key, seed);
-        int h0 = reduce((int) hash64(key, seed),               segSize);
-        int h1 = reduce((int) hash64(key, rotl(seed, 21)),     segSize) + segSize;
-        int h2 = reduce((int) hash64(key, rotl(seed, 42)),     segSize) + 2 * segSize;
+        int h0 = reduce((int) hash64(key, seed), segSize);
+        int h1 = reduce((int) hash64(key, rotl(seed, 21)), segSize) + segSize;
+        int h2 = reduce((int) hash64(key, rotl(seed, 42)), segSize) + 2 * segSize;
         short fp = fingerprint16(ph);
         return (short) (fingerprints[h0] ^ fingerprints[h1] ^ fingerprints[h2]) == fp;
     }
@@ -217,7 +217,7 @@ public final class BinaryFuse16AddressPresence implements AddressPresence {
         for (int i = 0; i < n; i++) {
             long ph = hash64(keys[i], seed);
             primaryHashes[i] = ph;
-            int h0 = reduce((int) ph,                     segSize);
+            int h0 = reduce((int) ph, segSize);
             int h1 = reduce((int) hash64(keys[i], seed1), segSize) + segSize;
             int h2 = reduce((int) hash64(keys[i], seed2), segSize) + 2 * segSize;
             count[h0]++;
@@ -255,7 +255,7 @@ public final class BinaryFuse16AddressPresence implements AddressPresence {
             done++;
 
             long key = keys[keyIdx];
-            int h0 = reduce((int) hash64(key, seed),  segSize);
+            int h0 = reduce((int) hash64(key, seed), segSize);
             int h1 = reduce((int) hash64(key, seed1), segSize) + segSize;
             int h2 = reduce((int) hash64(key, seed2), segSize) + 2 * segSize;
 
@@ -286,7 +286,7 @@ public final class BinaryFuse16AddressPresence implements AddressPresence {
         short[] table = new short[m];
         for (int j = done - 1; j >= 0; j--) {
             long key = keys[order[j]];
-            int h0 = reduce((int) hash64(key, seed),  segSize);
+            int h0 = reduce((int) hash64(key, seed), segSize);
             int h1 = reduce((int) hash64(key, seed1), segSize) + segSize;
             int h2 = reduce((int) hash64(key, seed2), segSize) + 2 * segSize;
             int pos = alone[j];

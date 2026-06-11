@@ -18,8 +18,7 @@ class BinaryFuse16AddressPresenceTest {
 
     @Test
     void empty_doesNotContainAnything() {
-        BinaryFuse16AddressPresence presence =
-                BinaryFuse16AddressPresence.populateFrom(new ListIterable());
+        BinaryFuse16AddressPresence presence = BinaryFuse16AddressPresence.populateFrom(new ListIterable());
         assertThat(presence.containsAddress(hash20(0x42, 1)), is(false));
         assertThat(presence.slotCount(), is(equalTo(0)));
     }
@@ -156,10 +155,7 @@ class BinaryFuse16AddressPresenceTest {
     @Test
     void exactlyThreeEntries_allFound() {
         BinaryFuse16AddressPresence presence = BinaryFuse16AddressPresence.populateFrom(
-                new ListIterable()
-                        .add(hash20(0xAA, 1))
-                        .add(hash20(0xBB, 2))
-                        .add(hash20(0xCC, 3)));
+                new ListIterable().add(hash20(0xAA, 1)).add(hash20(0xBB, 2)).add(hash20(0xCC, 3)));
         assertThat(presence.containsAddress(hash20(0xAA, 1)), is(true));
         assertThat(presence.containsAddress(hash20(0xBB, 2)), is(true));
         assertThat(presence.containsAddress(hash20(0xCC, 3)), is(true));
@@ -178,10 +174,10 @@ class BinaryFuse16AddressPresenceTest {
 
     @Test
     void twoIndependentFilters_doNotShareState() {
-        BinaryFuse16AddressPresence a = BinaryFuse16AddressPresence.populateFrom(
-                new ListIterable().add(hash20(0x01, 1)));
-        BinaryFuse16AddressPresence b = BinaryFuse16AddressPresence.populateFrom(
-                new ListIterable().add(hash20(0x02, 2)));
+        BinaryFuse16AddressPresence a =
+                BinaryFuse16AddressPresence.populateFrom(new ListIterable().add(hash20(0x01, 1)));
+        BinaryFuse16AddressPresence b =
+                BinaryFuse16AddressPresence.populateFrom(new ListIterable().add(hash20(0x02, 2)));
         assertThat(a.containsAddress(hash20(0x01, 1)), is(true));
         assertThat(a.containsAddress(hash20(0x02, 2)), is(false));
         assertThat(b.containsAddress(hash20(0x02, 2)), is(true));
@@ -190,8 +186,8 @@ class BinaryFuse16AddressPresenceTest {
 
     @Test
     void idempotentLookup_sameAnswerOnRepeatedQuery() {
-        BinaryFuse16AddressPresence presence = BinaryFuse16AddressPresence.populateFrom(
-                new ListIterable().add(hash20(0x33, 99)));
+        BinaryFuse16AddressPresence presence =
+                BinaryFuse16AddressPresence.populateFrom(new ListIterable().add(hash20(0x33, 99)));
         boolean first = presence.containsAddress(hash20(0x33, 99));
         boolean second = presence.containsAddress(hash20(0x33, 99));
         assertThat(first, is(true));
@@ -200,8 +196,8 @@ class BinaryFuse16AddressPresenceTest {
 
     @Test
     void containsAddress_emptyByteBuffer_returnsFalse() {
-        BinaryFuse16AddressPresence presence = BinaryFuse16AddressPresence.populateFrom(
-                new ListIterable().add(hash20(0x10, 7)));
+        BinaryFuse16AddressPresence presence =
+                BinaryFuse16AddressPresence.populateFrom(new ListIterable().add(hash20(0x10, 7)));
         assertThat(presence.containsAddress(ByteBuffer.wrap(new byte[0])), is(false));
     }
 }

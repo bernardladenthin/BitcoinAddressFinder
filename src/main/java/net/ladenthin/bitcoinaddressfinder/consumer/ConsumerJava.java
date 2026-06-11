@@ -300,7 +300,7 @@ public class ConsumerJava implements Consumer {
             case BLOOM -> BloomFilterAccelerator.populateFrom(lmdb, lmdb, bloomFpp);
             case HASHSET -> HashSetAddressPresence.populateFrom(lmdb);
             case TRUNCATED_LONG_64 -> TruncatedLong64SortedArrayPresence.populateFrom(lmdb);
-            case BINARY_FUSE_8  -> BinaryFuse8AddressPresence.populateFrom(lmdb);
+            case BINARY_FUSE_8 -> BinaryFuse8AddressPresence.populateFrom(lmdb);
             case BINARY_FUSE_16 -> BinaryFuse16AddressPresence.populateFrom(lmdb);
         };
     }

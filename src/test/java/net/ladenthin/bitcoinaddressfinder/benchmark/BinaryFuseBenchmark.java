@@ -213,7 +213,7 @@ public class BinaryFuseBenchmark {
     private static AddressPresence buildFilter(byte[][] entries, AddressLookupBackend backend) {
         ArrayIterable iterable = new ArrayIterable(entries);
         return switch (backend) {
-            case BINARY_FUSE_8  -> BinaryFuse8AddressPresence.populateFrom(iterable);
+            case BINARY_FUSE_8 -> BinaryFuse8AddressPresence.populateFrom(iterable);
             case BINARY_FUSE_16 -> BinaryFuse16AddressPresence.populateFrom(iterable);
             default -> throw new IllegalArgumentException("Unsupported backend: " + backend);
         };

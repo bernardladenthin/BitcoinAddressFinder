@@ -18,8 +18,7 @@ class BinaryFuse8AddressPresenceTest {
 
     @Test
     void empty_doesNotContainAnything() {
-        BinaryFuse8AddressPresence presence =
-                BinaryFuse8AddressPresence.populateFrom(new ListIterable());
+        BinaryFuse8AddressPresence presence = BinaryFuse8AddressPresence.populateFrom(new ListIterable());
         assertThat(presence.containsAddress(hash20(0x42, 1)), is(false));
         assertThat(presence.slotCount(), is(equalTo(0)));
     }
@@ -148,10 +147,7 @@ class BinaryFuse8AddressPresenceTest {
     @Test
     void exactlyThreeEntries_allFound() {
         BinaryFuse8AddressPresence presence = BinaryFuse8AddressPresence.populateFrom(
-                new ListIterable()
-                        .add(hash20(0xAA, 1))
-                        .add(hash20(0xBB, 2))
-                        .add(hash20(0xCC, 3)));
+                new ListIterable().add(hash20(0xAA, 1)).add(hash20(0xBB, 2)).add(hash20(0xCC, 3)));
         assertThat(presence.containsAddress(hash20(0xAA, 1)), is(true));
         assertThat(presence.containsAddress(hash20(0xBB, 2)), is(true));
         assertThat(presence.containsAddress(hash20(0xCC, 3)), is(true));
@@ -170,10 +166,8 @@ class BinaryFuse8AddressPresenceTest {
 
     @Test
     void twoIndependentFilters_doNotShareState() {
-        BinaryFuse8AddressPresence a = BinaryFuse8AddressPresence.populateFrom(
-                new ListIterable().add(hash20(0x01, 1)));
-        BinaryFuse8AddressPresence b = BinaryFuse8AddressPresence.populateFrom(
-                new ListIterable().add(hash20(0x02, 2)));
+        BinaryFuse8AddressPresence a = BinaryFuse8AddressPresence.populateFrom(new ListIterable().add(hash20(0x01, 1)));
+        BinaryFuse8AddressPresence b = BinaryFuse8AddressPresence.populateFrom(new ListIterable().add(hash20(0x02, 2)));
         assertThat(a.containsAddress(hash20(0x01, 1)), is(true));
         assertThat(a.containsAddress(hash20(0x02, 2)), is(false));
         assertThat(b.containsAddress(hash20(0x02, 2)), is(true));
@@ -182,8 +176,8 @@ class BinaryFuse8AddressPresenceTest {
 
     @Test
     void idempotentLookup_sameAnswerOnRepeatedQuery() {
-        BinaryFuse8AddressPresence presence = BinaryFuse8AddressPresence.populateFrom(
-                new ListIterable().add(hash20(0x33, 99)));
+        BinaryFuse8AddressPresence presence =
+                BinaryFuse8AddressPresence.populateFrom(new ListIterable().add(hash20(0x33, 99)));
         boolean first = presence.containsAddress(hash20(0x33, 99));
         boolean second = presence.containsAddress(hash20(0x33, 99));
         assertThat(first, is(true));
@@ -192,8 +186,8 @@ class BinaryFuse8AddressPresenceTest {
 
     @Test
     void containsAddress_emptyByteBuffer_returnsFalse() {
-        BinaryFuse8AddressPresence presence = BinaryFuse8AddressPresence.populateFrom(
-                new ListIterable().add(hash20(0x10, 7)));
+        BinaryFuse8AddressPresence presence =
+                BinaryFuse8AddressPresence.populateFrom(new ListIterable().add(hash20(0x10, 7)));
         assertThat(presence.containsAddress(ByteBuffer.wrap(new byte[0])), is(false));
     }
 }
