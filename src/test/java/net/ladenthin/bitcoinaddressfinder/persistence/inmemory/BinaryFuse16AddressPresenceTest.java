@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder.persistence.inmemory;
 import static net.ladenthin.bitcoinaddressfinder.persistence.inmemory.InMemoryTestSupport.hash20;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThan;
 
@@ -128,5 +129,79 @@ class BinaryFuse16AddressPresenceTest {
         assertThat(BinaryFuse16AddressPresence.reduce(0, 100), is(equalTo(0)));
         assertThat(BinaryFuse16AddressPresence.reduce(Integer.MAX_VALUE, 100), is(lessThan(100)));
         assertThat(BinaryFuse16AddressPresence.reduce(-1, 100), is(lessThan(100)));
+    }
+
+    @Test
+    void hash64_isDistributed() {
+        long h1 = BinaryFuse16AddressPresence.hash64(0x1234567890ABCDEFL, 0L);
+        long h2 = BinaryFuse16AddressPresence.hash64(0x1234567890ABCDEFL, 1L);
+        assertThat(h1 == h2, is(false));
+        long h3 = BinaryFuse16AddressPresence.hash64(0L, 0L);
+        long h4 = BinaryFuse16AddressPresence.hash64(1L, 0L);
+        assertThat(h3 == h4, is(false));
+    }
+
+    @Test
+    void largePopulation_allFound() {
+        ListIterable src = new ListIterable();
+        for (int i = 1; i <= 200; i++) {
+            src.add(hash20(i % 256, i));
+        }
+        BinaryFuse16AddressPresence presence = BinaryFuse16AddressPresence.populateFrom(src);
+        for (int i = 1; i <= 200; i++) {
+            assertThat("entry " + i, presence.containsAddress(hash20(i % 256, i)), is(true));
+        }
+    }
+
+    @Test
+    void exactlyThreeEntries_allFound() {
+        BinaryFuse16AddressPresence presence = BinaryFuse16AddressPresence.populateFrom(
+                new ListIterable()
+                        .add(hash20(0xAA, 1))
+                        .add(hash20(0xBB, 2))
+                        .add(hash20(0xCC, 3)));
+        assertThat(presence.containsAddress(hash20(0xAA, 1)), is(true));
+        assertThat(presence.containsAddress(hash20(0xBB, 2)), is(true));
+        assertThat(presence.containsAddress(hash20(0xCC, 3)), is(true));
+    }
+
+    @Test
+    void slotCount_isAtLeastN() {
+        int n = 50;
+        ListIterable src = new ListIterable();
+        for (int i = 1; i <= n; i++) {
+            src.add(hash20(i % 256, i));
+        }
+        BinaryFuse16AddressPresence presence = BinaryFuse16AddressPresence.populateFrom(src);
+        assertThat(presence.slotCount(), is(greaterThanOrEqualTo(n)));
+    }
+
+    @Test
+    void twoIndependentFilters_doNotShareState() {
+        BinaryFuse16AddressPresence a = BinaryFuse16AddressPresence.populateFrom(
+                new ListIterable().add(hash20(0x01, 1)));
+        BinaryFuse16AddressPresence b = BinaryFuse16AddressPresence.populateFrom(
+                new ListIterable().add(hash20(0x02, 2)));
+        assertThat(a.containsAddress(hash20(0x01, 1)), is(true));
+        assertThat(a.containsAddress(hash20(0x02, 2)), is(false));
+        assertThat(b.containsAddress(hash20(0x02, 2)), is(true));
+        assertThat(b.containsAddress(hash20(0x01, 1)), is(false));
+    }
+
+    @Test
+    void idempotentLookup_sameAnswerOnRepeatedQuery() {
+        BinaryFuse16AddressPresence presence = BinaryFuse16AddressPresence.populateFrom(
+                new ListIterable().add(hash20(0x33, 99)));
+        boolean first = presence.containsAddress(hash20(0x33, 99));
+        boolean second = presence.containsAddress(hash20(0x33, 99));
+        assertThat(first, is(true));
+        assertThat(second, is(equalTo(first)));
+    }
+
+    @Test
+    void containsAddress_emptyByteBuffer_returnsFalse() {
+        BinaryFuse16AddressPresence presence = BinaryFuse16AddressPresence.populateFrom(
+                new ListIterable().add(hash20(0x10, 7)));
+        assertThat(presence.containsAddress(ByteBuffer.wrap(new byte[0])), is(false));
     }
 }

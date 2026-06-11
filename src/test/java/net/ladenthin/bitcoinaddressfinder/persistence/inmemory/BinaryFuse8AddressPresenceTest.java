@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder.persistence.inmemory;
 import static net.ladenthin.bitcoinaddressfinder.persistence.inmemory.InMemoryTestSupport.hash20;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThan;
 
@@ -119,5 +120,80 @@ class BinaryFuse8AddressPresenceTest {
         assertThat(BinaryFuse8AddressPresence.reduce(0, 100), is(equalTo(0)));
         assertThat(BinaryFuse8AddressPresence.reduce(Integer.MAX_VALUE, 100), is(lessThan(100)));
         assertThat(BinaryFuse8AddressPresence.reduce(-1, 100), is(lessThan(100)));
+    }
+
+    @Test
+    void fingerprint8_knownValues() {
+        // h=0: (byte)(0 ^ 0) = 0
+        assertThat(BinaryFuse8AddressPresence.fingerprint8(0L), is(equalTo((byte) 0)));
+        // h=0x0000000100000002L: h ^ (h>>>32) = 3L; (byte)3 = 3
+        assertThat(BinaryFuse8AddressPresence.fingerprint8(0x0000000100000002L), is(equalTo((byte) 3)));
+        // h=0x0000000100000100L: h ^ (h>>>32) = 0x0000000100000101L; (byte) = 1
+        // fingerprint16 of same input gives (short)0x0101 = 257 — verifies the narrowing cast matters
+        assertThat(BinaryFuse8AddressPresence.fingerprint8(0x0000000100000100L), is(equalTo((byte) 1)));
+    }
+
+    @Test
+    void largePopulation_allFound() {
+        ListIterable src = new ListIterable();
+        for (int i = 1; i <= 200; i++) {
+            src.add(hash20(i % 256, i));
+        }
+        BinaryFuse8AddressPresence presence = BinaryFuse8AddressPresence.populateFrom(src);
+        for (int i = 1; i <= 200; i++) {
+            assertThat("entry " + i, presence.containsAddress(hash20(i % 256, i)), is(true));
+        }
+    }
+
+    @Test
+    void exactlyThreeEntries_allFound() {
+        BinaryFuse8AddressPresence presence = BinaryFuse8AddressPresence.populateFrom(
+                new ListIterable()
+                        .add(hash20(0xAA, 1))
+                        .add(hash20(0xBB, 2))
+                        .add(hash20(0xCC, 3)));
+        assertThat(presence.containsAddress(hash20(0xAA, 1)), is(true));
+        assertThat(presence.containsAddress(hash20(0xBB, 2)), is(true));
+        assertThat(presence.containsAddress(hash20(0xCC, 3)), is(true));
+    }
+
+    @Test
+    void slotCount_isAtLeastN() {
+        int n = 50;
+        ListIterable src = new ListIterable();
+        for (int i = 1; i <= n; i++) {
+            src.add(hash20(i % 256, i));
+        }
+        BinaryFuse8AddressPresence presence = BinaryFuse8AddressPresence.populateFrom(src);
+        assertThat(presence.slotCount(), is(greaterThanOrEqualTo(n)));
+    }
+
+    @Test
+    void twoIndependentFilters_doNotShareState() {
+        BinaryFuse8AddressPresence a = BinaryFuse8AddressPresence.populateFrom(
+                new ListIterable().add(hash20(0x01, 1)));
+        BinaryFuse8AddressPresence b = BinaryFuse8AddressPresence.populateFrom(
+                new ListIterable().add(hash20(0x02, 2)));
+        assertThat(a.containsAddress(hash20(0x01, 1)), is(true));
+        assertThat(a.containsAddress(hash20(0x02, 2)), is(false));
+        assertThat(b.containsAddress(hash20(0x02, 2)), is(true));
+        assertThat(b.containsAddress(hash20(0x01, 1)), is(false));
+    }
+
+    @Test
+    void idempotentLookup_sameAnswerOnRepeatedQuery() {
+        BinaryFuse8AddressPresence presence = BinaryFuse8AddressPresence.populateFrom(
+                new ListIterable().add(hash20(0x33, 99)));
+        boolean first = presence.containsAddress(hash20(0x33, 99));
+        boolean second = presence.containsAddress(hash20(0x33, 99));
+        assertThat(first, is(true));
+        assertThat(second, is(equalTo(first)));
+    }
+
+    @Test
+    void containsAddress_emptyByteBuffer_returnsFalse() {
+        BinaryFuse8AddressPresence presence = BinaryFuse8AddressPresence.populateFrom(
+                new ListIterable().add(hash20(0x10, 7)));
+        assertThat(presence.containsAddress(ByteBuffer.wrap(new byte[0])), is(false));
     }
 }
