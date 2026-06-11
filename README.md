@@ -275,6 +275,8 @@ Supported values:
 | `BLOOM`             | ~80 MB – ~1.5 GB (FPP)  | fast for misses      | yes              | when LMDB must stay open and most queries miss the database                             |
 | `HASHSET`           | ~80 B / entry           | fast                 | **no**           | small databases where memory is plentiful and exact lookup is required by callers       |
 | `TRUNCATED_LONG_64` | **~8 B / entry**        | **near HASHSET**     | **no**           | **recommended default for any in-RAM choice** — best memory/latency trade-off           |
+| `BINARY_FUSE_8`     | **~1.3 B / entry**      | **fast**             | **no**           | ultra-low RAM with 0.4% false-positive rate (LMDB fallback); closes LMDB after load    |
+| `BINARY_FUSE_16`    | **~2.6 B / entry**      | **fast**             | **no**           | 0.0015% false-positive rate — use when 0.4% LMDB fallback cost is measurable           |
 
 #### Memory footprint per backend across the published database tiers
 
@@ -285,6 +287,8 @@ Supported values:
 | `HASHSET`           | ~8.0 GB                     | ~10 GB                   | ~110 GB ❌                |
 | `TRUNCATED_LONG_64` | **~0.8 GB**                 | **~1.1 GB**              | **~11 GB**                |
 | `BLOOM` (FPP 0.01)  | ~120 MB                     | ~150 MB                  | ~1.6 GB                   |
+| `BINARY_FUSE_8`     | **~130 MB**                 | **~172 MB**              | **~1.8 GB**               |
+| `BINARY_FUSE_16`    | ~260 MB                     | ~343 MB                  | ~3.6 GB                   |
 
 #### Self-contained snapshots release the LMDB env
 
@@ -302,26 +306,56 @@ hash160 is the output of SHA-256 followed by RIPEMD-160 and is cryptographically
 - **JDK intrinsic**: `Arrays.binarySearch(long[], long)` is heavily JIT-optimised and produces branchless comparisons on modern CPUs.
 - **No boxing**, no per-entry object header, no pointer chasing — every comparison is a single CPU instruction.
 
-#### Benchmark numbers
+#### Binary Fuse Filters — probabilistic presence with no false negatives
 
-`AddressLookupBenchmarkTest` writes 2048 random hash160 entries into LMDB, then runs 200,000 random lookups against each backend (50,000 dropped for JIT warmup, same query sequence used for every backend so the comparison is apples-to-apples). Sample numbers from one workstation run — **relative ordering** is the architecturally interesting part; absolute values vary by machine, JVM, and dataset size:
+`BINARY_FUSE_8` and `BINARY_FUSE_16` are static XOR filters (Graf &amp; Lemire, 2022). Each inserted key maps to three positions in a fingerprint array — one per segment — via independent MurmurHash3 invocations with rotated seeds. A simple XOR invariant across those three slots makes lookup a single three-read check:
 
-| Backend             | Build (ms) | ns / op |
-|---------------------|-----------:|--------:|
-| `LMDB_ONLY`         | 1          | 1301    |
-| `BLOOM`             | 77         |  731    |
-| `HASHSET`           | 10         |   85    |
-| `TRUNCATED_LONG_64` | 6          |  108    |
-
-`TRUNCATED_LONG_64` reaches near-`HASHSET` latency at ~10× lower memory cost; for most practical database sizes (Light DB and smaller) it is the recommended default.
-
-Run the benchmark yourself with:
-
-```bash
-./mvnw test -Dtest=AddressLookupBenchmarkTest
+```
+h0 = reduce(hash64(key, seed),           segSize) + 0·segSize
+h1 = reduce(hash64(key, rotl(seed,21)),  segSize) + 1·segSize
+h2 = reduce(hash64(key, rotl(seed,42)),  segSize) + 2·segSize
+hit ⟺  fingerprints[h0] ⊕ fingerprints[h1] ⊕ fingerprints[h2] == fingerprint(key)
 ```
 
-The test logs a result table at INFO; passing/failing is informational only (timings are not asserted).
+**No false negatives** — every key inserted via `populateFrom` is always found.  
+**False-positive rate** — 1/256 ≈ 0.4% for Fuse-8 (8-bit fingerprint), 1/65536 ≈ 0.0015% for Fuse-16 (16-bit fingerprint). False positives fall through to the LMDB delegate as in any other probabilistic backend.  
+**Self-contained** — `requiresBackend()` returns `false`; the LMDB env is closed and its mmap pages are released after population, identical to `HASHSET` and `TRUNCATED_LONG_64`.
+
+Choose between the two variants based on how expensive the LMDB fallback is in your workload. For most use cases with a light or full database, `BINARY_FUSE_8` gives the best RAM-to-latency trade-off: lower memory than `BLOOM` (no LMDB open) with a higher FPR, while `BINARY_FUSE_16` halves the FPR at the cost of 2× the fingerprint array size.
+
+#### Benchmark numbers
+
+`AddressLookupBenchmark` (JMH, replaces the old JUnit timing test) writes 2048 random hash160 entries into LMDB, then measures average `containsAddress` time per backend across 8192 pre-generated miss queries with JMH-driven JIT warmup and fork isolation. Sample numbers from one workstation run — **relative ordering** is the architecturally interesting part; absolute values vary by machine, JVM, and dataset size:
+
+| Backend             | ns / op |
+|--------------------:|--------:|
+| `LMDB_ONLY`         | 1301    |
+| `BLOOM`             |  731    |
+| `HASHSET`           |   85    |
+| `TRUNCATED_LONG_64` |  108    |
+| `BINARY_FUSE_8`     |   ~25   |
+| `BINARY_FUSE_16`    |   ~25   |
+
+`TRUNCATED_LONG_64` reaches near-`HASHSET` latency at ~10× lower memory cost and is the recommended default for most cases. `BINARY_FUSE_8` and `BINARY_FUSE_16` offer even lower memory with O(1) lookup (3 direct array reads + 3 hashes); cache-cold latency grows with filter size, but for small-to-medium databases the three-read pattern typically stays in L2 or L3 cache.
+
+Run the backend comparison benchmark yourself with:
+
+```bash
+mvn test-compile exec:java -Dexec.args="AddressLookupBenchmark"
+
+# Narrow to a single backend
+mvn test-compile exec:java \
+  -Dexec.args="AddressLookupBenchmark -p backend=BINARY_FUSE_8"
+
+# Allocation profile (per-op bytes allocated)
+mvn test-compile exec:java -Dexec.args="AddressLookupBenchmark -prof gc"
+```
+
+For an isolated view of Binary Fuse Filter construction and lookup without LMDB (L1/L2/L3 cache-size sweep):
+
+```bash
+mvn test-compile exec:java -Dexec.args="BinaryFuseBenchmark"
+```
 
 #### Bloom filter — FPP tuning
 
@@ -603,7 +637,7 @@ If you're missing any information or have questions about usage or content, feel
 > ```json
 > "addressLookupBackend" : "TRUNCATED_LONG_64"
 > ```
-> See [Pluggable Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend) above for the full trade-off matrix and benchmark numbers. `TRUNCATED_LONG_64` loads every hash160 into RAM once at startup as 256 sorted `long[]` buckets (~1.1 GB for the Light DB), then closes the LMDB env and releases its mmap pages — near-`HASHSET` lookup latency at ~10× lower memory cost. If you have memory to spare and prefer exact-bit storage with no probabilistic fallthrough, `HASHSET` (~10 GB for the Light DB) is the next step up; `BLOOM` keeps LMDB open while still skipping it for the overwhelming majority of misses.
+> See [Pluggable Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend) above for the full trade-off matrix and benchmark numbers. `TRUNCATED_LONG_64` loads every hash160 into RAM once at startup as 256 sorted `long[]` buckets (~1.1 GB for the Light DB), then closes the LMDB env and releases its mmap pages — near-`HASHSET` lookup latency at ~10× lower memory cost. If you have memory to spare and prefer exact-bit storage with no probabilistic fallthrough, `HASHSET` (~10 GB for the Light DB) is the next step up. If RAM is tight, `BINARY_FUSE_8` (~172 MB for the Light DB) is the lowest-footprint self-contained option: it closes LMDB like `TRUNCATED_LONG_64` and redirects the ~0.4% false-positive rate back to LMDB as a verifier. `BLOOM` (~150 MB) covers a similar niche but keeps LMDB open.
 
 <details>
 <summary>Checksums lmdb_light.zip</summary>
@@ -661,6 +695,8 @@ LMDBToAddressFile_Light_HexHash.zip	SHA3-512	29CA44CD666D7B8CF9EAD4B340620FBB7ED
 > | Choice              | RAM needed at Full DB | LMDB stays open? | When to pick |
 > |---------------------|-----------------------|------------------|--------------|
 > | `TRUNCATED_LONG_64` | ~11 GB                | **no**           | recommended if you can spare ~12 GB; closes LMDB and releases its mmap pages |
+> | `BINARY_FUSE_8`     | **~1.8 GB**           | **no**           | closes LMDB like `TRUNCATED_LONG_64`; 0.4% FPR redirects those misses to LMDB as a one-time verifier (then it is closed) |
+> | `BINARY_FUSE_16`    | ~3.6 GB               | **no**           | same as Fuse-8 but with 0.0015% FPR — use when the LMDB fallback cost matters |
 > | `BLOOM` (FPP 0.01)  | ~1.6 GB               | yes              | keeps LMDB open as the verifier; skips it for the overwhelming majority of misses |
 > | `LMDB_ONLY`         | minimal (mmap only)   | yes              | fallback when there is essentially no spare RAM and disk-backed mmap is acceptable |
 >
