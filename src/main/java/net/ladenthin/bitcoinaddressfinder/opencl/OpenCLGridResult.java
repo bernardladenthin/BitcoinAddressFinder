@@ -100,18 +100,16 @@ public class OpenCLGridResult {
         ByteBuffer readOnlyResult = result.asReadOnlyBuffer().order(ByteOrder.LITTLE_ENDIAN);
 
         final int count = readOnlyResult.getInt(0);
-        if (count != OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL) {
-            // Compact mode is wired in Step G. Until then the kernel only emits the
-            // full-transfer sentinel; any other count means a layout/contract mismatch.
-            throw new IllegalStateException("Unexpected GPU output count word 0x" + Integer.toHexString(count)
-                    + "; expected full-transfer sentinel 0x"
-                    + Integer.toHexString(OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL));
-        }
 
-        PublicKeyBytes[] publicKeys = new PublicKeyBytes[workSize];
-        for (int i = 0; i < workSize; i++) {
-            PublicKeyBytes publicKeyBytes = getPublicKeyFromByteBufferXY(readOnlyResult, i, secretKeyBase);
-            publicKeys[i] = publicKeyBytes;
+        // Unified layout, two write modes:
+        //   - sentinel count -> full transfer: walk all workSize dense entries.
+        //   - any other K    -> compact mode:  walk only the K hit entries.
+        // Both share the same per-entry parser, which reads each entry's own work_item_index.
+        final int entryCount = count == OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL ? workSize : count;
+
+        PublicKeyBytes[] publicKeys = new PublicKeyBytes[entryCount];
+        for (int slot = 0; slot < entryCount; slot++) {
+            publicKeys[slot] = readEntry(readOnlyResult, slot, secretKeyBase);
         }
         return publicKeys;
     }
@@ -147,27 +145,30 @@ public class OpenCLGridResult {
      * <p>
      * If the reconstructed secret key is zero, a predefined fallback key is returned.
      *
-     * @param resultBuffer the buffer containing OpenCL results for all keys
-     * @param keyNumber the zero-based index of the key to extract
+     * @param resultBuffer the buffer containing OpenCL results (read as little-endian)
+     * @param slot the zero-based slot position of the entry within the output buffer
      * @param secretKeyBase the base secret key used to derive the current key
      * @return the reconstructed {@link PublicKeyBytes} object
      * @throws RuntimeException if the key bytes are invalid (e.g. all coordinate bytes are zero)
      */
-    private static final PublicKeyBytes getPublicKeyFromByteBufferXY(
-            ByteBuffer resultBuffer, int keyNumber, BigInteger secretKeyBase) {
+    private static final PublicKeyBytes readEntry(ByteBuffer resultBuffer, int slot, BigInteger secretKeyBase) {
+        // Unified entry: a leading 4-byte count header, then 108-byte entries whose first 4
+        // bytes are the work_item_index, followed by X/Y/hash160 at the OUTPUT_ENTRY_* offsets.
+        final int entryBaseInByteBuffer =
+                OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES + OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES * slot;
+
+        // The secret is derived from the entry's own work_item_index (essential in compact mode,
+        // where slots are claimed out of order; in full transfer it equals the slot index).
+        final int workItemIndex =
+                resultBuffer.getInt(entryBaseInByteBuffer + OpenClKernelConstants.OUTPUT_ENTRY_INDEX_BYTE_OFFSET);
         BigInteger secret =
                 // ADD combine mode: CalculateSecretKeyBenchmark measures ADD faster than OR for the aligned base +
                 // offset.
-                KeyUtility.calculateSecretKey(secretKeyBase, keyNumber, KeyUtility.CALCULATE_SECRET_KEY_USE_OR);
+                KeyUtility.calculateSecretKey(secretKeyBase, workItemIndex, KeyUtility.CALCULATE_SECRET_KEY_USE_OR);
         if (BigInteger.ZERO.equals(secret)) {
             // the calculated key is invalid, return a fallback
             return PublicKeyBytes.INVALID_KEY_ONE;
         }
-
-        // Unified entry: a leading 4-byte count header, then 108-byte entries whose first 4
-        // bytes are the work_item_index, followed by X/Y/hash160 at the OUTPUT_ENTRY_* offsets.
-        final int entryBaseInByteBuffer = OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES
-                + OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES * keyNumber;
 
         // Get X
         byte[] xFromBigEndian = new byte[OpenClKernelConstants.CHUNK_SIZE_00_NUM_BYTES_BIG_ENDIAN_X];

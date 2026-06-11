@@ -238,7 +238,7 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
   Tests:
   - `Fuse8GpuHashParityTest` (no GPU needed — pure Java): reimplements the GPU hash logic in Java (`key = ByteBuffer.wrap(h160).getLong(0); ph = hash64(key, seed); h0 = reduce((int)ph, seg); h1 = reduce((int)hash64(key, rotl(seed,21)), seg) + seg; ...`). For 1 000 distinct hash160 inputs, asserts that this Java reimplementation agrees with `BinaryFuse8AddressPresence.containsAddress()` on every hit/miss answer. This pins the exact key-extraction + hash formula in a runnable test before any OpenCL code is written — if the formulas drift, this test fails.
 
-  **Step G — Java compact-mode reader** (`opencl/OpenCLGridResult.java`)
+  **Step G — Java compact-mode reader** ✅ (`opencl/OpenCLGridResult.java`)
   `getPublicKeyBytes()` dispatches on the count word: `0xFFFFFFFF` → `readFullTransfer()` (walk `workSize` entries), otherwise → `readCompact(count)` (walk K entries). Because the entry layout is unified, both paths share the same per-entry parser: read `work_item_index` (entry offset 0), derive secret via `KeyUtility.calculateSecretKey(secretBase, index, USE_OR)`, read X/Y/hash160u/hash160c at the unified `OUTPUT_ENTRY_*` offsets, assemble `PublicKeyBytes` via `PublicKeyBytes.assembleUncompressedPublicKey(x, y)`.
   Tests (no GPU needed — hand-crafted `ByteBuffer`):
   - `readCompact_countZero_returnsEmptyArray`

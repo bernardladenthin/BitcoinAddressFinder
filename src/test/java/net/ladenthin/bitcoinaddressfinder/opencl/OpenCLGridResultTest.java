@@ -35,18 +35,34 @@ public class OpenCLGridResultTest {
     /** Builds a full-transfer unified output buffer (sentinel header + dense 108-byte entries). */
     private static ByteBuffer buildFullTransferBuffer(byte[][] xs, byte[][] ys, byte[][] hus, byte[][] hcs) {
         int workSize = xs.length;
-        int size = OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES
-                + OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES * workSize;
-        ByteBuffer buffer = ByteBuffer.allocate(size).order(ByteOrder.LITTLE_ENDIAN);
-        buffer.putInt(0, OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL);
+        int[] indices = new int[workSize];
         for (int i = 0; i < workSize; i++) {
-            int base =
-                    OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES + OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES * i;
-            buffer.putInt(base + OpenClKernelConstants.OUTPUT_ENTRY_INDEX_BYTE_OFFSET, i);
-            putBytes(buffer, base + OpenClKernelConstants.OUTPUT_ENTRY_X_BYTE_OFFSET, xs[i]);
-            putBytes(buffer, base + OpenClKernelConstants.OUTPUT_ENTRY_Y_BYTE_OFFSET, ys[i]);
-            putBytes(buffer, base + OpenClKernelConstants.OUTPUT_ENTRY_HASH160_UNCOMPRESSED_BYTE_OFFSET, hus[i]);
-            putBytes(buffer, base + OpenClKernelConstants.OUTPUT_ENTRY_HASH160_COMPRESSED_BYTE_OFFSET, hcs[i]);
+            indices[i] = i;
+        }
+        return buildBuffer(OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL, indices, xs, ys, hus, hcs);
+    }
+
+    /** Builds a compact unified output buffer (count word K, then K entries with explicit indices). */
+    private static ByteBuffer buildCompactBuffer(
+            int count, int[] indices, byte[][] xs, byte[][] ys, byte[][] hus, byte[][] hcs) {
+        return buildBuffer(count, indices, xs, ys, hus, hcs);
+    }
+
+    private static ByteBuffer buildBuffer(
+            int countWord, int[] indices, byte[][] xs, byte[][] ys, byte[][] hus, byte[][] hcs) {
+        int entries = indices.length;
+        int size = OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES
+                + OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES * Math.max(entries, 1);
+        ByteBuffer buffer = ByteBuffer.allocate(size).order(ByteOrder.LITTLE_ENDIAN);
+        buffer.putInt(0, countWord);
+        for (int slot = 0; slot < entries; slot++) {
+            int base = OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES
+                    + OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES * slot;
+            buffer.putInt(base + OpenClKernelConstants.OUTPUT_ENTRY_INDEX_BYTE_OFFSET, indices[slot]);
+            putBytes(buffer, base + OpenClKernelConstants.OUTPUT_ENTRY_X_BYTE_OFFSET, xs[slot]);
+            putBytes(buffer, base + OpenClKernelConstants.OUTPUT_ENTRY_Y_BYTE_OFFSET, ys[slot]);
+            putBytes(buffer, base + OpenClKernelConstants.OUTPUT_ENTRY_HASH160_UNCOMPRESSED_BYTE_OFFSET, hus[slot]);
+            putBytes(buffer, base + OpenClKernelConstants.OUTPUT_ENTRY_HASH160_COMPRESSED_BYTE_OFFSET, hcs[slot]);
         }
         return buffer;
     }
@@ -252,24 +268,6 @@ public class OpenCLGridResultTest {
     }
 
     @Test
-    public void getPublicKeyBytes_nonSentinelCount_throwsUntilCompactReaderLive() {
-        // arrange — a buffer whose count word is a compact count (not the sentinel)
-        ByteBuffer buffer = ByteBuffer.allocate(
-                        OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES + OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES)
-                .order(ByteOrder.LITTLE_ENDIAN);
-        buffer.putInt(0, 1); // compact count = 1
-        OpenCLGridResult gridResult = new OpenCLGridResult(BigInteger.ONE, 1, buffer);
-
-        // act + assert — Step E only emits the sentinel; compact reading arrives in Step G
-        try {
-            gridResult.getPublicKeyBytes();
-            throw new AssertionError("expected IllegalStateException for non-sentinel count");
-        } catch (IllegalStateException expected) {
-            assertThat(expected.getMessage().contains("count word"), is(true));
-        }
-    }
-
-    @Test
     public void getPublicKeyFromByteBufferXY_offsetShiftedByHeaderAndIndex() {
         // arrange — distinctive first X byte; the count word (bytes 0..3) and the work_item_index
         // (bytes 4..7) precede the X coordinate, so X[0] must be read from byte 8.
@@ -290,6 +288,102 @@ public class OpenCLGridResultTest {
 
         // assert — uncompressed is 04 || X || Y, so uncompressed[1] is X[0] read from byte 8
         assertThat(keys[0].getUncompressed()[1], is(equalTo((byte) 0xAB)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="getPublicKeyBytes — compact mode (Step G)">
+    @Test
+    public void readCompact_countZero_returnsEmptyArray() {
+        // arrange — compact count = 0, no entries
+        ByteBuffer buffer =
+                buildCompactBuffer(0, new int[0], new byte[0][], new byte[0][], new byte[0][], new byte[0][]);
+        // workSize is irrelevant in compact mode (the count word drives the entry count)
+        OpenCLGridResult gridResult = new OpenCLGridResult(BigInteger.valueOf(42), 1024, buffer);
+
+        // act
+        PublicKeyBytes[] keys = gridResult.getPublicKeyBytes();
+
+        // assert
+        assertThat(keys.length, is(equalTo(0)));
+    }
+
+    @Test
+    public void readCompact_countTwo_returnsCorrectSecretsAndHashes() {
+        // arrange — two compact hits with non-contiguous work_item_indices 5 and 9
+        int[] indices = {5, 9};
+        byte[] x0 = filled(32, 0x11);
+        byte[] y0 = filled(32, 0x22);
+        byte[] hu0 = filled(20, 0x33);
+        byte[] hc0 = filled(20, 0x44);
+        byte[] x1 = filled(32, 0x55);
+        byte[] y1 = filled(32, 0x66);
+        byte[] hu1 = filled(20, 0x77);
+        byte[] hc1 = filled(20, (byte) 0x88);
+        ByteBuffer buffer = buildCompactBuffer(
+                2, indices, new byte[][] {x0, x1}, new byte[][] {y0, y1}, new byte[][] {hu0, hu1}, new byte[][] {
+                    hc0, hc1
+                });
+        BigInteger secretKeyBase = BigInteger.valueOf(1000);
+        OpenCLGridResult gridResult = new OpenCLGridResult(secretKeyBase, 4096, buffer);
+
+        // act
+        PublicKeyBytes[] keys = gridResult.getPublicKeyBytes();
+
+        // assert
+        assertThat(keys.length, is(equalTo(2)));
+        // secret = base + work_item_index (read from each entry)
+        assertThat(keys[0].getSecretKey(), is(equalTo(BigInteger.valueOf(1005))));
+        assertThat(keys[1].getSecretKey(), is(equalTo(BigInteger.valueOf(1009))));
+        assertThat(keys[0].getUncompressed(), is(equalTo(PublicKeyBytes.assembleUncompressedPublicKey(x0, y0))));
+        assertThat(keys[1].getUncompressed(), is(equalTo(PublicKeyBytes.assembleUncompressedPublicKey(x1, y1))));
+        assertThat(keys[0].getUncompressedKeyHash(), is(equalTo(hu0)));
+        assertThat(keys[0].getCompressedKeyHash(), is(equalTo(hc0)));
+        assertThat(keys[1].getUncompressedKeyHash(), is(equalTo(hu1)));
+        assertThat(keys[1].getCompressedKeyHash(), is(equalTo(hc1)));
+    }
+
+    @Test
+    public void readCompact_invalidSecretZero_returnsInvalidKeyOne() {
+        // arrange — base 0 + work_item_index 0 -> secret 0 (invalid)
+        ByteBuffer buffer = buildCompactBuffer(
+                1,
+                new int[] {0},
+                new byte[][] {filled(32, 0x01)},
+                new byte[][] {filled(32, 0x02)},
+                new byte[][] {filled(20, 0x03)},
+                new byte[][] {filled(20, 0x04)});
+        OpenCLGridResult gridResult = new OpenCLGridResult(BigInteger.ZERO, 16, buffer);
+
+        // act
+        PublicKeyBytes[] keys = gridResult.getPublicKeyBytes();
+
+        // assert
+        assertThat(keys.length, is(equalTo(1)));
+        assertThat(keys[0] == PublicKeyBytes.INVALID_KEY_ONE, is(true));
+    }
+
+    @Test
+    public void getPublicKeyBytes_sentinelDispatch_doesNotCallCompactPath() {
+        // arrange — sentinel count with workSize=2 dense entries
+        byte[] x0 = filled(32, 0x11);
+        byte[] y0 = filled(32, 0x22);
+        byte[] hu0 = filled(20, 0x33);
+        byte[] hc0 = filled(20, 0x44);
+        byte[] x1 = filled(32, 0x55);
+        byte[] y1 = filled(32, 0x66);
+        byte[] hu1 = filled(20, 0x77);
+        byte[] hc1 = filled(20, (byte) 0x88);
+        ByteBuffer buffer = buildFullTransferBuffer(
+                new byte[][] {x0, x1}, new byte[][] {y0, y1}, new byte[][] {hu0, hu1}, new byte[][] {hc0, hc1});
+        OpenCLGridResult gridResult = new OpenCLGridResult(BigInteger.valueOf(7), 2, buffer);
+
+        // act
+        PublicKeyBytes[] keys = gridResult.getPublicKeyBytes();
+
+        // assert — full transfer reads workSize entries (NOT the sentinel value as a count)
+        assertThat(keys.length, is(equalTo(2)));
+        assertThat(keys[0].getSecretKey(), is(equalTo(BigInteger.valueOf(7))));
+        assertThat(keys[1].getSecretKey(), is(equalTo(BigInteger.valueOf(8))));
     }
     // </editor-fold>
 }
