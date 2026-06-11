@@ -772,6 +772,16 @@ __kernel void generateKeysKernel_grid(
         ripemd160_init(&ripemd_ctx_uncompressed);
         ripemd160_update_swap(&ripemd_ctx_uncompressed, ripemd160_input_uncompressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
 
+        // Snapshot the uncompressed hash160 into a private register array NOW. Under
+        // REUSE_FOR_COMPRESSED the ripemd context is a shared alias, so the compressed pass
+        // below overwrites ripemd_ctx_uncompressed.h; the deferred filter check and entry
+        // write must read this stable copy, not the (soon-clobbered) shared context.
+        u32 ripemd_uncompressed_h[RIPEMD160_HASH_NUM_WORDS];
+        #pragma unroll
+        for (int w = 0; w < RIPEMD160_HASH_NUM_WORDS; w++) {
+            ripemd_uncompressed_h[w] = ripemd_ctx_uncompressed.h[w];
+        }
+
         // === Hash compressed key ===
         #ifdef REUSE_FOR_COMPRESSED
             transform_sec_prefix_from_uncompressed_to_compressed(sec_compressed);
@@ -786,6 +796,14 @@ __kernel void generateKeysKernel_grid(
         ripemd160_init(&ripemd_ctx_compressed);
         ripemd160_update_swap(&ripemd_ctx_compressed, ripemd160_input_compressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
 
+        // Snapshot the compressed hash160 too, so both hashes are stable private copies for
+        // the filter check and the deferred entry write below.
+        u32 ripemd_compressed_h[RIPEMD160_HASH_NUM_WORDS];
+        #pragma unroll
+        for (int w = 0; w < RIPEMD160_HASH_NUM_WORDS; w++) {
+            ripemd_compressed_h[w] = ripemd_ctx_compressed.h[w];
+        }
+
         // === Decide whether and where to emit this entry ===
         // Full-transfer mode: every work-item emits, densely at slot loop_index.
         // Compact mode: emit only if the uncompressed OR compressed hash160 passes the Binary
@@ -796,8 +814,8 @@ __kernel void generateKeysKernel_grid(
             slot = loop_index;
             should_write = true;
         } else {
-            ulong key_uncompressed = fuse8_key_from_ripemd(ripemd_ctx_uncompressed.h);
-            ulong key_compressed   = fuse8_key_from_ripemd(ripemd_ctx_compressed.h);
+            ulong key_uncompressed = fuse8_key_from_ripemd(ripemd_uncompressed_h);
+            ulong key_compressed   = fuse8_key_from_ripemd(ripemd_compressed_h);
             bool hit = fuse8_contains(fuse8_fp, fuse8_seed, fuse8_seg, fuse8_seg_count_len, key_uncompressed)
                     || fuse8_contains(fuse8_fp, fuse8_seed, fuse8_seg, fuse8_seg_count_len, key_compressed);
             should_write = hit;
@@ -813,8 +831,8 @@ __kernel void generateKeysKernel_grid(
             r[r_offset + OUTPUT_ENTRY_OFFSET_INDEX] = loop_index;
             copy_private_u32_array_global_u32(&r[r_offset + OUTPUT_ENTRY_OFFSET_X],      x_bigEndian_local, CHUNK_SIZE_00_NUM_WORDS_BIG_ENDIAN_X);
             copy_private_u32_array_global_u32(&r[r_offset + OUTPUT_ENTRY_OFFSET_Y],      y_bigEndian_local, CHUNK_SIZE_01_NUM_WORDS_BIG_ENDIAN_Y);
-            copy_private_u32_array_global_u32(&r[r_offset + OUTPUT_ENTRY_OFFSET_RIPEMD160_UNCOMPRESSED], ripemd_ctx_uncompressed.h, RIPEMD160_HASH_NUM_WORDS);
-            copy_private_u32_array_global_u32(&r[r_offset + OUTPUT_ENTRY_OFFSET_RIPEMD160_COMPRESSED], ripemd_ctx_compressed.h, RIPEMD160_HASH_NUM_WORDS);
+            copy_private_u32_array_global_u32(&r[r_offset + OUTPUT_ENTRY_OFFSET_RIPEMD160_UNCOMPRESSED], ripemd_uncompressed_h, RIPEMD160_HASH_NUM_WORDS);
+            copy_private_u32_array_global_u32(&r[r_offset + OUTPUT_ENTRY_OFFSET_RIPEMD160_COMPRESSED], ripemd_compressed_h, RIPEMD160_HASH_NUM_WORDS);
         }
     }
 }
