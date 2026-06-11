@@ -16,6 +16,7 @@ path = [
     "examples/config_Find_8CPUProducer.json",
     "examples/config_Find_1CPUProducerBip39.json",
     "examples/config_Find_SecretsFile.json",
+    "examples/config_Find_GPUFilterCompact.json",
     "examples/config_LMDBToAddressFile.json",
     "examples/config_OpenCLInfo.json",
     "src/test/resources/testOpenCLInfo/config_OpenCLInfo.json",
