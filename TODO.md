@@ -19,6 +19,50 @@ pluggable-persistence design plan:
 
 ### GPU acceleration (three connected designs)
 
+#### CPU-side filter (Part 1) vs GPU-side filter (Part 2)
+
+All three GPU-acceleration TODOs below connect to a single architectural choice: **where does the address-presence filter live?**
+
+| | **Part 1 — CPU-side filter** (current) | **Part 2 — GPU-side filter** (goal) |
+|---|---|---|
+| **Filter lives in** | CPU RAM | GPU VRAM |
+| **Filter checked by** | CPU, after kernel returns | GPU, inside the kernel |
+| **What crosses PCIe per batch** | every hash160 (all N work-items × 104 B) | only candidates that passed the filter (~0.4 % with Fuse-8) |
+| **CPU-side lookup cost** | ~25–108 ns per candidate (depends on backend) | ~0 — only LMDB verification on the tiny trickle |
+| **GPU VRAM consumed by filter** | 0 | ~172 MB (Light DB) / ~1.8 GB (Full DB) with Fuse-8 |
+| **Kernel complexity** | unchanged | +3 hash calls + 3 array reads + 1 XOR per work-item |
+| **GPU needed for filter** | no — CPU-only configs work identically | yes — filter must be uploaded to VRAM at startup |
+| **When it wins** | always (no extra GPU work) | when PCIe bandwidth or CPU filter throughput is the bottleneck |
+| **When it regresses** | never | when GPU was already at ~100 % ALU occupancy on ECC |
+
+**How "copy only on hit" works in the GPU-side filter (Part 2):**
+There is no per-result "copy" flag. Instead the kernel uses an **atomic counter + compact output buffer**:
+
+```opencl
+__global volatile uint* hit_count   // initialised to 0 before kernel launch
+__global uchar*         hit_results // pre-allocated for MAX_HITS entries
+
+// Inside each work-item, after computing hash160 and running the Fuse-8 check:
+if (fuse_hit) {
+    uint idx = atomic_add(hit_count, 1u);  // claim the next output slot
+    if (idx < MAX_HITS) {
+        hit_results[idx * 20 .. idx*20+19] = my_hash160;
+    }
+}
+// Work-items that did NOT hit write nothing — they have no slot in hit_results.
+```
+
+After the kernel finishes:
+1. CPU reads `hit_count` (4 bytes PCIe transfer) → learns K hits.
+2. CPU reads only the first K entries from `hit_results` (K × 20 bytes).
+3. CPU calls LMDB for those K candidates. Everything else was silently discarded on the GPU.
+
+At 0.4 % FPR with a batch of 2048 work-items: K ≈ 8 hits per batch. PCIe transfer shrinks from 2048 × 104 B = 212 KB to 4 B + 8 × 20 B = 164 B — a >1000× reduction in bus traffic. The CPU never sees or processes the 2040 non-hit results.
+
+The current "flags byte per work-item" approach described in the GPU-side-filter TODO below is a softer version that keeps all N results on the PCIe bus but lets the CPU skip LMDB for non-flagged entries. The compact-buffer approach above is stricter: non-hits never cross the bus at all. The compact-buffer design requires changing `OpenCLGridResult` from a fixed-stride layout (offset = `work_item_index × CHUNK_SIZE`) to a variable-length layout (offset = `atomic_slot × 20`), which is a larger refactor but eliminates the PCIe bandwidth entirely.
+
+---
+
 - **Pre-compute the `HASHSET`-backend lookup hash on the GPU.** Targets the `HASHSET` backend (`AddressLookupBackend.HASHSET` → `persistence/inmemory/HashSetAddressPresence.java`), which today wraps each derived hash160 in a thread-local `ByteBuffer` (`ConsumerJava.java:367-371`) and then calls `Set<ByteBuffer>.contains(...)` (`HashSetAddressPresence.java:74-78`). The dominant cost inside `contains(...)` is recomputing `ByteBuffer.hashCode()` per candidate — for a 20-byte hash160 this is 20 multiply-adds (`h = 31*h + b`) plus the `HashMap` spread (`(h ^ (h >>> 16))`). The same arithmetic can be computed once on the GPU, returned alongside the hash160, and consumed CPU-side without re-hashing. Per README §"Lookup latency" the HASHSET path is ~85 ns/op; the JDK hash + spread is ~20–25 ns of that, so the headroom is ~25 % of the HASHSET lookup time per candidate.
   - **Extend the kernel output struct.** Today the kernel writes the layout described in `PublicKeyBytes.java:240-242` (X, Y, hash160 uncompressed, hash160 compressed = 104 B/work-item). Add a 4-byte `int hashCodeUncompressed` and a 4-byte `int hashCodeCompressed` field per work-item (112 B/work-item, +7.7 % per-candidate PCIe bandwidth). Reuse the existing `CHUNK_SIZE_*` offset machinery in `OpenCLGridResult.java:118-122` to lay the fields out without churn.
   - **Reproduce `java.nio.HeapByteBuffer.hashCode()` byte-for-byte in OpenCL C.** OpenJDK's implementation for a heap buffer with position 0 and limit 20 is:
@@ -66,7 +110,7 @@ pluggable-persistence design plan:
   - **What pre-computed hash does *not* help.** Cache misses on the bucket array at scale (the table is 8× L3 at Light DB and out-of-cache entirely at Full DB); `ByteBuffer.equals(other)` byte compare on the matched node (~15-25 ns); GC pressure if `ConsumerJava.java:367-371`'s "thread-local reusable ByteBuffer" turns out to allocate per call rather than reuse (verify before benchmarking — at 188 M ops/sec a per-call `ByteBuffer.wrap()` would be ~9 GB/sec of allocation pressure).
   - **What needs to be designed first** (before any kernel changes): the canonical reference of `HeapByteBuffer.hashCode()` semantics that the JMH guard will pin against (capture the bytecode of `java.nio.HeapByteBuffer#hashCode` for the running JDK and assert it matches a known-good copy at build time, so a JDK upgrade can't silently corrupt the GPU formula); whether `ConsumerJava` carries the precomputed hash through `AbstractProducer`/`AbstractKeyProducerQueueBuffered` as a parallel `int[]`/`IntBuffer` next to the existing hash160 buffers, or extends the per-candidate result struct in place; whether the `HashSet_PrecomputedHash` map should fall back to JDK `HashSet<ByteBuffer>` semantics on CPU-only paths (e.g. `ProducerJava` producers that don't go through OpenCL) by computing the same hash on the CPU side using the same reference formula — yes, for consistency across producers.
 
-- **Implement `BinaryFuse8AddressPresence` and `BinaryFuse16AddressPresence` — CPU-side Binary Fuse Filters for hash160 lookups.** ❌ **Not yet implemented.** No XOR / fuse filter backend exists in the codebase today. The JMH benchmark (`AddressLookupBenchmark`) already covers the four existing backends via `@Param({"LMDB_ONLY","BLOOM","HASHSET","TRUNCATED_LONG_64"})`; adding two more entries is the whole benchmark change. This is the **right first step** before the GPU-side filter — both variants are purely Java, prove the FPR/memory trade-off with real JMH numbers, and their construction logic (`populateFrom(LMDB)`) produces the same flat array the GPU will upload. Implementing **both 8-bit and 16-bit** now is deliberate: each serves a distinct use case (VRAM-constrained vs precision-required), and both must exist in the benchmark to let JMH pick the winner.
+- **Implement `BinaryFuse8AddressPresence` and `BinaryFuse16AddressPresence` — CPU-side Binary Fuse Filters for hash160 lookups.** ✅ **DONE** (`c603963`, `627b696`). No XOR / fuse filter backend exists in the codebase today. The JMH benchmark (`AddressLookupBenchmark`) already covers the four existing backends via `@Param({"LMDB_ONLY","BLOOM","HASHSET","TRUNCATED_LONG_64"})`; adding two more entries is the whole benchmark change. This is the **right first step** before the GPU-side filter — both variants are purely Java, prove the FPR/memory trade-off with real JMH numbers, and their construction logic (`populateFrom(LMDB)`) produces the same flat array the GPU will upload. Implementing **both 8-bit and 16-bit** now is deliberate: each serves a distinct use case (VRAM-constrained vs precision-required), and both must exist in the benchmark to let JMH pick the winner.
 
   **What is a Binary Fuse Filter?** A static probabilistic membership filter (no inserts after construction). Lookup: 3 array reads + XOR of fingerprints — branchless, no division. Memory: ~1.14 bytes/entry (8-bit) or ~2.28 bytes/entry (16-bit). No false negatives by construction — every stored key is always found. FPR ≈ 1/256 ≈ 0.4 % (8-bit) or 1/65536 ≈ 0.0015 % (16-bit). This is exactly the no-FN / FP-ok contract the GPU filter requires. Reference: *"Binary Fuse Filters: Fast and Smaller Than Xor Filters"* (Graf & Lemire, 2022).
 
