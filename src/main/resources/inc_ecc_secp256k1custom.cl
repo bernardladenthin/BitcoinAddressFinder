@@ -544,9 +544,27 @@ inline void build_ripemd160_block_from_sha256(const u32 *sha256_hash, u32 *ripem
  * - Avoids redundant serialization logic.
  * - Helps GPU kernels minimize register and local memory pressure.
  *
+ * Scope:
+ * - Beyond the SEC byte buffer, this macro also shares the SHA-256 and RIPEMD-160 working
+ *   contexts (sha_ctx_shared / ripemd_ctx_shared) and their input blocks between the
+ *   uncompressed and compressed passes (see the #ifdef block in the kernel). That is where
+ *   most of the saving comes from: ~349 bytes of private scratch per work-item (a second
+ *   sha256_ctx_t = 100 B, a second ripemd160_ctx_t = 88 B, plus the compressed input/sec
+ *   allocations). Keeping it materially lowers register pressure / raises occupancy.
+ *
  * Safety:
- * - This optimization is safe as long as the uncompressed SEC buffer is no longer needed
- *   after being overwritten with the compressed prefix.
+ * - Safe as long as each shared buffer is no longer needed once the compressed pass
+ *   overwrites it. The uncompressed pass is fully consumed into ripemd_ctx_shared.h before
+ *   the compressed pass begins, so the only value that must survive is the uncompressed
+ *   hash160 itself.
+ * - IMPORTANT (compact output): because ripemd_ctx_uncompressed and ripemd_ctx_compressed
+ *   are the SAME shared context, the compressed pass overwrites the uncompressed hash160.
+ *   The kernel therefore snapshots both hash160 results into private register arrays
+ *   (ripemd_uncompressed_h / ripemd_compressed_h, 20 B each) right after each is computed,
+ *   so the deferred filter check + entry write read stable copies. Those 40 bytes are the
+ *   minimal cost of holding both hashes until the compact-mode output slot is decided — they
+ *   are required by the compact feature, NOT a side effect of this macro, and are far cheaper
+ *   than the ~349 B that disabling REUSE would re-introduce. Do not remove them.
  */
 #define REUSE_FOR_COMPRESSED
 
