@@ -131,11 +131,19 @@ public class OpenClKernelConstantsTest {
     public void byteExact_unifiedOutputBufferFormat() {
         assertThat(OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES, is(4));
         assertThat(OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL, is(0xFFFF_FFFF));
+        // field sizes
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_INDEX_SIZE_BYTES, is(4));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_X_SIZE_BYTES, is(32));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_Y_SIZE_BYTES, is(32));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_HASH160_UNCOMPRESSED_SIZE_BYTES, is(20));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_HASH160_COMPRESSED_SIZE_BYTES, is(20));
+        // offsets (each = previous offset + previous size)
         assertThat(OpenClKernelConstants.OUTPUT_ENTRY_INDEX_BYTE_OFFSET, is(0));
         assertThat(OpenClKernelConstants.OUTPUT_ENTRY_X_BYTE_OFFSET, is(4));
         assertThat(OpenClKernelConstants.OUTPUT_ENTRY_Y_BYTE_OFFSET, is(36));
         assertThat(OpenClKernelConstants.OUTPUT_ENTRY_HASH160_UNCOMPRESSED_BYTE_OFFSET, is(68));
         assertThat(OpenClKernelConstants.OUTPUT_ENTRY_HASH160_COMPRESSED_BYTE_OFFSET, is(88));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_END_BYTE_OFFSET, is(108));
         assertThat(OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES, is(108));
     }
 }

@@ -234,8 +234,11 @@ public final class OpenClKernelConstants {
     // Both modes share the entry parser; they differ only in the loop bound (workSize vs K)
     // and in how the count is produced (constant vs atomic).
 
-    /** Size in bytes of the leading unsigned count word present in every GPU output buffer. */
-    public static final int OUTPUT_HEADER_SIZE_BYTES = 4;
+    /**
+     * Size in bytes of the leading unsigned count word present in every GPU output buffer.
+     * One {@code u32}.
+     */
+    public static final int OUTPUT_HEADER_SIZE_BYTES = U32_NUM_BYTES; // 4
 
     /**
      * Count-word value (written as an unsigned {@code u32} on the GPU) that flags
@@ -244,27 +247,47 @@ public final class OpenClKernelConstants {
      */
     public static final int OUTPUT_COUNT_FULL_TRANSFER_SENTINEL = 0xFFFF_FFFF;
 
+    // ==== Output-entry field sizes (Bytes) — mirrors the CHUNK_SIZE_* block ====
+    /** Size of the work-item index field at the start of an output entry (one {@code u32}). */
+    public static final int OUTPUT_ENTRY_INDEX_SIZE_BYTES = U32_NUM_BYTES; // 4
+    /** Size of the big-endian X-coordinate slot inside an output entry. */
+    public static final int OUTPUT_ENTRY_X_SIZE_BYTES = CHUNK_SIZE_00_NUM_BYTES_BIG_ENDIAN_X; // 32
+    /** Size of the big-endian Y-coordinate slot inside an output entry. */
+    public static final int OUTPUT_ENTRY_Y_SIZE_BYTES = CHUNK_SIZE_01_NUM_BYTES_BIG_ENDIAN_Y; // 32
+    /** Size of the uncompressed-key RIPEMD-160 slot inside an output entry. */
+    public static final int OUTPUT_ENTRY_HASH160_UNCOMPRESSED_SIZE_BYTES =
+            CHUNK_SIZE_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED; // 20
+    /** Size of the compressed-key RIPEMD-160 slot inside an output entry. */
+    public static final int OUTPUT_ENTRY_HASH160_COMPRESSED_SIZE_BYTES =
+            CHUNK_SIZE_11_NUM_BYTES_RIPEMD160_COMPRESSED; // 20
+
+    // ==== Offsets within an output entry (each = previous offset + previous size) ====
     /** Byte offset of the work-item index field inside an output entry. */
     public static final int OUTPUT_ENTRY_INDEX_BYTE_OFFSET = 0;
     /** Byte offset of the big-endian X coordinate inside an output entry. */
-    public static final int OUTPUT_ENTRY_X_BYTE_OFFSET = 4;
+    public static final int OUTPUT_ENTRY_X_BYTE_OFFSET = OUTPUT_ENTRY_INDEX_BYTE_OFFSET + OUTPUT_ENTRY_INDEX_SIZE_BYTES;
     /** Byte offset of the big-endian Y coordinate inside an output entry. */
-    public static final int OUTPUT_ENTRY_Y_BYTE_OFFSET = 36;
+    public static final int OUTPUT_ENTRY_Y_BYTE_OFFSET = OUTPUT_ENTRY_X_BYTE_OFFSET + OUTPUT_ENTRY_X_SIZE_BYTES;
     /** Byte offset of the uncompressed-key RIPEMD-160 hash inside an output entry. */
-    public static final int OUTPUT_ENTRY_HASH160_UNCOMPRESSED_BYTE_OFFSET = 68;
+    public static final int OUTPUT_ENTRY_HASH160_UNCOMPRESSED_BYTE_OFFSET =
+            OUTPUT_ENTRY_Y_BYTE_OFFSET + OUTPUT_ENTRY_Y_SIZE_BYTES;
     /** Byte offset of the compressed-key RIPEMD-160 hash inside an output entry. */
-    public static final int OUTPUT_ENTRY_HASH160_COMPRESSED_BYTE_OFFSET = 88;
+    public static final int OUTPUT_ENTRY_HASH160_COMPRESSED_BYTE_OFFSET =
+            OUTPUT_ENTRY_HASH160_UNCOMPRESSED_BYTE_OFFSET + OUTPUT_ENTRY_HASH160_UNCOMPRESSED_SIZE_BYTES;
+    /** Byte offset just past the end of an output entry (equals the entry size). */
+    public static final int OUTPUT_ENTRY_END_BYTE_OFFSET =
+            OUTPUT_ENTRY_HASH160_COMPRESSED_BYTE_OFFSET + OUTPUT_ENTRY_HASH160_COMPRESSED_SIZE_BYTES;
 
     /**
      * Total size in bytes of one output entry (the single, unified stride used by both
      * full-transfer and compact modes):
      * {@code [work_item_index:4][X:32][Y:32][hash160_uncompressed:20][hash160_compressed:20]}.
      *
-     * <p>Equals {@link #OUTPUT_ENTRY_INDEX_BYTE_OFFSET size of the index field}
-     * ({@value #OUTPUT_HEADER_SIZE_BYTES}) plus the {@link #CHUNK_SIZE_NUM_BYTES legacy
-     * coordinate-and-hash payload} ({@code 104}).
+     * <p>Derived as the running offset past the last field
+     * ({@link #OUTPUT_ENTRY_END_BYTE_OFFSET}), exactly like {@link #CHUNK_SIZE_NUM_BYTES} is
+     * derived from {@link #CHUNK_OFFSET_99_NUM_BYTES_END_OF_CHUNK}.
      */
-    public static final int OUTPUT_ENTRY_SIZE_BYTES = OUTPUT_HEADER_SIZE_BYTES + CHUNK_SIZE_NUM_BYTES; // 108
+    public static final int OUTPUT_ENTRY_SIZE_BYTES = OUTPUT_ENTRY_END_BYTE_OFFSET; // 108
 
     // ==== Derived array-capacity bound (was in PublicKeyBytes outside the SYNCHRONIZED block) ====
     /**
