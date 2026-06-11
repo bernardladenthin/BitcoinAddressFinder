@@ -61,6 +61,17 @@ At 0.4 % FPR with a batch of 2048 work-items: K ≈ 8 hits per batch. PCIe trans
 
 The current "flags byte per work-item" approach described in the GPU-side-filter TODO below is a softer version that keeps all N results on the PCIe bus but lets the CPU skip LMDB for non-flagged entries. The compact-buffer approach above is stricter: non-hits never cross the bus at all. The compact-buffer design requires changing `OpenCLGridResult` from a fixed-stride layout (offset = `work_item_index × CHUNK_SIZE`) to a variable-length layout (offset = `atomic_slot × 20`), which is a larger refactor but eliminates the PCIe bandwidth entirely.
 
+**Critical constraint — vanity scanning always requires all results on the CPU side.**
+The existing `ConsumerJava.processBatch()` runs **two independent checks** per work-item:
+1. `containsAddress(hash160)` — the database filter (fast, CPU-side, subject to Part 2 optimization).
+2. `vanityPattern.matcher(base58Address).matches()` — a Java regex against the base58-encoded address (`enableVanity = true`).
+
+The vanity check runs on **every** work-item unconditionally — it has nothing to do with whether the address is in the database. A result could be a vanity match but a database miss, or a database hit but not a vanity match. Therefore:
+- With `enableVanity = false` (pure database scanning): the compact-output-buffer approach works perfectly — non-hits never need to reach the CPU.
+- With `enableVanity = true` (vanity scanning): **all results must still cross PCIe**, because the GPU has no base58 encoder or regex engine. The compact-buffer optimization cannot be applied to the vanity path.
+
+This means the Part 2 GPU-side filter and the compact-output-buffer approach apply **only** to the `enableVanity = false` configuration. For vanity scanning the result struct stays full-width and every work-item still crosses the bus. A future vanity-on-GPU implementation would need an OpenCL base58 encoder + pattern matcher — tractable for simple prefix patterns (`1Abc...`), impractical for arbitrary Java regex.
+
 ---
 
 - **Pre-compute the `HASHSET`-backend lookup hash on the GPU.** Targets the `HASHSET` backend (`AddressLookupBackend.HASHSET` → `persistence/inmemory/HashSetAddressPresence.java`), which today wraps each derived hash160 in a thread-local `ByteBuffer` (`ConsumerJava.java:367-371`) and then calls `Set<ByteBuffer>.contains(...)` (`HashSetAddressPresence.java:74-78`). The dominant cost inside `contains(...)` is recomputing `ByteBuffer.hashCode()` per candidate — for a 20-byte hash160 this is 20 multiply-adds (`h = 31*h + b`) plus the `HashMap` spread (`(h ^ (h >>> 16))`). The same arithmetic can be computed once on the GPU, returned alongside the hash160, and consumed CPU-side without re-hashing. Per README §"Lookup latency" the HASHSET path is ~85 ns/op; the JDK hash + spread is ~20–25 ns of that, so the headroom is ~25 % of the HASHSET lookup time per candidate.
