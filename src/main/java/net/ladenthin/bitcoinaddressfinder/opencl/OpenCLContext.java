@@ -17,11 +17,13 @@ import static org.jocl.CL.clReleaseKernel;
 import static org.jocl.CL.clReleaseMemObject;
 import static org.jocl.CL.clReleaseProgram;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.Resources;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -30,6 +32,7 @@ import java.util.Objects;
 import java.util.Optional;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import org.jocl.CL;
@@ -180,6 +183,10 @@ public class OpenCLContext implements ReleaseCLObject {
 
         OpenCLDevice device = selection.device();
         LOGGER.info("Selected OpenCL device:\n{}", device.toStringPretty());
+        // Fail fast on a big-endian device: the kernel canonicalises its output assuming a
+        // little-endian device (see OpenClKernelConstants.GPU_NATIVE_WORD_ORDER), so running on
+        // a big-endian device would produce silently corrupt results. Reject it cleanly instead.
+        assertDeviceByteOrderSupported(device.getByteOrder(), device.deviceName());
         cl_context_properties contextProperties = selection.contextProperties();
         cl_device_id[] cl_device_ids = new cl_device_id[] {device.device()};
 
@@ -209,6 +216,29 @@ public class OpenCLContext implements ReleaseCLObject {
         // full-transfer mode (see createKeys()).
         allocateFilterBuffers(new byte[0], 0, 0, 2, 1, 0);
         gpuFilterUploaded = false;
+    }
+
+    /**
+     * Fails fast when the selected OpenCL device does not match the byte order the kernel and
+     * the host read path assume ({@link OpenClKernelConstants#GPU_NATIVE_WORD_ORDER}).
+     *
+     * <p>The kernel canonicalises its {@code u32} output (counts, indices, and the on-device
+     * X / Y / hash160 byte-swaps) assuming a little-endian device. Running on a big-endian
+     * device would corrupt those words silently, so this rejects it with a clear error rather
+     * than producing wrong &mdash; and security-relevant &mdash; results. Extracted as a static
+     * method so it can be unit-tested without a real device.
+     *
+     * @param deviceByteOrder the selected device's byte order (from {@code OpenCLDevice.getByteOrder()})
+     * @param deviceName      the device name, for the error message
+     * @throws UnsupportedOperationException if {@code deviceByteOrder} is not the supported order
+     */
+    @VisibleForTesting
+    static void assertDeviceByteOrderSupported(ByteOrder deviceByteOrder, String deviceName) {
+        if (!OpenClKernelConstants.GPU_NATIVE_WORD_ORDER.equals(deviceByteOrder)) {
+            throw new UnsupportedOperationException("OpenCL device '" + deviceName + "' is " + deviceByteOrder
+                    + "; only " + OpenClKernelConstants.GPU_NATIVE_WORD_ORDER
+                    + " devices are supported (the kernel output is little-endian-canonicalised).");
+        }
     }
 
     /**

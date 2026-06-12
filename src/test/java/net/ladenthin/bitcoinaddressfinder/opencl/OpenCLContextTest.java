@@ -104,6 +104,23 @@ public class OpenCLContextTest {
     }
     // </editor-fold>
 
+    // <editor-fold defaultstate="collapsed" desc="device byte-order guard">
+    @Test
+    public void assertDeviceByteOrderSupported_littleEndian_doesNotThrow() {
+        // little-endian matches GPU_NATIVE_WORD_ORDER -> no exception
+        OpenCLContext.assertDeviceByteOrderSupported(java.nio.ByteOrder.LITTLE_ENDIAN, "test-le-device");
+    }
+
+    @Test
+    public void assertDeviceByteOrderSupported_bigEndian_throws() {
+        UnsupportedOperationException ex = org.junit.jupiter.api.Assertions.assertThrows(
+                UnsupportedOperationException.class,
+                () -> OpenCLContext.assertDeviceByteOrderSupported(java.nio.ByteOrder.BIG_ENDIAN, "test-be-device"));
+        assertThat(ex.getMessage().contains("test-be-device"), is(true));
+        assertThat(ex.getMessage().contains("BIG_ENDIAN"), is(true));
+    }
+    // </editor-fold>
+
     // <editor-fold defaultstate="collapsed" desc="uploadGpuFilter / isInitialized (Step D)">
     @OpenCLTest
     @Test
