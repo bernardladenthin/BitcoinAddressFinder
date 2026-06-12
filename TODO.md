@@ -384,17 +384,28 @@ The "wire format" is therefore implicit and minimal: **the unit is exactly 32 by
 
 #### Proposed "very good API" — one transport-agnostic protocol, offered over the best-fit transports
 
-**Define one small, versioned, typed, framed message schema** (document it in `docs/wire-protocol.md` + a machine schema) and serve it over one or more transports. Message types (request/stream):
+**Topology + ownership (confirmed).** The **server** (e.g. one PC with a GPU) runs with **its own configured settings** and owns them — clients never configure it. In the normal case the two client roles are *different machines*: a **key-sender** client feeds keys to be checked (→ server's *receiver*), and a **completely separate result-listener** client only subscribes to events (→ server's *sender/publisher*). A **web UI is the special case** that does both. Every event is **broadcast to all subscribers** and is **self-describing** (carries its key/address), so a listener that did not submit still knows what each event refers to — no per-client correlation required.
+
+**Define one small, versioned, typed, framed message schema** (document it in `docs/wire-protocol.md` + a machine schema), split by direction:
+
+*Client → server (ingestion / `receiver`):*
 - `HELLO` / capability + version negotiation (key formats, compression, max batch, supported coins).
-- `SUBMIT_KEYS` — a **batch** of N×32-byte keys in one frame (kills the one-message-per-key overhead).
-- `SUBMIT_RANGE` — `{startKey:32, count, increment}` (+ optional compressed/coin flags). Orders of magnitude less bandwidth than enumerating keys; the finder expands it (reuse `KeyProducerJavaIncremental`). **The single highest-value new capability.**
-- `SUBMIT_HASH160` — pre-derived 20-byte hashes for the pure checker mode (skip EC derivation).
-- `ACK` / `ERROR` — accepted count, or rejection with a code (bad length, out-of-range, backpressure, unknown type) + optional correlation id.
-- `RESULT` — a **hit**: secret + address + which variant (uncompressed/compressed/coin), optionally correlated to the submitting batch/range/offset.
-- `VANITY_HIT` — pattern match event.
-- `PROGRESS` — for a range scan: position, keys checked, keys/sec, ETA, accepted/rejected counters.
+- `SUBMIT_KEYS` — a **batch** of N×32-byte keys in one frame. The minimal baseline is "just a private key to check"; batching kills the one-message-per-key overhead.
+- `SUBMIT_RANGE` — `{startKey:32, count, increment}` (+ optional compressed/coin flags). Orders of magnitude less bandwidth than enumerating keys; the finder expands it (reuse `KeyProducerJavaIncremental`). **The single highest-value ingestion capability.** *(optional extension)*
+- `SUBMIT_HASH160` — pre-derived 20-byte hashes for the pure checker mode (skip EC derivation). *(optional extension)*
+- `ACK` / `ERROR` — accepted count, or rejection with a code (bad length, out-of-range, backpressure, unknown type).
+
+*Server → subscribers (notification / `sender`) — queue/job granularity + configured hits ONLY:*
+- `CONFIG` — sent **once on connect**: a snapshot of the server's running configuration so a new subscriber knows the setup (device, backend, coins, vanity pattern, …).
+- `KEY_QUEUED` — "the service received a key/range to scan; it is now on the queue." Emitted per **submitted** unit (sender-controlled volume).
+- `GENERATION_STARTED` — emitted per key/key-range **taken** from the queue (scanning/generation began for that unit).
+- `VANITY_HIT` — a configured vanity-pattern match.
+- `HIT` — a database/GPU **found**: secret + address + variant (uncompressed/compressed/coin).
+- `PROGRESS` *(optional)* — periodic **aggregate** for a range scan (position, keys/sec, ETA) for the UI.
 - `PING` / `PONG`, `BYE`.
-- Flow control: **credit-based backpressure** (server advertises how many it can accept) replacing the unbounded queue; plus bounded queues with explicit drop/`ERROR` rather than silent loss.
+- **Hard non-goal:** never emit an event per *produced* key — only the **configured results of interest** (vanity hits / DB founds) plus the queue-lifecycle events above. Streaming every generated key would be orders of magnitude too slow and defeats the purpose.
+
+**Flow control:** **credit-based backpressure** on ingestion (server advertises how many it can accept) replacing the unbounded queue; on the notification side, bounded per-subscriber queues with explicit drop (for lossy `PROGRESS`) rather than silent loss, while founds stay on the durable log sink.
 
 **Transport recommendation (honest trade-offs):**
 - **WebSocket = primary.** Already a dependency (`Java-WebSocket`); bidirectional and **self-framing** (message boundaries built in — no manual length-prefix); carries **binary** (bulk keys) *and* **text/JSON** (control); and is **browser-native**, so the *same* endpoint feeds the web UI (ingest + feedback + monitoring over one connection). Best single choice for "a very good network API + the planned UI."
@@ -430,7 +441,11 @@ The current transports are **one-directional and not n-to-n**: TCP `KeyProducerJ
 - `PROGRESS` is **lossy-OK** — best-effort broadcast, drop for slow subscribers (ZMQ `PUB` with a send HWM does this natively; WebSocket: bounded per-subscriber queue, drop-oldest).
 - `RESULT` (founds) is **precious** — keep the existing durable log/file sink as the source of truth so a found key is *never* lost to a dropped notification, and optionally offer an at-least-once acked delivery for subscribers that need it.
 
-**Implementation seam:** model this as a `ResultSink`/event-bus interface the consumer publishes to (decoupled from any transport), with transport adapters (`ZmqPubResultSink`, `WebSocketBroadcastResultSink`, …) and a connection/subscriber registry; the ingestion side stays the `KeySource` abstraction feeding the existing queue. Producers and listeners are independent clients — a listener need not be a producer and vice versa.
+**Implementation seam — a `connection` package with two sub-packages (named from the server's perspective):**
+- `connection.receiver` — accepts incoming private keys (a `KeySource` that feeds the existing queue). Today's socket key producers are this role.
+- `connection.sender` — publishes `CONFIG`-on-connect + the event stream to all subscribers (a `ResultSink`/event-bus the consumer publishes to, plus a subscriber registry and per-subscriber bounded queues).
+
+Each transport provides the impls it needs in each sub-package (see the adapter matrix below). The consumer publishes to the transport-agnostic `ResultSink`; producers and listeners are independent clients — a listener need not be a producer and vice versa.
 
 **Adapter matrix (transport × direction) — do we implement a sender per receiver?** Conceptually yes: each transport can have an **ingestion adapter** (`KeySource`, today's receiver key producers already are this) *and* a **notification adapter** (`ResultSink`). But these are two different *roles*, not a receiver subclassed into a sender, and the directions are **not symmetric per transport** — so it is not 6 mandatory classes:
 
@@ -445,7 +460,7 @@ Fill the matrix by **value, not parity**: WebSocket both (API + web UI) first; Z
 #### Deliverables (ordered)
 
 1. **Finding service that accepts keys / ranges / hash160s (do first).** New run mode (`CCommand`, e.g. `FindService`) wiring the consumer to a network *key source* instead of an in-process producer queue. Introduce a `KeySource` abstraction feeding the existing queue; producers (`ProducerJava`, `ProducerOpenCL`, third-party) become **clients** of the protocol. Add `SUBMIT_RANGE` (reuse the incremental expander) and `SUBMIT_HASH160` (checker mode).
-2. **Result feedback channel (second).** A structured **outbound** event stream — `RESULT` (DB founds), `VANITY_HIT`, periodic `PROGRESS` — published from the consumer via a new `ResultSink`/event-emitter, optional and **backpressure-safe (never blocks the finding hot path)**. Over WebSocket (same connection) / ZMQ PUB / HTTP callback. This is what lets a UI or remote producer watch a key-range scan live instead of tailing logs.
+2. **Notification / result feedback channel (second) — `connection.sender`.** A structured **outbound** event stream published from the consumer via a transport-agnostic `ResultSink`/event-emitter: `CONFIG` on connect, then `KEY_QUEUED`, `GENERATION_STARTED`, `VANITY_HIT`, `HIT` (founds), and optional aggregate `PROGRESS` — **configured results of interest only, never per produced key**. Optional and **backpressure-safe (never blocks the finding hot path)**. Broadcast to all subscribers over WebSocket / ZMQ `PUB` / TCP. This is what lets a separate listener or web UI watch a scan live instead of tailing logs.
 3. **Web UI (third; ties into the Cross-platform GUI entry below).** Configure/start/stop a scan and **monitor** it (live keys/sec, range progress, hits, vanity) by subscribing to the Deliverable-2 stream over the same WebSocket. JSON config stays as the headless interface.
 
 #### Guardrails
