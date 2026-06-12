@@ -432,6 +432,16 @@ The current transports are **one-directional and not n-to-n**: TCP `KeyProducerJ
 
 **Implementation seam:** model this as a `ResultSink`/event-bus interface the consumer publishes to (decoupled from any transport), with transport adapters (`ZmqPubResultSink`, `WebSocketBroadcastResultSink`, …) and a connection/subscriber registry; the ingestion side stays the `KeySource` abstraction feeding the existing queue. Producers and listeners are independent clients — a listener need not be a producer and vice versa.
 
+**Adapter matrix (transport × direction) — do we implement a sender per receiver?** Conceptually yes: each transport can have an **ingestion adapter** (`KeySource`, today's receiver key producers already are this) *and* a **notification adapter** (`ResultSink`). But these are two different *roles*, not a receiver subclassed into a sender, and the directions are **not symmetric per transport** — so it is not 6 mandatory classes:
+
+| Transport | Ingestion (`KeySource`) | Notification (`ResultSink`) | Notes |
+|---|---|---|---|
+| WebSocket | `onMessage` | `broadcast(...)` | a **single dual-role class** can do both (bidirectional, multi-client, broadcast built-in) |
+| ZeroMQ | `PULL` adapter | **separate `PUB`** adapter | two thin adapters — socket types are fixed |
+| Raw TCP | existing single-accept reader | **new** broadcaster (accept-loop + registry + length-prefixed framing + per-client write isolation) | sender is much heavier than the receiver; not a flip |
+
+Fill the matrix by **value, not parity**: WebSocket both (API + web UI) first; ZMQ both (`PULL`+`PUB`) for cluster scale; raw TCP `KeySource` now, `ResultSink` optional/last (most work, least unique benefit). What makes the senders cheap is a **shared protocol codec** + the shared `ResultSink` event model, so each transport adapter is thin byte-moving plumbing.
+
 #### Deliverables (ordered)
 
 1. **Finding service that accepts keys / ranges / hash160s (do first).** New run mode (`CCommand`, e.g. `FindService`) wiring the consumer to a network *key source* instead of an in-process producer queue. Introduce a `KeySource` abstraction feeding the existing queue; producers (`ProducerJava`, `ProducerOpenCL`, third-party) become **clients** of the protocol. Add `SUBMIT_RANGE` (reuse the incremental expander) and `SUBMIT_HASH160` (checker mode).
