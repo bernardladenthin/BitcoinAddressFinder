@@ -360,6 +360,36 @@ This is architecturally the mirror image of the existing `KeyProducerJavaSocket`
 
 **Prerequisite before implementing:** define the wire format for key batches (size, byte order, compressed vs uncompressed flag) so that non-BAF producers can implement it without reading BAF source. Document it in `docs/wire-protocol.md`.
 
+### Decouple "producing" from "finding" — finding service + result feedback channel + web UI
+
+**Vision.** Split the project's two concerns — **generating/producing candidate keys** and **finding** (derive address → check DB → report) — into cleanly separated, independently runnable parts, *within this existing project*. Today key generation and checking are coupled in one `Finder` process. The goal is to shrink and separate them so that:
+- the **finding** side becomes a self-contained service that **accepts any keys or key ranges** from any source, and
+- a **lot more producers** can be implemented and plugged in (or run as fully external processes) without touching the finder, and
+- **operation moves to a web UI** where appropriate (configuring, starting, and especially *monitoring* are often better in a UI than in JSON config).
+
+This is the broader umbrella the **Standalone consumer (checker) service** entry above is the first concrete slice of, and it feeds the **Cross-platform GUI** entry below. Keep them consistent.
+
+**Why now / why it fits.** The existing socket / WebSocket / ZMQ key producers (`KeyProducerJavaSocket` / `KeyProducerJavaWebSocket` / `KeyProducerJavaZmq`) already demonstrate a **good ingestion API that accepts private keys (and key ranges)** over the wire. That API is the seam: generalise it into the front door of a finding service so producers are just clients.
+
+**Deliverable 1 — Finding service that accepts any keys/ranges (do first).**
+- A run mode (new `CCommand`, e.g. `FindService`) that starts the consumer/finder wired to a network key *source* instead of an in-process producer queue — accepting both individual keys and **key ranges** (start + count / start + end), expanding ranges on ingest.
+- Reuse the existing socket/WebSocket/ZMQ framing as the ingestion protocol; formalise it (the `docs/wire-protocol.md` prerequisite above covers the byte format). Producers — `ProducerJava`, `ProducerOpenCL`, third-party generators (hashcat, FPGA, cloud) — become *clients* of this service, in-process or remote.
+- Net effect: producing and finding are separable; new producers only need to speak the wire protocol, not link against the finder.
+
+**Deliverable 2 — Result feedback channel (separate, second).**
+- Today results are log-only. Add a structured **outbound feedback channel** that emits events back to whoever is driving a scan: **database founds (hits)** and **vanity-pattern matches**, plus periodic **progress** (e.g. for a key-range search: range start/end, keys checked, keys/sec, ETA, last position).
+- Transport mirrors the ingestion side (WebSocket / ZMQ PUB / HTTP callback) so a remote producer or a UI can subscribe. Keep it optional and backpressure-safe (never block the finding hot path).
+- This is what lets a **web UI monitor a key-range search live** — progress bars, found/vanity notifications — instead of tailing logs.
+
+**Deliverable 3 — Web UI (ties into the Cross-platform GUI entry below).**
+- Drive the finding service and (optionally) producers from a browser: configure a scan, start/stop, and **monitor** via the Deliverable-2 feedback channel (live keys/sec, progress of a range, hits, vanity matches).
+- Configuration-via-UI replaces hand-writing JSON for the common cases; the JSON config stays as the machine/headless interface.
+
+**Design notes / guardrails.**
+- Preserve the layered architecture: the network *source* and the *feedback emitter* are new edges; introduce them as their own small packages/interfaces (a `KeySource` abstraction feeding the existing `LinkedBlockingQueue`, and a `ResultSink`/event-emitter the consumer publishes to) rather than threading sockets through `ConsumerJava`.
+- The feedback channel must not couple finding to a UI — it publishes events; UI/CLI/remote producer are just subscribers.
+- Security: ingestion and feedback endpoints handle private keys and hits — bind locally by default, document auth/exposure clearly before any remote default.
+
 ### Cross-platform GUI (desktop + mobile) — beginner-friendly launcher
 
 BAF is currently a CLI + JSON-config tool. Adding a minimal GUI would make it accessible to users who are not comfortable with JSON configuration files. The target experience: download one file, double-click, pick a GPU or CPU, point at the Light DB, click Start — and see a live counter of keys/second and any hits.
