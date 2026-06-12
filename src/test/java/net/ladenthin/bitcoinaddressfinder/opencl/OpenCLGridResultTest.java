@@ -262,7 +262,7 @@ public class OpenCLGridResultTest {
         assertThat(keys[0].getCompressedKeyHash(), is(equalTo(hc0)));
         assertThat(keys[1].getUncompressedKeyHash(), is(equalTo(hu1)));
         assertThat(keys[1].getCompressedKeyHash(), is(equalTo(hc1)));
-        // uncompressed key is 04 || X || Y
+        // uncompressed key is the SEC prefix 0x04 followed by X then Y
         assertThat(keys[0].getUncompressed(), is(equalTo(PublicKeyBytes.assembleUncompressedPublicKey(x0, y0))));
         assertThat(keys[1].getUncompressed(), is(equalTo(PublicKeyBytes.assembleUncompressedPublicKey(x1, y1))));
     }
@@ -286,7 +286,7 @@ public class OpenCLGridResultTest {
         // act
         PublicKeyBytes[] keys = gridResult.getPublicKeyBytes();
 
-        // assert — uncompressed is 04 || X || Y, so uncompressed[1] is X[0] read from byte 8
+        // assert — uncompressed is 0x04 then X then Y, so uncompressed[1] is X[0] read from byte 8
         assertThat(keys[0].getUncompressed()[1], is(equalTo((byte) 0xAB)));
     }
     // </editor-fold>

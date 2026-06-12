@@ -275,6 +275,24 @@ class BinaryFuse8AddressPresenceTest {
     }
 
     @Test
+    void gpuFilterData_hasArrayAwareValueSemantics() {
+        byte[] fp = {1, 2, 3, 4};
+        BinaryFuse8GpuFilterData a = new BinaryFuse8GpuFilterData(fp.clone(), 7L, 2, 1, 4);
+        BinaryFuse8GpuFilterData equal = new BinaryFuse8GpuFilterData(fp.clone(), 7L, 2, 1, 4);
+        BinaryFuse8GpuFilterData differentArray = new BinaryFuse8GpuFilterData(new byte[] {1, 2, 3, 9}, 7L, 2, 1, 4);
+        BinaryFuse8GpuFilterData differentSeed = new BinaryFuse8GpuFilterData(fp.clone(), 8L, 2, 1, 4);
+
+        // value semantics: equal content (different array instances) are equal with equal hashCode
+        assertThat(a.equals(equal), is(true));
+        assertThat(a.hashCode() == equal.hashCode(), is(true));
+        // differing array content or scalar makes them unequal
+        assertThat(a.equals(differentArray), is(false));
+        assertThat(a.equals(differentSeed), is(false));
+        // toString prints the length, not the raw array content
+        assertThat(a.toString().contains("fingerprints.length=4"), is(true));
+    }
+
+    @Test
     void toGpuFilterData_mirrorsGettersForGpuUpload() {
         ListIterable src = new ListIterable();
         for (int i = 1; i <= 15; i++) {

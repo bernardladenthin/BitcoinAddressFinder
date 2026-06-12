@@ -15,8 +15,6 @@ import org.junit.jupiter.api.Test;
  */
 public class CProducerOpenCLTest {
 
-    public CProducerOpenCLTest() {}
-
     @Test
     public void defaults_enableGpuFilterAndTransferAll_areFalse() {
         // arrange + act

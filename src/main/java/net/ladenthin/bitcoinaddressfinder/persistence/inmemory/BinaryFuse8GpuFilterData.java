@@ -3,6 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.persistence.inmemory;
 
+import java.util.Arrays;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
+
 /**
  * Immutable, cross-layer payload describing a {@link BinaryFuse8AddressPresence} filter for
  * GPU VRAM upload.
@@ -14,16 +18,52 @@ package net.ladenthin.bitcoinaddressfinder.persistence.inmemory;
  * filter's package-private getters; {@code seed} is split into a low/high {@code int} pair by
  * the caller before it reaches the kernel.
  *
+ * <p>{@link #equals(Object)}, {@link #hashCode()} and {@link #toString()} are overridden to give
+ * the {@code fingerprints} array proper value semantics (the record's auto-generated versions
+ * would compare by array identity); {@code toString} prints only the array length, since the
+ * fingerprint array can be large.
+ *
  * @param fingerprints       the fingerprint slot array (reference, treated as read-only)
  * @param seed               the construction seed used by the lookup hash
  * @param segmentLength      the per-segment {@code reduce} length
  * @param segmentLengthMask  {@code segmentLength - 1} (GPU metadata mirror)
  * @param segmentCountLength  the total fingerprint slot count ({@code fingerprints.length})
  */
-// The fingerprint array is carried by reference as a read-only GPU-upload payload; this type is
-// never compared with equals()/hashCode() (the array-component identity-semantics concern the
-// ArrayRecordComponent check guards against does not apply here), so the array component is
-// intentional rather than a defect.
+// Error Prone's ArrayRecordComponent is purely syntactic (it flags any array record component
+// because the auto-generated equals/hashCode use identity); it is suppressed here because this
+// record provides explicit Arrays-aware equals/hashCode/toString below, giving the array correct
+// value semantics. SonarCloud rule S6218 is satisfied by those same overrides.
 @SuppressWarnings("ArrayRecordComponent")
 public record BinaryFuse8GpuFilterData(
-        byte[] fingerprints, long seed, int segmentLength, int segmentLengthMask, int segmentCountLength) {}
+        byte[] fingerprints, long seed, int segmentLength, int segmentLengthMask, int segmentCountLength) {
+
+    @Override
+    public boolean equals(@Nullable Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof BinaryFuse8GpuFilterData other)) {
+            return false;
+        }
+        return seed == other.seed
+                && segmentLength == other.segmentLength
+                && segmentLengthMask == other.segmentLengthMask
+                && segmentCountLength == other.segmentCountLength
+                && Arrays.equals(fingerprints, other.fingerprints);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(seed, segmentLength, segmentLengthMask, segmentCountLength);
+        result = 31 * result + Arrays.hashCode(fingerprints);
+        return result;
+    }
+
+    @Override
+    public String toString() {
+        // Length only — the fingerprint array can be large and would be log-killing in full.
+        return "BinaryFuse8GpuFilterData[fingerprints.length=" + fingerprints.length + ", seed=" + seed
+                + ", segmentLength=" + segmentLength + ", segmentLengthMask=" + segmentLengthMask
+                + ", segmentCountLength=" + segmentCountLength + "]";
+    }
+}
