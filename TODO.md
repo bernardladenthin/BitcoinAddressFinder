@@ -404,6 +404,32 @@ The "wire format" is therefore implicit and minimal: **the unit is exactly 32 by
 
 Recommendation: implement the schema once, ship **WebSocket first** (covers the API *and* the UI), add gRPC/ZMQ later only if a concrete scale/interop need appears.
 
+#### Async notifications + n-to-n (the "secondary results channel" question)
+
+The current transports are **one-directional and not n-to-n**: TCP `KeyProducerJavaSocket` in SERVER mode calls `serverSocket.accept()` exactly **once** and then reads 32-byte frames from that *single* client forever (one connection per producer instance — not even n-to-1); WebSocket's server is multi-client but only ingests; ZMQ uses a single PULL socket. None of them ever send anything back. So "async notification of results/progress" is genuinely new wiring, and the natural shape is **two logical channels with opposite fan patterns**:
+
+- **Ingestion channel — fan-in (n producers → 1 finder):** n key producers submit keys/ranges/hash160s.
+- **Notification channel — fan-out (1 finder → n listeners):** the finder publishes `RESULT` / `VANITY_HIT` / `PROGRESS` to all subscribers.
+
+**Is a separate (secondary) results socket good? — Yes, as the default, with a single-socket option per transport.** Trade-off:
+
+- **Separate results channel (recommended baseline).** Pros: keys and results have *different* fan patterns (fan-in vs fan-out) and *different* audiences — a **pure monitoring listener (e.g. the web UI) is not a key producer and should not need submit rights**; independent lifecycle, auth scope, and backpressure; idiomatic for ZMQ. Cons: cross-channel **correlation** (which hit belongs to which submitted key) — mitigated by making `RESULT` **self-describing** (it already carries the secret + address), so a listener that just wants "tell me about founds" needs no correlation at all; optional `producerId` / `batchId` covers producers that want to match their own submissions. Two endpoints to configure.
+- **Single bidirectional connection (per-transport option).** For **WebSocket / gRPC streaming**, results can return on the *same* connection the client opened — per-client correlation is then trivial and there is one endpoint. This does **not** serve pure listeners that never submitted, so even here the server still needs a subscribe role + a subscriber registry to broadcast.
+
+**Recommended model: two roles, not two hard-coded sockets.** A client may take a **submit** role, a **subscribe** role, or both. Each transport maps the roles idiomatically:
+
+| Transport | Ingestion (fan-in) | Notification (fan-out) |
+|---|---|---|
+| ZeroMQ | `PULL` (bind; n `PUSH` connect) | **separate `PUB`** socket (n `SUB` connect) — the idiomatic "secondary socket" |
+| WebSocket | one server, many clients in *submit* role | same server broadcasts to all clients in *subscribe* role (role negotiated per connection or via path `/submit` vs `/events`) |
+| Raw TCP | accept-**loop** many clients (fix the single-`accept()` limitation) + a connection registry | either a **second port** for events, or write events back on each subscriber's socket from the registry |
+
+**Backpressure + QoS (important for fan-out):** a slow listener must **never** stall the finding hot path. Split QoS by event kind:
+- `PROGRESS` is **lossy-OK** — best-effort broadcast, drop for slow subscribers (ZMQ `PUB` with a send HWM does this natively; WebSocket: bounded per-subscriber queue, drop-oldest).
+- `RESULT` (founds) is **precious** — keep the existing durable log/file sink as the source of truth so a found key is *never* lost to a dropped notification, and optionally offer an at-least-once acked delivery for subscribers that need it.
+
+**Implementation seam:** model this as a `ResultSink`/event-bus interface the consumer publishes to (decoupled from any transport), with transport adapters (`ZmqPubResultSink`, `WebSocketBroadcastResultSink`, …) and a connection/subscriber registry; the ingestion side stays the `KeySource` abstraction feeding the existing queue. Producers and listeners are independent clients — a listener need not be a producer and vice versa.
+
 #### Deliverables (ordered)
 
 1. **Finding service that accepts keys / ranges / hash160s (do first).** New run mode (`CCommand`, e.g. `FindService`) wiring the consumer to a network *key source* instead of an in-process producer queue. Introduce a `KeySource` abstraction feeding the existing queue; producers (`ProducerJava`, `ProducerOpenCL`, third-party) become **clients** of the protocol. Add `SUBMIT_RANGE` (reuse the incremental expander) and `SUBMIT_HASH160` (checker mode).
