@@ -360,35 +360,61 @@ This is architecturally the mirror image of the existing `KeyProducerJavaSocket`
 
 **Prerequisite before implementing:** define the wire format for key batches (size, byte order, compressed vs uncompressed flag) so that non-BAF producers can implement it without reading BAF source. Document it in `docs/wire-protocol.md`.
 
-### Decouple "producing" from "finding" — finding service + result feedback channel + web UI
+### Decouple "producing" from "finding" — a proper network API (finding service + result feedback + web UI)
 
-**Vision.** Split the project's two concerns — **generating/producing candidate keys** and **finding** (derive address → check DB → report) — into cleanly separated, independently runnable parts, *within this existing project*. Today key generation and checking are coupled in one `Finder` process. The goal is to shrink and separate them so that:
-- the **finding** side becomes a self-contained service that **accepts any keys or key ranges** from any source, and
-- a **lot more producers** can be implemented and plugged in (or run as fully external processes) without touching the finder, and
-- **operation moves to a web UI** where appropriate (configuring, starting, and especially *monitoring* are often better in a UI than in JSON config).
+**Vision.** Split the project's two concerns — **producing candidate keys** and **finding** (derive address → check DB → report) — into cleanly separated, independently runnable parts, *within this existing project*. Today they are coupled in one `Finder` process. Shrink and separate them so the **finding** side becomes a self-contained service reachable over the network that **accepts keys, key ranges, or hash160s** from any source; so a **lot more producers** can be added (in-process or fully external) without touching the finder; and so operation/monitoring can move to a **web UI**. This is the umbrella the **Standalone consumer (checker) service** entry above is the first slice of, and it feeds the **Cross-platform GUI** entry below.
 
-This is the broader umbrella the **Standalone consumer (checker) service** entry above is the first concrete slice of, and it feeds the **Cross-platform GUI** entry below. Keep them consistent.
+#### Current state (researched) — what the "raw sockets" actually are
 
-**Why now / why it fits.** The existing socket / WebSocket / ZMQ key producers (`KeyProducerJavaSocket` / `KeyProducerJavaWebSocket` / `KeyProducerJavaZmq`) already demonstrate a **good ingestion API that accepts private keys (and key ranges)** over the wire. That API is the seam: generalise it into the front door of a finding service so producers are just clients.
+Three network key-input transports already exist, all **inbound ingestion only**, all feeding the shared `LinkedBlockingQueue<byte[]>` through `AbstractKeyProducerQueueBuffered`:
 
-**Deliverable 1 — Finding service that accepts any keys/ranges (do first).**
-- A run mode (new `CCommand`, e.g. `FindService`) that starts the consumer/finder wired to a network key *source* instead of an in-process producer queue — accepting both individual keys and **key ranges** (start + count / start + end), expanding ranges on ingest.
-- Reuse the existing socket/WebSocket/ZMQ framing as the ingestion protocol; formalise it (the `docs/wire-protocol.md` prerequisite above covers the byte format). Producers — `ProducerJava`, `ProducerOpenCL`, third-party generators (hashcat, FPGA, cloud) — become *clients* of this service, in-process or remote.
-- Net effect: producing and finding are separable; new producers only need to speak the wire protocol, not link against the finder.
+| Transport | Class | Mode(s) | Framing today |
+|---|---|---|---|
+| TCP | `KeyProducerJavaSocket` | SERVER (accept) / CLIENT (connect) | reads **fixed 32-byte frames** back-to-back, no delimiter/header |
+| WebSocket | `KeyProducerJavaWebSocket` | embedded server | one **binary message == 32 bytes** per key (else rejected/logged) |
+| ZeroMQ | `KeyProducerJavaZmq` | PULL, BIND / CONNECT | one **message == 32 bytes** per key |
 
-**Deliverable 2 — Result feedback channel (separate, second).**
-- Today results are log-only. Add a structured **outbound feedback channel** that emits events back to whoever is driving a scan: **database founds (hits)** and **vanity-pattern matches**, plus periodic **progress** (e.g. for a key-range search: range start/end, keys checked, keys/sec, ETA, last position).
-- Transport mirrors the ingestion side (WebSocket / ZMQ PUB / HTTP callback) so a remote producer or a UI can subscribe. Keep it optional and backpressure-safe (never block the finding hot path).
-- This is what lets a **web UI monitor a key-range search live** — progress bars, found/vanity notifications — instead of tailing logs.
+The "wire format" is therefore implicit and minimal: **the unit is exactly 32 bytes = one raw big-endian *unsigned private key*** (decoded by `keyUtility.bigIntegerFromUnsignedByteArray`; length must equal `PRIVATE_KEY_MAX_NUM_BYTES`). What is **missing** (the gap to fill):
+- No protocol **version / handshake**, no **message types**, no **batch header** (one key per message on WS/ZMQ is very chatty).
+- **No key-range submission.** Only the local `KeyProducerJavaIncremental` enumerates ranges; the network path cannot say "scan start..start+N". (Earlier drafts of this TODO wrongly implied ranges over sockets — they do not exist.)
+- No way to submit **hash160s directly** (needed for the pure checker mode).
+- No **acknowledgements / errors** back to the sender (it can't tell if keys were accepted, invalid, or dropped).
+- No **result feedback** at all — hits/vanity are `ConsumerJava` **log-only** (`HIT_PREFIX` / `VANITY_HIT_PREFIX`); a remote sender gets nothing and cannot correlate a hit to what it sent.
+- No **backpressure** (the queue is unbounded → memory risk under a fast sender), no **auth/TLS** (it moves private keys in the clear).
 
-**Deliverable 3 — Web UI (ties into the Cross-platform GUI entry below).**
-- Drive the finding service and (optionally) producers from a browser: configure a scan, start/stop, and **monitor** via the Deliverable-2 feedback channel (live keys/sec, progress of a range, hits, vanity matches).
-- Configuration-via-UI replaces hand-writing JSON for the common cases; the JSON config stays as the machine/headless interface.
+#### Proposed "very good API" — one transport-agnostic protocol, offered over the best-fit transports
 
-**Design notes / guardrails.**
-- Preserve the layered architecture: the network *source* and the *feedback emitter* are new edges; introduce them as their own small packages/interfaces (a `KeySource` abstraction feeding the existing `LinkedBlockingQueue`, and a `ResultSink`/event-emitter the consumer publishes to) rather than threading sockets through `ConsumerJava`.
-- The feedback channel must not couple finding to a UI — it publishes events; UI/CLI/remote producer are just subscribers.
-- Security: ingestion and feedback endpoints handle private keys and hits — bind locally by default, document auth/exposure clearly before any remote default.
+**Define one small, versioned, typed, framed message schema** (document it in `docs/wire-protocol.md` + a machine schema) and serve it over one or more transports. Message types (request/stream):
+- `HELLO` / capability + version negotiation (key formats, compression, max batch, supported coins).
+- `SUBMIT_KEYS` — a **batch** of N×32-byte keys in one frame (kills the one-message-per-key overhead).
+- `SUBMIT_RANGE` — `{startKey:32, count, increment}` (+ optional compressed/coin flags). Orders of magnitude less bandwidth than enumerating keys; the finder expands it (reuse `KeyProducerJavaIncremental`). **The single highest-value new capability.**
+- `SUBMIT_HASH160` — pre-derived 20-byte hashes for the pure checker mode (skip EC derivation).
+- `ACK` / `ERROR` — accepted count, or rejection with a code (bad length, out-of-range, backpressure, unknown type) + optional correlation id.
+- `RESULT` — a **hit**: secret + address + which variant (uncompressed/compressed/coin), optionally correlated to the submitting batch/range/offset.
+- `VANITY_HIT` — pattern match event.
+- `PROGRESS` — for a range scan: position, keys checked, keys/sec, ETA, accepted/rejected counters.
+- `PING` / `PONG`, `BYE`.
+- Flow control: **credit-based backpressure** (server advertises how many it can accept) replacing the unbounded queue; plus bounded queues with explicit drop/`ERROR` rather than silent loss.
+
+**Transport recommendation (honest trade-offs):**
+- **WebSocket = primary.** Already a dependency (`Java-WebSocket`); bidirectional and **self-framing** (message boundaries built in — no manual length-prefix); carries **binary** (bulk keys) *and* **text/JSON** (control); and is **browser-native**, so the *same* endpoint feeds the web UI (ingest + feedback + monitoring over one connection). Best single choice for "a very good network API + the planned UI."
+- **gRPC (bidirectional streaming) = optional, for typed multi-language producers.** Protobuf gives a language-neutral contract with codegen (hashcat/FPGA/cloud producers in any language), built-in flow control and deadlines. Cost: adds `grpc-java` (heavier; friction with the repo's `dependencyConvergence` + `bannedDependencies`), and needs grpc-web for browsers. (Note: protobuf is already a transitive dep via bitcoinj, so the schema language is familiar.)
+- **ZeroMQ = optional, for scale fan-out.** Great for many-producers→one-finder or one-producer→many-checkers, but no built-in request/response correlation and not browser-friendly. Keep for the horizontal-scaling story.
+- **Raw TCP = keep as a minimal/low-overhead option, but versioned + length-prefixed** (the current "read 32 bytes forever" is fragile and un-versioned).
+
+Recommendation: implement the schema once, ship **WebSocket first** (covers the API *and* the UI), add gRPC/ZMQ later only if a concrete scale/interop need appears.
+
+#### Deliverables (ordered)
+
+1. **Finding service that accepts keys / ranges / hash160s (do first).** New run mode (`CCommand`, e.g. `FindService`) wiring the consumer to a network *key source* instead of an in-process producer queue. Introduce a `KeySource` abstraction feeding the existing queue; producers (`ProducerJava`, `ProducerOpenCL`, third-party) become **clients** of the protocol. Add `SUBMIT_RANGE` (reuse the incremental expander) and `SUBMIT_HASH160` (checker mode).
+2. **Result feedback channel (second).** A structured **outbound** event stream — `RESULT` (DB founds), `VANITY_HIT`, periodic `PROGRESS` — published from the consumer via a new `ResultSink`/event-emitter, optional and **backpressure-safe (never blocks the finding hot path)**. Over WebSocket (same connection) / ZMQ PUB / HTTP callback. This is what lets a UI or remote producer watch a key-range scan live instead of tailing logs.
+3. **Web UI (third; ties into the Cross-platform GUI entry below).** Configure/start/stop a scan and **monitor** it (live keys/sec, range progress, hits, vanity) by subscribing to the Deliverable-2 stream over the same WebSocket. JSON config stays as the headless interface.
+
+#### Guardrails
+
+- Preserve the layered architecture: the network *source* and *feedback emitter* are new edges — introduce them as their own small packages/interfaces (`KeySource` → existing `LinkedBlockingQueue`; `ResultSink` ← consumer events), not by threading sockets through `ConsumerJava`.
+- The feedback channel publishes events; UI / CLI / remote producer are just subscribers — finding must not depend on any UI.
+- **Security first:** ingestion and feedback move **private keys and hits**. Bind to localhost by default; require auth (token / mTLS) and TLS before any remote-exposed default; document the exposure model in `docs/wire-protocol.md`. Add bounded queues so a hostile/fast sender cannot OOM the finder.
 
 ### Cross-platform GUI (desktop + mobile) — beginner-friendly launcher
 
