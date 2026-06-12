@@ -128,6 +128,13 @@ public class OpenClKernelConstantsTest {
     }
 
     @Test
+    public void gpuNativeWordOrder_isLittleEndian() {
+        // Single source of truth for the host-side GPU byte-order assumption. Pinned so any
+        // change is deliberate and reviewed (it would also require lockstep kernel changes).
+        assertThat(OpenClKernelConstants.GPU_NATIVE_WORD_ORDER, is(java.nio.ByteOrder.LITTLE_ENDIAN));
+    }
+
+    @Test
     public void byteExact_unifiedOutputBufferFormat() {
         assertThat(OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES, is(4));
         assertThat(OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL, is(0xFFFF_FFFF));

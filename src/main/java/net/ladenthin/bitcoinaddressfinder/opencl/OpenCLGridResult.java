@@ -5,7 +5,6 @@ package net.ladenthin.bitcoinaddressfinder.opencl;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.Arrays;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
@@ -97,7 +96,7 @@ public class OpenCLGridResult {
         // device's native little-endian order; read the view as little-endian. The X/Y/hash
         // byte slots are copied verbatim (the kernel already produced big-endian coordinates),
         // so the buffer order does not affect those absolute byte-range reads.
-        ByteBuffer readOnlyResult = result.asReadOnlyBuffer().order(ByteOrder.LITTLE_ENDIAN);
+        ByteBuffer readOnlyResult = result.asReadOnlyBuffer().order(OpenClKernelConstants.GPU_NATIVE_WORD_ORDER);
 
         final int count = readOnlyResult.getInt(0);
 

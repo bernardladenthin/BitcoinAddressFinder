@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.constants;
 
+import java.nio.ByteOrder;
+
 /**
  * OpenCL kernel byte-layout and wire-format constants.
  *
@@ -35,6 +37,34 @@ public final class OpenClKernelConstants {
     private OpenClKernelConstants() {
         // utility constant holder; not instantiable.
     }
+
+    /**
+     * Byte order in which the OpenCL kernel writes its {@code u32} words into the output
+     * buffer &mdash; and therefore the order the Java side must use to read back every
+     * kernel-written multi-byte integer (the leading count word and the per-entry
+     * {@code work_item_index}), and the target order when uploading the private-key words to
+     * the kernel.
+     *
+     * <p><b>Single source of truth for the host-side GPU byte-order assumption.</b> Every Java
+     * site that interprets a kernel-native word references this constant instead of a bare
+     * {@link ByteOrder#LITTLE_ENDIAN} literal, so the assumption lives in exactly one place.
+     *
+     * <p>It is {@link ByteOrder#LITTLE_ENDIAN} because every OpenCL device the project targets
+     * (all NVIDIA / AMD / Intel GPUs, and pocl on x86/ARM) is little-endian. The kernel
+     * canonicalises its X / Y / hash160 output to big-endian <i>on-device</i> (via
+     * {@code swap_u32} / {@code ripemd160_update_swap}), so those fields are read on the host as
+     * raw bytes and are unaffected by this constant; only the kernel-native {@code u32} fields
+     * (count, index) and the private-key upload depend on it.
+     *
+     * <p><b>Changing this to {@link ByteOrder#BIG_ENDIAN} is necessary but NOT sufficient to
+     * run on a big-endian OpenCL device:</b> the kernel's own {@code swap_u32} /
+     * {@code ripemd160_update_swap} canonicalisation is likewise little-endian-baked and would
+     * have to change in lockstep (out of scope for the Java-side centralisation). A future
+     * device-endianness guard should reject any device whose
+     * {@code OpenCLDevice.getByteOrder()} differs from this value rather than produce silently
+     * corrupt results.
+     */
+    public static final ByteOrder GPU_NATIVE_WORD_ORDER = ByteOrder.LITTLE_ENDIAN;
 
     /** Number of bits in a byte. */
     public static final int BITS_PER_BYTE = 8;

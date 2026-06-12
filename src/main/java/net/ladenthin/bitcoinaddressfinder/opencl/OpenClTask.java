@@ -294,8 +294,8 @@ public class OpenClTask implements ReleaseCLObject {
         // longer key — that would corrupt the scalar fed to the kernel.
         final byte[] byteArray =
                 ByteBufferUtility.bigIntegerToFixedLengthBytes(privateKeyBase, PRIVATE_KEY_SOURCE_SIZE_IN_BYTES);
-        EndiannessConverter endiannessConverter =
-                new EndiannessConverter(ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN, byteBufferUtility);
+        EndiannessConverter endiannessConverter = new EndiannessConverter(
+                ByteOrder.BIG_ENDIAN, OpenClKernelConstants.GPU_NATIVE_WORD_ORDER, byteBufferUtility);
         endiannessConverter.convertEndian(byteArray);
         ByteBufferUtility.putToByteBuffer(privateKeySourceArgument.getByteBuffer(), byteArray);
     }
@@ -411,7 +411,7 @@ public class OpenClTask implements ReleaseCLObject {
                 // Read back the count word first, then only the bytes the kernel produced:
                 // full mode -> overallWorkSize entries; compact mode -> K hit entries.
                 final ByteBuffer countHeader = ByteBuffer.allocateDirect(OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES)
-                        .order(ByteOrder.LITTLE_ENDIAN);
+                        .order(OpenClKernelConstants.GPU_NATIVE_WORD_ORDER);
                 clEnqueueReadBuffer(
                         commandQueue,
                         destinationArgument.getMem(),
