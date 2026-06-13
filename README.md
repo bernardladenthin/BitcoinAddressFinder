@@ -1331,6 +1331,27 @@ advantage grows with `batchSizeInBits` (≈1.7× at grid 20). Run it yourself:
 mvn test-compile exec:java -Dexec.args="GpuFuse8FilterBenchmark"
 ```
 
+**Device-side breakdown (where the time actually goes).** The throughput above mixes three
+costs: GPU kernel compute, the PCIe read-back, and the host-side parse of the returned grid.
+To separate them, set `enableProfiling: true` on the OpenCL producer (or run the benchmark
+with `-p profiling=true`); the command queue is then created with `CL_QUEUE_PROFILING_ENABLE`
+and each launch is timestamped on the device. The same grid-19 run on the RTX 3070 reports:
+
+| Phase | Off — full transfer | On — Binary Fuse 8 compact | Effect |
+|-------|--------------------:|---------------------------:|--------|
+| GPU kernel compute            | 196.2 ms | 200.8 ms | **+4.7 ms (~2.4%)** — the inline filter check |
+| PCIe read-back (device)       |   8.74 ms |  0.035 ms | **~250× less** — only the ~0.4% hits cross the bus |
+| Host-side parse (wall − device) | ~67.9 ms |  ~8.4 ms | **~8× less** — the consumer parses ~2 k hits, not 524 k results |
+| **Per-launch wall time**      | ~272.8 ms | ~209.3 ms |  |
+
+The takeaway: **the GPU-side filtering is not expensive on the GPU.** It adds only ~2.4 % to
+kernel compute (a handful of integer ops + 3–6 fingerprint reads per candidate, versus the
+elliptic-curve math and two SHA-256 + two RIPEMD-160 hashes that dominate the kernel). The
+~1.28× end-to-end gain comes almost entirely from collapsing the PCIe transfer (~250×) and the
+host-side parse (~8×) — i.e. it offloads the address-presence check from the CPU at negligible
+GPU cost, which is exactly the design intent. (Profiling adds a little driver overhead and is
+**off by default**; it is a diagnostic switch, never enabled by the runtime pipeline.)
+
 
 ## Logging and Runtime Statistics
 

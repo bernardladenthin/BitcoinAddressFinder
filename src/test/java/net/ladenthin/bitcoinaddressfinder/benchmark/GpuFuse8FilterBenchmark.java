@@ -166,6 +166,16 @@ public class GpuFuse8FilterBenchmark {
     @Param({"1048576"})
     public int filterEntries;
 
+    /**
+     * Enables OpenCL device-side profiling ({@link CProducerOpenCL#enableProfiling}). When
+     * {@code true}, {@link #tearDown()} prints the device-side kernel-execution and result-readback
+     * times of the last launch, isolating GPU compute from PCIe transfer (and, against the
+     * wall-clock throughput, from host-side parsing). Off by default so the headline throughput
+     * rows are not perturbed by profiling overhead; enable with {@code -p profiling=true}.
+     */
+    @Param({"false"})
+    public boolean profiling;
+
     private OpenCLContext ctx;
     private BigInteger privateKeyBase;
 
@@ -197,6 +207,7 @@ public class GpuFuse8FilterBenchmark {
         // full-transfer layout (no filter uploaded -> createKeys() transfers every result).
         p.enableGpuFilter = gpuFilter;
         p.transferAll = false;
+        p.enableProfiling = profiling;
 
         ctx = new OpenCLContext(p, new BitHelper());
         ctx.init();
@@ -240,6 +251,18 @@ public class GpuFuse8FilterBenchmark {
     @TearDown(Level.Trial)
     public void tearDown() {
         if (ctx != null && !ctx.isClosed()) {
+            if (profiling) {
+                ctx.getOpenClTask().ifPresent(task -> {
+                    long kernelNanos = task.getLastKernelExecutionNanos();
+                    long readbackNanos = task.getLastResultReadbackNanos();
+                    // Printed to stdout (captured in the JMH log) rather than returned as a JMH
+                    // metric: these are device-side timings of the last launch, used to attribute
+                    // cost between GPU compute and PCIe transfer, not the benchmark's throughput.
+                    System.out.printf(
+                            "[profiling] gpuFilter=%s batchSizeInBits=%d -> kernel=%.3f ms, readback=%.3f ms%n",
+                            gpuFilter, batchSizeInBits, kernelNanos / 1_000_000.0, readbackNanos / 1_000_000.0);
+                });
+            }
             ctx.close();
         }
     }

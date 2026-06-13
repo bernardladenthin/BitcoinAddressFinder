@@ -5,6 +5,8 @@ package net.ladenthin.bitcoinaddressfinder.opencl;
 
 import static org.jocl.CL.CL_MEM_COPY_HOST_PTR;
 import static org.jocl.CL.CL_MEM_READ_ONLY;
+import static org.jocl.CL.CL_QUEUE_PROFILING_ENABLE;
+import static org.jocl.CL.CL_QUEUE_PROPERTIES;
 import static org.jocl.CL.clBuildProgram;
 import static org.jocl.CL.clCreateBuffer;
 import static org.jocl.CL.clCreateCommandQueueWithProperties;
@@ -206,8 +208,13 @@ public class OpenCLContext implements ReleaseCLObject {
         // Create a context for the selected device
         context = clCreateContext(contextProperties, 1, cl_device_ids, null, null, null);
 
-        // Create a command-queue for the selected device
+        // Create a command-queue for the selected device. Opt-in device-side profiling
+        // (CL_QUEUE_PROFILING_ENABLE) is enabled only when the diagnostic flag is set, so the
+        // production pipeline pays no profiling overhead (see CProducerOpenCL.enableProfiling).
         cl_queue_properties properties = new cl_queue_properties();
+        if (producerOpenCL.enableProfiling) {
+            properties.addProperty(CL_QUEUE_PROPERTIES, CL_QUEUE_PROFILING_ENABLE);
+        }
         commandQueue = clCreateCommandQueueWithProperties(context, device.device(), properties, null);
 
         // #################### kernel specifix ####################
