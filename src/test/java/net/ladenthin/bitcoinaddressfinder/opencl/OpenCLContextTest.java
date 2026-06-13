@@ -127,21 +127,18 @@ public class OpenCLContextTest {
     @Test
     public void assertCompactModeDeviceVersionSupported_notRequested_doesNotThrow() {
         // compact mode not requested -> version is irrelevant
-        OpenCLContext.assertCompactModeDeviceVersionSupported(
-                false, new ComparableVersion("1.2"), "test-old-device");
+        OpenCLContext.assertCompactModeDeviceVersionSupported(false, new ComparableVersion("1.2"), "test-old-device");
     }
 
     @Test
     public void assertCompactModeDeviceVersionSupported_requested_version2dot0_doesNotThrow() {
-        OpenCLContext.assertCompactModeDeviceVersionSupported(
-                true, new ComparableVersion("2.0"), "test-device");
+        OpenCLContext.assertCompactModeDeviceVersionSupported(true, new ComparableVersion("2.0"), "test-device");
     }
 
     @Test
     public void assertCompactModeDeviceVersionSupported_requested_version3dot0_doesNotThrow() {
         // 3.0 is a superset of 2.0 — should also pass
-        OpenCLContext.assertCompactModeDeviceVersionSupported(
-                true, new ComparableVersion("3.0"), "test-device");
+        OpenCLContext.assertCompactModeDeviceVersionSupported(true, new ComparableVersion("3.0"), "test-device");
     }
 
     @Test

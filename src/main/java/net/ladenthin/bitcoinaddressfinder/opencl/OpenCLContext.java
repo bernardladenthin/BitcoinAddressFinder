@@ -19,7 +19,6 @@ import static org.jocl.CL.clReleaseProgram;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.Resources;
-import org.apache.maven.artifact.versioning.ComparableVersion;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URL;
@@ -36,6 +35,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
+import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.jocl.CL;
 import org.jocl.Pointer;
 import org.jocl.Sizeof;
