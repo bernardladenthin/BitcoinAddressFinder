@@ -324,6 +324,47 @@ Recommended scoping by change type:
 
 **Full `mvn test` is reserved for the user to ask for explicitly** ("run the full tests", "do a full surefire run", or similar). Otherwise: narrow scope, report which tests were exercised, and call out anything that *would* exercise the change but was deliberately skipped so the user can decide whether to widen.
 
+### Running JMH benchmarks locally (GPU / FUSE_8 etc.)
+
+JMH benchmarks live under `src/test/java/.../benchmark/` (e.g. `GpuFuse8FilterBenchmark`,
+`GridSizeSweepBenchmark`). They have **no `@Test`** annotation and never run under `mvn test`;
+GPU benchmarks self-skip when no OpenCL 2.0+ device is present.
+
+The README documents the canonical `mvn test-compile exec:java -Dexec.args="<Benchmark>"`
+invocation. **That form was observed to fail locally on Windows**: the JVM JMH *forks* cannot
+find `org.openjdk.jmh.runner.ForkedMain` (`ClassNotFoundException`), because the pom's
+`exec-maven-plugin` runs JMH in-process and the fork does not inherit exec's classpath. The
+reliable local recipe is to launch JMH directly so the fork inherits a real `-cp`:
+
+```bash
+# 1. materialise the full test-scope classpath (includes jmh-core)
+mvn -q dependency:build-classpath -Dmdep.outputFile=target/cp-test.txt -DincludeScope=test
+
+# 2. run JMH directly; prepend the project's own classes to the dependency classpath.
+#    The --add-opens set must match pom.xml <argLine> (lmdbjava reflects into sun.nio.ch).
+java --add-opens=java.base/java.lang=ALL-UNNAMED \
+     --add-opens=java.base/java.io=ALL-UNNAMED \
+     --add-opens=java.base/java.nio=ALL-UNNAMED \
+     --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED \
+     --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED \
+     --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+     -cp "target/test-classes;target/classes;$(cat target/cp-test.txt)" \
+     org.openjdk.jmh.Main GpuFuse8FilterBenchmark -p batchSizeInBits=19 -f 1 -wi 1 -w 30 -i 1 -r 200
+```
+
+(On a POSIX shell use `:` instead of `;` as the classpath separator.) **For GPU benchmarks
+prefer one long measurement iteration over many short samples** (`-i 1 -r 200`, ~3.3 min per
+arm, plus a short `-wi 1 -w 30` to let the GPU reach steady clocks): the relevant one-time
+cost here is OpenCL **kernel compilation**, which happens once in `OpenCLContext.init()`
+(JMH `@Setup`, outside the timed region) — JVM warmup iterations do not help, so spending the
+budget on duration rather than sample count gives the steadier read. For a quick sanity check
+use `-wi 2 -i 4` (~2 min for both arms). Use `OpenCLInfo` (`{"command":"OpenCLInfo"}`) to
+confirm a device is present and pick `platformIndex` / `deviceIndex` before benchmarking.
+`GpuFuse8FilterBenchmark` was validated this way on an NVIDIA RTX 3070 (OpenCL 3.0 CUDA): a
+single ~200 s iteration gave compact FUSE_8 mode ≈ **1.28× faster** than full transfer at
+`batchSizeInBits = 19` (matching the README key-gen table's grid size; the gain grows with
+batch size, ≈ 1.7× at grid 20). The full two-arm long run took ~7m45s of wall time.
+
 ---
 
 ## Code Conventions

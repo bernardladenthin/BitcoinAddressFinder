@@ -383,6 +383,8 @@ Enable it on an OpenCL producer (see [`examples/config_Find_GPUFilterCompact.jso
 
 **Device requirements** — compact mode needs an **OpenCL 2.0+** device (the `atomic_add` on global memory) and a little-endian device (the kernel canonicalises its output as little-endian). Both are checked at producer init and fail fast with a clear message; on an older device set `transferAll: true` to keep the full-transfer path. The GPU/CPU lookup parity (key extraction + hash formula) is pinned by `Fuse8GpuHashParityTest` and exercised end-to-end on a real OpenCL device by `OpenCLCompactOutputIntegrationTest`.
 
+**Measured speedup** — see [GPU Binary Fuse 8 filter — compact output vs. full transfer](#gpu-binary-fuse-8-filter--compact-output-vs-full-transfer) under Performance Benchmarks for an A/B measurement (~1.28× at grid 19 on an RTX 3070).
+
 #### Bloom filter — FPP tuning
 
 When `addressLookupBackend` is `BLOOM`, the false positive probability is configurable via `bloomFilterFpp`:
@@ -1296,6 +1298,38 @@ For technical details, see:
 | NVIDIA RTX A3000            | Intel i7-11850H     | 160              | 19               |  5,000,000 keys/s      |
 | AMD Radeon 8060S            | AMD AI MAX+ 395     | 256              | 16               |  9,200,000 keys/s      |
 | AMD Radeon 8060S            | AMD AI MAX+ 395     | 160              | 16               | 11,000,000 keys/s      |
+
+##### GPU Binary Fuse 8 filter — compact output vs. full transfer
+
+The table above measures raw key generation. The table below isolates the effect of the
+[GPU-side Binary Fuse 8 filter](#gpu-side-binary-fuse-8-filtering-enablegpufilter)
+(`enableGpuFilter`): with it **on**, the kernel checks each derived hash160 against the
+on-GPU filter and transfers only the hits; with it **off**, every work-item result is read
+back over PCIe.
+
+> **Note:** These numbers come from the `GpuFuse8FilterBenchmark` JMH microbenchmark
+> (one kernel launch + PCIe read-back + host-side parse, measured in isolation). They are
+> **not** directly comparable to the full-pipeline figures above — the grid size differs and
+> there is no real consumer/queue — but the **on-vs-off ratio on the same row is the metric
+> that matters.**
+
+| GPU Filter (`enableGpuFilter`) | GPU Model              | Key Range (Bits) | Grid Size (Bits) | Effective Keys/s (~) | Speedup        |
+|--------------------------------|------------------------|------------------|------------------|----------------------|----------------|
+| Off — full transfer (legacy)   | NVIDIA RTX 3070 Laptop | 256              | 19               | 1,880,000 keys/s     | 1.00× baseline |
+| On — Binary Fuse 8 compact     | NVIDIA RTX 3070 Laptop | 256              | 19               | 2,410,000 keys/s     | **~1.28×**     |
+
+Measured against a ~1 M-entry filter at `batchSizeInBits = 19` (2¹⁹ ≈ 0.52 M candidates per
+launch), matching the grid size of the raw key-generation table above. The
+`GpuFuse8FilterBenchmark` JMH benchmark A/B-toggles compact mode against the legacy
+full-transfer path on the same kernel and batch; numbers above come from a single long
+measurement iteration (~200 s per arm) since the relevant one-time cost is OpenCL kernel
+compilation (done once in setup) and GPU clock ramp-up, not JVM warmup. The filter wins by
+collapsing the read-back from the full grid down to the ~0.4 % false-positive hits, so the
+advantage grows with `batchSizeInBits` (≈1.7× at grid 20). Run it yourself:
+
+```bash
+mvn test-compile exec:java -Dexec.args="GpuFuse8FilterBenchmark"
+```
 
 
 ## Logging and Runtime Statistics
