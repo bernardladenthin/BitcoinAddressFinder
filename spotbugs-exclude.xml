@@ -451,6 +451,19 @@ SPDX-License-Identifier: Apache-2.0
             <Class name="net.ladenthin.bitcoinaddressfinder.secret.RandomSecretSupplier"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerator"/>
+            <!--
+                5. BinaryFuse8GpuFilterData is a Java record that carries the
+                   fingerprints byte[] for GPU VRAM upload. The class Javadoc
+                   documents the array as "(reference, treated as read-only)";
+                   the array is consumed by the OpenCL upload path in a single
+                   call to clCreateBuffer + CL_MEM_COPY_HOST_PTR. Making a
+                   defensive copy at the accessor or in the compact constructor
+                   would double the allocation on the hot GPU-upload path with
+                   no safety gain — the record itself is immutable (only the
+                   fingerprints component is mutable-by-reference) and is not
+                   exposed beyond the upload call.
+            -->
+            <Class name="net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8GpuFilterData"/>
         </Or>
         <Or>
             <Bug pattern="EI_EXPOSE_REP"/>
@@ -697,6 +710,21 @@ SPDX-License-Identifier: Apache-2.0
             <And>
                 <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
                 <Method name="addresses"/>
+            </And>
+            <And>
+                <!--
+                    OpenCLContext.allocateFilterBuffers lines 370-374:
+                        catch (RuntimeException e) {
+                            clReleaseMemObject(localFpMem);
+                            throw e;
+                        }
+                    Frees the already-allocated fingerprint CL buffer before
+                    propagating, preventing a VRAM leak when the second
+                    clCreateBuffer (metadata) fails. Same false-positive
+                    catch+cleanup+rethrow pattern as the two existing sites.
+                -->
+                <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext"/>
+                <Method name="allocateFilterBuffers"/>
             </And>
         </Or>
         <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
@@ -1005,6 +1033,108 @@ SPDX-License-Identifier: Apache-2.0
         <Class name="net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils"/>
         <Field name="emptyByteBuffer"/>
         <Bug pattern="URF_UNREAD_FIELD"/>
+    </Match>
+
+    <!--
+        IAOM_DO_NOT_INCREASE_METHOD_ACCESSIBILITY on SecretsFile.processLine.
+
+        SecretsFile.processLine overrides the protected abstract
+        AbstractPlaintextFile.processLine with a public visibility modifier.
+        The increase is intentional: AbstractPlaintextFile is a template-method
+        base class where processLine is an internal callback hook (protected by
+        convention), but SecretsFile is a concrete, standalone reader that callers
+        may reasonably want to invoke directly — e.g. in unit tests that supply
+        a single line without constructing a full file reader. Restricting the
+        override to protected would force callers to subclass or use
+        reflection for that use case.
+
+        fb-contrib's IAOM detector flags any override that widens access from
+        protected to public without regard to the documented design intent of the
+        method in the subclass. Here the widening is the explicitly desired API.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.io.SecretsFile"/>
+        <Method name="processLine"/>
+        <Bug pattern="IAOM_DO_NOT_INCREASE_METHOD_ACCESSIBILITY"/>
+    </Match>
+
+    <!--
+        WEM_WEAK_EXCEPTION_MESSAGING on OpenCLContext.allocateFilterBuffers.
+
+        The message "uploadGpuFilter called before init() or after close()" is a
+        fixed diagnostic string for an internal state-machine violation: the
+        method is only callable when the OpenCL context is initialised and not
+        yet closed. The calling state is fully captured by the message (callers
+        who hit this did either not call init() or called close() first); there
+        is no variable context to add. The WEM detector flags any static message
+        string as "weak", regardless of whether additional dynamic context would
+        be meaningful or available.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext"/>
+        <Method name="allocateFilterBuffers"/>
+        <Bug pattern="WEM_WEAK_EXCEPTION_MESSAGING"/>
+    </Match>
+
+    <!--
+        IMC_IMMATURE_CLASS_NO_EQUALS on BinaryFuse8AddressPresence and
+        BinaryFuse16AddressPresence.
+
+        Both classes are large, mutable (during construction), identity-held filter
+        objects. They are constructed once via populateFrom(), injected into the
+        engine as presence-query singletons, and never compared to each other.
+        Lombok @ToString on these classes triggers the fb-contrib IMC heuristic
+        ("any class that has toString should also have equals/hashCode"), but
+        value equality is meaningless here: two separately-constructed filters
+        over the same address set may produce different internal layouts depending
+        on the seed-selection path, so structural equality would also be expensive
+        and misleading. The classes follow the standard Java mutable-object
+        identity convention (same as java.io.InputStream, java.util.Random, etc.).
+    -->
+    <Match>
+        <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8AddressPresence"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence"/>
+        </Or>
+        <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
+    </Match>
+
+    <!--
+        SEO_SUBOPTIMAL_EXPRESSION_ORDER on BinaryFuse8AddressPresence.containsAddress
+        and BinaryFuse16AddressPresence.containsAddress.
+
+        Both containsAddress methods guard with two sequential cheap checks:
+            if (hash160.remaining() != BYTES_PER_ADDRESS) return false;
+            if (fingerprints.length == 0)                 return false;
+
+        fb-contrib SEO flags the first guard as "more expensive" than the second
+        because remaining() is a virtual method call while fingerprints.length is
+        a direct array-length field read. The detector suggests reordering to put
+        the field access first.
+
+        The order is intentional: the ByteBuffer-size check is the input-validation
+        gate for the API contract (any caller passing a non-20-byte buffer has a
+        bug that must be surfaced regardless of filter state). An empty filter is a
+        degenerate construction-time edge case; checking it first would silently
+        swallow invalid-input bugs on an empty filter. The performance difference
+        is negligible: remaining() is a single subtraction on a heap-allocated
+        ByteBuffer (no virtual dispatch in practice, since all callers use the same
+        concrete HeapByteBuffer implementation). The semantic clarity of
+        validate-input-before-consulting-state outweighs a nanosecond of check
+        ordering in a method that subsequently performs multiple hash64 rounds.
+    -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8AddressPresence"/>
+                <Method name="containsAddress"/>
+            </And>
+            <And>
+                <Class name="net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence"/>
+                <Method name="containsAddress"/>
+            </And>
+        </Or>
+        <Bug pattern="SEO_SUBOPTIMAL_EXPRESSION_ORDER"/>
     </Match>
 
 </FindBugsFilter>
