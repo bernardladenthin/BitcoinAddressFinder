@@ -457,6 +457,23 @@ Each transport provides the impls it needs in each sub-package (see the adapter 
 
 Fill the matrix by **value, not parity**: WebSocket both (API + web UI) first; ZMQ both (`PULL`+`PUB`) for cluster scale; raw TCP `KeySource` now, `ResultSink` optional/last (most work, least unique benefit). What makes the senders cheap is a **shared protocol codec** + the shared `ResultSink` event model, so each transport adapter is thin byte-moving plumbing.
 
+#### Statistics publisher (thread-independent, change-fired) — feeds `connection.sender`
+
+**Current state (researched).** Runtime metrics live in two places, both written from many threads:
+- `RuntimeStatistics` (shared; created by `Finder`, injected into producers + consumer): `batchesByProducer` (per-producer label → `AtomicLong`, **incremented by each producer** on every dispatched batch) and a late-bound `runningProducersGauge` (computed from producer `RUNNING` states).
+- `ConsumerJava` `AtomicLong` counters, mutated on the **consumer hot path**: `checkedKeys` (per address check), `checkedKeysSumOfTimeToCheckContains`, `hits`, `vanityHits`, `consumerReadyCount`, `producerBlockedCount`; plus derived `keysQueue.size()`, `runningConsumerCount()`, `startTime`.
+- These are surfaced **pull/poll-only**: `ConsumerJava.startStatisticsTimer()` runs a `ScheduledExecutorService` every `printStatisticsEveryNSeconds` (default 60s), reads everything, renders a string via `Statistics.createStatisticsMessage(...)`, and `LOGGER.info`s it. **The log is the only sink.**
+
+**Proposed.** Add a **thread-independent `StatisticsPublisher`** that pushes updates to subscribers via the `ResultSink` (`connection.sender`), without touching the hot path:
+- Extract the per-tick aggregation into an immutable **`StatisticsSnapshot`** (uptime, keys, keys/sec, avg contains-time, batches-by-producer, producers running, consumers running, ready, blocked, queue size, hits, vanity hits). Feed the *same* snapshot to **both** the existing log line and the publisher — one source of truth, log behaviour unchanged.
+- The publisher **owns its own thread/scheduler**, reads the lock-free atomics, and broadcasts. Producers/consumer keep doing **only atomic increments** as today; a slow subscriber can never stall them (bounded per-subscriber queues, drop the lossy snapshot).
+
+**Critical: "fire on every change" must be coalesced, not literal.** `checkedKeys` increments millions of times/sec — publishing per-increment is the same firehose the per-produced-key non-goal forbids. So split by rate:
+- **Discrete, low-rate changes** → fire **immediately** on change: a `HIT`, a `VANITY_HIT`, a producer started/stopped, `KEY_QUEUED`, `GENERATION_STARTED`. (These are exactly the discrete events in the schema above.)
+- **High-frequency aggregate counters** (`checkedKeys`/keys-per-sec, queue size, avg-time) → publish a **coalesced `StatisticsSnapshot` on a tick** (the configured cadence, or faster — e.g. 1 s — for a responsive UI), never per-increment. A `dirty` flag skips ticks where nothing changed (idle); optionally emit only the fields that changed.
+
+So the publisher's two outputs map onto the existing event set: discrete changes = `HIT`/`VANITY_HIT`/`KEY_QUEUED`/`GENERATION_STARTED`; the coalesced snapshot = `PROGRESS`/`STATS`. (The separate address-file-import path has its own `ReadStatistic` progress, which could publish the same way if a UI ever drives imports.)
+
 #### Deliverables (ordered)
 
 1. **Finding service that accepts keys / ranges / hash160s (do first).** New run mode (`CCommand`, e.g. `FindService`) wiring the consumer to a network *key source* instead of an in-process producer queue. Introduce a `KeySource` abstraction feeding the existing queue; producers (`ProducerJava`, `ProducerOpenCL`, third-party) become **clients** of the protocol. Add `SUBMIT_RANGE` (reuse the incremental expander) and `SUBMIT_HASH160` (checker mode).
