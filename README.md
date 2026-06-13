@@ -284,6 +284,17 @@ device.
 > The batched inversion alone (vs. the previous per-key inverse) lifted this GPU's peak from
 > ~14.4 M keys/s (at `keysPerWorkItem = 32`) to ~19.8 M keys/s (at `keysPerWorkItem = 64`), ~+37%.
 
+Reproduce the sweep above (the bare benchmark uses different defaults, so pass the parameters
+explicitly):
+
+```bash
+mvn test-compile exec:java \
+  -Dexec.args="GridSizeSweepBenchmark -p batchSizeInBits=20 -p keysPerWorkItem=1,8,16,32,64,128"
+```
+
+Candidates/s = JMH ops/s × `2^batchSizeInBits`. The `~+37%` batched-inversion figure compares this
+benchmark's peak with `KEYS_BATCH_INV = 8` against the previous per-key-inverse kernel.
+
 ### 🚀 MSB-Zero Optimization
 To accelerate elliptic curve multiplication, BitcoinAddressFinder applies a **160-bit private key optimization**:
 
