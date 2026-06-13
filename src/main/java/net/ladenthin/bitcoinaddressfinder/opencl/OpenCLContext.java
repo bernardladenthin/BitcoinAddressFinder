@@ -127,18 +127,24 @@ public class OpenCLContext implements ReleaseCLObject {
     private @Nullable OpenClTask openClTask;
 
     /**
-     * GPU VRAM buffer holding the Binary Fuse 8 fingerprint slot array, or {@code null} when
-     * no GPU filter has been uploaded. Allocated by {@link #uploadGpuFilter}, released by
-     * {@link #close()}.
+     * GPU VRAM buffer holding the Binary Fuse 8 fingerprint slot array.
+     *
+     * <p>Always non-{@code null} between {@link #init()} and {@link #close()}: {@link #init()}
+     * allocates a one-byte dummy placeholder so the kernel arguments are always bindable;
+     * {@link #uploadGpuFilter} replaces it with the real filter. {@code null} before
+     * {@code init()} and after {@code close()}.
      */
     @ToString.Exclude
     private @Nullable cl_mem fuse8FingerprintsMem;
 
     /**
      * GPU VRAM buffer holding the 5-int Binary Fuse 8 metadata
-     * {@code [seedLo, seedHi, segLen, segLenMask, segCountLen]}, or {@code null} when no GPU
-     * filter has been uploaded. Allocated by {@link #uploadGpuFilter}, released by
-     * {@link #close()}.
+     * {@code [seedLo, seedHi, segLen, segLenMask, segCountLen]}.
+     *
+     * <p>Always non-{@code null} between {@link #init()} and {@link #close()}: {@link #init()}
+     * allocates a dummy zero-valued metadata block alongside the placeholder fingerprint buffer
+     * so the kernel arguments are always bindable; {@link #uploadGpuFilter} replaces it with
+     * the real metadata. {@code null} before {@code init()} and after {@code close()}.
      */
     @ToString.Exclude
     private @Nullable cl_mem fuse8MetadataMem;

@@ -192,6 +192,9 @@ public class ProducerOpenCL extends AbstractProducer {
                         snapshot.segLen(),
                         snapshot.segLenMask(),
                         snapshot.segCountLen());
+                // The GPU copy is now the live one; release the host-side reference so the
+                // fingerprint byte[] (potentially megabytes for large address sets) can be GC'd.
+                gpuFilterSnapshot = null;
             }
         } catch (Exception e) {
             localOpenCLContext.close();

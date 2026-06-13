@@ -257,6 +257,8 @@ public class OpenClTask implements ReleaseCLObject {
         // Unified output buffer: a 4-byte count header followed by overallWorkSize entries of
         // OUTPUT_ENTRY_SIZE_BYTES (108) each. This is also exactly compact mode's worst case
         // (every candidate is a filter hit), so the single allocation covers both write modes.
+        // The (long) cast forces 64-bit multiplication before the addition, preventing int
+        // overflow for large work sizes (108 × MAXIMUM_CHUNK_ELEMENTS ≈ 2.1 GB).
         return OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES
                 + (long) OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES * cProducer.getOverallWorkSize();
     }
@@ -429,6 +431,10 @@ public class OpenClTask implements ReleaseCLObject {
                 if (count == OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL) {
                     entriesToRead = cProducer.getOverallWorkSize();
                 } else {
+                    // The sentinel (0xFFFF_FFFF = 4_294_967_295 unsigned) can never alias a
+                    // real compact count: MAXIMUM_CHUNK_ELEMENTS (~19.9 M) is far below that
+                    // value, so the bounds check below always catches it before it would
+                    // silently look like a normal count.
                     final long compactCount = Integer.toUnsignedLong(count);
                     if (compactCount > cProducer.getOverallWorkSize()) {
                         throw new IllegalStateException("GPU compact-mode count " + compactCount
