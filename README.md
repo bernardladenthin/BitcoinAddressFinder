@@ -245,8 +245,30 @@ Example:
 - Grid size is reduced by a factor of 8  
 - All results are written to global memory
 
-> ✅ Lower `keysPerWorkItem` values like 4 or 8 are often ideal.  
-> ❌ Higher values may reduce GPU occupancy due to fewer active threads.
+Each subsequent key costs one **affine point addition** instead of a full scalar multiplication,
+so raising `keysPerWorkItem` above `1` replaces most of the expensive `k·G` work with cheap
+additions — until too few work-items remain to keep the GPU occupied, at which point throughput
+falls again. There is therefore a **per-device sweet spot**.
+
+**Benchmarked tuning (NVIDIA RTX 3070 Laptop, `batchSizeInBits = 20`, `GridSizeSweepBenchmark`):**
+
+| `keysPerWorkItem` | Throughput (~) | vs. `keysPerWorkItem = 1` |
+|------------------:|---------------:|--------------------------:|
+| 1 (default)       | ~2.6 M keys/s  | 1.0×                      |
+| 4                 | ~6.3 M keys/s  | 2.4×                      |
+| 8                 | ~8.7 M keys/s  | 3.3×                      |
+| 16                | ~11.7 M keys/s | 4.4×                      |
+| **32**            | **~14.4 M keys/s** | **5.5× (peak)**       |
+| 64                | ~11.9 M keys/s | 4.5×                      |
+| 256               | ~7.7 M keys/s  | 2.9×                      |
+
+> ✅ The default `keysPerWorkItem = 1` is **not** optimal for scanning — it pays a full scalar
+>    multiplication for every key. On this GPU, `keysPerWorkItem = 32` is ~5.5× faster.
+> ✅ The sweet spot is **device-dependent** (it is set by the balance between amortizing scalar
+>    multiplications and keeping enough work-items to saturate the GPU). Sweep `keysPerWorkItem`
+>    on your hardware with `GridSizeSweepBenchmark`; for the RTX 3070 the optimum is ~16–32.
+> ❌ Beyond the sweet spot, throughput drops because too few work-items remain to keep all
+>    compute units busy (e.g. `2^20 / 256 = 4096` work-items under-fills a 40-SM GPU).
 
 ### 🚀 MSB-Zero Optimization
 To accelerate elliptic curve multiplication, BitcoinAddressFinder applies a **160-bit private key optimization**:
