@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.opencl;
 
+import static org.jocl.CL.CL_MEM_COPY_HOST_PTR;
+import static org.jocl.CL.CL_MEM_READ_ONLY;
 import static org.jocl.CL.clBuildProgram;
+import static org.jocl.CL.clCreateBuffer;
 import static org.jocl.CL.clCreateCommandQueueWithProperties;
 import static org.jocl.CL.clCreateContext;
 import static org.jocl.CL.clCreateKernel;
@@ -11,13 +14,16 @@ import static org.jocl.CL.clCreateProgramWithSource;
 import static org.jocl.CL.clReleaseCommandQueue;
 import static org.jocl.CL.clReleaseContext;
 import static org.jocl.CL.clReleaseKernel;
+import static org.jocl.CL.clReleaseMemObject;
 import static org.jocl.CL.clReleaseProgram;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.Resources;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -26,14 +32,19 @@ import java.util.Objects;
 import java.util.Optional;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
+import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.jocl.CL;
+import org.jocl.Pointer;
+import org.jocl.Sizeof;
 import org.jocl.cl_command_queue;
 import org.jocl.cl_context;
 import org.jocl.cl_context_properties;
 import org.jocl.cl_device_id;
 import org.jocl.cl_kernel;
+import org.jocl.cl_mem;
 import org.jocl.cl_program;
 import org.jocl.cl_queue_properties;
 import org.jspecify.annotations.Nullable;
@@ -92,6 +103,7 @@ public class OpenCLContext implements ReleaseCLObject {
 
     private static final String KERNEL_NAME = "generateKeysKernel_grid";
     private static final boolean EXCEPTIONS_ENABLED = true;
+    private static final ComparableVersion REQUIRED_COMPACT_MODE_VERSION = new ComparableVersion("2.0");
 
     private final CProducerOpenCL producerOpenCL;
     private final BitHelper bitHelper;
@@ -113,6 +125,36 @@ public class OpenCLContext implements ReleaseCLObject {
 
     @ToString.Exclude
     private @Nullable OpenClTask openClTask;
+
+    /**
+     * GPU VRAM buffer holding the Binary Fuse 8 fingerprint slot array.
+     *
+     * <p>Always non-{@code null} between {@link #init()} and {@link #close()}: {@link #init()}
+     * allocates a one-byte dummy placeholder so the kernel arguments are always bindable;
+     * {@link #uploadGpuFilter} replaces it with the real filter. {@code null} before
+     * {@code init()} and after {@code close()}.
+     */
+    @ToString.Exclude
+    private @Nullable cl_mem fuse8FingerprintsMem;
+
+    /**
+     * GPU VRAM buffer holding the 5-int Binary Fuse 8 metadata
+     * {@code [seedLo, seedHi, segLen, segLenMask, segCountLen]}.
+     *
+     * <p>Always non-{@code null} between {@link #init()} and {@link #close()}: {@link #init()}
+     * allocates a dummy zero-valued metadata block alongside the placeholder fingerprint buffer
+     * so the kernel arguments are always bindable; {@link #uploadGpuFilter} replaces it with
+     * the real metadata. {@code null} before {@code init()} and after {@code close()}.
+     */
+    @ToString.Exclude
+    private @Nullable cl_mem fuse8MetadataMem;
+
+    /**
+     * Whether a real GPU filter has been uploaded via {@link #uploadGpuFilter}. {@code false}
+     * means the buffers hold a dummy empty filter (allocated in {@link #init()} so the kernel
+     * arguments are always bindable) and the kernel must run in full-transfer mode.
+     */
+    private boolean gpuFilterUploaded = false;
 
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
 
@@ -149,6 +191,15 @@ public class OpenCLContext implements ReleaseCLObject {
 
         OpenCLDevice device = selection.device();
         LOGGER.info("Selected OpenCL device:\n{}", device.toStringPretty());
+        // Fail fast on a big-endian device: the kernel canonicalises its output assuming a
+        // little-endian device (see OpenClKernelConstants.GPU_NATIVE_WORD_ORDER), so running on
+        // a big-endian device would produce silently corrupt results. Reject it cleanly instead.
+        assertDeviceByteOrderSupported(device.getByteOrder(), device.deviceName());
+        // Compact mode uses atomic_add on global memory, which requires OpenCL 2.0+.
+        assertCompactModeDeviceVersionSupported(
+                producerOpenCL.enableGpuFilter && !producerOpenCL.transferAll,
+                device.getDeviceVersionAsComparableVersion(),
+                device.deviceName());
         cl_context_properties contextProperties = selection.contextProperties();
         cl_device_id[] cl_device_ids = new cl_device_id[] {device.device()};
 
@@ -172,6 +223,65 @@ public class OpenCLContext implements ReleaseCLObject {
         kernel = clCreateKernel(program, KERNEL_NAME, null);
 
         openClTask = new OpenClTask(context, producerOpenCL, bitHelper, byteBufferUtility);
+
+        // Allocate a dummy empty filter so the kernel's fuse8 arguments are always bindable.
+        // uploadGpuFilter() replaces it with the real filter; until then the kernel runs in
+        // full-transfer mode (see createKeys()).
+        allocateFilterBuffers(new byte[0], 0, 0, 2, 1, 0);
+        gpuFilterUploaded = false;
+    }
+
+    /**
+     * Fails fast when the selected OpenCL device does not match the byte order the kernel and
+     * the host read path assume ({@link OpenClKernelConstants#GPU_NATIVE_WORD_ORDER}).
+     *
+     * <p>The kernel canonicalises its {@code u32} output (counts, indices, and the on-device
+     * X / Y / hash160 byte-swaps) assuming a little-endian device. Running on a big-endian
+     * device would corrupt those words silently, so this rejects it with a clear error rather
+     * than producing wrong &mdash; and security-relevant &mdash; results. Extracted as a static
+     * method so it can be unit-tested without a real device.
+     *
+     * @param deviceByteOrder the selected device's byte order (from {@code OpenCLDevice.getByteOrder()})
+     * @param deviceName      the device name, for the error message
+     * @throws UnsupportedOperationException if {@code deviceByteOrder} is not the supported order
+     */
+    @VisibleForTesting
+    static void assertDeviceByteOrderSupported(ByteOrder deviceByteOrder, String deviceName) {
+        if (!OpenClKernelConstants.GPU_NATIVE_WORD_ORDER.equals(deviceByteOrder)) {
+            throw new UnsupportedOperationException("OpenCL device '" + deviceName + "' is " + deviceByteOrder
+                    + "; only " + OpenClKernelConstants.GPU_NATIVE_WORD_ORDER
+                    + " devices are supported (the kernel output is little-endian-canonicalised).");
+        }
+    }
+
+    /**
+     * Fails fast when the selected OpenCL device does not meet the minimum version required
+     * for compact GPU filter mode.
+     *
+     * <p>Compact mode uses {@code atomic_add} on {@code __global uint*} memory, which requires
+     * OpenCL 2.0 or later. When compact mode is not requested ({@code compactModeRequested ==
+     * false}), this method is a no-op and does not inspect the device version.
+     *
+     * @param compactModeRequested {@code true} when {@code enableGpuFilter=true} and
+     *     {@code transferAll=false}; {@code false} otherwise
+     * @param deviceVersion        the selected device's version (from
+     *     {@link OpenCLDevice#getDeviceVersionAsComparableVersion()})
+     * @param deviceName           the device name, used in the error message
+     * @throws UnsupportedOperationException if compact mode is requested but the device version
+     *     is below 2.0
+     */
+    @VisibleForTesting
+    static void assertCompactModeDeviceVersionSupported(
+            boolean compactModeRequested, ComparableVersion deviceVersion, String deviceName) {
+        if (!compactModeRequested) {
+            return;
+        }
+        if (deviceVersion.compareTo(REQUIRED_COMPACT_MODE_VERSION) < 0) {
+            throw new UnsupportedOperationException(
+                    "Compact GPU filter mode (enableGpuFilter=true, transferAll=false) requires OpenCL 2.0+, "
+                            + "but device '" + deviceName + "' reports version " + deviceVersion
+                            + ". Set transferAll=true or upgrade to an OpenCL 2.0+ device.");
+        }
     }
 
     /**
@@ -184,6 +294,99 @@ public class OpenCLContext implements ReleaseCLObject {
         return Optional.ofNullable(openClTask);
     }
 
+    /**
+     * Returns whether this context has been initialised and not yet released.
+     *
+     * <p>{@code true} after {@link #init()} has created the OpenCL context and before
+     * {@link #close()} releases it; {@code false} before {@code init()} and after
+     * {@code close()}.
+     *
+     * @return {@code true} when the OpenCL context is live, {@code false} otherwise
+     */
+    public boolean isInitialized() {
+        return context != null && !closed;
+    }
+
+    /**
+     * Uploads a Binary Fuse 8 filter to GPU VRAM as two read-only device buffers.
+     *
+     * <p>The OpenCL layer accepts the filter as primitive arguments only &mdash; it never
+     * depends on the persistence type that produced them. The caller (the
+     * {@code ProducerOpenCL}, fed by the engine) decomposes the filter's public payload into
+     * the fingerprint byte array and the five metadata integers before invoking this method.
+     *
+     * <p>Two {@code CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR} buffers are allocated and retained
+     * for later kernel-argument binding: the fingerprint slot array and a 5-int metadata buffer
+     * {@code [seedLo, seedHi, segLen, segLenMask, segCountLen]}. An empty filter
+     * ({@code fingerprints.length == 0}, i.e. {@code segCountLen == 0}) still allocates a
+     * one-byte placeholder fingerprint buffer (zero-size device buffers are invalid); the kernel
+     * detects the empty filter via {@code segCountLen == 0} and never reports a hit.
+     *
+     * <p>Re-uploading releases any previously uploaded buffers first.
+     *
+     * @param fingerprints the fingerprint slot array
+     * @param seedLo       low 32 bits of the construction seed
+     * @param seedHi       high 32 bits of the construction seed
+     * @param segLen       per-segment {@code reduce} length
+     * @param segLenMask   {@code segLen - 1}
+     * @param segCountLen  total fingerprint slot count ({@code fingerprints.length})
+     * @throws IllegalStateException if the context has not been initialised
+     */
+    public void uploadGpuFilter(
+            byte[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
+        allocateFilterBuffers(fingerprints, seedLo, seedHi, segLen, segLenMask, segCountLen);
+        gpuFilterUploaded = true;
+    }
+
+    private void allocateFilterBuffers(
+            byte[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
+        final cl_context localContext = context;
+        if (localContext == null || closed) {
+            throw new IllegalStateException("uploadGpuFilter called before init() or after close()");
+        }
+
+        // Release any previously uploaded filter so a re-upload does not leak device memory.
+        releaseGpuFilter();
+
+        // Zero-size device buffers are invalid; pad an empty filter to a single zero byte. The
+        // kernel relies on segCountLen == 0 (not the buffer length) to detect the empty filter.
+        final byte[] fingerprintBytes = fingerprints.length == 0 ? new byte[1] : fingerprints;
+        final cl_mem localFpMem = clCreateBuffer(
+                localContext,
+                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                (long) fingerprintBytes.length,
+                Pointer.to(fingerprintBytes),
+                null);
+
+        final int[] metadata = new int[] {seedLo, seedHi, segLen, segLenMask, segCountLen};
+        final cl_mem localMetaMem;
+        try {
+            localMetaMem = clCreateBuffer(
+                    localContext,
+                    CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                    (long) metadata.length * Sizeof.cl_int,
+                    Pointer.to(metadata),
+                    null);
+        } catch (RuntimeException e) {
+            // First buffer was allocated; free it before propagating so no VRAM is leaked.
+            clReleaseMemObject(localFpMem);
+            throw e;
+        }
+        fuse8FingerprintsMem = localFpMem;
+        fuse8MetadataMem = localMetaMem;
+    }
+
+    private void releaseGpuFilter() {
+        if (fuse8FingerprintsMem != null) {
+            clReleaseMemObject(fuse8FingerprintsMem);
+            fuse8FingerprintsMem = null;
+        }
+        if (fuse8MetadataMem != null) {
+            clReleaseMemObject(fuse8MetadataMem);
+            fuse8MetadataMem = null;
+        }
+    }
+
     @Override
     public boolean isClosed() {
         return closed;
@@ -192,7 +395,9 @@ public class OpenCLContext implements ReleaseCLObject {
     @Override
     public void close() {
         if (!closed) {
+            releaseGpuFilter();
             if (openClTask != null) {
+                openClTask.close();
                 openClTask = null;
             }
             if (kernel != null) {
@@ -225,9 +430,16 @@ public class OpenCLContext implements ReleaseCLObject {
         OpenClTask localOpenClTask = Objects.requireNonNull(openClTask);
         cl_kernel localKernel = Objects.requireNonNull(kernel);
         cl_command_queue localCommandQueue = Objects.requireNonNull(commandQueue);
+        cl_mem localFuse8FingerprintsMem = Objects.requireNonNull(fuse8FingerprintsMem);
+        cl_mem localFuse8MetadataMem = Objects.requireNonNull(fuse8MetadataMem);
+
+        // Compact (filter) mode only when a real filter is uploaded AND the caller did not force
+        // full transfer; otherwise run full transfer (no filter, or vanity forced transferAll).
+        final int transferAll = (producerOpenCL.transferAll || !gpuFilterUploaded) ? 1 : 0;
 
         localOpenClTask.setSrcPrivateKeyChunk(privateKeyBase);
-        ByteBuffer dstByteBuffer = localOpenClTask.executeKernel(localKernel, localCommandQueue);
+        ByteBuffer dstByteBuffer = localOpenClTask.executeKernel(
+                localKernel, localCommandQueue, localFuse8FingerprintsMem, localFuse8MetadataMem, transferAll);
 
         return new OpenCLGridResult(privateKeyBase, producerOpenCL.getOverallWorkSize(), dstByteBuffer);
     }

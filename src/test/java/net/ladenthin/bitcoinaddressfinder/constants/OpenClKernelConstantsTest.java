@@ -120,7 +120,37 @@ public class OpenClKernelConstantsTest {
 
     @Test
     public void byteExact_derivedArrayCapacityBounds() {
-        assertThat(OpenClKernelConstants.MAXIMUM_CHUNK_ELEMENTS, is(20_648_881));
+        // Bound derived from the unified 108-byte entry stride minus the 4-byte header word.
+        assertThat(OpenClKernelConstants.MAXIMUM_CHUNK_ELEMENTS, is(19_884_107));
+        // BIT_COUNT must remain 24 (the grid-size cap used across the project); the unified
+        // stride does not change it.
         assertThat(OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY, is(24));
+    }
+
+    @Test
+    public void gpuNativeWordOrder_isLittleEndian() {
+        // Single source of truth for the host-side GPU byte-order assumption. Pinned so any
+        // change is deliberate and reviewed (it would also require lockstep kernel changes).
+        assertThat(OpenClKernelConstants.GPU_NATIVE_WORD_ORDER, is(java.nio.ByteOrder.LITTLE_ENDIAN));
+    }
+
+    @Test
+    public void byteExact_unifiedOutputBufferFormat() {
+        assertThat(OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES, is(4));
+        assertThat(OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL, is(0xFFFF_FFFF));
+        // field sizes
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_INDEX_SIZE_BYTES, is(4));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_X_SIZE_BYTES, is(32));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_Y_SIZE_BYTES, is(32));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_HASH160_UNCOMPRESSED_SIZE_BYTES, is(20));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_HASH160_COMPRESSED_SIZE_BYTES, is(20));
+        // offsets (each = previous offset + previous size)
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_INDEX_BYTE_OFFSET, is(0));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_X_BYTE_OFFSET, is(4));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_Y_BYTE_OFFSET, is(36));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_HASH160_UNCOMPRESSED_BYTE_OFFSET, is(68));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_HASH160_COMPRESSED_BYTE_OFFSET, is(88));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_END_BYTE_OFFSET, is(108));
+        assertThat(OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES, is(108));
     }
 }

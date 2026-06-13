@@ -139,6 +139,16 @@ jobs:
   #     BAF's `CL_DEVICE_VERSION >= 2.0` gate, so here the @OpenCLTest suite
   #     actually executes (real kernel compile + run on a CPU device).
   #
+  # Coverage note:
+  #   This job runs the FULL test suite (not just @OpenCLTest) and generates the
+  #   JaCoCo report that is sent to Coveralls / Codecov. The `test` ubuntu matrix
+  #   above also generates a jacoco-report artifact but that one skips all
+  #   @OpenCLTest classes (no ICD installed), so it would show 0% for the entire
+  #   OpenCL pipeline. Using the pocl run as the coverage source gives meaningful
+  #   numbers for OpenCLContext, OpenClTask, OpenCLGridResult, ProducerOpenCL, etc.
+  #   LMDB tests are still disabled here (native lib unavailable on GitHub runners);
+  #   Windows coverage (LMDB-enabled) is not merged — acceptable trade-off.
+  #
   # Reliability notes (why this is now safe to gate on):
   #   * The secp256k1 kernel's zero-scalar out-of-bounds read in `point_mul_xy`
   #     (which a CPU device traps as SIGSEGV while GPUs mask it) is fixed by an
@@ -167,9 +177,14 @@ jobs:
           sudo apt-get install -y pocl-opencl-icd ocl-icd-libopencl1 clinfo
           # Log the platform/device + CL_DEVICE_VERSION for the build record.
           clinfo || true
-      - name: OpenCL tests
+      - name: All tests including OpenCL (pocl) + JaCoCo coverage
         shell: bash
-        run: mvn --batch-mode -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true --update-snapshots test -Dtest='*OpenCL*'
+        run: mvn --batch-mode -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true --update-snapshots test jacoco:report
+      - uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-report-opencl
+          path: target/site/jacoco/jacoco.xml
+          if-no-files-found: warn
       # A forked test JVM that aborts (the known pocl SIGSEGV in the secp256k1
       # kernel) leaves an hs_err_pid log + a surefire dumpstream that are
       # otherwise only inside the uploaded artifact. Echo them into the job log
@@ -205,8 +220,11 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: temurin
+      # Prefer coverage from the pocl job: it runs ALL tests including @OpenCLTest
+      # (the ubuntu `test` matrix skips those because no ICD is installed there,
+      # so its jacoco-report shows 0% for the entire OpenCL pipeline).
       - uses: actions/download-artifact@v8
-        with: { name: jacoco-report, path: target/site/jacoco/ }
+        with: { name: jacoco-report-opencl, path: target/site/jacoco/ }
         continue-on-error: true
       - uses: advanced-security/maven-dependency-submission-action@v5
       - name: Coveralls

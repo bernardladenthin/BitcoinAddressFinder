@@ -357,6 +357,32 @@ For an isolated view of Binary Fuse Filter construction and lookup without LMDB 
 mvn test-compile exec:java -Dexec.args="BinaryFuseBenchmark"
 ```
 
+#### GPU-side Binary Fuse 8 filtering (`enableGpuFilter`)
+
+By default the OpenCL kernel transfers **every** derived work-item result back to the host, and the consumer then checks each hash160 against the selected `addressLookupBackend`. When the database is loaded as `BINARY_FUSE_8`, that same filter can instead be pushed **onto the GPU** so the kernel checks each derived hash160 inline and transmits only the candidates the filter marks as possibly present. This collapses the PCIe read-back from the full `2^batchSizeInBits` grid down to the handful of hits per batch — the dominant cost on large batches.
+
+Enable it on an OpenCL producer (see [`examples/config_Find_GPUFilterCompact.json`](examples/config_Find_GPUFilterCompact.json)):
+
+```json
+"consumerJava": {
+  "lmdbConfigurationReadOnly": { "addressLookupBackend": "BINARY_FUSE_8" }
+},
+"producerOpenCL": [
+  { "enableGpuFilter": true, "transferAll": false }
+]
+```
+
+| Field | Default | Effect |
+|-------|:-------:|--------|
+| `enableGpuFilter` | `false` | When `true` **and** the consumer backend is `BINARY_FUSE_8`, the filter is uploaded to GPU VRAM and the kernel filters inline (compact output). |
+| `transferAll` | `false` | Forces full-transfer (legacy) output even when `enableGpuFilter` is on. `Finder` sets this to `true` automatically — with a warning — whenever `enableVanity = true`, because vanity scanning must see every derived address. |
+
+**How compact mode works** — the kernel checks both the compressed and uncompressed hash160 of each candidate against the uploaded filter; a work-item that hits claims an output slot via an `atomic_add` on a shared count word and writes its entry there, so the buffer holds exactly the hits (each entry carries its own work-item index for secret-key reconstruction). A non-hit writes nothing.
+
+**No false negatives** — the Binary Fuse 8 guarantee carries to the GPU unchanged: any address actually in the database is always flagged. The ~0.4 % false positives fall through to the LMDB verifier exactly as they do for the in-RAM `BINARY_FUSE_8` backend.
+
+**Device requirements** — compact mode needs an **OpenCL 2.0+** device (the `atomic_add` on global memory) and a little-endian device (the kernel canonicalises its output as little-endian). Both are checked at producer init and fail fast with a clear message; on an older device set `transferAll: true` to keep the full-transfer path. The GPU/CPU lookup parity (key extraction + hash formula) is pinned by `Fuse8GpuHashParityTest` and exercised end-to-end on a real OpenCL device by `OpenCLCompactOutputIntegrationTest`.
+
 #### Bloom filter — FPP tuning
 
 When `addressLookupBackend` is `BLOOM`, the false positive probability is configurable via `bloomFilterFpp`:

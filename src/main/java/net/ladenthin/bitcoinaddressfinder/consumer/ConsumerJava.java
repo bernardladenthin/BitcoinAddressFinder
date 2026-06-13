@@ -8,6 +8,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -31,6 +32,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerator;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8AddressPresence;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8GpuFilterData;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.HashSetAddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.TruncatedLong64SortedArrayPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
@@ -291,6 +293,26 @@ public class ConsumerJava implements Consumer {
             lmdb.close();
             persistence = null;
         }
+    }
+
+    /**
+     * Returns the GPU-upload payload for the active Binary Fuse 8 filter, if the configured
+     * address-lookup backend built one.
+     *
+     * <p>Exposed so the engine ({@code Finder}) can read the filter the consumer built and route
+     * it to the OpenCL producers for VRAM upload (the consumer never touches the OpenCL layer
+     * directly). Returns {@link Optional#empty()} for every backend other than
+     * {@code BINARY_FUSE_8} and before {@link #initLMDB()} has run.
+     *
+     * @return the Binary Fuse 8 GPU-upload payload, or empty if the active lookup is not a
+     *     {@link BinaryFuse8AddressPresence}
+     */
+    public Optional<BinaryFuse8GpuFilterData> getGpuFilterData() {
+        AddressPresence localLookup = lookup;
+        if (localLookup instanceof BinaryFuse8AddressPresence fuse8) {
+            return Optional.of(fuse8.toGpuFilterData());
+        }
+        return Optional.empty();
     }
 
     private static AddressPresence buildLookupChain(

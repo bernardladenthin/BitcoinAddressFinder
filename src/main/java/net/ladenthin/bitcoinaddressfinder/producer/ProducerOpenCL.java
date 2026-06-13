@@ -58,6 +58,47 @@ public class ProducerOpenCL extends AbstractProducer {
     private @Nullable OpenCLContext openCLContext;
 
     /**
+     * All six filter parameters bundled into one record so {@link #setGpuFilter} can publish
+     * them to {@link #initProducer} with a single volatile write, establishing a happens-before
+     * edge between the engine thread (writer) and the producer-init thread (reader).
+     *
+     * <p>The {@code byte[]} component is intentional: the array is written once by the engine
+     * before {@link #initProducer()} is called, and consumed immediately during
+     * {@link OpenCLContext#uploadGpuFilter}. The identity-based {@code equals}/{@code hashCode}
+     * from {@code Object} are acceptable for a private, single-use holder that is never compared
+     * or stored in a collection.
+     */
+    @SuppressWarnings("ArrayRecordComponent")
+    private record GpuFilterSnapshot(
+            byte[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {}
+
+    /**
+     * Filter staged for GPU upload, or {@code null} when no GPU filter is configured.
+     * Written by the engine via {@link #setGpuFilter} and read by {@link #initProducer()}.
+     * Volatile so the single-write / single-read ordering is visible across threads.
+     */
+    @ToString.Exclude
+    private volatile @Nullable GpuFilterSnapshot gpuFilterSnapshot;
+
+    /**
+     * Stages a Binary Fuse 8 filter for upload to this producer's GPU at {@link #initProducer()}.
+     *
+     * <p>The OpenCL layer accepts only primitives, so the engine decomposes the filter's payload
+     * (seed split into low/high {@code int}s) before calling this method &mdash; the producer
+     * never depends on the persistence filter type.
+     *
+     * @param fingerprints the fingerprint slot array
+     * @param seedLo       low 32 bits of the construction seed
+     * @param seedHi       high 32 bits of the construction seed
+     * @param segLen       per-segment {@code reduce} length
+     * @param segLenMask   {@code segLen - 1}
+     * @param segCountLen  total fingerprint slot count
+     */
+    public void setGpuFilter(byte[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
+        gpuFilterSnapshot = new GpuFilterSnapshot(fingerprints, seedLo, seedHi, segLen, segLenMask, segCountLen);
+    }
+
+    /**
      * Returns whether the OpenCL context has been initialised and not yet released.
      *
      * <p>The context is {@code null} both before {@link #initProducer()} and after
@@ -77,11 +118,12 @@ public class ProducerOpenCL extends AbstractProducer {
      * Creates a new OpenCL producer with a default fixed-size result-reader thread pool
      * sized by {@code producerOpenCL.maxResultReaderThreads}.
      *
-     * @param producerOpenCL the OpenCL producer configuration
-     * @param consumer       the downstream consumer
-     * @param keyUtility     cryptographic helper
-     * @param keyProducer    the secret supplying strategy
-     * @param bitHelper      bit/batch-size helper
+     * @param producerOpenCL    the OpenCL producer configuration
+     * @param consumer          the downstream consumer
+     * @param keyUtility        cryptographic helper
+     * @param keyProducer       the secret supplying strategy
+     * @param bitHelper         bit/batch-size helper
+     * @param runtimeStatistics shared runtime metrics sink for per-producer batch counts
      */
     public ProducerOpenCL(
             CProducerOpenCL producerOpenCL,
@@ -138,8 +180,27 @@ public class ProducerOpenCL extends AbstractProducer {
     @Override
     public void initProducer() throws Exception {
         super.initProducer();
-        openCLContext = new OpenCLContext(producerOpenCL, bitHelper);
-        openCLContext.init();
+        OpenCLContext localOpenCLContext = new OpenCLContext(producerOpenCL, bitHelper);
+        try {
+            localOpenCLContext.init();
+            final GpuFilterSnapshot snapshot = gpuFilterSnapshot;
+            if (snapshot != null) {
+                localOpenCLContext.uploadGpuFilter(
+                        snapshot.fingerprints(),
+                        snapshot.seedLo(),
+                        snapshot.seedHi(),
+                        snapshot.segLen(),
+                        snapshot.segLenMask(),
+                        snapshot.segCountLen());
+                // The GPU copy is now the live one; release the host-side reference so the
+                // fingerprint byte[] (potentially megabytes for large address sets) can be GC'd.
+                gpuFilterSnapshot = null;
+            }
+        } catch (Exception e) {
+            localOpenCLContext.close();
+            throw e;
+        }
+        openCLContext = localOpenCLContext;
     }
 
     @Override

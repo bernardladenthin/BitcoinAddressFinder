@@ -402,6 +402,22 @@ GPU code is bound through JOCL (`jocl` 2.0.6). `OpenCLBuilder` constructs the pl
 | `claude-code-review.yml` | PR | AI-powered code review |
 | `claude.yml` | Issue/PR comment with `@claude` | Claude Code interactive assistant |
 
+### Coverage source — pocl (`test-opencl`) job, not the ubuntu `test` matrix
+
+BAF's `publish.yml` has **two** ubuntu test jobs:
+
+- **`test` (ubuntu)** — standard matrix; no OpenCL ICD installed. `@OpenCLTest` classes
+  (`OpenCLContext`, `OpenClTask`, `OpenCLGridResult`, `ProducerOpenCL`, etc.) self-skip via
+  `OpenCLPlatformAssume`. The JaCoCo report from this job shows 0% for the entire OpenCL
+  pipeline and is kept as an artifact (`jacoco-report`) but is **not** sent to Coveralls/Codecov.
+- **`test-opencl` (ubuntu + pocl)** — installs `pocl-opencl-icd` (a conformant OpenCL 3.0 CPU
+  implementation). `@OpenCLTest` classes actually execute here. This job runs the **full** test
+  suite (`mvn test jacoco:report`) and its report (`jacoco-report-opencl`) is the source
+  consumed by the `report` job → Coveralls/Codecov.
+
+This is intentional and documented in `workspace/crossrepostatus.md` "Deliberate non-parity".
+No other sibling repo has OpenCL code, so this distinction is BAF-only.
+
 ---
 
 ## Dependencies Summary

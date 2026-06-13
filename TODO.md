@@ -171,21 +171,27 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
 
 - **GPU-side Binary Fuse 8 filter — Part 2 implementation plan (atomic steps).** Uses the CPU-side `BinaryFuse8AddressPresence` (✅ done) uploaded to GPU VRAM so the kernel checks the filter inline and transmits only hits over PCIe. Controlled by two new config flags: `enableGpuFilter` (default `false`) and `transferAll` (default `false`; forced `true` automatically when `ConsumerJava.enableVanity = true`, since vanity scanning requires all results on the CPU). Each of the 9 steps below is independently committable and must compile + pass existing tests before the next step begins.
 
-  **Unified output buffer format.** Every GPU output buffer starts with a 4-byte unsigned count word at byte offset 0. Interpretation:
-  - Count = `0xFFFFFFFF` (sentinel): full-transfer mode — N work-items follow at offsets `4 + i × 104` (existing stride, unchanged semantics).
-  - Count = K (any other value): compact mode — K entries follow at `4 + j × 108`, each `[work_item_index:4][X:32][Y:32][hash160_u:20][hash160_c:20]`.
+  **Unified output buffer format (ONE physical layout, two write modes).** There is a *single* physical output layout, used unchanged by every kernel launch — there is **not** a separate full-transfer stride. This is deliberate: two different strides (104 vs 108) would make the destination-buffer sizing bound (`MAXIMUM_CHUNK_ELEMENTS` / `BIT_COUNT_FOR_MAX_CHUNKS_ARRAY`) depend on which format is active. With one stride the bound is computed off a single true entry size and the buffer is always `OUTPUT_HEADER_SIZE_BYTES + N × OUTPUT_ENTRY_SIZE_BYTES`, which is also exactly compact mode's worst case (every candidate is a filter hit), so one allocation safely covers both modes.
 
-  CPU reconstructs `secret = KeyUtility.calculateSecretKey(secretBase, work_item_index, USE_OR)`. PCIe saving at Fuse8 FPR 0.4%: ≈ 99.6 % bandwidth reduction. The mode flag `transfer_all` is a uniform kernel argument → zero branch divergence from mode selection; only the `if (hit)` branch inside compact mode may diverge (≈ 0.4 % of work-items enter it).
+  Layout:
+  - Byte 0: a 4-byte unsigned **count word**.
+  - Byte `4 + j × 108`: entry `j`, always `[work_item_index:4][X:32][Y:32][hash160_u:20][hash160_c:20]` (108 bytes). The `work_item_index` is present in **every** entry. It is redundant in full-transfer mode (entry `i` is written at slot `i`), but carrying it keeps the stride identical to compact mode. The +4 bytes/entry costs ≈ 3.8 % PCIe in full-transfer mode only — the rare vanity/regex path, where the CPU regex dominates and the GPU is not the bottleneck.
 
-  **Step A — Layout constants** (`constants/OpenClKernelConstants.java`)
-  Add `OUTPUT_HEADER_SIZE_BYTES = 4`, `OUTPUT_COUNT_FULL_TRANSFER_SENTINEL = 0xFFFF_FFFF`, `COMPACT_ENTRY_SIZE_BYTES = 108` and per-field byte offsets (`COMPACT_ENTRY_INDEX_BYTE_OFFSET = 0`, `_X_BYTE_OFFSET = 4`, `_Y_BYTE_OFFSET = 36`, `_HASH160_UNCOMPRESSED_BYTE_OFFSET = 68`, `_HASH160_COMPRESSED_BYTE_OFFSET = 88`).
+  The count word selects how the reader walks the entries:
+  - Count = `0xFFFFFFFF` (`OUTPUT_COUNT_FULL_TRANSFER_SENTINEL`): **full-transfer mode**. Every work-item is present; entry `i` is written densely at slot `i` with `work_item_index = i` (no atomics). The reader walks exactly `workSize` entries. Used when the GPU filter is disabled, or when `transfer_all` is forced (vanity/regex scanning needs every derived address on the CPU).
+  - Count = K (any other value): **compact mode**. Only the work-items whose hash160 passed the GPU Binary Fuse 8 filter wrote an entry, each claiming its slot via `atomic_add`, so the K entries appear in nondeterministic order and `work_item_index` is essential. The reader walks exactly K entries. K cannot collide with the sentinel: the grid is capped at `2^BIT_COUNT_FOR_MAX_CHUNKS_ARRAY` (= 2²⁴) work-items, far below `0xFFFFFFFF`, so even an all-hit batch (K == workSize) stays under it.
+
+  Both modes share the entry parser; they differ only in the loop bound (`workSize` vs K) and in how the count is produced (constant sentinel vs atomic counter). CPU reconstructs `secret = KeyUtility.calculateSecretKey(secretBase, work_item_index, USE_OR)` for every entry in both modes. PCIe saving at Fuse8 FPR 0.4 % (compact mode): ≈ 99.6 % bandwidth reduction. The mode flag `transfer_all` is a uniform kernel argument → zero branch divergence from mode selection; only the `if (hit)` branch inside compact mode may diverge (≈ 0.4 % of work-items enter it).
+
+  **Step A — Layout constants** ✅ (`constants/OpenClKernelConstants.java`)
+  Added `OUTPUT_HEADER_SIZE_BYTES = 4`, `OUTPUT_COUNT_FULL_TRANSFER_SENTINEL = 0xFFFF_FFFF`, the unified-entry offsets (`OUTPUT_ENTRY_INDEX_BYTE_OFFSET = 0`, `_X_BYTE_OFFSET = 4`, `_Y_BYTE_OFFSET = 36`, `_HASH160_UNCOMPRESSED_BYTE_OFFSET = 68`, `_HASH160_COMPRESSED_BYTE_OFFSET = 88`) and `OUTPUT_ENTRY_SIZE_BYTES = OUTPUT_HEADER_SIZE_BYTES + CHUNK_SIZE_NUM_BYTES = 108`. `MAXIMUM_CHUNK_ELEMENTS` is derived from the unified stride (`(Integer.MAX_VALUE − 4) / 108 = 19 884 107`); `BIT_COUNT_FOR_MAX_CHUNKS_ARRAY` is unchanged at 24. (Design note: the unified single-stride layout — full transfer also carries `work_item_index` — replaces the original dual-stride 104/108 plan, so the capacity bound has a single true entry size.)
   Tests: `mvn test -Dtest=BitcoinAddressFinderArchitectureTest` (constants-only change).
 
-  **Step B — Config flags** (`configuration/CProducerOpenCL.java`)
+  **Step B — Config flags** ✅ (`configuration/CProducerOpenCL.java`)
   Add `boolean enableGpuFilter = false` and `boolean transferAll = false` with Javadoc.
   Tests: JSON round-trip test in `CProducerOpenCLTest` verifying both fields default to `false` and survive a Jackson serialise/deserialise cycle.
 
-  **Step C — BinaryFuse8 getter exposure** (`persistence/inmemory/BinaryFuse8AddressPresence.java`)
+  **Step C — BinaryFuse8 getter exposure** ✅ (`persistence/inmemory/BinaryFuse8AddressPresence.java`)
   Add package-private getters: `getFingerprints()`, `getSeed()`, `getSegmentLength()`, `getSegmentLengthMask()`, `getSegmentCountLength()`.
   Tests (new, no GPU needed):
   - `getSeed_returnsInitialSeedForFirstSuccessfulBuild` — build a small filter, verify `getSeed()` is non-zero and matches the value `containsAddress` uses internally (cross-check by building an equivalent key manually).
@@ -193,20 +199,23 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
   - `getFingerprints_lengthEqualsSlotCount` — assert `getFingerprints().length == slotCount()`.
   - `getters_doNotMutateFilter` — call all getters, then verify `containsAddress` still returns the same answers.
 
-  **Step D — GPU VRAM upload** (`opencl/OpenCLContext.java`)
-  New `void uploadGpuFilter(BinaryFuse8AddressPresence filter)`: extracts fingerprints + 5-int metadata (seed_lo, seed_hi, segLen, segLenMask, segCountLen) and allocates two `cl_mem` buffers with `CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR`. `close()` releases both. `ConsumerJava` calls this after `openCLContext.init()` when `enableGpuFilter = true`.
+  **Step D — GPU VRAM upload** ✅ (`opencl/OpenCLContext.java`)
+  **Architecture note (revised wiring).** The enforced layered-architecture test forbids `consumer → opencl` and `opencl → persistence`. So the upload is routed cleanly through the producer rather than the consumer: `OpenCLContext.uploadGpuFilter` takes **primitives only** (`byte[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen`) — the OpenCL layer never references the persistence filter type. `BinaryFuse8AddressPresence.toGpuFilterData()` (public) returns a `BinaryFuse8GpuFilterData` record (a persistence-package carrier) that the **engine** (`Finder`, which may access both persistence and producer) reads and decomposes into those primitives, handing them to `ProducerOpenCL`, which uploads after its `OpenCLContext.init()` (Step H).
+  `uploadGpuFilter` allocates two `cl_mem` buffers with `CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR` (the fingerprint slot array + a 5-int metadata buffer `[seedLo, seedHi, segLen, segLenMask, segCountLen]`) and retains them for kernel binding; an empty filter pads to a 1-byte fingerprint buffer (zero-size device buffers are invalid) and is detected via `segCountLen == 0`. `close()` releases both. Adds `isInitialized()`.
   Tests (skip if no OpenCL device):
-  - `uploadGpuFilter_andClose_doesNotThrow` — upload a 5-entry filter, call `close()`, assert no exception.
-  - `isInitialized_falseBeforeInit_trueAfterInit_falseAfterRelease` — lifecycle state test (already partially covered; extend for the filter upload path).
+  - `uploadGpuFilter_andClose_doesNotThrow` — build a 5-entry filter, upload its payload, call `close()`, assert no exception.
+  - `isInitialized_falseBeforeInit_trueAfterInit_falseAfterRelease` — lifecycle state test including the filter upload path.
+  - Plus non-GPU `toGpuFilterData_*` tests pinning the payload mirrors the getters and the empty-filter case.
 
-  **Step E — 4-byte count header in output buffer** (kernel `.cl` + `OpenClTask` + `OpenCLGridResult`)
-  `getDstSizeInBytes()` grows by `OUTPUT_HEADER_SIZE_BYTES`. Work-item 0 writes `0xFFFFFFFFu` to output[0..3]. All per-work-item write offsets shift by 4. `getPublicKeyFromByteBufferXY` adds `OUTPUT_HEADER_SIZE_BYTES` to `keyOffsetInByteBuffer`. `getPublicKeyBytes()` reads count word and asserts sentinel (compact path not yet live).
+  **Step E — Unified output buffer: count header + per-entry work_item_index** ✅ (kernel `.cl` + `OpenClTask` + `OpenCLGridResult`)
+  Migrate the existing kernel output to the single unified 108-byte entry layout. `getDstSizeInBytes()` becomes `OUTPUT_HEADER_SIZE_BYTES + OUTPUT_ENTRY_SIZE_BYTES × overallWorkSize`. Work-item 0 writes `0xFFFFFFFFu` (the full-transfer sentinel) to output[0..3]. Each work-item writes its `work_item_index` at entry offset 0, then X/Y/hash160s at the unified entry offsets (shifted by the 4-byte index field). `getPublicKeyFromByteBufferXY` reads from `OUTPUT_HEADER_SIZE_BYTES + entry × OUTPUT_ENTRY_SIZE_BYTES` using the unified `OUTPUT_ENTRY_*` offsets. `getPublicKeyBytes()` reads the count word and asserts the sentinel (compact path not yet live).
   Tests (no GPU needed — hand-crafted `ByteBuffer`):
-  - `getPublicKeyBytes_sentinelCount_dispatchesToFullTransfer` — ByteBuffer with `0xFFFFFFFF` at offset 0 followed by correct 104-byte entries; assert correct `PublicKeyBytes` array returned.
-  - `getPublicKeyFromByteBufferXY_offsetShiftedByFourBytes` — verify the first key's X bytes are at byte 4, not byte 0.
+  - `getPublicKeyBytes_sentinelCount_dispatchesToFullTransfer` — ByteBuffer with `0xFFFFFFFF` at offset 0 followed by correct 108-byte unified entries; assert correct `PublicKeyBytes` array returned.
+  - `getPublicKeyFromByteBufferXY_offsetShiftedByHeaderAndIndex` — verify the first key's X bytes are at byte `4 + 4 = 8` (header + index field), not byte 0.
 
-  **Step F — In-kernel Fuse8 check + compact output path** (kernel `.cl` file + `OpenClTask`)
-  Add 7 new kernel arguments: `fuse8_fp` buffer, `fuse8_seed_lo/hi`, `fuse8_seg_len`, `fuse8_seg_len_mask`, `fuse8_seg_count_len`, `transfer_all`. In compact mode: `atomic_add` to claim output slot; write 108-byte compact entry (X+Y+hash160s+index). Java zero-initialises counter via `clEnqueueWriteBuffer` before kernel launch.
+  **Step F — In-kernel Fuse8 check + compact output path** ✅ (kernel `.cl` file + `OpenClTask` + `OpenCLContext`)
+  Add 3 new kernel arguments (the 5 metadata ints are passed as one buffer rather than 5 scalars, matching the Step D upload): `fuse8_fp` (fingerprint buffer), `fuse8_meta` (`[seedLo, seedHi, segLen, segLenMask, segCountLen]` buffer), `transfer_all` (uint). The physical entry layout is unchanged from Step E (the unified 108-byte entry); only the *write decision* changes: in compact mode (`transfer_all == 0`) a work-item writes its entry **only if** its uncompressed OR compressed hash160 passes the filter, claiming the slot via `atomic_add` on the count word (which starts at 0). In full-transfer mode (`transfer_all != 0`) every work-item writes its entry at its own index and work-item 0 stamps the sentinel, exactly as Step E. The kernel's Fuse8 primitives (`fuse8_hash64`/`reduce`/`rotl`/`fingerprint`/`contains`) are a byte-exact port of the Java helpers, and `fuse8_key_from_ripemd` byte-swaps the two LE RIPEMD words to reproduce `ByteBuffer.getLong(0)`. `OpenClTask.executeKernel` binds the args, zero-initialises the count word via `clEnqueueWriteBuffer` before launch, and reads back only the bytes the count word reports (full → `workSize` entries; compact → K). `OpenCLContext` allocates a dummy empty filter on `init()` so the args are always bindable, tracks `gpuFilterUploaded`, and computes `transfer_all = transferAll || !gpuFilterUploaded`.
+  Test: `Fuse8GpuHashParityTest` (no GPU) pins the key-extraction + hash formula against `BinaryFuse8AddressPresence.containsAddress` over 1 000 distinct hash160 inputs (members + non-members), so any kernel drift fails in pure Java. The kernel build + compact execution are exercised end-to-end in Step I (GPU-gated).
 
   **Hash strategy — MurmurHash3 finalizer (standard for XOR/fuse filters, ~20 lines total):**
   ```c
@@ -229,22 +238,22 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
   Tests:
   - `Fuse8GpuHashParityTest` (no GPU needed — pure Java): reimplements the GPU hash logic in Java (`key = ByteBuffer.wrap(h160).getLong(0); ph = hash64(key, seed); h0 = reduce((int)ph, seg); h1 = reduce((int)hash64(key, rotl(seed,21)), seg) + seg; ...`). For 1 000 distinct hash160 inputs, asserts that this Java reimplementation agrees with `BinaryFuse8AddressPresence.containsAddress()` on every hit/miss answer. This pins the exact key-extraction + hash formula in a runnable test before any OpenCL code is written — if the formulas drift, this test fails.
 
-  **Step G — Java compact-mode reader** (`opencl/OpenCLGridResult.java`)
-  `getPublicKeyBytes()` dispatches on the count word: `0xFFFFFFFF` → `readFullTransfer()` (existing loop), otherwise → `readCompact(count)`. `readCompact` for each entry reads `work_item_index`, derives secret via `KeyUtility.calculateSecretKey(secretBase, index, USE_OR)`, reads X/Y/hash160u/hash160c, assembles `PublicKeyBytes` via `PublicKeyBytes.assembleUncompressedPublicKey(x, y)`.
+  **Step G — Java compact-mode reader** ✅ (`opencl/OpenCLGridResult.java`)
+  `getPublicKeyBytes()` dispatches on the count word: `0xFFFFFFFF` → `readFullTransfer()` (walk `workSize` entries), otherwise → `readCompact(count)` (walk K entries). Because the entry layout is unified, both paths share the same per-entry parser: read `work_item_index` (entry offset 0), derive secret via `KeyUtility.calculateSecretKey(secretBase, index, USE_OR)`, read X/Y/hash160u/hash160c at the unified `OUTPUT_ENTRY_*` offsets, assemble `PublicKeyBytes` via `PublicKeyBytes.assembleUncompressedPublicKey(x, y)`.
   Tests (no GPU needed — hand-crafted `ByteBuffer`):
   - `readCompact_countZero_returnsEmptyArray`
   - `readCompact_countTwo_returnsCorrectSecretsAndHashes` — encode two known compact entries; assert both `PublicKeyBytes` have the expected secrets, uncompressed keys, and hash160s.
   - `readCompact_invalidSecretZero_returnsInvalidKeyOne` — compact entry with `work_item_index` that makes `secret = 0`; assert result is `PublicKeyBytes.INVALID_KEY_ONE`.
   - `getPublicKeyBytes_sentinelDispatch_doesNotCallCompactPath` — sentinel count must not be treated as a compact entry count.
 
-  **Step H — Integration wiring** (`consumer/ConsumerJava.java`, `engine/Finder.java`)
-  `ConsumerJava.buildLookupChain()` calls `openCLContext.uploadGpuFilter(filter)` when `enableGpuFilter = true` and backend is `BINARY_FUSE_8`. `Finder` forces `producerOpenCL.transferAll = true` when `consumerJava.enableVanity = true`, logging a warning that compact mode is disabled.
+  **Step H — Integration wiring** ✅ (`consumer/ConsumerJava.java`, `producer/ProducerOpenCL.java`, `engine/Finder.java`)
+  **Architecture note (revised wiring).** Routed through the producer instead of the consumer (the layered architecture forbids `consumer → opencl`). `ConsumerJava.getGpuFilterData()` returns the `BinaryFuse8GpuFilterData` payload when the backend is `BINARY_FUSE_8`. `Finder.configureProducer()` then (1) calls `applyVanityFullTransferOverride()` — forces `transferAll = true` on every OpenCL producer config when `consumerJava.enableVanity = true`, with a warning that compact mode is disabled — and (2) calls `uploadGpuFilterToProducers()`, which for each `enableGpuFilter` producer not in full-transfer mode reads the consumer payload, decomposes it into primitives, and calls `ProducerOpenCL.setGpuFilter(...)`. `ProducerOpenCL.initProducer()` uploads the staged filter to VRAM right after `OpenCLContext.init()`.
   Tests:
-  - `ConsumerJavaTest`: mock `OpenCLContext`; verify `uploadGpuFilter` is called when `enableGpuFilter = true`.
-  - `FinderTest`: verify `producerOpenCL.transferAll` is set to `true` when `consumerJava.enableVanity = true`, and `false` otherwise.
+  - `FinderTest`: `applyVanityFullTransferOverride` forces `transferAll = true` under vanity and leaves it `false` otherwise.
+  - `ConsumerJavaTest` (LMDB-gated): `getGpuFilterData()` returns a payload for the `BINARY_FUSE_8` backend and empty for `LMDB_ONLY`.
 
-  **Step I — End-to-end integration test + example config**
-  Add `OpenCLCompactOutputIntegrationTest` (skip unless GPU present via `OpenCLPlatformAssume`). All assertions are **exact** — no ± tolerances — because the test controls every address in both the filter and the batch.
+  **Step I — End-to-end integration test + example config** ✅
+  Added `OpenCLCompactOutputIntegrationTest`. All assertions are **exact** — no ± tolerances — because the test derives every candidate on the CPU and controls exactly which are inserted into the filter. It runs on any OpenCL 2.0+ device (the grid size is capped to the device's safe range, so a CPU OpenCL runtime such as pocl exercises the same compact path on a small batch and a GPU runs the full 256-wide batch); it self-skips when no OpenCL 2.0+ device is present. Three sub-tests: full-batch (all 2N hash160s inserted → `count == N` exactly, every returned key passes `runtimePublicKeyCalculationCheck()`); partial-batch (K=3 uncompressed hashes at indices 0/N·½/N−1 inserted → `count >= K` from the no-FN guarantee and `count < N`, with each inserted index present among the returned work-items); empty-filter (`count == 0`). Added `examples/config_Find_GPUFilterCompact.json` (BINARY_FUSE_8 backend + `enableGpuFilter: true`, `transferAll: false`).
 
   **Test setup (shared):** choose a fixed `secretBase` and `workSize = N` (e.g. N = 256). CPU-side, derive all N secrets `secretBase + i` for `i = 0 .. N-1` and compute their `hash160_uncompressed` + `hash160_compressed` via `KeyUtility`.
 
@@ -350,6 +359,132 @@ This is architecturally the mirror image of the existing `KeyProducerJavaSocket`
 **What this is NOT:** this is not the GPU-side presence-check optimisation (pushing `TRUNCATED_LONG_64` into the OpenCL kernel). That optimisation keeps everything in one process and moves the lookup to the GPU. The checker service idea moves the lookup to a *separate process/machine*, which is the opposite trade-off — more network overhead, but full decoupling of key generation hardware from database hardware.
 
 **Prerequisite before implementing:** define the wire format for key batches (size, byte order, compressed vs uncompressed flag) so that non-BAF producers can implement it without reading BAF source. Document it in `docs/wire-protocol.md`.
+
+### Decouple "producing" from "finding" — a proper network API (finding service + result feedback + web UI)
+
+**Vision.** Split the project's two concerns — **producing candidate keys** and **finding** (derive address → check DB → report) — into cleanly separated, independently runnable parts, *within this existing project*. Today they are coupled in one `Finder` process. Shrink and separate them so the **finding** side becomes a self-contained service reachable over the network that **accepts keys, key ranges, or hash160s** from any source; so a **lot more producers** can be added (in-process or fully external) without touching the finder; and so operation/monitoring can move to a **web UI**. This is the umbrella the **Standalone consumer (checker) service** entry above is the first slice of, and it feeds the **Cross-platform GUI** entry below.
+
+#### Current state (researched) — what the "raw sockets" actually are
+
+Three network key-input transports already exist, all **inbound ingestion only**, all feeding the shared `LinkedBlockingQueue<byte[]>` through `AbstractKeyProducerQueueBuffered`:
+
+| Transport | Class | Mode(s) | Framing today |
+|---|---|---|---|
+| TCP | `KeyProducerJavaSocket` | SERVER (accept) / CLIENT (connect) | reads **fixed 32-byte frames** back-to-back, no delimiter/header |
+| WebSocket | `KeyProducerJavaWebSocket` | embedded server | one **binary message == 32 bytes** per key (else rejected/logged) |
+| ZeroMQ | `KeyProducerJavaZmq` | PULL, BIND / CONNECT | one **message == 32 bytes** per key |
+
+The "wire format" is therefore implicit and minimal: **the unit is exactly 32 bytes = one raw big-endian *unsigned private key*** (decoded by `keyUtility.bigIntegerFromUnsignedByteArray`; length must equal `PRIVATE_KEY_MAX_NUM_BYTES`). What is **missing** (the gap to fill):
+- No protocol **version / handshake**, no **message types**, no **batch header** (one key per message on WS/ZMQ is very chatty).
+- **No key-range submission.** Only the local `KeyProducerJavaIncremental` enumerates ranges; the network path cannot say "scan start..start+N". (Earlier drafts of this TODO wrongly implied ranges over sockets — they do not exist.)
+- No way to submit **hash160s directly** (needed for the pure checker mode).
+- No **acknowledgements / errors** back to the sender (it can't tell if keys were accepted, invalid, or dropped).
+- No **result feedback** at all — hits/vanity are `ConsumerJava` **log-only** (`HIT_PREFIX` / `VANITY_HIT_PREFIX`); a remote sender gets nothing and cannot correlate a hit to what it sent.
+- No **backpressure** (the queue is unbounded → memory risk under a fast sender), no **auth/TLS** (it moves private keys in the clear).
+
+#### Proposed "very good API" — one transport-agnostic protocol, offered over the best-fit transports
+
+**Topology + ownership (confirmed).** The **server** (e.g. one PC with a GPU) runs with **its own configured settings** and owns them — clients never configure it. In the normal case the two client roles are *different machines*: a **key-sender** client feeds keys to be checked (→ server's *receiver*), and a **completely separate result-listener** client only subscribes to events (→ server's *sender/publisher*). A **web UI is the special case** that does both. Every event is **broadcast to all subscribers** and is **self-describing** (carries its key/address), so a listener that did not submit still knows what each event refers to — no per-client correlation required.
+
+**Define one small, versioned, typed, framed message schema** (document it in `docs/wire-protocol.md` + a machine schema), split by direction:
+
+*Client → server (ingestion / `receiver`):*
+- `HELLO` / capability + version negotiation (key formats, compression, max batch, supported coins).
+- `SUBMIT_KEYS` — a **batch** of N×32-byte keys in one frame. The minimal baseline is "just a private key to check"; batching kills the one-message-per-key overhead.
+- `SUBMIT_RANGE` — `{startKey:32, count, increment}` (+ optional compressed/coin flags). Orders of magnitude less bandwidth than enumerating keys; the finder expands it (reuse `KeyProducerJavaIncremental`). **The single highest-value ingestion capability.** *(optional extension)*
+- `SUBMIT_HASH160` — pre-derived 20-byte hashes for the pure checker mode (skip EC derivation). *(optional extension)*
+- `ACK` / `ERROR` — accepted count, or rejection with a code (bad length, out-of-range, backpressure, unknown type).
+
+*Server → subscribers (notification / `sender`) — queue/job granularity + configured hits ONLY:*
+- `CONFIG` — sent **once on connect**: a snapshot of the server's running configuration so a new subscriber knows the setup (device, backend, coins, vanity pattern, …).
+- `KEY_QUEUED` — "the service received a key/range to scan; it is now on the queue." Emitted per **submitted** unit (sender-controlled volume).
+- `GENERATION_STARTED` — emitted per key/key-range **taken** from the queue (scanning/generation began for that unit).
+- `VANITY_HIT` — a configured vanity-pattern match.
+- `HIT` — a database/GPU **found**: secret + address + variant (uncompressed/compressed/coin).
+- `PROGRESS` *(optional)* — periodic **aggregate** for a range scan (position, keys/sec, ETA) for the UI.
+- `PING` / `PONG`, `BYE`.
+- **Hard non-goal:** never emit an event per *produced* key — only the **configured results of interest** (vanity hits / DB founds) plus the queue-lifecycle events above. Streaming every generated key would be orders of magnitude too slow and defeats the purpose.
+
+**Flow control:** **credit-based backpressure** on ingestion (server advertises how many it can accept) replacing the unbounded queue; on the notification side, bounded per-subscriber queues with explicit drop (for lossy `PROGRESS`) rather than silent loss, while founds stay on the durable log sink.
+
+**Transport recommendation (honest trade-offs):**
+- **WebSocket = primary.** Already a dependency (`Java-WebSocket`); bidirectional and **self-framing** (message boundaries built in — no manual length-prefix); carries **binary** (bulk keys) *and* **text/JSON** (control); and is **browser-native**, so the *same* endpoint feeds the web UI (ingest + feedback + monitoring over one connection). Best single choice for "a very good network API + the planned UI."
+- **gRPC (bidirectional streaming) = optional, for typed multi-language producers.** Protobuf gives a language-neutral contract with codegen (hashcat/FPGA/cloud producers in any language), built-in flow control and deadlines. Cost: adds `grpc-java` (heavier; friction with the repo's `dependencyConvergence` + `bannedDependencies`), and needs grpc-web for browsers. (Note: protobuf is already a transitive dep via bitcoinj, so the schema language is familiar.)
+- **ZeroMQ = optional, for scale fan-out.** Great for many-producers→one-finder or one-producer→many-checkers, but no built-in request/response correlation and not browser-friendly. Keep for the horizontal-scaling story.
+- **Raw TCP = keep as a minimal/low-overhead option, but versioned + length-prefixed** (the current "read 32 bytes forever" is fragile and un-versioned).
+
+Recommendation: implement the schema once, ship **WebSocket first** (covers the API *and* the UI), add gRPC/ZMQ later only if a concrete scale/interop need appears.
+
+#### Async notifications + n-to-n (the "secondary results channel" question)
+
+The current transports are **one-directional and not n-to-n**: TCP `KeyProducerJavaSocket` in SERVER mode calls `serverSocket.accept()` exactly **once** and then reads 32-byte frames from that *single* client forever (one connection per producer instance — not even n-to-1); WebSocket's server is multi-client but only ingests; ZMQ uses a single PULL socket. None of them ever send anything back. So "async notification of results/progress" is genuinely new wiring, and the natural shape is **two logical channels with opposite fan patterns**:
+
+- **Ingestion channel — fan-in (n producers → 1 finder):** n key producers submit keys/ranges/hash160s.
+- **Notification channel — fan-out (1 finder → n listeners):** the finder publishes `RESULT` / `VANITY_HIT` / `PROGRESS` to all subscribers.
+
+**Is a separate (secondary) results socket good? — Yes, as the default, with a single-socket option per transport.** Trade-off:
+
+- **Separate results channel (recommended baseline).** Keys and results have *different* fan patterns (fan-in vs fan-out) and *different* audiences — a **pure monitoring listener (e.g. the web UI) is not a key producer and should not need submit rights**; independent lifecycle, auth scope, and backpressure; idiomatic for ZMQ. **No mapping / no correlation by design:** every event is **broadcast to every subscriber** and is **self-describing** (carries its key/address), so the server keeps no per-client routing state and a listener that never submitted still sees everything. Cost is just two endpoints to configure.
+- **Single bidirectional connection (per-transport option).** For **WebSocket / gRPC streaming** the client can submit and subscribe on the *same* connection (one endpoint) — convenient for the web-UI special case. It still **broadcasts all events to all subscribers** (no per-connection filtering), and a pure listener that never submitted still needs the subscribe role + the shared subscriber registry.
+
+**Recommended model: two roles, not two hard-coded sockets.** A client may take a **submit** role, a **subscribe** role, or both. Each transport maps the roles idiomatically:
+
+| Transport | Ingestion (fan-in) | Notification (fan-out) |
+|---|---|---|
+| ZeroMQ | `PULL` (bind; n `PUSH` connect) | **separate `PUB`** socket (n `SUB` connect) — the idiomatic "secondary socket" |
+| WebSocket | one server, many clients in *submit* role | same server broadcasts to all clients in *subscribe* role (role negotiated per connection or via path `/submit` vs `/events`) |
+| Raw TCP | accept-**loop** many clients (fix the single-`accept()` limitation) + a connection registry | either a **second port** for events, or write events back on each subscriber's socket from the registry |
+
+**Concrete answer — "one server, many subscribers, broadcast status to all":** this maps directly onto **WebSocket** and is the recommended primary. `WebSocketServer` already accepts many clients on one port, tracks them (`getConnections()`), and has built-in `broadcast(...)`; reuse the *same* server — `onMessage` ingests keys, an outbound `broadcast(status)` fans results/progress out to every connected subscriber (optionally a dedicated events-only server on its own port). Note it is **not** a literal "same class, send instead of listen" for the other transports: raw TCP needs a *new* broadcaster (accept-**loop** + connection registry + length-prefixed framing + per-client write isolation, because the existing class accepts a single client and only reads fixed 32-byte frames), and ZMQ uses a **separate `PUB` socket** (socket types are fixed — a `PULL` cannot send). Distinguish *submit* vs *subscribe* roles per connection (HELLO message or `/submit` vs `/events` path) with separate auth scopes — a pure status listener must not be able to submit keys.
+
+**Backpressure + QoS (important for fan-out):** a slow listener must **never** stall the finding hot path. Split QoS by event kind:
+- `PROGRESS` is **lossy-OK** — best-effort broadcast, drop for slow subscribers (ZMQ `PUB` with a send HWM does this natively; WebSocket: bounded per-subscriber queue, drop-oldest).
+- `RESULT` (founds) is **precious** — keep the existing durable log/file sink as the source of truth so a found key is *never* lost to a dropped notification, and optionally offer an at-least-once acked delivery for subscribers that need it.
+
+**Implementation seam — a `connection` package with two sub-packages (named from the server's perspective):**
+- `connection.receiver` — accepts incoming private keys (a `KeySource` that feeds the existing queue). Today's socket key producers are this role.
+- `connection.sender` — publishes `CONFIG`-on-connect + the event stream to all subscribers (a `ResultSink`/event-bus the consumer publishes to, plus a subscriber registry and per-subscriber bounded queues).
+
+Each transport provides the impls it needs in each sub-package (see the adapter matrix below). The consumer publishes to the transport-agnostic `ResultSink`; producers and listeners are independent clients — a listener need not be a producer and vice versa.
+
+**Adapter matrix (transport × direction) — do we implement a sender per receiver?** Conceptually yes: each transport can have an **ingestion adapter** (`KeySource`, today's receiver key producers already are this) *and* a **notification adapter** (`ResultSink`). But these are two different *roles*, not a receiver subclassed into a sender, and the directions are **not symmetric per transport** — so it is not 6 mandatory classes:
+
+| Transport | Ingestion (`KeySource`) | Notification (`ResultSink`) | Notes |
+|---|---|---|---|
+| WebSocket | `onMessage` | `broadcast(...)` | a **single dual-role class** can do both (bidirectional, multi-client, broadcast built-in) |
+| ZeroMQ | `PULL` adapter | **separate `PUB`** adapter | two thin adapters — socket types are fixed |
+| Raw TCP | existing single-accept reader | **new** broadcaster (accept-loop + registry + length-prefixed framing + per-client write isolation) | sender is much heavier than the receiver; not a flip |
+
+Fill the matrix by **value, not parity**: WebSocket both (API + web UI) first; ZMQ both (`PULL`+`PUB`) for cluster scale; raw TCP `KeySource` now, `ResultSink` optional/last (most work, least unique benefit). What makes the senders cheap is a **shared protocol codec** + the shared `ResultSink` event model, so each transport adapter is thin byte-moving plumbing.
+
+#### Statistics publisher (thread-independent, change-fired) — feeds `connection.sender`
+
+**Current state (researched).** Runtime metrics live in two places, both written from many threads:
+- `RuntimeStatistics` (shared; created by `Finder`, injected into producers + consumer): `batchesByProducer` (per-producer label → `AtomicLong`, **incremented by each producer** on every dispatched batch) and a late-bound `runningProducersGauge` (computed from producer `RUNNING` states).
+- `ConsumerJava` `AtomicLong` counters, mutated on the **consumer hot path**: `checkedKeys` (per address check), `checkedKeysSumOfTimeToCheckContains`, `hits`, `vanityHits`, `consumerReadyCount`, `producerBlockedCount`; plus derived `keysQueue.size()`, `runningConsumerCount()`, `startTime`.
+- These are surfaced **pull/poll-only**: `ConsumerJava.startStatisticsTimer()` runs a `ScheduledExecutorService` every `printStatisticsEveryNSeconds` (default 60s), reads everything, renders a string via `Statistics.createStatisticsMessage(...)`, and `LOGGER.info`s it. **The log is the only sink.**
+
+**Proposed.** Add a **thread-independent `StatisticsPublisher`** that pushes updates to subscribers via the `ResultSink` (`connection.sender`), without touching the hot path:
+- Extract the per-tick aggregation into an immutable **`StatisticsSnapshot`** (uptime, keys, keys/sec, avg contains-time, batches-by-producer, producers running, consumers running, ready, blocked, queue size, hits, vanity hits). Feed the *same* snapshot to **both** the existing log line and the publisher — one source of truth, log behaviour unchanged.
+- The publisher **owns its own thread/scheduler**, reads the lock-free atomics, and broadcasts. Producers/consumer keep doing **only atomic increments** as today; a slow subscriber can never stall them (bounded per-subscriber queues, drop the lossy snapshot).
+
+**Critical: "fire on every change" must be coalesced, not literal.** `checkedKeys` increments millions of times/sec — publishing per-increment is the same firehose the per-produced-key non-goal forbids. So split by rate:
+- **Discrete, low-rate changes** → fire **immediately** on change: a `HIT`, a `VANITY_HIT`, a producer started/stopped, `KEY_QUEUED`, `GENERATION_STARTED`. (These are exactly the discrete events in the schema above.)
+- **High-frequency aggregate counters** (`checkedKeys`/keys-per-sec, queue size, avg-time) → publish a **coalesced `StatisticsSnapshot` on a tick** (the configured cadence, or faster — e.g. 1 s — for a responsive UI), never per-increment. A `dirty` flag skips ticks where nothing changed (idle); optionally emit only the fields that changed.
+
+So the publisher's two outputs map onto the existing event set: discrete changes = `HIT`/`VANITY_HIT`/`KEY_QUEUED`/`GENERATION_STARTED`; the coalesced snapshot = `PROGRESS`/`STATS`. (The separate address-file-import path has its own `ReadStatistic` progress, which could publish the same way if a UI ever drives imports.)
+
+#### Deliverables (ordered)
+
+1. **Finding service that accepts keys / ranges / hash160s (do first).** New run mode (`CCommand`, e.g. `FindService`) wiring the consumer to a network *key source* instead of an in-process producer queue. Introduce a `KeySource` abstraction feeding the existing queue; producers (`ProducerJava`, `ProducerOpenCL`, third-party) become **clients** of the protocol. Add `SUBMIT_RANGE` (reuse the incremental expander) and `SUBMIT_HASH160` (checker mode).
+2. **Notification / result feedback channel (second) — `connection.sender`.** A structured **outbound** event stream published from the consumer via a transport-agnostic `ResultSink`/event-emitter: `CONFIG` on connect, then `KEY_QUEUED`, `GENERATION_STARTED`, `VANITY_HIT`, `HIT` (founds), and optional aggregate `PROGRESS` — **configured results of interest only, never per produced key**. Optional and **backpressure-safe (never blocks the finding hot path)**. Broadcast to all subscribers over WebSocket / ZMQ `PUB` / TCP. This is what lets a separate listener or web UI watch a scan live instead of tailing logs.
+3. **Web UI (third; ties into the Cross-platform GUI entry below).** Configure/start/stop a scan and **monitor** it (live keys/sec, range progress, hits, vanity) by subscribing to the Deliverable-2 stream over the same WebSocket. JSON config stays as the headless interface.
+
+#### Guardrails
+
+- Preserve the layered architecture: the network *source* and *feedback emitter* are new edges — introduce them as their own small packages/interfaces (`KeySource` → existing `LinkedBlockingQueue`; `ResultSink` ← consumer events), not by threading sockets through `ConsumerJava`.
+- The feedback channel publishes events; UI / CLI / remote producer are just subscribers — finding must not depend on any UI.
+- **Security first:** ingestion and feedback move **private keys and hits**. Bind to localhost by default; require auth (token / mTLS) and TLS before any remote-exposed default; document the exposure model in `docs/wire-protocol.md`. Add bounded queues so a hostile/fast sender cannot OOM the finder.
 
 ### Cross-platform GUI (desktop + mobile) — beginner-friendly launcher
 

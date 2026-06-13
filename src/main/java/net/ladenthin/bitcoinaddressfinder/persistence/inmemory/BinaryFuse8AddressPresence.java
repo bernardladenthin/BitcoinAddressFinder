@@ -149,6 +149,77 @@ public final class BinaryFuse8AddressPresence implements AddressPresence {
     }
 
     /**
+     * Returns an immutable payload describing this filter for GPU VRAM upload.
+     * <p>
+     * Public bridge accessor: the engine layer reads this single object (instead of the
+     * package-private getters, which are not visible across packages) and decomposes it into
+     * the primitive arguments accepted by the OpenCL upload path. This keeps the OpenCL layer
+     * free of any dependency on this persistence type.
+     *
+     * @return the GPU-upload payload (fingerprints reference plus seed and segment metadata)
+     */
+    public BinaryFuse8GpuFilterData toGpuFilterData() {
+        return new BinaryFuse8GpuFilterData(
+                getFingerprints(), getSeed(), getSegmentLength(), getSegmentLengthMask(), getSegmentCountLength());
+    }
+
+    /**
+     * Returns the fingerprint slot array, exposed for GPU VRAM upload and tests.
+     * <p>
+     * The reference (not a defensive copy) is returned deliberately: the array can be large
+     * and is treated as read-only by every caller (the GPU upload path copies it into device
+     * memory; tests only read it). Callers must not mutate it.
+     *
+     * @return the fingerprint byte array; its length equals {@link #slotCount()}
+     */
+    @SuppressWarnings("EI_EXPOSE_REP")
+    byte[] getFingerprints() {
+        return fingerprints;
+    }
+
+    /**
+     * Returns the construction seed of the first successful build.
+     *
+     * @return the seed value used by {@link #containsAddress(ByteBuffer)} for hashing
+     */
+    long getSeed() {
+        return seed;
+    }
+
+    /**
+     * Returns the per-segment length used by the {@code reduce} position mapping.
+     *
+     * @return the segment length
+     */
+    int getSegmentLength() {
+        return segSize;
+    }
+
+    /**
+     * Returns {@link #getSegmentLength()} minus one.
+     * <p>
+     * Provided as GPU-upload metadata to mirror the standard Binary Fuse filter layout; the
+     * {@code reduce}-based position mapping used here does not consume the mask directly.
+     *
+     * @return {@code getSegmentLength() - 1}
+     */
+    int getSegmentLengthMask() {
+        return segSize - 1;
+    }
+
+    /**
+     * Returns the total number of fingerprint slots (the three segments combined).
+     * <p>
+     * Equals {@link #getFingerprints()}{@code .length}, so the value matches the size of the
+     * buffer uploaded to GPU VRAM exactly.
+     *
+     * @return the total slot count across all segments
+     */
+    int getSegmentCountLength() {
+        return fingerprints.length;
+    }
+
+    /**
      * MurmurHash3 64-bit finaliser seeded by XOR with {@code seed}.
      *
      * @param key  the 64-bit key extracted from the hash160

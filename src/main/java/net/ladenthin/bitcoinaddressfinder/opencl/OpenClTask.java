@@ -254,7 +254,13 @@ public class OpenClTask implements ReleaseCLObject {
      * @return the size of the destination buffer in bytes for the current batch
      */
     public long getDstSizeInBytes() {
-        return (long) OpenClKernelConstants.CHUNK_SIZE_NUM_BYTES * cProducer.getOverallWorkSize();
+        // Unified output buffer: a 4-byte count header followed by overallWorkSize entries of
+        // OUTPUT_ENTRY_SIZE_BYTES (108) each. This is also exactly compact mode's worst case
+        // (every candidate is a filter hit), so the single allocation covers both write modes.
+        // The (long) cast forces 64-bit multiplication before the addition, preventing int
+        // overflow for large work sizes (108 × MAXIMUM_CHUNK_ELEMENTS ≈ 2.1 GB).
+        return OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES
+                + (long) OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES * cProducer.getOverallWorkSize();
     }
 
     /**
@@ -290,8 +296,8 @@ public class OpenClTask implements ReleaseCLObject {
         // longer key — that would corrupt the scalar fed to the kernel.
         final byte[] byteArray =
                 ByteBufferUtility.bigIntegerToFixedLengthBytes(privateKeyBase, PRIVATE_KEY_SOURCE_SIZE_IN_BYTES);
-        EndiannessConverter endiannessConverter =
-                new EndiannessConverter(ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN, byteBufferUtility);
+        EndiannessConverter endiannessConverter = new EndiannessConverter(
+                ByteOrder.BIG_ENDIAN, OpenClKernelConstants.GPU_NATIVE_WORD_ORDER, byteBufferUtility);
         endiannessConverter.convertEndian(byteArray);
         ByteBufferUtility.putToByteBuffer(privateKeySourceArgument.getByteBuffer(), byteArray);
     }
@@ -308,11 +314,22 @@ public class OpenClTask implements ReleaseCLObject {
     /**
      * Runs the OpenCL kernel for the configured batch and returns the result buffer.
      *
-     * @param kernel       the compiled OpenCL kernel
-     * @param commandQueue the OpenCL command queue
+     * <p>Binds the two GPU Binary Fuse 8 filter buffers and the {@code transfer_all} mode flag
+     * as kernel arguments, zero-initialises the output buffer's leading count word (so compact
+     * mode's {@code atomic_add} starts from zero), runs the kernel, then reads back only the
+     * bytes the kernel actually produced: in full-transfer mode the whole grid
+     * ({@code overallWorkSize} entries), in compact mode just the {@code K} hit entries the
+     * count word reports &mdash; realising the PCIe bandwidth saving.
+     *
+     * @param kernel        the compiled OpenCL kernel
+     * @param commandQueue  the OpenCL command queue
+     * @param fuse8FpMem    the GPU fingerprint slot buffer (a dummy empty filter when none is uploaded)
+     * @param fuse8MetaMem  the GPU 5-int metadata buffer {@code [seedLo, seedHi, segLen, segLenMask, segCountLen]}
+     * @param transferAll   {@code 0} for compact (filter) mode, non-zero to force full transfer
      * @return the destination buffer containing kernel results
      */
-    public ByteBuffer executeKernel(cl_kernel kernel, cl_command_queue commandQueue) {
+    public ByteBuffer executeKernel(
+            cl_kernel kernel, cl_command_queue commandQueue, cl_mem fuse8FpMem, cl_mem fuse8MetaMem, int transferAll) {
         final long dstSizeInBytes = getDstSizeInBytes();
         // Allocate a new destination buffer so that cloning after kernel execution is unnecessary
         try (final DestinationArgument destinationArgument = DestinationArgument.create(context, dstSizeInBytes)) {
@@ -345,6 +362,9 @@ public class OpenClTask implements ReleaseCLObject {
             clSetKernelArg(kernel, 0, Sizeof.cl_mem, destinationArgument.getClMemPointer());
             clSetKernelArg(kernel, 1, Sizeof.cl_mem, privateKeySourceArgument.getClMemPointer());
             clSetKernelArg(kernel, 2, Sizeof.cl_uint, Pointer.to(new int[] {keysPerWorkItem}));
+            clSetKernelArg(kernel, 3, Sizeof.cl_mem, Pointer.to(fuse8FpMem));
+            clSetKernelArg(kernel, 4, Sizeof.cl_mem, Pointer.to(fuse8MetaMem));
+            clSetKernelArg(kernel, 5, Sizeof.cl_uint, Pointer.to(new int[] {transferAll}));
 
             {
                 // write src buffer
@@ -355,6 +375,22 @@ public class OpenClTask implements ReleaseCLObject {
                         0,
                         PRIVATE_KEY_SOURCE_SIZE_IN_BYTES,
                         privateKeySourceArgument.getHostMemoryPointer(),
+                        0,
+                        null,
+                        null);
+                clFinish(commandQueue);
+            }
+            {
+                // zero-initialise the leading count word so compact mode's atomic_add starts at
+                // 0 (full mode's work-item 0 overwrites it with the sentinel).
+                final ByteBuffer zeroHeader = ByteBuffer.allocateDirect(OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES);
+                clEnqueueWriteBuffer(
+                        commandQueue,
+                        destinationArgument.getMem(),
+                        CL_TRUE,
+                        0,
+                        OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES,
+                        Pointer.to(zeroHeader),
                         0,
                         null,
                         null);
@@ -374,15 +410,49 @@ public class OpenClTask implements ReleaseCLObject {
                 }
             }
             {
-                // read the dst buffer
-                final long beforeRead = System.currentTimeMillis();
-
+                // Read back the count word first, then only the bytes the kernel produced:
+                // full mode -> overallWorkSize entries; compact mode -> K hit entries.
+                final ByteBuffer countHeader = ByteBuffer.allocateDirect(OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES)
+                        .order(OpenClKernelConstants.GPU_NATIVE_WORD_ORDER);
                 clEnqueueReadBuffer(
                         commandQueue,
                         destinationArgument.getMem(),
                         CL_TRUE,
                         0,
-                        dstSizeInBytes,
+                        OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES,
+                        Pointer.to(countHeader),
+                        0,
+                        null,
+                        null);
+                clFinish(commandQueue);
+
+                final int count = countHeader.getInt(0);
+                final long entriesToRead;
+                if (count == OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL) {
+                    entriesToRead = cProducer.getOverallWorkSize();
+                } else {
+                    // The sentinel (0xFFFF_FFFF = 4_294_967_295 unsigned) can never alias a
+                    // real compact count: MAXIMUM_CHUNK_ELEMENTS (~19.9 M) is far below that
+                    // value, so the bounds check below always catches it before it would
+                    // silently look like a normal count.
+                    final long compactCount = Integer.toUnsignedLong(count);
+                    if (compactCount > cProducer.getOverallWorkSize()) {
+                        throw new IllegalStateException("GPU compact-mode count " + compactCount
+                                + " exceeds overallWorkSize " + cProducer.getOverallWorkSize()
+                                + "; kernel output is corrupt");
+                    }
+                    entriesToRead = compactCount;
+                }
+                final long bytesToRead = OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES
+                        + entriesToRead * OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES;
+
+                final long beforeRead = System.currentTimeMillis();
+                clEnqueueReadBuffer(
+                        commandQueue,
+                        destinationArgument.getMem(),
+                        CL_TRUE,
+                        0,
+                        bytesToRead,
                         destinationArgument.getHostMemoryPointer(),
                         0,
                         null,
@@ -391,7 +461,7 @@ public class OpenClTask implements ReleaseCLObject {
 
                 final long afterRead = System.currentTimeMillis();
                 if (LOGGER.isTraceEnabled()) {
-                    LOGGER.trace("Read OpenCL data " + ((dstSizeInBytes / 1024) / 1024) + "Mb in "
+                    LOGGER.trace("Read OpenCL data " + ((bytesToRead / 1024) / 1024) + "Mb in "
                             + (afterRead - beforeRead) + "ms");
                 }
             }

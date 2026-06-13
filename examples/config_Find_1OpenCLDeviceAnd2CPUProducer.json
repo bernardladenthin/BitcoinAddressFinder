@@ -27,7 +27,7 @@
         "useProxyOptimal": true,
         "logStatsOnInit": true,
         "logStatsOnClose": false,
-        "addressLookupBackend" : "BLOOM",
+        "addressLookupBackend" : "BINARY_FUSE_8",
         "disableAddressLookup" : false
       },
       "printStatisticsEveryNSeconds": 10,
@@ -71,7 +71,9 @@
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
         "runOnce": false,
-        "shutdownTimeoutSeconds": 300
+        "shutdownTimeoutSeconds": 300,
+        "enableGpuFilter": true,
+        "transferAll": false
       }
     ]
   }

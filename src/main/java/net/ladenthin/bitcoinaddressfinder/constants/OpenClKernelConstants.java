@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.constants;
 
+import java.nio.ByteOrder;
+
 /**
  * OpenCL kernel byte-layout and wire-format constants.
  *
@@ -35,6 +37,34 @@ public final class OpenClKernelConstants {
     private OpenClKernelConstants() {
         // utility constant holder; not instantiable.
     }
+
+    /**
+     * Byte order in which the OpenCL kernel writes its {@code u32} words into the output
+     * buffer &mdash; and therefore the order the Java side must use to read back every
+     * kernel-written multi-byte integer (the leading count word and the per-entry
+     * {@code work_item_index}), and the target order when uploading the private-key words to
+     * the kernel.
+     *
+     * <p><b>Single source of truth for the host-side GPU byte-order assumption.</b> Every Java
+     * site that interprets a kernel-native word references this constant instead of a bare
+     * {@link ByteOrder#LITTLE_ENDIAN} literal, so the assumption lives in exactly one place.
+     *
+     * <p>It is {@link ByteOrder#LITTLE_ENDIAN} because every OpenCL device the project targets
+     * (all NVIDIA / AMD / Intel GPUs, and pocl on x86/ARM) is little-endian. The kernel
+     * canonicalises its X / Y / hash160 output to big-endian <i>on-device</i> (via
+     * {@code swap_u32} / {@code ripemd160_update_swap}), so those fields are read on the host as
+     * raw bytes and are unaffected by this constant; only the kernel-native {@code u32} fields
+     * (count, index) and the private-key upload depend on it.
+     *
+     * <p><b>Changing this to {@link ByteOrder#BIG_ENDIAN} is necessary but NOT sufficient to
+     * run on a big-endian OpenCL device:</b> the kernel's own {@code swap_u32} /
+     * {@code ripemd160_update_swap} canonicalisation is likewise little-endian-baked and would
+     * have to change in lockstep (out of scope for the Java-side centralisation). A future
+     * device-endianness guard should reject any device whose
+     * {@code OpenCLDevice.getByteOrder()} differs from this value rather than produce silently
+     * corrupt results.
+     */
+    public static final ByteOrder GPU_NATIVE_WORD_ORDER = ByteOrder.LITTLE_ENDIAN;
 
     /** Number of bits in a byte. */
     public static final int BITS_PER_BYTE = 8;
@@ -189,17 +219,118 @@ public final class OpenClKernelConstants {
     /** Total size of one OpenCL result chunk in bytes. */
     public static final int CHUNK_SIZE_NUM_BYTES = CHUNK_OFFSET_99_NUM_BYTES_END_OF_CHUNK;
 
+    // ==================================================================================
+    // ==== Unified GPU output buffer format (ONE physical layout, two write modes) =====
+    // ==================================================================================
+    // SYNCHRONIZED WITH OpenCL CONSTANTS — see the GPU kernel.
+    //
+    // There is a SINGLE physical output layout, used unchanged by every kernel launch.
+    // The buffer begins with a 4-byte unsigned count word, followed by fixed-stride
+    // entries of OUTPUT_ENTRY_SIZE_BYTES (108) each:
+    //
+    //   byte 0                         : [count : u32]          (the leading header word)
+    //   byte OUTPUT_HEADER_SIZE_BYTES  : entry[0]
+    //     + OUTPUT_ENTRY_INDEX_BYTE_OFFSET (= 0)  : [work_item_index : u32]
+    //     + OUTPUT_ENTRY_X_BYTE_OFFSET     (= 4)  : [X : 32 bytes big-endian]
+    //     + OUTPUT_ENTRY_Y_BYTE_OFFSET     (= 36) : [Y : 32 bytes big-endian]
+    //     + OUTPUT_ENTRY_HASH160_UNCOMPRESSED_BYTE_OFFSET (= 68) : [hash160 uncompressed : 20]
+    //     + OUTPUT_ENTRY_HASH160_COMPRESSED_BYTE_OFFSET   (= 88) : [hash160 compressed   : 20]
+    //   byte OUTPUT_HEADER_SIZE_BYTES + OUTPUT_ENTRY_SIZE_BYTES : entry[1]
+    //   ... and so on.
+    //
+    // The work_item_index is part of EVERY entry (it is redundant in full-transfer mode,
+    // where entry i is written at slot i, but it keeps the stride identical to compact
+    // mode). Because there is only one stride, the destination buffer is always sized as
+    // OUTPUT_HEADER_SIZE_BYTES + N * OUTPUT_ENTRY_SIZE_BYTES, and the array-capacity bound
+    // (MAXIMUM_CHUNK_ELEMENTS / BIT_COUNT_FOR_MAX_CHUNKS_ARRAY) is derived from that one
+    // true stride — there is no second format to reconcile.
+    //
+    // The count word selects how the reader walks the entries:
+    //
+    //   - OUTPUT_COUNT_FULL_TRANSFER_SENTINEL (0xFFFFFFFF) -> FULL-TRANSFER mode.
+    //       Every work-item is present; entry i is written densely at slot i with
+    //       work_item_index = i (no atomics). The reader walks exactly workSize entries.
+    //       Used when the GPU filter is disabled, or when transfer_all is forced (e.g.
+    //       vanity / regex scanning, where the CPU must see every derived address).
+    //
+    //   - any other value K -> COMPACT mode.
+    //       Only the (few) work-items whose hash160 passed the GPU Binary Fuse 8 filter
+    //       wrote an entry; each claimed its slot via atomic_add, so the K entries appear
+    //       in nondeterministic order and the work_item_index field is essential. The
+    //       reader walks exactly K entries. K cannot collide with the sentinel: the grid
+    //       size is capped at 2^BIT_COUNT_FOR_MAX_CHUNKS_ARRAY work-items, far below
+    //       0xFFFFFFFF, so even an all-hit batch (K == workSize) stays well under it.
+    //
+    // Both modes share the entry parser; they differ only in the loop bound (workSize vs K)
+    // and in how the count is produced (constant vs atomic).
+
+    /**
+     * Size in bytes of the leading unsigned count word present in every GPU output buffer.
+     * One {@code u32}.
+     */
+    public static final int OUTPUT_HEADER_SIZE_BYTES = U32_NUM_BYTES; // 4
+
+    /**
+     * Count-word value (written as an unsigned {@code u32} on the GPU) that flags
+     * full-transfer mode. Stored here as the signed {@code int} {@code 0xFFFFFFFF}
+     * (which is {@code -1}); compare against the buffer's count word read as an {@code int}.
+     */
+    public static final int OUTPUT_COUNT_FULL_TRANSFER_SENTINEL = 0xFFFF_FFFF;
+
+    // ==== Output-entry field sizes (Bytes) — mirrors the CHUNK_SIZE_* block ====
+    /** Size of the work-item index field at the start of an output entry (one {@code u32}). */
+    public static final int OUTPUT_ENTRY_INDEX_SIZE_BYTES = U32_NUM_BYTES; // 4
+    /** Size of the big-endian X-coordinate slot inside an output entry. */
+    public static final int OUTPUT_ENTRY_X_SIZE_BYTES = CHUNK_SIZE_00_NUM_BYTES_BIG_ENDIAN_X; // 32
+    /** Size of the big-endian Y-coordinate slot inside an output entry. */
+    public static final int OUTPUT_ENTRY_Y_SIZE_BYTES = CHUNK_SIZE_01_NUM_BYTES_BIG_ENDIAN_Y; // 32
+    /** Size of the uncompressed-key RIPEMD-160 slot inside an output entry. */
+    public static final int OUTPUT_ENTRY_HASH160_UNCOMPRESSED_SIZE_BYTES =
+            CHUNK_SIZE_10_NUM_BYTES_RIPEMD160_UNCOMPRESSED; // 20
+    /** Size of the compressed-key RIPEMD-160 slot inside an output entry. */
+    public static final int OUTPUT_ENTRY_HASH160_COMPRESSED_SIZE_BYTES =
+            CHUNK_SIZE_11_NUM_BYTES_RIPEMD160_COMPRESSED; // 20
+
+    // ==== Offsets within an output entry (each = previous offset + previous size) ====
+    /** Byte offset of the work-item index field inside an output entry. */
+    public static final int OUTPUT_ENTRY_INDEX_BYTE_OFFSET = 0;
+    /** Byte offset of the big-endian X coordinate inside an output entry. */
+    public static final int OUTPUT_ENTRY_X_BYTE_OFFSET = OUTPUT_ENTRY_INDEX_BYTE_OFFSET + OUTPUT_ENTRY_INDEX_SIZE_BYTES;
+    /** Byte offset of the big-endian Y coordinate inside an output entry. */
+    public static final int OUTPUT_ENTRY_Y_BYTE_OFFSET = OUTPUT_ENTRY_X_BYTE_OFFSET + OUTPUT_ENTRY_X_SIZE_BYTES;
+    /** Byte offset of the uncompressed-key RIPEMD-160 hash inside an output entry. */
+    public static final int OUTPUT_ENTRY_HASH160_UNCOMPRESSED_BYTE_OFFSET =
+            OUTPUT_ENTRY_Y_BYTE_OFFSET + OUTPUT_ENTRY_Y_SIZE_BYTES;
+    /** Byte offset of the compressed-key RIPEMD-160 hash inside an output entry. */
+    public static final int OUTPUT_ENTRY_HASH160_COMPRESSED_BYTE_OFFSET =
+            OUTPUT_ENTRY_HASH160_UNCOMPRESSED_BYTE_OFFSET + OUTPUT_ENTRY_HASH160_UNCOMPRESSED_SIZE_BYTES;
+    /** Byte offset just past the end of an output entry (equals the entry size). */
+    public static final int OUTPUT_ENTRY_END_BYTE_OFFSET =
+            OUTPUT_ENTRY_HASH160_COMPRESSED_BYTE_OFFSET + OUTPUT_ENTRY_HASH160_COMPRESSED_SIZE_BYTES;
+
+    /**
+     * Total size in bytes of one output entry (the single, unified stride used by both
+     * full-transfer and compact modes):
+     * {@code [work_item_index:4][X:32][Y:32][hash160_uncompressed:20][hash160_compressed:20]}.
+     *
+     * <p>Derived as the running offset past the last field
+     * ({@link #OUTPUT_ENTRY_END_BYTE_OFFSET}), exactly like {@link #CHUNK_SIZE_NUM_BYTES} is
+     * derived from {@link #CHUNK_OFFSET_99_NUM_BYTES_END_OF_CHUNK}.
+     */
+    public static final int OUTPUT_ENTRY_SIZE_BYTES = OUTPUT_ENTRY_END_BYTE_OFFSET; // 108
+
     // ==== Derived array-capacity bound (was in PublicKeyBytes outside the SYNCHRONIZED block) ====
     /**
-     * Maximum number of OpenCL chunks that fit in a single Java array,
+     * Maximum number of unified output entries that fit in a single Java direct buffer,
      * given {@link Integer#MAX_VALUE} as the addressable byte cap.
      *
-     * <p>The calculation divides {@link Integer#MAX_VALUE} by the number of
-     * bytes needed to store an OpenCL chunk ({@link #CHUNK_SIZE_NUM_BYTES}),
-     * ensuring the array's indexing does not surpass Java's maximum allowable
-     * array length.
+     * <p>The destination buffer is always {@link #OUTPUT_HEADER_SIZE_BYTES} +
+     * {@code N} &#x00d7; {@link #OUTPUT_ENTRY_SIZE_BYTES}, so the bound subtracts the
+     * leading header word before dividing by the single (unified) per-entry stride,
+     * ensuring the buffer length never surpasses Java's maximum addressable byte index.
      */
-    public static final int MAXIMUM_CHUNK_ELEMENTS = Integer.MAX_VALUE / CHUNK_SIZE_NUM_BYTES;
+    public static final int MAXIMUM_CHUNK_ELEMENTS =
+            (Integer.MAX_VALUE - OUTPUT_HEADER_SIZE_BYTES) / OUTPUT_ENTRY_SIZE_BYTES;
 
     /**
      * Minimum bit count needed to address every entry in an array of

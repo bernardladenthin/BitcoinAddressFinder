@@ -101,6 +101,21 @@ k_local[0] = 0x929f72dc;
 
 // ==== Total Chunk Size ====
 #define CHUNK_SIZE_NUM_WORDS                                         CHUNK_OFFSET_99_NUM_WORDS_END_OF_CHUNK
+
+// ==== Unified output buffer (ONE physical layout, two write modes) ====
+// Mirrors Java OpenClKernelConstants OUTPUT_* constants. The buffer begins with a
+// single-word count header, then fixed-stride entries that ALWAYS carry the work_item_index
+// as their first word (redundant in full-transfer mode, where entry i sits at slot i, but it
+// keeps the stride identical to compact mode). Word offsets here equal the Java byte offsets / 4.
+#define OUTPUT_HEADER_NUM_WORDS                                      1   // 4-byte count word at r[0]
+#define OUTPUT_COUNT_FULL_TRANSFER_SENTINEL                          0xFFFFFFFF
+#define OUTPUT_ENTRY_INDEX_NUM_WORDS                                 1   // work_item_index (u32)
+#define OUTPUT_ENTRY_OFFSET_INDEX                                    0
+#define OUTPUT_ENTRY_OFFSET_X                                        (OUTPUT_ENTRY_OFFSET_INDEX + OUTPUT_ENTRY_INDEX_NUM_WORDS)
+#define OUTPUT_ENTRY_OFFSET_Y                                        (OUTPUT_ENTRY_OFFSET_X + CHUNK_SIZE_00_NUM_WORDS_BIG_ENDIAN_X)
+#define OUTPUT_ENTRY_OFFSET_RIPEMD160_UNCOMPRESSED                   (OUTPUT_ENTRY_OFFSET_Y + CHUNK_SIZE_01_NUM_WORDS_BIG_ENDIAN_Y)
+#define OUTPUT_ENTRY_OFFSET_RIPEMD160_COMPRESSED                     (OUTPUT_ENTRY_OFFSET_RIPEMD160_UNCOMPRESSED + CHUNK_SIZE_10_NUM_WORDS_RIPEMD160_UNCOMPRESSED)
+#define OUTPUT_ENTRY_NUM_WORDS                                       (OUTPUT_ENTRY_OFFSET_RIPEMD160_COMPRESSED + CHUNK_SIZE_11_NUM_WORDS_RIPEMD160_COMPRESSED)
 // ==== END: SYNCHRONIZED WITH JAVA CONSTANTS ====
 
 /**
@@ -529,9 +544,27 @@ inline void build_ripemd160_block_from_sha256(const u32 *sha256_hash, u32 *ripem
  * - Avoids redundant serialization logic.
  * - Helps GPU kernels minimize register and local memory pressure.
  *
+ * Scope:
+ * - Beyond the SEC byte buffer, this macro also shares the SHA-256 and RIPEMD-160 working
+ *   contexts (sha_ctx_shared / ripemd_ctx_shared) and their input blocks between the
+ *   uncompressed and compressed passes (see the #ifdef block in the kernel). That is where
+ *   most of the saving comes from: ~349 bytes of private scratch per work-item (a second
+ *   sha256_ctx_t = 100 B, a second ripemd160_ctx_t = 88 B, plus the compressed input/sec
+ *   allocations). Keeping it materially lowers register pressure / raises occupancy.
+ *
  * Safety:
- * - This optimization is safe as long as the uncompressed SEC buffer is no longer needed
- *   after being overwritten with the compressed prefix.
+ * - Safe as long as each shared buffer is no longer needed once the compressed pass
+ *   overwrites it. The uncompressed pass is fully consumed into ripemd_ctx_shared.h before
+ *   the compressed pass begins, so the only value that must survive is the uncompressed
+ *   hash160 itself.
+ * - IMPORTANT (compact output): because ripemd_ctx_uncompressed and ripemd_ctx_compressed
+ *   are the SAME shared context, the compressed pass overwrites the uncompressed hash160.
+ *   The kernel therefore snapshots both hash160 results into private register arrays
+ *   (ripemd_uncompressed_h / ripemd_compressed_h, 20 B each) right after each is computed,
+ *   so the deferred filter check + entry write read stable copies. Those 40 bytes are the
+ *   minimal cost of holding both hashes until the compact-mode output slot is decided — they
+ *   are required by the compact feature, NOT a side effect of this macro, and are far cheaper
+ *   than the ~349 B that disabling REUSE would re-introduce. Do not remove them.
  */
 #define REUSE_FOR_COMPRESSED
 
@@ -563,7 +596,64 @@ inline void build_ripemd160_block_from_sha256(const u32 *sha256_hash, u32 *ripem
  *          Each thread writes CHUNK_SIZE_NUM_WORDS u32 values.
  * @param k Input buffer (global const u32*) representing a single base private key (8 words, little-endian).
  */
-__kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k, const u32 keysPerWorkItem)
+// ======================================================================================
+// ==== GPU-side Binary Fuse 8 filter (mirrors BinaryFuse8AddressPresence exactly) ======
+// ======================================================================================
+// These four primitives are a byte-exact port of the Java hash64 / reduce / fingerprint8
+// helpers. Any divergence produces silent false negatives (a stored address never flagged),
+// so they are pinned against the Java implementation by Fuse8GpuHashParityTest.
+
+inline ulong fuse8_hash64(ulong key, ulong seed) {
+    ulong h = key ^ seed;
+    h ^= h >> 33;
+    h *= 0xff51afd7ed558ccdUL;
+    h ^= h >> 33;
+    h *= 0xc4ceb9fe1a85ec53UL;
+    h ^= h >> 33;
+    return h;
+}
+
+inline uint fuse8_reduce(uint h, uint m) {
+    // Multiply-high mapping into [0, m): (uint)(((ulong)h * (ulong)m) >> 32). No division.
+    return (uint)(((ulong)h * (ulong)m) >> 32);
+}
+
+inline ulong fuse8_rotl(ulong v, int r) {
+    return (v << r) | (v >> (64 - r));
+}
+
+inline uchar fuse8_fingerprint(ulong h) {
+    return (uchar)(h ^ (h >> 32));
+}
+
+// Key extraction: the first 8 bytes of the hash160 read as a big-endian uint64. The two
+// little-endian RIPEMD-160 output words h[0], h[1] hold the canonical hash160 bytes in LE
+// layout, so byte-swapping each word yields the big-endian halves that Java's
+// ByteBuffer.getLong(0) produces.
+inline ulong fuse8_key_from_ripemd(const u32 *h) {
+    return ((ulong)swap_u32(h[0]) << 32) | (ulong)swap_u32(h[1]);
+}
+
+// Returns true when the key is POSSIBLY present (no false negatives; ~0.4% false positives).
+inline bool fuse8_contains(__global const uchar *fp, ulong seed, uint seg, uint seg_count_len, ulong key) {
+    if (seg_count_len == 0) {
+        return false; // empty filter never matches
+    }
+    ulong ph = fuse8_hash64(key, seed);
+    uint h0 = fuse8_reduce((uint)ph, seg);
+    uint h1 = fuse8_reduce((uint)fuse8_hash64(key, fuse8_rotl(seed, 21)), seg) + seg;
+    uint h2 = fuse8_reduce((uint)fuse8_hash64(key, fuse8_rotl(seed, 42)), seg) + 2 * seg;
+    uchar f8 = fuse8_fingerprint(ph);
+    return (uchar)(fp[h0] ^ fp[h1] ^ fp[h2]) == f8;
+}
+
+__kernel void generateKeysKernel_grid(
+    __global u32 *r,
+    __global const u32 *k,
+    const u32 keysPerWorkItem,
+    __global const uchar *fuse8_fp,    // Binary Fuse 8 fingerprint slot array
+    __global const uint *fuse8_meta,   // [seedLo, seedHi, segLen, segLenMask, segCountLen]
+    const u32 transfer_all)            // 0 = compact (filter) mode, non-zero = full transfer
 {
     // Little Endian format
     u32 k_littleEndian_local[PRIVATE_KEY_LENGTH];
@@ -644,9 +734,22 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k, co
     copy_constant_u32_array_private_u32(x1_local, &g_precomputed.xy[G_OFFSET_X1], ONE_COORDINATE_NUM_WORDS);
     copy_constant_u32_array_private_u32(y1_local, &g_precomputed.xy[G_OFFSET_Y1], ONE_COORDINATE_NUM_WORDS);
 
+    // Load the Binary Fuse 8 filter metadata once (only consulted in compact mode).
+    ulong fuse8_seed = ((ulong)fuse8_meta[1] << 32) | (ulong)fuse8_meta[0]; // [seedHi, seedLo]
+    uint fuse8_seg = fuse8_meta[2];
+    uint fuse8_seg_count_len = fuse8_meta[4];
+
+    // Full-transfer mode: work-item 0 stamps the count header with the sentinel. Every
+    // work-item writes its own entry densely at its slot below, so the reader walks workSize
+    // entries (the count is implicit). Compact mode instead leaves the count word at the
+    // host-zeroed 0 and grows it via atomic_add as hits claim slots, so the sentinel must NOT
+    // be written there.
+    if (transfer_all != 0 && global_id == 0) {
+        r[0] = OUTPUT_COUNT_FULL_TRANSFER_SENTINEL;
+    }
+
     for (u32 i = 0; i < keysPerWorkItem; i++) {
         u32 loop_index = base_offset + i;
-        u32 r_offset = loop_index * CHUNK_SIZE_NUM_WORDS;
 
         // Apply variation (global_id) to LSB part of key (k[0])
         // We use bitwise OR (|) instead of addition (+) to modify the key,
@@ -670,13 +773,12 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k, co
             point_add_xy(x_littleEndian_local, y_littleEndian_local, x1_local, y1_local);
         }
 
-        // create big endian
+        // create big endian (computed into private registers; written to global memory below
+        // only for entries that are actually emitted)
         // x
         copy_and_reverse_endianness_u32_array(x_bigEndian_local, 0, x_littleEndian_local, ONE_COORDINATE_NUM_WORDS);
-        copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_00_NUM_WORDS_BIG_ENDIAN_X],      x_bigEndian_local, CHUNK_SIZE_00_NUM_WORDS_BIG_ENDIAN_X);
         // y
         copy_and_reverse_endianness_u32_array(y_bigEndian_local, 0, y_littleEndian_local, ONE_COORDINATE_NUM_WORDS);
-        copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_01_NUM_WORDS_BIG_ENDIAN_Y],      y_bigEndian_local, CHUNK_SIZE_01_NUM_WORDS_BIG_ENDIAN_Y);
 
         // === Hash uncompressed key ===
         get_sec_bytes_uncompressed(x_bigEndian_local, y_bigEndian_local, sec_uncompressed);
@@ -688,7 +790,15 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k, co
         ripemd160_init(&ripemd_ctx_uncompressed);
         ripemd160_update_swap(&ripemd_ctx_uncompressed, ripemd160_input_uncompressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
 
-        copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_10_NUM_WORDS_RIPEMD160_UNCOMPRESSED], ripemd_ctx_uncompressed.h, RIPEMD160_HASH_NUM_WORDS);
+        // Snapshot the uncompressed hash160 into a private register array NOW. Under
+        // REUSE_FOR_COMPRESSED the ripemd context is a shared alias, so the compressed pass
+        // below overwrites ripemd_ctx_uncompressed.h; the deferred filter check and entry
+        // write must read this stable copy, not the (soon-clobbered) shared context.
+        u32 ripemd_uncompressed_h[RIPEMD160_HASH_NUM_WORDS];
+        #pragma unroll
+        for (int w = 0; w < RIPEMD160_HASH_NUM_WORDS; w++) {
+            ripemd_uncompressed_h[w] = ripemd_ctx_uncompressed.h[w];
+        }
 
         // === Hash compressed key ===
         #ifdef REUSE_FOR_COMPRESSED
@@ -704,6 +814,43 @@ __kernel void generateKeysKernel_grid(__global u32 *r, __global const u32 *k, co
         ripemd160_init(&ripemd_ctx_compressed);
         ripemd160_update_swap(&ripemd_ctx_compressed, ripemd160_input_compressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
 
-        copy_private_u32_array_global_u32(&r[r_offset + CHUNK_OFFSET_11_NUM_WORDS_RIPEMD160_COMPRESSED], ripemd_ctx_compressed.h, RIPEMD160_HASH_NUM_WORDS);
+        // Snapshot the compressed hash160 too, so both hashes are stable private copies for
+        // the filter check and the deferred entry write below.
+        u32 ripemd_compressed_h[RIPEMD160_HASH_NUM_WORDS];
+        #pragma unroll
+        for (int w = 0; w < RIPEMD160_HASH_NUM_WORDS; w++) {
+            ripemd_compressed_h[w] = ripemd_ctx_compressed.h[w];
+        }
+
+        // === Decide whether and where to emit this entry ===
+        // Full-transfer mode: every work-item emits, densely at slot loop_index.
+        // Compact mode: emit only if the uncompressed OR compressed hash160 passes the Binary
+        //   Fuse 8 filter; the output slot is claimed atomically on the count word (r[0]).
+        u32 slot;
+        bool should_write;
+        if (transfer_all != 0) {
+            slot = loop_index;
+            should_write = true;
+        } else {
+            ulong key_uncompressed = fuse8_key_from_ripemd(ripemd_uncompressed_h);
+            ulong key_compressed   = fuse8_key_from_ripemd(ripemd_compressed_h);
+            bool hit = fuse8_contains(fuse8_fp, fuse8_seed, fuse8_seg, fuse8_seg_count_len, key_uncompressed)
+                    || fuse8_contains(fuse8_fp, fuse8_seed, fuse8_seg, fuse8_seg_count_len, key_compressed);
+            should_write = hit;
+            slot = 0;
+            if (hit) {
+                // atomic_add returns the previous value -> the 0-based slot this hit claims.
+                slot = atomic_add((volatile __global uint *)&r[0], 1u);
+            }
+        }
+
+        if (should_write) {
+            u32 r_offset = OUTPUT_HEADER_NUM_WORDS + slot * OUTPUT_ENTRY_NUM_WORDS;
+            r[r_offset + OUTPUT_ENTRY_OFFSET_INDEX] = loop_index;
+            copy_private_u32_array_global_u32(&r[r_offset + OUTPUT_ENTRY_OFFSET_X],      x_bigEndian_local, CHUNK_SIZE_00_NUM_WORDS_BIG_ENDIAN_X);
+            copy_private_u32_array_global_u32(&r[r_offset + OUTPUT_ENTRY_OFFSET_Y],      y_bigEndian_local, CHUNK_SIZE_01_NUM_WORDS_BIG_ENDIAN_Y);
+            copy_private_u32_array_global_u32(&r[r_offset + OUTPUT_ENTRY_OFFSET_RIPEMD160_UNCOMPRESSED], ripemd_uncompressed_h, RIPEMD160_HASH_NUM_WORDS);
+            copy_private_u32_array_global_u32(&r[r_offset + OUTPUT_ENTRY_OFFSET_RIPEMD160_COMPRESSED], ripemd_compressed_h, RIPEMD160_HASH_NUM_WORDS);
+        }
     }
 }
