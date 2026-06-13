@@ -656,6 +656,13 @@ inline bool fuse8_contains(__global const uchar *fp, ulong seed, uint seg, uint 
  * KEYS_BATCH_INV points are inverted together: one inv_mod plus 3*(N-1) multiplies for N points.
  * Larger values amortise the inverse over more keys but cost more private scratch
  * (4 * KEYS_BATCH_INV * 8 u32 words) which lowers occupancy; tune per device.
+ *
+ * MUST be a compile-time constant: it sizes the per-work-item private arrays below
+ * (batch_x/batch_y/batch_z/batch_prefix), and OpenCL C requires private-array dimensions to be
+ * compile-time constants. It therefore cannot be a runtime kernel argument like keysPerWorkItem
+ * (which is just a loop count); it is baked into the program at clBuildProgram time. To make it
+ * host-configurable, prepend a "#define KEYS_BATCH_INV <n>" line to the program source before the
+ * build (host side) rather than passing it as an argument.
  */
 #define KEYS_BATCH_INV 8
 
