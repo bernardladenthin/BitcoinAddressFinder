@@ -425,9 +425,18 @@ public class OpenClTask implements ReleaseCLObject {
                 clFinish(commandQueue);
 
                 final int count = countHeader.getInt(0);
-                final long entriesToRead = count == OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL
-                        ? cProducer.getOverallWorkSize()
-                        : Integer.toUnsignedLong(count);
+                final long entriesToRead;
+                if (count == OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL) {
+                    entriesToRead = cProducer.getOverallWorkSize();
+                } else {
+                    final long compactCount = Integer.toUnsignedLong(count);
+                    if (compactCount > cProducer.getOverallWorkSize()) {
+                        throw new IllegalStateException("GPU compact-mode count " + compactCount
+                                + " exceeds overallWorkSize " + cProducer.getOverallWorkSize()
+                                + "; kernel output is corrupt");
+                    }
+                    entriesToRead = compactCount;
+                }
                 final long bytesToRead = OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES
                         + entriesToRead * OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES;
 

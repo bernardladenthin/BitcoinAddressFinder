@@ -58,19 +58,27 @@ public class ProducerOpenCL extends AbstractProducer {
     private @Nullable OpenCLContext openCLContext;
 
     /**
-     * Binary Fuse 8 filter fingerprints staged for GPU upload, or {@code null} when no GPU
-     * filter is configured for this producer. Set by the engine ({@code Finder}) via
-     * {@link #setGpuFilter} after the consumer has built the filter, and uploaded to VRAM in
-     * {@link #initProducer()} once the {@link OpenCLContext} is initialised.
+     * All six filter parameters bundled into one record so {@link #setGpuFilter} can publish
+     * them to {@link #initProducer} with a single volatile write, establishing a happens-before
+     * edge between the engine thread (writer) and the producer-init thread (reader).
+     *
+     * <p>The {@code byte[]} component is intentional: the array is written once by the engine
+     * before {@link #initProducer()} is called, and consumed immediately during
+     * {@link OpenCLContext#uploadGpuFilter}. The identity-based {@code equals}/{@code hashCode}
+     * from {@code Object} are acceptable for a private, single-use holder that is never compared
+     * or stored in a collection.
+     */
+    @SuppressWarnings("ArrayRecordComponent")
+    private record GpuFilterSnapshot(
+            byte[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {}
+
+    /**
+     * Filter staged for GPU upload, or {@code null} when no GPU filter is configured.
+     * Written by the engine via {@link #setGpuFilter} and read by {@link #initProducer()}.
+     * Volatile so the single-write / single-read ordering is visible across threads.
      */
     @ToString.Exclude
-    private byte @Nullable [] gpuFilterFingerprints;
-
-    private int gpuFilterSeedLo;
-    private int gpuFilterSeedHi;
-    private int gpuFilterSegLen;
-    private int gpuFilterSegLenMask;
-    private int gpuFilterSegCountLen;
+    private volatile @Nullable GpuFilterSnapshot gpuFilterSnapshot;
 
     /**
      * Stages a Binary Fuse 8 filter for upload to this producer's GPU at {@link #initProducer()}.
@@ -87,12 +95,7 @@ public class ProducerOpenCL extends AbstractProducer {
      * @param segCountLen  total fingerprint slot count
      */
     public void setGpuFilter(byte[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
-        this.gpuFilterFingerprints = fingerprints;
-        this.gpuFilterSeedLo = seedLo;
-        this.gpuFilterSeedHi = seedHi;
-        this.gpuFilterSegLen = segLen;
-        this.gpuFilterSegLenMask = segLenMask;
-        this.gpuFilterSegCountLen = segCountLen;
+        gpuFilterSnapshot = new GpuFilterSnapshot(fingerprints, seedLo, seedHi, segLen, segLenMask, segCountLen);
     }
 
     /**
@@ -178,16 +181,21 @@ public class ProducerOpenCL extends AbstractProducer {
     public void initProducer() throws Exception {
         super.initProducer();
         OpenCLContext localOpenCLContext = new OpenCLContext(producerOpenCL, bitHelper);
-        localOpenCLContext.init();
-        final byte[] localFingerprints = gpuFilterFingerprints;
-        if (localFingerprints != null) {
-            localOpenCLContext.uploadGpuFilter(
-                    localFingerprints,
-                    gpuFilterSeedLo,
-                    gpuFilterSeedHi,
-                    gpuFilterSegLen,
-                    gpuFilterSegLenMask,
-                    gpuFilterSegCountLen);
+        try {
+            localOpenCLContext.init();
+            final GpuFilterSnapshot snapshot = gpuFilterSnapshot;
+            if (snapshot != null) {
+                localOpenCLContext.uploadGpuFilter(
+                        snapshot.fingerprints(),
+                        snapshot.seedLo(),
+                        snapshot.seedHi(),
+                        snapshot.segLen(),
+                        snapshot.segLenMask(),
+                        snapshot.segCountLen());
+            }
+        } catch (Exception e) {
+            localOpenCLContext.close();
+            throw e;
         }
         openCLContext = localOpenCLContext;
     }

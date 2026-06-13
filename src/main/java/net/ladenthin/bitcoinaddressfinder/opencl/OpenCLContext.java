@@ -19,6 +19,7 @@ import static org.jocl.CL.clReleaseProgram;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.Resources;
+import org.apache.maven.artifact.versioning.ComparableVersion;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URL;
@@ -102,6 +103,7 @@ public class OpenCLContext implements ReleaseCLObject {
 
     private static final String KERNEL_NAME = "generateKeysKernel_grid";
     private static final boolean EXCEPTIONS_ENABLED = true;
+    private static final ComparableVersion REQUIRED_COMPACT_MODE_VERSION = new ComparableVersion("2.0");
 
     private final CProducerOpenCL producerOpenCL;
     private final BitHelper bitHelper;
@@ -187,6 +189,11 @@ public class OpenCLContext implements ReleaseCLObject {
         // little-endian device (see OpenClKernelConstants.GPU_NATIVE_WORD_ORDER), so running on
         // a big-endian device would produce silently corrupt results. Reject it cleanly instead.
         assertDeviceByteOrderSupported(device.getByteOrder(), device.deviceName());
+        // Compact mode uses atomic_add on global memory, which requires OpenCL 2.0+.
+        assertCompactModeDeviceVersionSupported(
+                producerOpenCL.enableGpuFilter && !producerOpenCL.transferAll,
+                device.getDeviceVersionAsComparableVersion(),
+                device.deviceName());
         cl_context_properties contextProperties = selection.contextProperties();
         cl_device_id[] cl_device_ids = new cl_device_id[] {device.device()};
 
@@ -238,6 +245,36 @@ public class OpenCLContext implements ReleaseCLObject {
             throw new UnsupportedOperationException("OpenCL device '" + deviceName + "' is " + deviceByteOrder
                     + "; only " + OpenClKernelConstants.GPU_NATIVE_WORD_ORDER
                     + " devices are supported (the kernel output is little-endian-canonicalised).");
+        }
+    }
+
+    /**
+     * Fails fast when the selected OpenCL device does not meet the minimum version required
+     * for compact GPU filter mode.
+     *
+     * <p>Compact mode uses {@code atomic_add} on {@code __global uint*} memory, which requires
+     * OpenCL 2.0 or later. When compact mode is not requested ({@code compactModeRequested ==
+     * false}), this method is a no-op and does not inspect the device version.
+     *
+     * @param compactModeRequested {@code true} when {@code enableGpuFilter=true} and
+     *     {@code transferAll=false}; {@code false} otherwise
+     * @param deviceVersion        the selected device's version (from
+     *     {@link OpenCLDevice#getDeviceVersionAsComparableVersion()})
+     * @param deviceName           the device name, used in the error message
+     * @throws UnsupportedOperationException if compact mode is requested but the device version
+     *     is below 2.0
+     */
+    @VisibleForTesting
+    static void assertCompactModeDeviceVersionSupported(
+            boolean compactModeRequested, ComparableVersion deviceVersion, String deviceName) {
+        if (!compactModeRequested) {
+            return;
+        }
+        if (deviceVersion.compareTo(REQUIRED_COMPACT_MODE_VERSION) < 0) {
+            throw new UnsupportedOperationException(
+                    "Compact GPU filter mode (enableGpuFilter=true, transferAll=false) requires OpenCL 2.0+, "
+                            + "but device '" + deviceName + "' reports version " + deviceVersion
+                            + ". Set transferAll=true or upgrade to an OpenCL 2.0+ device.");
         }
     }
 
@@ -308,7 +345,7 @@ public class OpenCLContext implements ReleaseCLObject {
         // Zero-size device buffers are invalid; pad an empty filter to a single zero byte. The
         // kernel relies on segCountLen == 0 (not the buffer length) to detect the empty filter.
         final byte[] fingerprintBytes = fingerprints.length == 0 ? new byte[1] : fingerprints;
-        fuse8FingerprintsMem = clCreateBuffer(
+        final cl_mem localFpMem = clCreateBuffer(
                 localContext,
                 CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                 (long) fingerprintBytes.length,
@@ -316,12 +353,21 @@ public class OpenCLContext implements ReleaseCLObject {
                 null);
 
         final int[] metadata = new int[] {seedLo, seedHi, segLen, segLenMask, segCountLen};
-        fuse8MetadataMem = clCreateBuffer(
-                localContext,
-                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                (long) metadata.length * Sizeof.cl_int,
-                Pointer.to(metadata),
-                null);
+        final cl_mem localMetaMem;
+        try {
+            localMetaMem = clCreateBuffer(
+                    localContext,
+                    CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                    (long) metadata.length * Sizeof.cl_int,
+                    Pointer.to(metadata),
+                    null);
+        } catch (RuntimeException e) {
+            // First buffer was allocated; free it before propagating so no VRAM is leaked.
+            clReleaseMemObject(localFpMem);
+            throw e;
+        }
+        fuse8FingerprintsMem = localFpMem;
+        fuse8MetadataMem = localMetaMem;
     }
 
     private void releaseGpuFilter() {

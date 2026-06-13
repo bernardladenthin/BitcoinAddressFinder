@@ -184,6 +184,52 @@ public class ProducerOpenCLTest {
     }
     // </editor-fold>
 
+    // <editor-fold defaultstate="collapsed" desc="setGpuFilter">
+    @Test
+    public void setGpuFilter_validParameters_noExceptionThrownAndProducerNotYetInitialized() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        MockConsumer mockConsumer = new MockConsumer();
+        Random random = new Random(1);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(
+                cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
+
+        // act (no exception)
+        producerOpenCL.setGpuFilter(new byte[] {1, 2, 3}, 0xABCD, 0x1234, 4, 3, 12);
+
+        // assert: staging the filter does not initialise the context
+        assertThat(producerOpenCL.isInitialized(), is(false));
+    }
+
+    @OpenCLTest
+    @Test
+    public void setGpuFilter_thenInitProducer_filterUploadedAndContextInitialized() throws Exception {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.enableGpuFilter = true;
+        cProducerOpenCL.transferAll = true; // avoid OCL 2.0 compact-mode check; test only the upload path
+        MockConsumer mockConsumer = new MockConsumer();
+        Random random = new Random(1);
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, random);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(
+                cProducerOpenCL, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
+
+        // Stage an empty filter (segCountLen=0; kernel sees no entries and never hits)
+        producerOpenCL.setGpuFilter(new byte[0], 0, 0, 2, 1, 0);
+
+        // act
+        producerOpenCL.initProducer();
+
+        // assert
+        assertThat(producerOpenCL.isInitialized(), is(true));
+
+        // cleanup
+        producerOpenCL.releaseProducer();
+    }
+    // </editor-fold>
+
     // <editor-fold defaultstate="collapsed" desc="produceKeys">
     @Test
     public void produceKeys_notInitialized_illegalStateExceptionThrown() throws Exception {

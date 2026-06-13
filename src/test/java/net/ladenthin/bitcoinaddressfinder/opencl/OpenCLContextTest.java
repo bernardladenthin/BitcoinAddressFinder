@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder.opencl;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -20,6 +21,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8GpuFil
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import nl.altindag.log.LogCaptor;
 import nl.altindag.log.model.LogEvent;
+import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.junit.jupiter.api.Test;
 
 public class OpenCLContextTest {
@@ -113,11 +115,43 @@ public class OpenCLContextTest {
 
     @Test
     public void assertDeviceByteOrderSupported_bigEndian_throws() {
-        UnsupportedOperationException ex = org.junit.jupiter.api.Assertions.assertThrows(
+        UnsupportedOperationException ex = assertThrows(
                 UnsupportedOperationException.class,
                 () -> OpenCLContext.assertDeviceByteOrderSupported(java.nio.ByteOrder.BIG_ENDIAN, "test-be-device"));
-        assertThat(ex.getMessage().contains("test-be-device"), is(true));
-        assertThat(ex.getMessage().contains("BIG_ENDIAN"), is(true));
+        assertThat(ex.getMessage(), containsString("test-be-device"));
+        assertThat(ex.getMessage(), containsString("BIG_ENDIAN"));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="compact-mode version guard">
+    @Test
+    public void assertCompactModeDeviceVersionSupported_notRequested_doesNotThrow() {
+        // compact mode not requested -> version is irrelevant
+        OpenCLContext.assertCompactModeDeviceVersionSupported(
+                false, new ComparableVersion("1.2"), "test-old-device");
+    }
+
+    @Test
+    public void assertCompactModeDeviceVersionSupported_requested_version2dot0_doesNotThrow() {
+        OpenCLContext.assertCompactModeDeviceVersionSupported(
+                true, new ComparableVersion("2.0"), "test-device");
+    }
+
+    @Test
+    public void assertCompactModeDeviceVersionSupported_requested_version3dot0_doesNotThrow() {
+        // 3.0 is a superset of 2.0 — should also pass
+        OpenCLContext.assertCompactModeDeviceVersionSupported(
+                true, new ComparableVersion("3.0"), "test-device");
+    }
+
+    @Test
+    public void assertCompactModeDeviceVersionSupported_requested_version1dot2_throws() {
+        UnsupportedOperationException ex = assertThrows(
+                UnsupportedOperationException.class,
+                () -> OpenCLContext.assertCompactModeDeviceVersionSupported(
+                        true, new ComparableVersion("1.2"), "test-old-device"));
+        assertThat(ex.getMessage(), containsString("test-old-device"));
+        assertThat(ex.getMessage(), containsString("2.0"));
     }
     // </editor-fold>
 
