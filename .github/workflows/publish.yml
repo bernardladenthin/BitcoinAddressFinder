@@ -60,7 +60,7 @@ jobs:
           distribution: temurin
           cache: maven
       - name: Build
-        run: mvn --batch-mode -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -DskipTests -Dmaven.javadoc.skip=true package
+        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -DskipTests -Dmaven.javadoc.skip=true package
       - uses: actions/upload-artifact@v7
         with: { name: jars, path: target/*.jar }
       - uses: actions/upload-artifact@v7
@@ -93,7 +93,7 @@ jobs:
           cache: maven
       - name: Test
         shell: bash
-        run: mvn --batch-mode -P jcstress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=${{ matrix.disable-lmdb }} --update-snapshots test jacoco:report
+        run: mvn --batch-mode --no-transfer-progress -P jcstress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=${{ matrix.disable-lmdb }} --update-snapshots test jacoco:report
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -109,7 +109,7 @@ jobs:
           if-no-files-found: ignore
       - name: Run PIT mutation tests
         if: matrix.os == 'ubuntu-latest'
-        run: mvn --batch-mode -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true test-compile org.pitest:pitest-maven:mutationCoverage -Dmaven.javadoc.skip=true
+        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true test-compile org.pitest:pitest-maven:mutationCoverage -Dmaven.javadoc.skip=true
       - name: Extract PIT survivors
         if: always() && matrix.os == 'ubuntu-latest'
         run: |
@@ -179,7 +179,7 @@ jobs:
           clinfo || true
       - name: All tests including OpenCL (pocl) + JaCoCo coverage
         shell: bash
-        run: mvn --batch-mode -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true --update-snapshots test jacoco:report
+        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true --update-snapshots test jacoco:report
       - uses: actions/upload-artifact@v7
         with:
           name: jacoco-report-opencl
@@ -280,7 +280,7 @@ jobs:
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
       - name: Deploy snapshot
-        run: mvn --batch-mode -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release deploy -DskipTests
+        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release deploy -DskipTests
         env:
           MAVEN_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN }}
@@ -342,7 +342,7 @@ jobs:
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
       - name: Deploy release
-        run: mvn --batch-mode -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release deploy -DskipTests
+        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release deploy -DskipTests
         env:
           MAVEN_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN }}
