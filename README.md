@@ -235,7 +235,8 @@ Constraints (enforced by [`CProducerOpenCL`](src/main/java/net/ladenthin/bitcoin
 The OpenCL kernel supports a **loop-based scalar strategy** controlled by the `keysPerWorkItem` parameter. Each GPU thread generates multiple EC keys by:
 
 - Computing the first key via full scalar multiplication: `P₀ = k₀·G` (using `point_mul_xy`)  
-- Computing subsequent keys via efficient affine additions: `Pₙ₊₁ = Pₙ + G` (using `point_add_xy`)
+- Computing subsequent keys via point additions: `Pₙ₊₁ = Pₙ + G`, kept in Jacobian coordinates
+  and converted back to affine in **batches** using Montgomery's simultaneous-inversion trick
 
 This enables high-throughput, grid-parallel **linear keyspace traversal** like:  
 `k₀·G, (k₀ + 1)·G, ..., (k₀ + keysPerWorkItem - 1)·G`
@@ -245,30 +246,43 @@ Example:
 - Grid size is reduced by a factor of 8  
 - All results are written to global memory
 
-Each subsequent key costs one **affine point addition** instead of a full scalar multiplication,
-so raising `keysPerWorkItem` above `1` replaces most of the expensive `k·G` work with cheap
-additions — until too few work-items remain to keep the GPU occupied, at which point throughput
-falls again. There is therefore a **per-device sweet spot**.
+Each subsequent key costs one **point addition** instead of a full scalar multiplication, so
+raising `keysPerWorkItem` above `1` replaces most of the expensive `k·G` work with cheap additions
+— until too few work-items remain to keep the GPU occupied, at which point throughput falls again.
+There is therefore a **per-device sweet spot**.
+
+**Batched modular inversion.** Converting each walked point from Jacobian back to affine needs a
+modular inverse of its Z coordinate — the single most expensive field operation. Rather than one
+inverse per key, the kernel inverts a sub-batch of `KEYS_BATCH_INV` points together (one `inv_mod`
+plus `3·(N−1)` multiplies for N points) via Montgomery's simultaneous inversion. This both raises
+the peak throughput and shifts the sweet spot to a larger `keysPerWorkItem` (more keys can be
+amortized before the inverse stops dominating). `KEYS_BATCH_INV` is a `#define` in
+`inc_ecc_secp256k1custom.cl` (default `8`); larger values amortize the inverse over more keys but
+use more private scratch (`4 · KEYS_BATCH_INV · 8` u32 words), which lowers occupancy — tune per
+device.
 
 **Benchmarked tuning (NVIDIA RTX 3070 Laptop, `batchSizeInBits = 20`, `GridSizeSweepBenchmark`):**
 
 | `keysPerWorkItem` | Throughput (~) | vs. `keysPerWorkItem = 1` |
 |------------------:|---------------:|--------------------------:|
-| 1 (default)       | ~2.6 M keys/s  | 1.0×                      |
-| 4                 | ~6.3 M keys/s  | 2.4×                      |
-| 8                 | ~8.7 M keys/s  | 3.3×                      |
-| 16                | ~11.7 M keys/s | 4.4×                      |
-| **32**            | **~14.4 M keys/s** | **5.5× (peak)**       |
-| 64                | ~11.9 M keys/s | 4.5×                      |
-| 256               | ~7.7 M keys/s  | 2.9×                      |
+| 1 (default)       | ~2.4 M keys/s  | 1.0×                      |
+| 8                 | ~11.1 M keys/s | 4.7×                      |
+| 16                | ~14.5 M keys/s | 6.2×                      |
+| 32                | ~16.7 M keys/s | 7.1×                      |
+| **64**            | **~19.8 M keys/s** | **8.4× (peak)**       |
+| 128               | ~19.0 M keys/s | 8.1×                      |
 
 > ✅ The default `keysPerWorkItem = 1` is **not** optimal for scanning — it pays a full scalar
->    multiplication for every key. On this GPU, `keysPerWorkItem = 32` is ~5.5× faster.
+>    multiplication for every key. On this GPU, `keysPerWorkItem = 64` is ~8.4× faster.
 > ✅ The sweet spot is **device-dependent** (it is set by the balance between amortizing scalar
->    multiplications and keeping enough work-items to saturate the GPU). Sweep `keysPerWorkItem`
->    on your hardware with `GridSizeSweepBenchmark`; for the RTX 3070 the optimum is ~16–32.
+>    multiplications / inversions and keeping enough work-items to saturate the GPU). Sweep
+>    `keysPerWorkItem` on your hardware with `GridSizeSweepBenchmark`; for the RTX 3070 the optimum
+>    is ~64.
 > ❌ Beyond the sweet spot, throughput drops because too few work-items remain to keep all
 >    compute units busy (e.g. `2^20 / 256 = 4096` work-items under-fills a 40-SM GPU).
+>
+> The batched inversion alone (vs. the previous per-key inverse) lifted this GPU's peak from
+> ~14.4 M keys/s (at `keysPerWorkItem = 32`) to ~19.8 M keys/s (at `keysPerWorkItem = 64`), ~+37%.
 
 ### 🚀 MSB-Zero Optimization
 To accelerate elliptic curve multiplication, BitcoinAddressFinder applies a **160-bit private key optimization**:
