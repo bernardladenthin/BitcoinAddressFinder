@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThan;
 
@@ -12,6 +13,8 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Stream;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
@@ -162,6 +165,72 @@ public class OpenCLCompactOutputIntegrationTest {
                 }
                 assertThat("inserted index " + idx + " must be flagged", found, is(true));
             }
+        } finally {
+            context.close();
+        }
+    }
+
+    @Test
+    public void compactPartialBatch_hitSetExactlyMatchesCpuPrediction() throws Exception {
+        OpenCLPlatformAssume assume = new OpenCLPlatformAssume();
+        assume.assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        final int bits = chooseBatchSizeInBits(assume);
+        final int n = 1 << bits;
+
+        // Insert BOTH hash160 variants of K candidates spread across the batch, so each inserted
+        // index is a guaranteed hit (the filter has no false negatives).
+        final int[] insertedIndices = {0, n / 2, n - 1};
+        List<byte[]> filterEntries = new ArrayList<>();
+        for (int idx : insertedIndices) {
+            PublicKeyBytes pkb = PublicKeyBytes.fromPrivate(SECRET_BASE.add(BigInteger.valueOf(idx)));
+            filterEntries.add(pkb.getUncompressedKeyHash());
+            filterEntries.add(pkb.getCompressedKeyHash());
+        }
+        BinaryFuse8AddressPresence presence = BinaryFuse8AddressPresence.populateFrom(iterableOf(filterEntries));
+
+        // CPU oracle: derive every work-item on the host and predict the EXACT set the kernel must
+        // emit. The kernel flags a work-item when contains(uncompressed) || contains(compressed),
+        // so the same predicate against the same filter yields the K true hits PLUS any Binary
+        // Fuse 8 false positives (~1/256 per lookup) among the other work-items. Because the GPU
+        // runs that identical filter (key-extraction + hash parity pinned by Fuse8GpuHashParityTest),
+        // the predicted set is what the kernel must reproduce bit-for-bit — which is what lets this
+        // assert an EXACT count rather than the weaker >= K of compactPartialBatch_kInserted...().
+        Set<BigInteger> expectedHitSecrets = new TreeSet<>();
+        for (int i = 0; i < n; i++) {
+            BigInteger secret = SECRET_BASE.add(BigInteger.valueOf(i));
+            PublicKeyBytes pkb = PublicKeyBytes.fromPrivate(secret);
+            boolean hit = presence.containsAddress(ByteBuffer.wrap(pkb.getUncompressedKeyHash()))
+                    || presence.containsAddress(ByteBuffer.wrap(pkb.getCompressedKeyHash()));
+            if (hit) {
+                expectedHitSecrets.add(secret);
+            }
+        }
+        // The predicted set must contain every inserted candidate (no false negatives) ...
+        for (int idx : insertedIndices) {
+            assertThat(expectedHitSecrets, hasItem(SECRET_BASE.add(BigInteger.valueOf(idx))));
+        }
+        // ... and be a strict subset of the batch, so this really is a partial (compact) result.
+        assertThat(expectedHitSecrets.size(), is(lessThan(n)));
+
+        OpenCLContext context = new OpenCLContext(compactProducerConfig(bits), bitHelper);
+        try {
+            context.init();
+            uploadPayload(context, presence.toGpuFilterData());
+            OpenCLGridResult result = context.createKeys(SECRET_BASE);
+            PublicKeyBytes[] keys = result.getPublicKeyBytes();
+
+            Set<BigInteger> actualHitSecrets = new TreeSet<>();
+            for (PublicKeyBytes key : keys) {
+                assertThat(key.runtimePublicKeyCalculationCheck(), is(true));
+                actualHitSecrets.add(key.getSecretKey());
+            }
+
+            // EXACT count: the kernel emitted exactly as many entries as the oracle predicted ...
+            assertThat(keys.length, is(expectedHitSecrets.size()));
+            // ... with no duplicate work-items ...
+            assertThat(actualHitSecrets.size(), is(keys.length));
+            // ... and exactly the predicted work-items, not merely the right cardinality.
+            assertThat(actualHitSecrets, is(expectedHitSecrets));
         } finally {
             context.close();
         }
