@@ -85,7 +85,7 @@ SPDX-License-Identifier: Apache-2.0
         <logcaptor.version>2.12.6</logcaptor.version>
         <jmh.version>1.37</jmh.version>
         <spotless.version>3.6.0</spotless.version>
-        <palantir-java-format.version>2.91.0</palantir-java-format.version>
+        <palantir-java-format.version>2.92.0</palantir-java-format.version>
     </properties>
 
     <!--
