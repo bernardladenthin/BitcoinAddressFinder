@@ -397,6 +397,7 @@ public class OpenCLContext implements ReleaseCLObject {
         if (!closed) {
             releaseGpuFilter();
             if (openClTask != null) {
+                openClTask.close();
                 openClTask = null;
             }
             if (kernel != null) {
