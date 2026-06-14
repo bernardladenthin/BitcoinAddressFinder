@@ -138,6 +138,33 @@ jobs:
         with: { name: pit-reports, path: target/pit-reports/ }
 
   # ---------------------------------------------------------------------------
+  # vmlens interleaving analysis — pure-Java, needs no LMDB or OpenCL device.
+  # Staged to a single smoke test for now (see the `vmlens` profile in pom.xml).
+  # ---------------------------------------------------------------------------
+  vmlens:
+    name: Test (vmlens interleavings)
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+      - name: Test under vmlens (one class — staged scope)
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Pvmlens test
+          -Dtest=VmlensInterleavingSmokeTest -DfailIfNoTests=false
+          -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: vmlens-report
+          path: target/vmlens-report/
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
   # Emulated-OpenCL coverage on a real CPU OpenCL device (pocl), kept separate
   # from the `test` matrix above. This is a REQUIRED gate — both Ubuntu pipelines
   # (the CPU-only `test` matrix where @OpenCLTest self-skips, and this emulated
