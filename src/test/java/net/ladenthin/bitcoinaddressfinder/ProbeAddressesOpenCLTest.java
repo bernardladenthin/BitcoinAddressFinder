@@ -49,6 +49,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class ProbeAddressesOpenCLTest {
 
@@ -582,6 +583,49 @@ public class ProbeAddressesOpenCLTest {
             hashPublicKeysFast(publicKeys, souts); // just for performance tests
 
             assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, souts, keyUtility);
+        }
+    }
+
+    /**
+     * Full-batch correctness across the whole {@code keysPerWorkItem} range, including the values
+     * that exercise the incremental scalar-walker path ({@code keysPerWorkItem > 1}, i.e. the
+     * {@code point_add_xy} additions) and its sub-batch boundaries.
+     *
+     * <p>Every returned result is checked two ways: {@link PublicKeyBytes#runtimePublicKeyCalculationCheck()}
+     * (self-consistency against bitcoinj) and an exact compare of the OpenCL public key + hash160
+     * against the bitcoinj reference for {@code secretBase | index} (via
+     * {@link #assertPublicKeyBytesCalculatedCorrect}). Because the slot index must equal the
+     * work-item's {@code loop_index} in full-transfer mode, this also pins the slot ordering — so
+     * any kernel change that batches the affine conversion (e.g. Montgomery simultaneous inversion)
+     * is caught here if it scrambles results, drops the partial final sub-batch, or mishandles the
+     * running point carried across sub-batches.
+     *
+     * @param keysPerWorkItem the scalar-walker iteration count under test
+     */
+    @ParameterizedTest
+    @OpenCLTest
+    @ValueSource(ints = {1, 2, 4, 8, 16})
+    public void createKeys_acrossKeysPerWorkItem_allResultsMatchReference(int keysPerWorkItem) throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+
+        KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
+
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
+        producerOpenCL.keysPerWorkItem = keysPerWorkItem;
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+            openCLContext.init();
+            Random random = new Random(1337);
+            BigInteger secretKeyBase = keyUtility.createSecret(Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS, random);
+            BigInteger secretBase =
+                    keyUtility.alignDown(secretKeyBase, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
+
+            OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
+            PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
+
+            // Full-transfer mode returns the whole grid regardless of keysPerWorkItem.
+            assertThat(publicKeys.length, is(equalTo((int) bitHelper.convertBitsToSize(BITS_FOR_BATCH))));
+            assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, false, keyUtility);
         }
     }
 

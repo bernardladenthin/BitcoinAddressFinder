@@ -6,12 +6,16 @@ package net.ladenthin.bitcoinaddressfinder.opencl;
 import static org.jocl.CL.CL_MEM_READ_ONLY;
 import static org.jocl.CL.CL_MEM_USE_HOST_PTR;
 import static org.jocl.CL.CL_MEM_WRITE_ONLY;
+import static org.jocl.CL.CL_PROFILING_COMMAND_END;
+import static org.jocl.CL.CL_PROFILING_COMMAND_START;
 import static org.jocl.CL.CL_TRUE;
 import static org.jocl.CL.clCreateBuffer;
 import static org.jocl.CL.clEnqueueNDRangeKernel;
 import static org.jocl.CL.clEnqueueReadBuffer;
 import static org.jocl.CL.clEnqueueWriteBuffer;
 import static org.jocl.CL.clFinish;
+import static org.jocl.CL.clGetEventProfilingInfo;
+import static org.jocl.CL.clReleaseEvent;
 import static org.jocl.CL.clReleaseMemObject;
 import static org.jocl.CL.clSetKernelArg;
 
@@ -30,6 +34,7 @@ import org.jocl.Pointer;
 import org.jocl.Sizeof;
 import org.jocl.cl_command_queue;
 import org.jocl.cl_context;
+import org.jocl.cl_event;
 import org.jocl.cl_kernel;
 import org.jocl.cl_mem;
 import org.slf4j.Logger;
@@ -66,6 +71,19 @@ public class OpenClTask implements ReleaseCLObject {
     private final PrivateKeyValidator privateKeyValidator;
 
     private boolean closed = false;
+
+    /** Sentinel meaning "no profiling timestamp captured for the most recent launch". */
+    public static final long PROFILING_NOT_AVAILABLE = -1L;
+
+    // Device-side nanosecond timings of the most recent executeKernel() call. Only populated when
+    // CProducerOpenCL.enableProfiling is true (a diagnostic/benchmark switch); otherwise they stay
+    // at PROFILING_NOT_AVAILABLE. Mutated from executeKernel and read by the benchmark; volatile so
+    // a reader on another thread sees a consistent value. Excluded from toString (mutable state).
+    @ToString.Exclude
+    private volatile long lastKernelExecutionNanos = PROFILING_NOT_AVAILABLE;
+
+    @ToString.Exclude
+    private volatile long lastResultReadbackNanos = PROFILING_NOT_AVAILABLE;
 
     /**
      * Common base for source and destination OpenCL buffer arguments backed by a {@link ByteBuffer}.
@@ -396,12 +414,25 @@ public class OpenClTask implements ReleaseCLObject {
                         null);
                 clFinish(commandQueue);
             }
+            final boolean profiling = cProducer.enableProfiling;
             {
                 // execute the kernel
                 final long beforeExecute = System.currentTimeMillis();
-                clEnqueueNDRangeKernel(
-                        commandQueue, kernel, workDim, null, global_work_size, localWorkSize, 0, null, null);
-                clFinish(commandQueue);
+                if (profiling) {
+                    // Profiling path: timestamp the kernel on the device. The event is a non-null
+                    // local kept within this branch so NullAway sees no nullable JOCL argument.
+                    final cl_event kernelEvent = new cl_event();
+                    clEnqueueNDRangeKernel(
+                            commandQueue, kernel, workDim, null, global_work_size, localWorkSize, 0, null, kernelEvent);
+                    clFinish(commandQueue);
+                    lastKernelExecutionNanos = deviceElapsedNanos(kernelEvent);
+                    clReleaseEvent(kernelEvent);
+                } else {
+                    clEnqueueNDRangeKernel(
+                            commandQueue, kernel, workDim, null, global_work_size, localWorkSize, 0, null, null);
+                    clFinish(commandQueue);
+                    lastKernelExecutionNanos = PROFILING_NOT_AVAILABLE;
+                }
 
                 final long afterExecute = System.currentTimeMillis();
 
@@ -447,19 +478,38 @@ public class OpenClTask implements ReleaseCLObject {
                         + entriesToRead * OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES;
 
                 final long beforeRead = System.currentTimeMillis();
-                clEnqueueReadBuffer(
-                        commandQueue,
-                        destinationArgument.getMem(),
-                        CL_TRUE,
-                        0,
-                        bytesToRead,
-                        destinationArgument.getHostMemoryPointer(),
-                        0,
-                        null,
-                        null);
-                clFinish(commandQueue);
+                if (profiling) {
+                    final cl_event readEvent = new cl_event();
+                    clEnqueueReadBuffer(
+                            commandQueue,
+                            destinationArgument.getMem(),
+                            CL_TRUE,
+                            0,
+                            bytesToRead,
+                            destinationArgument.getHostMemoryPointer(),
+                            0,
+                            null,
+                            readEvent);
+                    clFinish(commandQueue);
+                    lastResultReadbackNanos = deviceElapsedNanos(readEvent);
+                    clReleaseEvent(readEvent);
+                } else {
+                    clEnqueueReadBuffer(
+                            commandQueue,
+                            destinationArgument.getMem(),
+                            CL_TRUE,
+                            0,
+                            bytesToRead,
+                            destinationArgument.getHostMemoryPointer(),
+                            0,
+                            null,
+                            null);
+                    clFinish(commandQueue);
+                    lastResultReadbackNanos = PROFILING_NOT_AVAILABLE;
+                }
 
                 final long afterRead = System.currentTimeMillis();
+
                 if (LOGGER.isTraceEnabled()) {
                     LOGGER.trace("Read OpenCL data " + ((bytesToRead / 1024) / 1024) + "Mb in "
                             + (afterRead - beforeRead) + "ms");
@@ -467,6 +517,47 @@ public class OpenClTask implements ReleaseCLObject {
             }
             return destinationArgument.getByteBuffer();
         }
+    }
+
+    /**
+     * Reads the device-side {@code END - START} duration of a profiled command.
+     *
+     * @param event a completed event from a profiling-enabled queue
+     * @return the on-device execution time of the command, in nanoseconds
+     */
+    private static long deviceElapsedNanos(cl_event event) {
+        final long[] start = new long[1];
+        final long[] end = new long[1];
+        clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_START, Sizeof.cl_ulong, Pointer.to(start), null);
+        clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_END, Sizeof.cl_ulong, Pointer.to(end), null);
+        return end[0] - start[0];
+    }
+
+    /**
+     * Returns the on-device kernel execution time of the most recent {@link #executeKernel} call.
+     *
+     * <p>Populated only when {@link CProducerOpenCL#enableProfiling} is {@code true}; otherwise
+     * returns {@link #PROFILING_NOT_AVAILABLE}. This is GPU compute time only &mdash; it excludes
+     * PCIe transfer and host-side parsing.
+     *
+     * @return the last kernel execution time in nanoseconds, or {@link #PROFILING_NOT_AVAILABLE}
+     */
+    public long getLastKernelExecutionNanos() {
+        return lastKernelExecutionNanos;
+    }
+
+    /**
+     * Returns the on-device result read-back (PCIe transfer) time of the most recent
+     * {@link #executeKernel} call.
+     *
+     * <p>Populated only when {@link CProducerOpenCL#enableProfiling} is {@code true}; otherwise
+     * returns {@link #PROFILING_NOT_AVAILABLE}. In compact mode this covers only the {@code K} hit
+     * entries; in full-transfer mode the whole grid.
+     *
+     * @return the last read-back time in nanoseconds, or {@link #PROFILING_NOT_AVAILABLE}
+     */
+    public long getLastResultReadbackNanos() {
+        return lastResultReadbackNanos;
     }
 
     @Override

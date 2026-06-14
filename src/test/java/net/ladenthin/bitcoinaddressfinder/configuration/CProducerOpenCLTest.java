@@ -26,6 +26,43 @@ public class CProducerOpenCLTest {
     }
 
     @Test
+    public void defaults_enableProfiling_isFalse() {
+        // arrange + act
+        CProducerOpenCL config = new CProducerOpenCL();
+
+        // assert
+        assertThat(config.enableProfiling, is(false));
+    }
+
+    @Test
+    public void jsonRoundTrip_enableProfiling_survivesSerialiseDeserialise() throws Exception {
+        // arrange
+        ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        CProducerOpenCL original = new CProducerOpenCL();
+        original.enableProfiling = true;
+
+        // act
+        String json = mapper.writeValueAsString(original);
+        CProducerOpenCL parsed = mapper.readValue(json, CProducerOpenCL.class);
+
+        // assert
+        assertThat(parsed.enableProfiling, is(true));
+    }
+
+    @Test
+    public void jsonDeserialise_enableProfilingAbsent_defaultsToFalse() throws Exception {
+        // arrange
+        ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        String json = "{}";
+
+        // act
+        CProducerOpenCL parsed = mapper.readValue(json, CProducerOpenCL.class);
+
+        // assert
+        assertThat(parsed.enableProfiling, is(false));
+    }
+
+    @Test
     public void jsonRoundTrip_defaultFlags_surviveSerialiseDeserialise() throws Exception {
         // arrange
         // CProducer exposes a derived read-only getter (getOverallWorkSize) that serialises

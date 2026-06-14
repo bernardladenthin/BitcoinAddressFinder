@@ -85,4 +85,21 @@ public class CProducerOpenCL extends CProducer {
      * compact output buffer; set to {@code true} to keep the full-transfer output layout.
      */
     public boolean transferAll = false;
+
+    /**
+     * Enables OpenCL device-side profiling of the kernel launch and result read-back.
+     * <p>
+     * When {@code true} the command queue is created with {@code CL_QUEUE_PROFILING_ENABLE} and
+     * each kernel launch / read-back is timestamped on the device; the per-launch nanosecond
+     * times are exposed via {@code OpenClTask.getLastKernelExecutionNanos()} and
+     * {@code getLastResultReadbackNanos()}. This isolates GPU compute time from PCIe transfer
+     * time and host-side parsing, which is what the {@code GpuFuse8FilterBenchmark} uses to
+     * attribute cost between the kernel and the transfer.
+     * <p>
+     * This is a <b>diagnostic / benchmarking</b> switch, not a production tuning knob: profiling
+     * adds a small amount of driver overhead, so it is <b>off by default</b> and the runtime
+     * pipeline never enables it. Default {@code false}: the queue is created without profiling
+     * and the enqueue calls pass no events, exactly as the non-profiling path.
+     */
+    public boolean enableProfiling = false;
 }

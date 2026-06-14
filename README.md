@@ -235,7 +235,8 @@ Constraints (enforced by [`CProducerOpenCL`](src/main/java/net/ladenthin/bitcoin
 The OpenCL kernel supports a **loop-based scalar strategy** controlled by the `keysPerWorkItem` parameter. Each GPU thread generates multiple EC keys by:
 
 - Computing the first key via full scalar multiplication: `P₀ = k₀·G` (using `point_mul_xy`)  
-- Computing subsequent keys via efficient affine additions: `Pₙ₊₁ = Pₙ + G` (using `point_add_xy`)
+- Computing subsequent keys via point additions: `Pₙ₊₁ = Pₙ + G`, kept in Jacobian coordinates
+  and converted back to affine in **batches** using Montgomery's simultaneous-inversion trick
 
 This enables high-throughput, grid-parallel **linear keyspace traversal** like:  
 `k₀·G, (k₀ + 1)·G, ..., (k₀ + keysPerWorkItem - 1)·G`
@@ -245,8 +246,43 @@ Example:
 - Grid size is reduced by a factor of 8  
 - All results are written to global memory
 
-> ✅ Lower `keysPerWorkItem` values like 4 or 8 are often ideal.  
-> ❌ Higher values may reduce GPU occupancy due to fewer active threads.
+Each subsequent key costs one **point addition** instead of a full scalar multiplication, so
+raising `keysPerWorkItem` above `1` replaces most of the expensive `k·G` work with cheap additions
+— until too few work-items remain to keep the GPU occupied, at which point throughput falls again.
+There is therefore a **per-device sweet spot**.
+
+**Batched modular inversion.** Converting each walked point from Jacobian back to affine needs a
+modular inverse of its Z coordinate — the single most expensive field operation. Rather than one
+inverse per key, the kernel inverts a sub-batch of `KEYS_BATCH_INV` points together (one `inv_mod`
+plus `3·(N−1)` multiplies for N points) via Montgomery's simultaneous inversion. This both raises
+the peak throughput and shifts the sweet spot to a larger `keysPerWorkItem` (more keys can be
+amortized before the inverse stops dominating). `KEYS_BATCH_INV` is a `#define` in
+`inc_ecc_secp256k1custom.cl` (default `8`); larger values amortize the inverse over more keys but
+use more private scratch (`4 · KEYS_BATCH_INV · 8` u32 words), which lowers occupancy — tune per
+device.
+
+**Benchmarked tuning (NVIDIA RTX 3070 Laptop, `batchSizeInBits = 20`, `GridSizeSweepBenchmark`):**
+
+| `keysPerWorkItem` | Throughput (~) | vs. `keysPerWorkItem = 1` |
+|------------------:|---------------:|--------------------------:|
+| 1 (default)       | ~2.4 M keys/s  | 1.0×                      |
+| 8                 | ~11.1 M keys/s | 4.7×                      |
+| 16                | ~14.5 M keys/s | 6.2×                      |
+| 32                | ~16.7 M keys/s | 7.1×                      |
+| **64**            | **~19.8 M keys/s** | **8.4× (peak)**       |
+| 128               | ~19.0 M keys/s | 8.1×                      |
+
+> ✅ The default `keysPerWorkItem = 1` is **not** optimal for scanning — it pays a full scalar
+>    multiplication for every key. On this GPU, `keysPerWorkItem = 64` is ~8.4× faster.
+> ✅ The sweet spot is **device-dependent** (it is set by the balance between amortizing scalar
+>    multiplications / inversions and keeping enough work-items to saturate the GPU). Sweep
+>    `keysPerWorkItem` on your hardware with `GridSizeSweepBenchmark`; for the RTX 3070 the optimum
+>    is ~64.
+> ❌ Beyond the sweet spot, throughput drops because too few work-items remain to keep all
+>    compute units busy (e.g. `2^20 / 256 = 4096` work-items under-fills a 40-SM GPU).
+>
+> The batched inversion alone (vs. the previous per-key inverse) lifted this GPU's peak from
+> ~14.4 M keys/s (at `keysPerWorkItem = 32`) to ~19.8 M keys/s (at `keysPerWorkItem = 64`), ~+37%.
 
 ### 🚀 MSB-Zero Optimization
 To accelerate elliptic curve multiplication, BitcoinAddressFinder applies a **160-bit private key optimization**:
@@ -382,6 +418,8 @@ Enable it on an OpenCL producer (see [`examples/config_Find_GPUFilterCompact.jso
 **No false negatives** — the Binary Fuse 8 guarantee carries to the GPU unchanged: any address actually in the database is always flagged. The ~0.4 % false positives fall through to the LMDB verifier exactly as they do for the in-RAM `BINARY_FUSE_8` backend.
 
 **Device requirements** — compact mode needs an **OpenCL 2.0+** device (the `atomic_add` on global memory) and a little-endian device (the kernel canonicalises its output as little-endian). Both are checked at producer init and fail fast with a clear message; on an older device set `transferAll: true` to keep the full-transfer path. The GPU/CPU lookup parity (key extraction + hash formula) is pinned by `Fuse8GpuHashParityTest` and exercised end-to-end on a real OpenCL device by `OpenCLCompactOutputIntegrationTest`.
+
+**Measured speedup** — see [GPU Binary Fuse 8 filter — compact output vs. full transfer](#gpu-binary-fuse-8-filter--compact-output-vs-full-transfer) under Performance Benchmarks for an A/B measurement (~1.28× at grid 19 on an RTX 3070).
 
 #### Bloom filter — FPP tuning
 
@@ -1296,6 +1334,59 @@ For technical details, see:
 | NVIDIA RTX A3000            | Intel i7-11850H     | 160              | 19               |  5,000,000 keys/s      |
 | AMD Radeon 8060S            | AMD AI MAX+ 395     | 256              | 16               |  9,200,000 keys/s      |
 | AMD Radeon 8060S            | AMD AI MAX+ 395     | 160              | 16               | 11,000,000 keys/s      |
+
+##### GPU Binary Fuse 8 filter — compact output vs. full transfer
+
+The table above measures raw key generation. The table below isolates the effect of the
+[GPU-side Binary Fuse 8 filter](#gpu-side-binary-fuse-8-filtering-enablegpufilter)
+(`enableGpuFilter`): with it **on**, the kernel checks each derived hash160 against the
+on-GPU filter and transfers only the hits; with it **off**, every work-item result is read
+back over PCIe.
+
+> **Note:** These numbers come from the `GpuFuse8FilterBenchmark` JMH microbenchmark
+> (one kernel launch + PCIe read-back + host-side parse, measured in isolation). They are
+> **not** directly comparable to the full-pipeline figures above — the grid size differs and
+> there is no real consumer/queue — but the **on-vs-off ratio on the same row is the metric
+> that matters.**
+
+| GPU Filter (`enableGpuFilter`) | GPU Model              | Key Range (Bits) | Grid Size (Bits) | Effective Keys/s (~) | Speedup        |
+|--------------------------------|------------------------|------------------|------------------|----------------------|----------------|
+| Off — full transfer (legacy)   | NVIDIA RTX 3070 Laptop | 256              | 19               | 1,880,000 keys/s     | 1.00× baseline |
+| On — Binary Fuse 8 compact     | NVIDIA RTX 3070 Laptop | 256              | 19               | 2,410,000 keys/s     | **~1.28×**     |
+
+Measured against a ~1 M-entry filter at `batchSizeInBits = 19` (2¹⁹ ≈ 0.52 M candidates per
+launch), matching the grid size of the raw key-generation table above. The
+`GpuFuse8FilterBenchmark` JMH benchmark A/B-toggles compact mode against the legacy
+full-transfer path on the same kernel and batch; numbers above come from a single long
+measurement iteration (~200 s per arm) since the relevant one-time cost is OpenCL kernel
+compilation (done once in setup) and GPU clock ramp-up, not JVM warmup. The filter wins by
+collapsing the read-back from the full grid down to the ~0.4 % false-positive hits, so the
+advantage grows with `batchSizeInBits` (≈1.7× at grid 20). Run it yourself:
+
+```bash
+mvn test-compile exec:java -Dexec.args="GpuFuse8FilterBenchmark"
+```
+
+**Device-side breakdown (where the time actually goes).** The throughput above mixes three
+costs: GPU kernel compute, the PCIe read-back, and the host-side parse of the returned grid.
+To separate them, set `enableProfiling: true` on the OpenCL producer (or run the benchmark
+with `-p profiling=true`); the command queue is then created with `CL_QUEUE_PROFILING_ENABLE`
+and each launch is timestamped on the device. The same grid-19 run on the RTX 3070 reports:
+
+| Phase | Off — full transfer | On — Binary Fuse 8 compact | Effect |
+|-------|--------------------:|---------------------------:|--------|
+| GPU kernel compute            | 196.2 ms | 200.8 ms | **+4.7 ms (~2.4%)** — the inline filter check |
+| PCIe read-back (device)       |   8.74 ms |  0.035 ms | **~250× less** — only the ~0.4% hits cross the bus |
+| Host-side parse (wall − device) | ~67.9 ms |  ~8.4 ms | **~8× less** — the consumer parses ~2 k hits, not 524 k results |
+| **Per-launch wall time**      | ~272.8 ms | ~209.3 ms |  |
+
+The takeaway: **the GPU-side filtering is not expensive on the GPU.** It adds only ~2.4 % to
+kernel compute (a handful of integer ops + 3–6 fingerprint reads per candidate, versus the
+elliptic-curve math and two SHA-256 + two RIPEMD-160 hashes that dominate the kernel). The
+~1.28× end-to-end gain comes almost entirely from collapsing the PCIe transfer (~250×) and the
+host-side parse (~8×) — i.e. it offloads the address-presence check from the CPU at negligible
+GPU cost, which is exactly the design intent. (Profiling adds a little driver overhead and is
+**off by default**; it is a diagnostic switch, never enabled by the runtime pipeline.)
 
 
 ## Logging and Runtime Statistics
