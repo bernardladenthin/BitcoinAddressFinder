@@ -54,10 +54,10 @@ Tests run with `-Xmx2g -Xms1g` and several `--add-opens` / `--add-exports` to al
 
 ### Verifying Javadoc locally (release builds)
 
-The javadoc jar is attached only by the publish/deploy job (`mvn -P release deploy`);
-the regular build/test jobs pass `-Dmaven.javadoc.skip=true`. So a javadoc break is
-**invisible to `mvn test` and to PR CI** and only fails the snapshot publish on `main`.
-To reproduce the deploy-time javadoc step locally, run the **full lifecycle**:
+The javadoc jar is attached only by the publish/deploy job (`mvn -P release deploy`).
+So a javadoc break is **invisible to `mvn test` and to PR CI** and only fails the
+snapshot publish on `main`. To reproduce the deploy-time javadoc step locally, run the
+**full lifecycle**:
 
 ```bash
 mvn -P release clean package -DskipTests -Dgpg.skip=true \
@@ -74,6 +74,21 @@ block is declared **before** `maven-compiler-plugin` on purpose, so javadoc runs
 mode is unusable here — the module declares no `requires` and `module-info.java` lives
 in `src/main/java9`, off javadoc's source path). See the extensive comments on those two
 `pom.xml` executions before touching their phase or ordering.
+
+**The single surviving `-Dmaven.javadoc.skip=true` in CI (BAF-only, do not remove blindly).**
+After a cross-repo cleanup that deleted every other javadoc-skip flag from all four sibling
+pipelines, exactly **one** remains: the `build` job in `.github/workflows/publish.yml`. It is
+necessary because that job runs plain `mvn package`, which triggers `attach-javadocs` at
+`prepare-package`; BAF's javadoc is module-aware (`<source>21</source>` + `module-info.java`
+in `src/main/java9`), so an unguarded run can flip into JPMS module mode and fail with
+`No source files for package net.ladenthin...`. The Java-8 siblings (java-llama.cpp,
+streambuffer, llamacpp-ai-index — all `<source>8>`) stay in classpath mode regardless and
+therefore carry **no** skip flag; the redundant/no-op flags they used to have were removed,
+and streambuffer/llamacpp let javadoc build during their `verify` test job so it is gated in
+PR CI. BAF cannot do the same cheaply (the module-mode trap needs the full `-P release
+package` ordering), which is why BAF's javadoc is validated only at publish. Before dropping
+this last flag, prove `mvn package` builds BAF's javadoc clean — a standalone `mvn
+javadoc:jar` cannot, it always runs classpath mode and hides the trap.
 
 ### JPMS module descriptor (`module-info.java`) handling — why it's hidden until the end
 
