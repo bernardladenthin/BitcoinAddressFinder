@@ -271,7 +271,7 @@ public final class BinaryFuse8AddressPresence implements AddressPresence {
         int[] idx = {0};
         try (Stream<ByteBuffer> stream = source.addresses()) {
             stream.forEach(bb -> {
-                if (bb.remaining() == BYTES_PER_ADDRESS && idx[0] < keys.length) {
+                if (idx[0] < keys.length && bb.remaining() == BYTES_PER_ADDRESS) {
                     keys[idx[0]++] = bb.getLong(bb.position());
                 }
             });
