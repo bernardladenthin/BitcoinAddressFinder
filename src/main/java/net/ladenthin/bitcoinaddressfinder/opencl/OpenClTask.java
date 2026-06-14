@@ -55,6 +55,9 @@ public class OpenClTask implements ReleaseCLObject {
 
     private static final int PRIVATE_KEY_SOURCE_SIZE_IN_BYTES = OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES;
 
+    /** Sentinel meaning "no profiling timestamp captured for the most recent launch". */
+    public static final long PROFILING_NOT_AVAILABLE = -1L;
+
     private final CProducerOpenCL cProducer;
 
     // JOCL cl_context is a native-pointer wrapper — toString is uninformative.
@@ -70,10 +73,7 @@ public class OpenClTask implements ReleaseCLObject {
     private final BigInteger maxPrivateKeyForBatchSize;
     private final PrivateKeyValidator privateKeyValidator;
 
-    private boolean closed = false;
-
-    /** Sentinel meaning "no profiling timestamp captured for the most recent launch". */
-    public static final long PROFILING_NOT_AVAILABLE = -1L;
+    private volatile boolean closed = false;
 
     // Device-side nanosecond timings of the most recent executeKernel() call. Only populated when
     // CProducerOpenCL.enableProfiling is true (a diagnostic/benchmark switch); otherwise they stay
