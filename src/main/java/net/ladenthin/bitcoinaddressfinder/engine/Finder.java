@@ -339,7 +339,8 @@ public class Finder implements Interruptable {
      * @param producer the producer to stage the filter on
      * @param data     the GPU-upload payload built once by {@link #uploadGpuFilterToProducers()}
      */
-    private void stageGpuFilterOnProducer(CProducerOpenCL config, ProducerOpenCL producer, BinaryFuse8GpuFilterData data) {
+    private void stageGpuFilterOnProducer(
+            CProducerOpenCL config, ProducerOpenCL producer, BinaryFuse8GpuFilterData data) {
         if (!config.enableGpuFilter || config.transferAll) {
             return;
         }

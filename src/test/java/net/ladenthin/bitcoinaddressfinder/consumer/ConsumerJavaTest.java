@@ -147,7 +147,8 @@ public class ConsumerJavaTest {
         }
     }
 
-    // <editor-fold defaultstate="collapsed" desc="GPU pre-filter payload (built in initLMDB, decoupled from CPU lookup)">
+    // <editor-fold defaultstate="collapsed" desc="GPU pre-filter payload (built in initLMDB, decoupled from CPU
+    // lookup)">
     @Test
     public void gpuFilter_binaryFuse8Backend_reusesCpuFilter() throws Exception {
         new LMDBPlatformAssume().assumeLMDBExecution();
