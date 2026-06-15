@@ -602,11 +602,15 @@ DECLSPEC void mul_mod (PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a, PRIVATE_AS co
   u32 t1 = 0;
   u32 c  = 0;
 
-  // Stage-0 quick win: unroll the fixed 8-limb schoolbook-multiply loops (compile-time bounds).
+  // Schoolbook multiply: limb t[i] = Sum a[j]*b[i-j] over j in [max(0,i-7), min(7,i)].
+  // The two index halves (i<8: j in [0,i]; i>=8: j in [i-7,7]) are folded into one loop;
+  // with the compile-time bounds and #pragma unroll the compiler emits the same unrolled code.
   #pragma unroll
-  for (u32 i = 0; i < 8; i++)
+  for (u32 i = 0; i < 15; i++)
   {
-    for (u32 j = 0; j <= i; j++)
+    u32 jStart = (i > 7) ? (i - 7) : 0; // ternary, not i-7, to avoid u32 underflow for i<7
+    u32 jEnd   = (i < 8) ? i : 7;
+    for (u32 j = jStart; j <= jEnd; j++)
     {
       u64 p = ((u64) a[j]) * b[i - j];
 
@@ -618,31 +622,6 @@ DECLSPEC void mul_mod (PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a, PRIVATE_AS co
       t1 = d >> 32;
 
       c += d < p; // carry
-    }
-
-    t[i] = t0;
-
-    t0 = t1;
-    t1 = c;
-
-    c = 0;
-  }
-
-  #pragma unroll
-  for (u32 i = 8; i < 15; i++)
-  {
-    for (u32 j = i - 7; j < 8; j++)
-    {
-      u64 p = ((u64) a[j]) * b[i - j];
-
-      u64 d = ((u64) t1) << 32 | t0;
-
-      d += p;
-
-      t0 = (u32) d;
-      t1 = d >> 32;
-
-      c += d < p;
     }
 
     t[i] = t0;
