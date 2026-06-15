@@ -5,19 +5,25 @@ package net.ladenthin.bitcoinaddressfinder.opencl;
 
 import static org.jocl.CL.CL_MEM_COPY_HOST_PTR;
 import static org.jocl.CL.CL_MEM_READ_ONLY;
+import static org.jocl.CL.CL_MEM_READ_WRITE;
 import static org.jocl.CL.CL_QUEUE_PROFILING_ENABLE;
 import static org.jocl.CL.CL_QUEUE_PROPERTIES;
+import static org.jocl.CL.CL_TRUE;
 import static org.jocl.CL.clBuildProgram;
 import static org.jocl.CL.clCreateBuffer;
 import static org.jocl.CL.clCreateCommandQueueWithProperties;
 import static org.jocl.CL.clCreateContext;
 import static org.jocl.CL.clCreateKernel;
 import static org.jocl.CL.clCreateProgramWithSource;
+import static org.jocl.CL.clEnqueueNDRangeKernel;
+import static org.jocl.CL.clEnqueueReadBuffer;
+import static org.jocl.CL.clFinish;
 import static org.jocl.CL.clReleaseCommandQueue;
 import static org.jocl.CL.clReleaseContext;
 import static org.jocl.CL.clReleaseKernel;
 import static org.jocl.CL.clReleaseMemObject;
 import static org.jocl.CL.clReleaseProgram;
+import static org.jocl.CL.clSetKernelArg;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.Resources;
@@ -579,6 +585,48 @@ public class OpenCLContext implements ReleaseCLObject {
         if (combTableMem != null) {
             clReleaseMemObject(combTableMem);
             combTableMem = null;
+        }
+    }
+
+    /**
+     * Test hook: runs a single-work-item fixed-base precompute kernel from the already-built program
+     * (e.g. {@code precompute_ig_table}, {@code precompute_comb_table} in
+     * {@code copyfromhashcat/inc_ecc_secp256k1.cl}) into a fresh {@code CL_MEM_READ_WRITE} buffer and
+     * returns the result bytes. This validates the on-device table generation against the bitcoinj
+     * reference without changing the production (host-built) table path.
+     *
+     * @param kernelName  the precompute kernel to run (argument 0 is the output buffer)
+     * @param outputBytes size of the output buffer in bytes
+     * @param countArg    value for a trailing {@code const u32 count} argument, or {@code null} when
+     *     the kernel takes only the output buffer
+     * @return the kernel's output buffer contents
+     */
+    @VisibleForTesting
+    byte[] runPrecomputeKernelForTesting(String kernelName, int outputBytes, @Nullable Integer countArg) {
+        final cl_context localContext = Objects.requireNonNull(context);
+        final cl_program localProgram = Objects.requireNonNull(program);
+        final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
+
+        final cl_mem out = clCreateBuffer(localContext, CL_MEM_READ_WRITE, outputBytes, null, null);
+        final cl_kernel precomputeKernel = clCreateKernel(localProgram, kernelName, null);
+        try {
+            clSetKernelArg(precomputeKernel, 0, Sizeof.cl_mem, Pointer.to(out));
+            if (countArg != null) {
+                clSetKernelArg(precomputeKernel, 1, Sizeof.cl_uint, Pointer.to(new int[] {countArg}));
+            }
+            clEnqueueNDRangeKernel(localQueue, precomputeKernel, 1, null, new long[] {1L}, null, 0, null, null);
+            clFinish(localQueue);
+
+            final ByteBuffer buf = ByteBuffer.allocateDirect(outputBytes);
+            clEnqueueReadBuffer(localQueue, out, CL_TRUE, 0, outputBytes, Pointer.to(buf), 0, null, null);
+            clFinish(localQueue);
+
+            final byte[] bytes = new byte[outputBytes];
+            buf.get(bytes);
+            return bytes;
+        } finally {
+            clReleaseKernel(precomputeKernel);
+            clReleaseMemObject(out);
         }
     }
 

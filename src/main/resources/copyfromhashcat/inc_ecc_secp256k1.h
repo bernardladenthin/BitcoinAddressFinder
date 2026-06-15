@@ -227,4 +227,8 @@ DECLSPEC void point_mul (PRIVATE_AS u32 *r, PRIVATE_AS const u32 *k, SECP256K1_T
 
 DECLSPEC void set_precomputed_basepoint_g (PRIVATE_AS secp256k1_t *r);
 
+// Converts a Jacobian point (x, y, z) to affine in place (x <- x/z^2, y <- y/z^3); z is destroyed.
+// Reused by the fixed-base table precompute kernels below.
+DECLSPEC void point_to_affine (PRIVATE_AS u32 *x, PRIVATE_AS u32 *y, PRIVATE_AS u32 *z);
+
 #endif // INC_ECC_SECP256K1_H
