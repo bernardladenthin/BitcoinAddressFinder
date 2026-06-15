@@ -13,6 +13,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerator;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8AddressPresence;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuseAccelerator;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.HashSetAddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.TruncatedLong64SortedArrayPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
@@ -73,8 +74,8 @@ public class LMDBBase {
                         BloomFilterAccelerator.populateFrom(lmdb, lmdb, lmdbConfigurationReadOnly.bloomFilterFpp);
                     case HASHSET -> HashSetAddressPresence.populateFrom(lmdb);
                     case TRUNCATED_LONG_64 -> TruncatedLong64SortedArrayPresence.populateFrom(lmdb);
-                    case BINARY_FUSE_8 -> BinaryFuse8AddressPresence.populateFrom(lmdb);
-                    case BINARY_FUSE_16 -> BinaryFuse16AddressPresence.populateFrom(lmdb);
+                    case BINARY_FUSE_8 -> new BinaryFuseAccelerator(BinaryFuse8AddressPresence.populateFrom(lmdb), lmdb);
+                    case BINARY_FUSE_16 -> new BinaryFuseAccelerator(BinaryFuse16AddressPresence.populateFrom(lmdb), lmdb);
                 };
 
         return new LMDBHandle(lmdb, lookup);

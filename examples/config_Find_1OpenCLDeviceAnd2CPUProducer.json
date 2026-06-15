@@ -27,7 +27,7 @@
         "useProxyOptimal": true,
         "logStatsOnInit": true,
         "logStatsOnClose": false,
-        "addressLookupBackend" : "BINARY_FUSE_8",
+        "addressLookupBackend" : "LMDB_ONLY",
         "disableAddressLookup" : false
       },
       "printStatisticsEveryNSeconds": 10,

@@ -33,8 +33,10 @@ import org.jspecify.annotations.NonNull;
  *
  * <h2>False-positive rate</h2>
  * With 16-bit fingerprints the theoretical FPR is approximately 1/65536 &#x2248; 0.0015&nbsp;%.
- * Use this variant when the 0.4&nbsp;% FPR of {@link BinaryFuse8AddressPresence} causes
- * measurable LMDB fallback overhead on high-throughput workloads.
+ * Use this variant when the 0.4&nbsp;% FPR of {@link BinaryFuse8AddressPresence} sends too many
+ * hits to the exact delegate for verification on high-throughput workloads. Like Fuse-8 this
+ * filter is wrapped by {@link BinaryFuseAccelerator}, which verifies every filter hit against
+ * the LMDB read store; the lower FPR simply means fewer verifications.
  *
  * <h2>Memory cost</h2>
  * Approximately 2.60&nbsp;bytes per entry (one {@code short} slot per fingerprint position,
@@ -46,9 +48,11 @@ import org.jspecify.annotations.NonNull;
  * found by {@link #containsAddress(ByteBuffer)}.
  *
  * <h2>Lifecycle</h2>
- * Once populated this class holds no reference to its source.
- * {@link #requiresBackend()} returns {@code false}; the backing storage can be
- * closed and garbage collected after population.
+ * Once populated this class holds no reference to its source. As a bare filter it owns no
+ * delegate, so {@link #requiresBackend()} returns {@code false}; in production it is wrapped by
+ * {@link BinaryFuseAccelerator}, whose {@code requiresBackend()} returns {@code true} to keep
+ * the LMDB verifier open. Unlike the exact snapshots ({@code HASHSET}, {@code TRUNCATED_LONG_64})
+ * the LMDB env is therefore <em>not</em> released after population.
  *
  * <h2>Concurrency</h2>
  * Thread-safe for concurrent reads after construction. No mutation API is exposed.

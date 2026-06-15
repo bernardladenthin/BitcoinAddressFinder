@@ -42,10 +42,14 @@ public class CLMDBConfigurationReadOnly {
     /**
      * Selects the address-lookup chain placed in front of LMDB. See
      * {@link AddressLookupBackend} for the full trade-off matrix. Defaults to
-     * {@link AddressLookupBackend#BLOOM} which matches the historical behaviour of
-     * {@code useBloomFilter = true}.
+     * {@link AddressLookupBackend#LMDB_ONLY}: no in-RAM filter, LMDB stays open and answers
+     * every lookup exactly. This is the safest default — an exact backend can never report a
+     * false positive as a hit — and the in-RAM filters ({@code BLOOM}, {@code BINARY_FUSE_8},
+     * the exact snapshots) are opt-in latency optimisations. The GPU pre-filter
+     * ({@code producerOpenCL.enableGpuFilter}) is independent of this setting and works with the
+     * {@code LMDB_ONLY} default.
      */
-    public AddressLookupBackend addressLookupBackend = AddressLookupBackend.BLOOM;
+    public AddressLookupBackend addressLookupBackend = AddressLookupBackend.LMDB_ONLY;
 
     /**
      * The expected false positive probability (FPP) for the Bloom filter. Consulted only
