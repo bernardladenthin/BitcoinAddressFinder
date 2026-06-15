@@ -385,7 +385,7 @@ Choose between the two variants based on how expensive the LMDB verification of 
 | `BINARY_FUSE_8`     |   ~25   |
 | `BINARY_FUSE_16`    |   ~25   |
 
-`TRUNCATED_LONG_64` reaches near-`HASHSET` latency at ~10× lower memory cost and is the recommended default for most cases. `BINARY_FUSE_8` and `BINARY_FUSE_16` offer even lower memory with O(1) lookup (3 direct array reads + 3 hashes); cache-cold latency grows with filter size, but for small-to-medium databases the three-read pattern typically stays in L2 or L3 cache.
+The default backend is `LMDB_ONLY` (no in-RAM structure, exact, can never produce a false hit). When you *do* want to trade RAM for speed, `TRUNCATED_LONG_64` reaches near-`HASHSET` latency at ~10× lower memory cost and is the best in-RAM choice for most cases. `BINARY_FUSE_8` and `BINARY_FUSE_16` offer even lower memory with O(1) lookup (3 direct array reads + 3 hashes) but keep LMDB open to verify hits; cache-cold latency grows with filter size, but for small-to-medium databases the three-read pattern typically stays in L2 or L3 cache.
 
 Run the backend comparison benchmark yourself with:
 
