@@ -177,30 +177,25 @@ Every `examples/run_*.bat` has a matching `examples/run_*.sh` (same JVM flags); 
   * 🧵 Multiple CPU threads
   * 🖥️ Multiple OpenCL devices (optional)
 
-### ⚡ ECC Scalar Multiplication Optimizations
-To accelerate **elliptic curve scalar multiplication** (`k·G`, i.e. private key × base point), the OpenCL kernel applies the following optimizations:
+### ⚡ ECC Scalar Multiplication
 
-- **Windowed Non-Adjacent Form (wNAF)**:  
-  The scalar `k` is converted to a signed digit representation using a **window size of 4**.  
-  This results in digits from the set `{±1, ±3, ±5, ±7}`, with at least one zero between non-zero digits.  
-  This reduces the number of costly additions during multiplication.  
-  [Further explanation of wNAF on crypto.stackexchange.com](https://crypto.stackexchange.com/questions/82013/simple-explanation-of-sliding-window-and-wnaf-methods-of-elliptic-curve-point-mu)
+The OpenCL kernel generates keys with the same two techniques the fastest open-source secp256k1
+searchers (BitCrack, VanitySearch) use:
 
-- **Precomputed Table**:  
-  The kernel precomputes and stores the following multiples of the base point `G`:  
-  `±1·G`, `±3·G`, `±5·G`, `±7·G`  
-  These are stored in the `secp256k1_t` structure and reused during scalar multiplication.
+- A **fixed-base comb** computes each work-item's first key `P₀ = k₀·G` from a precomputed table of
+  multiples of the base point `G`, with almost no point-doublings.
+- An **affine batched-addition walk** then produces the remaining `keysPerWorkItem − 1` consecutive
+  keys (`P₀ + G`, `P₀ + 2G`, …) with cheap point additions, sharing one modular inverse across a
+  whole sub-batch (Montgomery's simultaneous inversion).
 
-- **Left-to-Right Scalar Multiplication**:  
-  The multiplication loop scans the wNAF digits from most to least significant:  
-  - Each iteration **always doubles** the current point.  
-  - If the current digit is non-zero, it **adds the matching precomputed point**.
+This is the hot path of GPU scanning, and it is **EC-arithmetic-bound, not hash-bound**. It is also
+deliberately **not constant-time** (speed over side-channel resistance — see the security note under
+[Find Addresses](#find-addresses)).
 
-- **Optimized for GPGPU (not constant-time)**:  
-  To prioritize speed on OpenCL/CUDA devices, this implementation is **not constant-time** and may be vulnerable to side-channel attacks in adversarial environments.
-
-- **Use of Constant Memory**:  
-  Precomputed points are stored in **constant GPU memory** (`__constant` via `CONSTANT_AS`), allowing fast access by all threads in a workgroup.
+> 🔧 **Tuning the two knobs that control it — `batchSizeInBits` and `keysPerWorkItem` — is the single
+> biggest performance decision.** The defaults are conservative and **not** optimal for scanning. For
+> the full mechanism, the staged optimization history with measured benchmarks, per-device tuning
+> guidance, and how to benchmark correctly, see **[docs/performance.md](docs/performance.md)**.
 
 ### 📦 Batch Size per Kernel (`batchSizeInBits`)
 Each Find-mode producer batch covers **`2^batchSizeInBits`** consecutive private keys (the field is a **log₂ exponent**, not a raw key count). For each batch the CPU:
@@ -231,193 +226,24 @@ The OpenCL kernel then evaluates `secretBase + i` for `i &#x2208; [0, 2^batchSiz
 
 Constraints (enforced by [`CProducerOpenCL`](src/main/java/net/ladenthin/bitcoinaddressfinder/configuration/CProducerOpenCL.java)): `keysPerWorkItem` must be a power of two, `2^batchSizeInBits` must be divisible by `keysPerWorkItem`, and the total per-launch result buffer (`workSize &#x00D7; keysPerWorkItem &#x00D7; chunkSize`) must not exceed `Integer.MAX_VALUE`.
 
-### 🔄 Scalar Walker per Kernel (`keysPerWorkItem`)
-The OpenCL kernel supports a **loop-based scalar strategy** controlled by the `keysPerWorkItem` parameter. Each GPU thread generates multiple EC keys by:
+### 🔄 Keys per Work-Item (`keysPerWorkItem`)
 
-- Computing the first key via full scalar multiplication: `P₀ = k₀·G` (using `point_mul_xy`)  
-- Computing subsequent keys via point additions: `Pₙ₊₁ = Pₙ + G`, kept in Jacobian coordinates
-  and converted back to affine in **batches** using Montgomery's simultaneous-inversion trick
+`keysPerWorkItem` controls how many consecutive keys each GPU work-item generates: it computes the
+first key with the fixed-base comb (`P₀ = k₀·G`) and the rest with the cheap affine-addition walk.
+Raising it amortizes the one expensive `k₀·G` over many cheap steps and shrinks the work-item count
+by the same factor — until too few work-items remain to keep the GPU busy. There is therefore a
+**per-device sweet spot**.
 
-This enables high-throughput, grid-parallel **linear keyspace traversal** like:  
-`k₀·G, (k₀ + 1)·G, ..., (k₀ + keysPerWorkItem - 1)·G`
+- Must be a power of two; `batchSizeInBits` must be divisible by it.
+- **The default `1` is the slowest setting** (a full `k·G` per key) — raise it for scanning.
+- The optimum is **device-dependent**. On an NVIDIA RTX 3070 Laptop it is `64` (~5× faster than `1`,
+  ~19–20 M keys/s). After the comb optimization the throughput curve is flat enough that even `8`–`16`
+  captures most of the gain on a wide range of GPUs.
 
-Example:  
-- If `keysPerWorkItem = 8`, each thread generates 8 keys  
-- Grid size is reduced by a factor of 8  
-- All results are written to global memory
-
-Each subsequent key costs one **point addition** instead of a full scalar multiplication, so
-raising `keysPerWorkItem` above `1` replaces most of the expensive `k·G` work with cheap additions
-— until too few work-items remain to keep the GPU occupied, at which point throughput falls again.
-There is therefore a **per-device sweet spot**.
-
-**Batched modular inversion.** Converting each walked point from Jacobian back to affine needs a
-modular inverse of its Z coordinate — the single most expensive field operation. Rather than one
-inverse per key, the kernel inverts a sub-batch of `KEYS_BATCH_INV` points together (one `inv_mod`
-plus `3·(N−1)` multiplies for N points) via Montgomery's simultaneous inversion. This both raises
-the peak throughput and shifts the sweet spot to a larger `keysPerWorkItem` (more keys can be
-amortized before the inverse stops dominating). `KEYS_BATCH_INV` is a `#define` in
-`inc_ecc_secp256k1custom.cl` (default `8`); larger values amortize the inverse over more keys but
-use more private scratch (`4 · KEYS_BATCH_INV · 8` u32 words), which lowers occupancy — tune per
-device.
-
-**Benchmarked tuning (NVIDIA RTX 3070 Laptop, `batchSizeInBits = 20`, `GridSizeSweepBenchmark`):**
-
-| `keysPerWorkItem` | Throughput (~) | vs. `keysPerWorkItem = 1` |
-|------------------:|---------------:|--------------------------:|
-| 1 (default)       | ~2.4 M keys/s  | 1.0×                      |
-| 8                 | ~11.1 M keys/s | 4.7×                      |
-| 16                | ~14.5 M keys/s | 6.2×                      |
-| 32                | ~16.7 M keys/s | 7.1×                      |
-| **64**            | **~19.8 M keys/s** | **8.4× (peak)**       |
-| 128               | ~19.0 M keys/s | 8.1×                      |
-
-> ✅ The default `keysPerWorkItem = 1` is **not** optimal for scanning — it pays a full scalar
->    multiplication for every key. On this GPU, `keysPerWorkItem = 64` is ~8.4× faster.
-> ✅ The sweet spot is **device-dependent** (it is set by the balance between amortizing scalar
->    multiplications / inversions and keeping enough work-items to saturate the GPU). Sweep
->    `keysPerWorkItem` on your hardware with `GridSizeSweepBenchmark`; for the RTX 3070 the optimum
->    is ~64.
-> ❌ Beyond the sweet spot, throughput drops because too few work-items remain to keep all
->    compute units busy (e.g. `2^20 / 256 = 4096` work-items under-fills a 40-SM GPU).
->
-> The batched inversion alone (vs. the previous per-key inverse) lifted this GPU's peak from
-> ~14.4 M keys/s (at `keysPerWorkItem = 32`) to ~19.8 M keys/s (at `keysPerWorkItem = 64`), ~+37%.
-
-Reproduce the sweep above (the bare benchmark uses different defaults, so pass the parameters
-explicitly):
-
-```bash
-mvn test-compile exec:java \
-  -Dexec.args="GridSizeSweepBenchmark -p batchSizeInBits=20 -p keysPerWorkItem=1,8,16,32,64,128"
-```
-
-Candidates/s = JMH ops/s × `2^batchSizeInBits`. The `~+37%` batched-inversion figure compares this
-benchmark's peak with `KEYS_BATCH_INV = 8` against the previous per-key-inverse kernel.
-
-### 🧪 GPU kernel optimization log
-
-This section is a running, reproducible record of the staged effort to speed up the secp256k1
-OpenCL kernel. The full investigation, cost analysis, and design rationale live in
-[`docs/ecc-gpu-performance-optimization.md`](docs/ecc-gpu-performance-optimization.md); the numbers
-below are **measured on real hardware** (NVIDIA RTX 3070 Laptop GPU, OpenCL 3.0 CUDA, driver
-581.83). All sweeps use `GridSizeSweepBenchmark` at `batchSizeInBits = 20` with identical JMH
-settings (`-f 1 -wi 1 -w 20 -i 3 -r 20`); throughput in `M keys/s` = JMH ops/s × `2^20 / 1e6`.
-Every stage is gated on
-`ProbeAddressesOpenCLTest#createKeys_acrossKeysPerWorkItem_allResultsMatchReference` (byte-for-byte
-parity against the bitcoinj reference) **before** any throughput is reported.
-
-> ℹ️ This log is intentionally kept inline in the README for now; a later session will move it to a
-> dedicated performance document.
-
-#### Reference baseline (pre-optimization)
-
-| `keysPerWorkItem` | 1 | 2 | 4 | 8 | 16 | 32 | 64 |
-|---|--:|--:|--:|--:|--:|--:|--:|
-| M keys/s | 2.51 | 4.51 | 6.82 | 10.92 | 14.17 | 16.00 | **18.54** |
-
-#### Stage 0 — kernel build flags + `#pragma unroll` (applied, no measurable gain)
-
-`clBuildProgram` now passes `-cl-std=CL2.0 -cl-mad-enable` (see `CL_BUILD_OPTIONS` in
-[`OpenCLContext.java`](src/main/java/net/ladenthin/bitcoinaddressfinder/opencl/OpenCLContext.java)),
-and `#pragma unroll` was added to the fixed 8-limb `mul_mod` / fast-reduction loops in
-[`copyfromhashcat/inc_ecc_secp256k1.cl`](src/main/resources/copyfromhashcat/inc_ecc_secp256k1.cl).
-
-Parity: ✅ 5/5 (output byte-identical; `-cl-std=CL2.0` is accepted by the NVIDIA driver).
-
-| `keysPerWorkItem` | 1 | 2 | 4 | 8 | 16 | 32 | 64 |
-|---|--:|--:|--:|--:|--:|--:|--:|
-| M keys/s | 2.35 | 3.94 | 7.34 | 10.22 | 13.56 | 15.78 | **19.30** |
-| vs. baseline | −6% | −13% | +8% | −6% | −4% | −1% | +4% |
-
-**Verdict: no reliable gain — every arm's JMH error bar overlaps the baseline** (e.g. at the
-operating point `keysPerWorkItem = 64`: 18.4 ± 1.4 vs. 17.7 ± 1.8 ops/s). This matches the
-expectation for an **integer-only** kernel: `-cl-mad-enable` affects only floating-point math, the
-NVIDIA PTX compiler already unrolls these small fixed-trip loops, and `-cl-std=CL2.0` merely pins
-language semantics that compact mode's 2.0 `atomic_add` already relied on. The flags are **kept**
-because they are harmless, verified byte-identical, and make the OpenCL-2.0 requirement explicit —
-but they are setup/hygiene, **not** a speed-up. The real levers are the staged EC-arithmetic
-rewrites that follow.
-
-#### Stage 1 — single-anchor affine batched-addition walk (+~10% at the sweet spot)
-
-Replaces the per-key **Jacobian** mixed-addition walk (advance a running point by `+G`, keep it in
-Jacobian `(X,Y,Z)`, batch-convert back to affine) with a **single-anchor affine** walk: every key
-is `Pₘ = P₀ + m·G`, computed directly in affine from the *same* anchor `P₀`. The fixed multiples
-`m·G` are read from a host-uploaded table (`iG_table`, built once in `OpenCLContext.init()` from the
-same bitcoinj curve the CPU reference uses). Anchoring every point at one `P₀` makes the slope
-denominators `dx_m = x_{mG} − x₀` mutually independent, so a single Montgomery simultaneous inversion
-still covers a whole sub-batch — but each key now costs ~6 `mul_mod` + ~6 `sub_mod` (slope formula)
-instead of an ~11-multiply Jacobian add plus per-point `X/Z²,Y/Z³` conversion. No Jacobian state, no
-running-point machinery.
-
-Correctness: ✅ byte-for-byte identical to the bitcoinj reference —
-`ProbeAddressesOpenCLTest#createKeys_acrossKeysPerWorkItem_allResultsMatchReference` (5/5), the full
-`@OpenCLTest` suite (77 run, 0 fail), plus a new pure-Java `OpenCLContextIGTableTest` that pins the
-`i·G` table byte layout without a GPU.
-
-> ⚠️ **Laptop-GPU thermal caveat for benchmarking:** the RTX 3070 Laptop throttles under sustained
-> load — the *same* Stage 1 kernel measured 16.8 ops/s right after a hot test run vs 18.9 ops/s when
-> cool, an ~11% swing. Only a **back-to-back, equal-thermal** A/B (baseline then candidate, run
-> consecutively) is trustworthy here.
-
-Fair A/B (back-to-back, identical JMH settings), throughput in M keys/s:
-
-| `keysPerWorkItem` | 1 | 4 | 16 | 32 | **64 (sweet spot)** |
-|---|--:|--:|--:|--:|--:|
-| Stage 0 baseline | 2.47 | 7.54 | 13.41 | 16.74 | 18.07 |
-| Stage 1          | 1.96 | 6.16 | 13.32 | 16.08 | **19.83** |
-| Δ                | −21% | −18% | ~0% | ~−4% | **+9.8%** |
-
-The walk rewrite only pays off where walk steps dominate the work-item: at `keysPerWorkItem = 64`
-(the device's documented optimum) 63 of every 64 keys are cheap affine steps, so Stage 1 is **+9.8%
-(18.07 → 19.83 M keys/s, error bars non-overlapping)**. At low `keysPerWorkItem` there is little or
-no walk to speed up and the fixed per-sub-batch `inv_mod` + anchor (`m=0`) overhead makes it slower —
-but production scanning runs at the sweet spot, so the operating-point gain is what matters. This is
-consistent with the investigation's L2 projection (≈1.09–1.14×); see
-[`docs/ecc-gpu-performance-optimization.md`](docs/ecc-gpu-performance-optimization.md) §7.
-
-#### Stage 2 — fixed-base comb for the `P₀` anchor (+~11% at the sweet spot, up to 2× at low `keysPerWorkItem`)
-
-Replaces the **wNAF** scalar multiplication (`point_mul_xy`, ~256 doublings + ~51 adds ≈ ~2600
-field-muls) used for the one-time anchor `P₀ = k₀·G` with a **fixed-base comb**. `G` is fixed, so
-`k·G` is read from a precomputed table with ~0 doublings: the scalar is split into 64 four-bit
-windows, `k·G = Σ_pos comb_table[pos][digit_pos(k)]` (~64 mixed point-adds). The table
-(`64 positions × 16 digits = 1024 affine points ≈ 64 KB`) is built once in `OpenCLContext.init()`
-from the same bitcoinj curve the CPU reference uses (scalars reduced mod `n`), uploaded as a
-read-only buffer (new kernel arg), and consumed by `point_mul_xy_comb` in the kernel. The Stage 1
-affine walk is unchanged.
-
-Correctness: ✅ byte-identical — full `@OpenCLTest` gate (86 run, 0 fail) plus a new pure-Java
-`OpenCLContextCombTableTest` that checks every table entry **and** reconstructs `k·G` by summing the
-window points for 32 random scalars (validating the comb decomposition without a GPU).
-
-> ⚠️ Same laptop-GPU thermal caveat as Stage 1, and it bites harder here: between-run throughput
-> varies ~±15% with temperature, which swamps the per-key deltas at high `keysPerWorkItem`. Only a
-> **matched-pair** measurement (Stage 1 and Stage 2 back-to-back in the same thermal window) is
-> trustworthy for the small operating-point delta; the large low-`keysPerWorkItem` gains survive any
-> thermal noise.
-
-Stage 1 → Stage 2 (fair back-to-back), throughput in M keys/s:
-
-| `keysPerWorkItem` | 1 | 8 | 16 | 32 | **64 (sweet spot)** |
-|---|--:|--:|--:|--:|--:|
-| Stage 1 | 1.89 | 9.26 | 12.63¹ | 16.34¹ | 17.37¹ |
-| Stage 2 | 4.01 | 15.23 | 16.70¹ | 18.06¹ | **19.25¹** |
-| Δ | **+112%** | **+64%** | +32% | +10.5% | **+10.8%** |
-
-<sup>¹ from the matched high-precision pair (6 samples each, same thermal window, error bars
-disjoint at kpwi=64); the other columns are the fair 3-sample sweep.</sup>
-
-The comb's win is largest where `P₀` is **not** amortized: at `keysPerWorkItem = 1` (a fresh `k·G`
-per key) Stage 2 is ~**2×**, and it is +64% at kpwi=8. At the kpwi=64 sweet spot `P₀` is only 1/64
-of the work — already cheap after Stage 1's amortization — so the remaining ceiling is the affine
-walk + the two hash160 chains, and the comb still adds a clean **+10.8%**. The optimum stays at the
-high end (≥64) but the throughput curve is far flatter, so near-peak speed is reached at much lower
-`keysPerWorkItem`. Combined with Stage 1, the cumulative gain over the original wNAF + Jacobian
-kernel at the sweet spot is ~+21%, and a multiple of that at low `keysPerWorkItem`. This is the
-BitCrack/VanitySearch design (fixed-base table for `k·G` + affine batched-addition walk); see
-[`docs/ecc-gpu-performance-optimization.md`](docs/ecc-gpu-performance-optimization.md) §8.
+> 📈 **Find your device's sweet spot — and read the benchmarking caveats (laptop GPUs throttle!) —
+> before trusting any number: see [docs/performance.md](docs/performance.md).** It has the
+> per-`keysPerWorkItem` benchmark tables, the full optimization history with measured gains, the
+> `KEYS_BATCH_INV` tuning knob, and the exact `GridSizeSweepBenchmark` invocation.
 
 ### 🚀 MSB-Zero Optimization
 To accelerate elliptic curve multiplication, BitcoinAddressFinder applies a **160-bit private key optimization**:

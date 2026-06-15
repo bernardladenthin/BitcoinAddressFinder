@@ -120,7 +120,7 @@ public class OpenCLContext implements ReleaseCLObject {
      *       rather than depending on the driver's default (CL1.2).</li>
      *   <li>{@code -cl-mad-enable} — permits fused multiply-add contraction. This kernel is
      *       integer-only so the effect is expected to be marginal, but it is harmless and part of
-     *       the documented quick-win set (see docs/ecc-gpu-performance-optimization.md §6).</li>
+     *       the documented quick-win set (see docs/performance.md, "Stage 0").</li>
      * </ul>
      *
      * <p>Deliberately omits {@code -cl-fast-relaxed-math}: it only affects floating-point math, of
