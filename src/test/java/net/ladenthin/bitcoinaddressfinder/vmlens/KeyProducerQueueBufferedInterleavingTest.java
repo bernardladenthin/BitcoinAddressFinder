@@ -6,9 +6,11 @@ package net.ladenthin.bitcoinaddressfinder.vmlens;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 
 import com.vmlens.api.AllInterleavings;
 import java.math.BigInteger;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicReference;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaReceiver;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.AbstractKeyProducerQueueBuffered;
@@ -63,7 +65,14 @@ public class KeyProducerQueueBufferedInterleavingTest {
         public void interrupt() {
             signalShutdown();
         }
+
+        void addForTest(byte[] secret) {
+            addSecret(secret);
+        }
     }
+
+    /** secp256k1 private-key byte length; a real secret has this many bytes, the sentinel has zero. */
+    private static final int PRIVATE_KEY_BYTES = 32;
 
     /**
      * Verifies that {@code signalShutdown()} always unblocks a consumer parked in
@@ -99,6 +108,62 @@ public class KeyProducerQueueBufferedInterleavingTest {
                 shutdown.join();
 
                 assertThat(outcome.get(), is(instanceOf(NoMoreSecretsAvailableException.class)));
+            }
+        }
+    }
+
+    /**
+     * Verifies the drop-after-stop invariant: when {@code addSecret(...)} races
+     * {@code signalShutdown()}, a subsequent consume yields exactly one of two
+     * outcomes in every interleaving — the real key (it was enqueued ahead of the
+     * sentinel) or a clean {@link NoMoreSecretsAvailableException} — and the
+     * zero-length {@code SHUTDOWN_SENTINEL} is <em>never</em> decoded as a key.
+     *
+     * <p>This is a regression guard, not a bug reproduction: the protocol is correct
+     * by construction (source-side drop via the {@code shouldStop} guard in
+     * {@code addSecret}; the consumer always throws on the sentinel so it can never
+     * advance to an element behind it; and a reference-identity check plus a
+     * {@code length != 32} backstop keep the sentinel from being mistaken for a key).
+     * vmlens proves it holds across <em>all</em> writer interleavings.</p>
+     *
+     * @throws InterruptedException if joining a worker thread is interrupted
+     */
+    @Test
+    public void shutdownNeverLetsTheSentinelBeDecodedAsAKey() throws InterruptedException {
+        try (AllInterleavings allInterleavings =
+                new AllInterleavings("AbstractKeyProducerQueueBuffered.dropAfterStop")) {
+            while (allInterleavings.hasNext()) {
+                final ShutdownProbe producer = new ShutdownProbe(new CKeyProducerJavaReceiver(), keyUtility);
+                final byte[] key = new byte[PRIVATE_KEY_BYTES];
+                Arrays.fill(key, (byte) 0xAB);
+                final BigInteger expectedKey = new BigInteger(1, key);
+                final AtomicReference<Throwable> producerFailure = new AtomicReference<>();
+
+                final Thread transport = new Thread(() -> {
+                    try {
+                        producer.addForTest(key);
+                    } catch (Throwable t) {
+                        producerFailure.compareAndSet(null, t);
+                    }
+                });
+                final Thread shutdown = new Thread(producer::interrupt);
+
+                transport.start();
+                shutdown.start();
+                transport.join();
+                shutdown.join();
+                assertThat(producerFailure.get(), is(nullValue()));
+
+                // The sentinel is always enqueued (unbounded queue), so this consume
+                // never blocks; it must resolve to the real key or a clean termination.
+                try {
+                    final BigInteger[] secrets = producer.createSecrets(1, true);
+                    assertThat(secrets.length, is(1));
+                    assertThat(
+                            "only the real key may ever be decoded, never the sentinel", secrets[0], is(expectedKey));
+                } catch (NoMoreSecretsAvailableException terminated) {
+                    // Acceptable: the consumer observed the sentinel / shouldStop and stopped.
+                }
             }
         }
     }
