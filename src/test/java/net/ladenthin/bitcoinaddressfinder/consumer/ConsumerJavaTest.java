@@ -147,9 +147,9 @@ public class ConsumerJavaTest {
         }
     }
 
-    // <editor-fold defaultstate="collapsed" desc="getGpuFilterData (Step H)">
+    // <editor-fold defaultstate="collapsed" desc="buildGpuFilterData (GPU pre-filter, decoupled from CPU lookup)">
     @Test
-    public void getGpuFilterData_binaryFuse8Backend_returnsPayload() throws Exception {
+    public void buildGpuFilterData_binaryFuse8Backend_reusesCpuFilter() throws Exception {
         new LMDBPlatformAssume().assumeLMDBExecution();
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
@@ -163,16 +163,19 @@ public class ConsumerJavaTest {
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         try {
             consumerJava.initLMDB();
-            // the Binary Fuse 8 backend builds a filter, so the GPU-upload payload is present
-            assertThat(consumerJava.getGpuFilterData().isPresent(), is(true));
-            assertThat(consumerJava.getGpuFilterData().get().fingerprints().length > 0, is(true));
+            // the Binary Fuse 8 backend already built a filter, so it is reused for GPU upload
+            assertThat(consumerJava.buildGpuFilterData().isPresent(), is(true));
+            assertThat(consumerJava.buildGpuFilterData().get().fingerprints().length > 0, is(true));
         } finally {
             consumerJava.interrupt();
         }
     }
 
     @Test
-    public void getGpuFilterData_lmdbOnlyBackend_returnsEmpty() throws Exception {
+    public void buildGpuFilterData_lmdbOnlyBackend_buildsFilterFromOpenLmdb() throws Exception {
+        // Decoupling: the GPU pre-filter must be available even when the CPU lookup is LMDB_ONLY
+        // (no CPU-side filter). buildGpuFilterData builds a transient Fuse-8 filter from the open
+        // LMDB purely for VRAM upload; the CPU lookup stays LMDB-only (no double filtering).
         new LMDBPlatformAssume().assumeLMDBExecution();
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
         TestAddressesFiles testAddresses = new TestAddressesFiles(false);
@@ -186,8 +189,31 @@ public class ConsumerJavaTest {
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         try {
             consumerJava.initLMDB();
-            // a non-Fuse8 backend has no GPU filter payload
-            assertThat(consumerJava.getGpuFilterData().isPresent(), is(false));
+            assertThat(consumerJava.buildGpuFilterData().isPresent(), is(true));
+            assertThat(consumerJava.buildGpuFilterData().get().fingerprints().length > 0, is(true));
+        } finally {
+            consumerJava.interrupt();
+        }
+    }
+
+    @Test
+    public void buildGpuFilterData_selfContainedBackend_returnsEmptyBecauseLmdbClosed() throws Exception {
+        // A self-contained snapshot (HASHSET) closes LMDB after population, so there is no open
+        // env to build the GPU filter from -> empty (the caller falls back to full transfer).
+        new LMDBPlatformAssume().assumeLMDBExecution();
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+        TestAddressesFiles testAddresses = new TestAddressesFiles(false);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
+
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        cConsumerJava.lmdbConfigurationReadOnly.addressLookupBackend =
+                net.ladenthin.bitcoinaddressfinder.configuration.AddressLookupBackend.HASHSET;
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        try {
+            consumerJava.initLMDB();
+            assertThat(consumerJava.buildGpuFilterData().isPresent(), is(false));
         } finally {
             consumerJava.interrupt();
         }

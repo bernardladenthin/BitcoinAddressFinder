@@ -267,14 +267,21 @@ public class Finder implements Interruptable {
     }
 
     /**
-     * Stages the consumer's Binary Fuse 8 filter on each compact-mode OpenCL producer.
+     * Builds the Binary Fuse 8 GPU pre-filter <em>once</em> and uploads it to every compact-mode
+     * OpenCL producer.
      *
-     * <p>Routed through the producer (not the consumer) to respect the layered architecture: the
-     * engine reads the filter payload from the consumer ({@code engine -> consumer/persistence}),
-     * decomposes it into primitives, and hands them to the producer
-     * ({@code engine -> producer -> opencl}). Producers with {@code enableGpuFilter = false}, or
-     * forced to full transfer (e.g. by vanity), are skipped, as is the case where the configured
-     * lookup backend did not build a Binary Fuse 8 filter.
+     * <p>The GPU pre-filter is decoupled from the CPU lookup backend: it is built purely as a
+     * transient VRAM-upload artifact (independent of whether the CPU lookup is {@code LMDB_ONLY},
+     * {@code BINARY_FUSE_8}, etc.) so the survivors that come back to the CPU are verified
+     * directly against LMDB and never "double filtered". Routed through the producer (not the
+     * consumer) to respect the layered architecture: the engine reads the filter payload from the
+     * consumer, decomposes it into primitives, and hands them to the producer
+     * ({@code engine -> producer -> opencl}). The host-side fingerprint array is released after
+     * each producer copies it into device memory (see {@code ProducerOpenCL#initProducer}); the
+     * upload happens only once per session.
+     *
+     * <p>Producers with {@code enableGpuFilter = false}, or forced to full transfer (e.g. by
+     * vanity), are skipped. If no producer requests the filter, nothing is built.
      */
     private void uploadGpuFilterToProducers() {
         ConsumerJava localConsumer = consumerJava;
@@ -282,31 +289,36 @@ public class Finder implements Interruptable {
             return;
         }
         List<CProducerOpenCL> configs = finder.producerOpenCL;
+        boolean anyCompactMode = configs.stream().anyMatch(c -> c.enableGpuFilter && !c.transferAll);
+        if (!anyCompactMode) {
+            return;
+        }
+
+        // Build the Fuse-8 filter exactly once, regardless of how many producers consume it.
+        Optional<BinaryFuse8GpuFilterData> payload = localConsumer.buildGpuFilterData();
+        if (payload.isEmpty()) {
+            LOGGER.warn("producerOpenCL.enableGpuFilter is true but the GPU filter could not be built "
+                    + "(LMDB is not open — the configured addressLookupBackend released it); running full transfer.");
+            return;
+        }
+        BinaryFuse8GpuFilterData data = payload.get();
         for (int i = 0; i < openCLProducers.size(); i++) {
-            stageGpuFilterOnProducer(configs.get(i), openCLProducers.get(i), localConsumer);
+            stageGpuFilterOnProducer(configs.get(i), openCLProducers.get(i), data);
         }
     }
 
     /**
-     * Stages the consumer's Binary Fuse 8 filter on a single OpenCL producer, if applicable.
-     * Skips producers with {@code enableGpuFilter = false} or forced to full transfer, and the
-     * case where the configured lookup backend did not build a Binary Fuse 8 filter.
+     * Stages the already-built Binary Fuse 8 filter payload on a single OpenCL producer, unless
+     * the producer has {@code enableGpuFilter = false} or is forced to full transfer.
      *
      * @param config   the producer configuration
      * @param producer the producer to stage the filter on
-     * @param consumer the consumer holding the built filter
+     * @param data     the GPU-upload payload built once by {@link #uploadGpuFilterToProducers()}
      */
-    private void stageGpuFilterOnProducer(CProducerOpenCL config, ProducerOpenCL producer, ConsumerJava consumer) {
+    private void stageGpuFilterOnProducer(CProducerOpenCL config, ProducerOpenCL producer, BinaryFuse8GpuFilterData data) {
         if (!config.enableGpuFilter || config.transferAll) {
             return;
         }
-        Optional<BinaryFuse8GpuFilterData> payload = consumer.getGpuFilterData();
-        if (payload.isEmpty()) {
-            LOGGER.warn("producerOpenCL.enableGpuFilter is true but the consumer's address-lookup backend "
-                    + "did not build a Binary Fuse 8 filter (backend must be BINARY_FUSE_8); running full transfer.");
-            return;
-        }
-        BinaryFuse8GpuFilterData data = payload.get();
         long seed = data.seed();
         producer.setGpuFilter(
                 data.fingerprints(),

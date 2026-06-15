@@ -26,6 +26,7 @@ import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.core.FireAndForget;
 import net.ladenthin.bitcoinaddressfinder.core.InterruptedRuntimeException;
 import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
@@ -297,21 +298,35 @@ public class ConsumerJava implements Consumer {
     }
 
     /**
-     * Returns the GPU-upload payload for the active Binary Fuse 8 filter, if the configured
-     * address-lookup backend built one.
+     * Builds the GPU-upload payload of a Binary Fuse 8 filter for the OpenCL pre-filter,
+     * independently of the CPU lookup backend.
      *
-     * <p>Exposed so the engine ({@code Finder}) can read the filter the consumer built and route
-     * it to the OpenCL producers for VRAM upload (the consumer never touches the OpenCL layer
-     * directly). Returns {@link Optional#empty()} for every backend other than
-     * {@code BINARY_FUSE_8} and before {@link #initLMDB()} has run.
+     * <p>The GPU pre-filter and the CPU lookup are deliberately decoupled: the CPU lookup may be
+     * {@code LMDB_ONLY} (exact, no CPU-side filter) while the GPU still runs a Fuse-8 filter to
+     * shrink the GPU&#x2192;CPU transfer. The filter is therefore built here as a transient
+     * artifact purely for VRAM upload — it is <em>not</em> retained as the lookup, so survivors
+     * of the GPU pre-filter are never "double filtered" on the CPU; they are verified directly
+     * against LMDB.
      *
-     * @return the Binary Fuse 8 GPU-upload payload, or empty if the active lookup is not a
-     *     {@link BinaryFuseAccelerator} wrapping a {@link BinaryFuse8AddressPresence}
+     * <p>If the CPU lookup already built a Fuse-8 filter (backend {@code BINARY_FUSE_8}), that
+     * filter is reused to avoid a second full LMDB scan. Otherwise a fresh filter is built from
+     * the open LMDB env. Returns {@link Optional#empty()} when LMDB is not available (a
+     * self-contained backend such as {@code HASHSET}/{@code TRUNCATED_LONG_64} released it) or
+     * before {@link #initLMDB()} has run.
+     *
+     * @return the Binary Fuse 8 GPU-upload payload, or empty if it cannot be built
      */
-    public Optional<BinaryFuse8GpuFilterData> getGpuFilterData() {
+    public Optional<BinaryFuse8GpuFilterData> buildGpuFilterData() {
         AddressPresence localLookup = lookup;
         if (localLookup instanceof BinaryFuseAccelerator accelerator) {
-            return accelerator.getGpuFilterData();
+            Optional<BinaryFuse8GpuFilterData> existing = accelerator.getGpuFilterData();
+            if (existing.isPresent()) {
+                return existing;
+            }
+        }
+        Persistence localPersistence = persistence;
+        if (localPersistence instanceof AddressIterable iterable) {
+            return Optional.of(BinaryFuse8AddressPresence.populateFrom(iterable).toGpuFilterData());
         }
         return Optional.empty();
     }

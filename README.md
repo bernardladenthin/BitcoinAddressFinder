@@ -308,20 +308,22 @@ This reduction in scalar size speeds up `k·G` computations, resulting in signif
 
 ### 🚀 Pluggable Address Lookup Backends (`addressLookupBackend`)
 
-As of version 1.6.0, the address presence check is decoupled from the on-disk LMDB store via a small `AddressPresence` interface. The consumer's scan hot path queries through whichever backend is selected in the config — LMDB itself, a Bloom filter in front of LMDB, or a self-contained in-memory snapshot that lets the LMDB env be closed and garbage-collected after population.
+As of version 1.6.0, the address presence check is decoupled from the on-disk LMDB store via a small `AddressPresence` interface. The consumer's scan hot path queries through whichever backend is selected in the config — LMDB itself, a Bloom/Binary-Fuse filter in front of LMDB, or a self-contained in-memory snapshot that lets the LMDB env be closed and garbage-collected after population.
 
 ```json
-"addressLookupBackend": "BLOOM"
+"addressLookupBackend": "LMDB_ONLY"
 ```
+
+**The default is `LMDB_ONLY`: no in-RAM filter, LMDB stays open and answers every lookup exactly.** This is the safest baseline — an exact backend can never report a false positive as a hit — and the in-RAM filters below are opt-in optimisations you add only when you want them. (Note the GPU pre-filter, `producerOpenCL.enableGpuFilter`, is independent of this setting and works with the `LMDB_ONLY` default; see below.)
 
 Supported values:
 
 | Value               | RAM cost                | Lookup latency       | LMDB stays open? | Best for                                                                                |
 |---------------------|-------------------------|----------------------|------------------|-----------------------------------------------------------------------------------------|
-| `LMDB_ONLY`         | minimal (mmap only)     | slowest              | yes              | very large databases that do not fit in RAM at all                                      |
-| `BLOOM`             | ~80 MB – ~1.5 GB (FPP)  | fast for misses      | yes              | when LMDB must stay open and most queries miss the database                             |
+| `LMDB_ONLY`         | minimal (mmap only)     | slowest              | yes              | **default** — exact, no filter, can never produce a false hit; also the simplest base for GPU pre-filtering |
+| `BLOOM`             | ~80 MB – ~1.5 GB (FPP)  | fast for misses      | yes              | when you want to skip LMDB for the common miss case but keep it open to verify hits      |
 | `HASHSET`           | ~80 B / entry           | fast                 | **no**           | small databases where memory is plentiful and exact lookup is required by callers       |
-| `TRUNCATED_LONG_64` | **~8 B / entry**        | **near HASHSET**     | **no**           | **recommended default for any in-RAM choice** — best memory/latency trade-off           |
+| `TRUNCATED_LONG_64` | **~8 B / entry**        | **near HASHSET**     | **no**           | best in-RAM trade-off when you *do* want to drop LMDB — near-`HASHSET` latency at ~10× less RAM |
 | `BINARY_FUSE_8`     | **~1.3 B / entry**      | **fast**             | yes              | ultra-low RAM filter in front of LMDB; 0.4% of filter hits are verified against LMDB (also feeds the GPU pre-filter) |
 | `BINARY_FUSE_16`    | **~2.6 B / entry**      | **fast**             | yes              | like Fuse-8 but 0.0015% FPR — fewer LMDB verifications; use when Fuse-8's verification cost is measurable |
 
@@ -406,13 +408,15 @@ mvn test-compile exec:java -Dexec.args="BinaryFuseBenchmark"
 
 #### GPU-side Binary Fuse 8 filtering (`enableGpuFilter`)
 
-By default the OpenCL kernel transfers **every** derived work-item result back to the host, and the consumer then checks each hash160 against the selected `addressLookupBackend`. When the database is loaded as `BINARY_FUSE_8`, that same filter can instead be pushed **onto the GPU** so the kernel checks each derived hash160 inline and transmits only the candidates the filter marks as possibly present. This collapses the PCIe read-back from the full `2^batchSizeInBits` grid down to the handful of hits per batch — the dominant cost on large batches.
+By default the OpenCL kernel transfers **every** derived work-item result back to the host, and the consumer then checks each hash160 against the selected `addressLookupBackend`. With `enableGpuFilter`, a Binary Fuse 8 filter is instead pushed **onto the GPU** so the kernel checks each derived hash160 inline and transmits only the candidates the filter marks as possibly present. This collapses the PCIe read-back from the full `2^batchSizeInBits` grid down to the handful of hits per batch — the dominant cost on large batches.
+
+The GPU pre-filter is **independent of the CPU `addressLookupBackend`.** It is built once from LMDB purely as a transient VRAM-upload artifact (the host copy is freed after the one-time upload), so it works with the `LMDB_ONLY` default — you do **not** have to set the CPU backend to `BINARY_FUSE_8`. The survivors that come back from the GPU are verified directly against LMDB on the CPU, so they are never "double filtered". (If the CPU backend already *is* `BINARY_FUSE_8`, that filter is reused for the upload to avoid a second LMDB scan.)
 
 Enable it on an OpenCL producer (see [`examples/config_Find_GPUFilterCompact.json`](examples/config_Find_GPUFilterCompact.json)):
 
 ```json
 "consumerJava": {
-  "lmdbConfigurationReadOnly": { "addressLookupBackend": "BINARY_FUSE_8" }
+  "lmdbConfigurationReadOnly": { "addressLookupBackend": "LMDB_ONLY" }
 },
 "producerOpenCL": [
   { "enableGpuFilter": true, "transferAll": false }
@@ -421,7 +425,7 @@ Enable it on an OpenCL producer (see [`examples/config_Find_GPUFilterCompact.jso
 
 | Field | Default | Effect |
 |-------|:-------:|--------|
-| `enableGpuFilter` | `false` | When `true` **and** the consumer backend is `BINARY_FUSE_8`, the filter is uploaded to GPU VRAM and the kernel filters inline (compact output). |
+| `enableGpuFilter` | `false` | When `true`, a Binary Fuse 8 filter is built from LMDB and uploaded to GPU VRAM (once per session); the kernel filters inline (compact output). Independent of the CPU `addressLookupBackend` — requires only that LMDB is open (it is under the `LMDB_ONLY` default). |
 | `transferAll` | `false` | Forces full-transfer (legacy) output even when `enableGpuFilter` is on. `Finder` sets this to `true` automatically — with a warning — whenever `enableVanity = true`, because vanity scanning must see every derived address. |
 
 **How compact mode works** — the kernel checks both the compressed and uncompressed hash160 of each candidate against the uploaded filter; a work-item that hits claims an output slot via an `atomic_add` on a shared count word and writes its entry there, so the buffer holds exactly the hits (each entry carries its own work-item index for secret-key reconstruction). A non-hit writes nothing.
