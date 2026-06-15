@@ -209,16 +209,16 @@ SPDX-License-Identifier: Apache-2.0
                     <version>3.5.6</version>
                     <configuration>
                         <!--
-                            The vmlens interleaving smoke test is meaningful only when run
-                            under the vmlens agent (the `vmlens` profile / CI job). Without the
-                            agent its AllInterleavings loop body never executes (a vacuous pass
-                            that also prints an "agent not configured" warning), so exclude it
-                            from the ordinary surefire run. The vmlens job re-includes it with
-                            `-Dtest=...`, which overrides this exclude. Merged with the main
-                            surefire <argLine>/fork config below via pluginManagement.
+                            Tests in the `vmlens` package are meaningful only under the vmlens
+                            agent (the `vmlens` profile / CI job). Without the agent an
+                            AllInterleavings loop body never executes (a vacuous pass that also
+                            prints an "agent not configured" warning), so exclude the whole
+                            package from the ordinary surefire run. The vmlens job re-includes
+                            them with `-Dtest=...`, which overrides this exclude. Merged with
+                            the main surefire <argLine>/fork config below via pluginManagement.
                         -->
                         <excludes>
-                            <exclude>**/VmlensInterleavingSmokeTest.java</exclude>
+                            <exclude>**/vmlens/*.java</exclude>
                         </excludes>
                     </configuration>
                 </plugin>
@@ -1074,14 +1074,15 @@ SPDX-License-Identifier: Apache-2.0
                         <artifactId>vmlens-maven-plugin</artifactId>
                         <configuration>
                             <!--
-                                Staged scope (one class for now): run vmlens interleaving
-                                analysis only on the minimal smoke test. The `com.vmlens:api`
-                                test dependency lives in the main <dependencies> block.
-                                Expand <includes> as more concurrency tests are added (the
-                                streambuffer repo runs vmlens over its whole suite).
+                                Run vmlens interleaving analysis over the whole `vmlens` test
+                                package: the smoke test plus the real interleaving tests (e.g.
+                                KeyProducerQueueBufferedInterleavingTest). The `com.vmlens:api`
+                                test dependency lives in the main <dependencies> block. Add new
+                                interleaving tests to the `vmlens` package and they are picked
+                                up automatically.
                             -->
                             <includes>
-                                <include>**/VmlensInterleavingSmokeTest.java</include>
+                                <include>**/vmlens/*.java</include>
                             </includes>
                         </configuration>
                         <executions>
