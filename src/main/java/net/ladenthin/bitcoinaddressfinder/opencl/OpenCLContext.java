@@ -35,6 +35,7 @@ import java.util.Optional;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.EndiannessConverter;
@@ -194,6 +195,19 @@ public class OpenCLContext implements ReleaseCLObject {
     @ToString.Exclude
     private @Nullable cl_mem igTableMem;
 
+    /**
+     * GPU VRAM buffer holding the fixed-base comb table used to compute the one-time anchor
+     * {@code P0 = k0·G} (Stage 2). For {@code pos = 0 .. 63} and {@code digit = 0 .. 15} it holds the
+     * affine point {@code (digit · 2^(4·pos))·G} as {@code [x(8 words)][y(8 words)]} in device word
+     * order; entry {@code (pos, digit)} is at word offset {@code (pos*16 + digit)*16}. The
+     * {@code digit == 0} slot is the point at infinity and is never read (left zero).
+     *
+     * <p>Built once and uploaded in {@link #init()} (independent of the private key), released in
+     * {@link #close()}. ~64 KB. {@code null} before {@code init()} and after {@code close()}.
+     */
+    @ToString.Exclude
+    private @Nullable cl_mem combTableMem;
+
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
 
     private boolean closed = false;
@@ -276,6 +290,10 @@ public class OpenCLContext implements ReleaseCLObject {
         // Build and upload the i·G table for the single-anchor affine scalar walk. It depends only
         // on the curve and keysPerWorkItem (not on the private key), so it is built once here.
         uploadIGTable(producerOpenCL.keysPerWorkItem);
+
+        // Build and upload the fixed-base comb table used to compute the one-time anchor P0 = k0·G.
+        // Curve-only (key-independent), so built once here.
+        uploadCombTable();
     }
 
     /**
@@ -496,6 +514,74 @@ public class OpenCLContext implements ReleaseCLObject {
         }
     }
 
+    private void uploadCombTable() {
+        final cl_context localContext = Objects.requireNonNull(context);
+        final byte[] table = buildCombTable(byteBufferUtility);
+        combTableMem = clCreateBuffer(
+                localContext, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) table.length, Pointer.to(table), null);
+    }
+
+    /** Number of 4-bit windows ("positions") covering a 256-bit scalar. */
+    @VisibleForTesting
+    static final int COMB_POSITIONS = 64;
+
+    /** Digits per window: {@code 0..15} (digit {@code 0} = point at infinity, never read). */
+    @VisibleForTesting
+    static final int COMB_DIGITS = 16;
+
+    /**
+     * Builds the fixed-base comb table consumed by {@code point_mul_xy_comb} in the kernel: for
+     * {@code pos = 0 .. 63} and {@code digit = 0 .. 15}, entry {@code (pos, digit)} holds the affine
+     * coordinates of {@code (digit · 2^(4·pos))·G} as {@code [x(32 bytes)][y(32 bytes)]}, each
+     * coordinate reversed from big-endian to device word order. Entry {@code (pos, digit)} starts at
+     * byte offset {@code (pos*16 + digit) * 64}.
+     *
+     * <p>The {@code digit == 0} slot is the point at infinity, which has no affine representation and
+     * is never read by the kernel; it is left zero. Scalars are reduced mod the group order {@code n}
+     * before deriving the point (for large {@code pos} the raw scalar {@code digit · 2^(4·pos)} can
+     * exceed {@code n}); since {@code [s]G = [s mod n]G} this yields the correct point. Derived with
+     * the same bitcoinj curve the CPU reference uses ({@link ECKey#publicPointFromPrivate}), so the
+     * table is a deterministic function of the curve.
+     *
+     * @param byteBufferUtility byte-buffer helper used by the endianness converter
+     * @return the packed comb table bytes ({@code 64 * 16 * 64} = 65536 bytes)
+     */
+    @VisibleForTesting
+    static byte[] buildCombTable(ByteBufferUtility byteBufferUtility) {
+        final int oneCoord = OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES;
+        final int twoCoord = OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES;
+        final BigInteger n = Secp256k1Constants.MAX_PRIVATE_KEY; // secp256k1 group order
+        final byte[] table = new byte[COMB_POSITIONS * COMB_DIGITS * twoCoord];
+        final EndiannessConverter converter = new EndiannessConverter(
+                ByteOrder.BIG_ENDIAN, OpenClKernelConstants.GPU_NATIVE_WORD_ORDER, byteBufferUtility);
+        for (int pos = 0; pos < COMB_POSITIONS; pos++) {
+            for (int digit = 1; digit < COMB_DIGITS; digit++) {
+                // scalar = digit * 2^(4*pos), reduced mod n ([s]G = [s mod n]G).
+                final BigInteger scalar =
+                        BigInteger.valueOf(digit).shiftLeft(4 * pos).mod(n);
+                final ECPoint point = ECKey.publicPointFromPrivate(scalar).normalize();
+                final byte[] x = ByteBufferUtility.bigIntegerToFixedLengthBytes(
+                        point.getAffineXCoord().toBigInteger(), oneCoord);
+                final byte[] y = ByteBufferUtility.bigIntegerToFixedLengthBytes(
+                        point.getAffineYCoord().toBigInteger(), oneCoord);
+                converter.convertEndian(x); // big-endian -> device word order
+                converter.convertEndian(y);
+                final int offset = (pos * COMB_DIGITS + digit) * twoCoord;
+                System.arraycopy(x, 0, table, offset, oneCoord);
+                System.arraycopy(y, 0, table, offset + oneCoord, oneCoord);
+            }
+            // digit == 0 slot left zero (point at infinity; never read).
+        }
+        return table;
+    }
+
+    private void releaseCombTable() {
+        if (combTableMem != null) {
+            clReleaseMemObject(combTableMem);
+            combTableMem = null;
+        }
+    }
+
     @Override
     public boolean isClosed() {
         return closed;
@@ -506,6 +592,7 @@ public class OpenCLContext implements ReleaseCLObject {
         if (!closed) {
             releaseGpuFilter();
             releaseIGTable();
+            releaseCombTable();
             if (openClTask != null) {
                 openClTask.close();
                 openClTask = null;
@@ -543,6 +630,7 @@ public class OpenCLContext implements ReleaseCLObject {
         cl_mem localFuse8FingerprintsMem = Objects.requireNonNull(fuse8FingerprintsMem);
         cl_mem localFuse8MetadataMem = Objects.requireNonNull(fuse8MetadataMem);
         cl_mem localIgTableMem = Objects.requireNonNull(igTableMem);
+        cl_mem localCombTableMem = Objects.requireNonNull(combTableMem);
 
         // Compact (filter) mode only when a real filter is uploaded AND the caller did not force
         // full transfer; otherwise run full transfer (no filter, or vanity forced transferAll).
@@ -555,7 +643,8 @@ public class OpenCLContext implements ReleaseCLObject {
                 localFuse8FingerprintsMem,
                 localFuse8MetadataMem,
                 transferAll,
-                localIgTableMem);
+                localIgTableMem,
+                localCombTableMem);
 
         return new OpenCLGridResult(privateKeyBase, producerOpenCL.getOverallWorkSize(), dstByteBuffer);
     }

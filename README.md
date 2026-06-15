@@ -377,6 +377,48 @@ but production scanning runs at the sweet spot, so the operating-point gain is w
 consistent with the investigation's L2 projection (≈1.09–1.14×); see
 [`docs/ecc-gpu-performance-optimization.md`](docs/ecc-gpu-performance-optimization.md) §7.
 
+#### Stage 2 — fixed-base comb for the `P₀` anchor (+~11% at the sweet spot, up to 2× at low `keysPerWorkItem`)
+
+Replaces the **wNAF** scalar multiplication (`point_mul_xy`, ~256 doublings + ~51 adds ≈ ~2600
+field-muls) used for the one-time anchor `P₀ = k₀·G` with a **fixed-base comb**. `G` is fixed, so
+`k·G` is read from a precomputed table with ~0 doublings: the scalar is split into 64 four-bit
+windows, `k·G = Σ_pos comb_table[pos][digit_pos(k)]` (~64 mixed point-adds). The table
+(`64 positions × 16 digits = 1024 affine points ≈ 64 KB`) is built once in `OpenCLContext.init()`
+from the same bitcoinj curve the CPU reference uses (scalars reduced mod `n`), uploaded as a
+read-only buffer (new kernel arg), and consumed by `point_mul_xy_comb` in the kernel. The Stage 1
+affine walk is unchanged.
+
+Correctness: ✅ byte-identical — full `@OpenCLTest` gate (86 run, 0 fail) plus a new pure-Java
+`OpenCLContextCombTableTest` that checks every table entry **and** reconstructs `k·G` by summing the
+window points for 32 random scalars (validating the comb decomposition without a GPU).
+
+> ⚠️ Same laptop-GPU thermal caveat as Stage 1, and it bites harder here: between-run throughput
+> varies ~±15% with temperature, which swamps the per-key deltas at high `keysPerWorkItem`. Only a
+> **matched-pair** measurement (Stage 1 and Stage 2 back-to-back in the same thermal window) is
+> trustworthy for the small operating-point delta; the large low-`keysPerWorkItem` gains survive any
+> thermal noise.
+
+Stage 1 → Stage 2 (fair back-to-back), throughput in M keys/s:
+
+| `keysPerWorkItem` | 1 | 8 | 16 | 32 | **64 (sweet spot)** |
+|---|--:|--:|--:|--:|--:|
+| Stage 1 | 1.89 | 9.26 | 12.63¹ | 16.34¹ | 17.37¹ |
+| Stage 2 | 4.01 | 15.23 | 16.70¹ | 18.06¹ | **19.25¹** |
+| Δ | **+112%** | **+64%** | +32% | +10.5% | **+10.8%** |
+
+<sup>¹ from the matched high-precision pair (6 samples each, same thermal window, error bars
+disjoint at kpwi=64); the other columns are the fair 3-sample sweep.</sup>
+
+The comb's win is largest where `P₀` is **not** amortized: at `keysPerWorkItem = 1` (a fresh `k·G`
+per key) Stage 2 is ~**2×**, and it is +64% at kpwi=8. At the kpwi=64 sweet spot `P₀` is only 1/64
+of the work — already cheap after Stage 1's amortization — so the remaining ceiling is the affine
+walk + the two hash160 chains, and the comb still adds a clean **+10.8%**. The optimum stays at the
+high end (≥64) but the throughput curve is far flatter, so near-peak speed is reached at much lower
+`keysPerWorkItem`. Combined with Stage 1, the cumulative gain over the original wNAF + Jacobian
+kernel at the sweet spot is ~+21%, and a multiple of that at low `keysPerWorkItem`. This is the
+BitCrack/VanitySearch design (fixed-base table for `k·G` + affine batched-addition walk); see
+[`docs/ecc-gpu-performance-optimization.md`](docs/ecc-gpu-performance-optimization.md) §8.
+
 ### 🚀 MSB-Zero Optimization
 To accelerate elliptic curve multiplication, BitcoinAddressFinder applies a **160-bit private key optimization**:
 

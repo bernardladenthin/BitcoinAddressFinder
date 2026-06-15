@@ -680,6 +680,69 @@ inline void copy_private_u32_array_private_u32(u32 *dst, const u32 *src, const i
     }
 }
 
+/**
+ * @brief Fixed-base comb scalar multiplication: (x1, y1) affine = k * G (Stage 2).
+ *
+ * Replaces the wNAF point_mul_xy for the one-time anchor P0. G is fixed, so k*G is evaluated from
+ * a precomputed table with ~0 doublings instead of ~256. The scalar is split into 64 four-bit
+ * windows: k = Sum_{pos=0..63} d_pos * 2^(4*pos), so
+ *     k*G = Sum_{pos} (d_pos * 2^(4*pos)) * G = Sum_{pos} comb_table[pos][d_pos].
+ * comb_table holds, for pos=0..63 and digit=0..15, the affine point (digit * 2^(4*pos)) * G as
+ * [x(8 words)][y(8 words)] in device word order; entry (pos,digit) is at word offset
+ * (pos*16 + digit)*16. The digit==0 slot is never read (it is the point at infinity).
+ *
+ * Accumulation uses the mixed Jacobian+affine point_add. Doubling/infinity edge cases (Q == ±P)
+ * cannot occur for the running partial sum vs. the next window point except with astronomically
+ * small probability (the partial sum's value is strictly below the next window's bit position),
+ * the same practical assumption point_mul_xy and the affine walk already rely on; if it ever
+ * happened the inv_mod zero-guard prevents a hang and the filter rejects the garbage result.
+ *
+ * @param x1          out: affine x of k*G (device word order)
+ * @param y1          out: affine y of k*G (device word order)
+ * @param k           in:  scalar, 8 little-endian u32 words
+ * @param comb_table  in:  64*16 precomputed points (see layout above)
+ */
+inline void point_mul_xy_comb(
+    PRIVATE_AS u32 *x1, PRIVATE_AS u32 *y1, PRIVATE_AS const u32 *k, __global const u32 *comb_table)
+{
+    u32 qx[ONE_COORDINATE_NUM_WORDS] = { 0 };
+    u32 qy[ONE_COORDINATE_NUM_WORDS] = { 0 };
+    u32 qz[ONE_COORDINATE_NUM_WORDS] = { 0 };
+    u32 have = 0;
+
+    for (u32 pos = 0; pos < 64; pos++) {
+        u32 word = pos >> 3;          // each u32 holds 8 nibbles
+        u32 shift = (pos & 7) << 2;   // nibble offset within the word
+        u32 d = (k[word] >> shift) & 0x0fu;
+        if (d == 0) {
+            continue; // 0 * anything = point at infinity -> contributes nothing
+        }
+
+        u32 base = (pos * 16u + d) * TWO_COORDINATE_NUM_WORDS; // 16 words per table point
+        u32 x2[ONE_COORDINATE_NUM_WORDS];
+        u32 y2[ONE_COORDINATE_NUM_WORDS];
+        copy_global_u32_array_private_u32(x2, &comb_table[base], ONE_COORDINATE_NUM_WORDS);
+        copy_global_u32_array_private_u32(y2, &comb_table[base + ONE_COORDINATE_NUM_WORDS], ONE_COORDINATE_NUM_WORDS);
+
+        if (have == 0) {
+            copy_private_u32_array_private_u32(qx, x2, ONE_COORDINATE_NUM_WORDS);
+            copy_private_u32_array_private_u32(qy, y2, ONE_COORDINATE_NUM_WORDS);
+            qz[0] = 1; // affine seed: Z = 1 (qz[1..7] already 0)
+            have = 1;
+        } else {
+            point_add(qx, qy, qz, x2, y2); // Q += comb point (mixed Jacobian+affine)
+        }
+    }
+
+    // Convert Q (Jacobian) to affine: x = X / Z^2, y = Y / Z^3.
+    inv_mod(qz);
+    u32 z2[ONE_COORDINATE_NUM_WORDS];
+    mul_mod(z2, qz, qz); // Z^2
+    mul_mod(x1, qx, z2); // x affine
+    mul_mod(qz, z2, qz); // Z^3
+    mul_mod(y1, qy, qz); // y affine
+}
+
 __kernel void generateKeysKernel_grid(
     __global u32 *r,
     __global const u32 *k,
@@ -687,7 +750,8 @@ __kernel void generateKeysKernel_grid(
     __global const uchar *fuse8_fp,    // Binary Fuse 8 fingerprint slot array
     __global const uint *fuse8_meta,   // [seedLo, seedHi, segLen, segLenMask, segCountLen]
     const u32 transfer_all,            // 0 = compact (filter) mode, non-zero = full transfer
-    __global const u32 *iG_table)      // (keysPerWorkItem-1) points: entry m-1 = [x_{mG}(8 words)][y_{mG}(8 words)], device word order
+    __global const u32 *iG_table,      // (keysPerWorkItem-1) points: entry m-1 = [x_{mG}(8 words)][y_{mG}(8 words)], device word order
+    __global const u32 *comb_table)    // fixed-base comb table: 64 positions * 16 digits, each [x(8)][y(8)], device word order
 {
     // Little Endian format
     u32 k_littleEndian_local[PRIVATE_KEY_LENGTH];
@@ -790,11 +854,11 @@ __kernel void generateKeysKernel_grid(
     // returns without hanging; the recovered inverses are then garbage and the filter rejects the
     // resulting hashes — strictly no worse than the previous path.
 
-    // Affine anchor P0 = (baseK0 | base_offset) * G, computed once with the wNAF scalar mult.
+    // Affine anchor P0 = (baseK0 | base_offset) * G, computed once with the fixed-base comb.
     u32 x0[ONE_COORDINATE_NUM_WORDS];
     u32 y0[ONE_COORDINATE_NUM_WORDS];
     k_littleEndian_local[0] = (baseK0 | base_offset);
-    point_mul_xy(x0, y0, k_littleEndian_local, &g_precomputed);
+    point_mul_xy_comb(x0, y0, k_littleEndian_local, comb_table);
 
     // Per-sub-batch scratch: dx_m denominators and their Montgomery prefix products.
     u32 dx[KEYS_BATCH_INV][ONE_COORDINATE_NUM_WORDS];

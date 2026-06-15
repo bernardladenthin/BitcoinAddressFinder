@@ -346,6 +346,7 @@ public class OpenClTask implements ReleaseCLObject {
      * @param transferAll   {@code 0} for compact (filter) mode, non-zero to force full transfer
      * @param iGTableMem    the GPU {@code i·G} table buffer for the affine scalar walk (a one-byte
      *     placeholder when {@code keysPerWorkItem == 1})
+     * @param combTableMem  the GPU fixed-base comb table buffer used to compute the {@code P0} anchor
      * @return the destination buffer containing kernel results
      */
     public ByteBuffer executeKernel(
@@ -354,7 +355,8 @@ public class OpenClTask implements ReleaseCLObject {
             cl_mem fuse8FpMem,
             cl_mem fuse8MetaMem,
             int transferAll,
-            cl_mem iGTableMem) {
+            cl_mem iGTableMem,
+            cl_mem combTableMem) {
         final long dstSizeInBytes = getDstSizeInBytes();
         // Allocate a new destination buffer so that cloning after kernel execution is unnecessary
         try (final DestinationArgument destinationArgument = DestinationArgument.create(context, dstSizeInBytes)) {
@@ -391,6 +393,7 @@ public class OpenClTask implements ReleaseCLObject {
             clSetKernelArg(kernel, 4, Sizeof.cl_mem, Pointer.to(fuse8MetaMem));
             clSetKernelArg(kernel, 5, Sizeof.cl_uint, Pointer.to(new int[] {transferAll}));
             clSetKernelArg(kernel, 6, Sizeof.cl_mem, Pointer.to(iGTableMem));
+            clSetKernelArg(kernel, 7, Sizeof.cl_mem, Pointer.to(combTableMem));
 
             {
                 // write src buffer
