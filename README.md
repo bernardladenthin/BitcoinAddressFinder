@@ -295,6 +295,50 @@ mvn test-compile exec:java \
 Candidates/s = JMH ops/s × `2^batchSizeInBits`. The `~+37%` batched-inversion figure compares this
 benchmark's peak with `KEYS_BATCH_INV = 8` against the previous per-key-inverse kernel.
 
+### 🧪 GPU kernel optimization log
+
+This section is a running, reproducible record of the staged effort to speed up the secp256k1
+OpenCL kernel. The full investigation, cost analysis, and design rationale live in
+[`docs/ecc-gpu-performance-optimization.md`](docs/ecc-gpu-performance-optimization.md); the numbers
+below are **measured on real hardware** (NVIDIA RTX 3070 Laptop GPU, OpenCL 3.0 CUDA, driver
+581.83). All sweeps use `GridSizeSweepBenchmark` at `batchSizeInBits = 20` with identical JMH
+settings (`-f 1 -wi 1 -w 20 -i 3 -r 20`); throughput in `M keys/s` = JMH ops/s × `2^20 / 1e6`.
+Every stage is gated on
+`ProbeAddressesOpenCLTest#createKeys_acrossKeysPerWorkItem_allResultsMatchReference` (byte-for-byte
+parity against the bitcoinj reference) **before** any throughput is reported.
+
+> ℹ️ This log is intentionally kept inline in the README for now; a later session will move it to a
+> dedicated performance document.
+
+#### Reference baseline (pre-optimization)
+
+| `keysPerWorkItem` | 1 | 2 | 4 | 8 | 16 | 32 | 64 |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| M keys/s | 2.51 | 4.51 | 6.82 | 10.92 | 14.17 | 16.00 | **18.54** |
+
+#### Stage 0 — kernel build flags + `#pragma unroll` (applied, no measurable gain)
+
+`clBuildProgram` now passes `-cl-std=CL2.0 -cl-mad-enable` (see `CL_BUILD_OPTIONS` in
+[`OpenCLContext.java`](src/main/java/net/ladenthin/bitcoinaddressfinder/opencl/OpenCLContext.java)),
+and `#pragma unroll` was added to the fixed 8-limb `mul_mod` / fast-reduction loops in
+[`copyfromhashcat/inc_ecc_secp256k1.cl`](src/main/resources/copyfromhashcat/inc_ecc_secp256k1.cl).
+
+Parity: ✅ 5/5 (output byte-identical; `-cl-std=CL2.0` is accepted by the NVIDIA driver).
+
+| `keysPerWorkItem` | 1 | 2 | 4 | 8 | 16 | 32 | 64 |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| M keys/s | 2.35 | 3.94 | 7.34 | 10.22 | 13.56 | 15.78 | **19.30** |
+| vs. baseline | −6% | −13% | +8% | −6% | −4% | −1% | +4% |
+
+**Verdict: no reliable gain — every arm's JMH error bar overlaps the baseline** (e.g. at the
+operating point `keysPerWorkItem = 64`: 18.4 ± 1.4 vs. 17.7 ± 1.8 ops/s). This matches the
+expectation for an **integer-only** kernel: `-cl-mad-enable` affects only floating-point math, the
+NVIDIA PTX compiler already unrolls these small fixed-trip loops, and `-cl-std=CL2.0` merely pins
+language semantics that compact mode's 2.0 `atomic_add` already relied on. The flags are **kept**
+because they are harmless, verified byte-identical, and make the OpenCL-2.0 requirement explicit —
+but they are setup/hygiene, **not** a speed-up. The real levers are the staged EC-arithmetic
+rewrites that follow.
+
 ### 🚀 MSB-Zero Optimization
 To accelerate elliptic curve multiplication, BitcoinAddressFinder applies a **160-bit private key optimization**:
 

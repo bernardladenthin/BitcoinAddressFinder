@@ -602,6 +602,8 @@ DECLSPEC void mul_mod (PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a, PRIVATE_AS co
   u32 t1 = 0;
   u32 c  = 0;
 
+  // Stage-0 quick win: unroll the fixed 8-limb schoolbook-multiply loops (compile-time bounds).
+  #pragma unroll
   for (u32 i = 0; i < 8; i++)
   {
     for (u32 j = 0; j <= i; j++)
@@ -626,6 +628,7 @@ DECLSPEC void mul_mod (PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a, PRIVATE_AS co
     c = 0;
   }
 
+  #pragma unroll
   for (u32 i = 8; i < 15; i++)
   {
     for (u32 j = i - 7; j < 8; j++)
@@ -668,6 +671,7 @@ DECLSPEC void mul_mod (PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a, PRIVATE_AS co
   // Note: SECP256K1_P = 2^256 - 2^32 - 977 (0x03d1 = 977)
   // multiply t[8]...t[15] by omega:
 
+  #pragma unroll
   for (u32 i = 0, j = 8; i < 8; i++, j++)
   {
     u64 p = ((u64) 0x03d1) * t[j] + c;
@@ -694,6 +698,7 @@ DECLSPEC void mul_mod (PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a, PRIVATE_AS co
 
   // memset (t, 0, sizeof (t));
 
+  #pragma unroll
   for (u32 i = 0, j = 8; i < 8; i++, j++)
   {
     u64 p = ((u64) 0x3d1) * tmp[j] + c2;

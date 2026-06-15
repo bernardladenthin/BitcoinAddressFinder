@@ -105,6 +105,25 @@ public class OpenCLContext implements ReleaseCLObject {
 
     private static final String KERNEL_NAME = "generateKeysKernel_grid";
     private static final boolean EXCEPTIONS_ENABLED = true;
+
+    /**
+     * {@code clBuildProgram} options string (Stage-0 quick win). Kept as a single constant so it is
+     * trivial to A/B and revert.
+     *
+     * <ul>
+     *   <li>{@code -cl-std=CL2.0} — the kernel's compact mode already relies on OpenCL 2.0
+     *       {@code atomic_add} on global memory; pinning the language standard makes that explicit
+     *       rather than depending on the driver's default (CL1.2).</li>
+     *   <li>{@code -cl-mad-enable} — permits fused multiply-add contraction. This kernel is
+     *       integer-only so the effect is expected to be marginal, but it is harmless and part of
+     *       the documented quick-win set (see docs/ecc-gpu-performance-optimization.md §6).</li>
+     * </ul>
+     *
+     * <p>Deliberately omits {@code -cl-fast-relaxed-math}: it only affects floating-point math, of
+     * which this kernel has none.
+     */
+    private static final String CL_BUILD_OPTIONS = "-cl-std=CL2.0 -cl-mad-enable";
+
     private static final ComparableVersion REQUIRED_COMPACT_MODE_VERSION = new ComparableVersion("2.0");
 
     private final CProducerOpenCL producerOpenCL;
@@ -223,8 +242,8 @@ public class OpenCLContext implements ReleaseCLObject {
         // Create the program from the source code
         program = clCreateProgramWithSource(context, openCLPrograms.length, openCLPrograms, null, null);
 
-        // Build the program
-        clBuildProgram(program, 0, null, null, null, null);
+        // Build the program with the Stage-0 quick-win options (see CL_BUILD_OPTIONS).
+        clBuildProgram(program, 0, null, CL_BUILD_OPTIONS, null, null);
 
         // Create the kernel
         kernel = clCreateKernel(program, KERNEL_NAME, null);
