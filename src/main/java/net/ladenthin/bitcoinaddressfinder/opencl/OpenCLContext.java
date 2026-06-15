@@ -41,13 +41,9 @@ import java.util.Optional;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
-import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
-import net.ladenthin.bitcoinaddressfinder.util.EndiannessConverter;
 import org.apache.maven.artifact.versioning.ComparableVersion;
-import org.bitcoinj.crypto.ECKey;
-import org.bouncycastle.math.ec.ECPoint;
 import org.jocl.CL;
 import org.jocl.Pointer;
 import org.jocl.Sizeof;
@@ -460,57 +456,39 @@ public class OpenCLContext implements ReleaseCLObject {
 
     private void uploadIGTable(int keysPerWorkItem) {
         final cl_context localContext = Objects.requireNonNull(context);
-        final byte[] table = buildIGTable(keysPerWorkItem, byteBufferUtility);
-        igTableMem = clCreateBuffer(
-                localContext, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) table.length, Pointer.to(table), null);
+        // One entry per walked key (m = 1 .. keysPerWorkItem-1); at least one so the device buffer is
+        // never zero-size. When keysPerWorkItem == 1 the walk reads no i*G entry, so the placeholder
+        // (left unwritten by the kernel's count=0 run) is never consumed.
+        final int entries = Math.max(keysPerWorkItem - 1, 1);
+        final long bytes = (long) entries * OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES;
+        igTableMem = clCreateBuffer(localContext, CL_MEM_READ_WRITE, bytes, null, null);
+        enqueuePrecomputeKernel(igTableMem, "precompute_ig_table", keysPerWorkItem - 1);
     }
 
     /**
-     * Builds the {@code i·G} table consumed by the affine scalar walk: for {@code i = 1 ..
-     * keysPerWorkItem-1}, entry {@code i-1} holds the affine coordinates of {@code i·G} as
-     * {@code [x(32 bytes)][y(32 bytes)]}, each coordinate reversed from big-endian to device word
-     * order (the same {@link EndiannessConverter} the private-key upload uses in
-     * {@link OpenClTask#setSrcPrivateKeyChunk}).
+     * Runs a single-work-item fixed-base precompute kernel (see
+     * {@code copyfromhashcat/inc_ecc_secp256k1.cl}) from the already-built program to populate
+     * {@code out} on the device. Argument 0 is the output buffer; {@code countArg}, when non-{@code
+     * null}, binds a trailing {@code const u32 count}.
      *
-     * <p>The points are derived with the same bitcoinj curve the CPU reference uses
-     * ({@link ECKey#publicPointFromPrivate(BigInteger)}), so the table is a deterministic function
-     * of the curve and there is a single source of truth. The lower-level {@code
-     * publicPointFromPrivate} is used rather than {@link ECKey#fromPrivate(BigInteger, boolean)}
-     * because the latter rejects the scalar {@code 1} (and {@code 0}) as a sentinel guard, and
-     * {@code 1·G} is the first table entry. When {@code keysPerWorkItem == 1} the walk emits only
-     * the anchor {@code P0} and never reads the table, so a one-byte placeholder is returned
-     * (zero-size device buffers are invalid).
-     *
-     * @param keysPerWorkItem  the per-work-item key count (the walk reads entries {@code 1..K-1})
-     * @param byteBufferUtility byte-buffer helper used by the endianness converter
-     * @return the packed table bytes, or a one-byte placeholder when {@code keysPerWorkItem == 1}
+     * @param out        the device buffer to populate (kernel argument 0)
+     * @param kernelName the precompute kernel name
+     * @param countArg   value for a trailing {@code const u32 count} argument, or {@code null}
      */
-    @VisibleForTesting
-    static byte[] buildIGTable(int keysPerWorkItem, ByteBufferUtility byteBufferUtility) {
-        final int entries = keysPerWorkItem - 1;
-        if (entries <= 0) {
-            return new byte[1];
+    private void enqueuePrecomputeKernel(cl_mem out, String kernelName, @Nullable Integer countArg) {
+        final cl_program localProgram = Objects.requireNonNull(program);
+        final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
+        final cl_kernel precomputeKernel = clCreateKernel(localProgram, kernelName, null);
+        try {
+            clSetKernelArg(precomputeKernel, 0, Sizeof.cl_mem, Pointer.to(out));
+            if (countArg != null) {
+                clSetKernelArg(precomputeKernel, 1, Sizeof.cl_uint, Pointer.to(new int[] {countArg}));
+            }
+            clEnqueueNDRangeKernel(localQueue, precomputeKernel, 1, null, new long[] {1L}, null, 0, null, null);
+            clFinish(localQueue);
+        } finally {
+            clReleaseKernel(precomputeKernel);
         }
-        final int oneCoord = OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES;
-        final int twoCoord = OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES;
-        final byte[] table = new byte[entries * twoCoord];
-        final EndiannessConverter converter = new EndiannessConverter(
-                ByteOrder.BIG_ENDIAN, OpenClKernelConstants.GPU_NATIVE_WORD_ORDER, byteBufferUtility);
-        for (int i = 1; i < keysPerWorkItem; i++) {
-            // i·G in affine coordinates, big-endian 32-byte X and Y.
-            final ECPoint point =
-                    ECKey.publicPointFromPrivate(BigInteger.valueOf(i)).normalize();
-            final byte[] x = ByteBufferUtility.bigIntegerToFixedLengthBytes(
-                    point.getAffineXCoord().toBigInteger(), oneCoord);
-            final byte[] y = ByteBufferUtility.bigIntegerToFixedLengthBytes(
-                    point.getAffineYCoord().toBigInteger(), oneCoord);
-            converter.convertEndian(x); // big-endian -> device word order (full reversal)
-            converter.convertEndian(y);
-            final int offset = (i - 1) * twoCoord;
-            System.arraycopy(x, 0, table, offset, oneCoord);
-            System.arraycopy(y, 0, table, offset + oneCoord, oneCoord);
-        }
-        return table;
     }
 
     private void releaseIGTable() {
@@ -522,9 +500,9 @@ public class OpenCLContext implements ReleaseCLObject {
 
     private void uploadCombTable() {
         final cl_context localContext = Objects.requireNonNull(context);
-        final byte[] table = buildCombTable(byteBufferUtility);
-        combTableMem = clCreateBuffer(
-                localContext, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) table.length, Pointer.to(table), null);
+        final long bytes = (long) COMB_POSITIONS * COMB_DIGITS * OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES;
+        combTableMem = clCreateBuffer(localContext, CL_MEM_READ_WRITE, bytes, null, null);
+        enqueuePrecomputeKernel(combTableMem, "precompute_comb_table", null);
     }
 
     /** Number of 4-bit windows ("positions") covering a 256-bit scalar. */
@@ -534,52 +512,6 @@ public class OpenCLContext implements ReleaseCLObject {
     /** Digits per window: {@code 0..15} (digit {@code 0} = point at infinity, never read). */
     @VisibleForTesting
     static final int COMB_DIGITS = 16;
-
-    /**
-     * Builds the fixed-base comb table consumed by {@code point_mul_xy_comb} in the kernel: for
-     * {@code pos = 0 .. 63} and {@code digit = 0 .. 15}, entry {@code (pos, digit)} holds the affine
-     * coordinates of {@code (digit · 2^(4·pos))·G} as {@code [x(32 bytes)][y(32 bytes)]}, each
-     * coordinate reversed from big-endian to device word order. Entry {@code (pos, digit)} starts at
-     * byte offset {@code (pos*16 + digit) * 64}.
-     *
-     * <p>The {@code digit == 0} slot is the point at infinity, which has no affine representation and
-     * is never read by the kernel; it is left zero. Scalars are reduced mod the group order {@code n}
-     * before deriving the point (for large {@code pos} the raw scalar {@code digit · 2^(4·pos)} can
-     * exceed {@code n}); since {@code [s]G = [s mod n]G} this yields the correct point. Derived with
-     * the same bitcoinj curve the CPU reference uses ({@link ECKey#publicPointFromPrivate}), so the
-     * table is a deterministic function of the curve.
-     *
-     * @param byteBufferUtility byte-buffer helper used by the endianness converter
-     * @return the packed comb table bytes ({@code 64 * 16 * 64} = 65536 bytes)
-     */
-    @VisibleForTesting
-    static byte[] buildCombTable(ByteBufferUtility byteBufferUtility) {
-        final int oneCoord = OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES;
-        final int twoCoord = OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES;
-        final BigInteger n = Secp256k1Constants.MAX_PRIVATE_KEY; // secp256k1 group order
-        final byte[] table = new byte[COMB_POSITIONS * COMB_DIGITS * twoCoord];
-        final EndiannessConverter converter = new EndiannessConverter(
-                ByteOrder.BIG_ENDIAN, OpenClKernelConstants.GPU_NATIVE_WORD_ORDER, byteBufferUtility);
-        for (int pos = 0; pos < COMB_POSITIONS; pos++) {
-            for (int digit = 1; digit < COMB_DIGITS; digit++) {
-                // scalar = digit * 2^(4*pos), reduced mod n ([s]G = [s mod n]G).
-                final BigInteger scalar =
-                        BigInteger.valueOf(digit).shiftLeft(4 * pos).mod(n);
-                final ECPoint point = ECKey.publicPointFromPrivate(scalar).normalize();
-                final byte[] x = ByteBufferUtility.bigIntegerToFixedLengthBytes(
-                        point.getAffineXCoord().toBigInteger(), oneCoord);
-                final byte[] y = ByteBufferUtility.bigIntegerToFixedLengthBytes(
-                        point.getAffineYCoord().toBigInteger(), oneCoord);
-                converter.convertEndian(x); // big-endian -> device word order
-                converter.convertEndian(y);
-                final int offset = (pos * COMB_DIGITS + digit) * twoCoord;
-                System.arraycopy(x, 0, table, offset, oneCoord);
-                System.arraycopy(y, 0, table, offset + oneCoord, oneCoord);
-            }
-            // digit == 0 slot left zero (point at infinity; never read).
-        }
-        return table;
-    }
 
     private void releaseCombTable() {
         if (combTableMem != null) {
@@ -604,18 +536,11 @@ public class OpenCLContext implements ReleaseCLObject {
     @VisibleForTesting
     byte[] runPrecomputeKernelForTesting(String kernelName, int outputBytes, @Nullable Integer countArg) {
         final cl_context localContext = Objects.requireNonNull(context);
-        final cl_program localProgram = Objects.requireNonNull(program);
         final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
 
         final cl_mem out = clCreateBuffer(localContext, CL_MEM_READ_WRITE, outputBytes, null, null);
-        final cl_kernel precomputeKernel = clCreateKernel(localProgram, kernelName, null);
         try {
-            clSetKernelArg(precomputeKernel, 0, Sizeof.cl_mem, Pointer.to(out));
-            if (countArg != null) {
-                clSetKernelArg(precomputeKernel, 1, Sizeof.cl_uint, Pointer.to(new int[] {countArg}));
-            }
-            clEnqueueNDRangeKernel(localQueue, precomputeKernel, 1, null, new long[] {1L}, null, 0, null, null);
-            clFinish(localQueue);
+            enqueuePrecomputeKernel(out, kernelName, countArg);
 
             final ByteBuffer buf = ByteBuffer.allocateDirect(outputBytes);
             clEnqueueReadBuffer(localQueue, out, CL_TRUE, 0, outputBytes, Pointer.to(buf), 0, null, null);
@@ -625,7 +550,6 @@ public class OpenCLContext implements ReleaseCLObject {
             buf.get(bytes);
             return bytes;
         } finally {
-            clReleaseKernel(precomputeKernel);
             clReleaseMemObject(out);
         }
     }
