@@ -74,8 +74,10 @@ public class LMDBBase {
                         BloomFilterAccelerator.populateFrom(lmdb, lmdb, lmdbConfigurationReadOnly.bloomFilterFpp);
                     case HASHSET -> HashSetAddressPresence.populateFrom(lmdb);
                     case TRUNCATED_LONG_64 -> TruncatedLong64SortedArrayPresence.populateFrom(lmdb);
-                    case BINARY_FUSE_8 -> new BinaryFuseAccelerator(BinaryFuse8AddressPresence.populateFrom(lmdb), lmdb);
-                    case BINARY_FUSE_16 -> new BinaryFuseAccelerator(BinaryFuse16AddressPresence.populateFrom(lmdb), lmdb);
+                    case BINARY_FUSE_8 ->
+                        new BinaryFuseAccelerator(BinaryFuse8AddressPresence.populateFrom(lmdb), lmdb);
+                    case BINARY_FUSE_16 ->
+                        new BinaryFuseAccelerator(BinaryFuse16AddressPresence.populateFrom(lmdb), lmdb);
                 };
 
         return new LMDBHandle(lmdb, lookup);

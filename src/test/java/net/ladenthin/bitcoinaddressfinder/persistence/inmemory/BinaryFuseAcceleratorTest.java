@@ -88,8 +88,7 @@ class BinaryFuseAcceleratorTest {
 
     @Test
     void requiresBackend_isTrue_becauseFuseIsProbabilistic() {
-        BinaryFuseAccelerator accelerator =
-                new BinaryFuseAccelerator(new RecordingPresence(), new RecordingPresence());
+        BinaryFuseAccelerator accelerator = new BinaryFuseAccelerator(new RecordingPresence(), new RecordingPresence());
         assertThat(accelerator.requiresBackend(), is(true));
     }
 
