@@ -322,8 +322,8 @@ Supported values:
 | `BLOOM`             | ~80 MB – ~1.5 GB (FPP)  | fast for misses      | yes              | when LMDB must stay open and most queries miss the database                             |
 | `HASHSET`           | ~80 B / entry           | fast                 | **no**           | small databases where memory is plentiful and exact lookup is required by callers       |
 | `TRUNCATED_LONG_64` | **~8 B / entry**        | **near HASHSET**     | **no**           | **recommended default for any in-RAM choice** — best memory/latency trade-off           |
-| `BINARY_FUSE_8`     | **~1.3 B / entry**      | **fast**             | **no**           | ultra-low RAM with 0.4% false-positive rate (LMDB fallback); closes LMDB after load    |
-| `BINARY_FUSE_16`    | **~2.6 B / entry**      | **fast**             | **no**           | 0.0015% false-positive rate — use when 0.4% LMDB fallback cost is measurable           |
+| `BINARY_FUSE_8`     | **~1.3 B / entry**      | **fast**             | **no**           | ultra-low RAM; closes LMDB after load — 0.4% false positives surface as rare unverified hits |
+| `BINARY_FUSE_16`    | **~2.6 B / entry**      | **fast**             | **no**           | closes LMDB after load — 0.0015% false-positive rate; use when Fuse-8's 0.4% spurious-hit rate is too high |
 
 #### Memory footprint per backend across the published database tiers
 
@@ -347,7 +347,7 @@ Supported values:
 
 #### Why `TRUNCATED_LONG_64` is so close to `HASHSET` despite being a binary search
 
-hash160 is the output of SHA-256 followed by RIPEMD-160 and is cryptographically uniform; any subset of its bits is also uniform. `TRUNCATED_LONG_64` keeps only the 8 bytes after the bucket byte (72 bits of total resolution: 8-bit bucket + 64-bit stored value). The probability that a random query collides with one of N stored entries is N/2⁶⁴, which for the largest published database tier is ~7.5 × 10⁻¹¹ per query — and any such collision falls through to the LMDB delegate. In return:
+hash160 is the output of SHA-256 followed by RIPEMD-160 and is cryptographically uniform; any subset of its bits is also uniform. `TRUNCATED_LONG_64` keeps only the 8 bytes after the bucket byte (72 bits of total resolution: 8-bit bucket + 64-bit stored value). The probability that a random query collides with one of N stored entries is N/2⁶⁴, which for the largest published database tier is ~7.5 × 10⁻¹¹ per query — rare enough that surfacing such a collision as an unverified hit is harmless (LMDB is closed after population, like the Binary Fuse backends). In return:
 
 - **Cache-line dense**: 8 longs per 64-byte cache line, the binary search walks very little memory.
 - **JDK intrinsic**: `Arrays.binarySearch(long[], long)` is heavily JIT-optimised and produces branchless comparisons on modern CPUs.
@@ -365,10 +365,10 @@ hit ⟺  fingerprints[h0] ⊕ fingerprints[h1] ⊕ fingerprints[h2] == fingerpri
 ```
 
 **No false negatives** — every key inserted via `populateFrom` is always found.  
-**False-positive rate** — 1/256 ≈ 0.4% for Fuse-8 (8-bit fingerprint), 1/65536 ≈ 0.0015% for Fuse-16 (16-bit fingerprint). False positives fall through to the LMDB delegate as in any other probabilistic backend.  
+**False-positive rate** — 1/256 ≈ 0.4% for Fuse-8 (8-bit fingerprint), 1/65536 ≈ 0.0015% for Fuse-16 (16-bit fingerprint). Because the filter is self-contained (see below), LMDB is closed after population, so a false positive is **not** re-verified against it — it surfaces as a reported hit. Genuine hits are astronomically rare under random scanning, so an occasional spurious hit is a negligible cost (it is logged for manual inspection).  
 **Self-contained** — `requiresBackend()` returns `false`; the LMDB env is closed and its mmap pages are released after population, identical to `HASHSET` and `TRUNCATED_LONG_64`.
 
-Choose between the two variants based on how expensive the LMDB fallback is in your workload. For most use cases with a light or full database, `BINARY_FUSE_8` gives the best RAM-to-latency trade-off: lower memory than `BLOOM` (no LMDB open) with a higher FPR, while `BINARY_FUSE_16` halves the FPR at the cost of 2× the fingerprint array size.
+Choose between the two variants based on how costly a spurious (unverified) hit is in your workflow. For most use cases with a light or full database, `BINARY_FUSE_8` gives the best RAM-to-latency trade-off: lower memory than `BLOOM` (no LMDB open) with a higher FPR, while `BINARY_FUSE_16` drops the FPR ~256× at the cost of 2× the fingerprint array size.
 
 #### Benchmark numbers
 
@@ -426,7 +426,7 @@ Enable it on an OpenCL producer (see [`examples/config_Find_GPUFilterCompact.jso
 
 **How compact mode works** — the kernel checks both the compressed and uncompressed hash160 of each candidate against the uploaded filter; a work-item that hits claims an output slot via an `atomic_add` on a shared count word and writes its entry there, so the buffer holds exactly the hits (each entry carries its own work-item index for secret-key reconstruction). A non-hit writes nothing.
 
-**No false negatives** — the Binary Fuse 8 guarantee carries to the GPU unchanged: any address actually in the database is always flagged. The ~0.4 % false positives fall through to the LMDB verifier exactly as they do for the in-RAM `BINARY_FUSE_8` backend.
+**No false negatives** — the Binary Fuse 8 guarantee carries to the GPU unchanged: any address actually in the database is always flagged. The ~0.4 % false positives surface as reported hits exactly as they do for the in-RAM `BINARY_FUSE_8` backend (LMDB is closed once the filter is built, so they are not re-verified).
 
 **Device requirements** — compact mode needs an **OpenCL 2.0+** device (the `atomic_add` on global memory) and a little-endian device (the kernel canonicalises its output as little-endian). Both are checked at producer init and fail fast with a clear message; on an older device set `transferAll: true` to keep the full-transfer path. The GPU/CPU lookup parity (key extraction + hash formula) is pinned by `Fuse8GpuHashParityTest` and exercised end-to-end on a real OpenCL device by `OpenCLCompactOutputIntegrationTest`.
 
@@ -770,8 +770,8 @@ LMDBToAddressFile_Light_HexHash.zip	SHA3-512	29CA44CD666D7B8CF9EAD4B340620FBB7ED
 > | Choice              | RAM needed at Full DB | LMDB stays open? | When to pick |
 > |---------------------|-----------------------|------------------|--------------|
 > | `TRUNCATED_LONG_64` | ~11 GB                | **no**           | recommended if you can spare ~12 GB; closes LMDB and releases its mmap pages |
-> | `BINARY_FUSE_8`     | **~1.8 GB**           | **no**           | closes LMDB like `TRUNCATED_LONG_64`; 0.4% FPR redirects those misses to LMDB as a one-time verifier (then it is closed) |
-> | `BINARY_FUSE_16`    | ~3.6 GB               | **no**           | same as Fuse-8 but with 0.0015% FPR — use when the LMDB fallback cost matters |
+> | `BINARY_FUSE_8`     | **~1.8 GB**           | **no**           | closes LMDB like `TRUNCATED_LONG_64` once the filter is built; 0.4% of queries are false positives, surfaced as rare unverified hits |
+> | `BINARY_FUSE_16`    | ~3.6 GB               | **no**           | same as Fuse-8 but with 0.0015% FPR — use when Fuse-8's spurious-hit rate matters |
 > | `BLOOM` (FPP 0.01)  | ~1.6 GB               | yes              | keeps LMDB open as the verifier; skips it for the overwhelming majority of misses |
 > | `LMDB_ONLY`         | minimal (mmap only)   | yes              | fallback when there is essentially no spare RAM and disk-backed mmap is acceptable |
 >

@@ -35,9 +35,10 @@ import org.jspecify.annotations.NonNull;
  *
  * <h2>False-positive rate</h2>
  * With 8-bit fingerprints the theoretical FPR is approximately 1/256 &#x2248; 0.4&nbsp;%.
- * Any positive answer from this filter that is not resolved by exact LMDB lookup is
- * an address collision; at the project's largest published database size (~1.4&nbsp;B
- * entries) this is expected to be negligible in practice.
+ * Because this filter is self-contained ({@link #requiresBackend()} returns {@code false}),
+ * the LMDB env is closed after population and a false positive is <em>not</em> re-verified
+ * against it — it surfaces as a reported hit. Genuine hits are astronomically rare under
+ * random scanning, so an occasional spurious hit is a negligible cost.
  *
  * <h2>Memory cost</h2>
  * Approximately 1.30&nbsp;bytes per entry (one {@code byte} slot per fingerprint position,

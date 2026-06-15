@@ -33,8 +33,10 @@ import org.jspecify.annotations.NonNull;
  *
  * <h2>False-positive rate</h2>
  * With 16-bit fingerprints the theoretical FPR is approximately 1/65536 &#x2248; 0.0015&nbsp;%.
- * Use this variant when the 0.4&nbsp;% FPR of {@link BinaryFuse8AddressPresence} causes
- * measurable LMDB fallback overhead on high-throughput workloads.
+ * Use this variant when the 0.4&nbsp;% FPR of {@link BinaryFuse8AddressPresence} produces
+ * too many spurious (unverified) hits on high-throughput workloads. Like Fuse-8 this filter
+ * is self-contained ({@link #requiresBackend()} returns {@code false}); LMDB is closed after
+ * population, so false positives are not re-verified against it.
  *
  * <h2>Memory cost</h2>
  * Approximately 2.60&nbsp;bytes per entry (one {@code short} slot per fingerprint position,
