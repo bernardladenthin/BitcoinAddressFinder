@@ -428,6 +428,16 @@ Enable it on an OpenCL producer (see [`examples/config_Find_GPUFilterCompact.jso
 | `enableGpuFilter` | `false` | When `true`, a Binary Fuse 8 filter is built from LMDB during consumer init and uploaded to GPU VRAM (once per session); the kernel filters inline (compact output). Independent of the CPU `addressLookupBackend` — built while LMDB is open, so it works with every backend including the `LMDB_ONLY` default. |
 | `transferAll` | `false` | Forces full-transfer (legacy) output even when `enableGpuFilter` is on. `Finder` sets this to `true` automatically — with a warning — whenever `enableVanity = true`, because vanity scanning must see every derived address. |
 
+The two flags are **independent**, not opposites — a common point of confusion. `enableGpuFilter` decides *whether the filter runs on the GPU*; `transferAll` decides *which output layout the kernel uses* (send back **all** derived results, or only the filtered hits). `transferAll` is really a "force full-transfer" override, so `enableGpuFilter: true, transferAll: false` is the normal compact-filtering case — filter on, send back only the hits. How they combine:
+
+| `enableGpuFilter` | `transferAll` | Behaviour |
+|:---:|:---:|---|
+| `true`  | **`false`** | **Compact mode** — filter on the GPU, only the matching candidates are transferred back (the recommended, fastest setup). |
+| `true`  | `true`  | Filter is uploaded but **overridden** to full transfer — every derived result is sent back (e.g. vanity scanning, or a device without OpenCL 2.0+ compact support). |
+| `false` | *(any)* | No GPU filter — full transfer (legacy); the consumer checks every result against `addressLookupBackend` on the CPU. |
+
+Compact mode runs only when a filter was uploaded **and** `transferAll` is false (`OpenCLContext` computes `transferAll = producerOpenCL.transferAll || !gpuFilterUploaded`).
+
 **How compact mode works** — the kernel checks both the compressed and uncompressed hash160 of each candidate against the uploaded filter; a work-item that hits claims an output slot via an `atomic_add` on a shared count word and writes its entry there, so the buffer holds exactly the hits (each entry carries its own work-item index for secret-key reconstruction). A non-hit writes nothing.
 
 **No false negatives** — the Binary Fuse 8 guarantee carries to the GPU unchanged: any address actually in the database is always flagged. The GPU pre-filter only shrinks the GPU→CPU transfer; the ~0.4 % false positives among the survivors are verified against LMDB on the CPU exactly as for the in-RAM `BINARY_FUSE_8` backend (LMDB stays open as the verifier), so no false positive is ever reported as a hit.
