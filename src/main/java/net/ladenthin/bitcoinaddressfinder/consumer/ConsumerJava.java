@@ -33,6 +33,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerat
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8GpuFilterData;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuseAccelerator;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.HashSetAddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.TruncatedLong64SortedArrayPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
@@ -305,12 +306,12 @@ public class ConsumerJava implements Consumer {
      * {@code BINARY_FUSE_8} and before {@link #initLMDB()} has run.
      *
      * @return the Binary Fuse 8 GPU-upload payload, or empty if the active lookup is not a
-     *     {@link BinaryFuse8AddressPresence}
+     *     {@link BinaryFuseAccelerator} wrapping a {@link BinaryFuse8AddressPresence}
      */
     public Optional<BinaryFuse8GpuFilterData> getGpuFilterData() {
         AddressPresence localLookup = lookup;
-        if (localLookup instanceof BinaryFuse8AddressPresence fuse8) {
-            return Optional.of(fuse8.toGpuFilterData());
+        if (localLookup instanceof BinaryFuseAccelerator accelerator) {
+            return accelerator.getGpuFilterData();
         }
         return Optional.empty();
     }
@@ -322,8 +323,8 @@ public class ConsumerJava implements Consumer {
             case BLOOM -> BloomFilterAccelerator.populateFrom(lmdb, lmdb, bloomFpp);
             case HASHSET -> HashSetAddressPresence.populateFrom(lmdb);
             case TRUNCATED_LONG_64 -> TruncatedLong64SortedArrayPresence.populateFrom(lmdb);
-            case BINARY_FUSE_8 -> BinaryFuse8AddressPresence.populateFrom(lmdb);
-            case BINARY_FUSE_16 -> BinaryFuse16AddressPresence.populateFrom(lmdb);
+            case BINARY_FUSE_8 -> new BinaryFuseAccelerator(BinaryFuse8AddressPresence.populateFrom(lmdb), lmdb);
+            case BINARY_FUSE_16 -> new BinaryFuseAccelerator(BinaryFuse16AddressPresence.populateFrom(lmdb), lmdb);
         };
     }
 

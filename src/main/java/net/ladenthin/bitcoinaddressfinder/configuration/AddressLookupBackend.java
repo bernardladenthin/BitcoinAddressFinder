@@ -29,14 +29,16 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
  *       {@code long} binary search uses the JDK intrinsic and is typically the fastest
  *       lookup of any backend (~10&#x00d7; more compact than HASHSET at near-HASHSET
  *       latency).</li>
- *   <li>{@link #BINARY_FUSE_8} - Binary Fuse Filter snapshot with 8-bit fingerprints.
- *       ~1.14 B/entry, FPR &#x2248; 0.4&nbsp;%. No false negatives. LMDB env closed and
- *       GC'd after population. Recommended for most workloads — fits Full DB (~1.6 GB)
- *       on any modern workstation.</li>
- *   <li>{@link #BINARY_FUSE_16} - Binary Fuse Filter snapshot with 16-bit fingerprints.
- *       ~2.28 B/entry, FPR &#x2248; 0.0015&nbsp;%. No false negatives. LMDB env closed
- *       and GC'd after population. Use when the 0.4&nbsp;% false-positive rate of
- *       {@link #BINARY_FUSE_8} causes measurable LMDB overhead.</li>
+ *   <li>{@link #BINARY_FUSE_8} - Binary Fuse Filter (8-bit fingerprints) in front of LMDB.
+ *       ~1.14 B/entry, FPR &#x2248; 0.4&nbsp;%. No false negatives. Like {@link #BLOOM} it is a
+ *       decorator: a filter miss is definitive, a filter hit falls through to LMDB to reject
+ *       false positives, so the LMDB env must stay open. Recommended for most workloads — the
+ *       filter fits Full DB in ~1.8 GB on any modern workstation and also feeds the optional
+ *       GPU pre-filter.</li>
+ *   <li>{@link #BINARY_FUSE_16} - Binary Fuse Filter (16-bit fingerprints) in front of LMDB.
+ *       ~2.28 B/entry, FPR &#x2248; 0.0015&nbsp;%. No false negatives. Same decorator behaviour
+ *       as {@link #BINARY_FUSE_8}; LMDB stays open. Use when the 0.4&nbsp;% false-positive rate
+ *       of {@link #BINARY_FUSE_8} sends too many hits to LMDB for verification.</li>
  * </ul>
  */
 public enum AddressLookupBackend {
@@ -54,16 +56,17 @@ public enum AddressLookupBackend {
     TRUNCATED_LONG_64,
 
     /**
-     * Binary Fuse Filter snapshot with 8-bit fingerprints. ~1.14 B/entry, FPR &#x2248; 0.4 %.
-     * No false negatives. LMDB env closed and GC'd after population.
-     * Recommended for most workloads — fits Full DB (~1.6 GB) on any modern workstation.
+     * Binary Fuse Filter (8-bit fingerprints) in front of LMDB. ~1.14 B/entry, FPR &#x2248; 0.4 %.
+     * No false negatives. Decorator like BLOOM: filter hits are verified against LMDB to reject
+     * false positives, so LMDB must stay open. Recommended for most workloads and feeds the GPU
+     * pre-filter.
      */
     BINARY_FUSE_8,
 
     /**
-     * Binary Fuse Filter snapshot with 16-bit fingerprints. ~2.28 B/entry, FPR &#x2248; 0.0015 %.
-     * No false negatives. LMDB env closed and GC'd after population.
-     * Use when the 0.4 % false-positive rate of BINARY_FUSE_8 causes measurable LMDB overhead.
+     * Binary Fuse Filter (16-bit fingerprints) in front of LMDB. ~2.28 B/entry, FPR &#x2248; 0.0015 %.
+     * No false negatives. Decorator like BINARY_FUSE_8; LMDB stays open. Use when the 0.4 %
+     * false-positive rate of BINARY_FUSE_8 sends too many hits to LMDB for verification.
      */
     BINARY_FUSE_16
 }
