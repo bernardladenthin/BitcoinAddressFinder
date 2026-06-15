@@ -8,6 +8,7 @@ import com.google.common.hash.Funnels;
 import java.nio.ByteBuffer;
 import java.util.stream.Stream;
 import lombok.ToString;
+import net.ladenthin.bitcoinaddressfinder.persistence.AbstractFilterAccelerator;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressLookup;
 import org.bitcoinj.base.Coin;
@@ -35,15 +36,12 @@ import org.jspecify.annotations.NonNull;
  * {@link BloomFilter} are thread-safe. Guava's {@link BloomFilter#mightContain} is safe for
  * concurrent reads.
  */
-@ToString
-public final class BloomFilterAccelerator implements AddressLookup {
+@ToString(callSuper = true)
+public final class BloomFilterAccelerator extends AbstractFilterAccelerator<AddressLookup> implements AddressLookup {
 
     // BloomFilter.toString dumps the full bit array — potentially millions of bits.
     @ToString.Exclude
     private final @NonNull BloomFilter<byte[]> bloom;
-
-    // Recurses into the wrapped lookup chain; bounded by the wrapped class's own @ToString.
-    private final @NonNull AddressLookup delegate;
 
     /**
      * Creates a new accelerator.
@@ -52,37 +50,29 @@ public final class BloomFilterAccelerator implements AddressLookup {
      * @param delegate the underlying lookup consulted on Bloom hits and for {@link #getAmount}
      */
     public BloomFilterAccelerator(@NonNull BloomFilter<byte[]> bloom, @NonNull AddressLookup delegate) {
+        super(delegate);
         this.bloom = bloom;
-        this.delegate = delegate;
     }
 
+    /**
+     * Probes the Bloom filter. A {@code mightContain == false} answer is definitive (no false
+     * negatives); a {@code true} answer is verified against the delegate by the base class.
+     *
+     * @param hash160 the address hash to test; its position is restored before return
+     * @return {@code true} if the Bloom filter reports the address as possibly present
+     */
     @Override
-    public boolean containsAddress(ByteBuffer hash160) {
+    protected boolean mightContain(ByteBuffer hash160) {
         byte[] bytes = new byte[hash160.remaining()];
         hash160.get(bytes);
         hash160.rewind();
-        if (!bloom.mightContain(bytes)) {
-            return false;
-        }
-        return delegate.containsAddress(hash160);
+        return bloom.mightContain(bytes);
     }
 
     @Override
     public Coin getAmount(ByteBuffer hash160) {
         // Bloom filter has no value information; always delegate.
-        return delegate.getAmount(hash160);
-    }
-
-    /**
-     * Bloom is a probabilistic decorator: a {@code mightContain == true} answer may be a
-     * false positive that must be disambiguated against the delegate. The backing
-     * storage must therefore remain open for the lifetime of this accelerator.
-     *
-     * @return {@code true} - bloom always requires its delegate to be available
-     */
-    @Override
-    public boolean requiresBackend() {
-        return true;
+        return delegate().getAmount(hash160);
     }
 
     /**

@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder.persistence.inmemory;
 import java.nio.ByteBuffer;
 import java.util.Optional;
 import lombok.ToString;
+import net.ladenthin.bitcoinaddressfinder.persistence.AbstractFilterAccelerator;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
 import org.jspecify.annotations.NonNull;
 
@@ -18,21 +19,9 @@ import org.jspecify.annotations.NonNull;
  * <em>false-positive</em> rate (&#x2248; 0.4&nbsp;% for the 8-bit variant,
  * &#x2248; 0.0015&nbsp;% for the 16-bit variant). That rate is far too high to report a filter
  * positive as a final hit — at a 0.4&nbsp;% FPR roughly one in every 250 scanned addresses
- * would be a spurious hit. The filter is therefore used exactly like a Bloom filter (see
- * {@code net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerator}):
- *
- * <ul>
- *   <li>a filter <em>miss</em> is definitive — the address is absent and the delegate is never
- *       consulted (the fast, overwhelmingly common path during a key scan);</li>
- *   <li>a filter <em>hit</em> is only probable — the call falls through to the exact delegate
- *       to confirm the address or reject it as a false positive.</li>
- * </ul>
- *
- * <p>Because positives must be disambiguated against the delegate, {@link #requiresBackend()}
- * returns {@code true}: the backing storage (LMDB env + mmap) must stay open for the lifetime
- * of this accelerator and is <em>not</em> released after the filter is built. This is the only
- * difference from the exact self-contained snapshots ({@code HASHSET}, {@code TRUNCATED_LONG_64}),
- * whose answers are definitive so they can drop LMDB.
+ * would be a spurious hit. The verify-on-hit behaviour and the {@code requiresBackend() == true}
+ * contract are inherited from {@link AbstractFilterAccelerator} (shared with the Bloom filter
+ * accelerator); this class only supplies the Fuse filter probe via {@link #mightContain(ByteBuffer)}.
  *
  * <h2>GPU pre-filtering</h2>
  * When the wrapped filter is a {@link BinaryFuse8AddressPresence}, {@link #getGpuFilterData()}
@@ -44,11 +33,10 @@ import org.jspecify.annotations.NonNull;
  * Thread-safe for concurrent reads as long as the wrapped filter and delegate are; the Binary
  * Fuse filters and the {@code LMDBPersistence} read path both are.
  */
-@ToString
-public final class BinaryFuseAccelerator implements AddressPresence {
+@ToString(callSuper = true)
+public final class BinaryFuseAccelerator extends AbstractFilterAccelerator<AddressPresence> {
 
     private final @NonNull AddressPresence filter;
-    private final @NonNull AddressPresence delegate;
 
     /**
      * Creates a new accelerator.
@@ -57,35 +45,19 @@ public final class BinaryFuseAccelerator implements AddressPresence {
      * @param delegate the exact lookup consulted to disambiguate filter positives
      */
     public BinaryFuseAccelerator(@NonNull AddressPresence filter, @NonNull AddressPresence delegate) {
+        super(delegate);
         this.filter = filter;
-        this.delegate = delegate;
     }
 
     /**
-     * Returns {@code true} only when the filter reports a hit <em>and</em> the exact delegate
-     * confirms the address. A filter miss short-circuits and never touches the delegate.
+     * Probes the Binary Fuse filter; no false negatives, so a miss is definitive.
      *
-     * @param hash160 the address hash to look up; its position/limit are restored by both the
-     *                filter and the delegate per the {@link AddressPresence} contract
-     * @return {@code true} if the address is confirmed present by the delegate
+     * @param hash160 the address hash to test (position/limit preserved by the filter)
+     * @return {@code true} if the filter reports the address as possibly present
      */
     @Override
-    public boolean containsAddress(ByteBuffer hash160) {
-        if (!filter.containsAddress(hash160)) {
-            return false;
-        }
-        return delegate.containsAddress(hash160);
-    }
-
-    /**
-     * A Binary Fuse filter is probabilistic: a filter hit may be a false positive that must be
-     * disambiguated against the delegate, so the backing storage must remain open.
-     *
-     * @return {@code true} - the delegate must always be available
-     */
-    @Override
-    public boolean requiresBackend() {
-        return true;
+    protected boolean mightContain(ByteBuffer hash160) {
+        return filter.containsAddress(hash160);
     }
 
     /**
