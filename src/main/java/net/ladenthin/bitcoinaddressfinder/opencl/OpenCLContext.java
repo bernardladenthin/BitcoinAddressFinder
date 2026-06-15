@@ -37,7 +37,10 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
+import net.ladenthin.bitcoinaddressfinder.util.EndiannessConverter;
 import org.apache.maven.artifact.versioning.ComparableVersion;
+import org.bitcoinj.crypto.ECKey;
+import org.bouncycastle.math.ec.ECPoint;
 import org.jocl.CL;
 import org.jocl.Pointer;
 import org.jocl.Sizeof;
@@ -177,6 +180,20 @@ public class OpenCLContext implements ReleaseCLObject {
      */
     private boolean gpuFilterUploaded = false;
 
+    /**
+     * GPU VRAM buffer holding the precomputed {@code i·G} table used by the single-anchor affine
+     * scalar walk (Stage 1). Entry {@code m-1} ({@code m = 1 .. keysPerWorkItem-1}) holds the
+     * affine coordinates of {@code m·G} as {@code [x(8 words)][y(8 words)]} in device word order.
+     *
+     * <p>Built once and uploaded in {@link #init()} (the table is independent of the private key),
+     * and released in {@link #close()}. When {@code keysPerWorkItem == 1} the walk never reads it,
+     * so a one-byte placeholder is uploaded (zero-size device buffers are invalid) &mdash; mirroring
+     * the empty-filter placeholder in {@link #allocateFilterBuffers}. {@code null} before
+     * {@code init()} and after {@code close()}.
+     */
+    @ToString.Exclude
+    private @Nullable cl_mem igTableMem;
+
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
 
     private boolean closed = false;
@@ -255,6 +272,10 @@ public class OpenCLContext implements ReleaseCLObject {
         // full-transfer mode (see createKeys()).
         allocateFilterBuffers(new byte[0], 0, 0, 2, 1, 0);
         gpuFilterUploaded = false;
+
+        // Build and upload the i·G table for the single-anchor affine scalar walk. It depends only
+        // on the curve and keysPerWorkItem (not on the private key), so it is built once here.
+        uploadIGTable(producerOpenCL.keysPerWorkItem);
     }
 
     /**
@@ -413,6 +434,68 @@ public class OpenCLContext implements ReleaseCLObject {
         }
     }
 
+    private void uploadIGTable(int keysPerWorkItem) {
+        final cl_context localContext = Objects.requireNonNull(context);
+        final byte[] table = buildIGTable(keysPerWorkItem, byteBufferUtility);
+        igTableMem = clCreateBuffer(
+                localContext, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) table.length, Pointer.to(table), null);
+    }
+
+    /**
+     * Builds the {@code i·G} table consumed by the affine scalar walk: for {@code i = 1 ..
+     * keysPerWorkItem-1}, entry {@code i-1} holds the affine coordinates of {@code i·G} as
+     * {@code [x(32 bytes)][y(32 bytes)]}, each coordinate reversed from big-endian to device word
+     * order (the same {@link EndiannessConverter} the private-key upload uses in
+     * {@link OpenClTask#setSrcPrivateKeyChunk}).
+     *
+     * <p>The points are derived with the same bitcoinj curve the CPU reference uses
+     * ({@link ECKey#publicPointFromPrivate(BigInteger)}), so the table is a deterministic function
+     * of the curve and there is a single source of truth. The lower-level {@code
+     * publicPointFromPrivate} is used rather than {@link ECKey#fromPrivate(BigInteger, boolean)}
+     * because the latter rejects the scalar {@code 1} (and {@code 0}) as a sentinel guard, and
+     * {@code 1·G} is the first table entry. When {@code keysPerWorkItem == 1} the walk emits only
+     * the anchor {@code P0} and never reads the table, so a one-byte placeholder is returned
+     * (zero-size device buffers are invalid).
+     *
+     * @param keysPerWorkItem  the per-work-item key count (the walk reads entries {@code 1..K-1})
+     * @param byteBufferUtility byte-buffer helper used by the endianness converter
+     * @return the packed table bytes, or a one-byte placeholder when {@code keysPerWorkItem == 1}
+     */
+    @VisibleForTesting
+    static byte[] buildIGTable(int keysPerWorkItem, ByteBufferUtility byteBufferUtility) {
+        final int entries = keysPerWorkItem - 1;
+        if (entries <= 0) {
+            return new byte[1];
+        }
+        final int oneCoord = OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES;
+        final int twoCoord = OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES;
+        final byte[] table = new byte[entries * twoCoord];
+        final EndiannessConverter converter = new EndiannessConverter(
+                ByteOrder.BIG_ENDIAN, OpenClKernelConstants.GPU_NATIVE_WORD_ORDER, byteBufferUtility);
+        for (int i = 1; i < keysPerWorkItem; i++) {
+            // i·G in affine coordinates, big-endian 32-byte X and Y.
+            final ECPoint point =
+                    ECKey.publicPointFromPrivate(BigInteger.valueOf(i)).normalize();
+            final byte[] x = ByteBufferUtility.bigIntegerToFixedLengthBytes(
+                    point.getAffineXCoord().toBigInteger(), oneCoord);
+            final byte[] y = ByteBufferUtility.bigIntegerToFixedLengthBytes(
+                    point.getAffineYCoord().toBigInteger(), oneCoord);
+            converter.convertEndian(x); // big-endian -> device word order (full reversal)
+            converter.convertEndian(y);
+            final int offset = (i - 1) * twoCoord;
+            System.arraycopy(x, 0, table, offset, oneCoord);
+            System.arraycopy(y, 0, table, offset + oneCoord, oneCoord);
+        }
+        return table;
+    }
+
+    private void releaseIGTable() {
+        if (igTableMem != null) {
+            clReleaseMemObject(igTableMem);
+            igTableMem = null;
+        }
+    }
+
     @Override
     public boolean isClosed() {
         return closed;
@@ -422,6 +505,7 @@ public class OpenCLContext implements ReleaseCLObject {
     public void close() {
         if (!closed) {
             releaseGpuFilter();
+            releaseIGTable();
             if (openClTask != null) {
                 openClTask.close();
                 openClTask = null;
@@ -458,6 +542,7 @@ public class OpenCLContext implements ReleaseCLObject {
         cl_command_queue localCommandQueue = Objects.requireNonNull(commandQueue);
         cl_mem localFuse8FingerprintsMem = Objects.requireNonNull(fuse8FingerprintsMem);
         cl_mem localFuse8MetadataMem = Objects.requireNonNull(fuse8MetadataMem);
+        cl_mem localIgTableMem = Objects.requireNonNull(igTableMem);
 
         // Compact (filter) mode only when a real filter is uploaded AND the caller did not force
         // full transfer; otherwise run full transfer (no filter, or vanity forced transferAll).
@@ -465,7 +550,12 @@ public class OpenCLContext implements ReleaseCLObject {
 
         localOpenClTask.setSrcPrivateKeyChunk(privateKeyBase);
         ByteBuffer dstByteBuffer = localOpenClTask.executeKernel(
-                localKernel, localCommandQueue, localFuse8FingerprintsMem, localFuse8MetadataMem, transferAll);
+                localKernel,
+                localCommandQueue,
+                localFuse8FingerprintsMem,
+                localFuse8MetadataMem,
+                transferAll,
+                localIgTableMem);
 
         return new OpenCLGridResult(privateKeyBase, producerOpenCL.getOverallWorkSize(), dstByteBuffer);
     }

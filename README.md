@@ -339,6 +339,44 @@ because they are harmless, verified byte-identical, and make the OpenCL-2.0 requ
 but they are setup/hygiene, **not** a speed-up. The real levers are the staged EC-arithmetic
 rewrites that follow.
 
+#### Stage 1 — single-anchor affine batched-addition walk (+~10% at the sweet spot)
+
+Replaces the per-key **Jacobian** mixed-addition walk (advance a running point by `+G`, keep it in
+Jacobian `(X,Y,Z)`, batch-convert back to affine) with a **single-anchor affine** walk: every key
+is `Pₘ = P₀ + m·G`, computed directly in affine from the *same* anchor `P₀`. The fixed multiples
+`m·G` are read from a host-uploaded table (`iG_table`, built once in `OpenCLContext.init()` from the
+same bitcoinj curve the CPU reference uses). Anchoring every point at one `P₀` makes the slope
+denominators `dx_m = x_{mG} − x₀` mutually independent, so a single Montgomery simultaneous inversion
+still covers a whole sub-batch — but each key now costs ~6 `mul_mod` + ~6 `sub_mod` (slope formula)
+instead of an ~11-multiply Jacobian add plus per-point `X/Z²,Y/Z³` conversion. No Jacobian state, no
+running-point machinery.
+
+Correctness: ✅ byte-for-byte identical to the bitcoinj reference —
+`ProbeAddressesOpenCLTest#createKeys_acrossKeysPerWorkItem_allResultsMatchReference` (5/5), the full
+`@OpenCLTest` suite (77 run, 0 fail), plus a new pure-Java `OpenCLContextIGTableTest` that pins the
+`i·G` table byte layout without a GPU.
+
+> ⚠️ **Laptop-GPU thermal caveat for benchmarking:** the RTX 3070 Laptop throttles under sustained
+> load — the *same* Stage 1 kernel measured 16.8 ops/s right after a hot test run vs 18.9 ops/s when
+> cool, an ~11% swing. Only a **back-to-back, equal-thermal** A/B (baseline then candidate, run
+> consecutively) is trustworthy here.
+
+Fair A/B (back-to-back, identical JMH settings), throughput in M keys/s:
+
+| `keysPerWorkItem` | 1 | 4 | 16 | 32 | **64 (sweet spot)** |
+|---|--:|--:|--:|--:|--:|
+| Stage 0 baseline | 2.47 | 7.54 | 13.41 | 16.74 | 18.07 |
+| Stage 1          | 1.96 | 6.16 | 13.32 | 16.08 | **19.83** |
+| Δ                | −21% | −18% | ~0% | ~−4% | **+9.8%** |
+
+The walk rewrite only pays off where walk steps dominate the work-item: at `keysPerWorkItem = 64`
+(the device's documented optimum) 63 of every 64 keys are cheap affine steps, so Stage 1 is **+9.8%
+(18.07 → 19.83 M keys/s, error bars non-overlapping)**. At low `keysPerWorkItem` there is little or
+no walk to speed up and the fixed per-sub-batch `inv_mod` + anchor (`m=0`) overhead makes it slower —
+but production scanning runs at the sweet spot, so the operating-point gain is what matters. This is
+consistent with the investigation's L2 projection (≈1.09–1.14×); see
+[`docs/ecc-gpu-performance-optimization.md`](docs/ecc-gpu-performance-optimization.md) §7.
+
 ### 🚀 MSB-Zero Optimization
 To accelerate elliptic curve multiplication, BitcoinAddressFinder applies a **160-bit private key optimization**:
 

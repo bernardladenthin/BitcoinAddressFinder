@@ -686,7 +686,8 @@ __kernel void generateKeysKernel_grid(
     const u32 keysPerWorkItem,
     __global const uchar *fuse8_fp,    // Binary Fuse 8 fingerprint slot array
     __global const uint *fuse8_meta,   // [seedLo, seedHi, segLen, segLenMask, segCountLen]
-    const u32 transfer_all)            // 0 = compact (filter) mode, non-zero = full transfer
+    const u32 transfer_all,            // 0 = compact (filter) mode, non-zero = full transfer
+    __global const u32 *iG_table)      // (keysPerWorkItem-1) points: entry m-1 = [x_{mG}(8 words)][y_{mG}(8 words)], device word order
 {
     // Little Endian format
     u32 k_littleEndian_local[PRIVATE_KEY_LENGTH];
@@ -696,11 +697,6 @@ __kernel void generateKeysKernel_grid(
     u32 x_bigEndian_local[ONE_COORDINATE_NUM_WORDS];
     u32 y_bigEndian_local[ONE_COORDINATE_NUM_WORDS];
 
-    u32 x1_local[ONE_COORDINATE_NUM_WORDS];
-    u32 y1_local[ONE_COORDINATE_NUM_WORDS];
-    u32 z1_local[ONE_COORDINATE_NUM_WORDS] = { 0 };
-    z1_local[0] = 1; // Initialize Jacobian Z-coordinate (affine point: z = 1)
-    
     u32             *sha256_input_uncompressed    ;
     u32             *ripemd160_input_uncompressed ;
     uchar           *sec_uncompressed             ;
@@ -762,11 +758,6 @@ __kernel void generateKeysKernel_grid(
     copy_global_u32_array_private_u32(k_littleEndian_local, k, PRIVATE_KEY_MAX_NUM_WORDS);
     u32 baseK0 = k_littleEndian_local[0];
 
-    // Copy base point G (in affine coordinates) from constant memory to local registers.
-    // This avoids repeated global memory access during the loop (e.g., for point additions).
-    copy_constant_u32_array_private_u32(x1_local, &g_precomputed.xy[G_OFFSET_X1], ONE_COORDINATE_NUM_WORDS);
-    copy_constant_u32_array_private_u32(y1_local, &g_precomputed.xy[G_OFFSET_Y1], ONE_COORDINATE_NUM_WORDS);
-
     // Load the Binary Fuse 8 filter metadata once (only consulted in compact mode).
     ulong fuse8_seed = ((ulong)fuse8_meta[1] << 32) | (ulong)fuse8_meta[0]; // [seedHi, seedLo]
     uint fuse8_seg = fuse8_meta[2];
@@ -781,34 +772,33 @@ __kernel void generateKeysKernel_grid(
         r[0] = OUTPUT_COUNT_FULL_TRANSFER_SENTINEL;
     }
 
-    // ===================== Scalar walker with batched (Montgomery) inversion =====================
-    // Generate keysPerWorkItem consecutive keys P0, P0+G, P0+2G, ... The first key uses a full
-    // scalar multiplication; every subsequent key is a single mixed Jacobian+affine addition
-    // (point_add, no inverse). The affine conversion's modular inverse — the dominant per-key cost
-    // in the old per-key point_add_xy path — is deferred and shared across a sub-batch of
-    // KEYS_BATCH_INV points via Montgomery's simultaneous inversion: one inv_mod per sub-batch
-    // instead of one per key.
+    // ===================== Single-anchor affine batched-addition walk =====================
+    // Every key is P_m = P0 + m·G. Instead of advancing a running point with a Jacobian mixed
+    // addition (the old walk) and converting each result back to affine, we anchor ALL points at
+    // the SAME affine P0 and add the fixed multiple m·G directly in affine. The m·G are read from
+    // a host-uploaded table (iG_table; entry m-1 holds x_{mG} then y_{mG}, each in device word
+    // order). Anchoring at one P0 makes the slope denominators dx_m = x_{mG} - x0 mutually
+    // independent, so a single Montgomery simultaneous inversion covers a whole KEYS_BATCH_INV
+    // sub-batch — no Jacobian state, no per-point Z conversion.
     //
-    // Caveat (same practical assumption as the previous per-key path): if the running point ever
-    // becomes the point at infinity (Z == 0, i.e. P + (-P) when (baseK0 + index) == 0 mod n),
-    // inv_mod guards against a hang but the whole sub-batch's inverses are then invalid. That
-    // requires the walk to hit the curve order within its window and never occurs for the
-    // supported random / sequential key ranges.
+    // Per walked key: ~5 mul_mod + ~5 sub_mod (slope formula + Montgomery overhead) plus one
+    // inv_mod per sub-batch, vs the previous Jacobian add + affine-conversion machinery.
+    //
+    // Degenerate case (same practical assumption as the previous path): dx_m == 0 iff m·G == ±P0,
+    // i.e. (baseK0 | base_offset) ≡ ∓m (mod n) — impossible for the supported aligned sequential /
+    // random ranges. If it ever happened, acc becomes 0 in Pass A and the inv_mod zero-guard
+    // returns without hanging; the recovered inverses are then garbage and the filter rejects the
+    // resulting hashes — strictly no worse than the previous path.
 
-    // Running point in Jacobian coordinates, seeded by the first key's full scalar multiplication.
-    u32 q_x[ONE_COORDINATE_NUM_WORDS];
-    u32 q_y[ONE_COORDINATE_NUM_WORDS];
-    u32 q_z[ONE_COORDINATE_NUM_WORDS] = { 0 };
-    q_z[0] = 1;
-
+    // Affine anchor P0 = (baseK0 | base_offset) * G, computed once with the wNAF scalar mult.
+    u32 x0[ONE_COORDINATE_NUM_WORDS];
+    u32 y0[ONE_COORDINATE_NUM_WORDS];
     k_littleEndian_local[0] = (baseK0 | base_offset);
-    point_mul_xy(q_x, q_y, k_littleEndian_local, &g_precomputed); // affine P0 = (baseK0 + base_offset) * G
+    point_mul_xy(x0, y0, k_littleEndian_local, &g_precomputed);
 
-    // Per-sub-batch scratch for the deferred affine conversion.
-    u32 batch_x[KEYS_BATCH_INV][ONE_COORDINATE_NUM_WORDS];
-    u32 batch_y[KEYS_BATCH_INV][ONE_COORDINATE_NUM_WORDS];
-    u32 batch_z[KEYS_BATCH_INV][ONE_COORDINATE_NUM_WORDS];
-    u32 batch_prefix[KEYS_BATCH_INV][ONE_COORDINATE_NUM_WORDS]; // Montgomery prefix products of Z
+    // Per-sub-batch scratch: dx_m denominators and their Montgomery prefix products.
+    u32 dx[KEYS_BATCH_INV][ONE_COORDINATE_NUM_WORDS];
+    u32 prefix[KEYS_BATCH_INV][ONE_COORDINATE_NUM_WORDS];
 
     for (u32 done = 0; done < keysPerWorkItem; done += KEYS_BATCH_INV) {
         u32 count = keysPerWorkItem - done;
@@ -816,39 +806,65 @@ __kernel void generateKeysKernel_grid(
             count = (u32) KEYS_BATCH_INV;
         }
 
-        // ---- collect Jacobian points + Montgomery prefix products; advance Q by +G each step ----
+        // ---- Pass A: dx_m = x_{mG} - x0 and Montgomery prefix products of dx ----
         u32 acc[ONE_COORDINATE_NUM_WORDS] = { 0 };
         acc[0] = 1;
         for (u32 j = 0; j < count; j++) {
-            copy_private_u32_array_private_u32(batch_x[j], q_x, ONE_COORDINATE_NUM_WORDS);
-            copy_private_u32_array_private_u32(batch_y[j], q_y, ONE_COORDINATE_NUM_WORDS);
-            copy_private_u32_array_private_u32(batch_z[j], q_z, ONE_COORDINATE_NUM_WORDS);
-            copy_private_u32_array_private_u32(batch_prefix[j], acc, ONE_COORDINATE_NUM_WORDS);
-            mul_mod(acc, acc, q_z); // acc = Z_0 * Z_1 * ... * Z_j
-            // Advance to the next key, except after the very last key of the whole walk.
-            if (done + j + 1 < keysPerWorkItem) {
-                point_add(q_x, q_y, q_z, x1_local, y1_local); // Q += G (mixed Jacobian+affine)
+            u32 m = done + j;
+            copy_private_u32_array_private_u32(prefix[j], acc, ONE_COORDINATE_NUM_WORDS);
+            if (m == 0) {
+                // P0 itself has no slope; contribute the multiplicative identity to the product.
+                dx[j][0] = 1;
+                #pragma unroll
+                for (int w = 1; w < ONE_COORDINATE_NUM_WORDS; w++) {
+                    dx[j][w] = 0;
+                }
+            } else {
+                u32 gx[ONE_COORDINATE_NUM_WORDS];
+                u32 ig_base = (m - 1) * TWO_COORDINATE_NUM_WORDS; // 16 words per table entry
+                copy_global_u32_array_private_u32(gx, &iG_table[ig_base], ONE_COORDINATE_NUM_WORDS);
+                sub_mod(dx[j], gx, x0); // dx_m = x_{mG} - x0
             }
+            mul_mod(acc, acc, dx[j]); // acc = dx_0 * ... * dx_j
         }
 
         // ---- one modular inverse for the whole sub-batch ----
-        inv_mod(acc); // acc = 1 / (Z_0 * ... * Z_{count-1})
+        inv_mod(acc); // acc = 1 / (dx_0 * ... * dx_{count-1})
 
-        // ---- emit each point (reverse order is fine; each writes its own slot) ----
+        // ---- Pass B (reverse): recover each 1/dx_m, apply the affine slope formula, emit ----
         for (int j = (int) count - 1; j >= 0; j--) {
-            u32 z_inv[ONE_COORDINATE_NUM_WORDS];
-            mul_mod(z_inv, acc, batch_prefix[j]); // 1 / Z_j = (1/product) * (Z_0..Z_{j-1})
-            mul_mod(acc, acc, batch_z[j]);        // strip Z_j: acc = 1 / (Z_0..Z_{j-1})
+            u32 m = done + (u32) j;
 
-            // Affine conversion: x = X / Z^2, y = Y / Z^3.
-            u32 z_inv_sq[ONE_COORDINATE_NUM_WORDS];
-            mul_mod(z_inv_sq, z_inv, z_inv);
-            mul_mod(x_littleEndian_local, batch_x[j], z_inv_sq);
-            u32 z_inv_cu[ONE_COORDINATE_NUM_WORDS];
-            mul_mod(z_inv_cu, z_inv_sq, z_inv);
-            mul_mod(y_littleEndian_local, batch_y[j], z_inv_cu);
+            u32 inv_dx[ONE_COORDINATE_NUM_WORDS];
+            mul_mod(inv_dx, acc, prefix[j]); // 1/dx_m = (1/product) * (dx_0..dx_{j-1})
+            mul_mod(acc, acc, dx[j]);        // strip dx_m: acc = 1 / (dx_0..dx_{j-1})
 
-            u32 loop_index = base_offset + done + (u32) j;
+            if (m == 0) {
+                // Emit the anchor P0 directly (inv_dx unused for this single key).
+                copy_private_u32_array_private_u32(x_littleEndian_local, x0, ONE_COORDINATE_NUM_WORDS);
+                copy_private_u32_array_private_u32(y_littleEndian_local, y0, ONE_COORDINATE_NUM_WORDS);
+            } else {
+                u32 gx[ONE_COORDINATE_NUM_WORDS];
+                u32 gy[ONE_COORDINATE_NUM_WORDS];
+                u32 ig_base = (m - 1) * TWO_COORDINATE_NUM_WORDS;
+                copy_global_u32_array_private_u32(gx, &iG_table[ig_base], ONE_COORDINATE_NUM_WORDS);
+                copy_global_u32_array_private_u32(gy, &iG_table[ig_base + ONE_COORDINATE_NUM_WORDS], ONE_COORDINATE_NUM_WORDS);
+
+                u32 num[ONE_COORDINATE_NUM_WORDS];
+                u32 lambda[ONE_COORDINATE_NUM_WORDS];
+                u32 lam2[ONE_COORDINATE_NUM_WORDS];
+                u32 t[ONE_COORDINATE_NUM_WORDS];
+                sub_mod(num, gy, y0);          // y_{mG} - y0
+                mul_mod(lambda, num, inv_dx);  // λ = (y_{mG} - y0) / dx_m
+                mul_mod(lam2, lambda, lambda); // λ^2
+                sub_mod(x_littleEndian_local, lam2, gx);                 // λ^2 - x_{mG}
+                sub_mod(x_littleEndian_local, x_littleEndian_local, x0); // x_m = λ^2 - x_{mG} - x0
+                sub_mod(t, x0, x_littleEndian_local);                    // x0 - x_m
+                mul_mod(t, lambda, t);                                   // λ(x0 - x_m)
+                sub_mod(y_littleEndian_local, t, y0);                    // y_m = λ(x0 - x_m) - y0
+            }
+
+            u32 loop_index = base_offset + m;
 
             // create big endian (computed into private registers; written to global memory below
             // only for entries that are actually emitted)

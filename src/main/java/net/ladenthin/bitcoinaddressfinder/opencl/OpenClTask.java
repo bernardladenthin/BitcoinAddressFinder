@@ -344,10 +344,17 @@ public class OpenClTask implements ReleaseCLObject {
      * @param fuse8FpMem    the GPU fingerprint slot buffer (a dummy empty filter when none is uploaded)
      * @param fuse8MetaMem  the GPU 5-int metadata buffer {@code [seedLo, seedHi, segLen, segLenMask, segCountLen]}
      * @param transferAll   {@code 0} for compact (filter) mode, non-zero to force full transfer
+     * @param iGTableMem    the GPU {@code i·G} table buffer for the affine scalar walk (a one-byte
+     *     placeholder when {@code keysPerWorkItem == 1})
      * @return the destination buffer containing kernel results
      */
     public ByteBuffer executeKernel(
-            cl_kernel kernel, cl_command_queue commandQueue, cl_mem fuse8FpMem, cl_mem fuse8MetaMem, int transferAll) {
+            cl_kernel kernel,
+            cl_command_queue commandQueue,
+            cl_mem fuse8FpMem,
+            cl_mem fuse8MetaMem,
+            int transferAll,
+            cl_mem iGTableMem) {
         final long dstSizeInBytes = getDstSizeInBytes();
         // Allocate a new destination buffer so that cloning after kernel execution is unnecessary
         try (final DestinationArgument destinationArgument = DestinationArgument.create(context, dstSizeInBytes)) {
@@ -383,6 +390,7 @@ public class OpenClTask implements ReleaseCLObject {
             clSetKernelArg(kernel, 3, Sizeof.cl_mem, Pointer.to(fuse8FpMem));
             clSetKernelArg(kernel, 4, Sizeof.cl_mem, Pointer.to(fuse8MetaMem));
             clSetKernelArg(kernel, 5, Sizeof.cl_uint, Pointer.to(new int[] {transferAll}));
+            clSetKernelArg(kernel, 6, Sizeof.cl_mem, Pointer.to(iGTableMem));
 
             {
                 // write src buffer
