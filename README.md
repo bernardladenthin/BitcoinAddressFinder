@@ -410,7 +410,7 @@ mvn test-compile exec:java -Dexec.args="BinaryFuseBenchmark"
 
 By default the OpenCL kernel transfers **every** derived work-item result back to the host, and the consumer then checks each hash160 against the selected `addressLookupBackend`. With `enableGpuFilter`, a Binary Fuse 8 filter is instead pushed **onto the GPU** so the kernel checks each derived hash160 inline and transmits only the candidates the filter marks as possibly present. This collapses the PCIe read-back from the full `2^batchSizeInBits` grid down to the handful of hits per batch — the dominant cost on large batches.
 
-The GPU pre-filter is **independent of the CPU `addressLookupBackend`.** It is built once from LMDB purely as a transient VRAM-upload artifact (the host copy is freed after the one-time upload), so it works with the `LMDB_ONLY` default — you do **not** have to set the CPU backend to `BINARY_FUSE_8`. The survivors that come back from the GPU are verified directly against LMDB on the CPU, so they are never "double filtered". (If the CPU backend already *is* `BINARY_FUSE_8`, that filter is reused for the upload to avoid a second LMDB scan.)
+The GPU pre-filter is **independent of the CPU `addressLookupBackend`.** It is built once during consumer init — while LMDB is still open, *before* a self-contained backend (`HASHSET`/`TRUNCATED_LONG_64`) would close it — purely as a transient VRAM-upload artifact (the host copy is freed after the one-time upload). So it works with **every** backend, including the `LMDB_ONLY` default; you do **not** have to set the CPU backend to `BINARY_FUSE_8`. The survivors that come back from the GPU are verified directly against the CPU lookup, so they are never "double filtered". (If the CPU backend already *is* `BINARY_FUSE_8`, that filter is reused for the upload to avoid a second LMDB scan.)
 
 Enable it on an OpenCL producer (see [`examples/config_Find_GPUFilterCompact.json`](examples/config_Find_GPUFilterCompact.json)):
 
@@ -425,7 +425,7 @@ Enable it on an OpenCL producer (see [`examples/config_Find_GPUFilterCompact.jso
 
 | Field | Default | Effect |
 |-------|:-------:|--------|
-| `enableGpuFilter` | `false` | When `true`, a Binary Fuse 8 filter is built from LMDB and uploaded to GPU VRAM (once per session); the kernel filters inline (compact output). Independent of the CPU `addressLookupBackend` — requires only that LMDB is open (it is under the `LMDB_ONLY` default). |
+| `enableGpuFilter` | `false` | When `true`, a Binary Fuse 8 filter is built from LMDB during consumer init and uploaded to GPU VRAM (once per session); the kernel filters inline (compact output). Independent of the CPU `addressLookupBackend` — built while LMDB is open, so it works with every backend including the `LMDB_ONLY` default. |
 | `transferAll` | `false` | Forces full-transfer (legacy) output even when `enableGpuFilter` is on. `Finder` sets this to `true` automatically — with a warning — whenever `enableVanity = true`, because vanity scanning must see every derived address. |
 
 **How compact mode works** — the kernel checks both the compressed and uncompressed hash160 of each candidate against the uploaded filter; a work-item that hits claims an output slot via an `atomic_add` on a shared count word and writes its entry there, so the buffer holds exactly the hits (each entry carries its own work-item index for secret-key reconstruction). A non-hit writes nothing.

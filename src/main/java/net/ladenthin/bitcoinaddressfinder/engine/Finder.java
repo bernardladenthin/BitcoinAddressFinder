@@ -201,9 +201,30 @@ public class Finder implements Interruptable {
         final ConsumerJava localConsumerJava =
                 new ConsumerJava(localCConsumerJava, keyUtility, persistenceUtils, runtimeStatistics);
         consumerJava = localConsumerJava;
+        // Decide up-front whether the GPU pre-filter is needed so initLMDB() can build it while
+        // LMDB is still open — a self-contained backend closes the env at the end of initLMDB().
+        localConsumerJava.setGpuFilterRequested(isGpuFilterRequested());
         localConsumerJava.initLMDB();
         localConsumerJava.startConsumer();
         localConsumerJava.startStatisticsTimer();
+    }
+
+    /**
+     * Returns whether any OpenCL producer will run in compact (GPU pre-filter) mode, so the
+     * consumer should build the Binary Fuse 8 GPU payload during {@code initLMDB()}.
+     *
+     * <p>Mirrors the vanity rule applied later by {@link #applyVanityFullTransferOverride()}:
+     * vanity scanning forces every producer to full transfer, so no GPU filter is needed then.
+     *
+     * @return {@code true} if at least one OpenCL producer requests compact mode and vanity is off
+     */
+    private boolean isGpuFilterRequested() {
+        CConsumerJava localCConsumerJava = finder.consumerJava;
+        if (localCConsumerJava != null && localCConsumerJava.enableVanity) {
+            return false;
+        }
+        List<CProducerOpenCL> configs = finder.producerOpenCL;
+        return configs != null && configs.stream().anyMatch(c -> c.enableGpuFilter && !c.transferAll);
     }
 
     /**
@@ -294,17 +315,20 @@ public class Finder implements Interruptable {
             return;
         }
 
-        // Build the Fuse-8 filter exactly once, regardless of how many producers consume it.
-        Optional<BinaryFuse8GpuFilterData> payload = localConsumer.buildGpuFilterData();
+        // The payload was built once during the consumer's initLMDB() (while LMDB was open).
+        Optional<BinaryFuse8GpuFilterData> payload = localConsumer.getGpuFilterData();
         if (payload.isEmpty()) {
-            LOGGER.warn("producerOpenCL.enableGpuFilter is true but the GPU filter could not be built "
-                    + "(LMDB is not open — the configured addressLookupBackend released it); running full transfer.");
+            LOGGER.warn("producerOpenCL.enableGpuFilter is true but the GPU filter payload is absent; "
+                    + "running full transfer.");
             return;
         }
         BinaryFuse8GpuFilterData data = payload.get();
         for (int i = 0; i < openCLProducers.size(); i++) {
             stageGpuFilterOnProducer(configs.get(i), openCLProducers.get(i), data);
         }
+        // Release the host-side copy now it is staged on every producer; each producer frees its
+        // own copy after the one-time VRAM upload in initProducer().
+        localConsumer.discardGpuFilterData();
     }
 
     /**
