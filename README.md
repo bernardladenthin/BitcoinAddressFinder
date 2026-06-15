@@ -236,9 +236,10 @@ by the same factor — until too few work-items remain to keep the GPU busy. The
 
 - Must be a power of two; `batchSizeInBits` must be divisible by it.
 - **The default `1` is the slowest setting** (a full `k·G` per key) — raise it for scanning.
-- The optimum is **device-dependent**. On an NVIDIA RTX 3070 Laptop it is `64` (~5× faster than `1`,
-  ~19–20 M keys/s). After the comb optimization the throughput curve is flat enough that even `8`–`16`
-  captures most of the gain on a wide range of GPUs.
+- The optimum is **device-dependent**. On an NVIDIA RTX 3070 Laptop it is `128` (~5× faster than `1`,
+  ~22 M keys/s at `batchSizeInBits=20`). After the comb optimization the throughput curve is flat
+  enough that even `16`–`32` captures most of the gain on a wide range of GPUs (the example configs
+  use `16`).
 
 > 📈 **Find your device's sweet spot — and read the benchmarking caveats (laptop GPUs throttle!) —
 > before trusting any number: see [docs/performance.md](docs/performance.md).** It has the

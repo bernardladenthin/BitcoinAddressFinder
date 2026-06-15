@@ -37,7 +37,7 @@
         "maxResultReaderThreads": 4,
         "keyProducerId": "exampleKeyProducerSecureRandomId",
         "batchSizeInBits": 18,
-        "keysPerWorkItem": 4,
+        "keysPerWorkItem": 16,
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
         "runOnce": false,

@@ -16,7 +16,8 @@ and understanding *why* — it goes well beyond the defaults.
    parallel.
 2. **Raise `keysPerWorkItem`.** The default is `1`, which is the *slowest* setting (a full `k·G`
    scalar multiplication per key). The optimum is **device-dependent**; on an NVIDIA RTX 3070 Laptop
-   it is `64`, which is ~8× faster than `1`. Sweep it on your hardware (§4).
+   it is `128` (≈5× faster than `1`, ~22 M keys/s, at `batchSizeInBits=20`). Sweep it on your
+   hardware (§4).
 3. **Match `batchSizeInBits` to the device** (e.g. `18` for a typical GPU, `20`–`21` for a high-end
    one) and ensure `batchSizeInBits` is divisible by `keysPerWorkItem`.
 4. **Benchmark with `GridSizeSweepBenchmark`** and read §6 first — laptop GPUs throttle, and naive
@@ -116,28 +117,29 @@ filter's measured transfer saving (~1.28× at grid 19 on an RTX 3070) is benchma
 
 ## 4. Benchmarked tuning — `keysPerWorkItem` sweep
 
-NVIDIA RTX 3070 Laptop GPU, OpenCL 3.0 CUDA, `batchSizeInBits = 20`, current kernel
-(Stage 2). Candidates/s = JMH ops/s × `2^batchSizeInBits`.
+NVIDIA RTX 3070 Laptop GPU, OpenCL 3.0 CUDA, `batchSizeInBits = 20`, current kernel (Stage 2,
+GPU-built tables). Full re-sweep; candidates/s = JMH ops/s × `2^batchSizeInBits`.
 
-| `keysPerWorkItem` | Throughput (~) | vs. `keysPerWorkItem = 1` |
-|---:|---:|---:|
-| 1 (default) | ~4 M keys/s | 1.0× |
-| 8 | ~15 M keys/s | ~3.8× |
-| 16 | ~17 M keys/s | ~4.3× |
-| 32 | ~18 M keys/s | ~4.6× |
-| **64** | **~19–20 M keys/s** | **~5× (peak)** |
+| `keysPerWorkItem` | 1 | 8 | 16 | 32 | 64 | **128** | 256 |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| M keys/s | 4.5 | 15.5 | 16.2 | 18.3 | 18.8 | **22.0** | 15.8 |
+| vs. `=1` | 1.0× | 3.5× | 3.6× | 4.1× | 4.2× | **4.9× (peak)** | 3.5× |
 
 Notes:
 
 - The default `keysPerWorkItem = 1` pays a full scalar multiplication per key and is far from
   optimal.
 - The sweet spot is **device-dependent** — set by the balance between amortizing the anchor `k·G`
-  and keeping enough work-items to saturate the GPU. Sweep on your own hardware.
+  and keeping enough work-items to saturate the GPU. Sweep on your own hardware. (Single 3-sample
+  sweep; the laptop GPU is thermally noisy per §6, but the rise-to-128 / fall-at-256 shape is clear.)
 - Beyond the sweet spot, throughput drops because too few work-items remain to fill all compute units
-  (e.g. `2^20 / 256 = 4096` work-items under-fills a 40-SM GPU at `keysPerWorkItem = 256`).
-- After Stage 2 (cheap comb `P₀`) the curve is much **flatter** than it used to be: near-peak speed
-  is reached at far lower `keysPerWorkItem` than before, so even a moderate value (8–16) is a big win
-  on a wide range of GPUs.
+  (`2^20 / 128 = 8192` work-items still fills this 40-SM GPU; `2^20 / 256 = 4096` under-fills it).
+- After Stage 2 (cheap comb `P₀`) the optimum **rose from 64 to 128**: a cheaper one-time `P₀`
+  amortises over more keys before it stops dominating. The peak also depends on `batchSizeInBits` via
+  the work-item count `2^batchSizeInBits / keysPerWorkItem` — at the smaller `batchSizeInBits = 18`
+  the work-item-count analog of this peak is `keysPerWorkItem = 32` (also 8192 work-items), and the
+  example configs use `16` as a safe cross-device default. The curve is also much flatter than
+  pre-comb, so even a moderate value (16–32) captures most of the gain on a wide range of GPUs.
 
 Use `{"command":"OpenCLInfo"}` to confirm a device is present and pick `platformIndex` /
 `deviceIndex` before benchmarking.
