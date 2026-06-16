@@ -1633,10 +1633,12 @@ Wished from Ulugbek:
 
 BitcoinAddressFinder stands on the shoulders of excellent open-source work. In particular:
 
-- **[hashcat](https://hashcat.net/hashcat/)** — the OpenCL secp256k1 elliptic-curve, SHA-256 and
-  RIPEMD-160 routines that power GPU key generation are ported from hashcat's MIT-licensed kernels
-  (see [`src/main/resources/copyfromhashcat/`](src/main/resources/copyfromhashcat/)). Huge thanks to
-  the hashcat project and its contributors.
+- **[hashcat](https://github.com/hashcat/hashcat)** ([hashcat.net](https://hashcat.net/hashcat/)) —
+  the OpenCL secp256k1 elliptic-curve, SHA-256 and RIPEMD-160 routines that power GPU key generation
+  are ported from hashcat's MIT-licensed kernels in
+  [`OpenCL/`](https://github.com/hashcat/hashcat/tree/master/OpenCL) (vendored here under
+  [`src/main/resources/copyfromhashcat/`](src/main/resources/copyfromhashcat/)). Huge thanks to the
+  hashcat project and its contributors.
 - **[bitcoinj](https://bitcoinj.org/)** — Bitcoin/altcoin key derivation and address encoding used
   across the CPU path and as the reference for the GPU parity tests.
 - **[LMDB](https://www.symas.com/lmdb)** / **[lmdbjava](https://github.com/lmdbjava/lmdbjava)** — the
