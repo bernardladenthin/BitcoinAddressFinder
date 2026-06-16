@@ -159,6 +159,16 @@ public class GpuFuse8FilterBenchmark {
     public int batchSizeInBits;
 
     /**
+     * Inner iterations per OpenCL work-item (the scalar-walker / comb amortisation lever). Default
+     * {@code 1} preserves the original filter-vs-transfer comparison; set it to the device sweet
+     * spot (e.g. {@code 128} on the RTX 3070) together with {@code profiling=true} to attribute
+     * compact-mode cost between GPU compute and PCIe readback at the real operating point.
+     * {@code 1 << batchSizeInBits} must be divisible by {@code keysPerWorkItem}.
+     */
+    @Param({"1"})
+    public int keysPerWorkItem;
+
+    /**
      * Number of (non-matching) addresses inserted into the GPU filter. Only relevant when
      * {@code gpuFilter=true}; sized to model a realistic database the scanned random keys do
      * not collide with, so the compact path emits only Binary Fuse 8 false-positives.
@@ -202,7 +212,7 @@ public class GpuFuse8FilterBenchmark {
 
         final CProducerOpenCL p = new CProducerOpenCL();
         p.batchSizeInBits = batchSizeInBits;
-        p.keysPerWorkItem = 1;
+        p.keysPerWorkItem = keysPerWorkItem;
         // Compact mode is requested only for the filter arm; the baseline arm keeps the legacy
         // full-transfer layout (no filter uploaded -> createKeys() transfers every result).
         p.enableGpuFilter = gpuFilter;
@@ -259,8 +269,12 @@ public class GpuFuse8FilterBenchmark {
                     // metric: these are device-side timings of the last launch, used to attribute
                     // cost between GPU compute and PCIe transfer, not the benchmark's throughput.
                     System.out.printf(
-                            "[profiling] gpuFilter=%s batchSizeInBits=%d -> kernel=%.3f ms, readback=%.3f ms%n",
-                            gpuFilter, batchSizeInBits, kernelNanos / 1_000_000.0, readbackNanos / 1_000_000.0);
+                            "[profiling] gpuFilter=%s batchSizeInBits=%d keysPerWorkItem=%d -> kernel=%.3f ms, readback=%.3f ms%n",
+                            gpuFilter,
+                            batchSizeInBits,
+                            keysPerWorkItem,
+                            kernelNanos / 1_000_000.0,
+                            readbackNanos / 1_000_000.0);
                 });
             }
             ctx.close();
