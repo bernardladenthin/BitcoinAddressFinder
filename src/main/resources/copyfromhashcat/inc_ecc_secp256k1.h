@@ -231,4 +231,9 @@ DECLSPEC void set_precomputed_basepoint_g (PRIVATE_AS secp256k1_t *r);
 // Reused by the fixed-base table precompute kernels below.
 DECLSPEC void point_to_affine (PRIVATE_AS u32 *x, PRIVATE_AS u32 *y, PRIVATE_AS u32 *z);
 
+// safegcd modular inverse (libsecp256k1 modinv32 port); drop-in alternative to inv_mod with the same
+// signature. Forward-declared so inv_mod can delegate to it (the default; build with
+// -D USE_LEGACY_BINARY_GCD_INV_MOD to fall back to the binary GCD).
+DECLSPEC void inv_mod_safegcd (PRIVATE_AS u32 *a);
+
 #endif // INC_ECC_SECP256K1_H

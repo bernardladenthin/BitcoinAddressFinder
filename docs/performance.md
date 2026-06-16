@@ -262,8 +262,10 @@ reading half as much table.
 Stage 1 (+9.8%) × Stage 2 (+10.8%) ≈ **~+21% at the sweet spot** over the original wNAF + Jacobian
 kernel, and a **multiple** of that at low `keysPerWorkItem`. This is the BitCrack/VanitySearch design:
 fixed-base table for `k·G` + affine batched-addition walk. Stage 2b halves the comb table at
-throughput parity (within noise); Stage 3 then adds host-side buffer reuse (+~18% end-to-end in
-compact mode).
+throughput parity (within noise); **Stage 4 (safegcd `inv_mod`) then adds ≈ +45% kernel throughput**
+by removing warp divergence in the modular inverse; Stage 3 separately adds host-side buffer reuse
+(+~18% end-to-end in compact mode). The largest single kernel-side win of the whole effort turned out
+to be Stage 4 — the modular inverse, not the point arithmetic.
 
 ### Stage 3 — result-buffer reuse (host-side I/O; +~18% in compact mode, no change in full transfer)
 
@@ -300,6 +302,42 @@ and the fixed per-launch host allocation was a large fraction of wall-clock — 
 dwarfs the allocation, so the pool neither helps nor hurts (error bars overlap). Crucially it is
 **never slower**, so per the on/off-flag criterion ("flag only if not always faster") **no flag was
 added** — reuse is unconditional.
+
+### Stage 4 — safegcd modular inverse (≈ +45% kernel throughput; now the default)
+
+Replaces the modular inverse `inv_mod` (used by every Jacobian→affine conversion: the comb's final
+`inv_mod`, the affine walk's batched inverse, `point_to_affine`) with a faithful port of
+libsecp256k1's **constant-time `modinv32`** (Bernstein–Yang "safegcd" divsteps; `inv_mod_safegcd` in
+`inc_ecc_secp256k1.cl`, 9 signed-30-bit limbs so every product fits a 64-bit accumulator).
+
+**Why it helps far more than expected.** The old `inv_mod` is a *binary* extended GCD whose iteration
+count and inner branches **depend on the input value**. Under SIMT, the 32 lanes of a warp run in
+lock-step, so a warp pays for its *slowest* lane every step — heavy **warp divergence**. safegcd does
+a **fixed 20×30 = 600 divsteps for every input**, branch-uniform, so a warp finishes together. Even
+though the inverse is only ~1 per 8 keys (batched) at high `keysPerWorkItem`, removing that divergence
+moved the whole-kernel throughput a lot.
+
+A/B was run **ON–OFF–ON** to defeat the thermal-ordering trap that §6 warns about (compact mode,
+`batchSizeInBits=19`, `-f 1 -wi 1 -w 20 -i 3 -r 40`):
+
+| run (in order) | kpwi=1 | kpwi=128 |
+|---|--:|--:|
+| safegcd ON (1st) | 13.81 ops/s | 156.79 ops/s |
+| binary-GCD OFF (2nd) | 10.88 ops/s | 108.08 ops/s |
+| safegcd ON (3rd) | 15.22 ops/s | 155.39 ops/s |
+
+The two ON runs bracket OFF and are **flat** (156.8 then 155.4 — the *last* run is not faster, so this
+is not warmup drift), while OFF sits clearly below both. The effect is therefore real, not ordering:
+**≈ +44% at kpwi=128** and **≈ +27–40% at kpwi=1**. This is the rare case where the measurement
+*beat* the thermal noise floor because the effect itself is large.
+
+safegcd is now the **default** `inv_mod` (per "if always faster, no flag"). The binary GCD is kept
+behind `-D USE_LEGACY_BINARY_GCD_INV_MOD` for A/B and as a fallback for any device whose signed
+right-shift is not arithmetic (safegcd, like the reference, assumes sign-extending `>>`; NVIDIA and
+pocl both comply). Correctness is gated two ways: `OpenCLPrecomputeKernelTest`'s `test_inv_mod_safegcd`
+cross-checks safegcd vs. the binary GCD **and** `x·x⁻¹ ≡ 1 (mod p)` over 4096 random inputs, and the
+full `ProbeAddressesOpenCLTest` (43/0-fail) derives byte-identical keys with safegcd as the live
+inverse.
 
 ---
 
