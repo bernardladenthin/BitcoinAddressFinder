@@ -10,10 +10,11 @@ import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
  * and {@code keysPerWorkItem}), derived from the device's reported capabilities plus the calibration
  * measured in {@code docs/performance.md}.
  *
- * <p><b>This is a coarse starting point, not an optimum.</b> The real sweet spot is device-specific
- * and thermally noisy (see {@code docs/performance.md} §4/§6); always sweep {@code keysPerWorkItem}
- * on the actual hardware. The defaults are deliberately conservative and clamped to the validated
- * range.
+ * <p><b>No benchmark, no device run — instant arithmetic on the reported {@code CL_DEVICE_*} values.</b>
+ * It is a coarse assumption ("better than the {@code keysPerWorkItem=1} default"), <b>not</b> an
+ * optimum: the real sweet spot is device-specific and thermally noisy (see {@code docs/performance.md}
+ * §4/§6), so always sweep {@code keysPerWorkItem} on the actual hardware. The defaults are
+ * deliberately conservative and clamped to the validated range.
  *
  * <p>Heuristics:
  * <ul>

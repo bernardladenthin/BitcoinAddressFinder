@@ -25,6 +25,7 @@ import net.ladenthin.bitcoinaddressfinder.core.Interruptable;
 import net.ladenthin.bitcoinaddressfinder.core.InterruptedRuntimeException;
 import net.ladenthin.bitcoinaddressfinder.engine.Finder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -261,7 +262,12 @@ public class Main implements Runnable, Interruptable {
                 case OpenCLInfo -> {
                     OpenCLBuilder openCLBuilder = new OpenCLBuilder();
                     List<OpenCLPlatform> openCLPlatforms = openCLBuilder.build();
-                    System.out.println(openCLPlatforms);
+                    for (OpenCLPlatform platform : openCLPlatforms) {
+                        System.out.println("=== OpenCL platform: " + platform.platformName() + " ===");
+                        for (OpenCLDevice device : platform.openCLDevices()) {
+                            System.out.println(device.toStringPretty());
+                        }
+                    }
                 }
                 default ->
                     throw new UnsupportedOperationException(

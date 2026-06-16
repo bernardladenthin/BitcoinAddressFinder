@@ -572,26 +572,35 @@ built with `-cl-nv-verbose` and the full `clGetProgramBuildInfo` build log is lo
 581.x driver**, which is why the always-on `clGetKernelWorkGroupInfo` line above is the primary
 occupancy signal). The device-info dump and the resource-usage line are logged regardless of this flag.
 
-### Suggested starting config (auto-derived from the device)
+### Suggested starting config (from the device info — no benchmark)
 
-The default `keysPerWorkItem = 1` is the slow trap (§3). To make the right ballpark obvious without a
-manual sweep, `OpenCLContext` logs a **heuristic starting-point config** once at init, derived from the
-device's reported `CL_DEVICE_MAX_COMPUTE_UNITS` and `CL_DEVICE_MAX_MEM_ALLOC_SIZE` (pure logic in
-`OpenClConfigSuggestion`, unit-tested without a GPU):
+The default `keysPerWorkItem = 1` is the slow trap (§3). To make the right ballpark obvious, the
+device-info block (`OpenCLDevice.toStringPretty`) ends with a suggested starting config — shown by the
+`OpenCLInfo` command (where users look before writing a config) and in the init device dump:
 
 ```
-Suggested starting config for this device (40 compute units): batchSizeInBits=21 keysPerWorkItem=256 (heuristic starting point - sweep to confirm, ...)
+... (all the CL_DEVICE_* lines) ...
+SUGGESTED START CONFIG (heuristic from the info above; sweep keysPerWorkItem to confirm):
+    producerOpenCL.batchSizeInBits = 21
+    producerOpenCL.keysPerWorkItem = 256
 ```
+
+It is **pure, instant arithmetic on the reported `CL_DEVICE_*` values — no benchmark, no profiling
+run** (logic in `OpenClConfigSuggestion`, unit-tested without a GPU):
 
 - **`batchSizeInBits`** — the largest batch whose full-transfer result buffer (`2^bits × 108 B`) fits
-  ¼ of max-alloc, clamped to `[14, 21]` (below the hard `BIT_COUNT_FOR_MAX_CHUNKS_ARRAY = 24` cap).
-- **`keysPerWorkItem`** — chosen to keep ≈ 200 work-items per compute unit (calibrated from the
-  RTX 3070's ~8192-work-item peak over 40 CUs), rounded down to a power of two, clamped `[1, 256]`.
+  ¼ of `CL_DEVICE_MAX_MEM_ALLOC_SIZE`, clamped to `[14, 21]` (below the hard
+  `BIT_COUNT_FOR_MAX_CHUNKS_ARRAY = 24` cap).
+- **`keysPerWorkItem`** — chosen to keep ≈ 200 work-items per compute unit (`CL_DEVICE_MAX_COMPUTE_UNITS`,
+  calibrated from the RTX 3070's ~8192-work-item peak over 40 CUs), rounded down to a power of two,
+  clamped `[1, 256]`.
 
-It is **a coarse starting point, not an optimum** — it deliberately can't capture the thermal/occupancy
-subtleties, so the message tells the user to **sweep `keysPerWorkItem`** (§4) to confirm. The value is
-that it replaces the kpwi=1 trap with a device-appropriate ballpark (e.g. "use ~256 / bsib 21 on this
-40-CU GPU"), which is usually within a sweep step of the real peak.
+It is a **coarse assumption, "better than the kpwi=1 default" — not an optimum.** It deliberately can't
+capture the thermal/occupancy subtleties, so it tells the user to **sweep `keysPerWorkItem`** (§4) to
+confirm. The value is replacing the kpwi=1 trap with a device-appropriate ballpark (e.g. "~256 / bsib
+21 on this 40-CU GPU"), usually within a sweep step of the real peak. A future, more accurate
+*measured* suggestion (a short on-device micro-sweep) is noted as possible future work — but is
+deliberately **not** done here to keep the suggestion instant and simple.
 
 ---
 
@@ -638,7 +647,7 @@ hot path; correctness is paramount.
 | — | `keysPerWorkItem` tuning | `GridSizeSweepBenchmark` (§4) | — |
 | — | stage attribution (EC vs hashing) | `GpuFuse8FilterBenchmark -p gpuFilter=true -p kernelProfileStage=FULL,ONE_HASH160,NO_HASH160` (§6) | `OpenCLContextTest#kernelProfileStage_buildsAndRuns` |
 | — | occupancy / register pressure | grep init log for `Kernel resource usage:` (§6); `logGpuDiagnostics=true` for the verbose build log | — |
-| — | suggested starting config | grep init log for `Suggested starting config` (§6); pure helper `OpenClConfigSuggestion` | `OpenClConfigSuggestionTest` |
+| — | suggested starting config | run `OpenCLInfo` (or grep init log) for `SUGGESTED START CONFIG` (§6); pure helper `OpenClConfigSuggestion` | `OpenClConfigSuggestionTest`, `OpenCLDeviceTest` |
 | — | `KEYS_BATCH_INV` sweep | edit the `#define`, `GpuFuse8FilterBenchmark` (§3) | `ProbeAddressesOpenCLTest` |
 
 **Honest caveat on A/B reproducibility:** only Stage 4 has a build-time toggle
@@ -738,9 +747,29 @@ cost balance shifts):
   micro-optimisation, or sharing more work between the uncompressed and compressed chains (they share
   the X coordinate; the compressed SEC prefix transform is already reused via `REUSE_FOR_COMPRESSED`),
   is the lever here — without ever dropping a chain. Both chains always run.
-- **Reduced-radix field representation** (e.g. 2^26 / 2^29 limbs) — the EC lever (EC ≈ 57% per §6),
-  attacking the carry/add chain that made `sqr_mod` a wash (see "Measured and rejected"). Big rewrite
-  of every field op; would also make `sqr_mod` pay off. Highest EC potential, highest effort/risk.
+- **Reduced-radix field representation — the #1 lever, corroborated by an external review.** The EC
+  side is ~57% (§6) and the field multiply is carry/add-bound (the `sqr_mod` result). A reduced-radix
+  layout stores 256 bits in limbs narrower than the word (e.g. **10×26-bit** for a 32-bit GPU, or
+  5×52-bit for 64-bit), so additive overflow lands in the spare bits and **carries are deferred**
+  instead of propagated every limb; reconciliation happens only inside `mul`/`sqr` or at an explicit
+  normalize ("lazy reduction" / magnitude tracking). This attacks **both** of our bottlenecks: the
+  carry-bound multiply *and* (per the §6 occupancy finding) the register ceiling — the 10×26
+  `mul_inner`/`sqr_inner` accumulate into just two `ulong` accumulators with 32×32→64 products instead
+  of a full 16×`u32` product array + long carry vector, so fewer wide temporaries are live. A
+  dedicated squaring then *does* pay off (it didn't in radix-2³² because we were carry-bound, not
+  multiply-bound). **Cross-repo investigation (2026, see Acknowledgements):** vanitygen /
+  vanitygen-plusplus use the same radix-2³² we do (no reduced radix — nothing to lift there); the
+  reference reduced-radix implementation is bitcoin-core/secp256k1 (`src/field_10x26_impl.h`,
+  `field_5x52_int128_impl.h`). For a GPU, **10×26 is the right variant** (single `mul_hi(u32)`-class
+  products + one `ulong` accumulator; 5×52 needs emulated 64×64→128 + 128-bit accumulators that cost
+  more registers). Honest caveat: 10 limbs raises the *partial-product count* (~100 vs 64), but since
+  we are not multiply-bound, trading cheap 32×32 muls for far fewer carries and fewer live registers
+  should net out positive — **must be measured.** Big rewrite of every field op (`mul_mod`, `add_mod`,
+  `sub_mod`, reduction, `inv_mod` representation, device-word ↔ limb conversions), gated byte-for-byte;
+  highest EC potential, highest effort/risk. **Skip on the same investigation:** GLV/endomorphism (we
+  do only one fixed-base scalar mul per work-item, amortized — no benefit) and the `_var`
+  (variable-time) modular inverse (faster on CPU but its data-dependent trip count diverges a SIMT
+  warp — our constant-time safegcd is the right GPU choice).
 - **Dedicated sequential-only "addition-walk" kernel (160-bit, output-only)** — a brand-new
   standalone kernel (alongside `generateKeysKernel_grid`) for contiguous scanning: the host supplies
   a single anchor `P0`, and the kernel enumerates `P0, P0+G, P0+2G, …` by pure affine point addition

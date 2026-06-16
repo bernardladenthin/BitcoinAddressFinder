@@ -394,18 +394,8 @@ public class OpenCLContext implements ReleaseCLObject {
                 workGroupSizeMultiple,
                 privateMemBytes,
                 localMemBytes);
-
-        // Heuristic starting-point config suggestion from the device capabilities (see
-        // OpenClConfigSuggestion / docs/performance.md). A coarse starting point, not an optimum —
-        // sweep keysPerWorkItem on the real hardware to confirm.
-        final OpenClConfigSuggestion suggestion =
-                OpenClConfigSuggestion.suggest(device.maxComputeUnits(), device.maxMemAllocSize());
-        LOGGER.info(
-                "Suggested starting config for this device ({} compute units): batchSizeInBits={} keysPerWorkItem={}"
-                        + " (heuristic starting point - sweep to confirm, see docs/performance.md)",
-                device.maxComputeUnits(),
-                suggestion.batchSizeInBits(),
-                suggestion.keysPerWorkItem());
+        // The heuristic starting-config suggestion lives in the device-info block
+        // (OpenCLDevice.toStringPretty, logged above and shown by the OpenCLInfo command).
     }
 
     /**

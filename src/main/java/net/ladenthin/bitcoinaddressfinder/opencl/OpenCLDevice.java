@@ -163,6 +163,14 @@ public record OpenCLDevice(
                     preferredVectorWidthLong,
                     preferredVectorWidthFloat,
                     preferredVectorWidthDouble);
+
+            // A quick starting-point config derived purely from the device info above (no benchmark
+            // run) — a rough assumption, "better than the keysPerWorkItem=1 default". Sweep
+            // keysPerWorkItem on the real hardware to find the actual optimum (see docs/performance.md).
+            final OpenClConfigSuggestion suggestion = OpenClConfigSuggestion.suggest(maxComputeUnits, maxMemAllocSize);
+            ps.printf("SUGGESTED START CONFIG (heuristic from the info above; sweep keysPerWorkItem to confirm):%n");
+            ps.printf("    producerOpenCL.batchSizeInBits = %d%n", suggestion.batchSizeInBits());
+            ps.printf("    producerOpenCL.keysPerWorkItem = %d%n", suggestion.keysPerWorkItem());
         }
 
         return baos.toString(charset);
