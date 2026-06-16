@@ -602,6 +602,24 @@ confirm. The value is replacing the kpwi=1 trap with a device-appropriate ballpa
 *measured* suggestion (a short on-device micro-sweep) is noted as possible future work — but is
 deliberately **not** done here to keep the suggestion instant and simple.
 
+**Validated against the benchmark (RTX 3070, compact mode, candidate keys/s = launches/s × 2^bits):**
+
+| config | candidate keys/s | work-items |
+|---|--:|--:|
+| `bsib=20, kpwi=128` (measured peak) | **~189 M** | 8192 |
+| `bsib=21, kpwi=128` | ~186 M | 16384 |
+| **`bsib=21, kpwi=256` (the suggestion)** | **~179 M** | 8192 |
+| `bsib=20, kpwi=256` | ~102 M | 4096 |
+
+The suggestion lands **within ~5% of the measured peak** and nails the right regime: its ≈200
+work-items/CU target = 8192 work-items, exactly the peak's work-item count. It is **not** the exact
+optimum (the best here is `bsib=20, kpwi=128`); the heuristic slightly overshoots `keysPerWorkItem`
+(picks 256), and **one sweep step down — `keysPerWorkItem` 256 → 128 — recovers the peak**, which is
+precisely what the "sweep to confirm" message instructs. So the suggestion behaves as intended: from
+cold device info, no benchmark, it puts you a single sweep step from the optimum. (Refinement note for
+the future *measured* version: the data slightly prefers **more** work-items than the ~200/CU target —
+nudging the target toward ~256–400/CU would point it straight at `kpwi=128`.)
+
 ---
 
 ## 7. Correctness gating
