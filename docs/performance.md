@@ -237,6 +237,42 @@ Stage 1 (+9.8%) × Stage 2 (+10.8%) ≈ **~+21% at the sweet spot** over the ori
 kernel, and a **multiple** of that at low `keysPerWorkItem`. This is the BitCrack/VanitySearch design:
 fixed-base table for `k·G` + affine batched-addition walk.
 
+### Stage 3 — result-buffer reuse (host-side I/O; +~18% in compact mode, no change in full transfer)
+
+Stages 0–2 are all *kernel* (compute) work. Stage 3 attacks the **host overhead per launch**:
+end-to-end profiling showed compact mode reaching only ~36 M keys/s against a ~118 M keys/s raw
+kernel, i.e. ~20 ms/launch spent outside the kernel — dominated by allocating and freeing the
+**full per-batch result buffers** (the GPU `cl_mem` plus a >100 MB direct host `ByteBuffer`) on
+*every* launch. Two steps, both **pure reuse — buffers stay full size, no right-sizing/overflow
+handling** (ranges with many consecutive hits must never lose entries):
+
+- **Step 1 — reuse the GPU output `cl_mem`.** Allocated once at the fixed batch size in the
+  `OpenClTask` constructor, reused every launch (it is touched strictly synchronously — kernel write
+  + readback, each `clFinish`-fenced, on the single producer thread). Measured **no** end-to-end
+  change → the device-buffer alloc was *not* the bottleneck.
+- **Step 2 — pool the host readback `ByteBuffer`.** This is the win. Each launch's host buffer is read
+  **asynchronously** by the result-reader pool, so it cannot be a single shared buffer; instead
+  `OpenClTask` keeps a thread-safe pool, `executeKernel` checks one out, and `OpenCLGridResult`
+  (now `AutoCloseable`) returns it on `close()` after the reader consumes it. Up to
+  `maxResultReaderThreads` buffers are in flight (the same peak as before) — isolation is preserved,
+  only the `allocateDirect` + zeroing is eliminated. A caller that never closes simply GCs its buffer
+  (no reuse, no leak), so reuse is an optimisation, not a correctness requirement.
+
+Matched back-to-back A/B on the RTX 3070 Laptop (baseline = commit before the pool; `batchSizeInBits=19`
+→ 524 288 candidates/launch, `keysPerWorkItem=128`, profiling off, `-f 1 -wi 1 -w 20 -i 3 -r 60`):
+
+| mode | baseline (no pool) | with host-buffer pool | Δ |
+|---|--:|--:|--:|
+| **compact** (`gpuFilter=true`) | 60.57 ± 1.61 ops/s (≈31.8 M keys/s) | **71.77 ± 0.68 ops/s (≈37.6 M keys/s)** | **+18.5%** |
+| full transfer (`gpuFilter=false`) | 9.71 ± 1.04 ops/s (≈5.09 M keys/s) | 9.78 ± 0.68 ops/s (≈5.13 M keys/s) | +0.8% (within noise) |
+
+The win lands entirely in **compact mode**: there only the hits are transferred, so readback is tiny
+and the fixed per-launch host allocation was a large fraction of wall-clock — removing it is +18.5%
+(error bars disjoint, robust). **Full transfer** is PCIe-bound on the ~113 MB readback itself, which
+dwarfs the allocation, so the pool neither helps nor hurts (error bars overlap). Crucially it is
+**never slower**, so per the on/off-flag criterion ("flag only if not always faster") **no flag was
+added** — reuse is unconditional.
+
 ---
 
 ## 6. Benchmarking methodology (read before trusting any number)
