@@ -42,7 +42,7 @@ class OpenCLPrecomputeKernelTest {
 
     private static final int ONE_COORD = OpenClKernelConstants.ONE_COORDINATE_NUM_BYTES; // 32
     private static final int TWO_COORD = OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES; // 64
-    private static final int COMB_DIGITS = OpenCLContext.COMB_DIGITS; // 16
+    private static final int COMB_MAGNITUDES = OpenCLContext.COMB_MAGNITUDES; // 8
     private static final BigInteger N = Secp256k1Constants.MAX_PRIVATE_KEY;
 
     private static CProducerOpenCL minimalProducer() {
@@ -80,33 +80,28 @@ class OpenCLPrecomputeKernelTest {
     }
 
     /**
-     * {@code precompute_comb_table}: entry (pos, digit) must equal {@code (digit*2^(4*pos))*G}, and the
-     * digit-0 slot must be zeroed.
+     * {@code precompute_comb_table} (signed-digit layout): entry (pos, mag) at slot {@code mag-1}
+     * must equal {@code (mag*2^(4*pos))*G} for magnitudes {@code 1..8}. There is no zero slot.
+     * Position 64 is the carry-out window; its entries are {@code (mag*2^256)*G}.
      *
      * @param pos the window position under test
      */
     @ParameterizedTest
     @OpenCLTest
-    @ValueSource(ints = {0, 1, 2, 15, 31, 62, 63})
+    @ValueSource(ints = {0, 1, 2, 15, 31, 62, 63, 64})
     void precomputeCombTable_matchesBitcoinjReference(int pos) throws IOException {
         new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
-        final int positions = OpenCLContext.COMB_POSITIONS; // 64
+        final int positions = OpenCLContext.COMB_POSITIONS; // 65
         try (OpenCLContext ctx = new OpenCLContext(minimalProducer(), bitHelper)) {
             ctx.init();
             final byte[] table = ctx.runPrecomputeKernelForTesting(
-                    "precompute_comb_table", positions * COMB_DIGITS * TWO_COORD, null);
+                    "precompute_comb_table", positions * COMB_MAGNITUDES * TWO_COORD, null);
 
-            // digit 0 = point at infinity -> all zero
-            final int zeroOff = (pos * COMB_DIGITS) * TWO_COORD;
-            for (int i = 0; i < TWO_COORD; i++) {
-                assertEquals(0, table[zeroOff + i], "comb[" + pos + "][0] must be zero at byte " + i);
-            }
-
-            for (int digit = 1; digit < COMB_DIGITS; digit++) {
+            for (int mag = 1; mag <= COMB_MAGNITUDES; mag++) {
                 final BigInteger scalar =
-                        BigInteger.valueOf(digit).shiftLeft(4 * pos).mod(N);
+                        BigInteger.valueOf(mag).shiftLeft(4 * pos).mod(N);
                 assertEntryEqualsScalarTimesG(
-                        table, pos * COMB_DIGITS + digit, scalar, "comb[" + pos + "][" + digit + "]");
+                        table, pos * COMB_MAGNITUDES + (mag - 1), scalar, "comb[" + pos + "][mag=" + mag + "]");
             }
         }
     }

@@ -681,15 +681,20 @@ inline void copy_private_u32_array_private_u32(u32 *dst, const u32 *src, const i
 }
 
 /**
- * @brief Fixed-base comb scalar multiplication: (x1, y1) affine = k * G (Stage 2).
+ * @brief Fixed-base SIGNED-digit comb scalar multiplication: (x1, y1) affine = k * G (Stage 2).
  *
  * Replaces the wNAF point_mul_xy for the one-time anchor P0. G is fixed, so k*G is evaluated from
- * a precomputed table with ~0 doublings instead of ~256. The scalar is split into 64 four-bit
- * windows: k = Sum_{pos=0..63} d_pos * 2^(4*pos), so
- *     k*G = Sum_{pos} (d_pos * 2^(4*pos)) * G = Sum_{pos} comb_table[pos][d_pos].
- * comb_table holds, for pos=0..63 and digit=0..15, the affine point (digit * 2^(4*pos)) * G as
- * [x(8 words)][y(8 words)] in device word order; entry (pos,digit) is at word offset
- * (pos*16 + digit)*16. The digit==0 slot is never read (it is the point at infinity).
+ * a precomputed table with ~0 doublings instead of ~256. The scalar's 4-bit windows are recoded
+ * on the fly into SIGNED digits b_pos in {-8..+7} (carry-propagated low->high):
+ *     k = Sum_{pos} b_pos * 2^(4*pos),   k*G = Sum_{pos} b_pos * (2^(4*pos) * G).
+ * Each term uses comb_table entry (pos, |b_pos|), negated (-P = (x, p - y)) when b_pos < 0. Storing
+ * only magnitudes 1..8 (not the unsigned digits 0..15) HALVES the table. A signed recode of a
+ * 256-bit scalar can carry out of the top window, so the comb runs to pos = 64 (one extra
+ * position, which only ever uses magnitude 1 = 2^256 * G).
+ *
+ * comb_table holds, for pos=0..64 and mag=1..8, the affine point (mag * 2^(4*pos)) * G as
+ * [x(8 words)][y(8 words)] in device word order; entry (pos, mag) is at word offset
+ * (pos*8 + (mag-1))*16. There is no zero slot (digit 0 contributes nothing and is skipped).
  *
  * Accumulation uses the mixed Jacobian+affine point_add. Doubling/infinity edge cases (Q == ±P)
  * cannot occur for the running partial sum vs. the next window point except with astronomically
@@ -700,7 +705,7 @@ inline void copy_private_u32_array_private_u32(u32 *dst, const u32 *src, const i
  * @param x1          out: affine x of k*G (device word order)
  * @param y1          out: affine y of k*G (device word order)
  * @param k           in:  scalar, 8 little-endian u32 words
- * @param comb_table  in:  64*16 precomputed points (see layout above)
+ * @param comb_table  in:  65*8 precomputed points (see layout above)
  */
 inline void point_mul_xy_comb(
     PRIVATE_AS u32 *x1, PRIVATE_AS u32 *y1, PRIVATE_AS const u32 *k, __global const u32 *comb_table)
@@ -709,20 +714,48 @@ inline void point_mul_xy_comb(
     u32 qy[ONE_COORDINATE_NUM_WORDS] = { 0 };
     u32 qz[ONE_COORDINATE_NUM_WORDS] = { 0 };
     u32 have = 0;
+    u32 carry = 0;
 
-    for (u32 pos = 0; pos < 64; pos++) {
-        u32 word = pos >> 3;          // each u32 holds 8 nibbles
-        u32 shift = (pos & 7) << 2;   // nibble offset within the word
-        u32 d = (k[word] >> shift) & 0x0fu;
-        if (d == 0) {
-            continue; // 0 * anything = point at infinity -> contributes nothing
+    // secp256k1 field prime, for the free point negation -P = (x, p - y).
+    const u32 fieldP[ONE_COORDINATE_NUM_WORDS] = {
+        SECP256K1_P0, SECP256K1_P1, SECP256K1_P2, SECP256K1_P3,
+        SECP256K1_P4, SECP256K1_P5, SECP256K1_P6, SECP256K1_P7 };
+
+    for (u32 pos = 0; pos < 65; pos++) {
+        // Window nibble (0 for the extra carry-out position 64), plus the incoming carry.
+        u32 nib = 0;
+        if (pos < 64) {
+            u32 word = pos >> 3;          // each u32 holds 8 nibbles
+            u32 shift = (pos & 7) << 2;   // nibble offset within the word
+            nib = (k[word] >> shift) & 0x0fu;
+        }
+        u32 t = nib + carry; // 0..16
+
+        // Signed recode: t >= 8 borrows from the next window (carry 1) and uses a negative digit.
+        u32 mag;       // magnitude |b|, 0..8
+        u32 negative;  // 1 if b < 0
+        if (t >= 8) {
+            mag = 16u - t; // t in 8..16 -> b = t-16 in -8..0 -> |b| = 16-t in 0..8
+            negative = 1;
+            carry = 1;
+        } else {
+            mag = t;       // t in 0..7 -> b = t in 0..7
+            negative = 0;
+            carry = 0;
+        }
+        if (mag == 0) {
+            continue; // 0 * anything = point at infinity -> contributes nothing (carry already set)
         }
 
-        u32 base = (pos * 16u + d) * TWO_COORDINATE_NUM_WORDS; // 16 words per table point
+        // 8 magnitude slots per position; slot index = mag-1.
+        u32 base = (pos * 8u + (mag - 1u)) * TWO_COORDINATE_NUM_WORDS;
         u32 x2[ONE_COORDINATE_NUM_WORDS];
         u32 y2[ONE_COORDINATE_NUM_WORDS];
         copy_global_u32_array_private_u32(x2, &comb_table[base], ONE_COORDINATE_NUM_WORDS);
         copy_global_u32_array_private_u32(y2, &comb_table[base + ONE_COORDINATE_NUM_WORDS], ONE_COORDINATE_NUM_WORDS);
+        if (negative) {
+            sub_mod(y2, fieldP, y2); // -P = (x, p - y)
+        }
 
         if (have == 0) {
             copy_private_u32_array_private_u32(qx, x2, ONE_COORDINATE_NUM_WORDS);
@@ -751,7 +784,7 @@ __kernel void generateKeysKernel_grid(
     __global const uint *fuse8_meta,   // [seedLo, seedHi, segLen, segLenMask, segCountLen]
     const u32 transfer_all,            // 0 = compact (filter) mode, non-zero = full transfer
     __global const u32 *iG_table,      // (keysPerWorkItem-1) points: entry m-1 = [x_{mG}(8 words)][y_{mG}(8 words)], device word order
-    __global const u32 *comb_table)    // fixed-base comb table: 64 positions * 16 digits, each [x(8)][y(8)], device word order
+    __global const u32 *comb_table)    // fixed-base signed-digit comb table: 65 positions * 8 magnitudes, each [x(8)][y(8)], device word order
 {
     // Little Endian format
     u32 k_littleEndian_local[PRIVATE_KEY_LENGTH];

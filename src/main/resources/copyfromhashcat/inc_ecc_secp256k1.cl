@@ -2300,10 +2300,15 @@ __kernel void precompute_ig_table (__global u32 *iG_table, const u32 count)
   }
 }
 
-// comb_table[pos][digit] = (digit * 2^(4*pos)) * G (affine), pos = 0..63, digit = 0..15.
-// Entry (pos, digit) starts at word offset (pos*16 + digit)*16. digit 0 is the point at infinity
-// and is written as zeros (the consuming comb routine never reads it). Built from G with a
-// per-position 2^4 doubling step and a per-digit addition.
+// Signed-digit comb table: comb_table[pos][mag-1] = (mag * 2^(4*pos)) * G (affine),
+// pos = 0..64, mag = 1..8. Entry (pos, mag) starts at word offset (pos*8 + (mag-1))*16.
+//
+// Only magnitudes 1..8 are stored (8 slots/position), not the full digit set 0..15: the consuming
+// comb routine recodes each 4-bit window into a SIGNED digit b in {-8..+7} (carry-propagated), and
+// gets the negative entries for free as -P = (x, p - y). This halves the table vs. the unsigned
+// 0..15 layout. A signed recode of a 256-bit scalar can carry out of the top window, so there is
+// one extra position (64): it only ever holds magnitude 1 = 2^256 * G, but all 8 slots are built
+// uniformly. Built from G with a per-position 2^4 doubling step and a per-magnitude addition.
 __kernel void precompute_comb_table (__global u32 *comb_table)
 {
   // affine base point G: x = SECP256K1_G0..G7; y = SECP256K1_G_PRE_COMPUTED_08..15 (the y1 of the
@@ -2320,44 +2325,40 @@ __kernel void precompute_comb_table (__global u32 *comb_table)
   bz[0] = 1;
   for (int i = 0; i < 8; i++) { bx[i] = gx[i]; by[i] = gy[i]; }
 
-  for (u32 pos = 0; pos < 64; pos++)
+  for (u32 pos = 0; pos < 65; pos++)
   {
     // affine base for this position: abx,aby = (2^(4*pos)) * G
     u32 abx[8], aby[8], abz[8];
     for (int i = 0; i < 8; i++) { abx[i] = bx[i]; aby[i] = by[i]; abz[i] = bz[i]; }
     point_to_affine (abx, aby, abz);
 
-    const u32 row = pos * 16; // 16 digit slots per position
+    const u32 row = pos * 8; // 8 magnitude slots per position
 
-    // digit 0: point at infinity -> zeroed (never read)
-    const u32 z0 = row * 16;
-    for (int i = 0; i < 16; i++) comb_table[z0 + i] = 0;
-
-    // digit 1: 1 * base
-    const u32 o1 = (row + 1) * 16;
+    // mag 1 -> slot 0: 1 * base
+    const u32 o1 = row * 16;
     for (int i = 0; i < 8; i++) { comb_table[o1 + i] = abx[i]; comb_table[o1 + 8 + i] = aby[i]; }
 
-    // digit 2..15: accumulate digit * base. digit 2 is a doubling (point_add cannot double);
-    // digit >= 3 adds the (distinct) affine base to the running multiple.
+    // mag 2..8 -> slots 1..7: accumulate mag * base. mag 2 is a doubling (point_add cannot double);
+    // mag >= 3 adds the (distinct) affine base to the running multiple.
     u32 cx[8], cy[8], cz[8] = { 0 };
     cz[0] = 1;
     for (int i = 0; i < 8; i++) { cx[i] = abx[i]; cy[i] = aby[i]; } // cur = 1 * base (affine)
 
-    for (u32 d = 2; d < 16; d++)
+    for (u32 mag = 2; mag <= 8; mag++)
     {
-      if (d == 2) point_double (cx, cy, cz);
-      else        point_add (cx, cy, cz, abx, aby);
+      if (mag == 2) point_double (cx, cy, cz);
+      else          point_add (cx, cy, cz, abx, aby);
 
       u32 ax[8], ay[8], az[8];
       for (int i = 0; i < 8; i++) { ax[i] = cx[i]; ay[i] = cy[i]; az[i] = cz[i]; }
       point_to_affine (ax, ay, az);
 
-      const u32 od = (row + d) * 16;
+      const u32 od = (row + (mag - 1)) * 16;
       for (int i = 0; i < 8; i++) { comb_table[od + i] = ax[i]; comb_table[od + 8 + i] = ay[i]; }
     }
 
     // advance base to the next position: base *= 2^4 (four doublings)
-    if (pos < 63)
+    if (pos < 64)
     {
       point_double (bx, by, bz);
       point_double (bx, by, bz);

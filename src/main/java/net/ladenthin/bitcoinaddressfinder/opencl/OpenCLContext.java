@@ -500,18 +500,27 @@ public class OpenCLContext implements ReleaseCLObject {
 
     private void uploadCombTable() {
         final cl_context localContext = Objects.requireNonNull(context);
-        final long bytes = (long) COMB_POSITIONS * COMB_DIGITS * OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES;
+        final long bytes = (long) COMB_POSITIONS * COMB_MAGNITUDES * OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES;
         combTableMem = clCreateBuffer(localContext, CL_MEM_READ_WRITE, bytes, null, null);
         enqueuePrecomputeKernel(combTableMem, "precompute_comb_table", null);
     }
 
-    /** Number of 4-bit windows ("positions") covering a 256-bit scalar. */
+    /**
+     * Number of 4-bit windows ("positions") in the signed-digit comb: 64 windows covering the
+     * 256-bit scalar, plus one extra position for the carry-out of the top window's signed recode
+     * (it only ever holds magnitude 1 = {@code 2^256 * G}).
+     */
     @VisibleForTesting
-    static final int COMB_POSITIONS = 64;
+    static final int COMB_POSITIONS = 65;
 
-    /** Digits per window: {@code 0..15} (digit {@code 0} = point at infinity, never read). */
+    /**
+     * Magnitude slots per position: {@code 1..8}, stored at slot index {@code mag-1}. The comb uses
+     * signed digits {@code b in {-8..+7}}; negative digits reuse the magnitude-{@code |b|} entry
+     * negated ({@code -P = (x, p - y)}), so only 8 points per position are stored (half the unsigned
+     * {@code 0..15} layout).
+     */
     @VisibleForTesting
-    static final int COMB_DIGITS = 16;
+    static final int COMB_MAGNITUDES = 8;
 
     private void releaseCombTable() {
         if (combTableMem != null) {
