@@ -698,7 +698,7 @@ inline bool fuse8_contains(__global const uchar *fp, ulong seed, uint seg, uint 
  * host-configurable, prepend a "#define KEYS_BATCH_INV <n>" line to the program source before the
  * build (host side) rather than passing it as an argument.
  */
-#define KEYS_BATCH_INV 8
+#define KEYS_BATCH_INV 16
 
 /**
  * @brief Copies word_count u32 values from one __private array to another.

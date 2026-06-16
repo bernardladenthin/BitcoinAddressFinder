@@ -327,6 +327,8 @@ public class OpenCLContext implements ReleaseCLObject {
         // Create the kernel
         kernel = clCreateKernel(program, KERNEL_NAME, null);
 
+        logKernelResourceUsage(device);
+
         openClTask = new OpenClTask(context, producerOpenCL, bitHelper, byteBufferUtility);
 
         // Allocate a dummy empty filter so the kernel's fuse8 arguments are always bindable.
@@ -342,6 +344,44 @@ public class OpenCLContext implements ReleaseCLObject {
         // Build and upload the fixed-base comb table used to compute the one-time anchor P0 = k0·G.
         // Curve-only (key-independent), so built once here.
         uploadCombTable();
+    }
+
+    /**
+     * Logs the built kernel's per-work-item resource usage (one INFO line at init). These standard
+     * {@code clGetKernelWorkGroupInfo} values are the occupancy diagnostic used in {@code
+     * docs/performance.md} ("Occupancy / register pressure"): {@code kernelMaxWorkGroupSize} below the
+     * device's {@code CL_DEVICE_MAX_WORK_GROUP_SIZE} indicates the kernel is resource- (typically
+     * register-) limited, and a non-zero {@code privateMemBytes} indicates register spilling to
+     * device-local memory. {@code workGroupSizeMultiple} is the warp/wavefront size.
+     *
+     * @param device the selected OpenCL device the kernel was built for
+     */
+    private void logKernelResourceUsage(OpenCLDevice device) {
+        final cl_kernel localKernel = Objects.requireNonNull(kernel);
+        final long[] value = new long[1];
+        CL.clGetKernelWorkGroupInfo(
+                localKernel, device.device(), CL.CL_KERNEL_WORK_GROUP_SIZE, Sizeof.size_t, Pointer.to(value), null);
+        final long kernelMaxWorkGroupSize = value[0];
+        CL.clGetKernelWorkGroupInfo(
+                localKernel,
+                device.device(),
+                CL.CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE,
+                Sizeof.size_t,
+                Pointer.to(value),
+                null);
+        final long workGroupSizeMultiple = value[0];
+        CL.clGetKernelWorkGroupInfo(
+                localKernel, device.device(), CL.CL_KERNEL_PRIVATE_MEM_SIZE, Sizeof.cl_ulong, Pointer.to(value), null);
+        final long privateMemBytes = value[0];
+        CL.clGetKernelWorkGroupInfo(
+                localKernel, device.device(), CL.CL_KERNEL_LOCAL_MEM_SIZE, Sizeof.cl_ulong, Pointer.to(value), null);
+        final long localMemBytes = value[0];
+        LOGGER.info(
+                "Kernel resource usage: kernelMaxWorkGroupSize={} workGroupSizeMultiple={} privateMemBytes={} localMemBytes={}",
+                kernelMaxWorkGroupSize,
+                workGroupSizeMultiple,
+                privateMemBytes,
+                localMemBytes);
     }
 
     /**
