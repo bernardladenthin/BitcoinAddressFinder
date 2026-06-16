@@ -8,6 +8,7 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,6 +16,7 @@ import java.util.stream.Stream;
 import net.ladenthin.bitcoinaddressfinder.OpenCLPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.OpenCLTest;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.configuration.KernelProfileStage;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8GpuFilterData;
@@ -23,6 +25,8 @@ import nl.altindag.log.LogCaptor;
 import nl.altindag.log.model.LogEvent;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 public class OpenCLContextTest {
 
@@ -76,6 +80,157 @@ public class OpenCLContextTest {
 
         // assert
         assertThat(openCLContext, is(notNullValue()));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="buildOptions">
+    @Test
+    public void buildOptions_useSafeGcdInverseTrue_omitsLegacyDefine() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.useSafeGcdInverse = true;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert
+        assertThat(options, not(containsString(OpenCLContext.LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION)));
+    }
+
+    @Test
+    public void buildOptions_useSafeGcdInverseFalse_appendsLegacyDefine() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.useSafeGcdInverse = false;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert
+        assertThat(options, containsString(OpenCLContext.LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION));
+    }
+
+    @Test
+    public void buildOptions_defaultConfiguration_usesSafeGcd() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert
+        assertThat(options, not(containsString(OpenCLContext.LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION)));
+    }
+
+    @Test
+    public void buildOptions_kernelProfileStageFull_omitsProfileDefines() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.kernelProfileStage = KernelProfileStage.FULL;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert
+        assertThat(options, not(containsString(OpenCLContext.PROFILE_SKIP_SECOND_HASH160_BUILD_OPTION)));
+        assertThat(options, not(containsString(OpenCLContext.PROFILE_SKIP_HASH160_BUILD_OPTION)));
+    }
+
+    @Test
+    public void buildOptions_kernelProfileStageOneHash160_appendsSkipSecondHashDefine() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.kernelProfileStage = KernelProfileStage.ONE_HASH160;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert: the single-chain define is present; the both-chains define is not (it is not a
+        // substring of "-D PROFILE_SKIP_SECOND_HASH160").
+        assertThat(options, containsString(OpenCLContext.PROFILE_SKIP_SECOND_HASH160_BUILD_OPTION));
+        assertThat(options, not(containsString(OpenCLContext.PROFILE_SKIP_HASH160_BUILD_OPTION)));
+    }
+
+    @Test
+    public void buildOptions_kernelProfileStageNoHash160_appendsSkipHashDefine() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.kernelProfileStage = KernelProfileStage.NO_HASH160;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert
+        assertThat(options, containsString(OpenCLContext.PROFILE_SKIP_HASH160_BUILD_OPTION));
+    }
+
+    @Test
+    public void buildOptions_logGpuDiagnosticsFalse_omitsNvVerbose() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.logGpuDiagnostics = false;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert
+        assertThat(options, not(containsString(OpenCLContext.NV_VERBOSE_BUILD_OPTION)));
+    }
+
+    @Test
+    public void buildOptions_logGpuDiagnosticsTrue_appendsNvVerbose() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.logGpuDiagnostics = true;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert
+        assertThat(options, containsString(OpenCLContext.NV_VERBOSE_BUILD_OPTION));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="kernelProfileStage builds and runs">
+    /**
+     * Every {@link KernelProfileStage} must compile and run on the device — this guards the
+     * {@code #ifdef PROFILE_*} guards in the kernel so the profiling suite (GpuFuse8FilterBenchmark
+     * {@code -p kernelProfileStage=...}) never breaks. Timing/correctness is not asserted here (the
+     * non-FULL modes intentionally emit incorrect hashes); only that the kernel builds and a launch
+     * completes and returns a result buffer.
+     *
+     * @param stage the kernel profiling stage under test
+     */
+    @ParameterizedTest
+    @EnumSource(KernelProfileStage.class)
+    @OpenCLTest
+    public void kernelProfileStage_buildsAndRuns(KernelProfileStage stage) throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.batchSizeInBits = 8;
+        cProducerOpenCL.keysPerWorkItem = 1;
+        cProducerOpenCL.kernelProfileStage = stage;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+        try {
+            openCLContext.init();
+
+            // act
+            try (OpenCLGridResult result = openCLContext.createKeys(BigInteger.valueOf(0x1234_5678L))) {
+                // assert: a launch completed and produced a readable result buffer
+                assertThat(result.getResult().capacity(), is(greaterThan(0)));
+            }
+        } finally {
+            openCLContext.close();
+        }
     }
     // </editor-fold>
 

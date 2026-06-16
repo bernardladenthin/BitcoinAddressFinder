@@ -602,9 +602,15 @@ DECLSPEC void mul_mod (PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a, PRIVATE_AS co
   u32 t1 = 0;
   u32 c  = 0;
 
-  for (u32 i = 0; i < 8; i++)
+  // Schoolbook multiply: limb t[i] = Sum a[j]*b[i-j] over j in [max(0,i-7), min(7,i)].
+  // The two index halves (i<8: j in [0,i]; i>=8: j in [i-7,7]) are folded into one loop;
+  // with the compile-time bounds and #pragma unroll the compiler emits the same unrolled code.
+  #pragma unroll
+  for (u32 i = 0; i < 15; i++)
   {
-    for (u32 j = 0; j <= i; j++)
+    u32 jStart = (i > 7) ? (i - 7) : 0; // ternary, not i-7, to avoid u32 underflow for i<7
+    u32 jEnd   = (i < 8) ? i : 7;
+    for (u32 j = jStart; j <= jEnd; j++)
     {
       u64 p = ((u64) a[j]) * b[i - j];
 
@@ -616,30 +622,6 @@ DECLSPEC void mul_mod (PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a, PRIVATE_AS co
       t1 = d >> 32;
 
       c += d < p; // carry
-    }
-
-    t[i] = t0;
-
-    t0 = t1;
-    t1 = c;
-
-    c = 0;
-  }
-
-  for (u32 i = 8; i < 15; i++)
-  {
-    for (u32 j = i - 7; j < 8; j++)
-    {
-      u64 p = ((u64) a[j]) * b[i - j];
-
-      u64 d = ((u64) t1) << 32 | t0;
-
-      d += p;
-
-      t0 = (u32) d;
-      t1 = d >> 32;
-
-      c += d < p;
     }
 
     t[i] = t0;
@@ -668,6 +650,7 @@ DECLSPEC void mul_mod (PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a, PRIVATE_AS co
   // Note: SECP256K1_P = 2^256 - 2^32 - 977 (0x03d1 = 977)
   // multiply t[8]...t[15] by omega:
 
+  #pragma unroll
   for (u32 i = 0, j = 8; i < 8; i++, j++)
   {
     u64 p = ((u64) 0x03d1) * t[j] + c;
@@ -694,6 +677,7 @@ DECLSPEC void mul_mod (PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a, PRIVATE_AS co
 
   // memset (t, 0, sizeof (t));
 
+  #pragma unroll
   for (u32 i = 0, j = 8; i < 8; i++, j++)
   {
     u64 p = ((u64) 0x3d1) * tmp[j] + c2;
@@ -797,6 +781,16 @@ DECLSPEC void sqrt_mod (PRIVATE_AS u32 *r)
 
 DECLSPEC void inv_mod (PRIVATE_AS u32 *a)
 {
+#ifndef USE_LEGACY_BINARY_GCD_INV_MOD
+  // Default: route every modular inverse through the fixed-iteration safegcd path (see
+  // inv_mod_safegcd below). Measured ~+45% kernel throughput at keysPerWorkItem=128 on an RTX 3070
+  // vs. the binary-GCD code below, because safegcd runs a fixed 600 divsteps for every lane (no
+  // warp divergence) where the binary GCD's iteration count is input-dependent. Same result.
+  // Build with -D USE_LEGACY_BINARY_GCD_INV_MOD to fall back to the binary GCD (A/B, or for a
+  // device where safegcd's signed arithmetic-shift assumption does not hold).
+  inv_mod_safegcd (a);
+  return;
+#else
   // Guard against a == 0 (the z-coordinate of the point at infinity, produced by
   // point_add of P + (-P) or the P == Q doubling case in the keysPerWorkItem>1 path).
   // Without this the binary-GCD loop below never terminates: t0 = 0 is always even,
@@ -1032,6 +1026,245 @@ DECLSPEC void inv_mod (PRIVATE_AS u32 *a)
   a[5] = t2[5];
   a[6] = t2[6];
   a[7] = t2[7];
+#endif // USE_LEGACY_BINARY_GCD_INV_MOD
+}
+
+/*
+ * safegcd modular inverse (Bernstein-Yang "divsteps"), a faithful port of libsecp256k1's
+ * CONSTANT-TIME modinv32 (bitcoin-core/secp256k1, src/modinv32_impl.h, MIT). Drop-in alternative to
+ * inv_mod() above with the SAME signature (u32 a[8] little-endian, value in [0, p), replaced by its
+ * inverse mod p). Self-contained: depends only on the field prime p (encoded below) and 32/64-bit
+ * integer math already used by mul_mod — no project-specific helpers — so it is upstreamable.
+ *
+ * Why this exists: inv_mod() above is a binary extended GCD whose iteration count DEPENDS ON THE
+ * INPUT. Under SIMT every lane in a warp runs to the slowest lane's count (warp divergence). safegcd
+ * runs a FIXED 20*30 = 600 divsteps for every input, so a warp finishes in lock-step.
+ *
+ * Representation: 9 signed 30-bit limbs (value = sum v[i]*2^(30*i)). 30-bit limbs keep every
+ * intermediate product inside a 64-bit accumulator (`long`), avoiding the 128-bit math the 62-bit
+ * variant needs.
+ *
+ * Shift note: like the reference, this relies on ARITHMETIC (sign-extending) right shift of signed
+ * `int`/`long`. NVIDIA and pocl both implement that; the parity test (test_inv_mod_safegcd) guards
+ * any device that disagrees.
+ */
+
+#define SAFEGCD_M30 0x3fffffff
+// secp256k1 field prime p = 2^256 - 2^32 - 977 in signed-30 limbs, and -p^-1 mod 2^30 helper.
+#define SAFEGCD_P_INIT { -0x3d1, -4, 0, 0, 0, 0, 0, 0, 65536 }
+#define SAFEGCD_P_INV30 0x2ddacacfu
+
+// 30 divsteps: builds the 2x2 transition matrix t[u,v,q,r] and returns the new zeta.
+DECLSPEC int modinv32_divsteps_30 (int zeta, u32 f0, u32 g0, PRIVATE_AS int *t)
+{
+  u32 u = 1, v = 0, q = 0, r = 1;
+  u32 c1, c2, mask1, mask2, f = f0, g = g0, x, y, z;
+
+  for (int i = 0; i < 30; i++)
+  {
+    c1 = (u32) (zeta >> 31);     // all-ones iff zeta < 0
+    mask1 = c1;
+    c2 = g & 1;
+    mask2 = -c2;                 // all-ones iff g odd
+    x = (f ^ mask1) - mask1;     // conditionally negate f,u,v
+    y = (u ^ mask1) - mask1;
+    z = (v ^ mask1) - mask1;
+    g += x & mask2;
+    q += y & mask2;
+    r += z & mask2;
+    mask1 &= mask2;              // (zeta < 0) AND (g odd)
+    zeta = (int) ((u32) zeta ^ mask1) - 1;
+    f += g & mask1;
+    u += q & mask1;
+    v += r & mask1;
+    g >>= 1;
+    u <<= 1;
+    v <<= 1;
+  }
+  t[0] = (int) u;
+  t[1] = (int) v;
+  t[2] = (int) q;
+  t[3] = (int) r;
+  return zeta;
+}
+
+// d,e <- (t*[d,e]) / 2^30 mod p (Bezout coefficients).
+DECLSPEC void modinv32_update_de_30 (PRIVATE_AS int *d, PRIVATE_AS int *e, PRIVATE_AS const int *t)
+{
+  const int modulus[9] = SAFEGCD_P_INIT;
+  const int u = t[0], v = t[1], q = t[2], r = t[3];
+  int di, ei, md, me, sd, se;
+  long cd, ce;
+
+  sd = d[8] >> 31;
+  se = e[8] >> 31;
+  md = (u & sd) + (v & se);
+  me = (q & sd) + (r & se);
+  di = d[0];
+  ei = e[0];
+  cd = (long) u * di + (long) v * ei;
+  ce = (long) q * di + (long) r * ei;
+  // choose md,me so the low 30 bits of t*[d,e]+p*[md,me] vanish
+  md -= (int) ((SAFEGCD_P_INV30 * (u32) cd + (u32) md) & SAFEGCD_M30);
+  me -= (int) ((SAFEGCD_P_INV30 * (u32) ce + (u32) me) & SAFEGCD_M30);
+  cd += (long) modulus[0] * md;
+  ce += (long) modulus[0] * me;
+  cd >>= 30;
+  ce >>= 30;
+  for (int i = 1; i < 9; i++)
+  {
+    di = d[i];
+    ei = e[i];
+    cd += (long) u * di + (long) v * ei;
+    ce += (long) q * di + (long) r * ei;
+    cd += (long) modulus[i] * md;
+    ce += (long) modulus[i] * me;
+    d[i - 1] = (int) cd & SAFEGCD_M30; cd >>= 30;
+    e[i - 1] = (int) ce & SAFEGCD_M30; ce >>= 30;
+  }
+  d[8] = (int) cd;
+  e[8] = (int) ce;
+}
+
+// f,g <- (t*[f,g]) / 2^30.
+DECLSPEC void modinv32_update_fg_30 (PRIVATE_AS int *f, PRIVATE_AS int *g, PRIVATE_AS const int *t)
+{
+  const int u = t[0], v = t[1], q = t[2], r = t[3];
+  int fi, gi;
+  long cf, cg;
+
+  fi = f[0];
+  gi = g[0];
+  cf = (long) u * fi + (long) v * gi;
+  cg = (long) q * fi + (long) r * gi;
+  cf >>= 30;
+  cg >>= 30;
+  for (int i = 1; i < 9; i++)
+  {
+    fi = f[i];
+    gi = g[i];
+    cf += (long) u * fi + (long) v * gi;
+    cg += (long) q * fi + (long) r * gi;
+    f[i - 1] = (int) cf & SAFEGCD_M30; cf >>= 30;
+    g[i - 1] = (int) cg & SAFEGCD_M30; cg >>= 30;
+  }
+  f[8] = (int) cf;
+  g[8] = (int) cg;
+}
+
+// Bring r from (-2p, p) to [0, p), optionally negating first (sign < 0 => negate).
+DECLSPEC void modinv32_normalize_30 (PRIVATE_AS int *r, int sign)
+{
+  const int modulus[9] = SAFEGCD_P_INIT;
+  const int M30 = SAFEGCD_M30;
+  int r0 = r[0], r1 = r[1], r2 = r[2], r3 = r[3], r4 = r[4], r5 = r[5], r6 = r[6], r7 = r[7], r8 = r[8];
+  int cond_add, cond_negate;
+
+  cond_add = r8 >> 31;
+  r0 += modulus[0] & cond_add;
+  r1 += modulus[1] & cond_add;
+  r2 += modulus[2] & cond_add;
+  r3 += modulus[3] & cond_add;
+  r4 += modulus[4] & cond_add;
+  r5 += modulus[5] & cond_add;
+  r6 += modulus[6] & cond_add;
+  r7 += modulus[7] & cond_add;
+  r8 += modulus[8] & cond_add;
+  cond_negate = sign >> 31;
+  r0 = (r0 ^ cond_negate) - cond_negate;
+  r1 = (r1 ^ cond_negate) - cond_negate;
+  r2 = (r2 ^ cond_negate) - cond_negate;
+  r3 = (r3 ^ cond_negate) - cond_negate;
+  r4 = (r4 ^ cond_negate) - cond_negate;
+  r5 = (r5 ^ cond_negate) - cond_negate;
+  r6 = (r6 ^ cond_negate) - cond_negate;
+  r7 = (r7 ^ cond_negate) - cond_negate;
+  r8 = (r8 ^ cond_negate) - cond_negate;
+  r1 += r0 >> 30; r0 &= M30;
+  r2 += r1 >> 30; r1 &= M30;
+  r3 += r2 >> 30; r2 &= M30;
+  r4 += r3 >> 30; r3 &= M30;
+  r5 += r4 >> 30; r4 &= M30;
+  r6 += r5 >> 30; r5 &= M30;
+  r7 += r6 >> 30; r6 &= M30;
+  r8 += r7 >> 30; r7 &= M30;
+
+  cond_add = r8 >> 31;
+  r0 += modulus[0] & cond_add;
+  r1 += modulus[1] & cond_add;
+  r2 += modulus[2] & cond_add;
+  r3 += modulus[3] & cond_add;
+  r4 += modulus[4] & cond_add;
+  r5 += modulus[5] & cond_add;
+  r6 += modulus[6] & cond_add;
+  r7 += modulus[7] & cond_add;
+  r8 += modulus[8] & cond_add;
+  r1 += r0 >> 30; r0 &= M30;
+  r2 += r1 >> 30; r1 &= M30;
+  r3 += r2 >> 30; r2 &= M30;
+  r4 += r3 >> 30; r3 &= M30;
+  r5 += r4 >> 30; r4 &= M30;
+  r6 += r5 >> 30; r5 &= M30;
+  r7 += r6 >> 30; r6 &= M30;
+  r8 += r7 >> 30; r7 &= M30;
+
+  r[0] = r0; r[1] = r1; r[2] = r2; r[3] = r3; r[4] = r4;
+  r[5] = r5; r[6] = r6; r[7] = r7; r[8] = r8;
+}
+
+// u32[8] little-endian (value in [0, 2^256)) -> 9 signed-30 limbs in [0, 2^30).
+DECLSPEC void modinv32_from_u32x8 (PRIVATE_AS int *g, PRIVATE_AS const u32 *a)
+{
+  for (int i = 0; i < 9; i++)
+  {
+    const int bit = 30 * i;
+    const int word = bit >> 5;
+    const int off = bit & 31;
+    u64 chunk = ((u64) a[word]) >> off;
+    if (off > 0 && (word + 1) < 8) chunk |= ((u64) a[word + 1]) << (32 - off);
+    g[i] = (int) ((u32) chunk & SAFEGCD_M30);
+  }
+}
+
+// 9 signed-30 limbs in [0, 2^30) (value in [0, p)) -> u32[8] little-endian. Limbs occupy disjoint
+// 30-bit ranges, so a plain OR (no carry) reconstructs the 256-bit value.
+DECLSPEC void modinv32_to_u32x8 (PRIVATE_AS u32 *a, PRIVATE_AS const int *d)
+{
+  for (int i = 0; i < 8; i++) a[i] = 0;
+  for (int i = 0; i < 9; i++)
+  {
+    const u64 v = (u64) ((u32) d[i] & SAFEGCD_M30);
+    const int bit = 30 * i;
+    const int word = bit >> 5;
+    const int off = bit & 31;
+    const u64 shifted = v << off;
+    a[word] |= (u32) (shifted & 0xffffffffu);
+    if ((word + 1) < 8) a[word + 1] |= (u32) (shifted >> 32);
+  }
+}
+
+// Drop-in modular inverse: a (u32[8], in [0, p)) <- a^-1 mod p. inv_mod(0) == 0 (matches inv_mod).
+DECLSPEC void inv_mod_safegcd (PRIVATE_AS u32 *a)
+{
+  int d[9] = { 0 };
+  int e[9] = { 0 };
+  int f[9] = SAFEGCD_P_INIT;
+  int g[9];
+  int t[4];
+
+  e[0] = 1;
+  modinv32_from_u32x8 (g, a);
+
+  int zeta = -1;
+  for (int it = 0; it < 20; it++)
+  {
+    zeta = modinv32_divsteps_30 (zeta, (u32) f[0], (u32) g[0], t);
+    modinv32_update_de_30 (d, e, t);
+    modinv32_update_fg_30 (f, g, t);
+  }
+  // g has reached 0; f == +/-1 (== gcd); d holds +/- the inverse. Normalize using sign of f.
+  modinv32_normalize_30 (d, f[8]);
+  modinv32_to_u32x8 (a, d);
 }
 
 /*
@@ -2251,4 +2484,135 @@ DECLSPEC void set_precomputed_basepoint_g (PRIVATE_AS secp256k1_t *r)
   r->xy[93] = SECP256K1_G_PRE_COMPUTED_93;
   r->xy[94] = SECP256K1_G_PRE_COMPUTED_94;
   r->xy[95] = SECP256K1_G_PRE_COMPUTED_95;
+}
+
+DECLSPEC void point_to_affine (PRIVATE_AS u32 *x, PRIVATE_AS u32 *y, PRIVATE_AS u32 *z)
+{
+  // (x, y, z) Jacobian -> (x, y) affine: x_affine = x / z^2, y_affine = y / z^3.
+  inv_mod (z);
+
+  u32 z2[8];
+
+  mul_mod (z2, z, z); // z^2
+  mul_mod (x, x, z2); // x / z^2
+
+  mul_mod (z, z2, z); // z^3
+  mul_mod (y, y, z);  // y / z^3
+}
+
+/*
+ * Fixed-base precompute kernels (self-contained).
+ *
+ * These build, on the device, the lookup tables used by a fixed-base-comb + affine-addition-walk
+ * key generator (the BitCrack / VanitySearch design). They depend only on this library's generic
+ * primitives (point_add, point_double, point_to_affine) and the public base point G
+ * (SECP256K1_G0..G7, SECP256K1_GY0..GY7) — no wNAF precomputed table, no host upload. Each table
+ * point is stored as [x(8 u32 words)][y(8 u32 words)] in device word order (8 little-endian limbs
+ * per coordinate), i.e. 16 words per entry. Launch each with a single work-item; this is one-time
+ * init work, off the hot path.
+ */
+
+// iG_table[m-1] = m*G (affine), for m = 1..count. Built from G by repeated mixed point_add.
+__kernel void precompute_ig_table (__global u32 *iG_table, const u32 count)
+{
+  // affine base point G: x = SECP256K1_G0..G7; y = SECP256K1_G_PRE_COMPUTED_08..15 (the y1 of the
+  // precomputed table, i.e. y(G)) — reused so no constant is duplicated.
+  u32 gx[8] = { SECP256K1_G0, SECP256K1_G1, SECP256K1_G2, SECP256K1_G3,
+                SECP256K1_G4, SECP256K1_G5, SECP256K1_G6, SECP256K1_G7 };
+  u32 gy[8] = { SECP256K1_G_PRE_COMPUTED_08, SECP256K1_G_PRE_COMPUTED_09,
+                SECP256K1_G_PRE_COMPUTED_10, SECP256K1_G_PRE_COMPUTED_11,
+                SECP256K1_G_PRE_COMPUTED_12, SECP256K1_G_PRE_COMPUTED_13,
+                SECP256K1_G_PRE_COMPUTED_14, SECP256K1_G_PRE_COMPUTED_15 };
+
+  // running point P = G in Jacobian coordinates (z = 1)
+  u32 px[8], py[8], pz[8] = { 0 };
+  pz[0] = 1;
+  for (int i = 0; i < 8; i++) { px[i] = gx[i]; py[i] = gy[i]; }
+
+  for (u32 m = 1; m <= count; m++)
+  {
+    // affine(P) -> entry m-1
+    u32 ax[8], ay[8], az[8];
+    for (int i = 0; i < 8; i++) { ax[i] = px[i]; ay[i] = py[i]; az[i] = pz[i]; }
+    point_to_affine (ax, ay, az);
+
+    const u32 out = (m - 1) * 16; // 16 words per entry: [x(8)][y(8)]
+    for (int i = 0; i < 8; i++) { iG_table[out + i] = ax[i]; iG_table[out + 8 + i] = ay[i]; }
+
+    // Advance P to (m+1)*G. The first step (m==1) is G+G, a doubling, which the mixed
+    // point_add cannot handle; every later step adds the (distinct) base G.
+    if (m < count)
+    {
+      if (m == 1) point_double (px, py, pz);      // 1*G -> 2*G
+      else        point_add (px, py, pz, gx, gy); // m*G -> (m+1)*G
+    }
+  }
+}
+
+// Signed-digit comb table: comb_table[pos][mag-1] = (mag * 2^(4*pos)) * G (affine),
+// pos = 0..64, mag = 1..8. Entry (pos, mag) starts at word offset (pos*8 + (mag-1))*16.
+//
+// Only magnitudes 1..8 are stored (8 slots/position), not the full digit set 0..15: the consuming
+// comb routine recodes each 4-bit window into a SIGNED digit b in {-8..+7} (carry-propagated), and
+// gets the negative entries for free as -P = (x, p - y). This halves the table vs. the unsigned
+// 0..15 layout. A signed recode of a 256-bit scalar can carry out of the top window, so there is
+// one extra position (64): it only ever holds magnitude 1 = 2^256 * G, but all 8 slots are built
+// uniformly. Built from G with a per-position 2^4 doubling step and a per-magnitude addition.
+__kernel void precompute_comb_table (__global u32 *comb_table)
+{
+  // affine base point G: x = SECP256K1_G0..G7; y = SECP256K1_G_PRE_COMPUTED_08..15 (the y1 of the
+  // precomputed table, i.e. y(G)) — reused so no constant is duplicated.
+  u32 gx[8] = { SECP256K1_G0, SECP256K1_G1, SECP256K1_G2, SECP256K1_G3,
+                SECP256K1_G4, SECP256K1_G5, SECP256K1_G6, SECP256K1_G7 };
+  u32 gy[8] = { SECP256K1_G_PRE_COMPUTED_08, SECP256K1_G_PRE_COMPUTED_09,
+                SECP256K1_G_PRE_COMPUTED_10, SECP256K1_G_PRE_COMPUTED_11,
+                SECP256K1_G_PRE_COMPUTED_12, SECP256K1_G_PRE_COMPUTED_13,
+                SECP256K1_G_PRE_COMPUTED_14, SECP256K1_G_PRE_COMPUTED_15 };
+
+  // base = 2^(4*pos) * G in Jacobian coordinates, starting at G (pos = 0)
+  u32 bx[8], by[8], bz[8] = { 0 };
+  bz[0] = 1;
+  for (int i = 0; i < 8; i++) { bx[i] = gx[i]; by[i] = gy[i]; }
+
+  for (u32 pos = 0; pos < 65; pos++)
+  {
+    // affine base for this position: abx,aby = (2^(4*pos)) * G
+    u32 abx[8], aby[8], abz[8];
+    for (int i = 0; i < 8; i++) { abx[i] = bx[i]; aby[i] = by[i]; abz[i] = bz[i]; }
+    point_to_affine (abx, aby, abz);
+
+    const u32 row = pos * 8; // 8 magnitude slots per position
+
+    // mag 1 -> slot 0: 1 * base
+    const u32 o1 = row * 16;
+    for (int i = 0; i < 8; i++) { comb_table[o1 + i] = abx[i]; comb_table[o1 + 8 + i] = aby[i]; }
+
+    // mag 2..8 -> slots 1..7: accumulate mag * base. mag 2 is a doubling (point_add cannot double);
+    // mag >= 3 adds the (distinct) affine base to the running multiple.
+    u32 cx[8], cy[8], cz[8] = { 0 };
+    cz[0] = 1;
+    for (int i = 0; i < 8; i++) { cx[i] = abx[i]; cy[i] = aby[i]; } // cur = 1 * base (affine)
+
+    for (u32 mag = 2; mag <= 8; mag++)
+    {
+      if (mag == 2) point_double (cx, cy, cz);
+      else          point_add (cx, cy, cz, abx, aby);
+
+      u32 ax[8], ay[8], az[8];
+      for (int i = 0; i < 8; i++) { ax[i] = cx[i]; ay[i] = cy[i]; az[i] = cz[i]; }
+      point_to_affine (ax, ay, az);
+
+      const u32 od = (row + (mag - 1)) * 16;
+      for (int i = 0; i < 8; i++) { comb_table[od + i] = ax[i]; comb_table[od + 8 + i] = ay[i]; }
+    }
+
+    // advance base to the next position: base *= 2^4 (four doublings)
+    if (pos < 64)
+    {
+      point_double (bx, by, bz);
+      point_double (bx, by, bz);
+      point_double (bx, by, bz);
+      point_double (bx, by, bz);
+    }
+  }
 }

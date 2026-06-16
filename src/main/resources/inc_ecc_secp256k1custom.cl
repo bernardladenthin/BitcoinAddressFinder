@@ -376,22 +376,6 @@ inline void copy_private_u32_array_global_u32(__global u32 *dst, const u32 *src,
  * @param src Source array of u32 values.
  * @param word_count Number of u32 words to copy (1 word = 4 bytes).
  */
-inline void copy_u32_array_bytes(uchar *dst, int dst_offset, const u32 *src, const int word_count) {
-    const uchar *src_bytes = (const uchar *)src;
-    #pragma unroll
-    for (int i = 0; i < word_count * 4; i++) {
-        dst[dst_offset + i] = src_bytes[i];
-    }
-}
-
-inline uchar get_lsb_of_little_endian_coordinate(const u32 *coord) {
-    return as_uchar4(coord[0]).s0;
-}
-
-inline uchar get_lsb_of_big_endian_coordinate(const u32 *coord) {
-    return as_uchar4(coord[ONE_COORDINATE_NUM_WORDS - 1]).s3;
-}
-
 // ======= Swap 32-bit value (safe across OpenCL versions) =======
 
 inline u32 swap_u32(u32 v) {
@@ -420,87 +404,90 @@ inline void copy_and_reverse_endianness_u32_array(u32 *dst, int dst_offset, cons
     }
 }
 
-/**
- * @brief Converts a byte array into an array of u32 words (big-endian).
- *
- * Packs 4 bytes at a time from the input byte array `src` into 32-bit words in `dst`,
- * assuming the byte order is big-endian (most significant byte first).
- *
- * For example, the bytes {0x12, 0x34, 0x56, 0x78} will become the u32 word 0x12345678.
- *
- * @param src Input byte array (length must be at least word_count * 4).
- * @param dst Output array of u32 words.
- * @param word_count Number of 32-bit words to produce (reads 4 * word_count bytes from src).
- */
-inline void pack_bytes_to_u32_words(const uchar *src, u32 *dst, const int word_count)
+// ===========================================================================================
+// Direct EC-coordinate -> SHA-256 input block construction (upstreamable to hashcat).
+//
+// Built from two small, general "append at byte offset" primitives instead of bespoke per-format
+// splices: zero the block, then "put" the 1-byte SEC prefix at offset 0, "put" each big-endian
+// coordinate word at successive offsets (X, then optionally Y), and "put" the trailing 0x80 pad bit;
+// the message-length word finishes it. Compressed vs. uncompressed differ only by how many words are
+// appended — same mechanism. No intermediate byte buffer, no per-word byte swap.
+//
+// Because the byte offsets are compile-time constants in the (unrolled) callers, sha_block_put_be32's
+// shift/branch fold away to exactly the hand-written (msword<<24)|(lsword>>8) splice — i.e. this is
+// the generality of a streaming append with the cost of a straight-line write.
+//
+// Input form: x[]/y[] are the secp256k1 coordinate limbs in DEVICE little-endian word order —
+// x[0] = least-significant 32 bits, x[7] = most-significant 32 bits (the form the EC point math here
+// produces, before any endianness reversal). Big-endian SEC word k is limb (7-k); the byte order
+// WITHIN a limb is already SHA's big-endian, so no swap is needed. prefix = 0x02/0x03 from the parity
+// of Y (its least-significant bit -> y[0] & 1), or 0x04 for the uncompressed form.
+// ===========================================================================================
+
+// Generic (NOT SHA-specific): OR a big-endian u32 `val` into a big-endian byte buffer `buf` (an array
+// of u32 words, byte 0 = MSB of word 0) at byte offset `byte_off`. A non-word-aligned offset straddles
+// two words. `buf` must be pre-zeroed over the written range (this ORs, it does not clear). When
+// `byte_off` is a compile-time constant (as in the callers here), the shift/branch fold away to a
+// straight-line write. Works for any big-endian word buffer — SHA-256 input blocks are just one user.
+inline void be_buffer_put_u32(u32 *buf, const u32 byte_off, const u32 val)
 {
-    #pragma unroll
-    for (int i = 0; i < word_count; i++) {
-        dst[i] =
-            ((u32)src[i * 4 + 0] << 24) |
-            ((u32)src[i * 4 + 1] << 16) |
-            ((u32)src[i * 4 + 2] << 8 ) |
-            ((u32)src[i * 4 + 3]);
+    const u32 wi = byte_off >> 2;
+    const u32 sh = (byte_off & 3u) * 8u;
+    if (sh == 0u) {
+        buf[wi] |= val;
+    } else {
+        buf[wi] |= (val >> sh);
+        buf[wi + 1] |= (val << (32u - sh));
     }
 }
 
-inline void sha256_add_padding(u32 *dst, const int padding_start_index, const u32 final_byte, const int length_index, const u32 bit_len)
+// Generic: OR a single byte `byte_val` into a big-endian byte buffer `buf` at byte offset `byte_off`.
+inline void be_buffer_put_byte(u32 *buf, const u32 byte_off, const u32 byte_val)
 {
-    // Write the final byte + 0x80 bit
-    dst[padding_start_index] = ((u32)final_byte << 24) | 0x00800000;
+    const u32 wi = byte_off >> 2;
+    const u32 sh = (3u - (byte_off & 3u)) * 8u;
+    buf[wi] |= (byte_val & 0xffu) << sh;
+}
 
-    // Zero-fill from padding_start_index + 1 up to length_index - 1
+// Appends the SEC prefix byte + the 8 big-endian X words (high limb -> low limb) starting at byte 1.
+// Shared by both SEC forms; X always occupies bytes 1..32.
+inline void be_buffer_put_sec_prefix_and_x(u32 *buf, const u32 prefix, const u32 *x)
+{
+    be_buffer_put_byte(buf, 0, prefix);
     #pragma unroll
-    for (int i = padding_start_index + 1; i < length_index; i++) {
-        dst[i] = 0;
+    for (int i = 0; i < ONE_COORDINATE_NUM_WORDS; i++) {
+        be_buffer_put_u32(buf, 1u + (u32)i * 4u, x[ONE_COORDINATE_NUM_WORDS - 1 - i]);
     }
-
-    // Store bit length
-    dst[length_index] = bit_len;
 }
 
-inline void get_sec_bytes_uncompressed(const u32 *x_bigEndian, const u32 *y_bigEndian, uchar *out_sec)
+// Uncompressed SEC pubkey -> 32-word (two-block) padded SHA-256 input. out_block must hold 32 u32.
+inline void sec_uncompressed_pubkey_to_sha256_blocks(const u32 *x, const u32 *y, u32 *out_block)
 {
-    out_sec[0] = SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT;
-    copy_u32_array_bytes(out_sec,  1, x_bigEndian, ONE_COORDINATE_NUM_WORDS);
-    copy_u32_array_bytes(out_sec, 33, y_bigEndian, ONE_COORDINATE_NUM_WORDS);
+    #pragma unroll
+    for (int i = 0; i < SHA256_INPUT_TOTAL_WORDS_UNCOMPRESSED; i++) {
+        out_block[i] = 0;
+    }
+    be_buffer_put_sec_prefix_and_x(out_block, (u32)SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT, x); // bytes 0..32
+    #pragma unroll
+    for (int i = 0; i < ONE_COORDINATE_NUM_WORDS; i++) {
+        be_buffer_put_u32(out_block, 33u + (u32)i * 4u, y[ONE_COORDINATE_NUM_WORDS - 1 - i]); // Y bytes 33..64
+    }
+    be_buffer_put_byte(out_block, 65, 0x80); // pad bit right after the 65-byte message
+    out_block[SHA256_INPUT_TOTAL_WORDS_UNCOMPRESSED - 1] = SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BITS; // 520
 }
 
-inline uchar get_compressed_prefix_from_lsb(uchar lsb)
+// Compressed SEC pubkey -> 16-word (one-block) padded SHA-256 input. out_block must hold 16 u32.
+inline void sec_compressed_pubkey_to_sha256_block(const u32 *x, const u32 *y, u32 *out_block)
 {
-    return (lsb & 1) == 0 ? SEC_PREFIX_COMPRESSED_ECDSA_POINT_EVEN_Y
-                          : SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y;
-}
-
-inline void get_sec_bytes_compressed(const u32 *x_bigEndian, const u32 *y_bigEndian, uchar *out_sec)
-{
-    uchar lsb = get_lsb_of_big_endian_coordinate(y_bigEndian);
-    out_sec[0] = get_compressed_prefix_from_lsb(lsb);
-    copy_u32_array_bytes(out_sec, 1, x_bigEndian, ONE_COORDINATE_NUM_WORDS);
-}
-
-inline void transform_sec_prefix_from_uncompressed_to_compressed(uchar *out_sec)
-{
-    uchar lsb = out_sec[SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BYTES - 1];
-    out_sec[0] = get_compressed_prefix_from_lsb(lsb);
-}
-
-inline void build_sha256_block_from_uncompressed_pubkey(const uchar *sec, u32 *sha256_input)
-{
-    // Pack 64 bytes from sec[0..63] into sha256_input[0..15]
-    pack_bytes_to_u32_words(sec, sha256_input, TWO_COORDINATE_NUM_WORDS);
-
-    // Apply SHA-256 padding: write 0x80 bit, zero-fill, append bit length (520 bits)
-    sha256_add_padding(sha256_input, TWO_COORDINATE_NUM_WORDS, sec[TWO_COORDINATES_NUM_BYTES], SHA256_INPUT_TOTAL_WORDS_UNCOMPRESSED - 1, SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BITS);
-}
-
-inline void build_sha256_block_from_compressed_pubkey(const uchar *sec, u32 *sha256_input)
-{
-    // Pack 32 bytes from sec[0..31] into sha256_input[0..7]
-    pack_bytes_to_u32_words(sec, sha256_input, ONE_COORDINATE_NUM_WORDS);
-
-    // Apply SHA-256 padding: write 0x80 bit, zero-fill, append bit length (264 bits)
-    sha256_add_padding(sha256_input, ONE_COORDINATE_NUM_WORDS, sec[ONE_COORDINATE_NUM_BYTES], SHA256_INPUT_TOTAL_WORDS_COMPRESSED - 1, SEC_PUBLIC_KEY_COMPRESSED_NUM_BITS);
+    const u32 prefix = ((y[0] & 1u) == 0u) ? (u32)SEC_PREFIX_COMPRESSED_ECDSA_POINT_EVEN_Y
+                                           : (u32)SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y;
+    #pragma unroll
+    for (int i = 0; i < SHA256_INPUT_TOTAL_WORDS_COMPRESSED; i++) {
+        out_block[i] = 0;
+    }
+    be_buffer_put_sec_prefix_and_x(out_block, prefix, x);  // bytes 0..32
+    be_buffer_put_byte(out_block, 33, 0x80);               // pad bit right after the 33-byte message
+    out_block[SHA256_INPUT_TOTAL_WORDS_COMPRESSED - 1] = SEC_PUBLIC_KEY_COMPRESSED_NUM_BITS; // 264
 }
 
 inline void build_ripemd160_block_from_sha256(const u32 *sha256_hash, u32 *ripemd_input)
@@ -525,6 +512,53 @@ inline void build_ripemd160_block_from_sha256(const u32 *sha256_hash, u32 *ripem
     // decimal 65536 is 00000000 00000001 00000000 00000000 in binary
     ripemd_input[14] = 0x00010000; // low word (bits 0–31)
     ripemd_input[15] = 0x00000000; // high word (bits 32–63)
+}
+
+// SHA-256 over `numBlocks` pre-built, pre-padded 64-byte blocks (16 u32 words each, already in the
+// order the transform consumes — exactly what build_sha256_block_* produces). Writes the 8-word
+// big-endian digest. Calls sha256_transform directly instead of sha256_init + sha256_update: the
+// message is already block-aligned and padded, so update's streaming bookkeeping (offset alignment
+// via switch_buffer_by_offset, partial-block buffering, length tracking, and the init-time zeroing of
+// the whole ctx) is pure overhead. Result is byte-identical (update ultimately calls this transform).
+inline void sha256_hash_prebuilt_blocks(const u32 *blocks, u32 numBlocks, u32 *digest)
+{
+    digest[0] = SHA256M_A;
+    digest[1] = SHA256M_B;
+    digest[2] = SHA256M_C;
+    digest[3] = SHA256M_D;
+    digest[4] = SHA256M_E;
+    digest[5] = SHA256M_F;
+    digest[6] = SHA256M_G;
+    digest[7] = SHA256M_H;
+
+    for (u32 b = 0; b < numBlocks; b++) {
+        const u32 *blk = blocks + b * SHA256_INPUT_BLOCK_SIZE_WORDS;
+        u32 w0[4] = {blk[0], blk[1], blk[2], blk[3]};
+        u32 w1[4] = {blk[4], blk[5], blk[6], blk[7]};
+        u32 w2[4] = {blk[8], blk[9], blk[10], blk[11]};
+        u32 w3[4] = {blk[12], blk[13], blk[14], blk[15]};
+        sha256_transform(w0, w1, w2, w3, digest);
+    }
+}
+
+// RIPEMD-160 of a single pre-built RIPEMD block (16 u32 words as build_ripemd160_block_from_sha256
+// produces them, big-endian). Byte-swaps each word to little-endian (exactly what
+// ripemd160_update_swap does) and calls ripemd160_transform directly, skipping the streaming
+// bookkeeping and ctx zeroing. Writes the 5-word hash160. Byte-identical to the init+update_swap path.
+inline void ripemd160_hash_prebuilt_block_swap(const u32 *block, u32 *out_h)
+{
+    u32 w0[4] = {hc_swap32_S(block[0]), hc_swap32_S(block[1]), hc_swap32_S(block[2]), hc_swap32_S(block[3])};
+    u32 w1[4] = {hc_swap32_S(block[4]), hc_swap32_S(block[5]), hc_swap32_S(block[6]), hc_swap32_S(block[7])};
+    u32 w2[4] = {hc_swap32_S(block[8]), hc_swap32_S(block[9]), hc_swap32_S(block[10]), hc_swap32_S(block[11])};
+    u32 w3[4] = {hc_swap32_S(block[12]), hc_swap32_S(block[13]), hc_swap32_S(block[14]), hc_swap32_S(block[15])};
+
+    out_h[0] = RIPEMD160M_A;
+    out_h[1] = RIPEMD160M_B;
+    out_h[2] = RIPEMD160M_C;
+    out_h[3] = RIPEMD160M_D;
+    out_h[4] = RIPEMD160M_E;
+
+    ripemd160_transform(w0, w1, w2, w3, out_h);
 }
 
 /**
@@ -664,7 +698,7 @@ inline bool fuse8_contains(__global const uchar *fp, ulong seed, uint seg, uint 
  * host-configurable, prepend a "#define KEYS_BATCH_INV <n>" line to the program source before the
  * build (host side) rather than passing it as an argument.
  */
-#define KEYS_BATCH_INV 8
+#define KEYS_BATCH_INV 16
 
 /**
  * @brief Copies word_count u32 values from one __private array to another.
@@ -680,13 +714,111 @@ inline void copy_private_u32_array_private_u32(u32 *dst, const u32 *src, const i
     }
 }
 
+/**
+ * @brief Fixed-base SIGNED-digit comb scalar multiplication: (x1, y1) affine = k * G (Stage 2).
+ *
+ * Replaces the wNAF point_mul_xy for the one-time anchor P0. G is fixed, so k*G is evaluated from
+ * a precomputed table with ~0 doublings instead of ~256. The scalar's 4-bit windows are recoded
+ * on the fly into SIGNED digits b_pos in {-8..+7} (carry-propagated low->high):
+ *     k = Sum_{pos} b_pos * 2^(4*pos),   k*G = Sum_{pos} b_pos * (2^(4*pos) * G).
+ * Each term uses comb_table entry (pos, |b_pos|), negated (-P = (x, p - y)) when b_pos < 0. Storing
+ * only magnitudes 1..8 (not the unsigned digits 0..15) HALVES the table. A signed recode of a
+ * 256-bit scalar can carry out of the top window, so the comb runs to pos = 64 (one extra
+ * position, which only ever uses magnitude 1 = 2^256 * G).
+ *
+ * comb_table holds, for pos=0..64 and mag=1..8, the affine point (mag * 2^(4*pos)) * G as
+ * [x(8 words)][y(8 words)] in device word order; entry (pos, mag) is at word offset
+ * (pos*8 + (mag-1))*16. There is no zero slot (digit 0 contributes nothing and is skipped).
+ *
+ * Accumulation uses the mixed Jacobian+affine point_add. Doubling/infinity edge cases (Q == ±P)
+ * cannot occur for the running partial sum vs. the next window point except with astronomically
+ * small probability (the partial sum's value is strictly below the next window's bit position),
+ * the same practical assumption point_mul_xy and the affine walk already rely on; if it ever
+ * happened the inv_mod zero-guard prevents a hang and the filter rejects the garbage result.
+ *
+ * @param x1          out: affine x of k*G (device word order)
+ * @param y1          out: affine y of k*G (device word order)
+ * @param k           in:  scalar, 8 little-endian u32 words
+ * @param comb_table  in:  65*8 precomputed points (see layout above)
+ */
+inline void point_mul_xy_comb(
+    PRIVATE_AS u32 *x1, PRIVATE_AS u32 *y1, PRIVATE_AS const u32 *k, __global const u32 *comb_table)
+{
+    u32 qx[ONE_COORDINATE_NUM_WORDS] = { 0 };
+    u32 qy[ONE_COORDINATE_NUM_WORDS] = { 0 };
+    u32 qz[ONE_COORDINATE_NUM_WORDS] = { 0 };
+    u32 have = 0;
+    u32 carry = 0;
+
+    // secp256k1 field prime, for the free point negation -P = (x, p - y).
+    const u32 fieldP[ONE_COORDINATE_NUM_WORDS] = {
+        SECP256K1_P0, SECP256K1_P1, SECP256K1_P2, SECP256K1_P3,
+        SECP256K1_P4, SECP256K1_P5, SECP256K1_P6, SECP256K1_P7 };
+
+    for (u32 pos = 0; pos < 65; pos++) {
+        // Window nibble (0 for the extra carry-out position 64), plus the incoming carry.
+        u32 nib = 0;
+        if (pos < 64) {
+            u32 word = pos >> 3;          // each u32 holds 8 nibbles
+            u32 shift = (pos & 7) << 2;   // nibble offset within the word
+            nib = (k[word] >> shift) & 0x0fu;
+        }
+        u32 t = nib + carry; // 0..16
+
+        // Signed recode: t >= 8 borrows from the next window (carry 1) and uses a negative digit.
+        u32 mag;       // magnitude |b|, 0..8
+        u32 negative;  // 1 if b < 0
+        if (t >= 8) {
+            mag = 16u - t; // t in 8..16 -> b = t-16 in -8..0 -> |b| = 16-t in 0..8
+            negative = 1;
+            carry = 1;
+        } else {
+            mag = t;       // t in 0..7 -> b = t in 0..7
+            negative = 0;
+            carry = 0;
+        }
+        if (mag == 0) {
+            continue; // 0 * anything = point at infinity -> contributes nothing (carry already set)
+        }
+
+        // 8 magnitude slots per position; slot index = mag-1.
+        u32 base = (pos * 8u + (mag - 1u)) * TWO_COORDINATE_NUM_WORDS;
+        u32 x2[ONE_COORDINATE_NUM_WORDS];
+        u32 y2[ONE_COORDINATE_NUM_WORDS];
+        copy_global_u32_array_private_u32(x2, &comb_table[base], ONE_COORDINATE_NUM_WORDS);
+        copy_global_u32_array_private_u32(y2, &comb_table[base + ONE_COORDINATE_NUM_WORDS], ONE_COORDINATE_NUM_WORDS);
+        if (negative) {
+            sub_mod(y2, fieldP, y2); // -P = (x, p - y)
+        }
+
+        if (have == 0) {
+            copy_private_u32_array_private_u32(qx, x2, ONE_COORDINATE_NUM_WORDS);
+            copy_private_u32_array_private_u32(qy, y2, ONE_COORDINATE_NUM_WORDS);
+            qz[0] = 1; // affine seed: Z = 1 (qz[1..7] already 0)
+            have = 1;
+        } else {
+            point_add(qx, qy, qz, x2, y2); // Q += comb point (mixed Jacobian+affine)
+        }
+    }
+
+    // Convert Q (Jacobian) to affine: x = X / Z^2, y = Y / Z^3.
+    inv_mod(qz);
+    u32 z2[ONE_COORDINATE_NUM_WORDS];
+    mul_mod(z2, qz, qz); // Z^2
+    mul_mod(x1, qx, z2); // x affine
+    mul_mod(qz, z2, qz); // Z^3
+    mul_mod(y1, qy, qz); // y affine
+}
+
 __kernel void generateKeysKernel_grid(
     __global u32 *r,
     __global const u32 *k,
     const u32 keysPerWorkItem,
     __global const uchar *fuse8_fp,    // Binary Fuse 8 fingerprint slot array
     __global const uint *fuse8_meta,   // [seedLo, seedHi, segLen, segLenMask, segCountLen]
-    const u32 transfer_all)            // 0 = compact (filter) mode, non-zero = full transfer
+    const u32 transfer_all,            // 0 = compact (filter) mode, non-zero = full transfer
+    __global const u32 *iG_table,      // (keysPerWorkItem-1) points: entry m-1 = [x_{mG}(8 words)][y_{mG}(8 words)], device word order
+    __global const u32 *comb_table)    // fixed-base signed-digit comb table: 65 positions * 8 magnitudes, each [x(8)][y(8)], device word order
 {
     // Little Endian format
     u32 k_littleEndian_local[PRIVATE_KEY_LENGTH];
@@ -696,57 +828,32 @@ __kernel void generateKeysKernel_grid(
     u32 x_bigEndian_local[ONE_COORDINATE_NUM_WORDS];
     u32 y_bigEndian_local[ONE_COORDINATE_NUM_WORDS];
 
-    u32 x1_local[ONE_COORDINATE_NUM_WORDS];
-    u32 y1_local[ONE_COORDINATE_NUM_WORDS];
-    u32 z1_local[ONE_COORDINATE_NUM_WORDS] = { 0 };
-    z1_local[0] = 1; // Initialize Jacobian Z-coordinate (affine point: z = 1)
-    
-    u32             *sha256_input_uncompressed    ;
-    u32             *ripemd160_input_uncompressed ;
-    uchar           *sec_uncompressed             ;
-    
-    u32             *sha256_input_compressed      ;
-    u32             *ripemd160_input_compressed   ;
-    uchar           *sec_compressed               ;
-    
+    // hash160 scratch. The SHA-256 input blocks are built directly from the coordinate limbs
+    // (sec_*_pubkey_to_sha256_block*) and consumed by sha256_transform / ripemd160_transform
+    // directly — no SEC uchar buffer and no sha256_ctx_t / ripemd160_ctx_t streaming contexts.
+    u32             *sha256_input_uncompressed;
+    u32             *ripemd160_input_uncompressed;
+    u32             *sha256_input_compressed;
+    u32             *ripemd160_input_compressed;
+
     u32             sha256_input_uncompressed_alloc[SHA256_INPUT_TOTAL_WORDS_UNCOMPRESSED];
     u32             ripemd160_input_uncompressed_alloc[RIPEMD160_INPUT_BLOCK_SIZE_WORDS];
-    uchar           sec_uncompressed_alloc[SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BYTES];
-    
-    sha256_input_uncompressed      = sha256_input_uncompressed_alloc;
-    ripemd160_input_uncompressed   = ripemd160_input_uncompressed_alloc;
-    sec_uncompressed               = sec_uncompressed_alloc;
+
+    sha256_input_uncompressed    = sha256_input_uncompressed_alloc;
+    ripemd160_input_uncompressed = ripemd160_input_uncompressed_alloc;
 
     #ifdef REUSE_FOR_COMPRESSED
-        // Shared context for both compressed and uncompressed operations
-        sha256_ctx_t                             sha_ctx_shared;
-        ripemd160_ctx_t                          ripemd_ctx_shared;
-
-        // Aliases for readability — both use the shared context
-        #define sha_ctx_uncompressed             sha_ctx_shared
-        #define sha_ctx_compressed               sha_ctx_shared
-
-        #define ripemd_ctx_uncompressed          ripemd_ctx_shared
-        #define ripemd_ctx_compressed            ripemd_ctx_shared
-        
-        // arrays
-        sha256_input_compressed    =             sha256_input_uncompressed_alloc;
-        ripemd160_input_compressed =             ripemd160_input_uncompressed_alloc;
-        sec_compressed             =             sec_uncompressed_alloc;
+        // Compressed reuses the uncompressed scratch (hashed sequentially, after the uncompressed
+        // chain has been fully consumed).
+        sha256_input_compressed    = sha256_input_uncompressed_alloc;
+        ripemd160_input_compressed = ripemd160_input_uncompressed_alloc;
     #else
-        // Separate contexts for uncompressed and compressed operations
-        sha256_ctx_t                             sha_ctx_uncompressed;
-        sha256_ctx_t                             sha_ctx_compressed;
-        ripemd160_ctx_t                          ripemd_ctx_uncompressed;
-        ripemd160_ctx_t                          ripemd_ctx_compressed;
-        
+        // Separate scratch buffers for the uncompressed and compressed chains.
         u32                                      sha256_input_compressed_alloc[SHA256_INPUT_TOTAL_WORDS_COMPRESSED];
         u32                                      ripemd160_input_compressed_alloc[RIPEMD160_INPUT_BLOCK_SIZE_WORDS];
-        uchar                                    sec_compressed_alloc[SEC_PUBLIC_KEY_COMPRESSED_NUM_BYTES];
-        
-        sha256_input_compressed    =             sha256_input_compressed_alloc;
-        ripemd160_input_compressed =             ripemd160_input_compressed_alloc;
-        sec_compressed             =             sec_compressed_alloc;
+
+        sha256_input_compressed    = sha256_input_compressed_alloc;
+        ripemd160_input_compressed = ripemd160_input_compressed_alloc;
     #endif
 
     // get_global_id(dim) where dim is the dimension index (0 for first, 1 for second dimension etc.)
@@ -762,11 +869,6 @@ __kernel void generateKeysKernel_grid(
     copy_global_u32_array_private_u32(k_littleEndian_local, k, PRIVATE_KEY_MAX_NUM_WORDS);
     u32 baseK0 = k_littleEndian_local[0];
 
-    // Copy base point G (in affine coordinates) from constant memory to local registers.
-    // This avoids repeated global memory access during the loop (e.g., for point additions).
-    copy_constant_u32_array_private_u32(x1_local, &g_precomputed.xy[G_OFFSET_X1], ONE_COORDINATE_NUM_WORDS);
-    copy_constant_u32_array_private_u32(y1_local, &g_precomputed.xy[G_OFFSET_Y1], ONE_COORDINATE_NUM_WORDS);
-
     // Load the Binary Fuse 8 filter metadata once (only consulted in compact mode).
     ulong fuse8_seed = ((ulong)fuse8_meta[1] << 32) | (ulong)fuse8_meta[0]; // [seedHi, seedLo]
     uint fuse8_seg = fuse8_meta[2];
@@ -781,34 +883,33 @@ __kernel void generateKeysKernel_grid(
         r[0] = OUTPUT_COUNT_FULL_TRANSFER_SENTINEL;
     }
 
-    // ===================== Scalar walker with batched (Montgomery) inversion =====================
-    // Generate keysPerWorkItem consecutive keys P0, P0+G, P0+2G, ... The first key uses a full
-    // scalar multiplication; every subsequent key is a single mixed Jacobian+affine addition
-    // (point_add, no inverse). The affine conversion's modular inverse — the dominant per-key cost
-    // in the old per-key point_add_xy path — is deferred and shared across a sub-batch of
-    // KEYS_BATCH_INV points via Montgomery's simultaneous inversion: one inv_mod per sub-batch
-    // instead of one per key.
+    // ===================== Single-anchor affine batched-addition walk =====================
+    // Every key is P_m = P0 + m·G. Instead of advancing a running point with a Jacobian mixed
+    // addition (the old walk) and converting each result back to affine, we anchor ALL points at
+    // the SAME affine P0 and add the fixed multiple m·G directly in affine. The m·G are read from
+    // a host-uploaded table (iG_table; entry m-1 holds x_{mG} then y_{mG}, each in device word
+    // order). Anchoring at one P0 makes the slope denominators dx_m = x_{mG} - x0 mutually
+    // independent, so a single Montgomery simultaneous inversion covers a whole KEYS_BATCH_INV
+    // sub-batch — no Jacobian state, no per-point Z conversion.
     //
-    // Caveat (same practical assumption as the previous per-key path): if the running point ever
-    // becomes the point at infinity (Z == 0, i.e. P + (-P) when (baseK0 + index) == 0 mod n),
-    // inv_mod guards against a hang but the whole sub-batch's inverses are then invalid. That
-    // requires the walk to hit the curve order within its window and never occurs for the
-    // supported random / sequential key ranges.
+    // Per walked key: ~5 mul_mod + ~5 sub_mod (slope formula + Montgomery overhead) plus one
+    // inv_mod per sub-batch, vs the previous Jacobian add + affine-conversion machinery.
+    //
+    // Degenerate case (same practical assumption as the previous path): dx_m == 0 iff m·G == ±P0,
+    // i.e. (baseK0 | base_offset) ≡ ∓m (mod n) — impossible for the supported aligned sequential /
+    // random ranges. If it ever happened, acc becomes 0 in Pass A and the inv_mod zero-guard
+    // returns without hanging; the recovered inverses are then garbage and the filter rejects the
+    // resulting hashes — strictly no worse than the previous path.
 
-    // Running point in Jacobian coordinates, seeded by the first key's full scalar multiplication.
-    u32 q_x[ONE_COORDINATE_NUM_WORDS];
-    u32 q_y[ONE_COORDINATE_NUM_WORDS];
-    u32 q_z[ONE_COORDINATE_NUM_WORDS] = { 0 };
-    q_z[0] = 1;
-
+    // Affine anchor P0 = (baseK0 | base_offset) * G, computed once with the fixed-base comb.
+    u32 x0[ONE_COORDINATE_NUM_WORDS];
+    u32 y0[ONE_COORDINATE_NUM_WORDS];
     k_littleEndian_local[0] = (baseK0 | base_offset);
-    point_mul_xy(q_x, q_y, k_littleEndian_local, &g_precomputed); // affine P0 = (baseK0 + base_offset) * G
+    point_mul_xy_comb(x0, y0, k_littleEndian_local, comb_table);
 
-    // Per-sub-batch scratch for the deferred affine conversion.
-    u32 batch_x[KEYS_BATCH_INV][ONE_COORDINATE_NUM_WORDS];
-    u32 batch_y[KEYS_BATCH_INV][ONE_COORDINATE_NUM_WORDS];
-    u32 batch_z[KEYS_BATCH_INV][ONE_COORDINATE_NUM_WORDS];
-    u32 batch_prefix[KEYS_BATCH_INV][ONE_COORDINATE_NUM_WORDS]; // Montgomery prefix products of Z
+    // Per-sub-batch scratch: dx_m denominators and their Montgomery prefix products.
+    u32 dx[KEYS_BATCH_INV][ONE_COORDINATE_NUM_WORDS];
+    u32 prefix[KEYS_BATCH_INV][ONE_COORDINATE_NUM_WORDS];
 
     for (u32 done = 0; done < keysPerWorkItem; done += KEYS_BATCH_INV) {
         u32 count = keysPerWorkItem - done;
@@ -816,39 +917,65 @@ __kernel void generateKeysKernel_grid(
             count = (u32) KEYS_BATCH_INV;
         }
 
-        // ---- collect Jacobian points + Montgomery prefix products; advance Q by +G each step ----
+        // ---- Pass A: dx_m = x_{mG} - x0 and Montgomery prefix products of dx ----
         u32 acc[ONE_COORDINATE_NUM_WORDS] = { 0 };
         acc[0] = 1;
         for (u32 j = 0; j < count; j++) {
-            copy_private_u32_array_private_u32(batch_x[j], q_x, ONE_COORDINATE_NUM_WORDS);
-            copy_private_u32_array_private_u32(batch_y[j], q_y, ONE_COORDINATE_NUM_WORDS);
-            copy_private_u32_array_private_u32(batch_z[j], q_z, ONE_COORDINATE_NUM_WORDS);
-            copy_private_u32_array_private_u32(batch_prefix[j], acc, ONE_COORDINATE_NUM_WORDS);
-            mul_mod(acc, acc, q_z); // acc = Z_0 * Z_1 * ... * Z_j
-            // Advance to the next key, except after the very last key of the whole walk.
-            if (done + j + 1 < keysPerWorkItem) {
-                point_add(q_x, q_y, q_z, x1_local, y1_local); // Q += G (mixed Jacobian+affine)
+            u32 m = done + j;
+            copy_private_u32_array_private_u32(prefix[j], acc, ONE_COORDINATE_NUM_WORDS);
+            if (m == 0) {
+                // P0 itself has no slope; contribute the multiplicative identity to the product.
+                dx[j][0] = 1;
+                #pragma unroll
+                for (int w = 1; w < ONE_COORDINATE_NUM_WORDS; w++) {
+                    dx[j][w] = 0;
+                }
+            } else {
+                u32 gx[ONE_COORDINATE_NUM_WORDS];
+                u32 ig_base = (m - 1) * TWO_COORDINATE_NUM_WORDS; // 16 words per table entry
+                copy_global_u32_array_private_u32(gx, &iG_table[ig_base], ONE_COORDINATE_NUM_WORDS);
+                sub_mod(dx[j], gx, x0); // dx_m = x_{mG} - x0
             }
+            mul_mod(acc, acc, dx[j]); // acc = dx_0 * ... * dx_j
         }
 
         // ---- one modular inverse for the whole sub-batch ----
-        inv_mod(acc); // acc = 1 / (Z_0 * ... * Z_{count-1})
+        inv_mod(acc); // acc = 1 / (dx_0 * ... * dx_{count-1})
 
-        // ---- emit each point (reverse order is fine; each writes its own slot) ----
+        // ---- Pass B (reverse): recover each 1/dx_m, apply the affine slope formula, emit ----
         for (int j = (int) count - 1; j >= 0; j--) {
-            u32 z_inv[ONE_COORDINATE_NUM_WORDS];
-            mul_mod(z_inv, acc, batch_prefix[j]); // 1 / Z_j = (1/product) * (Z_0..Z_{j-1})
-            mul_mod(acc, acc, batch_z[j]);        // strip Z_j: acc = 1 / (Z_0..Z_{j-1})
+            u32 m = done + (u32) j;
 
-            // Affine conversion: x = X / Z^2, y = Y / Z^3.
-            u32 z_inv_sq[ONE_COORDINATE_NUM_WORDS];
-            mul_mod(z_inv_sq, z_inv, z_inv);
-            mul_mod(x_littleEndian_local, batch_x[j], z_inv_sq);
-            u32 z_inv_cu[ONE_COORDINATE_NUM_WORDS];
-            mul_mod(z_inv_cu, z_inv_sq, z_inv);
-            mul_mod(y_littleEndian_local, batch_y[j], z_inv_cu);
+            u32 inv_dx[ONE_COORDINATE_NUM_WORDS];
+            mul_mod(inv_dx, acc, prefix[j]); // 1/dx_m = (1/product) * (dx_0..dx_{j-1})
+            mul_mod(acc, acc, dx[j]);        // strip dx_m: acc = 1 / (dx_0..dx_{j-1})
 
-            u32 loop_index = base_offset + done + (u32) j;
+            if (m == 0) {
+                // Emit the anchor P0 directly (inv_dx unused for this single key).
+                copy_private_u32_array_private_u32(x_littleEndian_local, x0, ONE_COORDINATE_NUM_WORDS);
+                copy_private_u32_array_private_u32(y_littleEndian_local, y0, ONE_COORDINATE_NUM_WORDS);
+            } else {
+                u32 gx[ONE_COORDINATE_NUM_WORDS];
+                u32 gy[ONE_COORDINATE_NUM_WORDS];
+                u32 ig_base = (m - 1) * TWO_COORDINATE_NUM_WORDS;
+                copy_global_u32_array_private_u32(gx, &iG_table[ig_base], ONE_COORDINATE_NUM_WORDS);
+                copy_global_u32_array_private_u32(gy, &iG_table[ig_base + ONE_COORDINATE_NUM_WORDS], ONE_COORDINATE_NUM_WORDS);
+
+                u32 num[ONE_COORDINATE_NUM_WORDS];
+                u32 lambda[ONE_COORDINATE_NUM_WORDS];
+                u32 lam2[ONE_COORDINATE_NUM_WORDS];
+                u32 t[ONE_COORDINATE_NUM_WORDS];
+                sub_mod(num, gy, y0);          // y_{mG} - y0
+                mul_mod(lambda, num, inv_dx);  // λ = (y_{mG} - y0) / dx_m
+                mul_mod(lam2, lambda, lambda); // λ^2
+                sub_mod(x_littleEndian_local, lam2, gx);                 // λ^2 - x_{mG}
+                sub_mod(x_littleEndian_local, x_littleEndian_local, x0); // x_m = λ^2 - x_{mG} - x0
+                sub_mod(t, x0, x_littleEndian_local);                    // x0 - x_m
+                mul_mod(t, lambda, t);                                   // λ(x0 - x_m)
+                sub_mod(y_littleEndian_local, t, y0);                    // y_m = λ(x0 - x_m) - y0
+            }
+
+            u32 loop_index = base_offset + m;
 
             // create big endian (computed into private registers; written to global memory below
             // only for entries that are actually emitted)
@@ -857,47 +984,54 @@ __kernel void generateKeysKernel_grid(
             // y
             copy_and_reverse_endianness_u32_array(y_bigEndian_local, 0, y_littleEndian_local, ONE_COORDINATE_NUM_WORDS);
 
-            // === Hash uncompressed key ===
-            get_sec_bytes_uncompressed(x_bigEndian_local, y_bigEndian_local, sec_uncompressed);
-            build_sha256_block_from_uncompressed_pubkey(sec_uncompressed, sha256_input_uncompressed);
-            sha256_init(&sha_ctx_uncompressed);
-            sha256_update(&sha_ctx_uncompressed, sha256_input_uncompressed, SHA256_INPUT_TOTAL_BYTES_UNCOMPRESSED);
-
-            build_ripemd160_block_from_sha256(sha_ctx_uncompressed.h, ripemd160_input_uncompressed);
-            ripemd160_init(&ripemd_ctx_uncompressed);
-            ripemd160_update_swap(&ripemd_ctx_uncompressed, ripemd160_input_uncompressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
-
-            // Snapshot the uncompressed hash160 into a private register array NOW. Under
-            // REUSE_FOR_COMPRESSED the ripemd context is a shared alias, so the compressed pass
-            // below overwrites ripemd_ctx_uncompressed.h; the deferred filter check and entry
-            // write must read this stable copy, not the (soon-clobbered) shared context.
+            // === hash160 stage(s) ===
+            // Profiling builds (docs/performance.md "Stage attribution") short-circuit the hashing to
+            // attribute kernel time; the default build (neither define set) runs both real chains and
+            // is byte-for-byte the production kernel. PROFILE_* modes produce INCORRECT hashes and are
+            // for benchmarking only. ripemd_uncompressed_h / ripemd_compressed_h are defined in every
+            // branch so the downstream filter/output path is identical.
             u32 ripemd_uncompressed_h[RIPEMD160_HASH_NUM_WORDS];
+            u32 ripemd_compressed_h[RIPEMD160_HASH_NUM_WORDS];
+
+            #ifdef PROFILE_SKIP_HASH160
+            // EC-only: skip both chains. Fill both hash160 slots from the public-key X coordinate so
+            // the EC result stays live (not dead-code-eliminated) and the filter/output path runs.
             #pragma unroll
             for (int w = 0; w < RIPEMD160_HASH_NUM_WORDS; w++) {
-                ripemd_uncompressed_h[w] = ripemd_ctx_uncompressed.h[w];
+                ripemd_uncompressed_h[w] = x_bigEndian_local[w];
+                ripemd_compressed_h[w] = x_bigEndian_local[w];
             }
+            #else
+            // === Hash uncompressed key ===
+            // Direct block transforms on the pre-built padded blocks (see sha256_hash_prebuilt_blocks
+            // / ripemd160_hash_prebuilt_block_swap) — no init/update streaming bookkeeping. The hash160
+            // is written straight into the stable register array, so there is no shared-context
+            // snapshot to worry about even under REUSE_FOR_COMPRESSED.
+            sec_uncompressed_pubkey_to_sha256_blocks(
+                x_littleEndian_local, y_littleEndian_local, sha256_input_uncompressed);
+            u32 sha256_digest_uncompressed[SHA256_HASH_NUM_WORDS];
+            sha256_hash_prebuilt_blocks(
+                sha256_input_uncompressed, SHA256_INPUT_BLOCKS_FOR_UNCOMPRESSED_SEC, sha256_digest_uncompressed);
+            build_ripemd160_block_from_sha256(sha256_digest_uncompressed, ripemd160_input_uncompressed);
+            ripemd160_hash_prebuilt_block_swap(ripemd160_input_uncompressed, ripemd_uncompressed_h);
 
             // === Hash compressed key ===
-            #ifdef REUSE_FOR_COMPRESSED
-                transform_sec_prefix_from_uncompressed_to_compressed(sec_compressed);
-            #else
-                get_sec_bytes_compressed(x_bigEndian_local, y_bigEndian_local, sec_compressed);
-            #endif
-            build_sha256_block_from_compressed_pubkey(sec_compressed, sha256_input_compressed);
-            sha256_init(&sha_ctx_compressed);
-            sha256_update(&sha_ctx_compressed, sha256_input_compressed, SHA256_INPUT_TOTAL_BYTES_COMPRESSED);
-
-            build_ripemd160_block_from_sha256(sha_ctx_compressed.h, ripemd160_input_compressed);
-            ripemd160_init(&ripemd_ctx_compressed);
-            ripemd160_update_swap(&ripemd_ctx_compressed, ripemd160_input_compressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
-
-            // Snapshot the compressed hash160 too, so both hashes are stable private copies for
-            // the filter check and the deferred entry write below.
-            u32 ripemd_compressed_h[RIPEMD160_HASH_NUM_WORDS];
+            #ifdef PROFILE_SKIP_SECOND_HASH160
+            // Single-chain profiling: skip the compressed chain, reuse the uncompressed hash160.
             #pragma unroll
             for (int w = 0; w < RIPEMD160_HASH_NUM_WORDS; w++) {
-                ripemd_compressed_h[w] = ripemd_ctx_compressed.h[w];
+                ripemd_compressed_h[w] = ripemd_uncompressed_h[w];
             }
+            #else
+            sec_compressed_pubkey_to_sha256_block(
+                x_littleEndian_local, y_littleEndian_local, sha256_input_compressed);
+            u32 sha256_digest_compressed[SHA256_HASH_NUM_WORDS];
+            sha256_hash_prebuilt_blocks(
+                sha256_input_compressed, SHA256_INPUT_BLOCKS_FOR_COMPRESSED_SEC, sha256_digest_compressed);
+            build_ripemd160_block_from_sha256(sha256_digest_compressed, ripemd160_input_compressed);
+            ripemd160_hash_prebuilt_block_swap(ripemd160_input_compressed, ripemd_compressed_h);
+            #endif // PROFILE_SKIP_SECOND_HASH160
+            #endif // PROFILE_SKIP_HASH160
 
             // === Decide whether and where to emit this entry ===
             // Full-transfer mode: every work-item emits, densely at slot loop_index.
@@ -931,4 +1065,107 @@ __kernel void generateKeysKernel_grid(
             }
         }
     }
+}
+
+/*
+ * Validation kernel (test scaffolding, not used in production): cross-checks inv_mod_safegcd against
+ * the legacy binary-GCD inv_mod AND against the defining identity x * x^-1 == 1 (mod p), for
+ * deterministic pseudo-random inputs. Single work-item, loops over `count` so it reuses the existing
+ * single-work-item precompute test harness. out[i] is a failure bitmask, 0 == pass:
+ *   bit 0 (1): safegcd result disagrees with the legacy inv_mod
+ *   bit 1 (2): x * safegcd(x) != 1 (mod p)   [x != 0]
+ *   bit 2 (4): safegcd(0) != 0
+ */
+__kernel void test_inv_mod_safegcd(__global u32 *out, const u32 count)
+{
+    u32 one[ONE_COORDINATE_NUM_WORDS] = { 0 };
+    one[0] = 1;
+
+    for (u32 i = 0; i < count; i++) {
+        // Deterministic xorshift-derived 256-bit candidate, then fully reduced into [0, p) via
+        // mul_mod(x, x, 1). The seed is never zero, so x == 0 essentially never occurs (guarded anyway).
+        u32 x[ONE_COORDINATE_NUM_WORDS];
+        u32 s = i * 2654435761u + 0x9e3779b9u;
+        for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) {
+            s ^= s << 13;
+            s ^= s >> 17;
+            s ^= s << 5;
+            x[j] = s;
+        }
+        mul_mod(x, x, one); // x = x mod p
+
+        u32 r_sg[ONE_COORDINATE_NUM_WORDS];
+        u32 r_bg[ONE_COORDINATE_NUM_WORDS];
+        for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) {
+            r_sg[j] = x[j];
+            r_bg[j] = x[j];
+        }
+        inv_mod_safegcd(r_sg);
+        inv_mod(r_bg);
+
+        u32 status = 0;
+
+        // (1) agreement with the legacy inverse
+        u32 diff = 0;
+        for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) diff |= (r_sg[j] ^ r_bg[j]);
+        if (diff != 0) status |= 1u;
+
+        // x == 0 ?
+        u32 orx = 0;
+        for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) orx |= x[j];
+
+        if (orx != 0) {
+            // (2) defining identity x * safegcd(x) == 1 (mod p)
+            u32 prod[ONE_COORDINATE_NUM_WORDS];
+            mul_mod(prod, x, r_sg);
+            u32 not_one = (prod[0] ^ 1u);
+            for (int j = 1; j < ONE_COORDINATE_NUM_WORDS; j++) not_one |= prod[j];
+            if (not_one != 0) status |= 2u;
+        } else {
+            // (3) safegcd(0) must be 0
+            u32 nz = 0;
+            for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) nz |= r_sg[j];
+            if (nz != 0) status |= 4u;
+        }
+
+        out[i] = status;
+    }
+}
+
+/*
+ * Microbenchmark kernel (test scaffolding, not used in production): each work-item performs
+ * `iterations` modular inverses of freshly generated operands, XOR-accumulating a checksum so the
+ * compiler cannot elide the work. It calls the build-selected inv_mod (safegcd by default, or the
+ * binary GCD under -D USE_LEGACY_BINARY_GCD_INV_MOD), launched over a full grid so warp divergence is
+ * realistic. `inputHighLimbsZero != 0` zeroes the top three u32 limbs of every operand (~160-bit
+ * inputs); 0 uses full ~256-bit operands. This isolates the inverse cost (InvModBenchmark) and shows
+ * how the binary GCD's input-dependent iteration count interacts with operand width, whereas safegcd
+ * is fixed-cost. Timing only — correctness is gated by test_inv_mod_safegcd / ProbeAddressesOpenCLTest.
+ */
+__kernel void bench_inv_mod(__global u32 *out, const u32 iterations, const u32 inputHighLimbsZero)
+{
+    const u32 gid = get_global_id(0);
+    u32 checksum = 0;
+    u32 s = gid * 2654435761u + 0x9e3779b9u;
+
+    for (u32 i = 0; i < iterations; i++) {
+        u32 v[ONE_COORDINATE_NUM_WORDS];
+        for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) {
+            s ^= s << 13;
+            s ^= s >> 17;
+            s ^= s << 5;
+            v[j] = s;
+        }
+        if (inputHighLimbsZero != 0) {
+            v[5] = 0;
+            v[6] = 0;
+            v[7] = 0; // ~160-bit operand (low 5 limbs)
+        }
+        v[0] |= 1u; // ensure nonzero so the inv_mod(0) early-out never skews timing
+
+        inv_mod(v);
+        checksum ^= v[0];
+    }
+
+    out[gid] = checksum;
 }

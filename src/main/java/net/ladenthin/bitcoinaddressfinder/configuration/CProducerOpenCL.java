@@ -87,6 +87,32 @@ public class CProducerOpenCL extends CProducer {
     public boolean transferAll = false;
 
     /**
+     * Selects the modular-inverse implementation compiled into the OpenCL kernel.
+     * <p>
+     * When {@code true} (default), {@code inv_mod} uses the <b>safegcd</b> path (a port of
+     * libsecp256k1's constant-time {@code modinv32}): a fixed 600 divsteps per input, so all lanes
+     * of a SIMT warp run in lock-step. When {@code false}, the kernel is built with
+     * {@code -D USE_LEGACY_BINARY_GCD_INV_MOD} and falls back to the input-dependent binary extended
+     * GCD.
+     * <p>
+     * safegcd was measured ≈ +45% kernel throughput at {@code keysPerWorkItem = 128} on an RTX 3070
+     * (it removes the binary GCD's warp divergence). It is the default; the legacy path is retained
+     * for A/B comparison and as a fallback for any device whose signed right-shift is not arithmetic
+     * (safegcd, like the reference, assumes sign-extending {@code >>}).
+     */
+    public boolean useSafeGcdInverse = true;
+
+    /**
+     * Compile-time profiling stage for the kernel (see {@link KernelProfileStage}). {@link
+     * KernelProfileStage#FULL} (default) is the normal, correct kernel. The other modes short-circuit
+     * the hash160 stages to attribute kernel time (EC arithmetic vs. hashing) and produce
+     * <b>incorrect</b> output — they are for benchmarking only, never production. {@code OpenCLContext}
+     * maps the mode to a {@code clBuildProgram} define; see {@code docs/performance.md} ("Stage
+     * attribution") for how to diff the modes.
+     */
+    public KernelProfileStage kernelProfileStage = KernelProfileStage.FULL;
+
+    /**
      * Enables OpenCL device-side profiling of the kernel launch and result read-back.
      * <p>
      * When {@code true} the command queue is created with {@code CL_QUEUE_PROFILING_ENABLE} and
@@ -102,4 +128,18 @@ public class CProducerOpenCL extends CProducer {
      * and the enqueue calls pass no events, exactly as the non-profiling path.
      */
     public boolean enableProfiling = false;
+
+    /**
+     * Enables verbose GPU build diagnostics in the log.
+     * <p>
+     * When {@code true}, {@code OpenCLContext} builds the kernel with {@code -cl-nv-verbose} and logs
+     * the full {@code clGetProgramBuildInfo} build log (on NVIDIA this can include ptxas register /
+     * spill stats; the content is driver-dependent and may be empty). The concise per-build "Kernel
+     * resource usage" line (work-group-size ceiling, private/local memory) and the device-info dump
+     * are always logged regardless of this flag.
+     * <p>
+     * Diagnostic only; off by default. See {@code docs/performance.md} ("Occupancy / register
+     * pressure").
+     */
+    public boolean logGpuDiagnostics = false;
 }

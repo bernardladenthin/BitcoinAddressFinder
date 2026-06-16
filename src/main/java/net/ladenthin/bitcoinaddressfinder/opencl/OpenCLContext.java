@@ -5,19 +5,26 @@ package net.ladenthin.bitcoinaddressfinder.opencl;
 
 import static org.jocl.CL.CL_MEM_COPY_HOST_PTR;
 import static org.jocl.CL.CL_MEM_READ_ONLY;
+import static org.jocl.CL.CL_MEM_READ_WRITE;
+import static org.jocl.CL.CL_MEM_WRITE_ONLY;
 import static org.jocl.CL.CL_QUEUE_PROFILING_ENABLE;
 import static org.jocl.CL.CL_QUEUE_PROPERTIES;
+import static org.jocl.CL.CL_TRUE;
 import static org.jocl.CL.clBuildProgram;
 import static org.jocl.CL.clCreateBuffer;
 import static org.jocl.CL.clCreateCommandQueueWithProperties;
 import static org.jocl.CL.clCreateContext;
 import static org.jocl.CL.clCreateKernel;
 import static org.jocl.CL.clCreateProgramWithSource;
+import static org.jocl.CL.clEnqueueNDRangeKernel;
+import static org.jocl.CL.clEnqueueReadBuffer;
+import static org.jocl.CL.clFinish;
 import static org.jocl.CL.clReleaseCommandQueue;
 import static org.jocl.CL.clReleaseContext;
 import static org.jocl.CL.clReleaseKernel;
 import static org.jocl.CL.clReleaseMemObject;
 import static org.jocl.CL.clReleaseProgram;
+import static org.jocl.CL.clSetKernelArg;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.Resources;
@@ -105,6 +112,77 @@ public class OpenCLContext implements ReleaseCLObject {
 
     private static final String KERNEL_NAME = "generateKeysKernel_grid";
     private static final boolean EXCEPTIONS_ENABLED = true;
+
+    /**
+     * {@code clBuildProgram} options string (Stage-0 quick win). Kept as a single constant so it is
+     * trivial to A/B and revert.
+     *
+     * <ul>
+     *   <li>{@code -cl-std=CL2.0} — the kernel's compact mode already relies on OpenCL 2.0
+     *       {@code atomic_add} on global memory; pinning the language standard makes that explicit
+     *       rather than depending on the driver's default (CL1.2).</li>
+     *   <li>{@code -cl-mad-enable} — permits fused multiply-add contraction. This kernel is
+     *       integer-only so the effect is expected to be marginal, but it is harmless and part of
+     *       the documented quick-win set (see docs/performance.md, "Stage 0").</li>
+     * </ul>
+     *
+     * <p>Deliberately omits {@code -cl-fast-relaxed-math}: it only affects floating-point math, of
+     * which this kernel has none.
+     */
+    private static final String CL_BUILD_OPTIONS = "-cl-std=CL2.0 -cl-mad-enable";
+
+    /**
+     * Build define that makes {@code inv_mod} fall back to the legacy binary-GCD modular inverse.
+     * Appended to the build options only when {@link CProducerOpenCL#useSafeGcdInverse} is
+     * {@code false}; the kernel uses safegcd by default (see {@code inc_ecc_secp256k1.cl}).
+     */
+    @VisibleForTesting
+    static final String LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION = "-D USE_LEGACY_BINARY_GCD_INV_MOD";
+
+    /** Kernel define that skips the compressed hash160 chain (profiling: isolate one hash chain). */
+    @VisibleForTesting
+    static final String PROFILE_SKIP_SECOND_HASH160_BUILD_OPTION = "-D PROFILE_SKIP_SECOND_HASH160";
+
+    /** Kernel define that skips both hash160 chains (profiling: isolate EC arithmetic). */
+    @VisibleForTesting
+    static final String PROFILE_SKIP_HASH160_BUILD_OPTION = "-D PROFILE_SKIP_HASH160";
+
+    /** NVIDIA verbose-build flag; appended when {@link CProducerOpenCL#logGpuDiagnostics} is set. */
+    @VisibleForTesting
+    static final String NV_VERBOSE_BUILD_OPTION = "-cl-nv-verbose";
+
+    /**
+     * Assembles the {@code clBuildProgram} options string: the constant {@link #CL_BUILD_OPTIONS},
+     * plus {@link #LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION} when {@link CProducerOpenCL#useSafeGcdInverse}
+     * is {@code false}, the profiling define for a non-{@code FULL}
+     * {@link CProducerOpenCL#kernelProfileStage}, and {@link #NV_VERBOSE_BUILD_OPTION} when
+     * {@link CProducerOpenCL#logGpuDiagnostics} is set.
+     *
+     * @return the build options string for this context's producer configuration
+     */
+    @VisibleForTesting
+    String buildOptions() {
+        final StringBuilder options = new StringBuilder(CL_BUILD_OPTIONS);
+        if (!producerOpenCL.useSafeGcdInverse) {
+            options.append(' ').append(LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION);
+        }
+        switch (producerOpenCL.kernelProfileStage) {
+            case ONE_HASH160:
+                options.append(' ').append(PROFILE_SKIP_SECOND_HASH160_BUILD_OPTION);
+                break;
+            case NO_HASH160:
+                options.append(' ').append(PROFILE_SKIP_HASH160_BUILD_OPTION);
+                break;
+            case FULL:
+            default:
+                break;
+        }
+        if (producerOpenCL.logGpuDiagnostics) {
+            options.append(' ').append(NV_VERBOSE_BUILD_OPTION);
+        }
+        return options.toString();
+    }
+
     private static final ComparableVersion REQUIRED_COMPACT_MODE_VERSION = new ComparableVersion("2.0");
 
     private final CProducerOpenCL producerOpenCL;
@@ -157,6 +235,33 @@ public class OpenCLContext implements ReleaseCLObject {
      * arguments are always bindable) and the kernel must run in full-transfer mode.
      */
     private boolean gpuFilterUploaded = false;
+
+    /**
+     * GPU VRAM buffer holding the precomputed {@code i·G} table used by the single-anchor affine
+     * scalar walk (Stage 1). Entry {@code m-1} ({@code m = 1 .. keysPerWorkItem-1}) holds the
+     * affine coordinates of {@code m·G} as {@code [x(8 words)][y(8 words)]} in device word order.
+     *
+     * <p>Built once and uploaded in {@link #init()} (the table is independent of the private key),
+     * and released in {@link #close()}. When {@code keysPerWorkItem == 1} the walk never reads it,
+     * so a one-byte placeholder is uploaded (zero-size device buffers are invalid) &mdash; mirroring
+     * the empty-filter placeholder in {@link #allocateFilterBuffers}. {@code null} before
+     * {@code init()} and after {@code close()}.
+     */
+    @ToString.Exclude
+    private @Nullable cl_mem igTableMem;
+
+    /**
+     * GPU VRAM buffer holding the fixed-base comb table used to compute the one-time anchor
+     * {@code P0 = k0·G} (Stage 2). For {@code pos = 0 .. 63} and {@code digit = 0 .. 15} it holds the
+     * affine point {@code (digit · 2^(4·pos))·G} as {@code [x(8 words)][y(8 words)]} in device word
+     * order; entry {@code (pos, digit)} is at word offset {@code (pos*16 + digit)*16}. The
+     * {@code digit == 0} slot is the point at infinity and is never read (left zero).
+     *
+     * <p>Built once and uploaded in {@link #init()} (independent of the private key), released in
+     * {@link #close()}. ~64 KB. {@code null} before {@code init()} and after {@code close()}.
+     */
+    @ToString.Exclude
+    private @Nullable cl_mem combTableMem;
 
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
 
@@ -223,11 +328,18 @@ public class OpenCLContext implements ReleaseCLObject {
         // Create the program from the source code
         program = clCreateProgramWithSource(context, openCLPrograms.length, openCLPrograms, null, null);
 
-        // Build the program
-        clBuildProgram(program, 0, null, null, null, null);
+        // Build the program with the Stage-0 quick-win options (see CL_BUILD_OPTIONS), plus the
+        // per-config modular-inverse selector (see CProducerOpenCL.useSafeGcdInverse).
+        clBuildProgram(program, 0, null, buildOptions(), null, null);
+
+        if (producerOpenCL.logGpuDiagnostics) {
+            logProgramBuildLog(device);
+        }
 
         // Create the kernel
         kernel = clCreateKernel(program, KERNEL_NAME, null);
+
+        logKernelResourceUsage(device);
 
         openClTask = new OpenClTask(context, producerOpenCL, bitHelper, byteBufferUtility);
 
@@ -236,6 +348,71 @@ public class OpenCLContext implements ReleaseCLObject {
         // full-transfer mode (see createKeys()).
         allocateFilterBuffers(new byte[0], 0, 0, 2, 1, 0);
         gpuFilterUploaded = false;
+
+        // Build and upload the i·G table for the single-anchor affine scalar walk. It depends only
+        // on the curve and keysPerWorkItem (not on the private key), so it is built once here.
+        uploadIGTable(producerOpenCL.keysPerWorkItem);
+
+        // Build and upload the fixed-base comb table used to compute the one-time anchor P0 = k0·G.
+        // Curve-only (key-independent), so built once here.
+        uploadCombTable();
+    }
+
+    /**
+     * Logs the built kernel's per-work-item resource usage (one INFO line at init). These standard
+     * {@code clGetKernelWorkGroupInfo} values are the occupancy diagnostic used in {@code
+     * docs/performance.md} ("Occupancy / register pressure"): {@code kernelMaxWorkGroupSize} below the
+     * device's {@code CL_DEVICE_MAX_WORK_GROUP_SIZE} indicates the kernel is resource- (typically
+     * register-) limited, and a non-zero {@code privateMemBytes} indicates register spilling to
+     * device-local memory. {@code workGroupSizeMultiple} is the warp/wavefront size.
+     *
+     * @param device the selected OpenCL device the kernel was built for
+     */
+    private void logKernelResourceUsage(OpenCLDevice device) {
+        final cl_kernel localKernel = Objects.requireNonNull(kernel);
+        final long[] value = new long[1];
+        CL.clGetKernelWorkGroupInfo(
+                localKernel, device.device(), CL.CL_KERNEL_WORK_GROUP_SIZE, Sizeof.size_t, Pointer.to(value), null);
+        final long kernelMaxWorkGroupSize = value[0];
+        CL.clGetKernelWorkGroupInfo(
+                localKernel,
+                device.device(),
+                CL.CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE,
+                Sizeof.size_t,
+                Pointer.to(value),
+                null);
+        final long workGroupSizeMultiple = value[0];
+        CL.clGetKernelWorkGroupInfo(
+                localKernel, device.device(), CL.CL_KERNEL_PRIVATE_MEM_SIZE, Sizeof.cl_ulong, Pointer.to(value), null);
+        final long privateMemBytes = value[0];
+        CL.clGetKernelWorkGroupInfo(
+                localKernel, device.device(), CL.CL_KERNEL_LOCAL_MEM_SIZE, Sizeof.cl_ulong, Pointer.to(value), null);
+        final long localMemBytes = value[0];
+        LOGGER.info(
+                "Kernel resource usage: kernelMaxWorkGroupSize={} workGroupSizeMultiple={} privateMemBytes={} localMemBytes={}",
+                kernelMaxWorkGroupSize,
+                workGroupSizeMultiple,
+                privateMemBytes,
+                localMemBytes);
+        // The heuristic starting-config suggestion lives in the device-info block
+        // (OpenCLDevice.toStringPretty, logged above and shown by the OpenCLInfo command).
+    }
+
+    /**
+     * Logs the full {@code clGetProgramBuildInfo} build log (enabled by {@link
+     * CProducerOpenCL#logGpuDiagnostics}). On NVIDIA, building with {@link #NV_VERBOSE_BUILD_OPTION}
+     * can surface ptxas register/spill stats here; the content is driver-dependent and may be empty.
+     *
+     * @param device the device the program was built for
+     */
+    private void logProgramBuildLog(OpenCLDevice device) {
+        final cl_program localProgram = Objects.requireNonNull(program);
+        final long[] size = new long[1];
+        CL.clGetProgramBuildInfo(localProgram, device.device(), CL.CL_PROGRAM_BUILD_LOG, 0, null, size);
+        final byte[] logBytes = new byte[(int) size[0]];
+        CL.clGetProgramBuildInfo(
+                localProgram, device.device(), CL.CL_PROGRAM_BUILD_LOG, logBytes.length, Pointer.to(logBytes), null);
+        LOGGER.info("GPU program build log:\n{}", new String(logBytes, StandardCharsets.UTF_8));
     }
 
     /**
@@ -394,6 +571,148 @@ public class OpenCLContext implements ReleaseCLObject {
         }
     }
 
+    private void uploadIGTable(int keysPerWorkItem) {
+        final cl_context localContext = Objects.requireNonNull(context);
+        // One entry per walked key (m = 1 .. keysPerWorkItem-1); at least one so the device buffer is
+        // never zero-size. When keysPerWorkItem == 1 the walk reads no i*G entry, so the placeholder
+        // (left unwritten by the kernel's count=0 run) is never consumed.
+        final int entries = Math.max(keysPerWorkItem - 1, 1);
+        final long bytes = (long) entries * OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES;
+        igTableMem = clCreateBuffer(localContext, CL_MEM_READ_WRITE, bytes, null, null);
+        enqueuePrecomputeKernel(igTableMem, "precompute_ig_table", keysPerWorkItem - 1);
+    }
+
+    /**
+     * Runs a single-work-item fixed-base precompute kernel (see
+     * {@code copyfromhashcat/inc_ecc_secp256k1.cl}) from the already-built program to populate
+     * {@code out} on the device. Argument 0 is the output buffer; {@code countArg}, when non-{@code
+     * null}, binds a trailing {@code const u32 count}.
+     *
+     * @param out        the device buffer to populate (kernel argument 0)
+     * @param kernelName the precompute kernel name
+     * @param countArg   value for a trailing {@code const u32 count} argument, or {@code null}
+     */
+    private void enqueuePrecomputeKernel(cl_mem out, String kernelName, @Nullable Integer countArg) {
+        final cl_program localProgram = Objects.requireNonNull(program);
+        final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
+        final cl_kernel precomputeKernel = clCreateKernel(localProgram, kernelName, null);
+        try {
+            clSetKernelArg(precomputeKernel, 0, Sizeof.cl_mem, Pointer.to(out));
+            if (countArg != null) {
+                clSetKernelArg(precomputeKernel, 1, Sizeof.cl_uint, Pointer.to(new int[] {countArg}));
+            }
+            clEnqueueNDRangeKernel(localQueue, precomputeKernel, 1, null, new long[] {1L}, null, 0, null, null);
+            clFinish(localQueue);
+        } finally {
+            clReleaseKernel(precomputeKernel);
+        }
+    }
+
+    private void releaseIGTable() {
+        if (igTableMem != null) {
+            clReleaseMemObject(igTableMem);
+            igTableMem = null;
+        }
+    }
+
+    private void uploadCombTable() {
+        final cl_context localContext = Objects.requireNonNull(context);
+        final long bytes = (long) COMB_POSITIONS * COMB_MAGNITUDES * OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES;
+        combTableMem = clCreateBuffer(localContext, CL_MEM_READ_WRITE, bytes, null, null);
+        enqueuePrecomputeKernel(combTableMem, "precompute_comb_table", null);
+    }
+
+    /**
+     * Number of 4-bit windows ("positions") in the signed-digit comb: 64 windows covering the
+     * 256-bit scalar, plus one extra position for the carry-out of the top window's signed recode
+     * (it only ever holds magnitude 1 = {@code 2^256 * G}).
+     */
+    @VisibleForTesting
+    static final int COMB_POSITIONS = 65;
+
+    /**
+     * Magnitude slots per position: {@code 1..8}, stored at slot index {@code mag-1}. The comb uses
+     * signed digits {@code b in {-8..+7}}; negative digits reuse the magnitude-{@code |b|} entry
+     * negated ({@code -P = (x, p - y)}), so only 8 points per position are stored (half the unsigned
+     * {@code 0..15} layout).
+     */
+    @VisibleForTesting
+    static final int COMB_MAGNITUDES = 8;
+
+    private void releaseCombTable() {
+        if (combTableMem != null) {
+            clReleaseMemObject(combTableMem);
+            combTableMem = null;
+        }
+    }
+
+    /**
+     * Test hook: runs a single-work-item fixed-base precompute kernel from the already-built program
+     * (e.g. {@code precompute_ig_table}, {@code precompute_comb_table} in
+     * {@code copyfromhashcat/inc_ecc_secp256k1.cl}) into a fresh {@code CL_MEM_READ_WRITE} buffer and
+     * returns the result bytes. This validates the on-device table generation against the bitcoinj
+     * reference without changing the production (host-built) table path.
+     *
+     * @param kernelName  the precompute kernel to run (argument 0 is the output buffer)
+     * @param outputBytes size of the output buffer in bytes
+     * @param countArg    value for a trailing {@code const u32 count} argument, or {@code null} when
+     *     the kernel takes only the output buffer
+     * @return the kernel's output buffer contents
+     */
+    @VisibleForTesting
+    byte[] runPrecomputeKernelForTesting(String kernelName, int outputBytes, @Nullable Integer countArg) {
+        final cl_context localContext = Objects.requireNonNull(context);
+        final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
+
+        final cl_mem out = clCreateBuffer(localContext, CL_MEM_READ_WRITE, outputBytes, null, null);
+        try {
+            enqueuePrecomputeKernel(out, kernelName, countArg);
+
+            final ByteBuffer buf = ByteBuffer.allocateDirect(outputBytes);
+            clEnqueueReadBuffer(localQueue, out, CL_TRUE, 0, outputBytes, Pointer.to(buf), 0, null, null);
+            clFinish(localQueue);
+
+            final byte[] bytes = new byte[outputBytes];
+            buf.get(bytes);
+            return bytes;
+        } finally {
+            clReleaseMemObject(out);
+        }
+    }
+
+    /**
+     * Benchmark hook: launches the {@code bench_inv_mod} microbenchmark kernel (see
+     * {@code inc_ecc_secp256k1custom.cl}) over {@code globalWorkSize} work-items, each performing
+     * {@code iterations} modular inverses with the build-selected {@code inv_mod}, and blocks until it
+     * finishes. Used by {@code InvModBenchmark} to isolate the inverse cost; the work is fully on the
+     * device (no result is read back). The output buffer and kernel are created and released per call.
+     *
+     * @param globalWorkSize     number of work-items (e.g. {@code 1 << gridSizeInBits})
+     * @param iterations         inverses performed per work-item
+     * @param inputHighLimbsZero {@code true} for ~160-bit operands (top three limbs zeroed),
+     *     {@code false} for full ~256-bit operands
+     */
+    @VisibleForTesting
+    public void runBenchInvMod(int globalWorkSize, int iterations, boolean inputHighLimbsZero) {
+        final cl_context localContext = Objects.requireNonNull(context);
+        final cl_program localProgram = Objects.requireNonNull(program);
+        final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
+
+        final cl_kernel benchKernel = clCreateKernel(localProgram, "bench_inv_mod", null);
+        final cl_mem out =
+                clCreateBuffer(localContext, CL_MEM_WRITE_ONLY, (long) globalWorkSize * Sizeof.cl_uint, null, null);
+        try {
+            clSetKernelArg(benchKernel, 0, Sizeof.cl_mem, Pointer.to(out));
+            clSetKernelArg(benchKernel, 1, Sizeof.cl_uint, Pointer.to(new int[] {iterations}));
+            clSetKernelArg(benchKernel, 2, Sizeof.cl_uint, Pointer.to(new int[] {inputHighLimbsZero ? 1 : 0}));
+            clEnqueueNDRangeKernel(localQueue, benchKernel, 1, null, new long[] {globalWorkSize}, null, 0, null, null);
+            clFinish(localQueue);
+        } finally {
+            clReleaseMemObject(out);
+            clReleaseKernel(benchKernel);
+        }
+    }
+
     @Override
     public boolean isClosed() {
         return closed;
@@ -403,6 +722,8 @@ public class OpenCLContext implements ReleaseCLObject {
     public void close() {
         if (!closed) {
             releaseGpuFilter();
+            releaseIGTable();
+            releaseCombTable();
             if (openClTask != null) {
                 openClTask.close();
                 openClTask = null;
@@ -439,6 +760,8 @@ public class OpenCLContext implements ReleaseCLObject {
         cl_command_queue localCommandQueue = Objects.requireNonNull(commandQueue);
         cl_mem localFuse8FingerprintsMem = Objects.requireNonNull(fuse8FingerprintsMem);
         cl_mem localFuse8MetadataMem = Objects.requireNonNull(fuse8MetadataMem);
+        cl_mem localIgTableMem = Objects.requireNonNull(igTableMem);
+        cl_mem localCombTableMem = Objects.requireNonNull(combTableMem);
 
         // Compact (filter) mode only when a real filter is uploaded AND the caller did not force
         // full transfer; otherwise run full transfer (no filter, or vanity forced transferAll).
@@ -446,9 +769,21 @@ public class OpenCLContext implements ReleaseCLObject {
 
         localOpenClTask.setSrcPrivateKeyChunk(privateKeyBase);
         ByteBuffer dstByteBuffer = localOpenClTask.executeKernel(
-                localKernel, localCommandQueue, localFuse8FingerprintsMem, localFuse8MetadataMem, transferAll);
+                localKernel,
+                localCommandQueue,
+                localFuse8FingerprintsMem,
+                localFuse8MetadataMem,
+                transferAll,
+                localIgTableMem,
+                localCombTableMem);
 
-        return new OpenCLGridResult(privateKeyBase, producerOpenCL.getOverallWorkSize(), dstByteBuffer);
+        // The result owns the readback buffer until closed; close() returns it to the task's reuse
+        // pool. The producer's result reader closes it after consuming (see ProducerOpenCL).
+        return new OpenCLGridResult(
+                privateKeyBase,
+                producerOpenCL.getOverallWorkSize(),
+                dstByteBuffer,
+                () -> localOpenClTask.releaseHostBuffer(dstByteBuffer));
     }
 
     private static List<String> getResourceNamesContent(Collection<String> resourceNames) throws IOException {

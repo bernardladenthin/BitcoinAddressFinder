@@ -37,13 +37,14 @@
         "maxResultReaderThreads": 4,
         "keyProducerId": "exampleKeyProducerSecureRandomId",
         "batchSizeInBits": 18,
-        "keysPerWorkItem": 4,
+        "keysPerWorkItem": 16,
         "batchUsePrivateKeyIncrement": true,
         "logSecretBase": false,
         "runOnce": false,
         "shutdownTimeoutSeconds": 300,
         "enableGpuFilter": true,
-        "transferAll": false
+        "transferAll": false,
+        "useSafeGcdInverse": true
       }
     ]
   }

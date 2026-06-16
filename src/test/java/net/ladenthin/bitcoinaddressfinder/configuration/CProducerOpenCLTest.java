@@ -116,4 +116,102 @@ public class CProducerOpenCLTest {
         assertThat(parsed.enableGpuFilter, is(false));
         assertThat(parsed.transferAll, is(false));
     }
+
+    @Test
+    public void defaults_useSafeGcdInverse_isTrue() {
+        // arrange + act
+        CProducerOpenCL config = new CProducerOpenCL();
+
+        // assert
+        assertThat(config.useSafeGcdInverse, is(true));
+    }
+
+    @Test
+    public void jsonRoundTrip_useSafeGcdInverseFalse_survivesSerialiseDeserialise() throws Exception {
+        // arrange
+        ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        CProducerOpenCL original = new CProducerOpenCL();
+        original.useSafeGcdInverse = false;
+
+        // act
+        String json = mapper.writeValueAsString(original);
+        CProducerOpenCL parsed = mapper.readValue(json, CProducerOpenCL.class);
+
+        // assert
+        assertThat(parsed.useSafeGcdInverse, is(false));
+    }
+
+    @Test
+    public void jsonDeserialise_useSafeGcdInverseAbsent_defaultsToTrue() throws Exception {
+        // arrange
+        ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        String json = "{}";
+
+        // act
+        CProducerOpenCL parsed = mapper.readValue(json, CProducerOpenCL.class);
+
+        // assert
+        assertThat(parsed.useSafeGcdInverse, is(true));
+    }
+
+    @Test
+    public void defaults_kernelProfileStage_isFull() {
+        // arrange + act
+        CProducerOpenCL config = new CProducerOpenCL();
+
+        // assert
+        assertThat(config.kernelProfileStage, is(KernelProfileStage.FULL));
+    }
+
+    @Test
+    public void jsonRoundTrip_kernelProfileStage_survivesSerialiseDeserialise() throws Exception {
+        // arrange
+        ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        CProducerOpenCL original = new CProducerOpenCL();
+        original.kernelProfileStage = KernelProfileStage.NO_HASH160;
+
+        // act
+        String json = mapper.writeValueAsString(original);
+        CProducerOpenCL parsed = mapper.readValue(json, CProducerOpenCL.class);
+
+        // assert
+        assertThat(parsed.kernelProfileStage, is(KernelProfileStage.NO_HASH160));
+    }
+
+    @Test
+    public void jsonDeserialise_kernelProfileStageAbsent_defaultsToFull() throws Exception {
+        // arrange
+        ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        String json = "{}";
+
+        // act
+        CProducerOpenCL parsed = mapper.readValue(json, CProducerOpenCL.class);
+
+        // assert
+        assertThat(parsed.kernelProfileStage, is(KernelProfileStage.FULL));
+    }
+
+    @Test
+    public void defaults_logGpuDiagnostics_isFalse() {
+        // arrange + act
+        CProducerOpenCL config = new CProducerOpenCL();
+
+        // assert
+        assertThat(config.logGpuDiagnostics, is(false));
+    }
+
+    @Test
+    public void jsonRoundTrip_logGpuDiagnostics_survivesSerialiseDeserialise() throws Exception {
+        // arrange
+        ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        CProducerOpenCL original = new CProducerOpenCL();
+        original.logGpuDiagnostics = true;
+
+        // act
+        String json = mapper.writeValueAsString(original);
+        CProducerOpenCL parsed = mapper.readValue(json, CProducerOpenCL.class);
+
+        // assert
+        assertThat(parsed.logGpuDiagnostics, is(true));
+    }
 }

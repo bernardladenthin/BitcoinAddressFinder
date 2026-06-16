@@ -286,6 +286,10 @@ public class ProducerOpenCL extends AbstractProducer {
                     consumer.consumeKeys(publicKeyBytesArray);
                 } catch (Throwable e) {
                     abstractProducer.logErrorInProduceKeys(e, secretBase);
+                } finally {
+                    // Reading is done: return the readback buffer to the reuse pool before releasing
+                    // the submit permit, so the next launch can pick it up instead of allocating.
+                    openCLGridResult.close();
                 }
             } finally {
                 // Outer finally — survives any task exception or Error so the

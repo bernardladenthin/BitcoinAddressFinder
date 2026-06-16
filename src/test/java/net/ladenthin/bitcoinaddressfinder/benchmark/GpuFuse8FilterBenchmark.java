@@ -15,7 +15,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import net.ladenthin.bitcoinaddressfinder.OpenCLPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.configuration.KernelProfileStage;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLGridResult;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8GpuFilterData;
@@ -159,6 +161,16 @@ public class GpuFuse8FilterBenchmark {
     public int batchSizeInBits;
 
     /**
+     * Inner iterations per OpenCL work-item (the scalar-walker / comb amortisation lever). Default
+     * {@code 1} preserves the original filter-vs-transfer comparison; set it to the device sweet
+     * spot (e.g. {@code 128} on the RTX 3070) together with {@code profiling=true} to attribute
+     * compact-mode cost between GPU compute and PCIe readback at the real operating point.
+     * {@code 1 << batchSizeInBits} must be divisible by {@code keysPerWorkItem}.
+     */
+    @Param({"1"})
+    public int keysPerWorkItem;
+
+    /**
      * Number of (non-matching) addresses inserted into the GPU filter. Only relevant when
      * {@code gpuFilter=true}; sized to model a realistic database the scanned random keys do
      * not collide with, so the compact path emits only Binary Fuse 8 false-positives.
@@ -175,6 +187,25 @@ public class GpuFuse8FilterBenchmark {
      */
     @Param({"false"})
     public boolean profiling;
+
+    /**
+     * Selects the kernel's modular-inverse implementation ({@link CProducerOpenCL#useSafeGcdInverse}).
+     * {@code true} (default) uses the safegcd path; {@code false} builds the legacy binary-GCD inverse.
+     * Sweep both (e.g. {@code -p useSafeGcdInverse=true,false}) to reproduce the Stage 4 A/B in §5 of
+     * {@code docs/performance.md} in a single JMH run.
+     */
+    @Param({"true"})
+    public boolean useSafeGcdInverse;
+
+    /**
+     * Compile-time kernel profiling stage ({@link CProducerOpenCL#kernelProfileStage}). {@code FULL}
+     * is the real kernel; {@code ONE_HASH160} / {@code NO_HASH160} short-circuit hashing to attribute
+     * kernel time. Sweep {@code -p kernelProfileStage=FULL,ONE_HASH160,NO_HASH160} (compact mode) and
+     * diff the throughputs per {@code docs/performance.md} "Stage attribution". Non-FULL modes emit
+     * incorrect hashes — timing only.
+     */
+    @Param({"FULL"})
+    public KernelProfileStage kernelProfileStage;
 
     private OpenCLContext ctx;
     private BigInteger privateKeyBase;
@@ -202,12 +233,14 @@ public class GpuFuse8FilterBenchmark {
 
         final CProducerOpenCL p = new CProducerOpenCL();
         p.batchSizeInBits = batchSizeInBits;
-        p.keysPerWorkItem = 1;
+        p.keysPerWorkItem = keysPerWorkItem;
         // Compact mode is requested only for the filter arm; the baseline arm keeps the legacy
         // full-transfer layout (no filter uploaded -> createKeys() transfers every result).
         p.enableGpuFilter = gpuFilter;
         p.transferAll = false;
         p.enableProfiling = profiling;
+        p.useSafeGcdInverse = useSafeGcdInverse;
+        p.kernelProfileStage = kernelProfileStage;
 
         ctx = new OpenCLContext(p, new BitHelper());
         ctx.init();
@@ -240,7 +273,10 @@ public class GpuFuse8FilterBenchmark {
      */
     @Benchmark
     public int oneKernelLaunch() {
-        return ctx.createKeys(privateKeyBase).getPublicKeyBytes().length;
+        // try-with-resources returns the readback buffer to the reuse pool after parsing.
+        try (OpenCLGridResult result = ctx.createKeys(privateKeyBase)) {
+            return result.getPublicKeyBytes().length;
+        }
     }
 
     /**
@@ -259,8 +295,12 @@ public class GpuFuse8FilterBenchmark {
                     // metric: these are device-side timings of the last launch, used to attribute
                     // cost between GPU compute and PCIe transfer, not the benchmark's throughput.
                     System.out.printf(
-                            "[profiling] gpuFilter=%s batchSizeInBits=%d -> kernel=%.3f ms, readback=%.3f ms%n",
-                            gpuFilter, batchSizeInBits, kernelNanos / 1_000_000.0, readbackNanos / 1_000_000.0);
+                            "[profiling] gpuFilter=%s batchSizeInBits=%d keysPerWorkItem=%d -> kernel=%.3f ms, readback=%.3f ms%n",
+                            gpuFilter,
+                            batchSizeInBits,
+                            keysPerWorkItem,
+                            kernelNanos / 1_000_000.0,
+                            readbackNanos / 1_000_000.0);
                 });
             }
             ctx.close();

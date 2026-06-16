@@ -161,6 +161,9 @@ public class OpenCLDeviceTest {
             CL_DEVICE_IMAGE3D_MAX_HEIGHT:          16384
             CL_DEVICE_IMAGE3D_MAX_DEPTH:           16384
             CL_DEVICE_PREFERRED_VECTOR_WIDTHS:     CHAR 1, SHORT 1, INT 1, LONG 1, FLOAT 1, DOUBLE 1
+            SUGGESTED START CONFIG (heuristic from the info above; sweep keysPerWorkItem to confirm):
+                producerOpenCL.batchSizeInBits = 21
+                producerOpenCL.keysPerWorkItem = 256
             """;
 
         assertThat(output, not(emptyOrNullString()));
