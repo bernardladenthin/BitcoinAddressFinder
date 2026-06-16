@@ -1045,3 +1045,68 @@ __kernel void generateKeysKernel_grid(
         }
     }
 }
+
+/*
+ * Validation kernel (test scaffolding, not used in production): cross-checks inv_mod_safegcd against
+ * the legacy binary-GCD inv_mod AND against the defining identity x * x^-1 == 1 (mod p), for
+ * deterministic pseudo-random inputs. Single work-item, loops over `count` so it reuses the existing
+ * single-work-item precompute test harness. out[i] is a failure bitmask, 0 == pass:
+ *   bit 0 (1): safegcd result disagrees with the legacy inv_mod
+ *   bit 1 (2): x * safegcd(x) != 1 (mod p)   [x != 0]
+ *   bit 2 (4): safegcd(0) != 0
+ */
+__kernel void test_inv_mod_safegcd(__global u32 *out, const u32 count)
+{
+    u32 one[ONE_COORDINATE_NUM_WORDS] = { 0 };
+    one[0] = 1;
+
+    for (u32 i = 0; i < count; i++) {
+        // Deterministic xorshift-derived 256-bit candidate, then fully reduced into [0, p) via
+        // mul_mod(x, x, 1). The seed is never zero, so x == 0 essentially never occurs (guarded anyway).
+        u32 x[ONE_COORDINATE_NUM_WORDS];
+        u32 s = i * 2654435761u + 0x9e3779b9u;
+        for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) {
+            s ^= s << 13;
+            s ^= s >> 17;
+            s ^= s << 5;
+            x[j] = s;
+        }
+        mul_mod(x, x, one); // x = x mod p
+
+        u32 r_sg[ONE_COORDINATE_NUM_WORDS];
+        u32 r_bg[ONE_COORDINATE_NUM_WORDS];
+        for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) {
+            r_sg[j] = x[j];
+            r_bg[j] = x[j];
+        }
+        inv_mod_safegcd(r_sg);
+        inv_mod(r_bg);
+
+        u32 status = 0;
+
+        // (1) agreement with the legacy inverse
+        u32 diff = 0;
+        for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) diff |= (r_sg[j] ^ r_bg[j]);
+        if (diff != 0) status |= 1u;
+
+        // x == 0 ?
+        u32 orx = 0;
+        for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) orx |= x[j];
+
+        if (orx != 0) {
+            // (2) defining identity x * safegcd(x) == 1 (mod p)
+            u32 prod[ONE_COORDINATE_NUM_WORDS];
+            mul_mod(prod, x, r_sg);
+            u32 not_one = (prod[0] ^ 1u);
+            for (int j = 1; j < ONE_COORDINATE_NUM_WORDS; j++) not_one |= prod[j];
+            if (not_one != 0) status |= 2u;
+        } else {
+            // (3) safegcd(0) must be 0
+            u32 nz = 0;
+            for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) nz |= r_sg[j];
+            if (nz != 0) status |= 4u;
+        }
+
+        out[i] = status;
+    }
+}

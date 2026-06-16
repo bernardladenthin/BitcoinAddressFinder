@@ -105,4 +105,25 @@ class OpenCLPrecomputeKernelTest {
             }
         }
     }
+
+    /**
+     * {@code test_inv_mod_safegcd}: the on-device self-check kernel runs the safegcd modular inverse
+     * over {@code count} deterministic pseudo-random field elements and cross-checks each against the
+     * legacy binary-GCD {@code inv_mod} and the identity {@code x * x^-1 == 1 (mod p)}. Every output
+     * word must be {@code 0} (a non-zero word is a failure bitmask for that input).
+     */
+    @Test
+    @OpenCLTest
+    void invModSafegcd_matchesLegacyInverseAndIdentity() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        final int count = 4096;
+        try (OpenCLContext ctx = new OpenCLContext(minimalProducer(), bitHelper)) {
+            ctx.init();
+            final byte[] status =
+                    ctx.runPrecomputeKernelForTesting("test_inv_mod_safegcd", count * Integer.BYTES, count);
+            for (int i = 0; i < status.length; i++) {
+                assertEquals(0, status[i], "safegcd self-check failure at status byte " + i);
+            }
+        }
+    }
 }

@@ -1019,6 +1019,244 @@ DECLSPEC void inv_mod (PRIVATE_AS u32 *a)
 }
 
 /*
+ * safegcd modular inverse (Bernstein-Yang "divsteps"), a faithful port of libsecp256k1's
+ * CONSTANT-TIME modinv32 (bitcoin-core/secp256k1, src/modinv32_impl.h, MIT). Drop-in alternative to
+ * inv_mod() above with the SAME signature (u32 a[8] little-endian, value in [0, p), replaced by its
+ * inverse mod p). Self-contained: depends only on the field prime p (encoded below) and 32/64-bit
+ * integer math already used by mul_mod — no project-specific helpers — so it is upstreamable.
+ *
+ * Why this exists: inv_mod() above is a binary extended GCD whose iteration count DEPENDS ON THE
+ * INPUT. Under SIMT every lane in a warp runs to the slowest lane's count (warp divergence). safegcd
+ * runs a FIXED 20*30 = 600 divsteps for every input, so a warp finishes in lock-step.
+ *
+ * Representation: 9 signed 30-bit limbs (value = sum v[i]*2^(30*i)). 30-bit limbs keep every
+ * intermediate product inside a 64-bit accumulator (`long`), avoiding the 128-bit math the 62-bit
+ * variant needs.
+ *
+ * Shift note: like the reference, this relies on ARITHMETIC (sign-extending) right shift of signed
+ * `int`/`long`. NVIDIA and pocl both implement that; the parity test (test_inv_mod_safegcd) guards
+ * any device that disagrees.
+ */
+
+#define SAFEGCD_M30 0x3fffffff
+// secp256k1 field prime p = 2^256 - 2^32 - 977 in signed-30 limbs, and -p^-1 mod 2^30 helper.
+#define SAFEGCD_P_INIT { -0x3d1, -4, 0, 0, 0, 0, 0, 0, 65536 }
+#define SAFEGCD_P_INV30 0x2ddacacfu
+
+// 30 divsteps: builds the 2x2 transition matrix t[u,v,q,r] and returns the new zeta.
+DECLSPEC int modinv32_divsteps_30 (int zeta, u32 f0, u32 g0, PRIVATE_AS int *t)
+{
+  u32 u = 1, v = 0, q = 0, r = 1;
+  u32 c1, c2, mask1, mask2, f = f0, g = g0, x, y, z;
+
+  for (int i = 0; i < 30; i++)
+  {
+    c1 = (u32) (zeta >> 31);     // all-ones iff zeta < 0
+    mask1 = c1;
+    c2 = g & 1;
+    mask2 = -c2;                 // all-ones iff g odd
+    x = (f ^ mask1) - mask1;     // conditionally negate f,u,v
+    y = (u ^ mask1) - mask1;
+    z = (v ^ mask1) - mask1;
+    g += x & mask2;
+    q += y & mask2;
+    r += z & mask2;
+    mask1 &= mask2;              // (zeta < 0) AND (g odd)
+    zeta = (int) ((u32) zeta ^ mask1) - 1;
+    f += g & mask1;
+    u += q & mask1;
+    v += r & mask1;
+    g >>= 1;
+    u <<= 1;
+    v <<= 1;
+  }
+  t[0] = (int) u;
+  t[1] = (int) v;
+  t[2] = (int) q;
+  t[3] = (int) r;
+  return zeta;
+}
+
+// d,e <- (t*[d,e]) / 2^30 mod p (Bezout coefficients).
+DECLSPEC void modinv32_update_de_30 (PRIVATE_AS int *d, PRIVATE_AS int *e, PRIVATE_AS const int *t)
+{
+  const int modulus[9] = SAFEGCD_P_INIT;
+  const int u = t[0], v = t[1], q = t[2], r = t[3];
+  int di, ei, md, me, sd, se;
+  long cd, ce;
+
+  sd = d[8] >> 31;
+  se = e[8] >> 31;
+  md = (u & sd) + (v & se);
+  me = (q & sd) + (r & se);
+  di = d[0];
+  ei = e[0];
+  cd = (long) u * di + (long) v * ei;
+  ce = (long) q * di + (long) r * ei;
+  // choose md,me so the low 30 bits of t*[d,e]+p*[md,me] vanish
+  md -= (int) ((SAFEGCD_P_INV30 * (u32) cd + (u32) md) & SAFEGCD_M30);
+  me -= (int) ((SAFEGCD_P_INV30 * (u32) ce + (u32) me) & SAFEGCD_M30);
+  cd += (long) modulus[0] * md;
+  ce += (long) modulus[0] * me;
+  cd >>= 30;
+  ce >>= 30;
+  for (int i = 1; i < 9; i++)
+  {
+    di = d[i];
+    ei = e[i];
+    cd += (long) u * di + (long) v * ei;
+    ce += (long) q * di + (long) r * ei;
+    cd += (long) modulus[i] * md;
+    ce += (long) modulus[i] * me;
+    d[i - 1] = (int) cd & SAFEGCD_M30; cd >>= 30;
+    e[i - 1] = (int) ce & SAFEGCD_M30; ce >>= 30;
+  }
+  d[8] = (int) cd;
+  e[8] = (int) ce;
+}
+
+// f,g <- (t*[f,g]) / 2^30.
+DECLSPEC void modinv32_update_fg_30 (PRIVATE_AS int *f, PRIVATE_AS int *g, PRIVATE_AS const int *t)
+{
+  const int u = t[0], v = t[1], q = t[2], r = t[3];
+  int fi, gi;
+  long cf, cg;
+
+  fi = f[0];
+  gi = g[0];
+  cf = (long) u * fi + (long) v * gi;
+  cg = (long) q * fi + (long) r * gi;
+  cf >>= 30;
+  cg >>= 30;
+  for (int i = 1; i < 9; i++)
+  {
+    fi = f[i];
+    gi = g[i];
+    cf += (long) u * fi + (long) v * gi;
+    cg += (long) q * fi + (long) r * gi;
+    f[i - 1] = (int) cf & SAFEGCD_M30; cf >>= 30;
+    g[i - 1] = (int) cg & SAFEGCD_M30; cg >>= 30;
+  }
+  f[8] = (int) cf;
+  g[8] = (int) cg;
+}
+
+// Bring r from (-2p, p) to [0, p), optionally negating first (sign < 0 => negate).
+DECLSPEC void modinv32_normalize_30 (PRIVATE_AS int *r, int sign)
+{
+  const int modulus[9] = SAFEGCD_P_INIT;
+  const int M30 = SAFEGCD_M30;
+  int r0 = r[0], r1 = r[1], r2 = r[2], r3 = r[3], r4 = r[4], r5 = r[5], r6 = r[6], r7 = r[7], r8 = r[8];
+  int cond_add, cond_negate;
+
+  cond_add = r8 >> 31;
+  r0 += modulus[0] & cond_add;
+  r1 += modulus[1] & cond_add;
+  r2 += modulus[2] & cond_add;
+  r3 += modulus[3] & cond_add;
+  r4 += modulus[4] & cond_add;
+  r5 += modulus[5] & cond_add;
+  r6 += modulus[6] & cond_add;
+  r7 += modulus[7] & cond_add;
+  r8 += modulus[8] & cond_add;
+  cond_negate = sign >> 31;
+  r0 = (r0 ^ cond_negate) - cond_negate;
+  r1 = (r1 ^ cond_negate) - cond_negate;
+  r2 = (r2 ^ cond_negate) - cond_negate;
+  r3 = (r3 ^ cond_negate) - cond_negate;
+  r4 = (r4 ^ cond_negate) - cond_negate;
+  r5 = (r5 ^ cond_negate) - cond_negate;
+  r6 = (r6 ^ cond_negate) - cond_negate;
+  r7 = (r7 ^ cond_negate) - cond_negate;
+  r8 = (r8 ^ cond_negate) - cond_negate;
+  r1 += r0 >> 30; r0 &= M30;
+  r2 += r1 >> 30; r1 &= M30;
+  r3 += r2 >> 30; r2 &= M30;
+  r4 += r3 >> 30; r3 &= M30;
+  r5 += r4 >> 30; r4 &= M30;
+  r6 += r5 >> 30; r5 &= M30;
+  r7 += r6 >> 30; r6 &= M30;
+  r8 += r7 >> 30; r7 &= M30;
+
+  cond_add = r8 >> 31;
+  r0 += modulus[0] & cond_add;
+  r1 += modulus[1] & cond_add;
+  r2 += modulus[2] & cond_add;
+  r3 += modulus[3] & cond_add;
+  r4 += modulus[4] & cond_add;
+  r5 += modulus[5] & cond_add;
+  r6 += modulus[6] & cond_add;
+  r7 += modulus[7] & cond_add;
+  r8 += modulus[8] & cond_add;
+  r1 += r0 >> 30; r0 &= M30;
+  r2 += r1 >> 30; r1 &= M30;
+  r3 += r2 >> 30; r2 &= M30;
+  r4 += r3 >> 30; r3 &= M30;
+  r5 += r4 >> 30; r4 &= M30;
+  r6 += r5 >> 30; r5 &= M30;
+  r7 += r6 >> 30; r6 &= M30;
+  r8 += r7 >> 30; r7 &= M30;
+
+  r[0] = r0; r[1] = r1; r[2] = r2; r[3] = r3; r[4] = r4;
+  r[5] = r5; r[6] = r6; r[7] = r7; r[8] = r8;
+}
+
+// u32[8] little-endian (value in [0, 2^256)) -> 9 signed-30 limbs in [0, 2^30).
+DECLSPEC void modinv32_from_u32x8 (PRIVATE_AS int *g, PRIVATE_AS const u32 *a)
+{
+  for (int i = 0; i < 9; i++)
+  {
+    const int bit = 30 * i;
+    const int word = bit >> 5;
+    const int off = bit & 31;
+    u64 chunk = ((u64) a[word]) >> off;
+    if (off > 0 && (word + 1) < 8) chunk |= ((u64) a[word + 1]) << (32 - off);
+    g[i] = (int) ((u32) chunk & SAFEGCD_M30);
+  }
+}
+
+// 9 signed-30 limbs in [0, 2^30) (value in [0, p)) -> u32[8] little-endian. Limbs occupy disjoint
+// 30-bit ranges, so a plain OR (no carry) reconstructs the 256-bit value.
+DECLSPEC void modinv32_to_u32x8 (PRIVATE_AS u32 *a, PRIVATE_AS const int *d)
+{
+  for (int i = 0; i < 8; i++) a[i] = 0;
+  for (int i = 0; i < 9; i++)
+  {
+    const u64 v = (u64) ((u32) d[i] & SAFEGCD_M30);
+    const int bit = 30 * i;
+    const int word = bit >> 5;
+    const int off = bit & 31;
+    const u64 shifted = v << off;
+    a[word] |= (u32) (shifted & 0xffffffffu);
+    if ((word + 1) < 8) a[word + 1] |= (u32) (shifted >> 32);
+  }
+}
+
+// Drop-in modular inverse: a (u32[8], in [0, p)) <- a^-1 mod p. inv_mod(0) == 0 (matches inv_mod).
+DECLSPEC void inv_mod_safegcd (PRIVATE_AS u32 *a)
+{
+  int d[9] = { 0 };
+  int e[9] = { 0 };
+  int f[9] = SAFEGCD_P_INIT;
+  int g[9];
+  int t[4];
+
+  e[0] = 1;
+  modinv32_from_u32x8 (g, a);
+
+  int zeta = -1;
+  for (int it = 0; it < 20; it++)
+  {
+    zeta = modinv32_divsteps_30 (zeta, (u32) f[0], (u32) g[0], t);
+    modinv32_update_de_30 (d, e, t);
+    modinv32_update_fg_30 (f, g, t);
+  }
+  // g has reached 0; f == +/-1 (== gcd); d holds +/- the inverse. Normalize using sign of f.
+  modinv32_normalize_30 (d, f[8]);
+  modinv32_to_u32x8 (a, d);
+}
+
+/*
   // everything from the formulas below of course MOD the prime:
 
   // we use this formula:
