@@ -586,6 +586,25 @@ command above.
 
 ## 8. Future work / not-yet-done levers
 
+### Measured neutral (kept for code quality)
+
+- **Direct `sha256_transform` / `ripemd160_transform` on pre-built blocks — throughput-neutral,
+  kept.** The kernel builds fully-padded, block-aligned hash inputs, but used to run them through
+  `sha256_init`+`sha256_update` / `ripemd160_init`+`ripemd160_update_swap`, whose streaming machinery
+  (offset alignment, partial-block buffering, length tracking, full-ctx zeroing) is pure overhead for
+  an already-aligned message. Replacing it with direct `*_transform` calls (custom-file helpers
+  `sha256_hash_prebuilt_blocks` / `ripemd160_hash_prebuilt_block_swap`; vendored hash code untouched)
+  is byte-identical (`ProbeAddressesOpenCLTest` 43/0). A matched **F1–base–F1** A/B at
+  `keysPerWorkItem=128` compact gave **142.06 / 141.82 / 141.83 ops/s** — within ~0.2%, i.e. **no
+  measurable change**. Kept anyway: it is simpler, idiomatic, and drops the per-key `ctx` structs
+  (≈50 private words) lowering register pressure (a latent occupancy win on tighter configs). The
+  lesson: the §6 "hashing ≈ 43%" cost is essentially **all** inside the vendored `sha256_transform` /
+  `ripemd160_transform` (64 + 80 rounds) — the custom-file wrapper around them was negligible, so the
+  hashing path is **not** a fruitful throughput target from the custom file (a follow-on idea to build
+  the SHA block words directly from the coordinate words, skipping the `uchar` SEC round-trip, was
+  therefore not pursued — strictly smaller than this, which already showed nothing). Faster hashing
+  would require changing the vendored transforms themselves, which is out of scope.
+
 ### Measured and rejected
 
 - **Dedicated `sqr_mod` (symmetric modular squaring) — ~5% *slower*, reverted.** A faithful symmetric
