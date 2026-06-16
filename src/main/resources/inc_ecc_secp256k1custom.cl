@@ -527,6 +527,53 @@ inline void build_ripemd160_block_from_sha256(const u32 *sha256_hash, u32 *ripem
     ripemd_input[15] = 0x00000000; // high word (bits 32–63)
 }
 
+// SHA-256 over `numBlocks` pre-built, pre-padded 64-byte blocks (16 u32 words each, already in the
+// order the transform consumes — exactly what build_sha256_block_* produces). Writes the 8-word
+// big-endian digest. Calls sha256_transform directly instead of sha256_init + sha256_update: the
+// message is already block-aligned and padded, so update's streaming bookkeeping (offset alignment
+// via switch_buffer_by_offset, partial-block buffering, length tracking, and the init-time zeroing of
+// the whole ctx) is pure overhead. Result is byte-identical (update ultimately calls this transform).
+inline void sha256_hash_prebuilt_blocks(const u32 *blocks, u32 numBlocks, u32 *digest)
+{
+    digest[0] = SHA256M_A;
+    digest[1] = SHA256M_B;
+    digest[2] = SHA256M_C;
+    digest[3] = SHA256M_D;
+    digest[4] = SHA256M_E;
+    digest[5] = SHA256M_F;
+    digest[6] = SHA256M_G;
+    digest[7] = SHA256M_H;
+
+    for (u32 b = 0; b < numBlocks; b++) {
+        const u32 *blk = blocks + b * SHA256_INPUT_BLOCK_SIZE_WORDS;
+        u32 w0[4] = {blk[0], blk[1], blk[2], blk[3]};
+        u32 w1[4] = {blk[4], blk[5], blk[6], blk[7]};
+        u32 w2[4] = {blk[8], blk[9], blk[10], blk[11]};
+        u32 w3[4] = {blk[12], blk[13], blk[14], blk[15]};
+        sha256_transform(w0, w1, w2, w3, digest);
+    }
+}
+
+// RIPEMD-160 of a single pre-built RIPEMD block (16 u32 words as build_ripemd160_block_from_sha256
+// produces them, big-endian). Byte-swaps each word to little-endian (exactly what
+// ripemd160_update_swap does) and calls ripemd160_transform directly, skipping the streaming
+// bookkeeping and ctx zeroing. Writes the 5-word hash160. Byte-identical to the init+update_swap path.
+inline void ripemd160_hash_prebuilt_block_swap(const u32 *block, u32 *out_h)
+{
+    u32 w0[4] = {hc_swap32_S(block[0]), hc_swap32_S(block[1]), hc_swap32_S(block[2]), hc_swap32_S(block[3])};
+    u32 w1[4] = {hc_swap32_S(block[4]), hc_swap32_S(block[5]), hc_swap32_S(block[6]), hc_swap32_S(block[7])};
+    u32 w2[4] = {hc_swap32_S(block[8]), hc_swap32_S(block[9]), hc_swap32_S(block[10]), hc_swap32_S(block[11])};
+    u32 w3[4] = {hc_swap32_S(block[12]), hc_swap32_S(block[13]), hc_swap32_S(block[14]), hc_swap32_S(block[15])};
+
+    out_h[0] = RIPEMD160M_A;
+    out_h[1] = RIPEMD160M_B;
+    out_h[2] = RIPEMD160M_C;
+    out_h[3] = RIPEMD160M_D;
+    out_h[4] = RIPEMD160M_E;
+
+    ripemd160_transform(w0, w1, w2, w3, out_h);
+}
+
 /**
  * @define REUSE_UNCOMPRESSED_SEC_FOR_COMPRESSED
  *
@@ -810,33 +857,20 @@ __kernel void generateKeysKernel_grid(
     ripemd160_input_uncompressed   = ripemd160_input_uncompressed_alloc;
     sec_uncompressed               = sec_uncompressed_alloc;
 
+    // The hash160 chains use sha256_transform / ripemd160_transform directly on the pre-built padded
+    // blocks (see the hash160 stage below), so no sha256_ctx_t / ripemd160_ctx_t streaming contexts
+    // are needed — only the input/SEC scratch buffers.
     #ifdef REUSE_FOR_COMPRESSED
-        // Shared context for both compressed and uncompressed operations
-        sha256_ctx_t                             sha_ctx_shared;
-        ripemd160_ctx_t                          ripemd_ctx_shared;
-
-        // Aliases for readability — both use the shared context
-        #define sha_ctx_uncompressed             sha_ctx_shared
-        #define sha_ctx_compressed               sha_ctx_shared
-
-        #define ripemd_ctx_uncompressed          ripemd_ctx_shared
-        #define ripemd_ctx_compressed            ripemd_ctx_shared
-        
-        // arrays
+        // Compressed reuses the uncompressed scratch (same X; only the SEC prefix byte differs).
         sha256_input_compressed    =             sha256_input_uncompressed_alloc;
         ripemd160_input_compressed =             ripemd160_input_uncompressed_alloc;
         sec_compressed             =             sec_uncompressed_alloc;
     #else
-        // Separate contexts for uncompressed and compressed operations
-        sha256_ctx_t                             sha_ctx_uncompressed;
-        sha256_ctx_t                             sha_ctx_compressed;
-        ripemd160_ctx_t                          ripemd_ctx_uncompressed;
-        ripemd160_ctx_t                          ripemd_ctx_compressed;
-        
+        // Separate scratch buffers for the uncompressed and compressed chains.
         u32                                      sha256_input_compressed_alloc[SHA256_INPUT_TOTAL_WORDS_COMPRESSED];
         u32                                      ripemd160_input_compressed_alloc[RIPEMD160_INPUT_BLOCK_SIZE_WORDS];
         uchar                                    sec_compressed_alloc[SEC_PUBLIC_KEY_COMPRESSED_NUM_BYTES];
-        
+
         sha256_input_compressed    =             sha256_input_compressed_alloc;
         ripemd160_input_compressed =             ripemd160_input_compressed_alloc;
         sec_compressed             =             sec_compressed_alloc;
@@ -989,23 +1023,17 @@ __kernel void generateKeysKernel_grid(
             }
             #else
             // === Hash uncompressed key ===
+            // Direct block transforms on the pre-built padded blocks (see sha256_hash_prebuilt_blocks
+            // / ripemd160_hash_prebuilt_block_swap) — no init/update streaming bookkeeping. The hash160
+            // is written straight into the stable register array, so there is no shared-context
+            // snapshot to worry about even under REUSE_FOR_COMPRESSED.
             get_sec_bytes_uncompressed(x_bigEndian_local, y_bigEndian_local, sec_uncompressed);
             build_sha256_block_from_uncompressed_pubkey(sec_uncompressed, sha256_input_uncompressed);
-            sha256_init(&sha_ctx_uncompressed);
-            sha256_update(&sha_ctx_uncompressed, sha256_input_uncompressed, SHA256_INPUT_TOTAL_BYTES_UNCOMPRESSED);
-
-            build_ripemd160_block_from_sha256(sha_ctx_uncompressed.h, ripemd160_input_uncompressed);
-            ripemd160_init(&ripemd_ctx_uncompressed);
-            ripemd160_update_swap(&ripemd_ctx_uncompressed, ripemd160_input_uncompressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
-
-            // Snapshot the uncompressed hash160 into a private register array NOW. Under
-            // REUSE_FOR_COMPRESSED the ripemd context is a shared alias, so the compressed pass
-            // below overwrites ripemd_ctx_uncompressed.h; the deferred filter check and entry
-            // write must read this stable copy, not the (soon-clobbered) shared context.
-            #pragma unroll
-            for (int w = 0; w < RIPEMD160_HASH_NUM_WORDS; w++) {
-                ripemd_uncompressed_h[w] = ripemd_ctx_uncompressed.h[w];
-            }
+            u32 sha256_digest_uncompressed[SHA256_HASH_NUM_WORDS];
+            sha256_hash_prebuilt_blocks(
+                sha256_input_uncompressed, SHA256_INPUT_BLOCKS_FOR_UNCOMPRESSED_SEC, sha256_digest_uncompressed);
+            build_ripemd160_block_from_sha256(sha256_digest_uncompressed, ripemd160_input_uncompressed);
+            ripemd160_hash_prebuilt_block_swap(ripemd160_input_uncompressed, ripemd_uncompressed_h);
 
             // === Hash compressed key ===
             #ifdef PROFILE_SKIP_SECOND_HASH160
@@ -1021,19 +1049,11 @@ __kernel void generateKeysKernel_grid(
                 get_sec_bytes_compressed(x_bigEndian_local, y_bigEndian_local, sec_compressed);
             #endif
             build_sha256_block_from_compressed_pubkey(sec_compressed, sha256_input_compressed);
-            sha256_init(&sha_ctx_compressed);
-            sha256_update(&sha_ctx_compressed, sha256_input_compressed, SHA256_INPUT_TOTAL_BYTES_COMPRESSED);
-
-            build_ripemd160_block_from_sha256(sha_ctx_compressed.h, ripemd160_input_compressed);
-            ripemd160_init(&ripemd_ctx_compressed);
-            ripemd160_update_swap(&ripemd_ctx_compressed, ripemd160_input_compressed, RIPEMD160_INPUT_BLOCK_SIZE_BYTES);
-
-            // Snapshot the compressed hash160 too, so both hashes are stable private copies for
-            // the filter check and the deferred entry write below.
-            #pragma unroll
-            for (int w = 0; w < RIPEMD160_HASH_NUM_WORDS; w++) {
-                ripemd_compressed_h[w] = ripemd_ctx_compressed.h[w];
-            }
+            u32 sha256_digest_compressed[SHA256_HASH_NUM_WORDS];
+            sha256_hash_prebuilt_blocks(
+                sha256_input_compressed, SHA256_INPUT_BLOCKS_FOR_COMPRESSED_SEC, sha256_digest_compressed);
+            build_ripemd160_block_from_sha256(sha256_digest_compressed, ripemd160_input_compressed);
+            ripemd160_hash_prebuilt_block_swap(ripemd160_input_compressed, ripemd_compressed_h);
             #endif // PROFILE_SKIP_SECOND_HASH160
             #endif // PROFILE_SKIP_HASH160
 
