@@ -324,6 +324,40 @@ hot path; correctness is paramount.
 Evaluated during the investigation; candidates for a future stage (re-sweep `keysPerWorkItem` after
 any of these, since the per-key cost balance shifts):
 
+- **Dedicated sequential-only "addition-walk" kernel (160-bit, output-only)** — a brand-new
+  standalone kernel (alongside `generateKeysKernel_grid`) for contiguous scanning: the host supplies
+  a single anchor `P0`, and the kernel enumerates `P0, P0+G, P0+2G, …` by pure affine point addition
+  (batched Montgomery inversion) — no per-key scalar multiplication, no comb, no wNAF. Restricted to
+  the 160-bit (MSB-zero) range, compact/output-only (no full-transfer path), keeping both hash160
+  chains. The whole keyspace is one arithmetic progression, so for sequential scans only the *first*
+  point needs a scalar multiplication; everything after is one addition per key — the theoretical
+  floor. Optionally persist each work-item's point across launches (advance by a constant
+  `Δ = batchSize·G`) so the per-launch start cost approaches zero.
+- **Persistent / warp-synchronous "megakernel" (different execution model, big rewrite).** The
+  endpoint of the addition-walk idea: instead of one host launch per batch, launch *once* as many
+  work-items as the GPU can keep resident (occupancy-maximal — tens of thousands on an RTX 3070, not
+  a handful), each owning a disjoint keyspace stripe, holding its running point **in registers**, and
+  looping internally: add `+G` → hash160 → Fuse8 → on the (astronomically rare) hit, atomically
+  append to a global output ring buffer. The inner loop is branch-free and warp-uniform, so SIMT
+  efficiency is ~ideal and steady-state memory traffic is ~zero ⇒ purely compute-bound. The kernel
+  runs "indefinitely" until a host `volatile` stop flag; the host **drains the output buffer
+  asynchronously** (double-buffer) while it keeps running. Gotchas: this needs a **completely
+  different host orchestration** (long-lived launch, persistent per-thread state, async drain,
+  back-pressure) — not the current stateless launch-per-batch model; beware the **display-GPU
+  TDR/watchdog** (chunk into long-but-bounded launches, disable TDR, or use a non-display GPU); the
+  only remaining divergence is the rare hit and the data-dependent `inv_mod` ⇒ pairs naturally with a
+  branch-free (safegcd) inverse. This is the most "OpenCL-native" design but also the largest
+  departure from the current architecture.
+  - **GPU-only compute + thin (Rust-capable) host + resumable "scan map".** Because all crypto lives
+    on the GPU, the host shrinks to a thin driver — seed the initial private keys, drain hits, and
+    **checkpoint the frontier** — so this component could be reimplemented standalone (e.g. in Rust)
+    over the OpenCL kernel. Periodically (and on stop) read back each thread's current offset (its
+    stripe is contiguous, so the covered set is just the union of `[start_t, start_t + done_t)`),
+    giving a compact, **`ddrescue`-style coverage/map file**: persist it to disk → resume after a
+    stop/crash by re-seeding each thread at its last frontier, and keep a provable, gap-/overlap-free
+    record of exactly which keyspace has been searched (your own searched-domain artifact). The
+    frontier is a handful of integers per thread, so checkpointing is cheap and can read a
+    host-mapped progress buffer the threads update, without stopping the kernel.
 - **Fermat inversion** (`a^(p−2)` via an addition chain) instead of binary-GCD: warp-uniform (no
   data-dependent iteration count) vs GCD's divergence. But inversion is only ~4% of runtime
   post-batching ⇒ headroom ≤ ~4%. A cheap A/B, not a headline.
