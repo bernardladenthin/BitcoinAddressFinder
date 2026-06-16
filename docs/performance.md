@@ -605,16 +605,23 @@ command above.
   throughput-neutral, kept.** Follow-on to the above: the hash160 path used to go EC limbs → reverse
   to big-endian words → `get_sec_bytes` (write a `uchar` SEC array) → `pack_bytes_to_u32_words`
   (repack) → pad. Two self-contained functions now build the fully-padded SHA-256 block(s) directly
-  from the little-endian coordinate limbs with a `(msword<<24)|(lsword>>8)` splice for the 1-byte SEC
-  prefix shift — no byte buffer, no pack/unpack, no per-word swap:
-  `sec_uncompressed_pubkey_to_sha256_blocks` / `sec_compressed_pubkey_to_sha256_block` (the clean
-  "coordinates → hash input" methods intended for **upstreaming to hashcat**). Removed ~10 now-dead
-  helpers + the SEC `uchar` buffers. Byte-identical (`ProbeAddressesOpenCLTest` 43/0; an initial
-  version fed the byte-swapped big-endian array and the gate caught it immediately — the full tests
-  localize wiring errors, so no dedicated test kernel was needed). Matched **F2–base–F2** A/B at
-  `keysPerWorkItem=128` compact: **134.96 / 140.58 / 143.31 ops/s** — the two F2 runs bracket the
-  baseline (intra-arm spread ≫ the F2-vs-baseline gap), i.e. **no measurable change**, confirming the
-  round-trip overhead was negligible. Kept for code cleanliness and the upstreamable methods.
+  from the little-endian coordinate limbs — no byte buffer, no pack/unpack, no per-word swap. The
+  final form factors this into two general, composable primitives rather than per-format splices:
+  `sha_block_put_be32(block, byte_off, val)` / `sha_block_put_byte(block, byte_off, b)` OR a value
+  into the block at an arbitrary byte offset (straddle-aware). The SEC builders then just zero the
+  block, "put" the prefix at offset 0, "put" each big-endian coordinate word at successive offsets
+  (X, then Y for uncompressed), and "put" the 0x80 pad — compressed vs. uncompressed differ only by
+  the number of appends. Because the offsets are compile-time constants in the unrolled callers, the
+  put shift/branch folds to exactly the `(msword<<24)|(lsword>>8)` splice: the generality of a
+  streaming append at the cost of a straight-line write. `sec_uncompressed_pubkey_to_sha256_blocks` /
+  `sec_compressed_pubkey_to_sha256_block` are the clean "coordinates → hash input" entry points
+  intended for **upstreaming to hashcat**. Removed ~10 now-dead helpers + the SEC `uchar` buffers.
+  Byte-identical (`ProbeAddressesOpenCLTest` 43/0; an early version fed the byte-swapped big-endian
+  array and the gate caught it immediately — the full tests localize wiring errors, so no dedicated
+  test kernel was needed). Matched A/B at `keysPerWorkItem=128` compact showed **no measurable
+  change** (both the direct-splice and the generic-put forms land within the ~6% run-to-run noise of
+  the baseline), confirming the round-trip overhead was negligible. Kept for code cleanliness, the
+  composable primitives, and the upstreamable methods.
 
 The combined conclusion: from the custom file, the hashing path is **not** a throughput lever — the
 cost lives in the vendored `sha256_transform` / `ripemd160_transform`. Faster hashing would require
