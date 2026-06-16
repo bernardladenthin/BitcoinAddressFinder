@@ -566,6 +566,33 @@ means the same big project as the compute lever (a reduced-radix field uses fewe
 splitting the megalithic kernel would also cut per-stage register peaks). Micro-tweaks won't move a
 kernel pinned at the 255-register ceiling.
 
+**Verbose build log (`producerOpenCL.logGpuDiagnostics`).** Off by default. When set, the kernel is
+built with `-cl-nv-verbose` and the full `clGetProgramBuildInfo` build log is logged (on NVIDIA this
+*can* surface ptxas register/spill stats — but is **driver-dependent and was empty on the RTX 3070's
+581.x driver**, which is why the always-on `clGetKernelWorkGroupInfo` line above is the primary
+occupancy signal). The device-info dump and the resource-usage line are logged regardless of this flag.
+
+### Suggested starting config (auto-derived from the device)
+
+The default `keysPerWorkItem = 1` is the slow trap (§3). To make the right ballpark obvious without a
+manual sweep, `OpenCLContext` logs a **heuristic starting-point config** once at init, derived from the
+device's reported `CL_DEVICE_MAX_COMPUTE_UNITS` and `CL_DEVICE_MAX_MEM_ALLOC_SIZE` (pure logic in
+`OpenClConfigSuggestion`, unit-tested without a GPU):
+
+```
+Suggested starting config for this device (40 compute units): batchSizeInBits=21 keysPerWorkItem=256 (heuristic starting point - sweep to confirm, ...)
+```
+
+- **`batchSizeInBits`** — the largest batch whose full-transfer result buffer (`2^bits × 108 B`) fits
+  ¼ of max-alloc, clamped to `[14, 21]` (below the hard `BIT_COUNT_FOR_MAX_CHUNKS_ARRAY = 24` cap).
+- **`keysPerWorkItem`** — chosen to keep ≈ 200 work-items per compute unit (calibrated from the
+  RTX 3070's ~8192-work-item peak over 40 CUs), rounded down to a power of two, clamped `[1, 256]`.
+
+It is **a coarse starting point, not an optimum** — it deliberately can't capture the thermal/occupancy
+subtleties, so the message tells the user to **sweep `keysPerWorkItem`** (§4) to confirm. The value is
+that it replaces the kpwi=1 trap with a device-appropriate ballpark (e.g. "use ~256 / bsib 21 on this
+40-CU GPU"), which is usually within a sweep step of the real peak.
+
 ---
 
 ## 7. Correctness gating
@@ -610,7 +637,8 @@ hot path; correctness is paramount.
 | 4 | safegcd `inv_mod` (isolated, 256/160-bit) | `InvModBenchmark -p useSafeGcdInverse=true,false -p inputBits=256,160` | same as above |
 | — | `keysPerWorkItem` tuning | `GridSizeSweepBenchmark` (§4) | — |
 | — | stage attribution (EC vs hashing) | `GpuFuse8FilterBenchmark -p gpuFilter=true -p kernelProfileStage=FULL,ONE_HASH160,NO_HASH160` (§6) | `OpenCLContextTest#kernelProfileStage_buildsAndRuns` |
-| — | occupancy / register pressure | grep init log for `Kernel resource usage:` (§6) | — |
+| — | occupancy / register pressure | grep init log for `Kernel resource usage:` (§6); `logGpuDiagnostics=true` for the verbose build log | — |
+| — | suggested starting config | grep init log for `Suggested starting config` (§6); pure helper `OpenClConfigSuggestion` | `OpenClConfigSuggestionTest` |
 | — | `KEYS_BATCH_INV` sweep | edit the `#define`, `GpuFuse8FilterBenchmark` (§3) | `ProbeAddressesOpenCLTest` |
 
 **Honest caveat on A/B reproducibility:** only Stage 4 has a build-time toggle
