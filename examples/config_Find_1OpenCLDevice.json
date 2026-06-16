@@ -91,7 +91,8 @@
         "runOnce": false,
         "shutdownTimeoutSeconds": 300,
         "enableGpuFilter": true,
-        "transferAll": false
+        "transferAll": false,
+        "useSafeGcdInverse": true
       }
     ]
   }
