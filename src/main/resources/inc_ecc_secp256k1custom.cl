@@ -376,22 +376,6 @@ inline void copy_private_u32_array_global_u32(__global u32 *dst, const u32 *src,
  * @param src Source array of u32 values.
  * @param word_count Number of u32 words to copy (1 word = 4 bytes).
  */
-inline void copy_u32_array_bytes(uchar *dst, int dst_offset, const u32 *src, const int word_count) {
-    const uchar *src_bytes = (const uchar *)src;
-    #pragma unroll
-    for (int i = 0; i < word_count * 4; i++) {
-        dst[dst_offset + i] = src_bytes[i];
-    }
-}
-
-inline uchar get_lsb_of_little_endian_coordinate(const u32 *coord) {
-    return as_uchar4(coord[0]).s0;
-}
-
-inline uchar get_lsb_of_big_endian_coordinate(const u32 *coord) {
-    return as_uchar4(coord[ONE_COORDINATE_NUM_WORDS - 1]).s3;
-}
-
 // ======= Swap 32-bit value (safe across OpenCL versions) =======
 
 inline u32 swap_u32(u32 v) {
@@ -420,87 +404,66 @@ inline void copy_and_reverse_endianness_u32_array(u32 *dst, int dst_offset, cons
     }
 }
 
-/**
- * @brief Converts a byte array into an array of u32 words (big-endian).
- *
- * Packs 4 bytes at a time from the input byte array `src` into 32-bit words in `dst`,
- * assuming the byte order is big-endian (most significant byte first).
- *
- * For example, the bytes {0x12, 0x34, 0x56, 0x78} will become the u32 word 0x12345678.
- *
- * @param src Input byte array (length must be at least word_count * 4).
- * @param dst Output array of u32 words.
- * @param word_count Number of 32-bit words to produce (reads 4 * word_count bytes from src).
- */
-inline void pack_bytes_to_u32_words(const uchar *src, u32 *dst, const int word_count)
+// ===========================================================================================
+// Direct EC-coordinate -> SHA-256 input block construction (upstreamable to hashcat).
+//
+// These build the fully-padded, big-endian SHA-256 message block(s) for a SEC public key DIRECTLY
+// from the coordinate limb words — no intermediate byte buffer (no SEC uchar array, no byte
+// pack/unpack, no per-word byte swap). Output is exactly what sha256_transform consumes (so they
+// pair with sha256_hash_prebuilt_blocks above).
+//
+// Input form: x[]/y[] are the secp256k1 coordinate limbs in DEVICE little-endian word order —
+// x[0] = least-significant 32 bits, x[7] = most-significant 32 bits (the form the EC point math here
+// produces, before any endianness reversal). The most-significant limb x[7] equals the first
+// big-endian SEC word; the byte order WITHIN a limb is already SHA's big-endian, so no swap is
+// needed. The 1-byte SEC prefix shifts every message byte one position, produced with a
+// (msword << 24) | (lsword >> 8) splice across adjacent limbs (walked high limb -> low limb).
+//
+// Layouts:
+//   uncompressed: 0x04 || X(32) || Y(32) = 65 bytes -> 2 blocks (32 words), trailing Y LSB then 0x80.
+//   compressed:   prefix || X(32)        = 33 bytes -> 1 block  (16 words), trailing 0x80.
+// where prefix = 0x02/0x03 from the parity of Y (its least-significant bit -> y[0] & 1).
+// ===========================================================================================
+
+// Uncompressed SEC pubkey -> 32-word (two-block) padded SHA-256 input. out_block must hold 32 u32.
+inline void sec_uncompressed_pubkey_to_sha256_blocks(const u32 *x, const u32 *y, u32 *out_block)
 {
+    out_block[0] = ((u32)SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT << 24) | (x[7] >> 8);
     #pragma unroll
-    for (int i = 0; i < word_count; i++) {
-        dst[i] =
-            ((u32)src[i * 4 + 0] << 24) |
-            ((u32)src[i * 4 + 1] << 16) |
-            ((u32)src[i * 4 + 2] << 8 ) |
-            ((u32)src[i * 4 + 3]);
+    for (int i = 1; i < ONE_COORDINATE_NUM_WORDS; i++) {
+        out_block[i] = (x[ONE_COORDINATE_NUM_WORDS - i] << 24) | (x[ONE_COORDINATE_NUM_WORDS - 1 - i] >> 8);
     }
-}
-
-inline void sha256_add_padding(u32 *dst, const int padding_start_index, const u32 final_byte, const int length_index, const u32 bit_len)
-{
-    // Write the final byte + 0x80 bit
-    dst[padding_start_index] = ((u32)final_byte << 24) | 0x00800000;
-
-    // Zero-fill from padding_start_index + 1 up to length_index - 1
+    out_block[8] = (x[0] << 24) | (y[7] >> 8); // X LSB || Y top bytes
     #pragma unroll
-    for (int i = padding_start_index + 1; i < length_index; i++) {
-        dst[i] = 0;
+    for (int i = 9; i < 16; i++) {
+        out_block[i] = (y[16 - i] << 24) | (y[15 - i] >> 8);
     }
-
-    // Store bit length
-    dst[length_index] = bit_len;
+    // Block 2: trailing Y LSB byte, then the 0x80 pad bit, zero-fill, and the 64-bit message length.
+    out_block[16] = (y[0] << 24) | 0x00800000;
+    #pragma unroll
+    for (int i = 17; i < 31; i++) {
+        out_block[i] = 0;
+    }
+    out_block[31] = SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BITS; // 520
 }
 
-inline void get_sec_bytes_uncompressed(const u32 *x_bigEndian, const u32 *y_bigEndian, uchar *out_sec)
+// Compressed SEC pubkey -> 16-word (one-block) padded SHA-256 input. out_block must hold 16 u32.
+inline void sec_compressed_pubkey_to_sha256_block(const u32 *x, const u32 *y, u32 *out_block)
 {
-    out_sec[0] = SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT;
-    copy_u32_array_bytes(out_sec,  1, x_bigEndian, ONE_COORDINATE_NUM_WORDS);
-    copy_u32_array_bytes(out_sec, 33, y_bigEndian, ONE_COORDINATE_NUM_WORDS);
-}
-
-inline uchar get_compressed_prefix_from_lsb(uchar lsb)
-{
-    return (lsb & 1) == 0 ? SEC_PREFIX_COMPRESSED_ECDSA_POINT_EVEN_Y
-                          : SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y;
-}
-
-inline void get_sec_bytes_compressed(const u32 *x_bigEndian, const u32 *y_bigEndian, uchar *out_sec)
-{
-    uchar lsb = get_lsb_of_big_endian_coordinate(y_bigEndian);
-    out_sec[0] = get_compressed_prefix_from_lsb(lsb);
-    copy_u32_array_bytes(out_sec, 1, x_bigEndian, ONE_COORDINATE_NUM_WORDS);
-}
-
-inline void transform_sec_prefix_from_uncompressed_to_compressed(uchar *out_sec)
-{
-    uchar lsb = out_sec[SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BYTES - 1];
-    out_sec[0] = get_compressed_prefix_from_lsb(lsb);
-}
-
-inline void build_sha256_block_from_uncompressed_pubkey(const uchar *sec, u32 *sha256_input)
-{
-    // Pack 64 bytes from sec[0..63] into sha256_input[0..15]
-    pack_bytes_to_u32_words(sec, sha256_input, TWO_COORDINATE_NUM_WORDS);
-
-    // Apply SHA-256 padding: write 0x80 bit, zero-fill, append bit length (520 bits)
-    sha256_add_padding(sha256_input, TWO_COORDINATE_NUM_WORDS, sec[TWO_COORDINATES_NUM_BYTES], SHA256_INPUT_TOTAL_WORDS_UNCOMPRESSED - 1, SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BITS);
-}
-
-inline void build_sha256_block_from_compressed_pubkey(const uchar *sec, u32 *sha256_input)
-{
-    // Pack 32 bytes from sec[0..31] into sha256_input[0..7]
-    pack_bytes_to_u32_words(sec, sha256_input, ONE_COORDINATE_NUM_WORDS);
-
-    // Apply SHA-256 padding: write 0x80 bit, zero-fill, append bit length (264 bits)
-    sha256_add_padding(sha256_input, ONE_COORDINATE_NUM_WORDS, sec[ONE_COORDINATE_NUM_BYTES], SHA256_INPUT_TOTAL_WORDS_COMPRESSED - 1, SEC_PUBLIC_KEY_COMPRESSED_NUM_BITS);
+    const u32 prefix = ((y[0] & 1u) == 0u) ? (u32)SEC_PREFIX_COMPRESSED_ECDSA_POINT_EVEN_Y
+                                           : (u32)SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y;
+    out_block[0] = (prefix << 24) | (x[7] >> 8);
+    #pragma unroll
+    for (int i = 1; i < ONE_COORDINATE_NUM_WORDS; i++) {
+        out_block[i] = (x[ONE_COORDINATE_NUM_WORDS - i] << 24) | (x[ONE_COORDINATE_NUM_WORDS - 1 - i] >> 8);
+    }
+    // Trailing X LSB byte, then the 0x80 pad bit, zero-fill, and the 64-bit message length.
+    out_block[8] = (x[0] << 24) | 0x00800000;
+    #pragma unroll
+    for (int i = 9; i < 15; i++) {
+        out_block[i] = 0;
+    }
+    out_block[15] = SEC_PUBLIC_KEY_COMPRESSED_NUM_BITS; // 264
 }
 
 inline void build_ripemd160_block_from_sha256(const u32 *sha256_hash, u32 *ripemd_input)
@@ -841,39 +804,32 @@ __kernel void generateKeysKernel_grid(
     u32 x_bigEndian_local[ONE_COORDINATE_NUM_WORDS];
     u32 y_bigEndian_local[ONE_COORDINATE_NUM_WORDS];
 
-    u32             *sha256_input_uncompressed    ;
-    u32             *ripemd160_input_uncompressed ;
-    uchar           *sec_uncompressed             ;
-    
-    u32             *sha256_input_compressed      ;
-    u32             *ripemd160_input_compressed   ;
-    uchar           *sec_compressed               ;
-    
+    // hash160 scratch. The SHA-256 input blocks are built directly from the coordinate limbs
+    // (sec_*_pubkey_to_sha256_block*) and consumed by sha256_transform / ripemd160_transform
+    // directly — no SEC uchar buffer and no sha256_ctx_t / ripemd160_ctx_t streaming contexts.
+    u32             *sha256_input_uncompressed;
+    u32             *ripemd160_input_uncompressed;
+    u32             *sha256_input_compressed;
+    u32             *ripemd160_input_compressed;
+
     u32             sha256_input_uncompressed_alloc[SHA256_INPUT_TOTAL_WORDS_UNCOMPRESSED];
     u32             ripemd160_input_uncompressed_alloc[RIPEMD160_INPUT_BLOCK_SIZE_WORDS];
-    uchar           sec_uncompressed_alloc[SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BYTES];
-    
-    sha256_input_uncompressed      = sha256_input_uncompressed_alloc;
-    ripemd160_input_uncompressed   = ripemd160_input_uncompressed_alloc;
-    sec_uncompressed               = sec_uncompressed_alloc;
 
-    // The hash160 chains use sha256_transform / ripemd160_transform directly on the pre-built padded
-    // blocks (see the hash160 stage below), so no sha256_ctx_t / ripemd160_ctx_t streaming contexts
-    // are needed — only the input/SEC scratch buffers.
+    sha256_input_uncompressed    = sha256_input_uncompressed_alloc;
+    ripemd160_input_uncompressed = ripemd160_input_uncompressed_alloc;
+
     #ifdef REUSE_FOR_COMPRESSED
-        // Compressed reuses the uncompressed scratch (same X; only the SEC prefix byte differs).
-        sha256_input_compressed    =             sha256_input_uncompressed_alloc;
-        ripemd160_input_compressed =             ripemd160_input_uncompressed_alloc;
-        sec_compressed             =             sec_uncompressed_alloc;
+        // Compressed reuses the uncompressed scratch (hashed sequentially, after the uncompressed
+        // chain has been fully consumed).
+        sha256_input_compressed    = sha256_input_uncompressed_alloc;
+        ripemd160_input_compressed = ripemd160_input_uncompressed_alloc;
     #else
         // Separate scratch buffers for the uncompressed and compressed chains.
         u32                                      sha256_input_compressed_alloc[SHA256_INPUT_TOTAL_WORDS_COMPRESSED];
         u32                                      ripemd160_input_compressed_alloc[RIPEMD160_INPUT_BLOCK_SIZE_WORDS];
-        uchar                                    sec_compressed_alloc[SEC_PUBLIC_KEY_COMPRESSED_NUM_BYTES];
 
-        sha256_input_compressed    =             sha256_input_compressed_alloc;
-        ripemd160_input_compressed =             ripemd160_input_compressed_alloc;
-        sec_compressed             =             sec_compressed_alloc;
+        sha256_input_compressed    = sha256_input_compressed_alloc;
+        ripemd160_input_compressed = ripemd160_input_compressed_alloc;
     #endif
 
     // get_global_id(dim) where dim is the dimension index (0 for first, 1 for second dimension etc.)
@@ -1027,8 +983,8 @@ __kernel void generateKeysKernel_grid(
             // / ripemd160_hash_prebuilt_block_swap) — no init/update streaming bookkeeping. The hash160
             // is written straight into the stable register array, so there is no shared-context
             // snapshot to worry about even under REUSE_FOR_COMPRESSED.
-            get_sec_bytes_uncompressed(x_bigEndian_local, y_bigEndian_local, sec_uncompressed);
-            build_sha256_block_from_uncompressed_pubkey(sec_uncompressed, sha256_input_uncompressed);
+            sec_uncompressed_pubkey_to_sha256_blocks(
+                x_littleEndian_local, y_littleEndian_local, sha256_input_uncompressed);
             u32 sha256_digest_uncompressed[SHA256_HASH_NUM_WORDS];
             sha256_hash_prebuilt_blocks(
                 sha256_input_uncompressed, SHA256_INPUT_BLOCKS_FOR_UNCOMPRESSED_SEC, sha256_digest_uncompressed);
@@ -1043,12 +999,8 @@ __kernel void generateKeysKernel_grid(
                 ripemd_compressed_h[w] = ripemd_uncompressed_h[w];
             }
             #else
-            #ifdef REUSE_FOR_COMPRESSED
-                transform_sec_prefix_from_uncompressed_to_compressed(sec_compressed);
-            #else
-                get_sec_bytes_compressed(x_bigEndian_local, y_bigEndian_local, sec_compressed);
-            #endif
-            build_sha256_block_from_compressed_pubkey(sec_compressed, sha256_input_compressed);
+            sec_compressed_pubkey_to_sha256_block(
+                x_littleEndian_local, y_littleEndian_local, sha256_input_compressed);
             u32 sha256_digest_compressed[SHA256_HASH_NUM_WORDS];
             sha256_hash_prebuilt_blocks(
                 sha256_input_compressed, SHA256_INPUT_BLOCKS_FOR_COMPRESSED_SEC, sha256_digest_compressed);
