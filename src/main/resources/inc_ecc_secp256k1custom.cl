@@ -407,44 +407,70 @@ inline void copy_and_reverse_endianness_u32_array(u32 *dst, int dst_offset, cons
 // ===========================================================================================
 // Direct EC-coordinate -> SHA-256 input block construction (upstreamable to hashcat).
 //
-// These build the fully-padded, big-endian SHA-256 message block(s) for a SEC public key DIRECTLY
-// from the coordinate limb words — no intermediate byte buffer (no SEC uchar array, no byte
-// pack/unpack, no per-word byte swap). Output is exactly what sha256_transform consumes (so they
-// pair with sha256_hash_prebuilt_blocks above).
+// Built from two small, general "append at byte offset" primitives instead of bespoke per-format
+// splices: zero the block, then "put" the 1-byte SEC prefix at offset 0, "put" each big-endian
+// coordinate word at successive offsets (X, then optionally Y), and "put" the trailing 0x80 pad bit;
+// the message-length word finishes it. Compressed vs. uncompressed differ only by how many words are
+// appended — same mechanism. No intermediate byte buffer, no per-word byte swap.
+//
+// Because the byte offsets are compile-time constants in the (unrolled) callers, sha_block_put_be32's
+// shift/branch fold away to exactly the hand-written (msword<<24)|(lsword>>8) splice — i.e. this is
+// the generality of a streaming append with the cost of a straight-line write.
 //
 // Input form: x[]/y[] are the secp256k1 coordinate limbs in DEVICE little-endian word order —
 // x[0] = least-significant 32 bits, x[7] = most-significant 32 bits (the form the EC point math here
-// produces, before any endianness reversal). The most-significant limb x[7] equals the first
-// big-endian SEC word; the byte order WITHIN a limb is already SHA's big-endian, so no swap is
-// needed. The 1-byte SEC prefix shifts every message byte one position, produced with a
-// (msword << 24) | (lsword >> 8) splice across adjacent limbs (walked high limb -> low limb).
-//
-// Layouts:
-//   uncompressed: 0x04 || X(32) || Y(32) = 65 bytes -> 2 blocks (32 words), trailing Y LSB then 0x80.
-//   compressed:   prefix || X(32)        = 33 bytes -> 1 block  (16 words), trailing 0x80.
-// where prefix = 0x02/0x03 from the parity of Y (its least-significant bit -> y[0] & 1).
+// produces, before any endianness reversal). Big-endian SEC word k is limb (7-k); the byte order
+// WITHIN a limb is already SHA's big-endian, so no swap is needed. prefix = 0x02/0x03 from the parity
+// of Y (its least-significant bit -> y[0] & 1), or 0x04 for the uncompressed form.
 // ===========================================================================================
+
+// Append a big-endian u32 `val` into a (pre-zeroed) SHA block at byte offset `byte_off`, OR-ing it in
+// so a non-word-aligned offset straddles two block words. Offset is compile-time in our callers.
+inline void sha_block_put_be32(u32 *block, const u32 byte_off, const u32 val)
+{
+    const u32 wi = byte_off >> 2;
+    const u32 sh = (byte_off & 3u) * 8u;
+    if (sh == 0u) {
+        block[wi] |= val;
+    } else {
+        block[wi] |= (val >> sh);
+        block[wi + 1] |= (val << (32u - sh));
+    }
+}
+
+// Append a single byte `byte_val` into a (pre-zeroed) SHA block at byte offset `byte_off`.
+inline void sha_block_put_byte(u32 *block, const u32 byte_off, const u32 byte_val)
+{
+    const u32 wi = byte_off >> 2;
+    const u32 sh = (3u - (byte_off & 3u)) * 8u;
+    block[wi] |= (byte_val & 0xffu) << sh;
+}
+
+// Appends the SEC prefix + the 8 big-endian X words (high limb -> low limb) starting at byte 1.
+// Shared by both SEC forms; X always occupies bytes 1..32.
+inline void sha_block_put_prefix_and_x(u32 *block, const u32 prefix, const u32 *x)
+{
+    sha_block_put_byte(block, 0, prefix);
+    #pragma unroll
+    for (int i = 0; i < ONE_COORDINATE_NUM_WORDS; i++) {
+        sha_block_put_be32(block, 1u + (u32)i * 4u, x[ONE_COORDINATE_NUM_WORDS - 1 - i]);
+    }
+}
 
 // Uncompressed SEC pubkey -> 32-word (two-block) padded SHA-256 input. out_block must hold 32 u32.
 inline void sec_uncompressed_pubkey_to_sha256_blocks(const u32 *x, const u32 *y, u32 *out_block)
 {
-    out_block[0] = ((u32)SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT << 24) | (x[7] >> 8);
     #pragma unroll
-    for (int i = 1; i < ONE_COORDINATE_NUM_WORDS; i++) {
-        out_block[i] = (x[ONE_COORDINATE_NUM_WORDS - i] << 24) | (x[ONE_COORDINATE_NUM_WORDS - 1 - i] >> 8);
-    }
-    out_block[8] = (x[0] << 24) | (y[7] >> 8); // X LSB || Y top bytes
-    #pragma unroll
-    for (int i = 9; i < 16; i++) {
-        out_block[i] = (y[16 - i] << 24) | (y[15 - i] >> 8);
-    }
-    // Block 2: trailing Y LSB byte, then the 0x80 pad bit, zero-fill, and the 64-bit message length.
-    out_block[16] = (y[0] << 24) | 0x00800000;
-    #pragma unroll
-    for (int i = 17; i < 31; i++) {
+    for (int i = 0; i < SHA256_INPUT_TOTAL_WORDS_UNCOMPRESSED; i++) {
         out_block[i] = 0;
     }
-    out_block[31] = SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BITS; // 520
+    sha_block_put_prefix_and_x(out_block, (u32)SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT, x); // bytes 0..32
+    #pragma unroll
+    for (int i = 0; i < ONE_COORDINATE_NUM_WORDS; i++) {
+        sha_block_put_be32(out_block, 33u + (u32)i * 4u, y[ONE_COORDINATE_NUM_WORDS - 1 - i]); // Y bytes 33..64
+    }
+    sha_block_put_byte(out_block, 65, 0x80); // pad bit right after the 65-byte message
+    out_block[SHA256_INPUT_TOTAL_WORDS_UNCOMPRESSED - 1] = SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BITS; // 520
 }
 
 // Compressed SEC pubkey -> 16-word (one-block) padded SHA-256 input. out_block must hold 16 u32.
@@ -452,18 +478,13 @@ inline void sec_compressed_pubkey_to_sha256_block(const u32 *x, const u32 *y, u3
 {
     const u32 prefix = ((y[0] & 1u) == 0u) ? (u32)SEC_PREFIX_COMPRESSED_ECDSA_POINT_EVEN_Y
                                            : (u32)SEC_PREFIX_COMPRESSED_ECDSA_POINT_ODD_Y;
-    out_block[0] = (prefix << 24) | (x[7] >> 8);
     #pragma unroll
-    for (int i = 1; i < ONE_COORDINATE_NUM_WORDS; i++) {
-        out_block[i] = (x[ONE_COORDINATE_NUM_WORDS - i] << 24) | (x[ONE_COORDINATE_NUM_WORDS - 1 - i] >> 8);
-    }
-    // Trailing X LSB byte, then the 0x80 pad bit, zero-fill, and the 64-bit message length.
-    out_block[8] = (x[0] << 24) | 0x00800000;
-    #pragma unroll
-    for (int i = 9; i < 15; i++) {
+    for (int i = 0; i < SHA256_INPUT_TOTAL_WORDS_COMPRESSED; i++) {
         out_block[i] = 0;
     }
-    out_block[15] = SEC_PUBLIC_KEY_COMPRESSED_NUM_BITS; // 264
+    sha_block_put_prefix_and_x(out_block, prefix, x);  // bytes 0..32
+    sha_block_put_byte(out_block, 33, 0x80);           // pad bit right after the 33-byte message
+    out_block[SHA256_INPUT_TOTAL_WORDS_COMPRESSED - 1] = SEC_PUBLIC_KEY_COMPRESSED_NUM_BITS; // 264
 }
 
 inline void build_ripemd160_block_from_sha256(const u32 *sha256_hash, u32 *ripemd_input)
