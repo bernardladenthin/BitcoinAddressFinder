@@ -60,13 +60,22 @@ public class OpenClTask implements ReleaseCLObject {
 
     private final CProducerOpenCL cProducer;
 
-    // JOCL cl_context is a native-pointer wrapper — toString is uninformative.
-    @ToString.Exclude
-    private final cl_context context;
-
     // SourceArgument carries its own ByteBuffer payload — heavy and not useful in logs.
     @ToString.Exclude
     private final SourceArgument privateKeySourceArgument;
+
+    // Reusable GPU output buffer (CL_MEM_WRITE_ONLY). Allocated once at the fixed per-batch result
+    // size and reused for every executeKernel() launch, instead of clCreateBuffer/clReleaseMemObject
+    // per launch (the ~100+ MB device buffer alloc/free dominated per-launch host overhead). It is
+    // safe to reuse a single device buffer because executeKernel() uses it strictly synchronously
+    // (kernel write + readback, each followed by clFinish, on the single producer thread) before
+    // returning; the asynchronous result readers only ever touch the host-side ByteBuffer copy, never
+    // this cl_mem. Released in close().
+    @ToString.Exclude
+    private final cl_mem dstMem;
+
+    @ToString.Exclude
+    private final Pointer dstMemPointer;
 
     private final BitHelper bitHelper;
     private final ByteBufferUtility byteBufferUtility;
@@ -89,26 +98,6 @@ public class OpenClTask implements ReleaseCLObject {
      * Common base for source and destination OpenCL buffer arguments backed by a {@link ByteBuffer}.
      */
     public abstract static class CLByteBufferPointerArgument implements ReleaseCLObject {
-        /**
-         * Controls how memory is allocated for the OpenCL output buffer.
-         *
-         * If set to {@link org.jocl.CL#CL_MEM_USE_HOST_PTR}, the OpenCL buffer is created using a host pointer,
-         * meaning the host's {@link ByteBuffer} is directly used by the device (zero-copy if supported).
-         * This may reduce memory copy overhead on some platforms, but:
-         * <ul>
-         *     <li>It requires the buffer to remain valid and pinned in memory.</li>
-         *     <li>On some OpenCL implementations or devices (e.g. discrete GPUs), it may cause slower access due to lack of true zero-copy support.</li>
-         *     <li>Debugging and compatibility issues can arise if host memory alignment or page-locking requirements aren't met.</li>
-         * </ul>
-         *
-         * If set to {@link org.jocl.CL#CL_MEM_WRITE_ONLY}, the buffer is created with no reference to host memory,
-         * and OpenCL manages the memory internally. This is typically safer and potentially faster on discrete GPUs,
-         * although it requires an explicit copy back to the host after kernel execution.
-         *
-         * In most cases, {@link org.jocl.CL#CL_MEM_WRITE_ONLY} (i.e. setting this flag to {@code false}) is more robust and portable.
-         */
-        protected static final boolean USE_HOST_PTR = false;
-
         /** Host-side direct byte buffer holding the data. */
         protected final ByteBuffer byteBuffer;
         /** {@link Pointer} that references {@link #byteBuffer} for host memory transfers. */
@@ -187,40 +176,6 @@ public class OpenClTask implements ReleaseCLObject {
     }
 
     /**
-     * Destination (kernel output) OpenCL buffer argument.
-     */
-    public static class DestinationArgument extends CLByteBufferPointerArgument {
-
-        private DestinationArgument(
-                ByteBuffer byteBuffer, Pointer hostMemoryPointer, cl_mem mem, Pointer clMemPointer) {
-            super(byteBuffer, hostMemoryPointer, mem, clMemPointer);
-        }
-
-        /**
-         * Allocates a new destination buffer of {@code sizeInBytes} bytes.
-         *
-         * @param context     the OpenCL context
-         * @param sizeInBytes the buffer size in bytes
-         * @return the created {@link DestinationArgument}
-         */
-        public static DestinationArgument create(cl_context context, long sizeInBytes) {
-            final ByteBuffer byteBuffer =
-                    ByteBuffer.allocateDirect(ByteBufferUtility.ensureByteBufferCapacityFitsInt(sizeInBytes));
-            final Pointer hostMemoryPointer = Pointer.to(byteBuffer);
-            final cl_mem mem;
-
-            if (USE_HOST_PTR) {
-                mem = clCreateBuffer(context, CL_MEM_USE_HOST_PTR, sizeInBytes, hostMemoryPointer, null);
-            } else {
-                mem = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeInBytes, null, null);
-            }
-            final Pointer clMemPointer = Pointer.to(mem);
-
-            return new DestinationArgument(byteBuffer, hostMemoryPointer, mem, clMemPointer);
-        }
-    }
-
-    /**
      * Source (kernel input) OpenCL buffer argument.
      */
     public static class SourceArgument extends CLByteBufferPointerArgument {
@@ -257,13 +212,17 @@ public class OpenClTask implements ReleaseCLObject {
      */
     public OpenClTask(
             cl_context context, CProducerOpenCL cProducer, BitHelper bitHelper, ByteBufferUtility byteBufferUtility) {
-        this.context = context;
         this.cProducer = cProducer;
         this.bitHelper = bitHelper;
         this.byteBufferUtility = byteBufferUtility;
         this.privateKeyValidator = new PrivateKeyValidator();
         this.maxPrivateKeyForBatchSize = privateKeyValidator.getMaxPrivateKeyForBatchSize(cProducer.batchSizeInBits);
         this.privateKeySourceArgument = SourceArgument.create(context, PRIVATE_KEY_SOURCE_SIZE_IN_BYTES);
+        // Allocate the reusable GPU output buffer once at the fixed per-batch size (constant for this
+        // task's lifetime). Reused by every executeKernel() launch; released in close(). Uses the
+        // static size helper to avoid a this-escape (no overridable instance call in the constructor).
+        this.dstMem = clCreateBuffer(context, CL_MEM_WRITE_ONLY, dstSizeInBytes(cProducer), null, null);
+        this.dstMemPointer = Pointer.to(dstMem);
     }
 
     /**
@@ -272,6 +231,18 @@ public class OpenClTask implements ReleaseCLObject {
      * @return the size of the destination buffer in bytes for the current batch
      */
     public long getDstSizeInBytes() {
+        return dstSizeInBytes(cProducer);
+    }
+
+    /**
+     * Computes the destination buffer size for the given producer config. {@code static} so the
+     * constructor can size the reusable {@code dstMem} without calling an overridable instance
+     * method ({@code this}-escape during construction).
+     *
+     * @param cProducer the OpenCL producer configuration
+     * @return the destination buffer size in bytes
+     */
+    private static long dstSizeInBytes(CProducerOpenCL cProducer) {
         // Unified output buffer: a 4-byte count header followed by overallWorkSize entries of
         // OUTPUT_ENTRY_SIZE_BYTES (108) each. This is also exactly compact mode's worst case
         // (every candidate is a filter hit), so the single allocation covers both write modes.
@@ -358,176 +329,164 @@ public class OpenClTask implements ReleaseCLObject {
             cl_mem iGTableMem,
             cl_mem combTableMem) {
         final long dstSizeInBytes = getDstSizeInBytes();
-        // Allocate a new destination buffer so that cloning after kernel execution is unnecessary
-        try (final DestinationArgument destinationArgument = DestinationArgument.create(context, dstSizeInBytes)) {
-            // Set the work-item dimensions
-            final long totalResultCount = bitHelper.convertBitsToSize(cProducer.batchSizeInBits);
-            final int keysPerWorkItem = cProducer.keysPerWorkItem;
-            final long adjustedWorkSize = totalResultCount / keysPerWorkItem;
+        // Fresh host-side readback buffer per launch: it is handed to the OpenCLGridResult and read
+        // asynchronously by the result-reader pool, so it must not be shared between launches. The
+        // GPU-side buffer (dstMem) IS reused (allocated once in the constructor) — see its field doc.
+        final ByteBuffer dstByteBuffer =
+                ByteBuffer.allocateDirect(ByteBufferUtility.ensureByteBufferCapacityFitsInt(dstSizeInBytes));
+        final Pointer dstByteBufferPointer = Pointer.to(dstByteBuffer);
 
-            // Validate keysPerWorkItem constraints
-            if (keysPerWorkItem < 1) {
-                throw new IllegalArgumentException("keysPerWorkItem must be >= 1 but was " + keysPerWorkItem
-                        + " (totalResultCount=" + totalResultCount + ")");
-            }
-            if (keysPerWorkItem > totalResultCount) {
-                throw new IllegalArgumentException("keysPerWorkItem must not exceed total result count. Given: "
-                        + keysPerWorkItem + ", max: " + totalResultCount);
-            }
-            if (totalResultCount % keysPerWorkItem != 0) {
-                throw new IllegalArgumentException("totalResultCount=" + totalResultCount
-                        + " is not divisible by keysPerWorkItem=" + keysPerWorkItem
-                        + "; result count would be invalid"
-                        + " (cProducer.batchSizeInBits=" + cProducer.batchSizeInBits + ")");
-            }
+        // Set the work-item dimensions
+        final long totalResultCount = bitHelper.convertBitsToSize(cProducer.batchSizeInBits);
+        final int keysPerWorkItem = cProducer.keysPerWorkItem;
+        final long adjustedWorkSize = totalResultCount / keysPerWorkItem;
 
-            final long[] global_work_size = new long[] {adjustedWorkSize};
-            final long[] localWorkSize = null; // new long[]{1}; // enabling the system to choose the work-group size.
-            final int workDim = 1;
-
-            // Set the arguments for the kernel
-            clSetKernelArg(kernel, 0, Sizeof.cl_mem, destinationArgument.getClMemPointer());
-            clSetKernelArg(kernel, 1, Sizeof.cl_mem, privateKeySourceArgument.getClMemPointer());
-            clSetKernelArg(kernel, 2, Sizeof.cl_uint, Pointer.to(new int[] {keysPerWorkItem}));
-            clSetKernelArg(kernel, 3, Sizeof.cl_mem, Pointer.to(fuse8FpMem));
-            clSetKernelArg(kernel, 4, Sizeof.cl_mem, Pointer.to(fuse8MetaMem));
-            clSetKernelArg(kernel, 5, Sizeof.cl_uint, Pointer.to(new int[] {transferAll}));
-            clSetKernelArg(kernel, 6, Sizeof.cl_mem, Pointer.to(iGTableMem));
-            clSetKernelArg(kernel, 7, Sizeof.cl_mem, Pointer.to(combTableMem));
-
-            {
-                // write src buffer
-                clEnqueueWriteBuffer(
-                        commandQueue,
-                        privateKeySourceArgument.getMem(),
-                        CL_TRUE,
-                        0,
-                        PRIVATE_KEY_SOURCE_SIZE_IN_BYTES,
-                        privateKeySourceArgument.getHostMemoryPointer(),
-                        0,
-                        null,
-                        null);
-                clFinish(commandQueue);
-            }
-            {
-                // zero-initialise the leading count word so compact mode's atomic_add starts at
-                // 0 (full mode's work-item 0 overwrites it with the sentinel).
-                final ByteBuffer zeroHeader = ByteBuffer.allocateDirect(OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES);
-                clEnqueueWriteBuffer(
-                        commandQueue,
-                        destinationArgument.getMem(),
-                        CL_TRUE,
-                        0,
-                        OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES,
-                        Pointer.to(zeroHeader),
-                        0,
-                        null,
-                        null);
-                clFinish(commandQueue);
-            }
-            final boolean profiling = cProducer.enableProfiling;
-            {
-                // execute the kernel
-                final long beforeExecute = System.currentTimeMillis();
-                if (profiling) {
-                    // Profiling path: timestamp the kernel on the device. The event is a non-null
-                    // local kept within this branch so NullAway sees no nullable JOCL argument.
-                    final cl_event kernelEvent = new cl_event();
-                    clEnqueueNDRangeKernel(
-                            commandQueue, kernel, workDim, null, global_work_size, localWorkSize, 0, null, kernelEvent);
-                    clFinish(commandQueue);
-                    lastKernelExecutionNanos = deviceElapsedNanos(kernelEvent);
-                    clReleaseEvent(kernelEvent);
-                } else {
-                    clEnqueueNDRangeKernel(
-                            commandQueue, kernel, workDim, null, global_work_size, localWorkSize, 0, null, null);
-                    clFinish(commandQueue);
-                    lastKernelExecutionNanos = PROFILING_NOT_AVAILABLE;
-                }
-
-                final long afterExecute = System.currentTimeMillis();
-
-                if (LOGGER.isTraceEnabled()) {
-                    LOGGER.trace("Executed OpenCL kernel in " + (afterExecute - beforeExecute) + "ms");
-                }
-            }
-            {
-                // Read back the count word first, then only the bytes the kernel produced:
-                // full mode -> overallWorkSize entries; compact mode -> K hit entries.
-                final ByteBuffer countHeader = ByteBuffer.allocateDirect(OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES)
-                        .order(OpenClKernelConstants.GPU_NATIVE_WORD_ORDER);
-                clEnqueueReadBuffer(
-                        commandQueue,
-                        destinationArgument.getMem(),
-                        CL_TRUE,
-                        0,
-                        OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES,
-                        Pointer.to(countHeader),
-                        0,
-                        null,
-                        null);
-                clFinish(commandQueue);
-
-                final int count = countHeader.getInt(0);
-                final long entriesToRead;
-                if (count == OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL) {
-                    entriesToRead = cProducer.getOverallWorkSize();
-                } else {
-                    // The sentinel (0xFFFF_FFFF = 4_294_967_295 unsigned) can never alias a
-                    // real compact count: MAXIMUM_CHUNK_ELEMENTS (~19.9 M) is far below that
-                    // value, so the bounds check below always catches it before it would
-                    // silently look like a normal count.
-                    final long compactCount = Integer.toUnsignedLong(count);
-                    if (compactCount > cProducer.getOverallWorkSize()) {
-                        throw new IllegalStateException("GPU compact-mode count " + compactCount
-                                + " exceeds overallWorkSize " + cProducer.getOverallWorkSize()
-                                + "; kernel output is corrupt");
-                    }
-                    entriesToRead = compactCount;
-                }
-                final long bytesToRead = OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES
-                        + entriesToRead * OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES;
-
-                final long beforeRead = System.currentTimeMillis();
-                if (profiling) {
-                    final cl_event readEvent = new cl_event();
-                    clEnqueueReadBuffer(
-                            commandQueue,
-                            destinationArgument.getMem(),
-                            CL_TRUE,
-                            0,
-                            bytesToRead,
-                            destinationArgument.getHostMemoryPointer(),
-                            0,
-                            null,
-                            readEvent);
-                    clFinish(commandQueue);
-                    lastResultReadbackNanos = deviceElapsedNanos(readEvent);
-                    clReleaseEvent(readEvent);
-                } else {
-                    clEnqueueReadBuffer(
-                            commandQueue,
-                            destinationArgument.getMem(),
-                            CL_TRUE,
-                            0,
-                            bytesToRead,
-                            destinationArgument.getHostMemoryPointer(),
-                            0,
-                            null,
-                            null);
-                    clFinish(commandQueue);
-                    lastResultReadbackNanos = PROFILING_NOT_AVAILABLE;
-                }
-
-                final long afterRead = System.currentTimeMillis();
-
-                if (LOGGER.isTraceEnabled()) {
-                    LOGGER.trace("Read OpenCL data " + ((bytesToRead / 1024) / 1024) + "Mb in "
-                            + (afterRead - beforeRead) + "ms");
-                }
-            }
-            return destinationArgument.getByteBuffer();
+        // Validate keysPerWorkItem constraints
+        if (keysPerWorkItem < 1) {
+            throw new IllegalArgumentException("keysPerWorkItem must be >= 1 but was " + keysPerWorkItem
+                    + " (totalResultCount=" + totalResultCount + ")");
         }
+        if (keysPerWorkItem > totalResultCount) {
+            throw new IllegalArgumentException("keysPerWorkItem must not exceed total result count. Given: "
+                    + keysPerWorkItem + ", max: " + totalResultCount);
+        }
+        if (totalResultCount % keysPerWorkItem != 0) {
+            throw new IllegalArgumentException("totalResultCount=" + totalResultCount
+                    + " is not divisible by keysPerWorkItem=" + keysPerWorkItem
+                    + "; result count would be invalid"
+                    + " (cProducer.batchSizeInBits=" + cProducer.batchSizeInBits + ")");
+        }
+
+        final long[] global_work_size = new long[] {adjustedWorkSize};
+        final long[] localWorkSize = null; // new long[]{1}; // enabling the system to choose the work-group size.
+        final int workDim = 1;
+
+        // Set the arguments for the kernel
+        clSetKernelArg(kernel, 0, Sizeof.cl_mem, dstMemPointer);
+        clSetKernelArg(kernel, 1, Sizeof.cl_mem, privateKeySourceArgument.getClMemPointer());
+        clSetKernelArg(kernel, 2, Sizeof.cl_uint, Pointer.to(new int[] {keysPerWorkItem}));
+        clSetKernelArg(kernel, 3, Sizeof.cl_mem, Pointer.to(fuse8FpMem));
+        clSetKernelArg(kernel, 4, Sizeof.cl_mem, Pointer.to(fuse8MetaMem));
+        clSetKernelArg(kernel, 5, Sizeof.cl_uint, Pointer.to(new int[] {transferAll}));
+        clSetKernelArg(kernel, 6, Sizeof.cl_mem, Pointer.to(iGTableMem));
+        clSetKernelArg(kernel, 7, Sizeof.cl_mem, Pointer.to(combTableMem));
+
+        {
+            // write src buffer
+            clEnqueueWriteBuffer(
+                    commandQueue,
+                    privateKeySourceArgument.getMem(),
+                    CL_TRUE,
+                    0,
+                    PRIVATE_KEY_SOURCE_SIZE_IN_BYTES,
+                    privateKeySourceArgument.getHostMemoryPointer(),
+                    0,
+                    null,
+                    null);
+            clFinish(commandQueue);
+        }
+        {
+            // zero-initialise the leading count word so compact mode's atomic_add starts at
+            // 0 (full mode's work-item 0 overwrites it with the sentinel). Also resets any stale
+            // count left in the reused dstMem from the previous launch.
+            final ByteBuffer zeroHeader = ByteBuffer.allocateDirect(OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES);
+            clEnqueueWriteBuffer(
+                    commandQueue,
+                    dstMem,
+                    CL_TRUE,
+                    0,
+                    OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES,
+                    Pointer.to(zeroHeader),
+                    0,
+                    null,
+                    null);
+            clFinish(commandQueue);
+        }
+        final boolean profiling = cProducer.enableProfiling;
+        {
+            // execute the kernel
+            final long beforeExecute = System.currentTimeMillis();
+            if (profiling) {
+                // Profiling path: timestamp the kernel on the device. The event is a non-null
+                // local kept within this branch so NullAway sees no nullable JOCL argument.
+                final cl_event kernelEvent = new cl_event();
+                clEnqueueNDRangeKernel(
+                        commandQueue, kernel, workDim, null, global_work_size, localWorkSize, 0, null, kernelEvent);
+                clFinish(commandQueue);
+                lastKernelExecutionNanos = deviceElapsedNanos(kernelEvent);
+                clReleaseEvent(kernelEvent);
+            } else {
+                clEnqueueNDRangeKernel(
+                        commandQueue, kernel, workDim, null, global_work_size, localWorkSize, 0, null, null);
+                clFinish(commandQueue);
+                lastKernelExecutionNanos = PROFILING_NOT_AVAILABLE;
+            }
+
+            final long afterExecute = System.currentTimeMillis();
+
+            if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace("Executed OpenCL kernel in " + (afterExecute - beforeExecute) + "ms");
+            }
+        }
+        {
+            // Read back the count word first, then only the bytes the kernel produced:
+            // full mode -> overallWorkSize entries; compact mode -> K hit entries.
+            final ByteBuffer countHeader = ByteBuffer.allocateDirect(OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES)
+                    .order(OpenClKernelConstants.GPU_NATIVE_WORD_ORDER);
+            clEnqueueReadBuffer(
+                    commandQueue,
+                    dstMem,
+                    CL_TRUE,
+                    0,
+                    OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES,
+                    Pointer.to(countHeader),
+                    0,
+                    null,
+                    null);
+            clFinish(commandQueue);
+
+            final int count = countHeader.getInt(0);
+            final long entriesToRead;
+            if (count == OpenClKernelConstants.OUTPUT_COUNT_FULL_TRANSFER_SENTINEL) {
+                entriesToRead = cProducer.getOverallWorkSize();
+            } else {
+                // The sentinel (0xFFFF_FFFF = 4_294_967_295 unsigned) can never alias a
+                // real compact count: MAXIMUM_CHUNK_ELEMENTS (~19.9 M) is far below that
+                // value, so the bounds check below always catches it before it would
+                // silently look like a normal count.
+                final long compactCount = Integer.toUnsignedLong(count);
+                if (compactCount > cProducer.getOverallWorkSize()) {
+                    throw new IllegalStateException("GPU compact-mode count " + compactCount
+                            + " exceeds overallWorkSize " + cProducer.getOverallWorkSize()
+                            + "; kernel output is corrupt");
+                }
+                entriesToRead = compactCount;
+            }
+            final long bytesToRead = OpenClKernelConstants.OUTPUT_HEADER_SIZE_BYTES
+                    + entriesToRead * OpenClKernelConstants.OUTPUT_ENTRY_SIZE_BYTES;
+
+            final long beforeRead = System.currentTimeMillis();
+            if (profiling) {
+                final cl_event readEvent = new cl_event();
+                clEnqueueReadBuffer(
+                        commandQueue, dstMem, CL_TRUE, 0, bytesToRead, dstByteBufferPointer, 0, null, readEvent);
+                clFinish(commandQueue);
+                lastResultReadbackNanos = deviceElapsedNanos(readEvent);
+                clReleaseEvent(readEvent);
+            } else {
+                clEnqueueReadBuffer(commandQueue, dstMem, CL_TRUE, 0, bytesToRead, dstByteBufferPointer, 0, null, null);
+                clFinish(commandQueue);
+                lastResultReadbackNanos = PROFILING_NOT_AVAILABLE;
+            }
+
+            final long afterRead = System.currentTimeMillis();
+
+            if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace("Read OpenCL data " + ((bytesToRead / 1024) / 1024) + "Mb in " + (afterRead - beforeRead)
+                        + "ms");
+            }
+        }
+        return dstByteBuffer;
     }
 
     /**
@@ -580,8 +539,11 @@ public class OpenClTask implements ReleaseCLObject {
     public void close() {
         if (!closed) {
             privateKeySourceArgument.close();
+            // Release the reusable GPU output buffer. Safe here: close() runs only after the
+            // producer has stopped issuing launches; the asynchronous result readers never touch
+            // dstMem (they read the host-side ByteBuffer copies), so there is no use-after-free.
+            clReleaseMemObject(dstMem);
             closed = true;
-            // hint: destinationArgument will be released immediately
         }
     }
 
