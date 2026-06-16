@@ -521,9 +521,12 @@ to **EC 57% / hashing 43%** — hashing is a larger slice than previously assume
 are comparable (the uncompressed SEC is 2 SHA-256 blocks vs 1 for compressed, but both share a
 RIPEMD-160, so the gap is only ~4 pts). Direct consequences for what to optimize next:
 
-- **Hashing is ~43%** ⇒ a config-gated *single-address* mode (compute only the chain a deployment
-  needs) would save ~19–24% of the kernel — the cheapest large win, and it keeps `FULL`/both as the
-  default (see §8).
+- **Both hash160 chains (uncompressed and compressed) are mandatory and must always be computed** —
+  dropping either is explicitly out of scope (the tool must find both legacy/uncompressed and
+  compressed addresses). The 43% hashing cost is therefore a target for *faster* hashing
+  (e.g. SHA-256/RIPEMD-160 micro-optimisation, sharing work between the two chains), **not** for
+  skipping a chain. The `NO_HASH160`/`ONE_HASH160` modes above are **diagnostic only** — they exist
+  to measure the split, never to run in production.
 - **EC is ~57%** and is dominated by the field multiply (carry/add-bound, per the `sqr_mod` result in
   §8) ⇒ the EC lever is a **reduced-radix field** (shorter carry chains), not fewer multiplies.
 
@@ -604,15 +607,15 @@ command above.
 Evaluated during the investigation (re-sweep `keysPerWorkItem` after any of these, since the per-key
 cost balance shifts):
 
-- **Config-gated single-address mode (compute only one hash160 chain) — the cheapest large win,
-  pointed to directly by the §6 attribution (hashing ≈ 43%, each chain ≈ 19–24%).** A deployment that
-  only needs e.g. compressed P2PKH pays for the uncompressed chain it never uses. A config flag
-  selecting `BOTH` (default, unchanged) / `COMPRESSED_ONLY` / `UNCOMPRESSED_ONLY` would skip the
-  unused chain for a ~19–24% kernel speedup — byte-identical per mode, gated like the existing
-  switches. (The profiling `kernelProfileStage` already proves the kernel runs correctly with one
-  chain skipped; a production single-address mode is the same skip plus a matching CPU-side
-  expectation.) Mechanically simple; the only reason it is "future" not "done" is the product
-  decision that both address types stay the default.
+> **Not an option: dropping a hash160 chain.** Both the uncompressed and the compressed hash160 are
+> mandatory in every mode — the tool must find both address types. The §6 finding that hashing is
+> ~43% is a target for making *both* chains faster, never for computing only one. (The diagnostic
+> `kernelProfileStage` modes that skip a chain are timing-only and must never be used in production.)
+
+- **Faster hash160 (both chains kept).** Hashing is ~43% (§6), so SHA-256 / RIPEMD-160
+  micro-optimisation, or sharing more work between the uncompressed and compressed chains (they share
+  the X coordinate; the compressed SEC prefix transform is already reused via `REUSE_FOR_COMPRESSED`),
+  is the lever here — without ever dropping a chain. Both chains always run.
 - **Reduced-radix field representation** (e.g. 2^26 / 2^29 limbs) — the EC lever (EC ≈ 57% per §6),
   attacking the carry/add chain that made `sqr_mod` a wash (see "Measured and rejected"). Big rewrite
   of every field op; would also make `sqr_mod` pay off. Highest EC potential, highest effort/risk.
