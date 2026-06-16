@@ -231,11 +231,39 @@ The comb's win is largest where `P₀` is **not** amortized: at kpwi=1 (a fresh 
 after Stage 1 — so the remaining ceiling is the affine walk + the two hash160 chains, and the comb
 still adds a clean **+10.8%**. The optimum stays at the high end (≥64) but the curve is far flatter.
 
+### Stage 2b — signed-digit (±P) comb halving (table −50%; throughput within measurement noise)
+
+A refinement of the Stage 2 comb: recode each 4-bit window into a **signed** digit `b ∈ {−8..+7}`
+(carry-propagated low→high) instead of an unsigned `0..15`. On this curve `−P = (x, p − y)` is free,
+so a negative digit reuses the magnitude-`|b|` table entry with `y` negated. The table therefore
+stores only **magnitudes 1..8 per position (8 points)** instead of digits 0..15 (16) — **half the
+table, 64 KB → ~32.5 KB**. A signed recode of a 256-bit scalar can carry out of the top window, so
+the comb runs to **65 positions** (the extra position only ever uses magnitude 1 = `2²⁵⁶·G`).
+
+Correctness: ✅ byte-identical — `OpenCLPrecomputeKernelTest` validates every `(pos, mag)` entry
+incl. the new carry-out position 64, and `ProbeAddressesOpenCLTest` (43/0-fail) proves end-to-end key
+derivation is unchanged.
+
+**Throughput: no measurable change on the RTX 3070 Laptop — and that is the honest finding, not a
+hedge.** The comb computes only the `P₀` anchor (once per work-item), so at the high-`keysPerWorkItem`
+operating point it is amortized to a negligible fraction and any effect is expected to be sub-1%. The
+attempt to measure it ran straight into the thermal-noise wall (§6): two back-to-back runs of the
+**identical unsigned baseline** scored **73.1 then 109.9 ops/s at kpwi=128** (a +50% swing) and
+**10.93 then 8.95 ops/s at kpwi=1** (−18%). The signed-comb numbers (90.2 / 9.22 ops/s) fall *inside*
+that baseline's own run-to-run envelope, i.e. the change is statistically indistinguishable from
+noise on this machine. It was kept regardless: correctness is proven, it is **never a large loss**,
+and the **halved table is a concrete, throughput-independent win** (less VRAM, less memory traffic per
+`point_add`, and the freed budget could fund a denser comb later). The kernel-side cost is balanced —
+the same ~60 `point_add`s as before, plus ~30 cheap `sub_mod` negations and one extra position, against
+reading half as much table.
+
 ### Cumulative result
 
 Stage 1 (+9.8%) × Stage 2 (+10.8%) ≈ **~+21% at the sweet spot** over the original wNAF + Jacobian
 kernel, and a **multiple** of that at low `keysPerWorkItem`. This is the BitCrack/VanitySearch design:
-fixed-base table for `k·G` + affine batched-addition walk.
+fixed-base table for `k·G` + affine batched-addition walk. Stage 2b halves the comb table at
+throughput parity (within noise); Stage 3 then adds host-side buffer reuse (+~18% end-to-end in
+compact mode).
 
 ### Stage 3 — result-buffer reuse (host-side I/O; +~18% in compact mode, no change in full transfer)
 
