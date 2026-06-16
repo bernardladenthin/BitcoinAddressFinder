@@ -103,6 +103,7 @@ using the assigned ID:
   - [Hybrid Graphics Performance (Low Throughput)](#hybrid-graphics-performance-low-throughput)
 - [Future Improvements](#future-improvements)
   - [KeyProvider](#keyprovider)
+- [Acknowledgements](#acknowledgements)
 - [Legal](#legal)
   - [Permitted Use Cases](#️-permitted-use-cases)
   - [Prohibited Use Cases](#-prohibited-use-cases)
@@ -1626,6 +1627,27 @@ Wished from Ulugbek:
 - ExecutableKeyProvider gets data from stdout
 
 -----
+
+
+## Acknowledgements
+
+BitcoinAddressFinder stands on the shoulders of excellent open-source work. In particular:
+
+- **[hashcat](https://hashcat.net/hashcat/)** — the OpenCL secp256k1 elliptic-curve, SHA-256 and
+  RIPEMD-160 routines that power GPU key generation are ported from hashcat's MIT-licensed kernels
+  (see [`src/main/resources/copyfromhashcat/`](src/main/resources/copyfromhashcat/)). Huge thanks to
+  the hashcat project and its contributors.
+- **[bitcoinj](https://bitcoinj.org/)** — Bitcoin/altcoin key derivation and address encoding used
+  across the CPU path and as the reference for the GPU parity tests.
+- **[LMDB](https://www.symas.com/lmdb)** / **[lmdbjava](https://github.com/lmdbjava/lmdbjava)** — the
+  high-performance memory-mapped address database.
+- **[JOCL](https://www.jocl.org/)** — Java bindings to OpenCL.
+- **Binary Fuse filters** — by [Thomas Mueller Graf and Daniel Lemire](https://github.com/FastFilter),
+  with the [SipHash](https://github.com/veorq/SipHash) construction by Jean-Philippe Aumasson and
+  Daniel J. Bernstein.
+
+See the bundled third-party licenses for full attribution; some subprojects are under their own
+licenses (e.g. the `copyfromhashcat` kernels are MIT).
 
 
 ## Legal
