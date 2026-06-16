@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder.opencl;
 import static org.jocl.CL.CL_MEM_COPY_HOST_PTR;
 import static org.jocl.CL.CL_MEM_READ_ONLY;
 import static org.jocl.CL.CL_MEM_READ_WRITE;
+import static org.jocl.CL.CL_MEM_WRITE_ONLY;
 import static org.jocl.CL.CL_QUEUE_PROFILING_ENABLE;
 import static org.jocl.CL.CL_QUEUE_PROPERTIES;
 import static org.jocl.CL.CL_TRUE;
@@ -584,6 +585,39 @@ public class OpenCLContext implements ReleaseCLObject {
             return bytes;
         } finally {
             clReleaseMemObject(out);
+        }
+    }
+
+    /**
+     * Benchmark hook: launches the {@code bench_inv_mod} microbenchmark kernel (see
+     * {@code inc_ecc_secp256k1custom.cl}) over {@code globalWorkSize} work-items, each performing
+     * {@code iterations} modular inverses with the build-selected {@code inv_mod}, and blocks until it
+     * finishes. Used by {@code InvModBenchmark} to isolate the inverse cost; the work is fully on the
+     * device (no result is read back). The output buffer and kernel are created and released per call.
+     *
+     * @param globalWorkSize     number of work-items (e.g. {@code 1 << gridSizeInBits})
+     * @param iterations         inverses performed per work-item
+     * @param inputHighLimbsZero {@code true} for ~160-bit operands (top three limbs zeroed),
+     *     {@code false} for full ~256-bit operands
+     */
+    @VisibleForTesting
+    public void runBenchInvMod(int globalWorkSize, int iterations, boolean inputHighLimbsZero) {
+        final cl_context localContext = Objects.requireNonNull(context);
+        final cl_program localProgram = Objects.requireNonNull(program);
+        final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
+
+        final cl_kernel benchKernel = clCreateKernel(localProgram, "bench_inv_mod", null);
+        final cl_mem out =
+                clCreateBuffer(localContext, CL_MEM_WRITE_ONLY, (long) globalWorkSize * Sizeof.cl_uint, null, null);
+        try {
+            clSetKernelArg(benchKernel, 0, Sizeof.cl_mem, Pointer.to(out));
+            clSetKernelArg(benchKernel, 1, Sizeof.cl_uint, Pointer.to(new int[] {iterations}));
+            clSetKernelArg(benchKernel, 2, Sizeof.cl_uint, Pointer.to(new int[] {inputHighLimbsZero ? 1 : 0}));
+            clEnqueueNDRangeKernel(localQueue, benchKernel, 1, null, new long[] {globalWorkSize}, null, 0, null, null);
+            clFinish(localQueue);
+        } finally {
+            clReleaseMemObject(out);
+            clReleaseKernel(benchKernel);
         }
     }
 

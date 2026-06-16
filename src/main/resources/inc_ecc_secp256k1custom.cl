@@ -1110,3 +1110,41 @@ __kernel void test_inv_mod_safegcd(__global u32 *out, const u32 count)
         out[i] = status;
     }
 }
+
+/*
+ * Microbenchmark kernel (test scaffolding, not used in production): each work-item performs
+ * `iterations` modular inverses of freshly generated operands, XOR-accumulating a checksum so the
+ * compiler cannot elide the work. It calls the build-selected inv_mod (safegcd by default, or the
+ * binary GCD under -D USE_LEGACY_BINARY_GCD_INV_MOD), launched over a full grid so warp divergence is
+ * realistic. `inputHighLimbsZero != 0` zeroes the top three u32 limbs of every operand (~160-bit
+ * inputs); 0 uses full ~256-bit operands. This isolates the inverse cost (InvModBenchmark) and shows
+ * how the binary GCD's input-dependent iteration count interacts with operand width, whereas safegcd
+ * is fixed-cost. Timing only — correctness is gated by test_inv_mod_safegcd / ProbeAddressesOpenCLTest.
+ */
+__kernel void bench_inv_mod(__global u32 *out, const u32 iterations, const u32 inputHighLimbsZero)
+{
+    const u32 gid = get_global_id(0);
+    u32 checksum = 0;
+    u32 s = gid * 2654435761u + 0x9e3779b9u;
+
+    for (u32 i = 0; i < iterations; i++) {
+        u32 v[ONE_COORDINATE_NUM_WORDS];
+        for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) {
+            s ^= s << 13;
+            s ^= s >> 17;
+            s ^= s << 5;
+            v[j] = s;
+        }
+        if (inputHighLimbsZero != 0) {
+            v[5] = 0;
+            v[6] = 0;
+            v[7] = 0; // ~160-bit operand (low 5 limbs)
+        }
+        v[0] |= 1u; // ensure nonzero so the inv_mod(0) early-out never skews timing
+
+        inv_mod(v);
+        checksum ^= v[0];
+    }
+
+    out[gid] = checksum;
+}

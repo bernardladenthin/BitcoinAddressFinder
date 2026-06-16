@@ -356,6 +356,44 @@ cross-checks safegcd vs. the binary GCD **and** `x·x⁻¹ ≡ 1 (mod p)` over 4
 full `ProbeAddressesOpenCLTest` (43/0-fail) derives byte-identical keys with safegcd as the live
 inverse.
 
+#### Isolated inverse microbenchmark (256-bit vs 160-bit operands)
+
+The whole-kernel +45% mixes the inverse with everything else. `InvModBenchmark` isolates just
+`inv_mod` (`bench_inv_mod` kernel: each work-item does 256 inverses over a 2¹⁸ grid, so warp
+divergence is realistic), at two operand widths. One op = `2¹⁸ × 256 ≈ 67 M` inverses:
+
+| operand width | safegcd | binary GCD | safegcd advantage |
+|---|--:|--:|--:|
+| **256-bit** (production) | 3.82 ops/s ≈ **256 M inv/s** | 0.40 ops/s ≈ 27 M inv/s | **9.5×** |
+| 160-bit | 3.79 ops/s ≈ 254 M inv/s | 0.56 ops/s ≈ 37 M inv/s | **6.8×** |
+
+Reading the table:
+
+- **safegcd is flat across width** (3.82 vs 3.79) — it does a fixed 600 divsteps regardless of the
+  operand, so its cost does not depend on the input. The binary GCD is **input-dependent**: it is
+  ~38% faster at 160-bit than 256-bit (fewer bits to shift out) — which is exactly what makes it
+  diverge across warp lanes.
+- **safegcd wins at both widths** — 9.5× at 256-bit, still 6.8× at 160-bit. There is no operand size
+  in range where the legacy inverse is competitive on this GPU.
+- **256-bit is the production case.** `inv_mod` is only ever applied to field coordinates (X/Y/Z mod
+  `p`), which are pseudo-random in `[0, p)` — i.e. full ≈256-bit — *no matter how small the
+  private-key range being scanned is* (even a 1-bit private key yields a 256-bit public-key
+  coordinate). So scanning a "160-bit range" does **not** put the inverse in the 160-bit column; the
+  inverse always runs the 256-bit workload, where safegcd is 9.5× ahead in isolation (and that
+  dilutes to the +45% whole-kernel figure because the inverse is ~1-per-8-keys of total work).
+
+#### "Constant-time" here means *fast*, not slow
+
+A note on the surprise (the original prediction was that an amortized ~1-inverse-per-8-keys change
+would be lost in the noise — instead it was the biggest kernel win): the port is libsecp256k1's
+**constant-time** `modinv32`, but it was chosen for **speed, not side-channel resistance** (this is a
+key-search tool, not a wallet — there is no secret to leak). On a CPU the *variable-time* safegcd
+(`modinv32_var`, with `ctz`-based jumps) is faster; on a **SIMT GPU the opposite holds** — any
+data-dependent branching or variable trip-count serialises a whole 32-lane warp to its slowest lane.
+The binary GCD's input-dependence is precisely why it is ~7–10× slower above. So "constant-time"
+(branch-uniform, fixed trip-count) *is* the fast choice on the GPU; a variable-time inverse would
+re-introduce the divergence we just removed and is expected to be slower here, not faster.
+
 ---
 
 ## 6. Benchmarking methodology (read before trusting any number)
@@ -406,8 +444,10 @@ java --add-opens=java.base/java.lang=ALL-UNNAMED \
      -p batchSizeInBits=20 -p keysPerWorkItem=1,2,4,8,16,32,64 -f 1 -wi 1 -w 20 -i 3 -r 20
 ```
 
-Other benchmarks: `GpuFuse8FilterBenchmark` (filter/transfer path, `keysPerWorkItem = 1`; enable
-`-p profiling=true` to split device kernel vs readback nanos). GPU benchmarks self-skip when no
+Other benchmarks: `GpuFuse8FilterBenchmark` (filter/transfer path; `-p useSafeGcdInverse=true,false`
+for the Stage 4 whole-kernel A/B; `-p profiling=true` to split device kernel vs readback nanos) and
+`InvModBenchmark` (isolates just `inv_mod` over a full grid; `-p useSafeGcdInverse=true,false
+-p inputBits=256,160` for the Stage 4 isolated/width A/B). GPU benchmarks self-skip when no
 OpenCL 2.0+ device is present.
 
 ---
@@ -450,7 +490,8 @@ hot path; correctness is paramount.
 | 2 | fixed-base comb `P₀` | `GridSizeSweepBenchmark` | `OpenCLPrecomputeKernelTest` + `ProbeAddressesOpenCLTest` |
 | 2b | signed-digit (±P) comb halving | within noise on this GPU — table size is the win, not throughput | `OpenCLPrecomputeKernelTest` |
 | 3 | host result-buffer reuse | `GpuFuse8FilterBenchmark -p gpuFilter=true -p keysPerWorkItem=128` | `OpenCLCompactOutputIntegrationTest` + `ProbeAddressesOpenCLTest` |
-| 4 | safegcd `inv_mod` | `GpuFuse8FilterBenchmark … -p useSafeGcdInverse=true,false` (one run, both arms) | `OpenCLPrecomputeKernelTest#invModSafegcd_…` + `ProbeAddressesOpenCLTest` |
+| 4 | safegcd `inv_mod` (whole-kernel) | `GpuFuse8FilterBenchmark … -p useSafeGcdInverse=true,false` (one run, both arms) | `OpenCLPrecomputeKernelTest#invModSafegcd_…` + `ProbeAddressesOpenCLTest` |
+| 4 | safegcd `inv_mod` (isolated, 256/160-bit) | `InvModBenchmark -p useSafeGcdInverse=true,false -p inputBits=256,160` | same as above |
 | — | `keysPerWorkItem` tuning | `GridSizeSweepBenchmark` (§4) | — |
 
 **Honest caveat on A/B reproducibility:** only Stage 4 has a build-time toggle
