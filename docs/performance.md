@@ -514,8 +514,26 @@ command above.
 
 ## 8. Future work / not-yet-done levers
 
-Evaluated during the investigation; candidates for a future stage (re-sweep `keysPerWorkItem` after
-any of these, since the per-key cost balance shifts):
+### Measured and rejected
+
+- **Dedicated `sqr_mod` (symmetric modular squaring) — ~5% *slower*, reverted.** A faithful symmetric
+  squaring (each off-diagonal product `a[j]·a[k]` formed once and added twice, diagonals once) cuts
+  the 32×32 limb multiplies per square ~44% (≈36 vs 64) and was wired into every EC squaring
+  (`λ²` in the affine walk, the `z²` conversions, `point_double`/`point_add`/`point_to_affine`). It
+  was gated byte-identical (a `test_sqr_mod` kernel proving `sqr_mod(a) == mul_mod(a,a)` over 4096
+  inputs, plus `ProbeAddressesOpenCLTest` 43/0-fail). A matched **sqr–mul–sqr** A/B at the
+  `keysPerWorkItem=128` compact operating point on the RTX 3070 gave **mul 135.5 ops/s vs sqr
+  127.3 / 130.4** — i.e. squaring was consistently ~5% slower (the `mul` middle run sat above both
+  `sqr` runs, and `sqr` ran first/cooler, so it is not thermal ordering). **Why:** this schoolbook
+  field multiply is **carry/add-bound, not multiply-bound** on this GPU — `sqr_mod` keeps the same
+  ~64-term carry-propagating 64-bit add chain and only removes multiplies, while adding loop
+  branch/addressing overhead, so it loses. Reverted. Could be revisited on a *multiply-bound* device
+  (or paired with a reduced-radix representation that shortens the add chain).
+
+### Candidates for a future stage
+
+Evaluated during the investigation (re-sweep `keysPerWorkItem` after any of these, since the per-key
+cost balance shifts):
 
 - **Dedicated sequential-only "addition-walk" kernel (160-bit, output-only)** — a brand-new
   standalone kernel (alongside `generateKeysKernel_grid`) for contiguous scanning: the host supplies
