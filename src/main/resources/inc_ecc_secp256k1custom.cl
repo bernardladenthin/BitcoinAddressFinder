@@ -304,7 +304,7 @@ DECLSPEC void point_add_xy (PRIVATE_AS u32 *x1, PRIVATE_AS u32 *y1, PRIVATE_AS c
     inv_mod(z1);
 
     u32 z2[8];
-    mul_mod(z2, z1, z1);     // z^2
+    sqr_mod(z2, z1);         // z^2
     mul_mod(x1, x1, z2);     // x_affine = x / z^2
 
     mul_mod(z2, z2, z1);     // z^3
@@ -770,7 +770,7 @@ inline void point_mul_xy_comb(
     // Convert Q (Jacobian) to affine: x = X / Z^2, y = Y / Z^3.
     inv_mod(qz);
     u32 z2[ONE_COORDINATE_NUM_WORDS];
-    mul_mod(z2, qz, qz); // Z^2
+    sqr_mod(z2, qz); // Z^2
     mul_mod(x1, qx, z2); // x affine
     mul_mod(qz, z2, qz); // Z^3
     mul_mod(y1, qy, qz); // y affine
@@ -953,7 +953,7 @@ __kernel void generateKeysKernel_grid(
                 u32 t[ONE_COORDINATE_NUM_WORDS];
                 sub_mod(num, gy, y0);          // y_{mG} - y0
                 mul_mod(lambda, num, inv_dx);  // λ = (y_{mG} - y0) / dx_m
-                mul_mod(lam2, lambda, lambda); // λ^2
+                sqr_mod(lam2, lambda); // λ^2 (dedicated squaring; hot path, once per walked key)
                 sub_mod(x_littleEndian_local, lam2, gx);                 // λ^2 - x_{mG}
                 sub_mod(x_littleEndian_local, x_littleEndian_local, x0); // x_m = λ^2 - x_{mG} - x0
                 sub_mod(t, x0, x_littleEndian_local);                    // x0 - x_m
@@ -1147,4 +1147,33 @@ __kernel void bench_inv_mod(__global u32 *out, const u32 iterations, const u32 i
     }
 
     out[gid] = checksum;
+}
+
+/*
+ * Validation kernel (test scaffolding, not used in production): checks that sqr_mod(a) produces the
+ * byte-identical result of mul_mod(a, a) for `count` deterministic pseudo-random operands (full
+ * ~256-bit, possibly >= p — both reduce mod p). Single work-item, loops over count so it reuses the
+ * single-work-item precompute test harness. out[i] = 0 on agreement, 1 on mismatch.
+ */
+__kernel void test_sqr_mod(__global u32 *out, const u32 count)
+{
+    for (u32 i = 0; i < count; i++) {
+        u32 a[ONE_COORDINATE_NUM_WORDS];
+        u32 s = i * 2654435761u + 0x9e3779b9u;
+        for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) {
+            s ^= s << 13;
+            s ^= s >> 17;
+            s ^= s << 5;
+            a[j] = s;
+        }
+
+        u32 viaMul[ONE_COORDINATE_NUM_WORDS];
+        u32 viaSqr[ONE_COORDINATE_NUM_WORDS];
+        mul_mod(viaMul, a, a);
+        sqr_mod(viaSqr, a);
+
+        u32 diff = 0;
+        for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) diff |= (viaMul[j] ^ viaSqr[j]);
+        out[i] = (diff != 0) ? 1u : 0u;
+    }
 }

@@ -134,4 +134,23 @@ class OpenCLPrecomputeKernelTest {
             }
         }
     }
+
+    /**
+     * {@code test_sqr_mod}: the on-device self-check kernel verifies {@code sqr_mod(a)} is
+     * byte-identical to {@code mul_mod(a, a)} over {@code count} deterministic pseudo-random operands.
+     * Every output word must be {@code 0} (a non-zero word marks a mismatch for that input).
+     */
+    @Test
+    @OpenCLTest
+    void sqrMod_matchesMulMod() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        final int count = 4096;
+        try (OpenCLContext ctx = new OpenCLContext(minimalProducer(), bitHelper)) {
+            ctx.init();
+            final byte[] status = ctx.runPrecomputeKernelForTesting("test_sqr_mod", count * Integer.BYTES, count);
+            for (int i = 0; i < status.length; i++) {
+                assertEquals(0, status[i], "sqr_mod vs mul_mod mismatch at status byte " + i);
+            }
+        }
+    }
 }
