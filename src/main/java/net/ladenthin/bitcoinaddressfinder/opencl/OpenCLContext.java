@@ -147,11 +147,16 @@ public class OpenCLContext implements ReleaseCLObject {
     @VisibleForTesting
     static final String PROFILE_SKIP_HASH160_BUILD_OPTION = "-D PROFILE_SKIP_HASH160";
 
+    /** NVIDIA verbose-build flag; appended when {@link CProducerOpenCL#logGpuDiagnostics} is set. */
+    @VisibleForTesting
+    static final String NV_VERBOSE_BUILD_OPTION = "-cl-nv-verbose";
+
     /**
      * Assembles the {@code clBuildProgram} options string: the constant {@link #CL_BUILD_OPTIONS},
      * plus {@link #LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION} when {@link CProducerOpenCL#useSafeGcdInverse}
-     * is {@code false}, plus the profiling define for a non-{@code FULL}
-     * {@link CProducerOpenCL#kernelProfileStage}.
+     * is {@code false}, the profiling define for a non-{@code FULL}
+     * {@link CProducerOpenCL#kernelProfileStage}, and {@link #NV_VERBOSE_BUILD_OPTION} when
+     * {@link CProducerOpenCL#logGpuDiagnostics} is set.
      *
      * @return the build options string for this context's producer configuration
      */
@@ -171,6 +176,9 @@ public class OpenCLContext implements ReleaseCLObject {
             case FULL:
             default:
                 break;
+        }
+        if (producerOpenCL.logGpuDiagnostics) {
+            options.append(' ').append(NV_VERBOSE_BUILD_OPTION);
         }
         return options.toString();
     }
@@ -324,6 +332,10 @@ public class OpenCLContext implements ReleaseCLObject {
         // per-config modular-inverse selector (see CProducerOpenCL.useSafeGcdInverse).
         clBuildProgram(program, 0, null, buildOptions(), null, null);
 
+        if (producerOpenCL.logGpuDiagnostics) {
+            logProgramBuildLog(device);
+        }
+
         // Create the kernel
         kernel = clCreateKernel(program, KERNEL_NAME, null);
 
@@ -382,6 +394,35 @@ public class OpenCLContext implements ReleaseCLObject {
                 workGroupSizeMultiple,
                 privateMemBytes,
                 localMemBytes);
+
+        // Heuristic starting-point config suggestion from the device capabilities (see
+        // OpenClConfigSuggestion / docs/performance.md). A coarse starting point, not an optimum —
+        // sweep keysPerWorkItem on the real hardware to confirm.
+        final OpenClConfigSuggestion suggestion =
+                OpenClConfigSuggestion.suggest(device.maxComputeUnits(), device.maxMemAllocSize());
+        LOGGER.info(
+                "Suggested starting config for this device ({} compute units): batchSizeInBits={} keysPerWorkItem={}"
+                        + " (heuristic starting point - sweep to confirm, see docs/performance.md)",
+                device.maxComputeUnits(),
+                suggestion.batchSizeInBits(),
+                suggestion.keysPerWorkItem());
+    }
+
+    /**
+     * Logs the full {@code clGetProgramBuildInfo} build log (enabled by {@link
+     * CProducerOpenCL#logGpuDiagnostics}). On NVIDIA, building with {@link #NV_VERBOSE_BUILD_OPTION}
+     * can surface ptxas register/spill stats here; the content is driver-dependent and may be empty.
+     *
+     * @param device the device the program was built for
+     */
+    private void logProgramBuildLog(OpenCLDevice device) {
+        final cl_program localProgram = Objects.requireNonNull(program);
+        final long[] size = new long[1];
+        CL.clGetProgramBuildInfo(localProgram, device.device(), CL.CL_PROGRAM_BUILD_LOG, 0, null, size);
+        final byte[] logBytes = new byte[(int) size[0]];
+        CL.clGetProgramBuildInfo(
+                localProgram, device.device(), CL.CL_PROGRAM_BUILD_LOG, logBytes.length, Pointer.to(logBytes), null);
+        LOGGER.info("GPU program build log:\n{}", new String(logBytes, StandardCharsets.UTF_8));
     }
 
     /**

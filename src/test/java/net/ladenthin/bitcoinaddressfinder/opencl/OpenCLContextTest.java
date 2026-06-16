@@ -169,6 +169,34 @@ public class OpenCLContextTest {
         // assert
         assertThat(options, containsString(OpenCLContext.PROFILE_SKIP_HASH160_BUILD_OPTION));
     }
+
+    @Test
+    public void buildOptions_logGpuDiagnosticsFalse_omitsNvVerbose() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.logGpuDiagnostics = false;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert
+        assertThat(options, not(containsString(OpenCLContext.NV_VERBOSE_BUILD_OPTION)));
+    }
+
+    @Test
+    public void buildOptions_logGpuDiagnosticsTrue_appendsNvVerbose() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.logGpuDiagnostics = true;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert
+        assertThat(options, containsString(OpenCLContext.NV_VERBOSE_BUILD_OPTION));
+    }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="kernelProfileStage builds and runs">

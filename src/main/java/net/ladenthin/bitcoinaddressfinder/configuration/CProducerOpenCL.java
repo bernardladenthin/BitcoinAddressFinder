@@ -128,4 +128,18 @@ public class CProducerOpenCL extends CProducer {
      * and the enqueue calls pass no events, exactly as the non-profiling path.
      */
     public boolean enableProfiling = false;
+
+    /**
+     * Enables verbose GPU build diagnostics in the log.
+     * <p>
+     * When {@code true}, {@code OpenCLContext} builds the kernel with {@code -cl-nv-verbose} and logs
+     * the full {@code clGetProgramBuildInfo} build log (on NVIDIA this can include ptxas register /
+     * spill stats; the content is driver-dependent and may be empty). The concise per-build "Kernel
+     * resource usage" line (work-group-size ceiling, private/local memory) and the device-info dump
+     * are always logged regardless of this flag.
+     * <p>
+     * Diagnostic only; off by default. See {@code docs/performance.md} ("Occupancy / register
+     * pressure").
+     */
+    public boolean logGpuDiagnostics = false;
 }
