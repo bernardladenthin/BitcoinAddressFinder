@@ -599,11 +599,27 @@ command above.
   measurable change**. Kept anyway: it is simpler, idiomatic, and drops the per-key `ctx` structs
   (≈50 private words) lowering register pressure (a latent occupancy win on tighter configs). The
   lesson: the §6 "hashing ≈ 43%" cost is essentially **all** inside the vendored `sha256_transform` /
-  `ripemd160_transform` (64 + 80 rounds) — the custom-file wrapper around them was negligible, so the
-  hashing path is **not** a fruitful throughput target from the custom file (a follow-on idea to build
-  the SHA block words directly from the coordinate words, skipping the `uchar` SEC round-trip, was
-  therefore not pursued — strictly smaller than this, which already showed nothing). Faster hashing
-  would require changing the vendored transforms themselves, which is out of scope.
+  `ripemd160_transform` (64 + 80 rounds) — the custom-file wrapper around them was negligible.
+
+- **Build the SHA-256 input blocks directly from coordinate limbs (no `uchar` round-trip) —
+  throughput-neutral, kept.** Follow-on to the above: the hash160 path used to go EC limbs → reverse
+  to big-endian words → `get_sec_bytes` (write a `uchar` SEC array) → `pack_bytes_to_u32_words`
+  (repack) → pad. Two self-contained functions now build the fully-padded SHA-256 block(s) directly
+  from the little-endian coordinate limbs with a `(msword<<24)|(lsword>>8)` splice for the 1-byte SEC
+  prefix shift — no byte buffer, no pack/unpack, no per-word swap:
+  `sec_uncompressed_pubkey_to_sha256_blocks` / `sec_compressed_pubkey_to_sha256_block` (the clean
+  "coordinates → hash input" methods intended for **upstreaming to hashcat**). Removed ~10 now-dead
+  helpers + the SEC `uchar` buffers. Byte-identical (`ProbeAddressesOpenCLTest` 43/0; an initial
+  version fed the byte-swapped big-endian array and the gate caught it immediately — the full tests
+  localize wiring errors, so no dedicated test kernel was needed). Matched **F2–base–F2** A/B at
+  `keysPerWorkItem=128` compact: **134.96 / 140.58 / 143.31 ops/s** — the two F2 runs bracket the
+  baseline (intra-arm spread ≫ the F2-vs-baseline gap), i.e. **no measurable change**, confirming the
+  round-trip overhead was negligible. Kept for code cleanliness and the upstreamable methods.
+
+The combined conclusion: from the custom file, the hashing path is **not** a throughput lever — the
+cost lives in the vendored `sha256_transform` / `ripemd160_transform`. Faster hashing would require
+changing those transforms (out of scope) or fewer of them (impossible without dropping a chain, which
+is forbidden — both address types are mandatory).
 
 ### Measured and rejected
 
