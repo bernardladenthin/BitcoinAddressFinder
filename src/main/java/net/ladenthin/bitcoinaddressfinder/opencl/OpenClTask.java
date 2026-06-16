@@ -22,6 +22,8 @@ import static org.jocl.CL.clSetKernelArg;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
@@ -76,6 +78,18 @@ public class OpenClTask implements ReleaseCLObject {
 
     @ToString.Exclude
     private final Pointer dstMemPointer;
+
+    // Pool of reusable host-side readback buffers (full per-batch result size). Unlike dstMem, each
+    // launch's host buffer is handed to an OpenCLGridResult and read ASYNCHRONOUSLY by the
+    // result-reader pool, so it must not be shared with the next launch until that reader is done.
+    // The pool isolates in-flight buffers (up to maxResultReaderThreads, the same peak as before)
+    // while avoiding a fresh 100+ MB allocateDirect (and its zeroing) on every launch: executeKernel
+    // checks one out; OpenCLGridResult.close() (called by the reader when finished) returns it.
+    // A caller that never closes its result simply lets the buffer be GC'd (no reuse, no leak), so
+    // reuse is an optimisation, not a correctness requirement. Thread-safe: checkout on the single
+    // producer thread, return on reader threads.
+    @ToString.Exclude
+    private final Queue<ByteBuffer> hostBufferPool = new ConcurrentLinkedQueue<>();
 
     private final BitHelper bitHelper;
     private final ByteBufferUtility byteBufferUtility;
@@ -253,6 +267,32 @@ public class OpenClTask implements ReleaseCLObject {
     }
 
     /**
+     * Checks out a host-side readback buffer: reuses one from the pool, or allocates a fresh
+     * full-size direct buffer if the pool is empty. The returned buffer has position 0 so
+     * {@code Pointer.to(...)} reads from the start.
+     *
+     * @return a host readback buffer of {@link #getDstSizeInBytes()} bytes
+     */
+    private ByteBuffer acquireHostBuffer() {
+        final ByteBuffer pooled = hostBufferPool.poll();
+        if (pooled != null) {
+            pooled.clear();
+            return pooled;
+        }
+        return ByteBuffer.allocateDirect(ByteBufferUtility.ensureByteBufferCapacityFitsInt(getDstSizeInBytes()));
+    }
+
+    /**
+     * Returns a host-side readback buffer to the pool for reuse by a later launch. Called by
+     * {@link OpenCLGridResult#close()} once the asynchronous reader has finished with it.
+     *
+     * @param buffer the host readback buffer to return to the pool
+     */
+    void releaseHostBuffer(ByteBuffer buffer) {
+        hostBufferPool.offer(buffer);
+    }
+
+    /**
      * Writes the base private key to the source buffer in the format expected by the OpenCL kernel.
      * <p>
      * The method ensures that the provided private key is valid for the current batch size. If it exceeds
@@ -328,12 +368,9 @@ public class OpenClTask implements ReleaseCLObject {
             int transferAll,
             cl_mem iGTableMem,
             cl_mem combTableMem) {
-        final long dstSizeInBytes = getDstSizeInBytes();
-        // Fresh host-side readback buffer per launch: it is handed to the OpenCLGridResult and read
-        // asynchronously by the result-reader pool, so it must not be shared between launches. The
-        // GPU-side buffer (dstMem) IS reused (allocated once in the constructor) — see its field doc.
-        final ByteBuffer dstByteBuffer =
-                ByteBuffer.allocateDirect(ByteBufferUtility.ensureByteBufferCapacityFitsInt(dstSizeInBytes));
+        // Host-side readback buffer for this launch. Checked out from the pool (reused, see field
+        // doc) or freshly allocated if the pool is empty; returned by OpenCLGridResult.close().
+        final ByteBuffer dstByteBuffer = acquireHostBuffer();
         final Pointer dstByteBufferPointer = Pointer.to(dstByteBuffer);
 
         // Set the work-item dimensions

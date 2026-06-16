@@ -618,7 +618,13 @@ public class OpenCLContext implements ReleaseCLObject {
                 localIgTableMem,
                 localCombTableMem);
 
-        return new OpenCLGridResult(privateKeyBase, producerOpenCL.getOverallWorkSize(), dstByteBuffer);
+        // The result owns the readback buffer until closed; close() returns it to the task's reuse
+        // pool. The producer's result reader closes it after consuming (see ProducerOpenCL).
+        return new OpenCLGridResult(
+                privateKeyBase,
+                producerOpenCL.getOverallWorkSize(),
+                dstByteBuffer,
+                () -> localOpenClTask.releaseHostBuffer(dstByteBuffer));
     }
 
     private static List<String> getResourceNamesContent(Collection<String> resourceNames) throws IOException {

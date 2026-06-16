@@ -173,15 +173,21 @@ public class GridSizeSweepBenchmark {
     }
 
     /**
-     * One kernel launch at the current {@code @Param} combo. Returns the
-     * {@link OpenCLGridResult} so JMH's dead-code elimination cannot remove
-     * the call.
+     * One kernel launch at the current {@code @Param} combo. Closes the result
+     * (returning its pooled host buffer for reuse by the next launch) and
+     * returns the raw count header so JMH's dead-code elimination cannot remove
+     * the call. Reading only the header keeps this benchmark a measure of raw
+     * kernel + readback cost — it deliberately avoids the per-entry parse of
+     * {@link OpenCLGridResult#getPublicKeyBytes()}, which would dominate the
+     * full-transfer arm.
      *
-     * @return the grid result of one OpenCL kernel launch
+     * @return the leading u32 count header of one OpenCL kernel launch
      */
     @Benchmark
-    public OpenCLGridResult oneKernelLaunch() {
-        return ctx.createKeys(privateKeyBase);
+    public int oneKernelLaunch() {
+        try (OpenCLGridResult result = ctx.createKeys(privateKeyBase)) {
+            return result.getResult().getInt(0);
+        }
     }
 
     /**

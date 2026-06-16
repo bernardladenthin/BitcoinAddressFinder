@@ -16,6 +16,7 @@ import java.util.stream.Stream;
 import net.ladenthin.bitcoinaddressfinder.OpenCLPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLGridResult;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8GpuFilterData;
@@ -250,7 +251,10 @@ public class GpuFuse8FilterBenchmark {
      */
     @Benchmark
     public int oneKernelLaunch() {
-        return ctx.createKeys(privateKeyBase).getPublicKeyBytes().length;
+        // try-with-resources returns the readback buffer to the reuse pool after parsing.
+        try (OpenCLGridResult result = ctx.createKeys(privateKeyBase)) {
+            return result.getPublicKeyBytes().length;
+        }
     }
 
     /**

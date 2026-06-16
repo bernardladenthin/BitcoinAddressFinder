@@ -11,13 +11,14 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Holds the raw OpenCL grid result for a single secret-key base together with helpers to convert
  * it into {@link PublicKeyBytes} objects.
  */
 @ToString
-public class OpenCLGridResult {
+public class OpenCLGridResult implements AutoCloseable {
 
     /**
      * Enable additional validation to check if generated uncompressed keys are not all zero.
@@ -38,10 +39,55 @@ public class OpenCLGridResult {
     @ToString.Exclude
     private final ByteBuffer result;
 
+    // Returns the result buffer to the OpenClTask reuse pool when this result is closed. Null for
+    // results not backed by a pooled buffer (e.g. unit tests that construct a result directly), in
+    // which case close() is a no-op and the buffer is simply garbage-collected.
+    @ToString.Exclude
+    private final @Nullable Runnable onClose;
+
+    private boolean closed = false;
+
+    /**
+     * Constructs a result whose buffer is not pooled; {@link #close()} is a no-op. Used by tests.
+     *
+     * @param secretKeyBase the base secret used by the kernel for this batch
+     * @param workSize      the number of keys in this batch
+     * @param result        the raw OpenCL result buffer
+     */
     OpenCLGridResult(BigInteger secretKeyBase, int workSize, ByteBuffer result) {
+        this(secretKeyBase, workSize, result, null);
+    }
+
+    /**
+     * Constructs a result backed by a pooled buffer.
+     *
+     * @param secretKeyBase the base secret used by the kernel for this batch
+     * @param workSize      the number of keys in this batch
+     * @param result        the raw OpenCL result buffer (checked out from the task's pool)
+     * @param onClose       returns {@code result} to the pool; run once by {@link #close()}
+     */
+    OpenCLGridResult(BigInteger secretKeyBase, int workSize, ByteBuffer result, @Nullable Runnable onClose) {
         this.secretKeyBase = secretKeyBase;
         this.workSize = workSize;
         this.result = result;
+        this.onClose = onClose;
+    }
+
+    /**
+     * Releases this result, returning its backing buffer to the reusable pool (if pooled). Idempotent.
+     *
+     * <p>After {@code close()} the buffer may be handed to a later launch, so {@link #getResult()}
+     * and {@link #getPublicKeyBytes()} must not be called afterwards. Callers that read the result
+     * must finish reading <em>before</em> closing (the asynchronous result reader does exactly this).
+     */
+    @Override
+    public void close() {
+        if (!closed) {
+            closed = true;
+            if (onClose != null) {
+                onClose.run();
+            }
+        }
     }
 
     /**
