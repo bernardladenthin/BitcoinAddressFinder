@@ -79,6 +79,49 @@ public class OpenCLContextTest {
     }
     // </editor-fold>
 
+    // <editor-fold defaultstate="collapsed" desc="buildOptions">
+    @Test
+    public void buildOptions_useSafeGcdInverseTrue_omitsLegacyDefine() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.useSafeGcdInverse = true;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert
+        assertThat(options, not(containsString(OpenCLContext.LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION)));
+    }
+
+    @Test
+    public void buildOptions_useSafeGcdInverseFalse_appendsLegacyDefine() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.useSafeGcdInverse = false;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert
+        assertThat(options, containsString(OpenCLContext.LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION));
+    }
+
+    @Test
+    public void buildOptions_defaultConfiguration_usesSafeGcd() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert
+        assertThat(options, not(containsString(OpenCLContext.LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION)));
+    }
+    // </editor-fold>
+
     // <editor-fold defaultstate="collapsed" desc="init">
     @OpenCLTest
     @Test

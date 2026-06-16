@@ -130,6 +130,29 @@ public class OpenCLContext implements ReleaseCLObject {
      */
     private static final String CL_BUILD_OPTIONS = "-cl-std=CL2.0 -cl-mad-enable";
 
+    /**
+     * Build define that makes {@code inv_mod} fall back to the legacy binary-GCD modular inverse.
+     * Appended to the build options only when {@link CProducerOpenCL#useSafeGcdInverse} is
+     * {@code false}; the kernel uses safegcd by default (see {@code inc_ecc_secp256k1.cl}).
+     */
+    @VisibleForTesting
+    static final String LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION = "-D USE_LEGACY_BINARY_GCD_INV_MOD";
+
+    /**
+     * Assembles the {@code clBuildProgram} options string: the constant {@link #CL_BUILD_OPTIONS}
+     * plus, when {@link CProducerOpenCL#useSafeGcdInverse} is {@code false},
+     * {@link #LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION}.
+     *
+     * @return the build options string for this context's producer configuration
+     */
+    @VisibleForTesting
+    String buildOptions() {
+        if (producerOpenCL.useSafeGcdInverse) {
+            return CL_BUILD_OPTIONS;
+        }
+        return CL_BUILD_OPTIONS + " " + LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION;
+    }
+
     private static final ComparableVersion REQUIRED_COMPACT_MODE_VERSION = new ComparableVersion("2.0");
 
     private final CProducerOpenCL producerOpenCL;
@@ -275,8 +298,9 @@ public class OpenCLContext implements ReleaseCLObject {
         // Create the program from the source code
         program = clCreateProgramWithSource(context, openCLPrograms.length, openCLPrograms, null, null);
 
-        // Build the program with the Stage-0 quick-win options (see CL_BUILD_OPTIONS).
-        clBuildProgram(program, 0, null, CL_BUILD_OPTIONS, null, null);
+        // Build the program with the Stage-0 quick-win options (see CL_BUILD_OPTIONS), plus the
+        // per-config modular-inverse selector (see CProducerOpenCL.useSafeGcdInverse).
+        clBuildProgram(program, 0, null, buildOptions(), null, null);
 
         // Create the kernel
         kernel = clCreateKernel(program, KERNEL_NAME, null);

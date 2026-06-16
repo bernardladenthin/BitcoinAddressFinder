@@ -332,9 +332,12 @@ is not warmup drift), while OFF sits clearly below both. The effect is therefore
 *beat* the thermal noise floor because the effect itself is large.
 
 safegcd is now the **default** `inv_mod` (per "if always faster, no flag"). The binary GCD is kept
-behind `-D USE_LEGACY_BINARY_GCD_INV_MOD` for A/B and as a fallback for any device whose signed
-right-shift is not arithmetic (safegcd, like the reference, assumes sign-extending `>>`; NVIDIA and
-pocl both comply). Correctness is gated two ways: `OpenCLPrecomputeKernelTest`'s `test_inv_mod_safegcd`
+behind the kernel define `-D USE_LEGACY_BINARY_GCD_INV_MOD` for A/B and as a fallback for any device
+whose signed right-shift is not arithmetic (safegcd, like the reference, assumes sign-extending `>>`;
+NVIDIA and pocl both comply). The define is exposed as a runtime config flag,
+`CProducerOpenCL.useSafeGcdInverse` (default `true`); setting it `false` makes `OpenCLContext`
+append the legacy define to the kernel build options — so the inverse can be switched per run from
+the JSON config without editing code. Correctness is gated two ways: `OpenCLPrecomputeKernelTest`'s `test_inv_mod_safegcd`
 cross-checks safegcd vs. the binary GCD **and** `x·x⁻¹ ≡ 1 (mod p)` over 4096 random inputs, and the
 full `ProbeAddressesOpenCLTest` (43/0-fail) derives byte-identical keys with safegcd as the live
 inverse.

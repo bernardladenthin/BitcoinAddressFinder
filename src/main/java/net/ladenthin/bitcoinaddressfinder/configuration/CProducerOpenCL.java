@@ -87,6 +87,22 @@ public class CProducerOpenCL extends CProducer {
     public boolean transferAll = false;
 
     /**
+     * Selects the modular-inverse implementation compiled into the OpenCL kernel.
+     * <p>
+     * When {@code true} (default), {@code inv_mod} uses the <b>safegcd</b> path (a port of
+     * libsecp256k1's constant-time {@code modinv32}): a fixed 600 divsteps per input, so all lanes
+     * of a SIMT warp run in lock-step. When {@code false}, the kernel is built with
+     * {@code -D USE_LEGACY_BINARY_GCD_INV_MOD} and falls back to the input-dependent binary extended
+     * GCD.
+     * <p>
+     * safegcd was measured ≈ +45% kernel throughput at {@code keysPerWorkItem = 128} on an RTX 3070
+     * (it removes the binary GCD's warp divergence). It is the default; the legacy path is retained
+     * for A/B comparison and as a fallback for any device whose signed right-shift is not arithmetic
+     * (safegcd, like the reference, assumes sign-extending {@code >>}).
+     */
+    public boolean useSafeGcdInverse = true;
+
+    /**
      * Enables OpenCL device-side profiling of the kernel launch and result read-back.
      * <p>
      * When {@code true} the command queue is created with {@code CL_QUEUE_PROFILING_ENABLE} and
