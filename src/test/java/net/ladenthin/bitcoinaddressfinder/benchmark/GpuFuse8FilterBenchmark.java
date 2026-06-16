@@ -187,6 +187,15 @@ public class GpuFuse8FilterBenchmark {
     @Param({"false"})
     public boolean profiling;
 
+    /**
+     * Selects the kernel's modular-inverse implementation ({@link CProducerOpenCL#useSafeGcdInverse}).
+     * {@code true} (default) uses the safegcd path; {@code false} builds the legacy binary-GCD inverse.
+     * Sweep both (e.g. {@code -p useSafeGcdInverse=true,false}) to reproduce the Stage 4 A/B in §5 of
+     * {@code docs/performance.md} in a single JMH run.
+     */
+    @Param({"true"})
+    public boolean useSafeGcdInverse;
+
     private OpenCLContext ctx;
     private BigInteger privateKeyBase;
 
@@ -219,6 +228,7 @@ public class GpuFuse8FilterBenchmark {
         p.enableGpuFilter = gpuFilter;
         p.transferAll = false;
         p.enableProfiling = profiling;
+        p.useSafeGcdInverse = useSafeGcdInverse;
 
         ctx = new OpenCLContext(p, new BitHelper());
         ctx.init();

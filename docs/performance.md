@@ -52,8 +52,10 @@ Per work-item:
    which entries are emitted (claimed with `atomic_add`, OpenCL 2.0+).
 
 **Field layer** (`src/main/resources/copyfromhashcat/inc_ecc_secp256k1.cl`): 8×`u32` limbs;
-schoolbook `mul_mod` + fast reduction for `p = 2²⁵⁶ − 2³² − 977`; `add_mod`; `sub_mod`; `inv_mod` is
-a binary extended-GCD (~256 data-dependent iterations) that guards `a == 0`.
+schoolbook `mul_mod` + fast reduction for `p = 2²⁵⁶ − 2³² − 977`; `add_mod`; `sub_mod`; `inv_mod`
+defaults to the **safegcd** path (§5, Stage 4 — a fixed-iteration libsecp256k1 `modinv32` port), with
+the original binary extended-GCD (~256 data-dependent iterations, guards `a == 0`) kept behind
+`-D USE_LEGACY_BINARY_GCD_INV_MOD` / `useSafeGcdInverse=false`.
 
 ### Why this is the hot path
 
@@ -75,8 +77,8 @@ work-items remain to keep the GPU's compute units busy — so there is a **per-d
 
 - Must be a power of two; `batchSizeInBits` must be divisible by it.
 - Default `1` is **not** optimal for scanning.
-- On an RTX 3070 Laptop the optimum is `64` (§4 table). Weaker/older GPUs peak lower; sweep to find
-  it.
+- On an RTX 3070 Laptop the optimum is `128` at `batchSizeInBits=20` (§4 table; it rose from 64 to 128
+  once Stage 2 made `P₀` cheap). Weaker/older GPUs peak lower; sweep to find it.
 - Config field: `producerOpenCL.keysPerWorkItem` (`CProducerOpenCL.java`).
 
 ### `batchSizeInBits`
@@ -317,7 +319,19 @@ a **fixed 20×30 = 600 divsteps for every input**, branch-uniform, so a warp fin
 though the inverse is only ~1 per 8 keys (batched) at high `keysPerWorkItem`, removing that divergence
 moved the whole-kernel throughput a lot.
 
-A/B was run **ON–OFF–ON** to defeat the thermal-ordering trap that §6 warns about (compact mode,
+Reproduce the A/B in one JMH run (safegcd is a benchmark `@Param`, so no rebuild between arms):
+
+```bash
+# (after the classpath step in §6) — sweeps the inverse at the operating point
+java <--add-opens flags from §6> -cp "target/test-classes;target/classes;$(cat target/cp-test.txt)" \
+     org.openjdk.jmh.Main GpuFuse8FilterBenchmark \
+     -p gpuFilter=true -p batchSizeInBits=19 -p keysPerWorkItem=128 \
+     -p useSafeGcdInverse=true,false -f 1 -wi 1 -w 20 -i 3 -r 40
+```
+
+Because JMH iterates the params in order, prefer running each arm a couple of times (or interleaving)
+and reading the relative delta per §6 — a single ON/OFF pair is thermally confounded. The numbers
+below came from an explicit **ON–OFF–ON** sequence to defeat the thermal-ordering trap (compact mode,
 `batchSizeInBits=19`, `-f 1 -wi 1 -w 20 -i 3 -r 40`):
 
 | run (in order) | kpwi=1 | kpwi=128 |
@@ -404,23 +418,47 @@ Every kernel change is gated **before** any throughput is reported. These run un
 `test-opencl` job) or a real GPU; `@OpenCLTest` classes self-skip when no device is present.
 
 ```bash
-mvn test -Dtest='ProbeAddressesOpenCLTest,OpenCLCompactOutputIntegrationTest,OpenCLContextTest,Fuse8GpuHashParityTest,ProducerOpenCLTest,OpenCLContextIGTableTest,OpenCLContextCombTableTest'
+mvn test -Dtest='ProbeAddressesOpenCLTest,OpenCLCompactOutputIntegrationTest,OpenCLContextTest,Fuse8GpuHashParityTest,ProducerOpenCLTest,OpenCLPrecomputeKernelTest'
 ```
 
 - **`ProbeAddressesOpenCLTest#createKeys_acrossKeysPerWorkItem_allResultsMatchReference`** — the
   primary gate. Byte-compares GPU X/Y **and** both hash160s against `ECKey.fromPrivate(secretBase | i,
-  …)` for every work-item, across `keysPerWorkItem ∈ {1,2,4,8,16}`.
+  …)` for every work-item, across `keysPerWorkItem ∈ {1,2,4,8,16}`. This is what proves Stages 0–4 end
+  to end: it runs on the live kernel, so the comb, the affine walk, and the (default) safegcd inverse
+  all have to produce byte-identical keys.
 - **`OpenCLCompactOutputIntegrationTest`** — compact-mode hit-set vs a CPU oracle (filter + emit +
-  buffer plumbing).
-- **`OpenCLContextTest`** — init/upload/close lifecycle; the device buffers must allocate in `init()`
-  and release in `close()` without leaking.
-- **`OpenCLContextIGTableTest` / `OpenCLContextCombTableTest`** — pure-Java table generators
-  (no GPU): every `i·G` and comb entry decodes back to the bitcoinj point, and the comb sum
-  reconstructs `k·G`.
+  buffer plumbing); covers Stage 3's reuse of the result buffers.
+- **`OpenCLContextTest`** — init/upload/close lifecycle (device buffers allocate in `init()` and
+  release in `close()` without leaking) **and** `buildOptions()` (the `useSafeGcdInverse` →
+  `-D USE_LEGACY_BINARY_GCD_INV_MOD` wiring; no GPU needed).
+- **`OpenCLPrecomputeKernelTest`** — runs the on-device precompute / validation kernels and compares
+  against bitcoinj: every `i·G` table entry equals `m·G`; every signed-digit comb entry (Stage 2b)
+  equals `(mag·2^(4·pos))·G` incl. the carry-out position 64; and `invModSafegcd_…` (Stage 4)
+  cross-checks safegcd vs. the binary GCD **and** `x·x⁻¹ ≡ 1 (mod p)` over 4096 random inputs (built
+  with `useSafeGcdInverse=false` so both inverses are present and genuinely compared).
 - **`Fuse8GpuHashParityTest`** — the pure-Java filter-hash contract the kernel filter must match.
 
 **Never report a speedup from a build whose parity tests have not passed.** This is the cryptographic
 hot path; correctness is paramount.
+
+### Reproducibility map (every stage → how to re-measure → how it's gated)
+
+| Stage | Optimization | Reproduce the throughput | Correctness gate |
+|---|---|---|---|
+| 0 | build flags + `#pragma unroll` | `GridSizeSweepBenchmark` (kpwi sweep) | `ProbeAddressesOpenCLTest` |
+| 1 | affine batched-addition walk | `GridSizeSweepBenchmark` | `ProbeAddressesOpenCLTest` |
+| 2 | fixed-base comb `P₀` | `GridSizeSweepBenchmark` | `OpenCLPrecomputeKernelTest` + `ProbeAddressesOpenCLTest` |
+| 2b | signed-digit (±P) comb halving | within noise on this GPU — table size is the win, not throughput | `OpenCLPrecomputeKernelTest` |
+| 3 | host result-buffer reuse | `GpuFuse8FilterBenchmark -p gpuFilter=true -p keysPerWorkItem=128` | `OpenCLCompactOutputIntegrationTest` + `ProbeAddressesOpenCLTest` |
+| 4 | safegcd `inv_mod` | `GpuFuse8FilterBenchmark … -p useSafeGcdInverse=true,false` (one run, both arms) | `OpenCLPrecomputeKernelTest#invModSafegcd_…` + `ProbeAddressesOpenCLTest` |
+| — | `keysPerWorkItem` tuning | `GridSizeSweepBenchmark` (§4) | — |
+
+**Honest caveat on A/B reproducibility:** only Stage 4 has a build-time toggle
+(`useSafeGcdInverse`), so its A/B is a single JMH run. Stages 2b and 3 are unconditional (no flag, per
+"if always faster, no flag" / "table size is the real win"), so to re-measure *their* deltas you must
+benchmark the commit before the change vs. after (the staged commits on this branch are the A/B
+points). All stages' **correctness**, though, is reproducible from the current build via the gate
+command above.
 
 ---
 
