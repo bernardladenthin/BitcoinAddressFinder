@@ -424,36 +424,39 @@ inline void copy_and_reverse_endianness_u32_array(u32 *dst, int dst_offset, cons
 // of Y (its least-significant bit -> y[0] & 1), or 0x04 for the uncompressed form.
 // ===========================================================================================
 
-// Append a big-endian u32 `val` into a (pre-zeroed) SHA block at byte offset `byte_off`, OR-ing it in
-// so a non-word-aligned offset straddles two block words. Offset is compile-time in our callers.
-inline void sha_block_put_be32(u32 *block, const u32 byte_off, const u32 val)
+// Generic (NOT SHA-specific): OR a big-endian u32 `val` into a big-endian byte buffer `buf` (an array
+// of u32 words, byte 0 = MSB of word 0) at byte offset `byte_off`. A non-word-aligned offset straddles
+// two words. `buf` must be pre-zeroed over the written range (this ORs, it does not clear). When
+// `byte_off` is a compile-time constant (as in the callers here), the shift/branch fold away to a
+// straight-line write. Works for any big-endian word buffer — SHA-256 input blocks are just one user.
+inline void be_buffer_put_u32(u32 *buf, const u32 byte_off, const u32 val)
 {
     const u32 wi = byte_off >> 2;
     const u32 sh = (byte_off & 3u) * 8u;
     if (sh == 0u) {
-        block[wi] |= val;
+        buf[wi] |= val;
     } else {
-        block[wi] |= (val >> sh);
-        block[wi + 1] |= (val << (32u - sh));
+        buf[wi] |= (val >> sh);
+        buf[wi + 1] |= (val << (32u - sh));
     }
 }
 
-// Append a single byte `byte_val` into a (pre-zeroed) SHA block at byte offset `byte_off`.
-inline void sha_block_put_byte(u32 *block, const u32 byte_off, const u32 byte_val)
+// Generic: OR a single byte `byte_val` into a big-endian byte buffer `buf` at byte offset `byte_off`.
+inline void be_buffer_put_byte(u32 *buf, const u32 byte_off, const u32 byte_val)
 {
     const u32 wi = byte_off >> 2;
     const u32 sh = (3u - (byte_off & 3u)) * 8u;
-    block[wi] |= (byte_val & 0xffu) << sh;
+    buf[wi] |= (byte_val & 0xffu) << sh;
 }
 
-// Appends the SEC prefix + the 8 big-endian X words (high limb -> low limb) starting at byte 1.
+// Appends the SEC prefix byte + the 8 big-endian X words (high limb -> low limb) starting at byte 1.
 // Shared by both SEC forms; X always occupies bytes 1..32.
-inline void sha_block_put_prefix_and_x(u32 *block, const u32 prefix, const u32 *x)
+inline void be_buffer_put_sec_prefix_and_x(u32 *buf, const u32 prefix, const u32 *x)
 {
-    sha_block_put_byte(block, 0, prefix);
+    be_buffer_put_byte(buf, 0, prefix);
     #pragma unroll
     for (int i = 0; i < ONE_COORDINATE_NUM_WORDS; i++) {
-        sha_block_put_be32(block, 1u + (u32)i * 4u, x[ONE_COORDINATE_NUM_WORDS - 1 - i]);
+        be_buffer_put_u32(buf, 1u + (u32)i * 4u, x[ONE_COORDINATE_NUM_WORDS - 1 - i]);
     }
 }
 
@@ -464,12 +467,12 @@ inline void sec_uncompressed_pubkey_to_sha256_blocks(const u32 *x, const u32 *y,
     for (int i = 0; i < SHA256_INPUT_TOTAL_WORDS_UNCOMPRESSED; i++) {
         out_block[i] = 0;
     }
-    sha_block_put_prefix_and_x(out_block, (u32)SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT, x); // bytes 0..32
+    be_buffer_put_sec_prefix_and_x(out_block, (u32)SEC_PREFIX_UNCOMPRESSED_ECDSA_POINT, x); // bytes 0..32
     #pragma unroll
     for (int i = 0; i < ONE_COORDINATE_NUM_WORDS; i++) {
-        sha_block_put_be32(out_block, 33u + (u32)i * 4u, y[ONE_COORDINATE_NUM_WORDS - 1 - i]); // Y bytes 33..64
+        be_buffer_put_u32(out_block, 33u + (u32)i * 4u, y[ONE_COORDINATE_NUM_WORDS - 1 - i]); // Y bytes 33..64
     }
-    sha_block_put_byte(out_block, 65, 0x80); // pad bit right after the 65-byte message
+    be_buffer_put_byte(out_block, 65, 0x80); // pad bit right after the 65-byte message
     out_block[SHA256_INPUT_TOTAL_WORDS_UNCOMPRESSED - 1] = SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BITS; // 520
 }
 
@@ -482,8 +485,8 @@ inline void sec_compressed_pubkey_to_sha256_block(const u32 *x, const u32 *y, u3
     for (int i = 0; i < SHA256_INPUT_TOTAL_WORDS_COMPRESSED; i++) {
         out_block[i] = 0;
     }
-    sha_block_put_prefix_and_x(out_block, prefix, x);  // bytes 0..32
-    sha_block_put_byte(out_block, 33, 0x80);           // pad bit right after the 33-byte message
+    be_buffer_put_sec_prefix_and_x(out_block, prefix, x);  // bytes 0..32
+    be_buffer_put_byte(out_block, 33, 0x80);               // pad bit right after the 33-byte message
     out_block[SHA256_INPUT_TOTAL_WORDS_COMPRESSED - 1] = SEC_PUBLIC_KEY_COMPRESSED_NUM_BITS; // 264
 }
 
