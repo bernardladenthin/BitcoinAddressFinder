@@ -101,11 +101,24 @@ but cost more VRAM for the result buffer and more host readback per launch.
 
 Sub-batch size for Montgomery's simultaneous inversion in the affine walk: `KEYS_BATCH_INV` points
 share **one** `inv_mod` (plus a few multiplies per point) instead of one inverse each. It is a
-`#define` in `inc_ecc_secp256k1custom.cl` (default `8`). Larger values amortize the inverse over more
-keys but use more private scratch (lowering occupancy). It is **not** a runtime argument — it sizes
-fixed-length private arrays, so changing it means editing the kernel (or prepending a `#define` to
-the program source before `clBuildProgram`) and re-running. Re-sweep `keysPerWorkItem` after changing
-it.
+`#define` in `inc_ecc_secp256k1custom.cl` (default **`16`**). Larger values amortize the inverse over
+more keys but use more private scratch. It is **not** a runtime argument — it sizes fixed-length
+private arrays, so changing it means editing the kernel (or prepending a `#define` to the program
+source before `clBuildProgram`) and re-running. Re-sweep `keysPerWorkItem` after changing it.
+
+**Measured (RTX 3070, kpwi=128 compact, order-controlled).** Larger batch is genuinely faster — the
+extra inverse amortization beats the extra spill (`kernelMaxWorkGroupSize` stays 256 regardless, so
+occupancy is *not* the limiter here; only spill grows):
+
+| `KEYS_BATCH_INV` | 4 | **8 (old default)** | **16 (default)** | 32 | 64 |
+|---|--:|--:|--:|--:|--:|
+| ops/s (kpwi=128) | ~136 | ~147 | ~155 | ~161 | ~165 |
+| private-mem spill (bytes/work-item) | 384 | 640 | 1152 | 2176 | 4224 |
+
+The default was raised **8 → 16** (≈ +5%, modest spill, and it matches the example configs' `kpwi=16`).
+`32`/`64` add a further ≈ +4% / +6% **only when `keysPerWorkItem` is large** — they are worth setting
+for a high-kpwi deployment but waste scratch when kpwi is small (the arrays are always sized to
+`KEYS_BATCH_INV`), so they are left as an opt-in tune rather than the default.
 
 ### Address-lookup backend (`addressLookupBackend`) and the GPU filter
 
@@ -530,6 +543,29 @@ RIPEMD-160, so the gap is only ~4 pts). Direct consequences for what to optimize
 - **EC is ~57%** and is dominated by the field multiply (carry/add-bound, per the `sqr_mod` result in
   §8) ⇒ the EC lever is a **reduced-radix field** (shorter carry chains), not fewer multiplies.
 
+### Occupancy / register pressure
+
+`OpenCLContext` logs the built kernel's standard `clGetKernelWorkGroupInfo` stats once at init (see
+`logKernelResourceUsage`) — grep the init log for `Kernel resource usage:`. On the RTX 3070:
+
+```
+Kernel resource usage: kernelMaxWorkGroupSize=256 workGroupSizeMultiple=32 privateMemBytes=640 localMemBytes=…
+```
+
+Reading it: the device's `CL_DEVICE_MAX_WORK_GROUP_SIZE` is 1024, but the kernel's max work-group
+size is **256** — the kernel is **resource- (register-) limited**. On Ampere (65 536 registers per
+SM-block) a 256-thread cap implies ≈ **255 registers/thread (the hardware ceiling)**, with
+`privateMemBytes > 0` indicating **register spilling** to device-local memory. That puts achieved
+occupancy at roughly **8 of 48 warps/SM (~17 %)** — the kernel is **register-bound, not
+memory-bandwidth-bound**. This single fact explains several results: `sqr_mod` couldn't help (the
+field path is carry-bound), and `KEYS_BATCH_INV` does not change `kernelMaxWorkGroupSize` (the
+ceiling comes from the inlined EC + safegcd + hash core, not the batch arrays — only spill scales).
+
+The practical lever this points to is **reducing register pressure** to lift occupancy — which today
+means the same big project as the compute lever (a reduced-radix field uses fewer/cheaper temporaries;
+splitting the megalithic kernel would also cut per-stage register peaks). Micro-tweaks won't move a
+kernel pinned at the 255-register ceiling.
+
 ---
 
 ## 7. Correctness gating
@@ -574,6 +610,8 @@ hot path; correctness is paramount.
 | 4 | safegcd `inv_mod` (isolated, 256/160-bit) | `InvModBenchmark -p useSafeGcdInverse=true,false -p inputBits=256,160` | same as above |
 | — | `keysPerWorkItem` tuning | `GridSizeSweepBenchmark` (§4) | — |
 | — | stage attribution (EC vs hashing) | `GpuFuse8FilterBenchmark -p gpuFilter=true -p kernelProfileStage=FULL,ONE_HASH160,NO_HASH160` (§6) | `OpenCLContextTest#kernelProfileStage_buildsAndRuns` |
+| — | occupancy / register pressure | grep init log for `Kernel resource usage:` (§6) | — |
+| — | `KEYS_BATCH_INV` sweep | edit the `#define`, `GpuFuse8FilterBenchmark` (§3) | `ProbeAddressesOpenCLTest` |
 
 **Honest caveat on A/B reproducibility:** only Stage 4 has a build-time toggle
 (`useSafeGcdInverse`), so its A/B is a single JMH run. Stages 2b and 3 are unconditional (no flag, per
@@ -585,6 +623,20 @@ command above.
 ---
 
 ## 8. Future work / not-yet-done levers
+
+### Measured neutral — reverted
+
+- **Stage `iG_table` into `__local` memory — neutral, reverted.** The affine walk reads the `m·G`
+  table (≈ 8 KB at kpwi=128) from global memory per key, and every work-item reads the *same* table,
+  so cooperatively copying it into per-work-group local memory once (with a barrier) looked like a way
+  to cut global-memory latency. Implemented (extra `__local` kernel arg + cooperative load + barrier)
+  and gated byte-identical (`ProbeAddressesOpenCLTest` 43/0). Matched **local–nolocal–local** A/B at
+  kpwi=128 compact: **164.5 / 159.2 / 155.2 ops/s** — the two staged runs bracket the baseline, i.e.
+  **no measurable change**. Expected from the occupancy finding (§6): the kernel is **register-bound,
+  not memory-bound**, and the tiny broadcast-read table is already served well by L2. Since staging
+  *adds* a barrier + complexity for zero gain (unlike the hashing rewrites, which simplified code), it
+  was **reverted**. (`__constant` was considered instead but is capped at 64 KB, breaking for large
+  kpwi.)
 
 ### Measured neutral (kept for code quality)
 
