@@ -1647,6 +1647,14 @@ BitcoinAddressFinder stands on the shoulders of excellent open-source work. In p
 - **Binary Fuse filters** — by [Thomas Mueller Graf and Daniel Lemire](https://github.com/FastFilter),
   with the [SipHash](https://github.com/veorq/SipHash) construction by Jean-Philippe Aumasson and
   Daniel J. Bernstein.
+- **[vanitygen](https://github.com/samr7/vanitygen)** (Samr7) and
+  **[vanitygen-plusplus](https://github.com/10gic/vanitygen-plusplus)** (10gic) — pioneering
+  CPU/OpenCL Bitcoin vanity-address searchers; studied for their GPU EC key-generation techniques.
+- **[bitcoin-core/secp256k1](https://github.com/bitcoin-core/secp256k1)** — the reference
+  high-performance secp256k1 library (reduced-radix field, GLV endomorphism, safegcd modular
+  inverse); the basis for several of the EC optimizations and a reference for correctness.
+- **[bitcoinj/secp256k1-jdk](https://github.com/bitcoinj/secp256k1-jdk)** — secp256k1 bindings for
+  the JVM; a reference for the Java-side secp256k1 surface.
 
 See the bundled third-party licenses for full attribution; some subprojects are under their own
 licenses (e.g. the `copyfromhashcat` kernels are MIT).
