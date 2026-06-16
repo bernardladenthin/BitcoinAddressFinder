@@ -139,19 +139,40 @@ public class OpenCLContext implements ReleaseCLObject {
     @VisibleForTesting
     static final String LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION = "-D USE_LEGACY_BINARY_GCD_INV_MOD";
 
+    /** Kernel define that skips the compressed hash160 chain (profiling: isolate one hash chain). */
+    @VisibleForTesting
+    static final String PROFILE_SKIP_SECOND_HASH160_BUILD_OPTION = "-D PROFILE_SKIP_SECOND_HASH160";
+
+    /** Kernel define that skips both hash160 chains (profiling: isolate EC arithmetic). */
+    @VisibleForTesting
+    static final String PROFILE_SKIP_HASH160_BUILD_OPTION = "-D PROFILE_SKIP_HASH160";
+
     /**
-     * Assembles the {@code clBuildProgram} options string: the constant {@link #CL_BUILD_OPTIONS}
-     * plus, when {@link CProducerOpenCL#useSafeGcdInverse} is {@code false},
-     * {@link #LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION}.
+     * Assembles the {@code clBuildProgram} options string: the constant {@link #CL_BUILD_OPTIONS},
+     * plus {@link #LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION} when {@link CProducerOpenCL#useSafeGcdInverse}
+     * is {@code false}, plus the profiling define for a non-{@code FULL}
+     * {@link CProducerOpenCL#kernelProfileStage}.
      *
      * @return the build options string for this context's producer configuration
      */
     @VisibleForTesting
     String buildOptions() {
-        if (producerOpenCL.useSafeGcdInverse) {
-            return CL_BUILD_OPTIONS;
+        final StringBuilder options = new StringBuilder(CL_BUILD_OPTIONS);
+        if (!producerOpenCL.useSafeGcdInverse) {
+            options.append(' ').append(LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION);
         }
-        return CL_BUILD_OPTIONS + " " + LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION;
+        switch (producerOpenCL.kernelProfileStage) {
+            case ONE_HASH160:
+                options.append(' ').append(PROFILE_SKIP_SECOND_HASH160_BUILD_OPTION);
+                break;
+            case NO_HASH160:
+                options.append(' ').append(PROFILE_SKIP_HASH160_BUILD_OPTION);
+                break;
+            case FULL:
+            default:
+                break;
+        }
+        return options.toString();
     }
 
     private static final ComparableVersion REQUIRED_COMPACT_MODE_VERSION = new ComparableVersion("2.0");

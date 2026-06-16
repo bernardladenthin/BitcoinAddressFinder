@@ -970,6 +970,24 @@ __kernel void generateKeysKernel_grid(
             // y
             copy_and_reverse_endianness_u32_array(y_bigEndian_local, 0, y_littleEndian_local, ONE_COORDINATE_NUM_WORDS);
 
+            // === hash160 stage(s) ===
+            // Profiling builds (docs/performance.md "Stage attribution") short-circuit the hashing to
+            // attribute kernel time; the default build (neither define set) runs both real chains and
+            // is byte-for-byte the production kernel. PROFILE_* modes produce INCORRECT hashes and are
+            // for benchmarking only. ripemd_uncompressed_h / ripemd_compressed_h are defined in every
+            // branch so the downstream filter/output path is identical.
+            u32 ripemd_uncompressed_h[RIPEMD160_HASH_NUM_WORDS];
+            u32 ripemd_compressed_h[RIPEMD160_HASH_NUM_WORDS];
+
+            #ifdef PROFILE_SKIP_HASH160
+            // EC-only: skip both chains. Fill both hash160 slots from the public-key X coordinate so
+            // the EC result stays live (not dead-code-eliminated) and the filter/output path runs.
+            #pragma unroll
+            for (int w = 0; w < RIPEMD160_HASH_NUM_WORDS; w++) {
+                ripemd_uncompressed_h[w] = x_bigEndian_local[w];
+                ripemd_compressed_h[w] = x_bigEndian_local[w];
+            }
+            #else
             // === Hash uncompressed key ===
             get_sec_bytes_uncompressed(x_bigEndian_local, y_bigEndian_local, sec_uncompressed);
             build_sha256_block_from_uncompressed_pubkey(sec_uncompressed, sha256_input_uncompressed);
@@ -984,13 +1002,19 @@ __kernel void generateKeysKernel_grid(
             // REUSE_FOR_COMPRESSED the ripemd context is a shared alias, so the compressed pass
             // below overwrites ripemd_ctx_uncompressed.h; the deferred filter check and entry
             // write must read this stable copy, not the (soon-clobbered) shared context.
-            u32 ripemd_uncompressed_h[RIPEMD160_HASH_NUM_WORDS];
             #pragma unroll
             for (int w = 0; w < RIPEMD160_HASH_NUM_WORDS; w++) {
                 ripemd_uncompressed_h[w] = ripemd_ctx_uncompressed.h[w];
             }
 
             // === Hash compressed key ===
+            #ifdef PROFILE_SKIP_SECOND_HASH160
+            // Single-chain profiling: skip the compressed chain, reuse the uncompressed hash160.
+            #pragma unroll
+            for (int w = 0; w < RIPEMD160_HASH_NUM_WORDS; w++) {
+                ripemd_compressed_h[w] = ripemd_uncompressed_h[w];
+            }
+            #else
             #ifdef REUSE_FOR_COMPRESSED
                 transform_sec_prefix_from_uncompressed_to_compressed(sec_compressed);
             #else
@@ -1006,11 +1030,12 @@ __kernel void generateKeysKernel_grid(
 
             // Snapshot the compressed hash160 too, so both hashes are stable private copies for
             // the filter check and the deferred entry write below.
-            u32 ripemd_compressed_h[RIPEMD160_HASH_NUM_WORDS];
             #pragma unroll
             for (int w = 0; w < RIPEMD160_HASH_NUM_WORDS; w++) {
                 ripemd_compressed_h[w] = ripemd_ctx_compressed.h[w];
             }
+            #endif // PROFILE_SKIP_SECOND_HASH160
+            #endif // PROFILE_SKIP_HASH160
 
             // === Decide whether and where to emit this entry ===
             // Full-transfer mode: every work-item emits, densely at slot loop_index.

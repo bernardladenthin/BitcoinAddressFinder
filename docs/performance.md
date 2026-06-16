@@ -60,10 +60,11 @@ the original binary extended-GCD (~256 data-dependent iterations, guards `a == 0
 ### Why this is the hot path
 
 Key generation dominates GPU runtime; address hashing + LMDB lookup run on the CPU consumer in
-parallel. Within the kernel, **EC point arithmetic — not the SHA/RIPEMD hashing — is the
-bottleneck**. Working backwards from the measured +37% gain when batched inversion was introduced
-(removing 7 of every 8 `inv_mod`), EC arithmetic is ≈ 60–75% of kernel runtime, hashing ≈ 30%,
-inversion now ≈ 4% (already batched).
+parallel. Within the kernel, **EC point arithmetic is the largest cost, but the two hash160 chains
+are not far behind**: the stage-attribution suite (§6) measures **EC ≈ 57%, hashing ≈ 43%** on the
+current kernel (RTX 3070, `keysPerWorkItem=128`). (An earlier back-of-envelope estimate put hashing
+at ~30%; the direct measurement corrected it upward — re-run the suite on your device, the split is
+device-dependent.)
 
 ---
 
@@ -459,6 +460,73 @@ for the Stage 4 whole-kernel A/B; `-p profiling=true` to split device kernel vs 
 -p inputBits=256,160` for the Stage 4 isolated/width A/B). GPU benchmarks self-skip when no
 OpenCL 2.0+ device is present.
 
+### Stage attribution — where kernel time goes (permanent, re-runnable)
+
+The per-key kernel pipeline is **EC point generation → uncompressed hash160 → compressed hash160 →
+filter/output**. To attribute time across these *without* per-instruction profiling, the kernel has
+compile-time stage switches (`CProducerOpenCL.kernelProfileStage`, mapped to `-D PROFILE_*` defines
+in `OpenCLContext.buildOptions`) that short-circuit the hashing. They are exposed as a
+`GpuFuse8FilterBenchmark` `@Param`, so the full attribution is **one JMH run** — no code to write,
+just run the suite and diff:
+
+```bash
+# (after the classpath step above) — compact mode keeps it compute-bound
+java <--add-opens flags> -cp "target/test-classes;target/classes;$(cat target/cp-test.txt)" \
+     org.openjdk.jmh.Main GpuFuse8FilterBenchmark \
+     -p gpuFilter=true -p batchSizeInBits=20 -p keysPerWorkItem=128 \
+     -p kernelProfileStage=FULL,ONE_HASH160,NO_HASH160 -f 1 -wi 1 -w 20 -i 3 -r 20
+```
+
+The three modes (each rebuilds the kernel in `@Setup`, outside timing):
+
+| `kernelProfileStage` | kernel does | define |
+|---|---|---|
+| `NO_HASH160` | EC point generation only (hash160 slots filled from X) | `-D PROFILE_SKIP_HASH160` |
+| `ONE_HASH160` | EC + one hash160 chain (compressed reuses uncompressed) | `-D PROFILE_SKIP_SECOND_HASH160` |
+| `FULL` (default) | EC + both hash160 chains (the real kernel) | *(none)* |
+
+**Interpreting it** — throughput is inverse time, so convert each mode to a per-op time `t = 1/ops`
+(compact mode, so transfer is negligible and `t` is ~pure compute):
+
+- EC arithmetic = `t(NO_HASH160)`
+- one hash160 chain = `t(ONE_HASH160) − t(NO_HASH160)`
+- the second hash160 chain = `t(FULL) − t(ONE_HASH160)`
+- as a share of the kernel: divide each by `t(FULL)`.
+
+**Caveats.** The non-`FULL` modes emit **incorrect** hash160s (they skip the real hashing) — this is
+a *timing* harness, never a production mode; correctness lives in §7. Run the modes back-to-back and
+read the relative split per the thermal rule above. `OpenCLContextTest.kernelProfileStage_buildsAndRuns`
+gates that all three modes compile and launch, so the suite never silently rots.
+
+**Measured (RTX 3070 Laptop, compact, `batchSizeInBits=20`, `keysPerWorkItem=128`, one back-to-back
+sweep so the ratios are robust):**
+
+| `kernelProfileStage` | ops/s | isolates |
+|---|--:|---|
+| `NO_HASH160` | 250.3 | EC point generation |
+| `ONE_HASH160` | 177.5 | EC + one hash160 chain |
+| `FULL` | 143.4 | EC + both hash160 chains |
+
+Per-op-time attribution of the **full kernel**:
+
+| stage | share |
+|---|--:|
+| EC point generation | **57%** |
+| hash160 chain #1 (uncompressed) | 23.5% |
+| hash160 chain #2 (compressed) | 19.2% |
+| **both hash160 chains** | **43%** |
+
+This **refines the old §2 estimate** ("EC ≈ 60–75%, hashing ≈ 30%"): after Stage 4 the split is closer
+to **EC 57% / hashing 43%** — hashing is a larger slice than previously assumed, and the two chains
+are comparable (the uncompressed SEC is 2 SHA-256 blocks vs 1 for compressed, but both share a
+RIPEMD-160, so the gap is only ~4 pts). Direct consequences for what to optimize next:
+
+- **Hashing is ~43%** ⇒ a config-gated *single-address* mode (compute only the chain a deployment
+  needs) would save ~19–24% of the kernel — the cheapest large win, and it keeps `FULL`/both as the
+  default (see §8).
+- **EC is ~57%** and is dominated by the field multiply (carry/add-bound, per the `sqr_mod` result in
+  §8) ⇒ the EC lever is a **reduced-radix field** (shorter carry chains), not fewer multiplies.
+
 ---
 
 ## 7. Correctness gating
@@ -502,6 +570,7 @@ hot path; correctness is paramount.
 | 4 | safegcd `inv_mod` (whole-kernel) | `GpuFuse8FilterBenchmark … -p useSafeGcdInverse=true,false` (one run, both arms) | `OpenCLPrecomputeKernelTest#invModSafegcd_…` + `ProbeAddressesOpenCLTest` |
 | 4 | safegcd `inv_mod` (isolated, 256/160-bit) | `InvModBenchmark -p useSafeGcdInverse=true,false -p inputBits=256,160` | same as above |
 | — | `keysPerWorkItem` tuning | `GridSizeSweepBenchmark` (§4) | — |
+| — | stage attribution (EC vs hashing) | `GpuFuse8FilterBenchmark -p gpuFilter=true -p kernelProfileStage=FULL,ONE_HASH160,NO_HASH160` (§6) | `OpenCLContextTest#kernelProfileStage_buildsAndRuns` |
 
 **Honest caveat on A/B reproducibility:** only Stage 4 has a build-time toggle
 (`useSafeGcdInverse`), so its A/B is a single JMH run. Stages 2b and 3 are unconditional (no flag, per
@@ -535,6 +604,18 @@ command above.
 Evaluated during the investigation (re-sweep `keysPerWorkItem` after any of these, since the per-key
 cost balance shifts):
 
+- **Config-gated single-address mode (compute only one hash160 chain) — the cheapest large win,
+  pointed to directly by the §6 attribution (hashing ≈ 43%, each chain ≈ 19–24%).** A deployment that
+  only needs e.g. compressed P2PKH pays for the uncompressed chain it never uses. A config flag
+  selecting `BOTH` (default, unchanged) / `COMPRESSED_ONLY` / `UNCOMPRESSED_ONLY` would skip the
+  unused chain for a ~19–24% kernel speedup — byte-identical per mode, gated like the existing
+  switches. (The profiling `kernelProfileStage` already proves the kernel runs correctly with one
+  chain skipped; a production single-address mode is the same skip plus a matching CPU-side
+  expectation.) Mechanically simple; the only reason it is "future" not "done" is the product
+  decision that both address types stay the default.
+- **Reduced-radix field representation** (e.g. 2^26 / 2^29 limbs) — the EC lever (EC ≈ 57% per §6),
+  attacking the carry/add chain that made `sqr_mod` a wash (see "Measured and rejected"). Big rewrite
+  of every field op; would also make `sqr_mod` pay off. Highest EC potential, highest effort/risk.
 - **Dedicated sequential-only "addition-walk" kernel (160-bit, output-only)** — a brand-new
   standalone kernel (alongside `generateKeysKernel_grid`) for contiguous scanning: the host supplies
   a single anchor `P0`, and the kernel enumerates `P0, P0+G, P0+2G, …` by pure affine point addition

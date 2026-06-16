@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import net.ladenthin.bitcoinaddressfinder.OpenCLPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.configuration.KernelProfileStage;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLGridResult;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
@@ -196,6 +197,16 @@ public class GpuFuse8FilterBenchmark {
     @Param({"true"})
     public boolean useSafeGcdInverse;
 
+    /**
+     * Compile-time kernel profiling stage ({@link CProducerOpenCL#kernelProfileStage}). {@code FULL}
+     * is the real kernel; {@code ONE_HASH160} / {@code NO_HASH160} short-circuit hashing to attribute
+     * kernel time. Sweep {@code -p kernelProfileStage=FULL,ONE_HASH160,NO_HASH160} (compact mode) and
+     * diff the throughputs per {@code docs/performance.md} "Stage attribution". Non-FULL modes emit
+     * incorrect hashes — timing only.
+     */
+    @Param({"FULL"})
+    public KernelProfileStage kernelProfileStage;
+
     private OpenCLContext ctx;
     private BigInteger privateKeyBase;
 
@@ -229,6 +240,7 @@ public class GpuFuse8FilterBenchmark {
         p.transferAll = false;
         p.enableProfiling = profiling;
         p.useSafeGcdInverse = useSafeGcdInverse;
+        p.kernelProfileStage = kernelProfileStage;
 
         ctx = new OpenCLContext(p, new BitHelper());
         ctx.init();

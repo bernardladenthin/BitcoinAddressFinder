@@ -103,6 +103,16 @@ public class CProducerOpenCL extends CProducer {
     public boolean useSafeGcdInverse = true;
 
     /**
+     * Compile-time profiling stage for the kernel (see {@link KernelProfileStage}). {@link
+     * KernelProfileStage#FULL} (default) is the normal, correct kernel. The other modes short-circuit
+     * the hash160 stages to attribute kernel time (EC arithmetic vs. hashing) and produce
+     * <b>incorrect</b> output — they are for benchmarking only, never production. {@code OpenCLContext}
+     * maps the mode to a {@code clBuildProgram} define; see {@code docs/performance.md} ("Stage
+     * attribution") for how to diff the modes.
+     */
+    public KernelProfileStage kernelProfileStage = KernelProfileStage.FULL;
+
+    /**
      * Enables OpenCL device-side profiling of the kernel launch and result read-back.
      * <p>
      * When {@code true} the command queue is created with {@code CL_QUEUE_PROFILING_ENABLE} and
