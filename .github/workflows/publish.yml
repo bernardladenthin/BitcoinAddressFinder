@@ -103,9 +103,12 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: temurin
           cache: maven
+      - name: Memory before tests
+        if: runner.os == 'Linux'
+        run: free -h
       - name: Test
         shell: bash
-        run: mvn --batch-mode --no-transfer-progress -P jcstress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=${{ matrix.disable-lmdb }} --update-snapshots test jacoco:report
+        run: mvn -e --batch-mode --no-transfer-progress -P jcstress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=${{ matrix.disable-lmdb }} --update-snapshots test jacoco:report
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -113,6 +116,10 @@ jobs:
           path: |
             target/surefire-reports/**
             hs_err_pid*.log
+            *.hprof
+      - name: Memory after tests
+        if: always() && runner.os == 'Linux'
+        run: free -h
       - uses: actions/upload-artifact@v7
         if: matrix.os == 'ubuntu-latest'
         with:
@@ -263,6 +270,7 @@ jobs:
           path: |
             target/surefire-reports/**
             hs_err_pid*.log
+            *.hprof
           if-no-files-found: ignore
 
   report:

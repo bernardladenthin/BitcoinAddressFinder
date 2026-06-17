@@ -587,6 +587,10 @@ BAF is the worked example; its repo-specific handling (why `module-info.java` li
 flags) is in the **"JPMS module descriptor (`module-info.java`) handling"** subsection under
 Build System above.
 
+## CI Test Diagnostics
+
+See [`../workspace/policies/ci-test-diagnostics.md`](../workspace/policies/ci-test-diagnostics.md).
+
 ## Open TODOs
 
 Open TODOs for this repo live in [`TODO.md`](TODO.md). Cross-repo status
