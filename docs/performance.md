@@ -191,16 +191,25 @@ dominated EC cost once the walk amortized it.
 
 ### Stage 0 — kernel build flags + `#pragma unroll` (no measurable gain; kept as hygiene)
 
-`clBuildProgram` passes `-cl-std=CL2.0 -cl-mad-enable` (constant `CL_BUILD_OPTIONS` in
+`clBuildProgram` passes `-cl-std=CL1.2 -cl-mad-enable` (constant `CL_BUILD_OPTIONS` in
 `OpenCLContext.java`), and `#pragma unroll` was added to the fixed 8-limb `mul_mod` / fast-reduction
 loops in `copyfromhashcat/inc_ecc_secp256k1.cl`.
 
 Parity: ✅ 5/5 byte-identical. Throughput: **no reliable gain** — every arm's JMH error bar overlaps
 the baseline (e.g. kpwi=64: 18.4 ± 1.4 vs 17.7 ± 1.8 ops/s). Expected for an integer-only kernel:
-`-cl-mad-enable` affects only floating-point math, the NVIDIA PTX compiler already unrolls these
-small fixed-trip loops, and `-cl-std=CL2.0` only pins the OpenCL-2.0 semantics compact mode's
-`atomic_add` already required. Kept because harmless, verified byte-identical, and it makes the
-2.0 requirement explicit — but it is setup/hygiene, not a speed-up.
+`-cl-mad-enable` affects only floating-point math, and the NVIDIA PTX compiler already unrolls these
+small fixed-trip loops. Kept because harmless and verified byte-identical — setup/hygiene, not a
+speed-up.
+
+> **`-cl-std` note (was `CL2.0`, now `CL1.2`).** An earlier revision pinned `-cl-std=CL2.0` on the
+> belief that compact mode's global `atomic_add` was an OpenCL-2.0 feature. It is not — `atomic_add`
+> on global `int` is core since OpenCL C 1.1 (`cl_khr_global_int32_base_atomics`, advertised by every
+> target), and the hashcat `IS_OPENCL` path uses the same 1.1 atomics (the C11 `atomic_*_explicit`
+> forms are `IS_METAL`-only). `CL2.0` was rejected by pocl's CPU device (which advertises only OpenCL
+> C 1.2 even on an OpenCL 3.0 platform) with `CL_BUILD_PROGRAM_FAILURE`, breaking the `test-opencl`
+> (pocl) CI job. `CL1.2` is accepted everywhere (pocl CPU + NVIDIA GPU) and the kernel needs nothing
+> newer. The compact-mode *device*-version gate (≥ 2.0, on `CL_DEVICE_VERSION`) is a separate check
+> and is unchanged.
 
 ### Stage 1 — single-anchor affine batched-addition walk (+~10% at the sweet spot)
 

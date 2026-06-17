@@ -123,9 +123,18 @@ public class OpenCLContext implements ReleaseCLObject {
      * trivial to A/B and revert.
      *
      * <ul>
-     *   <li>{@code -cl-std=CL2.0} — the kernel's compact mode already relies on OpenCL 2.0
-     *       {@code atomic_add} on global memory; pinning the language standard makes that explicit
-     *       rather than depending on the driver's default (CL1.2).</li>
+     *   <li>{@code -cl-std=CL1.2} — pins the OpenCL C language version. The kernel only uses features
+     *       available in OpenCL C 1.1/1.2: the compact-mode counter is the <b>extension</b>
+     *       {@code atomic_add} on global {@code int} (core since OpenCL C 1.1, advertised by every
+     *       target via {@code cl_khr_global_int32_base_atomics}); the hashcat {@code IS_OPENCL} path
+     *       likewise uses the 1.1 {@code atomic_add}/{@code atomic_sub}/{@code atomic_or} (the C11
+     *       {@code atomic_*_explicit} forms are {@code IS_METAL}-only). It deliberately does <b>not</b>
+     *       force {@code CL2.0}: pocl's CPU device advertises only OpenCL C 1.2 (even on an OpenCL 3.0
+     *       platform) and rejects {@code -cl-std=CL2.0} with {@code CL_BUILD_PROGRAM_FAILURE}
+     *       ("device cpu doesn't support that OpenCL C version"), which broke the {@code test-opencl}
+     *       (pocl) CI job. {@code CL1.2} is accepted by every OpenCL 1.2+ device (pocl CPU and the
+     *       NVIDIA GPU alike). The compact-mode <em>device</em> version gate is separate and unchanged
+     *       (see {@link #REQUIRED_COMPACT_MODE_VERSION} / {@link #assertCompactModeDeviceVersionSupported}).</li>
      *   <li>{@code -cl-mad-enable} — permits fused multiply-add contraction. This kernel is
      *       integer-only so the effect is expected to be marginal, but it is harmless and part of
      *       the documented quick-win set (see docs/performance.md, "Stage 0").</li>
@@ -134,7 +143,7 @@ public class OpenCLContext implements ReleaseCLObject {
      * <p>Deliberately omits {@code -cl-fast-relaxed-math}: it only affects floating-point math, of
      * which this kernel has none.
      */
-    private static final String CL_BUILD_OPTIONS = "-cl-std=CL2.0 -cl-mad-enable";
+    private static final String CL_BUILD_OPTIONS = "-cl-std=CL1.2 -cl-mad-enable";
 
     /**
      * Build define that makes {@code inv_mod} fall back to the legacy binary-GCD modular inverse.
