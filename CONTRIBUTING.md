@@ -45,7 +45,7 @@ Pre-built example configuration files and Windows batch scripts live in the
 
 ### JVM memory and module flags
 
-Tests are launched with `-Xmx2g -Xms1g` and several `--add-opens` flags (for LMDB and internal module access). These are defined in `pom.xml` (`<argLine>`) and `.mvn/jvm.config` — the Maven Wrapper picks them up automatically.
+Tests are launched with `-Xmx2g` (the initial heap is left at the JVM default — no eager `-Xms` — because each test class runs in its own short-lived fork) and several `--add-opens` flags (for LMDB and internal module access). These are defined in `pom.xml` (`<argLine>`) and `.mvn/jvm.config` — the Maven Wrapper picks them up automatically.
 
 ## Reporting issues
 
