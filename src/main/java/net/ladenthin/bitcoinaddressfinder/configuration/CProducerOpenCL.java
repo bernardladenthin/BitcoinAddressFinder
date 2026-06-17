@@ -7,6 +7,7 @@ import static org.jocl.CL.CL_DEVICE_TYPE_ALL;
 
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Configuration for the OpenCL (GPU) producer.
@@ -167,24 +168,34 @@ public class CProducerOpenCL extends CProducer {
 
     /**
      * Forces the kernel's helper functions out-of-line to fix pathological OpenCL compile times on
-     * AMD GPUs.
+     * AMD GPUs. <b>Tri-state</b> — {@code null}, {@link Boolean#TRUE}, {@link Boolean#FALSE}:
+     * <ul>
+     *   <li>{@code null} (<b>default</b>) — <b>auto / vendor-detect</b>: the build define is enabled
+     *       <em>only when the selected device is AMD</em> and disabled on every other vendor. The
+     *       decision and reason are logged at {@code INFO} by
+     *       {@code OpenCLContext.resolveEffectiveNoInlineHelpers(...)}. This is the recommended
+     *       setting: AMD gets the compile-time fix automatically, NVIDIA keeps full throughput.</li>
+     *   <li>{@link Boolean#TRUE} — <b>force on</b> regardless of vendor: the kernel is always built
+     *       with {@code -D AMD_NOINLINE_HELPERS}.</li>
+     *   <li>{@link Boolean#FALSE} — <b>force off</b> regardless of vendor: the define is never added,
+     *       even on AMD (a slow-compile warning is logged). Needed to A/B inlined vs. out-of-line on
+     *       an AMD device.</li>
+     * </ul>
      * <p>
-     * When {@code false} (default), the kernel is built normally: LLVM inlines the secp256k1, comb,
-     * safegcd and both hash160 helpers into one giant {@code generateKeysKernel_grid} function. On
-     * NVIDIA's (non-LLVM) back-end that compiles in seconds, but AMD's LLVM-based "LC"/comgr back-end
-     * (greedy register allocation + SelectionDAG scheduling) scales ~super-linearly per function, so
-     * that single huge function takes <b>8–16+ minutes</b> to build on AMD RDNA3 (measured: the full
-     * kernel did not finish within 16&nbsp;min on an RX&nbsp;7900&nbsp;XTX / gfx1100).
+     * <b>Background.</b> With the kernel inlined, AMD's LLVM-based "LC"/comgr back-end (greedy register
+     * allocation + SelectionDAG scheduling) scales ~super-linearly per function, so the single giant
+     * {@code generateKeysKernel_grid} takes <b>8–16+ minutes</b> to build on AMD RDNA3 (the full kernel
+     * did not finish within 16&nbsp;min on an RX&nbsp;7900&nbsp;XTX / gfx1100). The {@code -D
+     * AMD_NOINLINE_HELPERS} define makes the vendored {@code DECLSPEC} helpers
+     * {@code __attribute__((noinline))}, partitioning the back-end work into many small functions and
+     * cutting the cold compile to <b>≈3&nbsp;s</b>. (Removing the {@code inline} hint alone does nothing
+     * — LLVM still inlines at {@code -O3}; only a hard {@code noinline} stops it.)
      * <p>
-     * When {@code true}, the kernel is built with {@code -D AMD_NOINLINE_HELPERS}, which makes the
-     * vendored {@code DECLSPEC} helpers {@code __attribute__((noinline))}. This partitions the
-     * back-end work into many small functions and cut the cold compile from {@literal >}16&nbsp;min to
-     * <b>≈3&nbsp;s</b> on the RX&nbsp;7900&nbsp;XTX. (Removing the {@code inline} hint alone does
-     * nothing — LLVM still inlines at {@code -O3}; only a hard {@code noinline} stops it.)
-     * <p>
-     * Off by default and opt-in because out-of-line calls can cost runtime throughput: it must be
-     * validated with an NVIDIA throughput A/B before being enabled there. On AMD the compile-time win
-     * is decisive. See {@code docs/performance.md} ("slow AMD compile").
+     * <b>Why AMD-only.</b> Out-of-line calls cost runtime throughput: a matched NVIDIA A/B measured the
+     * out-of-line kernel <b>≈4.5× slower</b> on an RTX 3070 (≈ 45 vs ≈ 200 ops/s; see
+     * {@code docs/performance.md} §9–§10). On NVIDIA the inlined kernel compiles in seconds anyway, so
+     * there is no reason to pay that cost — hence the {@code null}-default auto-detect applies the fix
+     * to AMD alone. See {@code docs/performance.md} ("slow AMD compile").
      */
-    public boolean noInlineHelpers = false;
+    public @Nullable Boolean noInlineHelpers;
 }

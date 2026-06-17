@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,27 +36,56 @@ public class CProducerOpenCLTest {
     }
 
     @Test
-    public void defaults_noInlineHelpers_isFalse() {
+    public void defaults_noInlineHelpers_isNull() {
         // arrange + act
         CProducerOpenCL config = new CProducerOpenCL();
 
-        // assert
-        assertThat(config.noInlineHelpers, is(false));
+        // assert: null = auto / vendor-detect (enabled for AMD only); see OpenCLContext
+        // .resolveEffectiveNoInlineHelpers and docs/performance.md §9-§10.
+        assertThat(config.noInlineHelpers, is(nullValue()));
     }
 
     @Test
-    public void jsonRoundTrip_noInlineHelpers_survivesSerialiseDeserialise() throws Exception {
+    public void jsonRoundTrip_noInlineHelpersTrue_survivesSerialiseDeserialise() throws Exception {
         // arrange
         ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         CProducerOpenCL original = new CProducerOpenCL();
-        original.noInlineHelpers = true;
+        original.noInlineHelpers = Boolean.TRUE;
 
         // act
         String json = mapper.writeValueAsString(original);
         CProducerOpenCL parsed = mapper.readValue(json, CProducerOpenCL.class);
 
         // assert
-        assertThat(parsed.noInlineHelpers, is(true));
+        assertThat(parsed.noInlineHelpers, is(Boolean.TRUE));
+    }
+
+    @Test
+    public void jsonRoundTrip_noInlineHelpersFalse_survivesSerialiseDeserialise() throws Exception {
+        // arrange
+        ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        CProducerOpenCL original = new CProducerOpenCL();
+        original.noInlineHelpers = Boolean.FALSE;
+
+        // act
+        String json = mapper.writeValueAsString(original);
+        CProducerOpenCL parsed = mapper.readValue(json, CProducerOpenCL.class);
+
+        // assert
+        assertThat(parsed.noInlineHelpers, is(Boolean.FALSE));
+    }
+
+    @Test
+    public void jsonDeserialise_noInlineHelpersAbsent_defaultsToNull() throws Exception {
+        // arrange
+        ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        String json = "{}";
+
+        // act
+        CProducerOpenCL parsed = mapper.readValue(json, CProducerOpenCL.class);
+
+        // assert: absent stays null (auto), so the AMD vendor-detect can engage
+        assertThat(parsed.noInlineHelpers, is(nullValue()));
     }
 
     @Test

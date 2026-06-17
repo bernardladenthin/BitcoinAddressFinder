@@ -218,6 +218,19 @@ public class GpuFuse8FilterBenchmark {
     @Param({"false"})
     public boolean useReducedRadixField;
 
+    /**
+     * Forces the kernel's {@code DECLSPEC} helpers out-of-line ({@link CProducerOpenCL#noInlineHelpers},
+     * build define {@code -D AMD_NOINLINE_HELPERS}). {@code false} = normal fully-inlined kernel
+     * (default); {@code true} = helpers built {@code __attribute__((noinline))}. This is purely a
+     * compile-time fix for AMD's LLVM/comgr back-end (minutes → seconds; see {@code docs/performance.md}
+     * §9) and is correctness-neutral. Sweep both (e.g. {@code -p noInlineHelpers=false,true}, both
+     * orderings) at the device sweet spot to measure the <em>runtime</em> throughput cost of
+     * out-of-line calls on NVIDIA — the open question gating whether it can be auto-enabled for AMD or
+     * made a global default (§10 "Track B").
+     */
+    @Param({"false"})
+    public boolean noInlineHelpers;
+
     private OpenCLContext ctx;
     private BigInteger privateKeyBase;
 
@@ -253,6 +266,7 @@ public class GpuFuse8FilterBenchmark {
         p.useSafeGcdInverse = useSafeGcdInverse;
         p.kernelProfileStage = kernelProfileStage;
         p.useReducedRadixField = useReducedRadixField;
+        p.noInlineHelpers = noInlineHelpers;
 
         ctx = new OpenCLContext(p, new BitHelper());
         ctx.init();

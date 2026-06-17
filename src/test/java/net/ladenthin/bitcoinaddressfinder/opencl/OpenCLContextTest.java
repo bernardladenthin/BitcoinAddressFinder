@@ -227,10 +227,10 @@ public class OpenCLContextTest {
     }
 
     @Test
-    public void buildOptions_noInlineHelpersFalse_omitsNoInlineDefine() {
+    public void buildOptions_noInlineHelpersExplicitFalse_omitsNoInlineDefine() {
         // arrange
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
-        cProducerOpenCL.noInlineHelpers = false;
+        cProducerOpenCL.noInlineHelpers = Boolean.FALSE;
         OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
 
         // act
@@ -241,10 +241,10 @@ public class OpenCLContextTest {
     }
 
     @Test
-    public void buildOptions_noInlineHelpersTrue_appendsNoInlineDefine() {
+    public void buildOptions_noInlineHelpersExplicitTrue_appendsNoInlineDefine() {
         // arrange
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
-        cProducerOpenCL.noInlineHelpers = true;
+        cProducerOpenCL.noInlineHelpers = Boolean.TRUE;
         OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
 
         // act
@@ -252,6 +252,138 @@ public class OpenCLContextTest {
 
         // assert
         assertThat(options, containsString(OpenCLContext.NO_INLINE_HELPERS_BUILD_OPTION));
+    }
+
+    @Test
+    public void buildOptions_noInlineHelpersNullAuto_omitsNoInlineDefine() {
+        // arrange: null (auto) must NOT append the define via the config-only overload; the AMD
+        // vendor-detect lives in resolveEffectiveNoInlineHelpers + buildOptions(boolean) instead.
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.noInlineHelpers = null;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert
+        assertThat(options, not(containsString(OpenCLContext.NO_INLINE_HELPERS_BUILD_OPTION)));
+    }
+
+    @Test
+    public void buildOptionsBoolean_true_appendsNoInlineDefine() {
+        // arrange
+        OpenCLContext openCLContext = new OpenCLContext(new CProducerOpenCL(), bitHelper);
+
+        // act + assert
+        assertThat(openCLContext.buildOptions(true), containsString(OpenCLContext.NO_INLINE_HELPERS_BUILD_OPTION));
+        assertThat(
+                openCLContext.buildOptions(false), not(containsString(OpenCLContext.NO_INLINE_HELPERS_BUILD_OPTION)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="noInlineHelpers vendor auto-detect">
+    @Test
+    public void isAmdVendor_recognisesAmdReportsRejectsOthers() {
+        // AMD's OpenCL runtimes report either form; match is case-insensitive.
+        assertThat(OpenCLContext.isAmdVendor("Advanced Micro Devices, Inc."), is(true));
+        assertThat(OpenCLContext.isAmdVendor("AMD"), is(true));
+        assertThat(OpenCLContext.isAmdVendor("amd"), is(true));
+        // non-AMD vendors.
+        assertThat(OpenCLContext.isAmdVendor("NVIDIA Corporation"), is(false));
+        assertThat(OpenCLContext.isAmdVendor("Intel(R) Corporation"), is(false));
+        assertThat(OpenCLContext.isAmdVendor("The pocl project"), is(false));
+        // defensive: null/blank.
+        assertThat(OpenCLContext.isAmdVendor(null), is(false));
+        assertThat(OpenCLContext.isAmdVendor(""), is(false));
+    }
+
+    @Test
+    public void resolveEffectiveNoInlineHelpers_autoOnAmd_enablesAndLogsReason() {
+        // arrange: null = auto.
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.noInlineHelpers = null;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(OpenCLContext.class)) {
+            // act
+            boolean effective = openCLContext.resolveEffectiveNoInlineHelpers(
+                    "AMD Radeon RX 7900 XTX", "Advanced Micro Devices, Inc.");
+
+            // assert
+            assertThat(effective, is(true));
+            assertThat(
+                    logCaptor.getInfoLogs().stream()
+                            .anyMatch(m -> m.contains("noInlineHelpers=auto")
+                                    && m.contains("AMD device detected")
+                                    && m.contains("ENABLING")),
+                    is(true));
+        }
+    }
+
+    @Test
+    public void resolveEffectiveNoInlineHelpers_autoOnNonAmd_disablesAndLogsReason() {
+        // arrange: null = auto.
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.noInlineHelpers = null;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(OpenCLContext.class)) {
+            // act
+            boolean effective = openCLContext.resolveEffectiveNoInlineHelpers(
+                    "NVIDIA GeForce RTX 3070 Laptop GPU", "NVIDIA Corporation");
+
+            // assert
+            assertThat(effective, is(false));
+            assertThat(
+                    logCaptor.getInfoLogs().stream()
+                            .anyMatch(m -> m.contains("noInlineHelpers=auto")
+                                    && m.contains("non-AMD device")
+                                    && m.contains("INLINED")),
+                    is(true));
+        }
+    }
+
+    @Test
+    public void resolveEffectiveNoInlineHelpers_explicitTrue_honouredRegardlessOfVendor() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.noInlineHelpers = Boolean.TRUE;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(OpenCLContext.class)) {
+            // act: forced on even on a non-AMD device.
+            boolean effective =
+                    openCLContext.resolveEffectiveNoInlineHelpers("NVIDIA GeForce RTX 3070", "NVIDIA Corporation");
+
+            // assert
+            assertThat(effective, is(true));
+            assertThat(
+                    logCaptor.getInfoLogs().stream()
+                            .anyMatch(m -> m.contains("explicit configuration")
+                                    && m.contains("vendor auto-detection skipped")),
+                    is(true));
+        }
+    }
+
+    @Test
+    public void resolveEffectiveNoInlineHelpers_explicitFalseOnAmd_honouredWithSlowCompileWarning() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.noInlineHelpers = Boolean.FALSE;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(OpenCLContext.class)) {
+            // act: forced off on AMD (needed to A/B inlined vs out-of-line on AMD).
+            boolean effective = openCLContext.resolveEffectiveNoInlineHelpers(
+                    "AMD Radeon RX 7900 XTX", "Advanced Micro Devices, Inc.");
+
+            // assert: honoured, but a slow-compile warning is logged.
+            assertThat(effective, is(false));
+            assertThat(
+                    logCaptor.getWarnLogs().stream()
+                            .anyMatch(m -> m.contains("explicitly FALSE on AMD device") && m.contains("8-16+ minutes")),
+                    is(true));
+        }
     }
     // </editor-fold>
 

@@ -1043,7 +1043,7 @@ many small functions**, each compiling in roughly linear time, instead of one qu
 Note removing the `inline` *keyword* alone does nothing — LLVM still inlines at `-O3`; only the hard
 `noinline` attribute stops it.
 
-| Cold compile (fresh `comgr` cache), RX 7900 XTX | default (inlined) | `-D AMD_NOINLINE_HELPERS` |
+| Cold compile (fresh `comgr` cache), RX 7900 XTX | inlined (`noInlineHelpers=false`) | `-D AMD_NOINLINE_HELPERS` (AMD auto-default) |
 |---|--:|--:|
 | Stripped (no hash160, legacy inverse) | 8m 02s | **2.99 s** |
 | **Full (both hash160 chains + safegcd)** | **>16 min (never finished)** | **3.09 s** |
@@ -1052,16 +1052,33 @@ Note removing the `inline` *keyword* alone does nothing — LLVM still inlines a
 `ProbeAddressesOpenCLTest` 43 run / 0 fail in 21.6 s (byte-compared to bitcoinj across
 `keysPerWorkItem` 1…16). `noinline` is a compile directive only; it cannot change numerical results.
 
-**How to enable.** Runtime config flag `producerOpenCL.noInlineHelpers` (`CProducerOpenCL`,
-default `false`) → `OpenCLContext.buildOptions()` appends the define. Unit-gated by
-`OpenCLContextTest#buildOptions_noInlineHelpers{True,False}` and `CProducerOpenCLTest`.
+**How to enable — tri-state, AMD auto-detected.** Runtime config flag
+`producerOpenCL.noInlineHelpers` (`CProducerOpenCL`) is a **nullable `Boolean`**:
 
-**Why it is opt-in / off by default.** Out-of-line calls can cost *runtime* throughput (call
-overhead, lost cross-function optimisation, possible extra VGPR pressure at call sites). The
-compile-time win on AMD is decisive, but enabling it as a default — or auto-enabling it for AMD
-devices — should be gated on an NVIDIA throughput A/B first. Tuning lever for later: apply `noinline`
-selectively (heaviest helpers first — SHA-256, RIPEMD-160, safegcd) rather than to every helper, to
-trade the smallest runtime cost for most of the compile-time win.
+| value | behaviour |
+|---|---|
+| `null` (**default**) | **auto / vendor-detect**: the define is added **only when the selected device is AMD** (`CL_DEVICE_VENDOR` matches `"amd"` / `"advanced micro devices"`), off on every other vendor. |
+| `true` | force on (any vendor). |
+| `false` | force off (any vendor) — needed to A/B inlined vs out-of-line on an AMD device. |
+
+The decision is resolved against the device at `init()` by
+`OpenCLContext.resolveEffectiveNoInlineHelpers(name, vendor)` and **logged with its reason** (INFO for
+auto/explicit, WARN when explicitly `false` on AMD — which keeps the slow inlined compile). The vendor
+predicate is `OpenCLContext.isAmdVendor(...)`. Unit-gated by `OpenCLContextTest`
+(`isAmdVendor_*`, `resolveEffectiveNoInlineHelpers_*` with `LogCaptor` assertions on the log lines,
+`buildOptions*`) and `CProducerOpenCLTest` (tri-state default-`null` + JSON round-trips); parity by
+`ProbeAddressesOpenCLTest#createKeys_noInlineHelpers_resultsMatchReference`.
+
+**Why AMD-only and not a global default — answered by the NVIDIA A/B (RTX 3070).** Out-of-line calls
+cost *runtime* throughput (call overhead, lost cross-function optimisation, extra VGPR pressure at call
+sites). Track B (below) measured exactly how much: at the NVIDIA sweet spot (compact,
+`batchSizeInBits=20`, `keysPerWorkItem=128`, reduced-radix on) the out-of-line kernel ran
+**≈ 4.5× slower — ~45 vs ~200 ops/s, a ~77% throughput loss** — consistent across both A/B orderings
+and on AC power. That is far past any "few %" bar for a global default, so `noinline` is **auto-enabled
+for AMD only** (where the inlined kernel cannot compile in a practical time at all) and left off on
+NVIDIA (which compiles inlined in seconds and wants the throughput). Tuning lever still open: apply
+`noinline` *selectively* (heaviest helpers first — SHA-256, RIPEMD-160, safegcd) to keep most of the
+AMD compile-time win at a smaller runtime cost; re-run the parity gate after any change.
 
 ---
 
@@ -1072,7 +1089,7 @@ Devices the kernel has been built and run on (byte-identical to the bitcoinj ref
 | Device | Architecture | OpenCL | Role | Notes |
 |---|---|---|---|---|
 | NVIDIA RTX 3070 Laptop | Ampere (40 SM) | 3.0 CUDA | primary perf / tuning | fast compile (ptxas); `keysPerWorkItem` sweet spot **128** |
-| AMD RX 7900 XTX | RDNA3 (`gfx1100`, 48 CU) | 2.0 AMD-APP | cross-device confirmation | **needs `noInlineHelpers`** for a practical compile (§9); sweet spot **32** |
+| AMD RX 7900 XTX | RDNA3 (`gfx1100`, 48 CU) | 2.0 AMD-APP | cross-device confirmation | `noInlineHelpers` **auto-enabled** (vendor-detect) for a practical compile (§9); sweet spot **32** |
 | pocl (CPU) | CPU | 3.0 platform / CL C 1.2 | CI `test-opencl` job | conformant; small grids only (per-fork timeout) |
 
 **Feature compatibility / requirements:**
@@ -1082,27 +1099,48 @@ Devices the kernel has been built and run on (byte-identical to the bitcoinj ref
 | Reduced-radix 2²⁶ field | `useReducedRadixField` (**`true`**) | none beyond base OpenCL | byte-identical on NVIDIA / AMD / pocl; ≈ +22% / +8% |
 | safegcd modular inverse | `useSafeGcdInverse` (`true`) | arithmetic (sign-extending) `>>` | NVIDIA / AMD / pocl comply; `false` → legacy binary-GCD fallback |
 | GPU Binary-Fuse-8 filter (compact) | `enableGpuFilter` (`false`) | OpenCL **≥ 2.0** device (global `atomic_add`) | gated by `assertCompactModeDeviceVersionSupported`; otherwise full transfer |
-| Out-of-line helpers | `noInlineHelpers` (`false`) | none | AMD compile fix (§9); opt-in pending the NVIDIA A/B below |
+| Out-of-line helpers | `noInlineHelpers` (`null` = **auto**) | none | AMD compile fix (§9); auto-enabled for AMD only (vendor-detect), off on NVIDIA (≈4.5× slower there); `true`/`false` force |
 | Device endianness | — (implicit) | **little-endian** device | big-endian rejected at init (`assertDeviceByteOrderSupported`) |
 
 **Compile-time, by vendor:** NVIDIA — seconds. AMD — 8–16+ min inlined, **≈ 3 s with `noInlineHelpers`** (§9); the `comgr` disk cache (`%LOCALAPPDATA%\comgr`) persists successful builds. pocl — fast; note `-cl-std=CL2.0` is rejected (CL C 1.2 only), so the kernel pins `-cl-std=CL1.2` (§5 Stage 0).
 
-### TODO — Track B (handoff): NVIDIA `noinline` throughput A/B
+### Track B (handoff) — NVIDIA `noinline` throughput A/B — ✅ RESOLVED
 
-**Owner: NVIDIA-side agent (this needs an NVIDIA GPU; not runnable on the AMD box).**
+**Question (closed):** could `noInlineHelpers` be enabled more broadly — auto-enabled for AMD, or made
+the global default — or must it stay opt-in? It was already **correctness-neutral** (byte-identical,
+gated by `ProbeAddressesOpenCLTest#createKeys_noInlineHelpers_resultsMatchReference`); the only open
+question was its **runtime throughput** cost.
 
-**Question to answer:** can `noInlineHelpers` be enabled more broadly — auto-enabled for AMD devices, or even made the global default — or must it stay opt-in? It is already proven **correctness-neutral** (byte-identical, gated by `ProbeAddressesOpenCLTest#createKeys_noInlineHelpers_resultsMatchReference`); the open question is purely its **runtime throughput** cost (out-of-line calls can cost H/s).
+**Result (RTX 3070, Ampere).** `noInlineHelpers` was exposed as a `GpuFuse8FilterBenchmark` `@Param`
+(mirroring `useReducedRadixField`) and A/B-measured at the device sweet spot (compact,
+`batchSizeInBits=20`, `keysPerWorkItem=128`, reduced-radix on):
 
-**What's left to do, concretely:**
-1. **Expose `noInlineHelpers` as a benchmark `@Param`** in `GpuFuse8FilterBenchmark` (mirror the existing `useReducedRadixField` `@Param` wiring) so the A/B is a single clean JMH run with no source edits.
-2. **Measure on NVIDIA** (e.g. RTX 3070): compact mode, `batchSizeInBits=20`, at the device sweet spot (`keysPerWorkItem=128`), `-p noInlineHelpers=false,true`, **both orderings** to defeat thermal bias (§6). Record the relative throughput delta.
-3. **Measure on AMD too** (quantify what AMD pays): warm the inlined `comgr` cache once (one uninterrupted ~16 min inlined build), then A/B inlined vs `noinline` at the AMD sweet spot (`keysPerWorkItem=32`).
-4. **Decide enablement policy:**
-   - If `noinline` costs **≲ a few %** on NVIDIA → consider making it the global default (simplest).
-   - If it costs **meaningful** NVIDIA throughput → keep it off for NVIDIA but **auto-enable for AMD devices** via vendor detection in `OpenCLContext.buildOptions()` (enable when `CL_DEVICE_VENDOR` / platform is AMD), leaving the config flag as an override.
-   - Either way, evaluate **selective `noinline`** (apply only to the heaviest helpers — SHA-256, RIPEMD-160, safegcd — instead of all `DECLSPEC`) as a way to keep most of the AMD compile-time win at a smaller runtime cost; re-run the parity gate after any change.
+| `noInlineHelpers` | throughput | relative |
+|---|--:|--:|
+| `false` (inlined) | **≈ 201 ops/s** (AC; 193/191 on battery) | 1.00× |
+| `true` (out-of-line) | **≈ 45 ops/s** | **≈ 0.23× (~4.5× slower)** |
 
-**Inputs already available:** AMD compile/throughput numbers and the sweet-spot sweep are in §4 "Cross-device"; the `noinline` mechanism and the `comgr` cache controls are in §9.
+Identical across both A/B orderings (`false→true` and cold `true→false`) and on AC power — not thermal
+ordering. A ~77% throughput loss, far past any "few %" bar for a global default.
+
+**Decision (implemented).** Keep `noinline` **off for NVIDIA**, **auto-enable for AMD only** via vendor
+detection — the Track-B branch-2 policy. Implemented as a tri-state `@Nullable Boolean noInlineHelpers`
+(`null`=auto → AMD-only; `true`/`false` force), resolved + **logged** in
+`OpenCLContext.resolveEffectiveNoInlineHelpers(...)` (predicate `isAmdVendor(...)`); the config flag
+remains a manual override. See §9 "How to enable". Steps 1 (benchmark `@Param`), 2 (NVIDIA measure) and
+4 (policy + code) are **done**.
+
+**Still open (AMD-side, optional):**
+- **Quantify what AMD pays** (step 3): warm the inlined `comgr` cache once (one uninterrupted ~16 min
+  inlined build), then A/B inlined vs `noinline` at the AMD sweet spot (`keysPerWorkItem=32`). Needs the
+  AMD box.
+- **Selective `noinline`** — apply only to the heaviest helpers (SHA-256, RIPEMD-160, safegcd) instead
+  of every `DECLSPEC`, to keep most of the AMD compile-time win at a smaller runtime cost; re-run the
+  parity gate after any change. The NVIDIA 4.5× figure shows the all-helpers hammer is expensive, so a
+  scalpel is worth trying on AMD.
+
+**Inputs:** AMD compile/throughput numbers + sweet-spot sweep in §4 "Cross-device"; the `noinline`
+mechanism + `comgr` cache controls in §9.
 
 ---
 
