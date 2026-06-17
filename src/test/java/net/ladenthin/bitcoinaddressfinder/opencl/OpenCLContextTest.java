@@ -225,6 +225,34 @@ public class OpenCLContextTest {
         // assert
         assertThat(options, containsString(OpenCLContext.REDUCED_RADIX_FIELD_BUILD_OPTION));
     }
+
+    @Test
+    public void buildOptions_noInlineHelpersFalse_omitsNoInlineDefine() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.noInlineHelpers = false;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert
+        assertThat(options, not(containsString(OpenCLContext.NO_INLINE_HELPERS_BUILD_OPTION)));
+    }
+
+    @Test
+    public void buildOptions_noInlineHelpersTrue_appendsNoInlineDefine() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.noInlineHelpers = true;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert
+        assertThat(options, containsString(OpenCLContext.NO_INLINE_HELPERS_BUILD_OPTION));
+    }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="kernelProfileStage builds and runs">

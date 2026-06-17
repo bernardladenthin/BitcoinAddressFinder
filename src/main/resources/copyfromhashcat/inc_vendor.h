@@ -157,6 +157,17 @@ using namespace metal;
 #define DECLSPEC __device__
 #elif defined IS_HIP
 #define DECLSPEC __device__ HC_INLINE
+#elif defined AMD_NOINLINE_HELPERS
+// AMD/OpenCL compile-time experiment (opt-in via -D AMD_NOINLINE_HELPERS). On the generic OpenCL
+// path DECLSPEC is normally empty, so helpers carry no `inline` hint -- but LLVM (AMD's "LC"/comgr
+// back-end) still inlines them at -O3, megamerging the entire secp256k1 + double-hash160 + safegcd
+// kernel into one giant function. The LLVM back-end (greedy regalloc + SelectionDAG scheduling)
+// scales ~super-linearly per function, so that single huge function takes 8-16+ min to build on AMD
+// RDNA3 (vs seconds on NVIDIA's separate ptxas). Forcing the heavy DECLSPEC helpers out-of-line
+// partitions the back-end work into many smaller functions. See docs/performance.md ("slow AMD
+// compile"). Trade-off: out-of-line calls can cost runtime throughput, so this is opt-in and must be
+// validated with an NVIDIA A/B + the parity gate before becoming a default.
+#define DECLSPEC __attribute__((noinline))
 #else
 #define DECLSPEC
 #endif

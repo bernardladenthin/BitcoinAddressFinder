@@ -629,6 +629,45 @@ public class ProbeAddressesOpenCLTest {
         }
     }
 
+    /**
+     * Byte-identical parity with {@code noInlineHelpers = true} ({@code -D AMD_NOINLINE_HELPERS}).
+     *
+     * <p>The {@code noinline} build forces the kernel's {@code DECLSPEC} helpers out-of-line to fix
+     * the multi-minute AMD/LLVM compile (see {@code docs/performance.md} §9). It is a pure compile
+     * directive and must not change results — this test pins that: it derives a full batch with the
+     * flag on (at {@code keysPerWorkItem > 1}, so the affine walk's out-of-line {@code point_add_xy} /
+     * {@code mul_mod} are exercised) and byte-compares every public key + hash160 against the bitcoinj
+     * reference via {@link #assertPublicKeyBytesCalculatedCorrect}. It also guards against a future
+     * helper that cannot legally be {@code noinline}: the build would fail or the output would diverge,
+     * and this test would catch it. Short by design (one small batch); the inline path is covered
+     * exhaustively by {@link #createKeys_acrossKeysPerWorkItem_allResultsMatchReference}.
+     */
+    @Test
+    @OpenCLTest
+    public void createKeys_noInlineHelpers_resultsMatchReference() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+
+        KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
+
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.batchSizeInBits = BITS_FOR_BATCH;
+        producerOpenCL.keysPerWorkItem = KEYS_PER_WORK_ITEM;
+        producerOpenCL.noInlineHelpers = true;
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+            openCLContext.init();
+            Random random = new Random(1337);
+            BigInteger secretKeyBase = keyUtility.createSecret(Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS, random);
+            BigInteger secretBase =
+                    keyUtility.alignDown(secretKeyBase, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
+
+            OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
+            PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
+
+            assertThat(publicKeys.length, is(equalTo((int) bitHelper.convertBitsToSize(BITS_FOR_BATCH))));
+            assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, false, keyUtility);
+        }
+    }
+
     private static void assertAllRuntimePublicKeyCalculationsValid(PublicKeyBytes[] publicKeys) {
         for (int i = 0; i < publicKeys.length; i++) {
             assertRuntimePublicKeyCalculationValid(publicKeys[i]);

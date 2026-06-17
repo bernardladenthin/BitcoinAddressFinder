@@ -35,6 +35,30 @@ public class CProducerOpenCLTest {
     }
 
     @Test
+    public void defaults_noInlineHelpers_isFalse() {
+        // arrange + act
+        CProducerOpenCL config = new CProducerOpenCL();
+
+        // assert
+        assertThat(config.noInlineHelpers, is(false));
+    }
+
+    @Test
+    public void jsonRoundTrip_noInlineHelpers_survivesSerialiseDeserialise() throws Exception {
+        // arrange
+        ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        CProducerOpenCL original = new CProducerOpenCL();
+        original.noInlineHelpers = true;
+
+        // act
+        String json = mapper.writeValueAsString(original);
+        CProducerOpenCL parsed = mapper.readValue(json, CProducerOpenCL.class);
+
+        // assert
+        assertThat(parsed.noInlineHelpers, is(true));
+    }
+
+    @Test
     public void jsonRoundTrip_enableProfiling_survivesSerialiseDeserialise() throws Exception {
         // arrange
         ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -216,12 +240,13 @@ public class CProducerOpenCLTest {
     }
 
     @Test
-    public void defaults_useReducedRadixField_isFalse() {
+    public void defaults_useReducedRadixField_isTrue() {
         // arrange + act
         CProducerOpenCL config = new CProducerOpenCL();
 
-        // assert
-        assertThat(config.useReducedRadixField, is(false));
+        // assert: reduced-radix 2^26 is the default after the cross-device win was confirmed
+        // (+22% RTX 3070 / +8% AMD RX 7900 XTX); see docs/performance.md.
+        assertThat(config.useReducedRadixField, is(true));
     }
 
     @Test
@@ -240,7 +265,7 @@ public class CProducerOpenCLTest {
     }
 
     @Test
-    public void jsonDeserialise_useReducedRadixFieldAbsent_defaultsToFalse() throws Exception {
+    public void jsonDeserialise_useReducedRadixFieldAbsent_defaultsToTrue() throws Exception {
         // arrange
         ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         String json = "{}";
@@ -249,6 +274,6 @@ public class CProducerOpenCLTest {
         CProducerOpenCL parsed = mapper.readValue(json, CProducerOpenCL.class);
 
         // assert
-        assertThat(parsed.useReducedRadixField, is(false));
+        assertThat(parsed.useReducedRadixField, is(true));
     }
 }

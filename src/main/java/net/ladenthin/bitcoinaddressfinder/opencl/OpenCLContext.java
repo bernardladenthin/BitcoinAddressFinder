@@ -175,6 +175,15 @@ public class OpenCLContext implements ReleaseCLObject {
     static final String REDUCED_RADIX_FIELD_BUILD_OPTION = "-D USE_REDUCED_RADIX_FIELD";
 
     /**
+     * Build define that forces the kernel's {@code DECLSPEC} helpers out-of-line
+     * ({@code __attribute__((noinline))}). Appended only when {@link CProducerOpenCL#noInlineHelpers}
+     * is {@code true}; it slashes the AMD LLVM/comgr cold compile time (≈ minutes → seconds) by
+     * partitioning the otherwise-megamerged kernel. See {@code docs/performance.md}.
+     */
+    @VisibleForTesting
+    static final String NO_INLINE_HELPERS_BUILD_OPTION = "-D AMD_NOINLINE_HELPERS";
+
+    /**
      * Assembles the {@code clBuildProgram} options string: the constant {@link #CL_BUILD_OPTIONS},
      * plus {@link #LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION} when {@link CProducerOpenCL#useSafeGcdInverse}
      * is {@code false}, the profiling define for a non-{@code FULL}
@@ -206,6 +215,9 @@ public class OpenCLContext implements ReleaseCLObject {
         }
         if (producerOpenCL.useReducedRadixField) {
             options.append(' ').append(REDUCED_RADIX_FIELD_BUILD_OPTION);
+        }
+        if (producerOpenCL.noInlineHelpers) {
+            options.append(' ').append(NO_INLINE_HELPERS_BUILD_OPTION);
         }
         return options.toString();
     }
