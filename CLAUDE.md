@@ -46,7 +46,7 @@ The project uses **Maven** (minimum 3.6.3) with a Maven Wrapper.
 
 ### JVM / Compiler Flags
 
-Tests run with `-Xmx2g -Xms1g` and several `--add-opens` / `--add-exports` to allow LMDB and internal module access. These are configured in `pom.xml` (`<argLine>`) and `.mvn/jvm.config`.
+Tests run with `-Xmx2g` (no eager `-Xms` — forks are short-lived, one fresh JVM per test class with `reuseForks=false`, so an eager initial heap only inflated the spawn-time footprint) and several `--add-opens` / `--add-exports` to allow LMDB and internal module access. These are configured in `pom.xml` (`<argLine>`) and `.mvn/jvm.config`.
 
 **Error Prone** static analysis with **NullAway** is active at compile time:
 - All code in `net.ladenthin` packages must carry proper `@Nullable` / `@NonNull` annotations.

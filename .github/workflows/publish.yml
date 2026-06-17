@@ -220,9 +220,21 @@ jobs:
           sudo apt-get install -y pocl-opencl-icd ocl-icd-libopencl1 clinfo
           # Log the platform/device + CL_DEVICE_VERSION for the build record.
           clinfo || true
+      # Capture the runner's memory + process/thread limits BEFORE the test run. A
+      # "Error occurred in starting fork" failure with no hs_err and no surefire dumpstream
+      # is an OS-level spawn failure (ENOMEM / EAGAIN), not a test timeout — these numbers
+      # plus `mvn -e` (which prints the underlying IOException errno) make it diagnosable.
+      - name: Runner resource snapshot (pre-test)
+        shell: bash
+        run: |
+          echo "===== free -m ====="; free -m || true
+          echo "===== nproc ====="; nproc || true
+          echo "===== ulimit -a ====="; ulimit -a || true
+          echo "===== vm.max_map_count ====="; cat /proc/sys/vm/max_map_count || true
+          echo "===== vm.overcommit_memory ====="; cat /proc/sys/vm/overcommit_memory || true
       - name: All tests including OpenCL (pocl) + JaCoCo coverage
         shell: bash
-        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true --update-snapshots test jacoco:report
+        run: mvn -e --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true --update-snapshots test jacoco:report
       - uses: actions/upload-artifact@v7
         with:
           name: jacoco-report-opencl
@@ -236,6 +248,8 @@ jobs:
         if: ${{ failure() }}
         shell: bash
         run: |
+          echo "===== free -m (post-failure) ====="; free -m || true
+          echo "===== thread/process count (post-failure) ====="; ps -eL 2>/dev/null | wc -l || true
           echo "===== hs_err_pid*.log ====="
           for f in hs_err_pid*.log; do [ -e "$f" ] && { echo "----- $f -----"; cat "$f"; }; done
           echo "===== surefire dumpstream / dump ====="
