@@ -668,6 +668,7 @@ hot path; correctness is paramount.
 | — | suggested starting config | run `OpenCLInfo` (or grep init log) for `SUGGESTED START CONFIG` (§6); pure helper `OpenClConfigSuggestion` | `OpenClConfigSuggestionTest`, `OpenCLDeviceTest` |
 | — | `KEYS_BATCH_INV` sweep | edit the `#define`, `GpuFuse8FilterBenchmark` (§3) | `ProbeAddressesOpenCLTest` |
 | — | reduced-radix 2²⁶ field multiply (isolated; §8) | `FieldMulBenchmark -p useReducedRadix=true,false` | `OpenCLFe10x26ParityTest` (`test_fe10x26`, 8192 pairs, byte-identical to radix-2³²) |
+| 5 | reduced-radix 2²⁶ scalar-walker (end-to-end; §8) | `GpuFuse8FilterBenchmark -p gpuFilter=true -p batchSizeInBits=20 -p keysPerWorkItem=128 -p useReducedRadixField=false,true` | `ProbeAddressesManySeedsOpenCLTest` (flag on+off, 16 seeds × 256 keys vs bitcoinj) + `ProbeAddressesOpenCLTest` |
 
 **Honest caveat on A/B reproducibility:** only Stage 4 has a build-time toggle
 (`useSafeGcdInverse`), so its A/B is a single JMH run. Stages 2b and 3 are unconditional (no flag, per
@@ -752,34 +753,64 @@ is forbidden — both address types are mandatory).
   branch/addressing overhead, so it loses. Reverted. Could be revisited on a *multiply-bound* device
   (or paired with a reduced-radix representation that shortens the add chain).
 
-### Implemented & measured building block — reduced-radix 2²⁶ field (not yet in the hot path)
+### Stage 5 (opt-in) — reduced-radix 2²⁶ field in the scalar-walker (≈ +22% end-to-end, flag-gated)
 
-The #1 EC lever (below) is no longer purely theoretical: the reduced-radix field arithmetic is
-**implemented, parity-proven, and benchmarked in isolation**. What is *not* yet done is wiring it into
-the production scalar-multiply / point-addition walk — that is the remaining (large) step.
+The #1 EC lever is **implemented, parity-proven, integrated into the hot loop behind a flag, and
+benchmarked both in isolation and end-to-end**. It is **off by default** (`useReducedRadixField =
+false`) pending per-device confirmation; flipping the default is a one-line change now that it is
+proven. The comb anchor and the `copyfromhashcat` files are unchanged either way.
 
 - **What was built.** `src/main/resources/inc_ecc_secp256k1_fe10x26.cl` — a self-contained OpenCL port
   of libsecp256k1's `field_10x26_impl.h` (Pieter Wuille, MIT): `fe10x26_mul`, `fe10x26_sqr`,
-  `fe10x26_normalize`, `fe10x26_add`, `fe10x26_negate`, plus a **compatibility layer**
+  `fe10x26_normalize`, `fe10x26_add`, `fe10x26_negate`, `fe10x26_sub`, plus a **compatibility layer**
   (`fe10x26_from_u32x8` / `fe10x26_to_u32x8`) that converts between the 2²⁶ form and the radix-2³²
   `u32[8]` form used everywhere else (and by hashcat: limb 0 = least-significant 32 bits). The vendored
   `copyfromhashcat/inc_ecc_secp256k1.cl` is **untouched** and the new file is written in the same
   hashcat dialect (`DECLSPEC`, `u32`/`u64`, `PRIVATE_AS`), so it could be dropped into a hashcat tree.
-- **Correctness (gated).** `test_fe10x26` kernel + `OpenCLFe10x26ParityTest` run **8192** deterministic
-  pseudo-random operand pairs and assert the 2²⁶ path is **byte-identical** to the radix-2³² reference
-  for roundtrip, multiply, square, add, and subtract. Passes on the RTX 3070 (and under pocl in CI).
-- **Measured speed (RTX 3070 Laptop, isolated).** `FieldMulBenchmark` → `bench_fe_mul` kernel chains
-  `iterations` field multiplies per work-item over a full grid (`gridSizeInBits=18`, `iterations=4096`),
-  keeping coordinates in their native form for the whole chain (the 2²⁶ arm converts in/out only once):
+- **Integration.** With `useReducedRadixField = true` (build define `-D USE_REDUCED_RADIX_FIELD`) the
+  affine batched-addition walk in `generateKeysKernel_grid` holds coordinates in 2²⁶: the comb anchor
+  `x0/y0` is converted once, the increment-table reads and the two emitted coordinates convert at their
+  boundaries, and the single per-sub-batch inverse is done in radix-2³² via the conversion layer
+  (reusing the build-selected safegcd `inv_mod`). The slope law follows libsecp's magnitude discipline
+  (intermediate magnitudes ≤ 7, so only the two emitted coordinates are normalized). The radix-2³²
+  walk is retained verbatim as the `#else` branch and remains the default.
+- **Correctness (gated, two layers).**
+  (1) `test_fe10x26` kernel + `OpenCLFe10x26ParityTest` run **8192** deterministic pseudo-random
+  operand pairs and assert the 2²⁶ field ops are **byte-identical** to the radix-2³² reference for
+  roundtrip, multiply, square, add, subtract.
+  (2) `ProbeAddressesManySeedsOpenCLTest` builds the kernel with the flag **off and on** and derives
+  **16 seeds × 256 keys** each (varied bit sizes), verifying every key against **bitcoinj**
+  (`runtimePublicKeyCalculationCheck` — both pubkeys + both hash160 chains). Both arms pass on the RTX
+  3070; `ProbeAddressesOpenCLTest` (43 cases, default path) still 43/0. bitcoinj is an independent
+  oracle, so this catches any representation-specific (e.g. rare magnitude/carry) bug — important
+  because a wrong result here is a *silently missed key*, not a crash.
+- **Measured speed.** Two benchmarks, both on the RTX 3070 Laptop, both A/B-bracketed against the
+  laptop's thermal noise.
+
+  *Isolated field multiply* — `FieldMulBenchmark` → `bench_fe_mul` kernel chains `iterations` multiplies
+  per work-item over a full grid (`gridSizeInBits=18`, `iterations=4096`), coordinates kept native for
+  the whole chain (2²⁶ arm converts in/out only once):
 
   | field multiply         | throughput (ops/s) | relative |
   |------------------------|--------------------|----------|
   | reduced-radix 2²⁶      | **10.20**          | **1.56×** |
   | radix-2³² `mul_mod`    | 6.53               | 1.00×    |
 
-  ~**1.56× faster** field multiply, confirming the carry-bound diagnosis (the `sqr_mod` finding above).
-  Not a thermal artifact: the radix-2³² arm measured **6.57** when run *cold* in its own fresh JVM
-  (vs 6.53 when run second/hot), and per-iteration variance was tiny (6.52–6.57). Reproduce:
+  *End-to-end kernel* — `GpuFuse8FilterBenchmark -p gpuFilter=true -p batchSizeInBits=20 -p
+  keysPerWorkItem=128 -p useReducedRadixField=false,true` (compact mode, the §4 sweet spot):
+
+  | scalar-walker field | throughput (ops/s) | relative |
+  |---------------------|--------------------|----------|
+  | reduced-radix 2²⁶   | **188.6**          | **1.22×** |
+  | radix-2³²           | 155.2              | 1.00×    |
+
+  ~**+22% end-to-end** (consistent across both A/B orderings: 189.3/152.1 = 1.24× and, reversed/cold,
+  188.6/155.2 = 1.22×; tight ±1–2 ops/s error). The end-to-end gain is smaller than the isolated 1.56×
+  because hashing is ~43% of the kernel (§6) and the per-key boundary conversions (increment-table
+  reads, coordinate outputs) cost a little — storing the `iG_table` in 2²⁶ form would remove those reads
+  and is the obvious next refinement. The isolated multiply confirms the carry-bound diagnosis (the
+  `sqr_mod` finding above): not a thermal artifact — the radix-2³² multiply measured **6.57** cold in a
+  fresh JVM (vs 6.53 hot). Reproduce the isolated multiply:
 
   ```bash
   # after: mvn -q dependency:build-classpath -Dmdep.outputFile=target/cp-test.txt -DincludeScope=test
@@ -787,16 +818,16 @@ the production scalar-multiply / point-addition walk — that is the remaining (
        org.openjdk.jmh.Main FieldMulBenchmark -p gridSizeInBits=18 -p iterations=4096 -f 1 -wi 1 -w 20 -i 3 -r 50
   ```
 
-- **What remains (the actual Stage).** Convert the hot path (the comb anchor, the affine
-  batched-addition walk, `point_add`/`point_double`/`point_to_affine`, and the Montgomery
-  simultaneous-inversion chain) to hold coordinates in 2²⁶ form, converting only at kernel
-  input/output, and reuse the existing `inv_mod` via the conversion layer (or port `modinv32`'s 2²⁶
-  path). The **1.56× is the multiply in isolation**; end-to-end it will be diluted by hashing (~43%,
-  §6) and the non-multiply EC work, and *helped* by lower register pressure (fewer live wide
-  temporaries → better occupancy, §6). Net end-to-end gain **must be measured** with a fresh
-  `keysPerWorkItem` sweep. This is gated and low-risk to *add* (the module is proven); the risk is all
-  in the hot-path rewrite, which changes address-derivation correctness and so needs the full
-  `ProbeAddressesOpenCLTest` 43/0 gate plus the parity kernel.
+- **What remains (refinements, all optional).**
+  (a) **Flip the default** to `useReducedRadixField = true` once the +22% is confirmed on more than
+  this one RTX 3070 (the safegcd precedent: made default after a cross-device win). One-line change.
+  (b) **Store `iG_table` in 2²⁶ form** (host build or a post-process kernel) to drop the per-key
+  increment-read conversions — the main remaining overhead diluting the gain.
+  (c) **Convert the comb anchor** to 2²⁶ too (needs a 2²⁶ Jacobian `point_add` in our own file, since
+  `copyfromhashcat` is untouched). Low payoff — the comb runs once per work-item vs the walk's
+  `keysPerWorkItem` iterations — so only worth it after (b).
+  (d) **Re-sweep `keysPerWorkItem`** with the flag on: the per-key cost balance shifted, so the §4
+  sweet spot may move.
 
 ### Candidates for a future stage
 
@@ -812,10 +843,10 @@ cost balance shifts):
   micro-optimisation, or sharing more work between the uncompressed and compressed chains (they share
   the X coordinate; the compressed SEC prefix transform is already reused via `REUSE_FOR_COMPRESSED`),
   is the lever here — without ever dropping a chain. Both chains always run.
-- **Reduced-radix field representation — the #1 lever; the field module is now built & measured
-  (see "Implemented & measured building block" above), hot-path integration is what remains.** The EC
-  side is ~57% (§6) and the field multiply is carry/add-bound (the `sqr_mod` result, now also confirmed
-  the other way: the 2²⁶ multiply measured ~1.56× faster in isolation). A reduced-radix
+- **Reduced-radix field representation — DONE for the scalar-walker (see "Stage 5" above:
+  ≈ +22% end-to-end, flag-gated, proven vs bitcoinj). The notes below remain for the comb anchor and
+  for context.** The EC side is ~57% (§6) and the field multiply is carry/add-bound (the `sqr_mod`
+  result, now confirmed the other way: the 2²⁶ multiply measured ~1.56× faster in isolation). A reduced-radix
   layout stores 256 bits in limbs narrower than the word (e.g. **10×26-bit** for a 32-bit GPU, or
   5×52-bit for 64-bit), so additive overflow lands in the spare bits and **carries are deferred**
   instead of propagated every limb; reconciliation happens only inside `mul`/`sqr` or at an explicit

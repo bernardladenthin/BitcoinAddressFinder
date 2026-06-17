@@ -214,4 +214,41 @@ public class CProducerOpenCLTest {
         // assert
         assertThat(parsed.logGpuDiagnostics, is(true));
     }
+
+    @Test
+    public void defaults_useReducedRadixField_isFalse() {
+        // arrange + act
+        CProducerOpenCL config = new CProducerOpenCL();
+
+        // assert
+        assertThat(config.useReducedRadixField, is(false));
+    }
+
+    @Test
+    public void jsonRoundTrip_useReducedRadixFieldTrue_survivesSerialiseDeserialise() throws Exception {
+        // arrange
+        ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        CProducerOpenCL original = new CProducerOpenCL();
+        original.useReducedRadixField = true;
+
+        // act
+        String json = mapper.writeValueAsString(original);
+        CProducerOpenCL parsed = mapper.readValue(json, CProducerOpenCL.class);
+
+        // assert
+        assertThat(parsed.useReducedRadixField, is(true));
+    }
+
+    @Test
+    public void jsonDeserialise_useReducedRadixFieldAbsent_defaultsToFalse() throws Exception {
+        // arrange
+        ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        String json = "{}";
+
+        // act
+        CProducerOpenCL parsed = mapper.readValue(json, CProducerOpenCL.class);
+
+        // assert
+        assertThat(parsed.useReducedRadixField, is(false));
+    }
 }

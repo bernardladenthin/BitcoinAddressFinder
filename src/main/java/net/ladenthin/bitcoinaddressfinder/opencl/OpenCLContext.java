@@ -157,11 +157,21 @@ public class OpenCLContext implements ReleaseCLObject {
     static final String NV_VERBOSE_BUILD_OPTION = "-cl-nv-verbose";
 
     /**
+     * Build define that switches the scalar-walker hot loop to the reduced-radix 2²⁶ field
+     * ({@code inc_ecc_secp256k1_fe10x26.cl}). Appended only when
+     * {@link CProducerOpenCL#useReducedRadixField} is {@code true}; the default walk uses the vendored
+     * radix-2³² field.
+     */
+    @VisibleForTesting
+    static final String REDUCED_RADIX_FIELD_BUILD_OPTION = "-D USE_REDUCED_RADIX_FIELD";
+
+    /**
      * Assembles the {@code clBuildProgram} options string: the constant {@link #CL_BUILD_OPTIONS},
      * plus {@link #LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION} when {@link CProducerOpenCL#useSafeGcdInverse}
      * is {@code false}, the profiling define for a non-{@code FULL}
-     * {@link CProducerOpenCL#kernelProfileStage}, and {@link #NV_VERBOSE_BUILD_OPTION} when
-     * {@link CProducerOpenCL#logGpuDiagnostics} is set.
+     * {@link CProducerOpenCL#kernelProfileStage}, {@link #NV_VERBOSE_BUILD_OPTION} when
+     * {@link CProducerOpenCL#logGpuDiagnostics} is set, and {@link #REDUCED_RADIX_FIELD_BUILD_OPTION}
+     * when {@link CProducerOpenCL#useReducedRadixField} is set.
      *
      * @return the build options string for this context's producer configuration
      */
@@ -184,6 +194,9 @@ public class OpenCLContext implements ReleaseCLObject {
         }
         if (producerOpenCL.logGpuDiagnostics) {
             options.append(' ').append(NV_VERBOSE_BUILD_OPTION);
+        }
+        if (producerOpenCL.useReducedRadixField) {
+            options.append(' ').append(REDUCED_RADIX_FIELD_BUILD_OPTION);
         }
         return options.toString();
     }

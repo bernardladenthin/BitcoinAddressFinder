@@ -191,6 +191,19 @@ DECLSPEC void fe10x26_negate(PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a, const i
 }
 
 /*
+ * r = a - b (mod p), congruent only - NOT normalized. Computes a + (-b) via fe10x26_negate, so the
+ * caller must pass b's magnitude `mb` (b's limbs <= 2*mb*(2^26-1), n[9] <= 2*mb*(2^22-1)). The result
+ * has magnitude a.magnitude + mb + 1; normalize before lowering with fe10x26_to_u32x8, and keep that
+ * magnitude <= 8 if the result feeds straight into fe10x26_mul/fe10x26_sqr. r may alias a or b.
+ */
+DECLSPEC void fe10x26_sub(PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a, PRIVATE_AS const u32 *b, const int mb)
+{
+  u32 neg[SECP256K1_FE10X26_NUM_LIMBS];
+  fe10x26_negate(neg, b, mb);
+  fe10x26_add(r, a, neg);
+}
+
+/*
  * r = a * b mod p. Port of secp256k1_fe_mul_inner. Inputs must have limbs
  * a[0..8],b[0..8] < 2^30 and a[9],b[9] < 2^26 (magnitude <= 8). Output is
  * magnitude 1 but only weakly normalized.
