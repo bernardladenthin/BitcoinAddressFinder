@@ -191,16 +191,25 @@ dominated EC cost once the walk amortized it.
 
 ### Stage 0 — kernel build flags + `#pragma unroll` (no measurable gain; kept as hygiene)
 
-`clBuildProgram` passes `-cl-std=CL2.0 -cl-mad-enable` (constant `CL_BUILD_OPTIONS` in
+`clBuildProgram` passes `-cl-std=CL1.2 -cl-mad-enable` (constant `CL_BUILD_OPTIONS` in
 `OpenCLContext.java`), and `#pragma unroll` was added to the fixed 8-limb `mul_mod` / fast-reduction
 loops in `copyfromhashcat/inc_ecc_secp256k1.cl`.
 
 Parity: ✅ 5/5 byte-identical. Throughput: **no reliable gain** — every arm's JMH error bar overlaps
 the baseline (e.g. kpwi=64: 18.4 ± 1.4 vs 17.7 ± 1.8 ops/s). Expected for an integer-only kernel:
-`-cl-mad-enable` affects only floating-point math, the NVIDIA PTX compiler already unrolls these
-small fixed-trip loops, and `-cl-std=CL2.0` only pins the OpenCL-2.0 semantics compact mode's
-`atomic_add` already required. Kept because harmless, verified byte-identical, and it makes the
-2.0 requirement explicit — but it is setup/hygiene, not a speed-up.
+`-cl-mad-enable` affects only floating-point math, and the NVIDIA PTX compiler already unrolls these
+small fixed-trip loops. Kept because harmless and verified byte-identical — setup/hygiene, not a
+speed-up.
+
+> **`-cl-std` note (was `CL2.0`, now `CL1.2`).** An earlier revision pinned `-cl-std=CL2.0` on the
+> belief that compact mode's global `atomic_add` was an OpenCL-2.0 feature. It is not — `atomic_add`
+> on global `int` is core since OpenCL C 1.1 (`cl_khr_global_int32_base_atomics`, advertised by every
+> target), and the hashcat `IS_OPENCL` path uses the same 1.1 atomics (the C11 `atomic_*_explicit`
+> forms are `IS_METAL`-only). `CL2.0` was rejected by pocl's CPU device (which advertises only OpenCL
+> C 1.2 even on an OpenCL 3.0 platform) with `CL_BUILD_PROGRAM_FAILURE`, breaking the `test-opencl`
+> (pocl) CI job. `CL1.2` is accepted everywhere (pocl CPU + NVIDIA GPU) and the kernel needs nothing
+> newer. The compact-mode *device*-version gate (≥ 2.0, on `CL_DEVICE_VERSION`) is a separate check
+> and is unchanged.
 
 ### Stage 1 — single-anchor affine batched-addition walk (+~10% at the sweet spot)
 
@@ -628,7 +637,7 @@ Every kernel change is gated **before** any throughput is reported. These run un
 `test-opencl` job) or a real GPU; `@OpenCLTest` classes self-skip when no device is present.
 
 ```bash
-mvn test -Dtest='ProbeAddressesOpenCLTest,OpenCLCompactOutputIntegrationTest,OpenCLContextTest,Fuse8GpuHashParityTest,ProducerOpenCLTest,OpenCLPrecomputeKernelTest'
+mvn test -Dtest='ProbeAddressesOpenCLTest,ProbeAddressesManySeedsOpenCLTest,OpenCLCompactOutputIntegrationTest,OpenCLContextTest,OpenCLKernelModeMatrixTest,OpenCLFe10x26ParityTest,Fuse8GpuHashParityTest,ProducerOpenCLTest,OpenCLPrecomputeKernelTest'
 ```
 
 - **`ProbeAddressesOpenCLTest#createKeys_acrossKeysPerWorkItem_allResultsMatchReference`** — the
@@ -647,9 +656,44 @@ mvn test -Dtest='ProbeAddressesOpenCLTest,OpenCLCompactOutputIntegrationTest,Ope
   cross-checks safegcd vs. the binary GCD **and** `x·x⁻¹ ≡ 1 (mod p)` over 4096 random inputs (built
   with `useSafeGcdInverse=false` so both inverses are present and genuinely compared).
 - **`Fuse8GpuHashParityTest`** — the pure-Java filter-hash contract the kernel filter must match.
+- **`ProbeAddressesManySeedsOpenCLTest`** — the hardened many-seed gate: builds the kernel with
+  `useReducedRadixField` **off and on** and derives 16 random bases × 256 keys each (varied bit sizes),
+  verifying every key against bitcoinj. Widens the input space beyond the single fixed seed so a
+  representation-specific carry/magnitude bug (a *silently missed* key, not a crash) is caught.
+- **`OpenCLKernelModeMatrixTest`** — builds+runs the reduced-radix *interactions* not covered above
+  (the 2²⁶ walk feeding the legacy inverse, verified vs bitcoinj; the 2²⁶ walk under each profiling
+  stage, build+run only).
 
 **Never report a speedup from a build whose parity tests have not passed.** This is the cryptographic
 hot path; correctness is paramount.
+
+### Compile-time kernel modes — what selects them and how each is gated
+
+The kernel has exactly **three** externally toggleable compile-time switches (each a `CProducerOpenCL`
+field → a `-D` define in `OpenCLContext.buildOptions()`), plus the legacy-inverse switch in the
+vendored field file. **Both states of every switch are built and run on a device by some test.**
+"Correctness" means byte-compared against bitcoinj; the profiling modes deliberately emit wrong hashes
+(timing only), so for them the test can only assert the branch *compiles and runs*.
+
+| Build define | Config field | Default | OFF gated by | ON gated by | Correctness checkable? |
+|---|---|---|---|---|---|
+| *(none)* / `-D USE_LEGACY_BINARY_GCD_INV_MOD` | `useSafeGcdInverse` | safegcd | every `@OpenCLTest` (safegcd) | `OpenCLPrecomputeKernelTest#invModSafegcd_…` (built legacy) + `OpenCLKernelModeMatrixTest` | yes (both, vs bitcoinj / `x·x⁻¹≡1`) |
+| `-D USE_REDUCED_RADIX_FIELD` | `useReducedRadixField` | radix-2³² | every `@OpenCLTest` + `ProbeAddressesManySeedsOpenCLTest` | `ProbeAddressesManySeedsOpenCLTest` + `OpenCLKernelModeMatrixTest` | yes (both, vs bitcoinj) |
+| `-D PROFILE_SKIP_SECOND_HASH160` | `kernelProfileStage=ONE_HASH160` | `FULL` | every FULL test | `OpenCLContextTest#kernelProfileStage_buildsAndRuns` + `OpenCLKernelModeMatrixTest` | build+run only (mode emits wrong hashes by design) |
+| `-D PROFILE_SKIP_HASH160` | `kernelProfileStage=NO_HASH160` | `FULL` | every FULL test | `OpenCLContextTest#kernelProfileStage_buildsAndRuns` + `OpenCLKernelModeMatrixTest` | build+run only (mode emits wrong hashes by design) |
+
+Non-toggles in `inc_ecc_secp256k1custom.cl` (for completeness, not config-driven):
+`REUSE_FOR_COMPRESSED` is unconditionally `#define`d, so only its active branch ever compiles (its
+`#else` is dead code); `#if defined(__builtin_bswap32)` is platform autodetect, so only the branch the
+build platform selects is compiled. Both active branches run in every test.
+
+Honest scope: the **full cross-product** of all switches (3×2×3 = 18 distinct builds) is **not**
+exhaustively tested — every distinct `-D` set is a fresh kernel build, and a class that built all of
+them would exceed the Surefire per-fork timeout. Each switch is covered in both states, and the
+reduced-radix interactions (the genuinely new code) are covered explicitly; the remaining
+combinations are orthogonal `#ifdef` regions (inverse selection in the field file, profiling in the
+hashing tail, radix in the walk). As with the rest of this section, these are `@OpenCLTest` classes:
+they run in CI's `test-opencl` (pocl) job and on a local GPU, and self-skip on the no-device matrix.
 
 ### Reproducibility map (every stage → how to re-measure → how it's gated)
 
@@ -667,6 +711,8 @@ hot path; correctness is paramount.
 | — | occupancy / register pressure | grep init log for `Kernel resource usage:` (§6); `logGpuDiagnostics=true` for the verbose build log | — |
 | — | suggested starting config | run `OpenCLInfo` (or grep init log) for `SUGGESTED START CONFIG` (§6); pure helper `OpenClConfigSuggestion` | `OpenClConfigSuggestionTest`, `OpenCLDeviceTest` |
 | — | `KEYS_BATCH_INV` sweep | edit the `#define`, `GpuFuse8FilterBenchmark` (§3) | `ProbeAddressesOpenCLTest` |
+| — | reduced-radix 2²⁶ field multiply (isolated; §8) | `FieldMulBenchmark -p useReducedRadix=true,false` | `OpenCLFe10x26ParityTest` (`test_fe10x26`, 8192 pairs, byte-identical to radix-2³²) |
+| 5 | reduced-radix 2²⁶ scalar-walker (end-to-end; §8) | `GpuFuse8FilterBenchmark -p gpuFilter=true -p batchSizeInBits=20 -p keysPerWorkItem=128 -p useReducedRadixField=false,true` | `ProbeAddressesManySeedsOpenCLTest` (flag on+off, 16 seeds × 256 keys vs bitcoinj) + `ProbeAddressesOpenCLTest` |
 
 **Honest caveat on A/B reproducibility:** only Stage 4 has a build-time toggle
 (`useSafeGcdInverse`), so its A/B is a single JMH run. Stages 2b and 3 are unconditional (no flag, per
@@ -751,6 +797,82 @@ is forbidden — both address types are mandatory).
   branch/addressing overhead, so it loses. Reverted. Could be revisited on a *multiply-bound* device
   (or paired with a reduced-radix representation that shortens the add chain).
 
+### Stage 5 (opt-in) — reduced-radix 2²⁶ field in the scalar-walker (≈ +22% end-to-end, flag-gated)
+
+The #1 EC lever is **implemented, parity-proven, integrated into the hot loop behind a flag, and
+benchmarked both in isolation and end-to-end**. It is **off by default** (`useReducedRadixField =
+false`) pending per-device confirmation; flipping the default is a one-line change now that it is
+proven. The comb anchor and the `copyfromhashcat` files are unchanged either way.
+
+- **What was built.** `src/main/resources/inc_ecc_secp256k1_fe10x26.cl` — a self-contained OpenCL port
+  of libsecp256k1's `field_10x26_impl.h` (Pieter Wuille, MIT): `fe10x26_mul`, `fe10x26_sqr`,
+  `fe10x26_normalize`, `fe10x26_add`, `fe10x26_negate`, `fe10x26_sub`, plus a **compatibility layer**
+  (`fe10x26_from_u32x8` / `fe10x26_to_u32x8`) that converts between the 2²⁶ form and the radix-2³²
+  `u32[8]` form used everywhere else (and by hashcat: limb 0 = least-significant 32 bits). The vendored
+  `copyfromhashcat/inc_ecc_secp256k1.cl` is **untouched** and the new file is written in the same
+  hashcat dialect (`DECLSPEC`, `u32`/`u64`, `PRIVATE_AS`), so it could be dropped into a hashcat tree.
+- **Integration.** With `useReducedRadixField = true` (build define `-D USE_REDUCED_RADIX_FIELD`) the
+  affine batched-addition walk in `generateKeysKernel_grid` holds coordinates in 2²⁶: the comb anchor
+  `x0/y0` is converted once, the increment-table reads and the two emitted coordinates convert at their
+  boundaries, and the single per-sub-batch inverse is done in radix-2³² via the conversion layer
+  (reusing the build-selected safegcd `inv_mod`). The slope law follows libsecp's magnitude discipline
+  (intermediate magnitudes ≤ 7, so only the two emitted coordinates are normalized). The radix-2³²
+  walk is retained verbatim as the `#else` branch and remains the default.
+- **Correctness (gated, two layers).**
+  (1) `test_fe10x26` kernel + `OpenCLFe10x26ParityTest` run **8192** deterministic pseudo-random
+  operand pairs and assert the 2²⁶ field ops are **byte-identical** to the radix-2³² reference for
+  roundtrip, multiply, square, add, subtract.
+  (2) `ProbeAddressesManySeedsOpenCLTest` builds the kernel with the flag **off and on** and derives
+  **16 seeds × 256 keys** each (varied bit sizes), verifying every key against **bitcoinj**
+  (`runtimePublicKeyCalculationCheck` — both pubkeys + both hash160 chains). Both arms pass on the RTX
+  3070; `ProbeAddressesOpenCLTest` (43 cases, default path) still 43/0. bitcoinj is an independent
+  oracle, so this catches any representation-specific (e.g. rare magnitude/carry) bug — important
+  because a wrong result here is a *silently missed key*, not a crash.
+- **Measured speed.** Two benchmarks, both on the RTX 3070 Laptop, both A/B-bracketed against the
+  laptop's thermal noise.
+
+  *Isolated field multiply* — `FieldMulBenchmark` → `bench_fe_mul` kernel chains `iterations` multiplies
+  per work-item over a full grid (`gridSizeInBits=18`, `iterations=4096`), coordinates kept native for
+  the whole chain (2²⁶ arm converts in/out only once):
+
+  | field multiply         | throughput (ops/s) | relative |
+  |------------------------|--------------------|----------|
+  | reduced-radix 2²⁶      | **10.20**          | **1.56×** |
+  | radix-2³² `mul_mod`    | 6.53               | 1.00×    |
+
+  *End-to-end kernel* — `GpuFuse8FilterBenchmark -p gpuFilter=true -p batchSizeInBits=20 -p
+  keysPerWorkItem=128 -p useReducedRadixField=false,true` (compact mode, the §4 sweet spot):
+
+  | scalar-walker field | throughput (ops/s) | relative |
+  |---------------------|--------------------|----------|
+  | reduced-radix 2²⁶   | **188.6**          | **1.22×** |
+  | radix-2³²           | 155.2              | 1.00×    |
+
+  ~**+22% end-to-end** (consistent across both A/B orderings: 189.3/152.1 = 1.24× and, reversed/cold,
+  188.6/155.2 = 1.22×; tight ±1–2 ops/s error). The end-to-end gain is smaller than the isolated 1.56×
+  because hashing is ~43% of the kernel (§6) and the per-key boundary conversions (increment-table
+  reads, coordinate outputs) cost a little — storing the `iG_table` in 2²⁶ form would remove those reads
+  and is the obvious next refinement. The isolated multiply confirms the carry-bound diagnosis (the
+  `sqr_mod` finding above): not a thermal artifact — the radix-2³² multiply measured **6.57** cold in a
+  fresh JVM (vs 6.53 hot). Reproduce the isolated multiply:
+
+  ```bash
+  # after: mvn -q dependency:build-classpath -Dmdep.outputFile=target/cp-test.txt -DincludeScope=test
+  java <add-opens from §5/pom.xml> -cp "target/test-classes;target/classes;$(cat target/cp-test.txt)" \
+       org.openjdk.jmh.Main FieldMulBenchmark -p gridSizeInBits=18 -p iterations=4096 -f 1 -wi 1 -w 20 -i 3 -r 50
+  ```
+
+- **What remains (refinements, all optional).**
+  (a) **Flip the default** to `useReducedRadixField = true` once the +22% is confirmed on more than
+  this one RTX 3070 (the safegcd precedent: made default after a cross-device win). One-line change.
+  (b) **Store `iG_table` in 2²⁶ form** (host build or a post-process kernel) to drop the per-key
+  increment-read conversions — the main remaining overhead diluting the gain.
+  (c) **Convert the comb anchor** to 2²⁶ too (needs a 2²⁶ Jacobian `point_add` in our own file, since
+  `copyfromhashcat` is untouched). Low payoff — the comb runs once per work-item vs the walk's
+  `keysPerWorkItem` iterations — so only worth it after (b).
+  (d) **Re-sweep `keysPerWorkItem`** with the flag on: the per-key cost balance shifted, so the §4
+  sweet spot may move.
+
 ### Candidates for a future stage
 
 Evaluated during the investigation (re-sweep `keysPerWorkItem` after any of these, since the per-key
@@ -765,8 +887,10 @@ cost balance shifts):
   micro-optimisation, or sharing more work between the uncompressed and compressed chains (they share
   the X coordinate; the compressed SEC prefix transform is already reused via `REUSE_FOR_COMPRESSED`),
   is the lever here — without ever dropping a chain. Both chains always run.
-- **Reduced-radix field representation — the #1 lever, corroborated by an external review.** The EC
-  side is ~57% (§6) and the field multiply is carry/add-bound (the `sqr_mod` result). A reduced-radix
+- **Reduced-radix field representation — DONE for the scalar-walker (see "Stage 5" above:
+  ≈ +22% end-to-end, flag-gated, proven vs bitcoinj). The notes below remain for the comb anchor and
+  for context.** The EC side is ~57% (§6) and the field multiply is carry/add-bound (the `sqr_mod`
+  result, now confirmed the other way: the 2²⁶ multiply measured ~1.56× faster in isolation). A reduced-radix
   layout stores 256 bits in limbs narrower than the word (e.g. **10×26-bit** for a 32-bit GPU, or
   5×52-bit for 64-bit), so additive overflow lands in the spare bits and **carries are deferred**
   instead of propagated every limb; reconciliation happens only inside `mul`/`sqr` or at an explicit
@@ -829,9 +953,6 @@ cost balance shifts):
   memory (64 KB fits, but competes with `g_precomputed`). The current `T[pos][digit]` read is
   secret-keyed (data-dependent, not a warp broadcast) — cache-resident and occupancy-hidden, but
   benchmark alternatives per device.
-- **Optional single-hash (compressed-only) mode:** skip one of the two hash160 chains (~+15% if
-  hashing ~30% of runtime) — but it is a coverage/semantics change (would miss uncompressed P2PKH
-  hits), so it must be opt-in and clearly documented.
 - **±P symmetry** (one addition yields `P` and `−P`): random-search mode only — for sequential range
   scanning the `−P` keys fall outside the scanned range.
 - **Rejected:** GLV endomorphism (subsumed by the fixed-base comb, which already removes almost all

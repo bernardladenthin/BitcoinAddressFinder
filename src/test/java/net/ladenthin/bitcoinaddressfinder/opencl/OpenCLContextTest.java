@@ -197,6 +197,34 @@ public class OpenCLContextTest {
         // assert
         assertThat(options, containsString(OpenCLContext.NV_VERBOSE_BUILD_OPTION));
     }
+
+    @Test
+    public void buildOptions_useReducedRadixFieldFalse_omitsReducedRadixDefine() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.useReducedRadixField = false;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert
+        assertThat(options, not(containsString(OpenCLContext.REDUCED_RADIX_FIELD_BUILD_OPTION)));
+    }
+
+    @Test
+    public void buildOptions_useReducedRadixFieldTrue_appendsReducedRadixDefine() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.useReducedRadixField = true;
+        OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
+
+        // act
+        String options = openCLContext.buildOptions();
+
+        // assert
+        assertThat(options, containsString(OpenCLContext.REDUCED_RADIX_FIELD_BUILD_OPTION));
+    }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="kernelProfileStage builds and runs">

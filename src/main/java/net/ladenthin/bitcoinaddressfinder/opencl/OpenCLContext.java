@@ -106,6 +106,11 @@ public class OpenCLContext implements ReleaseCLObject {
 
         resourceNames.add("copyfromhashcat/inc_ecc_secp256k1.h");
         resourceNames.add("copyfromhashcat/inc_ecc_secp256k1.cl");
+        // Reduced-radix 2^26 field module (our own file; does not touch copyfromhashcat). Provides the
+        // 10x26 multiply/square plus the u32[8] <-> 2^26 compatibility layer used by test_fe10x26 and
+        // FieldMulBenchmark. Must come after inc_ecc_secp256k1.* (it reuses u32/u64/PRIVATE_AS) and
+        // before the custom kernel file that references its symbols.
+        resourceNames.add("inc_ecc_secp256k1_fe10x26.cl");
         resourceNames.add("inc_ecc_secp256k1custom.cl");
         return resourceNames;
     }
@@ -118,9 +123,18 @@ public class OpenCLContext implements ReleaseCLObject {
      * trivial to A/B and revert.
      *
      * <ul>
-     *   <li>{@code -cl-std=CL2.0} — the kernel's compact mode already relies on OpenCL 2.0
-     *       {@code atomic_add} on global memory; pinning the language standard makes that explicit
-     *       rather than depending on the driver's default (CL1.2).</li>
+     *   <li>{@code -cl-std=CL1.2} — pins the OpenCL C language version. The kernel only uses features
+     *       available in OpenCL C 1.1/1.2: the compact-mode counter is the <b>extension</b>
+     *       {@code atomic_add} on global {@code int} (core since OpenCL C 1.1, advertised by every
+     *       target via {@code cl_khr_global_int32_base_atomics}); the hashcat {@code IS_OPENCL} path
+     *       likewise uses the 1.1 {@code atomic_add}/{@code atomic_sub}/{@code atomic_or} (the C11
+     *       {@code atomic_*_explicit} forms are {@code IS_METAL}-only). It deliberately does <b>not</b>
+     *       force {@code CL2.0}: pocl's CPU device advertises only OpenCL C 1.2 (even on an OpenCL 3.0
+     *       platform) and rejects {@code -cl-std=CL2.0} with {@code CL_BUILD_PROGRAM_FAILURE}
+     *       ("device cpu doesn't support that OpenCL C version"), which broke the {@code test-opencl}
+     *       (pocl) CI job. {@code CL1.2} is accepted by every OpenCL 1.2+ device (pocl CPU and the
+     *       NVIDIA GPU alike). The compact-mode <em>device</em> version gate is separate and unchanged
+     *       (see {@link #REQUIRED_COMPACT_MODE_VERSION} / {@link #assertCompactModeDeviceVersionSupported}).</li>
      *   <li>{@code -cl-mad-enable} — permits fused multiply-add contraction. This kernel is
      *       integer-only so the effect is expected to be marginal, but it is harmless and part of
      *       the documented quick-win set (see docs/performance.md, "Stage 0").</li>
@@ -129,7 +143,7 @@ public class OpenCLContext implements ReleaseCLObject {
      * <p>Deliberately omits {@code -cl-fast-relaxed-math}: it only affects floating-point math, of
      * which this kernel has none.
      */
-    private static final String CL_BUILD_OPTIONS = "-cl-std=CL2.0 -cl-mad-enable";
+    private static final String CL_BUILD_OPTIONS = "-cl-std=CL1.2 -cl-mad-enable";
 
     /**
      * Build define that makes {@code inv_mod} fall back to the legacy binary-GCD modular inverse.
@@ -152,11 +166,21 @@ public class OpenCLContext implements ReleaseCLObject {
     static final String NV_VERBOSE_BUILD_OPTION = "-cl-nv-verbose";
 
     /**
+     * Build define that switches the scalar-walker hot loop to the reduced-radix 2²⁶ field
+     * ({@code inc_ecc_secp256k1_fe10x26.cl}). Appended only when
+     * {@link CProducerOpenCL#useReducedRadixField} is {@code true}; the default walk uses the vendored
+     * radix-2³² field.
+     */
+    @VisibleForTesting
+    static final String REDUCED_RADIX_FIELD_BUILD_OPTION = "-D USE_REDUCED_RADIX_FIELD";
+
+    /**
      * Assembles the {@code clBuildProgram} options string: the constant {@link #CL_BUILD_OPTIONS},
      * plus {@link #LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION} when {@link CProducerOpenCL#useSafeGcdInverse}
      * is {@code false}, the profiling define for a non-{@code FULL}
-     * {@link CProducerOpenCL#kernelProfileStage}, and {@link #NV_VERBOSE_BUILD_OPTION} when
-     * {@link CProducerOpenCL#logGpuDiagnostics} is set.
+     * {@link CProducerOpenCL#kernelProfileStage}, {@link #NV_VERBOSE_BUILD_OPTION} when
+     * {@link CProducerOpenCL#logGpuDiagnostics} is set, and {@link #REDUCED_RADIX_FIELD_BUILD_OPTION}
+     * when {@link CProducerOpenCL#useReducedRadixField} is set.
      *
      * @return the build options string for this context's producer configuration
      */
@@ -179,6 +203,9 @@ public class OpenCLContext implements ReleaseCLObject {
         }
         if (producerOpenCL.logGpuDiagnostics) {
             options.append(' ').append(NV_VERBOSE_BUILD_OPTION);
+        }
+        if (producerOpenCL.useReducedRadixField) {
+            options.append(' ').append(REDUCED_RADIX_FIELD_BUILD_OPTION);
         }
         return options.toString();
     }
@@ -705,6 +732,40 @@ public class OpenCLContext implements ReleaseCLObject {
             clSetKernelArg(benchKernel, 0, Sizeof.cl_mem, Pointer.to(out));
             clSetKernelArg(benchKernel, 1, Sizeof.cl_uint, Pointer.to(new int[] {iterations}));
             clSetKernelArg(benchKernel, 2, Sizeof.cl_uint, Pointer.to(new int[] {inputHighLimbsZero ? 1 : 0}));
+            clEnqueueNDRangeKernel(localQueue, benchKernel, 1, null, new long[] {globalWorkSize}, null, 0, null, null);
+            clFinish(localQueue);
+        } finally {
+            clReleaseMemObject(out);
+            clReleaseKernel(benchKernel);
+        }
+    }
+
+    /**
+     * Benchmark hook: launches the {@code bench_fe_mul} microbenchmark kernel (see
+     * {@code inc_ecc_secp256k1custom.cl}) over {@code globalWorkSize} work-items, each performing
+     * {@code iterations} chained field multiplies, and blocks until it finishes. Used by
+     * {@code FieldMulBenchmark} to compare the reduced-radix 2^26 field multiply against the vendored
+     * radix-2^32 {@code mul_mod}. The work is fully on the device (no result is read back). The output
+     * buffer and kernel are created and released per call.
+     *
+     * @param globalWorkSize  number of work-items (e.g. {@code 1 << gridSizeInBits})
+     * @param iterations      chained multiplies performed per work-item
+     * @param useReducedRadix {@code true} for the 2^26 field path, {@code false} for radix-2^32
+     *     {@code mul_mod}
+     */
+    @VisibleForTesting
+    public void runBenchFeMul(int globalWorkSize, int iterations, boolean useReducedRadix) {
+        final cl_context localContext = Objects.requireNonNull(context);
+        final cl_program localProgram = Objects.requireNonNull(program);
+        final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
+
+        final cl_kernel benchKernel = clCreateKernel(localProgram, "bench_fe_mul", null);
+        final cl_mem out =
+                clCreateBuffer(localContext, CL_MEM_WRITE_ONLY, (long) globalWorkSize * Sizeof.cl_uint, null, null);
+        try {
+            clSetKernelArg(benchKernel, 0, Sizeof.cl_mem, Pointer.to(out));
+            clSetKernelArg(benchKernel, 1, Sizeof.cl_uint, Pointer.to(new int[] {iterations}));
+            clSetKernelArg(benchKernel, 2, Sizeof.cl_uint, Pointer.to(new int[] {useReducedRadix ? 1 : 0}));
             clEnqueueNDRangeKernel(localQueue, benchKernel, 1, null, new long[] {globalWorkSize}, null, 0, null, null);
             clFinish(localQueue);
         } finally {

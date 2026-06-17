@@ -1542,6 +1542,8 @@ BitcoinAddressFinder can simulate this type of scenario by generating keys using
 * https://allprivatekeys.com/vanity-address
 * https://github.com/treyyoder/bitcoin-wallet-finder
 * https://github.com/albertobsd/keyhunt
+* https://github.com/brichard19/BitCrack — CUDA/OpenCL secp256k1 brute-forcer
+* https://github.com/kanhavishva/KeyHunt-Cuda — CUDA key/puzzle hunter (a modified version of [VanitySearch](https://github.com/JeanLucPons/VanitySearch))
 * https://github.com/mvrc42/bitp0wn
 * https://github.com/JeanLucPons/BTCCollider
 * https://github.com/JeanLucPons/VanitySearch

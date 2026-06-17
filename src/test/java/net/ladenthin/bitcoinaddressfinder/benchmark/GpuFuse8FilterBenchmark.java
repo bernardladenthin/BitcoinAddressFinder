@@ -207,6 +207,17 @@ public class GpuFuse8FilterBenchmark {
     @Param({"FULL"})
     public KernelProfileStage kernelProfileStage;
 
+    /**
+     * Selects the scalar-walker field representation ({@link CProducerOpenCL#useReducedRadixField}).
+     * {@code false} = radix-2³² (default); {@code true} = reduced-radix 2²⁶. Sweep both
+     * (e.g. {@code -p useReducedRadixField=false,true}) to measure the end-to-end effect of the 2²⁶
+     * walk (the isolated multiply was ≈ 1.56× faster — see {@code FieldMulBenchmark} and §8 of
+     * {@code docs/performance.md}). Best paired with a realistic {@code keysPerWorkItem} (e.g. 128),
+     * since the win lives in the per-key walk, not the one-time comb anchor.
+     */
+    @Param({"false"})
+    public boolean useReducedRadixField;
+
     private OpenCLContext ctx;
     private BigInteger privateKeyBase;
 
@@ -241,6 +252,7 @@ public class GpuFuse8FilterBenchmark {
         p.enableProfiling = profiling;
         p.useSafeGcdInverse = useSafeGcdInverse;
         p.kernelProfileStage = kernelProfileStage;
+        p.useReducedRadixField = useReducedRadixField;
 
         ctx = new OpenCLContext(p, new BitHelper());
         ctx.init();

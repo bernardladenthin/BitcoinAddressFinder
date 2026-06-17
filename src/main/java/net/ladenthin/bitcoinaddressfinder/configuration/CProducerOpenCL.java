@@ -142,4 +142,22 @@ public class CProducerOpenCL extends CProducer {
      * pressure").
      */
     public boolean logGpuDiagnostics = false;
+
+    /**
+     * Selects the field-arithmetic representation used in the scalar-walker hot loop.
+     * <p>
+     * When {@code false} (default), the affine batched-addition walk computes coordinates in the
+     * vendored radix-2³² field ({@code copyfromhashcat/inc_ecc_secp256k1.cl}). When {@code true}, the
+     * kernel is built with {@code -D USE_REDUCED_RADIX_FIELD} and the walk holds coordinates in the
+     * reduced-radix 2²⁶ field ({@code inc_ecc_secp256k1_fe10x26.cl}), converting to radix-2³² only at
+     * the increment-table reads, the single per-sub-batch inverse, and the coordinate outputs.
+     * <p>
+     * Motivation: the radix-2³² field multiply is carry-bound; the isolated {@code FieldMulBenchmark}
+     * measured the 2²⁶ multiply ≈ 1.56× faster on an RTX 3070. The comb anchor and the
+     * {@code copyfromhashcat} files are unchanged either way. Off by default until the end-to-end gain
+     * is confirmed per device; correctness is identical (gated against bitcoinj by
+     * {@code ProbeAddressesOpenCLTest} / {@code ProbeAddressesManySeedsOpenCLTest} with the flag on).
+     * See {@code docs/performance.md} ("reduced-radix 2²⁶ field").
+     */
+    public boolean useReducedRadixField = false;
 }

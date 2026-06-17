@@ -907,9 +907,25 @@ __kernel void generateKeysKernel_grid(
     k_littleEndian_local[0] = (baseK0 | base_offset);
     point_mul_xy_comb(x0, y0, k_littleEndian_local, comb_table);
 
+#ifdef USE_REDUCED_RADIX_FIELD
+    // Reduced-radix 2^26 walk (inc_ecc_secp256k1_fe10x26.cl): the comb anchor x0/y0 stays radix-2^32
+    // (it is computed once), but the per-key slope arithmetic runs in 2^26. Convert the anchor once;
+    // the increment-table reads, the single per-sub-batch inverse, and the coordinate outputs convert
+    // at their boundaries. All field elements stay within libsecp's magnitude bounds (<= 8 for mul
+    // inputs), so the only normalizes are immediately before lowering a coordinate to radix-2^32.
+    u32 nx0[SECP256K1_FE10X26_NUM_LIMBS];
+    u32 ny0[SECP256K1_FE10X26_NUM_LIMBS];
+    fe10x26_from_u32x8(nx0, x0);
+    fe10x26_from_u32x8(ny0, y0);
+
+    // Per-sub-batch scratch: dx_m denominators and their Montgomery prefix products (2^26 limbs).
+    u32 dx[KEYS_BATCH_INV][SECP256K1_FE10X26_NUM_LIMBS];
+    u32 prefix[KEYS_BATCH_INV][SECP256K1_FE10X26_NUM_LIMBS];
+#else
     // Per-sub-batch scratch: dx_m denominators and their Montgomery prefix products.
     u32 dx[KEYS_BATCH_INV][ONE_COORDINATE_NUM_WORDS];
     u32 prefix[KEYS_BATCH_INV][ONE_COORDINATE_NUM_WORDS];
+#endif
 
     for (u32 done = 0; done < keysPerWorkItem; done += KEYS_BATCH_INV) {
         u32 count = keysPerWorkItem - done;
@@ -918,6 +934,38 @@ __kernel void generateKeysKernel_grid(
         }
 
         // ---- Pass A: dx_m = x_{mG} - x0 and Montgomery prefix products of dx ----
+#ifdef USE_REDUCED_RADIX_FIELD
+        u32 acc[SECP256K1_FE10X26_NUM_LIMBS] = { 0 };
+        acc[0] = 1; // field element 1, normalized
+        for (u32 j = 0; j < count; j++) {
+            u32 m = done + j;
+            copy_private_u32_array_private_u32(prefix[j], acc, SECP256K1_FE10X26_NUM_LIMBS);
+            if (m == 0) {
+                // P0 itself has no slope; contribute the multiplicative identity to the product.
+                dx[j][0] = 1;
+                #pragma unroll
+                for (int w = 1; w < SECP256K1_FE10X26_NUM_LIMBS; w++) {
+                    dx[j][w] = 0;
+                }
+            } else {
+                u32 gx[ONE_COORDINATE_NUM_WORDS];
+                u32 ig_base = (m - 1) * TWO_COORDINATE_NUM_WORDS; // 16 words per table entry
+                copy_global_u32_array_private_u32(gx, &iG_table[ig_base], ONE_COORDINATE_NUM_WORDS);
+                u32 ngx[SECP256K1_FE10X26_NUM_LIMBS];
+                fe10x26_from_u32x8(ngx, gx);
+                fe10x26_sub(dx[j], ngx, nx0, 1); // dx_m = x_{mG} - x0 (magnitude 3)
+            }
+            fe10x26_mul(acc, acc, dx[j]); // acc = dx_0 * ... * dx_j (magnitude 1)
+        }
+
+        // ---- one modular inverse for the whole sub-batch (done in radix-2^32 via the conversion
+        //      layer; reuses the build-selected safegcd/legacy inv_mod) ----
+        u32 accU[ONE_COORDINATE_NUM_WORDS];
+        fe10x26_normalize(acc);
+        fe10x26_to_u32x8(accU, acc);
+        inv_mod(accU); // accU = 1 / (dx_0 * ... * dx_{count-1})
+        fe10x26_from_u32x8(acc, accU);
+#else
         u32 acc[ONE_COORDINATE_NUM_WORDS] = { 0 };
         acc[0] = 1;
         for (u32 j = 0; j < count; j++) {
@@ -941,11 +989,57 @@ __kernel void generateKeysKernel_grid(
 
         // ---- one modular inverse for the whole sub-batch ----
         inv_mod(acc); // acc = 1 / (dx_0 * ... * dx_{count-1})
+#endif
 
         // ---- Pass B (reverse): recover each 1/dx_m, apply the affine slope formula, emit ----
         for (int j = (int) count - 1; j >= 0; j--) {
             u32 m = done + (u32) j;
 
+#ifdef USE_REDUCED_RADIX_FIELD
+            u32 inv_dx[SECP256K1_FE10X26_NUM_LIMBS];
+            fe10x26_mul(inv_dx, acc, prefix[j]); // 1/dx_m = (1/product) * (dx_0..dx_{j-1})
+            fe10x26_mul(acc, acc, dx[j]);        // strip dx_m: acc = 1 / (dx_0..dx_{j-1})
+
+            if (m == 0) {
+                // Emit the anchor P0 directly (inv_dx unused for this single key); x0/y0 are still in
+                // radix-2^32 from the comb, so no conversion is needed.
+                copy_private_u32_array_private_u32(x_littleEndian_local, x0, ONE_COORDINATE_NUM_WORDS);
+                copy_private_u32_array_private_u32(y_littleEndian_local, y0, ONE_COORDINATE_NUM_WORDS);
+            } else {
+                u32 gx[ONE_COORDINATE_NUM_WORDS];
+                u32 gy[ONE_COORDINATE_NUM_WORDS];
+                u32 ig_base = (m - 1) * TWO_COORDINATE_NUM_WORDS;
+                copy_global_u32_array_private_u32(gx, &iG_table[ig_base], ONE_COORDINATE_NUM_WORDS);
+                copy_global_u32_array_private_u32(gy, &iG_table[ig_base + ONE_COORDINATE_NUM_WORDS], ONE_COORDINATE_NUM_WORDS);
+                u32 ngx[SECP256K1_FE10X26_NUM_LIMBS];
+                u32 ngy[SECP256K1_FE10X26_NUM_LIMBS];
+                fe10x26_from_u32x8(ngx, gx);
+                fe10x26_from_u32x8(ngy, gy);
+
+                // Affine slope law in 2^26. Magnitudes (mul/sqr inputs must stay <= 8): num=3,
+                // lambda/lam2=1, xr=3 then 5, t=7 then 1, ynew=3. Only the two emitted coordinates
+                // are normalized + lowered to radix-2^32.
+                u32 num[SECP256K1_FE10X26_NUM_LIMBS];
+                u32 lambda[SECP256K1_FE10X26_NUM_LIMBS];
+                u32 lam2[SECP256K1_FE10X26_NUM_LIMBS];
+                u32 t[SECP256K1_FE10X26_NUM_LIMBS];
+                u32 xr[SECP256K1_FE10X26_NUM_LIMBS];
+                u32 ynew[SECP256K1_FE10X26_NUM_LIMBS];
+                fe10x26_sub(num, ngy, ny0, 1);   // y_{mG} - y0           (mag 3)
+                fe10x26_mul(lambda, num, inv_dx);// λ = (y_{mG} - y0)/dx_m (mag 1)
+                fe10x26_sqr(lam2, lambda);       // λ^2                    (mag 1)
+                fe10x26_sub(xr, lam2, ngx, 1);   // λ^2 - x_{mG}           (mag 3)
+                fe10x26_sub(xr, xr, nx0, 1);     // x_m = λ^2 - x_{mG} - x0 (mag 5)
+                fe10x26_sub(t, nx0, xr, 5);      // x0 - x_m               (mag 7)
+                fe10x26_mul(t, lambda, t);       // λ(x0 - x_m)            (mag 1)
+                fe10x26_sub(ynew, t, ny0, 1);    // y_m = λ(x0 - x_m) - y0 (mag 3)
+
+                fe10x26_normalize(xr);
+                fe10x26_to_u32x8(x_littleEndian_local, xr);
+                fe10x26_normalize(ynew);
+                fe10x26_to_u32x8(y_littleEndian_local, ynew);
+            }
+#else
             u32 inv_dx[ONE_COORDINATE_NUM_WORDS];
             mul_mod(inv_dx, acc, prefix[j]); // 1/dx_m = (1/product) * (dx_0..dx_{j-1})
             mul_mod(acc, acc, dx[j]);        // strip dx_m: acc = 1 / (dx_0..dx_{j-1})
@@ -974,6 +1068,7 @@ __kernel void generateKeysKernel_grid(
                 mul_mod(t, lambda, t);                                   // λ(x0 - x_m)
                 sub_mod(y_littleEndian_local, t, y0);                    // y_m = λ(x0 - x_m) - y0
             }
+#endif
 
             u32 loop_index = base_offset + m;
 
@@ -1165,6 +1260,169 @@ __kernel void bench_inv_mod(__global u32 *out, const u32 iterations, const u32 i
 
         inv_mod(v);
         checksum ^= v[0];
+    }
+
+    out[gid] = checksum;
+}
+
+/*
+ * Validation kernel (test scaffolding, not used in production): proves the reduced-radix 2^26 field
+ * module (inc_ecc_secp256k1_fe10x26.cl) is byte-identical to the vendored radix-2^32 field, so it can
+ * be trusted as a drop-in. Single work-item, loops over `count` deterministic pseudo-random operand
+ * pairs (x, y), each fully reduced into [0, p) via mul_mod(., ., 1). out[i] is a failure bitmask,
+ * 0 == pass:
+ *   bit 0 (1):  roundtrip   to_u32x8(from_u32x8(x)) != x
+ *   bit 1 (2):  multiply    fe10x26_mul(x, y) != mul_mod(x, y)
+ *   bit 2 (4):  square      fe10x26_sqr(x)    != mul_mod(x, x)
+ *   bit 3 (8):  add         fe10x26_add(x, y) != add_mod(x, y)
+ *   bit 4 (16): subtract    fe10x26 (x + (-y)) != sub_mod(x, y)
+ */
+__kernel void test_fe10x26(__global u32 *out, const u32 count)
+{
+    u32 one[ONE_COORDINATE_NUM_WORDS] = { 0 };
+    one[0] = 1;
+
+    for (u32 i = 0; i < count; i++) {
+        // Two independent xorshift streams -> x and y, then reduce each into [0, p).
+        u32 x[ONE_COORDINATE_NUM_WORDS];
+        u32 y[ONE_COORDINATE_NUM_WORDS];
+        u32 sx = i * 2654435761u + 0x9e3779b9u;
+        u32 sy = i * 40503u + 0x85ebca6bu;
+        for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) {
+            sx ^= sx << 13; sx ^= sx >> 17; sx ^= sx << 5; x[j] = sx;
+            sy ^= sy << 13; sy ^= sy >> 17; sy ^= sy << 5; y[j] = sy;
+        }
+        mul_mod(x, x, one); // x = x mod p
+        mul_mod(y, y, one); // y = y mod p
+
+        u32 status = 0;
+
+        u32 nx[10];
+        u32 ny[10];
+        fe10x26_from_u32x8(nx, x);
+        fe10x26_from_u32x8(ny, y);
+
+        // (1) roundtrip
+        {
+            u32 n[10];
+            for (int j = 0; j < 10; j++) n[j] = nx[j];
+            fe10x26_normalize(n);
+            u32 w[ONE_COORDINATE_NUM_WORDS];
+            fe10x26_to_u32x8(w, n);
+            u32 diff = 0;
+            for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) diff |= (w[j] ^ x[j]);
+            if (diff != 0) status |= 1u;
+        }
+
+        // (2) multiply
+        {
+            u32 n[10];
+            fe10x26_mul(n, nx, ny);
+            fe10x26_normalize(n);
+            u32 w[ONE_COORDINATE_NUM_WORDS];
+            fe10x26_to_u32x8(w, n);
+            u32 ref[ONE_COORDINATE_NUM_WORDS];
+            mul_mod(ref, x, y);
+            u32 diff = 0;
+            for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) diff |= (w[j] ^ ref[j]);
+            if (diff != 0) status |= 2u;
+        }
+
+        // (3) square
+        {
+            u32 n[10];
+            fe10x26_sqr(n, nx);
+            fe10x26_normalize(n);
+            u32 w[ONE_COORDINATE_NUM_WORDS];
+            fe10x26_to_u32x8(w, n);
+            u32 ref[ONE_COORDINATE_NUM_WORDS];
+            mul_mod(ref, x, x);
+            u32 diff = 0;
+            for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) diff |= (w[j] ^ ref[j]);
+            if (diff != 0) status |= 4u;
+        }
+
+        // (4) add
+        {
+            u32 n[10];
+            fe10x26_add(n, nx, ny);
+            fe10x26_normalize(n);
+            u32 w[ONE_COORDINATE_NUM_WORDS];
+            fe10x26_to_u32x8(w, n);
+            u32 ref[ONE_COORDINATE_NUM_WORDS];
+            add_mod(ref, x, y);
+            u32 diff = 0;
+            for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) diff |= (w[j] ^ ref[j]);
+            if (diff != 0) status |= 8u;
+        }
+
+        // (5) subtract via negate + add (ny is normalized, magnitude 1)
+        {
+            u32 neg[10];
+            fe10x26_negate(neg, ny, 1);
+            u32 n[10];
+            fe10x26_add(n, nx, neg);
+            fe10x26_normalize(n);
+            u32 w[ONE_COORDINATE_NUM_WORDS];
+            fe10x26_to_u32x8(w, n);
+            u32 ref[ONE_COORDINATE_NUM_WORDS];
+            sub_mod(ref, x, y);
+            u32 diff = 0;
+            for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) diff |= (w[j] ^ ref[j]);
+            if (diff != 0) status |= 16u;
+        }
+
+        out[i] = status;
+    }
+}
+
+/*
+ * Microbenchmark kernel (test scaffolding, not used in production): each work-item performs
+ * `iterations` chained field multiplies and XOR-accumulates a checksum so the compiler cannot elide
+ * the work. `useReducedRadix != 0` runs the chain in the reduced-radix 2^26 field
+ * (inc_ecc_secp256k1_fe10x26.cl), converting in/out only once (mirroring a real EC walk that keeps
+ * coordinates in 2^26 form); 0 runs the chain in the vendored radix-2^32 mul_mod. Launched over a full
+ * grid for realistic occupancy. Timing only - correctness is gated by test_fe10x26. See FieldMulBenchmark.
+ */
+__kernel void bench_fe_mul(__global u32 *out, const u32 iterations, const u32 useReducedRadix)
+{
+    const u32 gid = get_global_id(0);
+    u32 one[ONE_COORDINATE_NUM_WORDS] = { 0 };
+    one[0] = 1;
+
+    u32 a[ONE_COORDINATE_NUM_WORDS];
+    u32 b[ONE_COORDINATE_NUM_WORDS];
+    u32 s = gid * 2654435761u + 0x9e3779b9u;
+    for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) {
+        s ^= s << 13; s ^= s >> 17; s ^= s << 5; a[j] = s;
+    }
+    for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) {
+        s ^= s << 13; s ^= s >> 17; s ^= s << 5; b[j] = s;
+    }
+    a[0] |= 1u;
+    b[0] |= 1u;
+    mul_mod(a, a, one); // reduce into [0, p)
+    mul_mod(b, b, one);
+
+    u32 checksum = 0;
+
+    if (useReducedRadix != 0) {
+        u32 na[10];
+        u32 nb[10];
+        fe10x26_from_u32x8(na, a);
+        fe10x26_from_u32x8(nb, b);
+        for (u32 i = 0; i < iterations; i++) {
+            fe10x26_mul(na, na, nb); // na = na * nb (alias-safe: all reads precede writes)
+        }
+        fe10x26_normalize(na);
+        u32 w[ONE_COORDINATE_NUM_WORDS];
+        fe10x26_to_u32x8(w, na);
+        checksum = w[0];
+    } else {
+        for (u32 i = 0; i < iterations; i++) {
+            mul_mod(a, a, b); // a = a * b mod p
+        }
+        checksum = a[0];
     }
 
     out[gid] = checksum;
