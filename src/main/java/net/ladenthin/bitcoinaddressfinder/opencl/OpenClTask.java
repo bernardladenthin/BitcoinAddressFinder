@@ -289,7 +289,12 @@ public class OpenClTask implements ReleaseCLObject {
      * @param buffer the host readback buffer to return to the pool
      */
     void releaseHostBuffer(ByteBuffer buffer) {
-        hostBufferPool.offer(buffer);
+        // Unbounded ConcurrentLinkedQueue: offer() never fails, but its boolean result must not be
+        // silently dropped (SpotBugs RV_RETURN_VALUE_IGNORED). Should a future bounded pool ever
+        // reject the buffer, leave it for the JVM Cleaner to reclaim rather than retrying.
+        if (!hostBufferPool.offer(buffer)) {
+            LOGGER.trace("Host buffer pool rejected a returned buffer; leaving it for GC.");
+        }
     }
 
     /**

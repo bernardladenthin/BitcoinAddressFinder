@@ -26,6 +26,7 @@ import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.core.FireAndForget;
 import net.ladenthin.bitcoinaddressfinder.core.InterruptedRuntimeException;
 import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
@@ -153,7 +154,7 @@ public class ConsumerJava implements Consumer {
      * {@code TRUNCATED_LONG_64}) {@link #initLMDB()} closes the env once the snapshot is built,
      * so a later build would have no source to read from.
      */
-    private boolean gpuFilterRequested = false;
+    private volatile boolean gpuFilterRequested = false;
 
     /**
      * The Binary Fuse 8 GPU-upload payload built by {@link #initLMDB()} when
@@ -372,7 +373,7 @@ public class ConsumerJava implements Consumer {
      * @param lmdb  the open LMDB persistence (also an {@link AddressIterable} source)
      * @return the GPU-upload payload (never {@code null})
      */
-    private static BinaryFuse8GpuFilterData computeGpuFilterPayload(AddressPresence chain, LMDBPersistence lmdb) {
+    private static BinaryFuse8GpuFilterData computeGpuFilterPayload(AddressPresence chain, AddressIterable lmdb) {
         if (chain instanceof BinaryFuseAccelerator accelerator) {
             Optional<BinaryFuse8GpuFilterData> existing = accelerator.getGpuFilterData();
             if (existing.isPresent()) {
