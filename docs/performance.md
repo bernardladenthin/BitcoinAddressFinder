@@ -667,6 +667,7 @@ hot path; correctness is paramount.
 | — | occupancy / register pressure | grep init log for `Kernel resource usage:` (§6); `logGpuDiagnostics=true` for the verbose build log | — |
 | — | suggested starting config | run `OpenCLInfo` (or grep init log) for `SUGGESTED START CONFIG` (§6); pure helper `OpenClConfigSuggestion` | `OpenClConfigSuggestionTest`, `OpenCLDeviceTest` |
 | — | `KEYS_BATCH_INV` sweep | edit the `#define`, `GpuFuse8FilterBenchmark` (§3) | `ProbeAddressesOpenCLTest` |
+| — | reduced-radix 2²⁶ field multiply (isolated; §8) | `FieldMulBenchmark -p useReducedRadix=true,false` | `OpenCLFe10x26ParityTest` (`test_fe10x26`, 8192 pairs, byte-identical to radix-2³²) |
 
 **Honest caveat on A/B reproducibility:** only Stage 4 has a build-time toggle
 (`useSafeGcdInverse`), so its A/B is a single JMH run. Stages 2b and 3 are unconditional (no flag, per
@@ -751,6 +752,52 @@ is forbidden — both address types are mandatory).
   branch/addressing overhead, so it loses. Reverted. Could be revisited on a *multiply-bound* device
   (or paired with a reduced-radix representation that shortens the add chain).
 
+### Implemented & measured building block — reduced-radix 2²⁶ field (not yet in the hot path)
+
+The #1 EC lever (below) is no longer purely theoretical: the reduced-radix field arithmetic is
+**implemented, parity-proven, and benchmarked in isolation**. What is *not* yet done is wiring it into
+the production scalar-multiply / point-addition walk — that is the remaining (large) step.
+
+- **What was built.** `src/main/resources/inc_ecc_secp256k1_fe10x26.cl` — a self-contained OpenCL port
+  of libsecp256k1's `field_10x26_impl.h` (Pieter Wuille, MIT): `fe10x26_mul`, `fe10x26_sqr`,
+  `fe10x26_normalize`, `fe10x26_add`, `fe10x26_negate`, plus a **compatibility layer**
+  (`fe10x26_from_u32x8` / `fe10x26_to_u32x8`) that converts between the 2²⁶ form and the radix-2³²
+  `u32[8]` form used everywhere else (and by hashcat: limb 0 = least-significant 32 bits). The vendored
+  `copyfromhashcat/inc_ecc_secp256k1.cl` is **untouched** and the new file is written in the same
+  hashcat dialect (`DECLSPEC`, `u32`/`u64`, `PRIVATE_AS`), so it could be dropped into a hashcat tree.
+- **Correctness (gated).** `test_fe10x26` kernel + `OpenCLFe10x26ParityTest` run **8192** deterministic
+  pseudo-random operand pairs and assert the 2²⁶ path is **byte-identical** to the radix-2³² reference
+  for roundtrip, multiply, square, add, and subtract. Passes on the RTX 3070 (and under pocl in CI).
+- **Measured speed (RTX 3070 Laptop, isolated).** `FieldMulBenchmark` → `bench_fe_mul` kernel chains
+  `iterations` field multiplies per work-item over a full grid (`gridSizeInBits=18`, `iterations=4096`),
+  keeping coordinates in their native form for the whole chain (the 2²⁶ arm converts in/out only once):
+
+  | field multiply         | throughput (ops/s) | relative |
+  |------------------------|--------------------|----------|
+  | reduced-radix 2²⁶      | **10.20**          | **1.56×** |
+  | radix-2³² `mul_mod`    | 6.53               | 1.00×    |
+
+  ~**1.56× faster** field multiply, confirming the carry-bound diagnosis (the `sqr_mod` finding above).
+  Not a thermal artifact: the radix-2³² arm measured **6.57** when run *cold* in its own fresh JVM
+  (vs 6.53 when run second/hot), and per-iteration variance was tiny (6.52–6.57). Reproduce:
+
+  ```bash
+  # after: mvn -q dependency:build-classpath -Dmdep.outputFile=target/cp-test.txt -DincludeScope=test
+  java <add-opens from §5/pom.xml> -cp "target/test-classes;target/classes;$(cat target/cp-test.txt)" \
+       org.openjdk.jmh.Main FieldMulBenchmark -p gridSizeInBits=18 -p iterations=4096 -f 1 -wi 1 -w 20 -i 3 -r 50
+  ```
+
+- **What remains (the actual Stage).** Convert the hot path (the comb anchor, the affine
+  batched-addition walk, `point_add`/`point_double`/`point_to_affine`, and the Montgomery
+  simultaneous-inversion chain) to hold coordinates in 2²⁶ form, converting only at kernel
+  input/output, and reuse the existing `inv_mod` via the conversion layer (or port `modinv32`'s 2²⁶
+  path). The **1.56× is the multiply in isolation**; end-to-end it will be diluted by hashing (~43%,
+  §6) and the non-multiply EC work, and *helped* by lower register pressure (fewer live wide
+  temporaries → better occupancy, §6). Net end-to-end gain **must be measured** with a fresh
+  `keysPerWorkItem` sweep. This is gated and low-risk to *add* (the module is proven); the risk is all
+  in the hot-path rewrite, which changes address-derivation correctness and so needs the full
+  `ProbeAddressesOpenCLTest` 43/0 gate plus the parity kernel.
+
 ### Candidates for a future stage
 
 Evaluated during the investigation (re-sweep `keysPerWorkItem` after any of these, since the per-key
@@ -765,8 +812,10 @@ cost balance shifts):
   micro-optimisation, or sharing more work between the uncompressed and compressed chains (they share
   the X coordinate; the compressed SEC prefix transform is already reused via `REUSE_FOR_COMPRESSED`),
   is the lever here — without ever dropping a chain. Both chains always run.
-- **Reduced-radix field representation — the #1 lever, corroborated by an external review.** The EC
-  side is ~57% (§6) and the field multiply is carry/add-bound (the `sqr_mod` result). A reduced-radix
+- **Reduced-radix field representation — the #1 lever; the field module is now built & measured
+  (see "Implemented & measured building block" above), hot-path integration is what remains.** The EC
+  side is ~57% (§6) and the field multiply is carry/add-bound (the `sqr_mod` result, now also confirmed
+  the other way: the 2²⁶ multiply measured ~1.56× faster in isolation). A reduced-radix
   layout stores 256 bits in limbs narrower than the word (e.g. **10×26-bit** for a 32-bit GPU, or
   5×52-bit for 64-bit), so additive overflow lands in the spare bits and **carries are deferred**
   instead of propagated every limb; reconciliation happens only inside `mul`/`sqr` or at an explicit
@@ -829,9 +878,6 @@ cost balance shifts):
   memory (64 KB fits, but competes with `g_precomputed`). The current `T[pos][digit]` read is
   secret-keyed (data-dependent, not a warp broadcast) — cache-resident and occupancy-hidden, but
   benchmark alternatives per device.
-- **Optional single-hash (compressed-only) mode:** skip one of the two hash160 chains (~+15% if
-  hashing ~30% of runtime) — but it is a coverage/semantics change (would miss uncompressed P2PKH
-  hits), so it must be opt-in and clearly documented.
 - **±P symmetry** (one addition yields `P` and `−P`): random-search mode only — for sequential range
   scanning the `−P` keys fall outside the scanned range.
 - **Rejected:** GLV endomorphism (subsumed by the fixed-base comb, which already removes almost all

@@ -1169,3 +1169,166 @@ __kernel void bench_inv_mod(__global u32 *out, const u32 iterations, const u32 i
 
     out[gid] = checksum;
 }
+
+/*
+ * Validation kernel (test scaffolding, not used in production): proves the reduced-radix 2^26 field
+ * module (inc_ecc_secp256k1_fe10x26.cl) is byte-identical to the vendored radix-2^32 field, so it can
+ * be trusted as a drop-in. Single work-item, loops over `count` deterministic pseudo-random operand
+ * pairs (x, y), each fully reduced into [0, p) via mul_mod(., ., 1). out[i] is a failure bitmask,
+ * 0 == pass:
+ *   bit 0 (1):  roundtrip   to_u32x8(from_u32x8(x)) != x
+ *   bit 1 (2):  multiply    fe10x26_mul(x, y) != mul_mod(x, y)
+ *   bit 2 (4):  square      fe10x26_sqr(x)    != mul_mod(x, x)
+ *   bit 3 (8):  add         fe10x26_add(x, y) != add_mod(x, y)
+ *   bit 4 (16): subtract    fe10x26 (x + (-y)) != sub_mod(x, y)
+ */
+__kernel void test_fe10x26(__global u32 *out, const u32 count)
+{
+    u32 one[ONE_COORDINATE_NUM_WORDS] = { 0 };
+    one[0] = 1;
+
+    for (u32 i = 0; i < count; i++) {
+        // Two independent xorshift streams -> x and y, then reduce each into [0, p).
+        u32 x[ONE_COORDINATE_NUM_WORDS];
+        u32 y[ONE_COORDINATE_NUM_WORDS];
+        u32 sx = i * 2654435761u + 0x9e3779b9u;
+        u32 sy = i * 40503u + 0x85ebca6bu;
+        for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) {
+            sx ^= sx << 13; sx ^= sx >> 17; sx ^= sx << 5; x[j] = sx;
+            sy ^= sy << 13; sy ^= sy >> 17; sy ^= sy << 5; y[j] = sy;
+        }
+        mul_mod(x, x, one); // x = x mod p
+        mul_mod(y, y, one); // y = y mod p
+
+        u32 status = 0;
+
+        u32 nx[10];
+        u32 ny[10];
+        fe10x26_from_u32x8(nx, x);
+        fe10x26_from_u32x8(ny, y);
+
+        // (1) roundtrip
+        {
+            u32 n[10];
+            for (int j = 0; j < 10; j++) n[j] = nx[j];
+            fe10x26_normalize(n);
+            u32 w[ONE_COORDINATE_NUM_WORDS];
+            fe10x26_to_u32x8(w, n);
+            u32 diff = 0;
+            for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) diff |= (w[j] ^ x[j]);
+            if (diff != 0) status |= 1u;
+        }
+
+        // (2) multiply
+        {
+            u32 n[10];
+            fe10x26_mul(n, nx, ny);
+            fe10x26_normalize(n);
+            u32 w[ONE_COORDINATE_NUM_WORDS];
+            fe10x26_to_u32x8(w, n);
+            u32 ref[ONE_COORDINATE_NUM_WORDS];
+            mul_mod(ref, x, y);
+            u32 diff = 0;
+            for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) diff |= (w[j] ^ ref[j]);
+            if (diff != 0) status |= 2u;
+        }
+
+        // (3) square
+        {
+            u32 n[10];
+            fe10x26_sqr(n, nx);
+            fe10x26_normalize(n);
+            u32 w[ONE_COORDINATE_NUM_WORDS];
+            fe10x26_to_u32x8(w, n);
+            u32 ref[ONE_COORDINATE_NUM_WORDS];
+            mul_mod(ref, x, x);
+            u32 diff = 0;
+            for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) diff |= (w[j] ^ ref[j]);
+            if (diff != 0) status |= 4u;
+        }
+
+        // (4) add
+        {
+            u32 n[10];
+            fe10x26_add(n, nx, ny);
+            fe10x26_normalize(n);
+            u32 w[ONE_COORDINATE_NUM_WORDS];
+            fe10x26_to_u32x8(w, n);
+            u32 ref[ONE_COORDINATE_NUM_WORDS];
+            add_mod(ref, x, y);
+            u32 diff = 0;
+            for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) diff |= (w[j] ^ ref[j]);
+            if (diff != 0) status |= 8u;
+        }
+
+        // (5) subtract via negate + add (ny is normalized, magnitude 1)
+        {
+            u32 neg[10];
+            fe10x26_negate(neg, ny, 1);
+            u32 n[10];
+            fe10x26_add(n, nx, neg);
+            fe10x26_normalize(n);
+            u32 w[ONE_COORDINATE_NUM_WORDS];
+            fe10x26_to_u32x8(w, n);
+            u32 ref[ONE_COORDINATE_NUM_WORDS];
+            sub_mod(ref, x, y);
+            u32 diff = 0;
+            for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) diff |= (w[j] ^ ref[j]);
+            if (diff != 0) status |= 16u;
+        }
+
+        out[i] = status;
+    }
+}
+
+/*
+ * Microbenchmark kernel (test scaffolding, not used in production): each work-item performs
+ * `iterations` chained field multiplies and XOR-accumulates a checksum so the compiler cannot elide
+ * the work. `useReducedRadix != 0` runs the chain in the reduced-radix 2^26 field
+ * (inc_ecc_secp256k1_fe10x26.cl), converting in/out only once (mirroring a real EC walk that keeps
+ * coordinates in 2^26 form); 0 runs the chain in the vendored radix-2^32 mul_mod. Launched over a full
+ * grid for realistic occupancy. Timing only - correctness is gated by test_fe10x26. See FieldMulBenchmark.
+ */
+__kernel void bench_fe_mul(__global u32 *out, const u32 iterations, const u32 useReducedRadix)
+{
+    const u32 gid = get_global_id(0);
+    u32 one[ONE_COORDINATE_NUM_WORDS] = { 0 };
+    one[0] = 1;
+
+    u32 a[ONE_COORDINATE_NUM_WORDS];
+    u32 b[ONE_COORDINATE_NUM_WORDS];
+    u32 s = gid * 2654435761u + 0x9e3779b9u;
+    for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) {
+        s ^= s << 13; s ^= s >> 17; s ^= s << 5; a[j] = s;
+    }
+    for (int j = 0; j < ONE_COORDINATE_NUM_WORDS; j++) {
+        s ^= s << 13; s ^= s >> 17; s ^= s << 5; b[j] = s;
+    }
+    a[0] |= 1u;
+    b[0] |= 1u;
+    mul_mod(a, a, one); // reduce into [0, p)
+    mul_mod(b, b, one);
+
+    u32 checksum = 0;
+
+    if (useReducedRadix != 0) {
+        u32 na[10];
+        u32 nb[10];
+        fe10x26_from_u32x8(na, a);
+        fe10x26_from_u32x8(nb, b);
+        for (u32 i = 0; i < iterations; i++) {
+            fe10x26_mul(na, na, nb); // na = na * nb (alias-safe: all reads precede writes)
+        }
+        fe10x26_normalize(na);
+        u32 w[ONE_COORDINATE_NUM_WORDS];
+        fe10x26_to_u32x8(w, na);
+        checksum = w[0];
+    } else {
+        for (u32 i = 0; i < iterations; i++) {
+            mul_mod(a, a, b); // a = a * b mod p
+        }
+        checksum = a[0];
+    }
+
+    out[gid] = checksum;
+}

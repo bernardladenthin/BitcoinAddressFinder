@@ -106,6 +106,11 @@ public class OpenCLContext implements ReleaseCLObject {
 
         resourceNames.add("copyfromhashcat/inc_ecc_secp256k1.h");
         resourceNames.add("copyfromhashcat/inc_ecc_secp256k1.cl");
+        // Reduced-radix 2^26 field module (our own file; does not touch copyfromhashcat). Provides the
+        // 10x26 multiply/square plus the u32[8] <-> 2^26 compatibility layer used by test_fe10x26 and
+        // FieldMulBenchmark. Must come after inc_ecc_secp256k1.* (it reuses u32/u64/PRIVATE_AS) and
+        // before the custom kernel file that references its symbols.
+        resourceNames.add("inc_ecc_secp256k1_fe10x26.cl");
         resourceNames.add("inc_ecc_secp256k1custom.cl");
         return resourceNames;
     }
@@ -705,6 +710,40 @@ public class OpenCLContext implements ReleaseCLObject {
             clSetKernelArg(benchKernel, 0, Sizeof.cl_mem, Pointer.to(out));
             clSetKernelArg(benchKernel, 1, Sizeof.cl_uint, Pointer.to(new int[] {iterations}));
             clSetKernelArg(benchKernel, 2, Sizeof.cl_uint, Pointer.to(new int[] {inputHighLimbsZero ? 1 : 0}));
+            clEnqueueNDRangeKernel(localQueue, benchKernel, 1, null, new long[] {globalWorkSize}, null, 0, null, null);
+            clFinish(localQueue);
+        } finally {
+            clReleaseMemObject(out);
+            clReleaseKernel(benchKernel);
+        }
+    }
+
+    /**
+     * Benchmark hook: launches the {@code bench_fe_mul} microbenchmark kernel (see
+     * {@code inc_ecc_secp256k1custom.cl}) over {@code globalWorkSize} work-items, each performing
+     * {@code iterations} chained field multiplies, and blocks until it finishes. Used by
+     * {@code FieldMulBenchmark} to compare the reduced-radix 2^26 field multiply against the vendored
+     * radix-2^32 {@code mul_mod}. The work is fully on the device (no result is read back). The output
+     * buffer and kernel are created and released per call.
+     *
+     * @param globalWorkSize  number of work-items (e.g. {@code 1 << gridSizeInBits})
+     * @param iterations      chained multiplies performed per work-item
+     * @param useReducedRadix {@code true} for the 2^26 field path, {@code false} for radix-2^32
+     *     {@code mul_mod}
+     */
+    @VisibleForTesting
+    public void runBenchFeMul(int globalWorkSize, int iterations, boolean useReducedRadix) {
+        final cl_context localContext = Objects.requireNonNull(context);
+        final cl_program localProgram = Objects.requireNonNull(program);
+        final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
+
+        final cl_kernel benchKernel = clCreateKernel(localProgram, "bench_fe_mul", null);
+        final cl_mem out =
+                clCreateBuffer(localContext, CL_MEM_WRITE_ONLY, (long) globalWorkSize * Sizeof.cl_uint, null, null);
+        try {
+            clSetKernelArg(benchKernel, 0, Sizeof.cl_mem, Pointer.to(out));
+            clSetKernelArg(benchKernel, 1, Sizeof.cl_uint, Pointer.to(new int[] {iterations}));
+            clSetKernelArg(benchKernel, 2, Sizeof.cl_uint, Pointer.to(new int[] {useReducedRadix ? 1 : 0}));
             clEnqueueNDRangeKernel(localQueue, benchKernel, 1, null, new long[] {globalWorkSize}, null, 0, null, null);
             clFinish(localQueue);
         } finally {
