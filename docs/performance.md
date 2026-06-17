@@ -637,7 +637,7 @@ Every kernel change is gated **before** any throughput is reported. These run un
 `test-opencl` job) or a real GPU; `@OpenCLTest` classes self-skip when no device is present.
 
 ```bash
-mvn test -Dtest='ProbeAddressesOpenCLTest,OpenCLCompactOutputIntegrationTest,OpenCLContextTest,Fuse8GpuHashParityTest,ProducerOpenCLTest,OpenCLPrecomputeKernelTest'
+mvn test -Dtest='ProbeAddressesOpenCLTest,ProbeAddressesManySeedsOpenCLTest,OpenCLCompactOutputIntegrationTest,OpenCLContextTest,OpenCLKernelModeMatrixTest,OpenCLFe10x26ParityTest,Fuse8GpuHashParityTest,ProducerOpenCLTest,OpenCLPrecomputeKernelTest'
 ```
 
 - **`ProbeAddressesOpenCLTest#createKeys_acrossKeysPerWorkItem_allResultsMatchReference`** — the
@@ -656,9 +656,44 @@ mvn test -Dtest='ProbeAddressesOpenCLTest,OpenCLCompactOutputIntegrationTest,Ope
   cross-checks safegcd vs. the binary GCD **and** `x·x⁻¹ ≡ 1 (mod p)` over 4096 random inputs (built
   with `useSafeGcdInverse=false` so both inverses are present and genuinely compared).
 - **`Fuse8GpuHashParityTest`** — the pure-Java filter-hash contract the kernel filter must match.
+- **`ProbeAddressesManySeedsOpenCLTest`** — the hardened many-seed gate: builds the kernel with
+  `useReducedRadixField` **off and on** and derives 16 random bases × 256 keys each (varied bit sizes),
+  verifying every key against bitcoinj. Widens the input space beyond the single fixed seed so a
+  representation-specific carry/magnitude bug (a *silently missed* key, not a crash) is caught.
+- **`OpenCLKernelModeMatrixTest`** — builds+runs the reduced-radix *interactions* not covered above
+  (the 2²⁶ walk feeding the legacy inverse, verified vs bitcoinj; the 2²⁶ walk under each profiling
+  stage, build+run only).
 
 **Never report a speedup from a build whose parity tests have not passed.** This is the cryptographic
 hot path; correctness is paramount.
+
+### Compile-time kernel modes — what selects them and how each is gated
+
+The kernel has exactly **three** externally toggleable compile-time switches (each a `CProducerOpenCL`
+field → a `-D` define in `OpenCLContext.buildOptions()`), plus the legacy-inverse switch in the
+vendored field file. **Both states of every switch are built and run on a device by some test.**
+"Correctness" means byte-compared against bitcoinj; the profiling modes deliberately emit wrong hashes
+(timing only), so for them the test can only assert the branch *compiles and runs*.
+
+| Build define | Config field | Default | OFF gated by | ON gated by | Correctness checkable? |
+|---|---|---|---|---|---|
+| *(none)* / `-D USE_LEGACY_BINARY_GCD_INV_MOD` | `useSafeGcdInverse` | safegcd | every `@OpenCLTest` (safegcd) | `OpenCLPrecomputeKernelTest#invModSafegcd_…` (built legacy) + `OpenCLKernelModeMatrixTest` | yes (both, vs bitcoinj / `x·x⁻¹≡1`) |
+| `-D USE_REDUCED_RADIX_FIELD` | `useReducedRadixField` | radix-2³² | every `@OpenCLTest` + `ProbeAddressesManySeedsOpenCLTest` | `ProbeAddressesManySeedsOpenCLTest` + `OpenCLKernelModeMatrixTest` | yes (both, vs bitcoinj) |
+| `-D PROFILE_SKIP_SECOND_HASH160` | `kernelProfileStage=ONE_HASH160` | `FULL` | every FULL test | `OpenCLContextTest#kernelProfileStage_buildsAndRuns` + `OpenCLKernelModeMatrixTest` | build+run only (mode emits wrong hashes by design) |
+| `-D PROFILE_SKIP_HASH160` | `kernelProfileStage=NO_HASH160` | `FULL` | every FULL test | `OpenCLContextTest#kernelProfileStage_buildsAndRuns` + `OpenCLKernelModeMatrixTest` | build+run only (mode emits wrong hashes by design) |
+
+Non-toggles in `inc_ecc_secp256k1custom.cl` (for completeness, not config-driven):
+`REUSE_FOR_COMPRESSED` is unconditionally `#define`d, so only its active branch ever compiles (its
+`#else` is dead code); `#if defined(__builtin_bswap32)` is platform autodetect, so only the branch the
+build platform selects is compiled. Both active branches run in every test.
+
+Honest scope: the **full cross-product** of all switches (3×2×3 = 18 distinct builds) is **not**
+exhaustively tested — every distinct `-D` set is a fresh kernel build, and a class that built all of
+them would exceed the Surefire per-fork timeout. Each switch is covered in both states, and the
+reduced-radix interactions (the genuinely new code) are covered explicitly; the remaining
+combinations are orthogonal `#ifdef` regions (inverse selection in the field file, profiling in the
+hashing tail, radix in the walk). As with the rest of this section, these are `@OpenCLTest` classes:
+they run in CI's `test-opencl` (pocl) job and on a local GPU, and self-skip on the no-device matrix.
 
 ### Reproducibility map (every stage → how to re-measure → how it's gated)
 
