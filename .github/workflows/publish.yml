@@ -9,6 +9,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Publish a RELEASE to Maven Central. Off by default; the release publish runs only when this is true AND the workflow is run on a v* tag."
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -389,7 +394,7 @@ jobs:
   publish-release:
     name: Publish Release to Central
     needs: [check-tag, code-style]
-    if: needs.check-tag.result == 'success'
+    if: needs.check-tag.result == 'success' && inputs.publish_release
     runs-on: ubuntu-latest
     environment: maven-central
     permissions:
