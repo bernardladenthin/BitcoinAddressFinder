@@ -336,9 +336,12 @@ OpenCL 2.0 AMD-APP, wave32.
 > uses `-D AMD_NOINLINE_HELPERS` because the inlined kernel takes 8–16+ min to compile on AMD (§9).
 > Out-of-line calls can cost runtime throughput, so the **absolute** AMD M keys/s above are
 > *understated* relative to the **warm-cache *inlined* AMD build, which is actually faster** — §10
-> "Track B" measured ≈ **288 M keys/s** inlined (`batch=20, kpwi=64`) vs the ~177 here, i.e. the ~3.3×
-> `noinline` runtime cost. So `noinline`'s ~177 M keys/s is the **out-of-the-box (auto-default) AMD
-> ceiling**, not the device ceiling; a sustained scan that warms the `comgr` cache and sets
+> "Track B" measured the `noinline` cost at **~3.3×** at a matched config (`batch=20, kpwi=32`:
+> 279 → 83 M keys/s), and the inlined build's own peak reaches ≈ **288 M keys/s** (`batch=20, kpwi=64`).
+> (Note 288-vs-177 is a best-config-vs-best-config gap, ~1.63×, not the same-config 3.3×; the noinline
+> build's 177 sits at a better-occupancy config, `batch=24, kpwi=128`.) So `noinline`'s ~177 M keys/s is
+> the **out-of-the-box (auto-default) AMD ceiling**, not the device ceiling; a sustained scan that warms
+> the `comgr` cache and sets
 > `noInlineHelpers=false` is substantially faster (§9/§10). The AMD absolutes are also **not** directly
 > comparable to the inlined RTX 3070 absolutes. What *is* comparable: the **sweet-spot location**
 > (architectural) and the **reduced-radix relative delta** (`noinline` is in both A/B arms, so it cancels).
