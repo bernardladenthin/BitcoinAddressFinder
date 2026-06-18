@@ -129,6 +129,23 @@ public class BitcoinAddressFinderArchitectureTest {
             .beFinal();
 
     /**
+     * No public mutable <b>static</b> state: any {@code public static} field must also be
+     * {@code final}. This is the static-axis complement of {@link #noPublicMutableFields} (which covers
+     * instance fields) — together they forbid all publicly reachable mutable state. {@code public static
+     * final} constants remain allowed (immutable); only a mutable {@code public static} field (a
+     * reassignable global) is rejected.
+     *
+     * <p>Unlike the instance-field rule this needs <b>no exceptions</b>: the configuration POJOs carry
+     * only instance fields, and the production tree currently has zero publicly reachable mutable static
+     * fields. This rule is therefore a pure drift-guard — it adds no fixes today, it just keeps a global
+     * mutable from being introduced later (loggers stay {@code private static final} via
+     * {@link #loggersArePrivateStaticFinal}).
+     */
+    @ArchTest
+    static final ArchRule noPublicMutableStaticFields =
+            fields().that().arePublic().and().areStatic().should().beFinal();
+
+    /**
      * Production code must not call {@link System#exit(int)}; throw an exception instead so the
      * {@code Shutdown} hook gets to run and the cause is visible in stack traces.
      */
