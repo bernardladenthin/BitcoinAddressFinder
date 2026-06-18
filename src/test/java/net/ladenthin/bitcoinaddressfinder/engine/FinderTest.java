@@ -45,7 +45,6 @@ import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocketTest;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaTest;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaZmq;
-import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaZmqTest;
 import net.ladenthin.bitcoinaddressfinder.producer.Producer;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerState;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerStateProvider;
@@ -414,10 +413,15 @@ public class FinderTest {
         webSocket.port = KeyProducerJavaSocketTest.findFreePort();
         cFinder.keyProducerJavaWebSocket.add(webSocket);
 
-        // 6. JavaZmq
+        // 6. JavaZmq — bind to a ZMQ ephemeral port ("*"), not a pre-picked one. The producer binds
+        // in BIND mode (default); pre-picking a port via findFreePort() (open ServerSocket(0), close,
+        // reuse the number) has a TOCTOU race — the port can be taken between the close and the ZMQ
+        // bind, which intermittently failed CI with "ZMQ Errno 48" (EADDRINUSE). ZMQ resolves "*" to a
+        // free port atomically at bind time. This test only asserts the producer instance exists, so it
+        // never needs the concrete port.
         CKeyProducerJavaZmq zmq = new CKeyProducerJavaZmq();
         zmq.keyProducerId = "zmqId";
-        zmq.address = KeyProducerJavaZmqTest.findFreeZmqAddress();
+        zmq.address = "tcp://127.0.0.1:*";
         cFinder.keyProducerJavaZmq.add(zmq);
 
         Finder finder = new Finder(cFinder);
@@ -502,7 +506,11 @@ public class FinderTest {
 
     private void configureKeyProducerJavaZmq(String keyProducerId, CFinder cFinder) {
         CKeyProducerJavaZmq zmq = new CKeyProducerJavaZmq();
-        zmq.address = KeyProducerJavaZmqTest.findFreeZmqAddress();
+        // Bind to a ZMQ ephemeral port ("*") rather than a pre-picked findFreePort() number, which has
+        // a TOCTOU race (the port can be taken between the probe's ServerSocket close and the ZMQ bind
+        // -> "ZMQ Errno 48" EADDRINUSE). ZMQ resolves "*" atomically at bind time; these tests only
+        // exercise the producer lifecycle and never connect a client, so the concrete port is unneeded.
+        zmq.address = "tcp://127.0.0.1:*";
         zmq.timeoutMillis = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
         zmq.keyProducerId = keyProducerId;
         cFinder.keyProducerJavaZmq.add(zmq);

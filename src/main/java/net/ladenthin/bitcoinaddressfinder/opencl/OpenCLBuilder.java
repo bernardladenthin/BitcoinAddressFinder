@@ -42,6 +42,7 @@ import static org.jocl.CL.CL_DEVICE_VENDOR;
 import static org.jocl.CL.CL_DEVICE_VERSION;
 import static org.jocl.CL.CL_DRIVER_VERSION;
 import static org.jocl.CL.CL_PLATFORM_NAME;
+import static org.jocl.CL.CL_PLATFORM_NOT_FOUND_KHR;
 import static org.jocl.CL.clGetDeviceIDs;
 import static org.jocl.CL.clGetDeviceInfo;
 import static org.jocl.CL.clGetPlatformIDs;
@@ -55,6 +56,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import org.apache.maven.artifact.versioning.ComparableVersion;
+import org.jocl.CLException;
 import org.jocl.Pointer;
 import org.jocl.Sizeof;
 import org.jocl.cl_context_properties;
@@ -88,10 +90,26 @@ public class OpenCLBuilder {
      * @return the list of detected OpenCL platforms
      */
     public List<OpenCLPlatform> build() {
-        // Obtain the number of platforms
+        // Obtain the number of platforms. An OpenCL ICD *loader* can be present (so the native
+        // library loads) while no ICD/platform is actually installed — common on bare CI runners
+        // (e.g. Windows without a GPU driver). In that case the loader returns
+        // CL_PLATFORM_NOT_FOUND_KHR, which JOCL surfaces as a CLException when exceptions are enabled.
+        // Treat "no platforms" as an empty result rather than failing, so callers (and the
+        // OpenCLAddKernelSmokeTest) can cleanly skip instead of erroring.
         int[] numPlatforms = new int[1];
-        clGetPlatformIDs(0, null, numPlatforms);
+        try {
+            clGetPlatformIDs(0, null, numPlatforms);
+        } catch (CLException e) {
+            if (e.getStatus() == CL_PLATFORM_NOT_FOUND_KHR) {
+                return new ArrayList<>();
+            }
+            throw e;
+        }
         int numPlatformCount = numPlatforms[0];
+        if (numPlatformCount == 0) {
+            // Exceptions-disabled path: the call returned the error code instead of throwing.
+            return new ArrayList<>();
+        }
 
         // Obtain the platform IDs
         List<OpenCLPlatform> openCLPlatforms = new ArrayList<>(numPlatformCount);
