@@ -4,7 +4,6 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
 import static org.jocl.CL.CL_MEM_COPY_HOST_PTR;
 import static org.jocl.CL.CL_MEM_READ_ONLY;
@@ -40,6 +39,7 @@ import org.jocl.cl_kernel;
 import org.jocl.cl_mem;
 import org.jocl.cl_program;
 import org.jocl.cl_queue_properties;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -55,7 +55,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Requires only that the OpenCL native library and at least one device are present; it does
  * <em>not</em> require OpenCL 2.0 (a plain {@code add} needs nothing newer), so it runs on the
- * widest possible device set. It self-skips (does not fail) when no OpenCL library is available.
+ * widest possible device set. It self-skips (does not fail) when no OpenCL library is available, and
+ * also when the library/loader is present but reports no platform or device (e.g. a bare CI runner
+ * without a GPU driver — the loader returns {@code CL_PLATFORM_NOT_FOUND_KHR}).
  */
 public class OpenCLAddKernelSmokeTest {
 
@@ -93,8 +95,11 @@ public class OpenCLAddKernelSmokeTest {
             }
         }
 
-        // assert: the library was available, so at least one device must have been exercised.
-        assertThat(devicesExercised, is(greaterThan(0)));
+        // An OpenCL loader can be present with zero platforms/devices (a bare CI runner without a GPU
+        // driver — the loader returns CL_PLATFORM_NOT_FOUND_KHR, which OpenCLBuilder.build() maps to an
+        // empty list). There is nothing to smoke-test then, so skip cleanly rather than fail. When a
+        // device IS present, runAddKernelOnDevice above has already asserted the elementwise sum on it.
+        Assumptions.assumeTrue(devicesExercised > 0, "No OpenCL platform/device present — skipping smoke test");
     }
     // </editor-fold>
 
