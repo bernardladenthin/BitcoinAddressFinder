@@ -17,6 +17,91 @@ pluggable-persistence design plan:
 
 - **Add standalone `BloomFilterPersistence`** (Bloom-only / probabilistic mode without a backing `AddressLookup`). The current `BloomFilterAccelerator` returns `requiresBackend()==true`; a pure-Bloom variant would return `false` and accept `getAmount` semantics of "unsupported / always `Coin.ZERO`". Not yet needed by any caller; ship only when someone asks for it.
 
+### Self-contained jar — zero-download first run (configs + demo DB + launchers)
+
+> **Status: idea / not yet investigated to implementation depth.** Goal: a newcomer
+> runs BitcoinAddressFinder with **nothing to download but the jar** (and Java) — no
+> hand-copied config, no `logbackConfiguration.xml`, no multi-GB LMDB download before
+> the first run. Three independently shippable phases; each needs its own design pass
+> before coding. Captured here so the idea isn't lost.
+
+#### Phase 1 — Ship example configs *inside* the jar + classpath resolution + parse guard
+
+- **Idea:** package `examples/config_*.json` (9 files today) into the jar and let the CLI
+  accept a bare *name* that resolves *local file if it exists, else jar/classpath* (no silent
+  shadowing of an edited local file).
+- **Investigate first:**
+  - `cli/Main.java` is filesystem-only today: `main()` → `loadConfiguration(Path)` (line ~177)
+    → `readString` (`Files.readString`, line ~110) → `fromJson`/`fromYaml` (extension picks the
+    parser, `.json/.js` vs `.yaml/.yml`). Refactor so a `(String content, String nameForExtension)`
+    path shares the parser branch; **keep `loadConfiguration(Path)` intact** (used by `MainTest`).
+  - The repo already loads classpath resources cleanly — mirror, don't invent: `getResourceAsStream`
+    (`secret/BIP39Wordlist.java`) and Guava `Resources.getResource` (`opencl/OpenCLContext.java`).
+  - Decide canonical home: move configs to `src/main/resources/config/` (packaged at `/config/...`),
+    or copy at build time. `pom.xml` already copies `src/main/resources` into both the normal and
+    `assembly` fat jar.
+  - **Guard test:** add/extend a `ConfigFixturesParseTest` that loads each bundled config *from the
+    classpath* and asserts it deserialises to a `CConfiguration` with the expected `command`/`finder`
+    shape — this is what stops the shipped configs rotting.
+  - **REUSE/CI:** `REUSE.toml` currently lists `examples/config_*.json`. Moving them means updating
+    those annotation paths; every committed file needs SPDX metadata.
+- **Tests to run:** `mvn test -Dtest='ConfigFixturesParseTest,MainTest'`.
+
+#### Phase 2 — Embedded ~1000-address demo LMDB, built at `mvn` time, auto-fallback at runtime
+
+- **Idea:** embed a tiny (~1000-address) demo LMDB so a first `Find` run works end-to-end with no DB
+  download. **Decisions already taken:** demo DB is *generated during the build* (no binary committed
+  to git), and it activates as an *auto-fallback when the configured `lmdbDirectory` is missing* —
+  **plus a loud WARN every time** it is used (this tool scans for real balances; it must never
+  silently use the tiny set).
+- **Investigate first:**
+  - LMDB is memory-mapped and **cannot** be opened from inside a jar: `persistence/lmdb/LMDBPersistence`
+    `initReadOnly()` opens `new File(lmdbDirectory)` with `MDB_RDONLY_ENV | MDB_NOLOCK` → only `data.mdb`
+    must be extracted to a temp dir (no `lock.mdb` needed). Need a new resource→temp extractor (Guava
+    `Resources` + `Files.copy`, `deleteOnExit`) — none exists today.
+  - Runtime seam for the fallback: `consumer/ConsumerJava.initLMDB()` (line ~301-303,
+    `new LMDBPersistence(cfg, persistenceUtils); lmdb.init();`). Branch: if `lmdbDirectory` is
+    empty / has no `data.mdb`, extract the embedded demo DB to temp, WARN, open read-only; else open
+    the configured dir exactly as today. Build a read-only `CLMDBConfigurationReadOnly` for the temp dir.
+  - Build a DB from keys: `command/AddressFilesToLMDB` writes hash160→coin via `putNewAmount(...)`;
+    test path `LMDBBase.createAndFillAndOpenLMDB` → `TestAddressesLMDB.createTestLMDB`. Derivation via
+    `model/PublicKeyBytes` + `Hash160`. A demo DB built from private keys `1..N` yields real **hits**
+    when an incremental producer scans from `1`.
+  - Build wiring: bind `exec-maven-plugin` (already present for JMH) to `process-classes` (after main
+    compile, before `test`) to run a `demo/DemoLmdbGenerator` `main` writing into
+    `target/classes/demo/lmdb/` → on the test classpath *and* packaged into the jar. `exec:java` runs
+    in-process so it inherits `.mvn/jvm.config`'s lmdbjava `--add-opens`. Build outputs under `target/`
+    are **not** REUSE-checked → a build-time demo DB needs **no** REUSE entry.
+  - NullAway is error-level — annotate every new `@Nullable`/`@NonNull`.
+  - **Smoke test idea:** with no `lmdb/` present, run a tiny incremental-from-1 `Find` config and assert
+    the demo fallback activates and a hit is produced; add `config_Find_Demo.json`.
+- **Tests to run:** `mvn test -Dtest='DemoDatabaseSmokeTest,ConsumerJavaTest'`, then `mvn package -P assembly`
+  + `unzip -l target/*-jar-with-dependencies.jar | grep demo/lmdb` to confirm packaging.
+
+#### Phase 3 — Zero/low-friction launchers (jar + a JDK only)
+
+- **Idea:** with configs + demo DB in the jar, launchers need only deliver the **jar** and a **JDK 21**;
+  first run needs no other download.
+- **Investigate first:**
+  - `examples/baf.sh` / `baf.ps1` / `baf.cmd`: local jar first → else download the pinned fat jar from
+    Maven Central + verify SHA-256 → enforce Java 21 → run with the two required runtime `--add-opens`
+    (`java.base/java.nio`, `java.base/sun.nio.ch`) and `-Dlogback.configurationFile=...`.
+  - JBang quickstart (`quickstart.sh` / `.ps1` + `jbang-catalog.json`): JBang brings JDK 21 and runs the
+    GAV `net.ladenthin:bitcoinaddressfinder:<version>` directly.
+  - **Version-pin upkeep:** pin the current release (now **1.6.0**) + its fat-jar SHA-256 in `baf.*`,
+    the GAV in catalog/quickstart, and the README; add a release version-bump checklist. Central vs
+    GitHub-Release bytes are separate uploads — pin the checksum of whichever mirror the script fetches.
+  - **Verification:** `shellcheck examples/*.sh`; PSScriptAnalyzer on `.ps1`; fresh-dir run downloads the
+    jar once then runs offline.
+
+#### Out of scope / notes
+- Sandbox caveat: this environment may block external installs (JBang/Central/light-DB download) and the
+  GPU/OpenCL path — the demo (CPU incremental + tiny LMDB) is fully exercisable offline; live fetches must
+  be validated in CI or on a dev box.
+- Optional niceties (not required): a `lmdbDirectory: "classpath:demo"` sentinel to *force* the demo even
+  when a real dir exists; a `--extract-config <name>` to drop a bundled config to disk for editing.
+- Snapshot resolution (timestamped metadata) is out — Release + pinned checksum only.
+
 ### GPU acceleration (three connected designs)
 
 #### CPU-side filter (Part 1) vs GPU-side filter (Part 2)
