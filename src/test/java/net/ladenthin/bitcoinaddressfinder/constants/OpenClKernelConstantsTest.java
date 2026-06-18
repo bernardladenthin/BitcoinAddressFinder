@@ -63,6 +63,15 @@ public class OpenClKernelConstantsTest {
     }
 
     @Test
+    public void byteExact_fe10x26TableLayout() {
+        // Reduced-radix 2^26 i*G table entry layout; must match SECP256K1_FE10X26_NUM_LIMBS (10) and
+        // SECP256K1_FE10X26_TWO_COORD_WORDS (20) in inc_ecc_secp256k1_fe10x26.cl.
+        assertThat(OpenClKernelConstants.FE10X26_ONE_COORDINATE_NUM_WORDS, is(10));
+        assertThat(OpenClKernelConstants.FE10X26_TWO_COORDINATE_NUM_WORDS, is(20));
+        assertThat(OpenClKernelConstants.FE10X26_TWO_COORDINATES_NUM_BYTES, is(80));
+    }
+
+    @Test
     public void byteExact_publicKeyLengths() {
         assertThat(OpenClKernelConstants.SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BITS, is(520));
         assertThat(OpenClKernelConstants.SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BYTES, is(65));

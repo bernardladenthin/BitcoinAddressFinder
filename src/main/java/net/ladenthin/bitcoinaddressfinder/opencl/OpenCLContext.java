@@ -735,9 +735,51 @@ public class OpenCLContext implements ReleaseCLObject {
         // never zero-size. When keysPerWorkItem == 1 the walk reads no i*G entry, so the placeholder
         // (left unwritten by the kernel's count=0 run) is never consumed.
         final int entries = Math.max(keysPerWorkItem - 1, 1);
-        final long bytes = (long) entries * OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES;
-        igTableMem = clCreateBuffer(localContext, CL_MEM_READ_WRITE, bytes, null, null);
-        enqueuePrecomputeKernel(igTableMem, "precompute_ig_table", keysPerWorkItem - 1);
+        if (producerOpenCL.useReducedRadixField) {
+            // Refinement (b): store the i*G table in reduced-radix 2^26 form so the 2^26 scalar-walker
+            // reads increment coordinates with no per-key fe10x26_from_u32x8 conversion. The vendored
+            // precompute_ig_table emits only radix-2^32, so build into a scratch buffer and lower it
+            // once with our own convert_ig_table_to_fe10x26 kernel (present only on the 2^26 build).
+            final long radixBytes = (long) entries * OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES;
+            final cl_mem radix32Table = clCreateBuffer(localContext, CL_MEM_READ_WRITE, radixBytes, null, null);
+            try {
+                enqueuePrecomputeKernel(radix32Table, "precompute_ig_table", keysPerWorkItem - 1);
+                final long bytes = (long) entries * OpenClKernelConstants.FE10X26_TWO_COORDINATES_NUM_BYTES;
+                igTableMem = clCreateBuffer(localContext, CL_MEM_READ_WRITE, bytes, null, null);
+                enqueueConvertIgTableToFe10x26(igTableMem, radix32Table, keysPerWorkItem - 1);
+            } finally {
+                clReleaseMemObject(radix32Table);
+            }
+        } else {
+            final long bytes = (long) entries * OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES;
+            igTableMem = clCreateBuffer(localContext, CL_MEM_READ_WRITE, bytes, null, null);
+            enqueuePrecomputeKernel(igTableMem, "precompute_ig_table", keysPerWorkItem - 1);
+        }
+    }
+
+    /**
+     * Lowers the radix-2³² i*G table {@code in} into the reduced-radix 2²⁶ layout {@code out} on the
+     * device via the {@code convert_ig_table_to_fe10x26} kernel (single work item). Used only on the
+     * 2²⁶ build path (see {@link #uploadIGTable}); that kernel exists only when the program was built
+     * with {@link #REDUCED_RADIX_FIELD_BUILD_OPTION}.
+     *
+     * @param out   the destination 2²⁶ table buffer ({@code [x(10)][y(10)]} per entry)
+     * @param in    the source radix-2³² table buffer ({@code [x(8)][y(8)]} per entry)
+     * @param count number of entries to convert ({@code keysPerWorkItem - 1}; 0 is a valid no-op)
+     */
+    private void enqueueConvertIgTableToFe10x26(cl_mem out, cl_mem in, int count) {
+        final cl_program localProgram = Objects.requireNonNull(program);
+        final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
+        final cl_kernel convertKernel = clCreateKernel(localProgram, "convert_ig_table_to_fe10x26", null);
+        try {
+            clSetKernelArg(convertKernel, 0, Sizeof.cl_mem, Pointer.to(out));
+            clSetKernelArg(convertKernel, 1, Sizeof.cl_mem, Pointer.to(in));
+            clSetKernelArg(convertKernel, 2, Sizeof.cl_uint, Pointer.to(new int[] {count}));
+            clEnqueueNDRangeKernel(localQueue, convertKernel, 1, null, new long[] {1L}, null, 0, null, null);
+            clFinish(localQueue);
+        } finally {
+            clReleaseKernel(convertKernel);
+        }
     }
 
     /**
