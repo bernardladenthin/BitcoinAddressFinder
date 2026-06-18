@@ -1130,14 +1130,39 @@ detection — the Track-B branch-2 policy. Implemented as a tri-state `@Nullable
 remains a manual override. See §9 "How to enable". Steps 1 (benchmark `@Param`), 2 (NVIDIA measure) and
 4 (policy + code) are **done**.
 
-**Still open (AMD-side, optional):**
-- **Quantify what AMD pays** (step 3): warm the inlined `comgr` cache once (one uninterrupted ~16 min
-  inlined build), then A/B inlined vs `noinline` at the AMD sweet spot (`keysPerWorkItem=32`). Needs the
-  AMD box.
-- **Selective `noinline`** — apply only to the heaviest helpers (SHA-256, RIPEMD-160, safegcd) instead
-  of every `DECLSPEC`, to keep most of the AMD compile-time win at a smaller runtime cost; re-run the
-  parity gate after any change. The NVIDIA 4.5× figure shows the all-helpers hammer is expensive, so a
-  scalpel is worth trying on AMD.
+**Quantified — what AMD pays (step 3): ✅ DONE.** A/B on the **RX 7900 XTX** (compact,
+`batchSizeInBits=20`, `keysPerWorkItem=32`, reduced-radix on; `-f 1 -wi 1 -w 30 -i 1 -r 240`):
+
+| `noInlineHelpers` | throughput | M keys/s | relative |
+|---|--:|--:|--:|
+| `false` (inlined) | **265.98 ops/s** | ≈ 279 | 1.00× |
+| `true` (out-of-line, the AMD auto-default) | **79.63 ops/s** | ≈ 83 | **≈ 0.30× (~3.34× slower)** |
+
+So `noinline` costs AMD **~3.3×** runtime throughput — same order as NVIDIA's ~4.5×, **not** a cheap
+fix. Key consequence of the `comgr` cache: the inlined 8–16 min compile is a **one-time** cost (warm
+hits are ~0.7 s thereafter), so a **long-running AMD scan is ~3.3× faster with `noInlineHelpers=false`**
+once the cache is warm. The `null`=auto default (out-of-line on AMD) optimises **first-run / test /
+CI** convenience — it must never pay a 16 min compile — at the price of steady-state throughput.
+Practical guidance: for a sustained production scan on AMD, warm the cache once and set
+`noInlineHelpers=false` at `keysPerWorkItem ≈ 64`; leave it on auto everywhere else. (The §4 sweet-spot
+sweep used the `noinline` build, peak at 32; the *inline* peak is ≈ 64 — measured in the step-3
+follow-ups below.)
+
+**Investigated — step 3 AMD-side follow-ups: ✅ DONE (neither changes the policy).**
+- **Selective `noinline` — tried, not viable.** Tagging only the 6 heaviest *structural* helpers out-of-line
+  (comb `point_mul_xy_comb`, `point_add`, `point_add_xy`, `inv_mod_safegcd`, `sha256_transform`,
+  `ripemd160_transform`) via a `NOINLINE_HEAVY` marker — while keeping the field multiply
+  (`mul_mod`/`fe10x26_mul`) inline — compiled in **~5.3 min** (vs ~16 min fully inlined, ~3 s blanket).
+  Still far over the 180 s test-fork budget, so it cannot serve as the AMD default. Root cause: the
+  **field multiply is both the compile bottleneck** (inlined into `point_add`/`point_add_xy`/conversions
+  everywhere) **and the runtime-hottest function** — keep it inline and compile stays minutes;
+  out-of-line it and runtime collapses toward the blanket's 3.3×. No split wins both, so the blanket
+  out-of-line stays the AMD auto path and the experiment was reverted.
+- **Inline `keysPerWorkItem` sweet spot ≈ 64** (re-sweep done; RX 7900 XTX, compact, `batchSizeInBits=20`,
+  reduced-radix on, warm cache): 8 → 144.6, 16 → 205.9, 32 → 269.5, **64 → 274.7**, 128 → 244.3 ops/s
+  (≈ 288 M keys/s at the peak). The inline build prefers slightly fatter work-items than the `noinline`
+  build (sweet spot 32, §4), so for a sustained production scan on AMD use `noInlineHelpers=false` at
+  `keysPerWorkItem ≈ 64` (a broad 32–64 plateau).
 
 **Inputs:** AMD compile/throughput numbers + sweet-spot sweep in §4 "Cross-device"; the `noinline`
 mechanism + `comgr` cache controls in §9.
