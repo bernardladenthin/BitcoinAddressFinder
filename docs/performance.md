@@ -149,16 +149,19 @@ Notes:
 
 - The default `keysPerWorkItem = 1` pays a full scalar multiplication per key and is far from
   optimal — up to ~20× off the peak in compact mode.
-- **The sweet spot is `keysPerWorkItem = 128` (at `batchSizeInBits = 20`) and did not move after
-  Stage 4** — confirmed independently in *both* modes (rise to 128, fall at 256). safegcd made every
-  point faster but the peak is set by the work-item count vs. the GPU's compute units, not by the
-  inverse cost.
+- **`keysPerWorkItem = 128` is the peak *only at this fixed `batchSizeInBits = 20`.*** It is **not**
+  the global optimum: with the batch size also free, the joint `(batchSizeInBits, keysPerWorkItem)`
+  optimum is much higher and ~**+33%** faster — see "**Joint (batch, kpwi) optimum**" below. Within the
+  batch=20 row the peak does sit at 128 (rise to 128, fall at 256), confirmed in both modes.
 - **Compact ≫ full transfer** because the fast path skips the ~113 MB readback; this is why the
   numbers here are much higher than the pre-Stage-3/4 editions of this table (those were full transfer
   in an unknown thermal window — per §6, treat absolute numbers across sessions as non-comparable; the
   robust, reproducible result is the *shape and the peak location*).
-- Beyond the sweet spot, throughput drops because too few work-items remain to fill all compute units
-  (`2^20 / 128 = 8192` work-items still fills this 40-SM GPU; `2^20 / 256 = 4096` under-fills it).
+- Beyond this row's peak, throughput drops because too few work-items remain. **Correction:** an earlier
+  edition claimed `2^20 / 128 = 8192` work-items "fills this 40-SM GPU" — it does **not**. 8192 work-items
+  is only ~32 work-groups (≤256 each) for 40 SMs, i.e. **under one group per SM** — the GPU is
+  *under-occupied* at batch=20. Real saturation needs several groups per SM (`batchSizeInBits ≈ 22-24`);
+  see the joint-optimum subsection.
 - The sweet spot is **device-dependent** — sweep on your own hardware with the §6 recipe. The peak
   also depends on `batchSizeInBits` via the work-item count `2^batchSizeInBits / keysPerWorkItem` — at
   the smaller `batchSizeInBits = 18` the work-item-count analog of this peak is `keysPerWorkItem = 32`
@@ -168,6 +171,54 @@ Notes:
 
 Use `{"command":"OpenCLInfo"}` to confirm a device is present and pick `platformIndex` /
 `deviceIndex` before benchmarking.
+
+### Joint (batchSizeInBits, keysPerWorkItem) optimum — the real sweet spot (≈ +33%)
+
+The `keysPerWorkItem` table above fixes `batchSizeInBits = 20`. **That batch size under-occupies the
+RTX 3070, and 128 is not the global optimum.** A 2-D sweep over both axes (compact, reduced-radix on,
+RTX 3070 Laptop, candidates/s = JMH ops/s × `2^batchSizeInBits`) finds a far higher peak:
+
+| M keys/s | kpwi=128 | kpwi=256 | kpwi=512 | kpwi=1024 | kpwi=2048 |
+|---|--:|--:|--:|--:|--:|
+| **batch=20** | 200 | — | — | — | — |
+| **batch=22** | 206 | 242 | 250 | — | — |
+| **batch=23** | 233 | 242 | 260 | 248 | 154 ⬍ |
+| **batch=24** | — | — | 258 | 256 | **266 (peak)** |
+
+⬍ = occupancy collapse (`2^23 / 2048 = 4096` work-items, too few). **Peak ≈ 266 M keys/s at
+`batchSizeInBits = 24`, `keysPerWorkItem = 2048`** — **≈ +33% over the documented `batch=20, kpwi=128`
+(200 M keys/s)**, both measured same-session.
+
+**Why both axes want to be large — it's amortization, not work-item count.** `batch=20/kpwi=128` and
+`batch=24/kpwi=2048` use the *same* 8192 work-items, yet the latter is +33% faster. Two fixed costs are
+spread over more keys: a larger **`batchSizeInBits`** amortizes the per-launch overhead (kernel launch,
+host round-trip) over `2^batch` keys, and a larger **`keysPerWorkItem`** amortizes the one expensive
+**comb anchor** (a full fixed-base scalar multiplication, done once per work-item) over `kpwi` cheap
+affine-walk keys. The rule is therefore: **maximize `batchSizeInBits` and `keysPerWorkItem` while
+keeping ≳ 8 192 work-items resident for occupancy** — not "pick kpwi=128". The ceiling on `batchSizeInBits`
+here is **24** (`2^24 < MAXIMUM_CHUNK_ELEMENTS = 20 648 881`; `2^25` exceeds it); below ~8 192 work-items
+(e.g. `batch=23/kpwi=2048`) occupancy collapses.
+
+**Reduced-radix 2²⁶ helps *more* at this optimum, not less.** A matched radix A/B at `batch=24`:
+
+| config | radix-2³² | reduced-radix 2²⁶ (+ (b)) | 2²⁶ gain |
+|---|--:|--:|--:|
+| kpwi=512 | 225.7 ± 2.7 | 258.4 ± 1.1 | +14.5% |
+| **kpwi=2048** | 205.6 ± 0.4 | **265.7 ± 0.9** | **+29.2%** |
+
+The 2²⁶ advantage **scales with `keysPerWorkItem`**: ~+1% at `kpwi=128` (where the radix-2³² comb anchor
+is a big, un-accelerated fraction) up to **+29% at `kpwi=2048`**, where the arithmetic-heavy affine walk
+dominates and the 1.56× faster 2²⁶ field multiply (§5/§8) is fully expressed. radix-2³² can't exploit
+high `kpwi` at all — it is *slower* at `kpwi=2048` (205.6) than `kpwi=512` (225.7), because its slow
+field multiply makes the longer walk the bottleneck. So Stage 5 (reduced-radix) is **worth more in
+combination with the high-`kpwi` config** than the original `batch=20` +22% headline implied — and the
+earlier "they converge at saturation" reading was a `kpwi=128` artifact.
+
+> **Actionable.** For a sustained scan on an 8 GB RTX-3070-class GPU, prefer `batchSizeInBits = 24`,
+> `keysPerWorkItem = 2048`, reduced-radix on (≈ 266 M keys/s) over the legacy `batch=20, kpwi=128`
+> (≈ 200 M). Scale `batchSizeInBits` down for lower-VRAM devices, and re-sweep both axes per device
+> (the `OpenCLInfo` heuristic currently suggests a more conservative `batch=21, kpwi=256` start — a good
+> first guess but ~10% below this peak; sweeping upward from there is worthwhile).
 
 ### Cross-device: AMD RX 7900 XTX (RDNA3) vs RTX 3070 Laptop (Ampere)
 
@@ -938,12 +989,14 @@ and the `copyfromhashcat` files are unchanged either way.
   payoff. **Skipped on spec.** Takeaway: the anchor region is more codegen-sensitive than the compute
   estimate implies, so the kernel sits on a register/occupancy knife-edge (§6) — a careful, correctness-
   preserving experiment could revisit it, but the blind 2²⁶-comb port is not justified.
-  (d) **Re-sweep `keysPerWorkItem` with the flag on — ✅ DONE: sweet spot unchanged at 128.** Sweep on
-  the RTX 3070 (compact, `batchSizeInBits=20`, reduced-radix on, with (b)): 8 → 56.5, 16 → 93.7,
-  32 → 129.5, 64 → 157.8, **128 → 188.3 (peak)**, 256 → 130.3 ops/s. The per-key cost shift from
-  reduced-radix + (b) did **not** move the NVIDIA optimum — it remains **`keysPerWorkItem = 128`** (8 192
-  work-items for the 40 SMs), matching the §4 table. (AMD's optimum differs — 32 for `noinline`, ~64
-  inlined — see §4/§10 "Cross-device".)
+  (d) **Re-sweep `keysPerWorkItem` with the flag on — ✅ DONE, and it uncovered a bigger win.** At the
+  *fixed* `batchSizeInBits = 20` the kpwi peak is unchanged at 128 (8 → 56.5 … **128 → 188.3** … 256 →
+  130.3 ops/s). **But freeing `batchSizeInBits` too** revealed that batch=20 under-occupies the GPU and
+  128 is not the global optimum: the joint `(batchSizeInBits, keysPerWorkItem)` peak is **`batch=24,
+  kpwi=2048` ≈ 266 M keys/s — ≈ +33%** over `batch=20/kpwi=128` — and reduced-radix 2²⁶ is worth **+29%**
+  there (vs +1% at kpwi=128). See §4 "**Joint (batch, kpwi) optimum**" for the full 2-D sweep, the
+  amortization model, and the actionable config. (AMD's optimum differs — 32 for `noinline`, ~64 inlined
+  — see §4/§10 "Cross-device".)
 
 ### Candidates for a future stage
 
