@@ -80,9 +80,8 @@ jobs:
         #
         # -P assembly additionally builds the runnable fat jar-with-dependencies
         # (bitcoinaddressfinder-<version>-jar-with-dependencies.jar). It lands in target/ and
-        # rides along in the `jars` upload-artifact below - a CI run artifact only, NOT a Maven
-        # Central / GitHub-Release asset. Documented as deliberate non-parity (BAF + jllama only)
-        # in workspace/crossrepostatus.md.
+        # rides along in the `jars` upload-artifact below - a CI run artifact only, not a Maven
+        # Central / GitHub-Release asset.
         run: mvn --batch-mode --no-transfer-progress -P assembly -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -DskipTests -Dmaven.javadoc.skip=true package
       - uses: actions/upload-artifact@v7
         with: { name: jars, path: target/*.jar }
