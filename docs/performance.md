@@ -15,11 +15,17 @@ and understanding *why* — it goes well beyond the defaults.
 1. **Use a discrete GPU via OpenCL** for key generation; the CPU consumer checks addresses in
    parallel.
 2. **Raise `keysPerWorkItem`.** The default is `1`, which is the *slowest* setting (a full `k·G`
-   scalar multiplication per key). The optimum is **device-dependent**; on an NVIDIA RTX 3070 Laptop
-   it is `128` at `batchSizeInBits=20` — ≈**20× faster than `1`** in compact mode (≈138 M candidate
-   keys/s on the GPU-filter fast path; ≈43 M in full-transfer mode). Sweep it on your hardware (§4).
-3. **Match `batchSizeInBits` to the device** (e.g. `18` for a typical GPU, `20`–`21` for a high-end
-   one) and ensure `batchSizeInBits` is divisible by `keysPerWorkItem`.
+   scalar multiplication per key). The optimum is **device-dependent and jointly tuned with
+   `batchSizeInBits`** (see point 3). On an NVIDIA RTX 3070 Laptop the joint optimum is
+   `keysPerWorkItem=2048` at `batchSizeInBits=24` (≈ **266 M keys/s** compact, reduced-radix on); on an
+   AMD RX 7900 XTX it is `keysPerWorkItem=128` at `batch=24` (≈ 177 M keys/s, `noinline`). Never leave it
+   at `1`. Sweep both axes on your hardware (§4 "Joint (batch, kpwi) optimum").
+3. **Maximize `batchSizeInBits` too** — a larger batch amortizes the per-launch overhead and lets a
+   larger `keysPerWorkItem` amortize the one-time comb anchor. Push it up to **`24`** (the
+   `MAXIMUM_CHUNK_ELEMENTS` cap) on an 8 GB+ GPU, scaling down for lower VRAM, while keeping ≳ 8 192
+   work-items resident (`2^batchSizeInBits / keysPerWorkItem`). `batchSizeInBits` must be ≥
+   `log2(keysPerWorkItem)`. The old fixed `batch=20, kpwi=128` is ~33% (NVIDIA) / ~2× (AMD) below the
+   joint optimum.
 4. **Benchmark with `GridSizeSweepBenchmark`** and read §6 first — laptop GPUs throttle, and naive
    A/B comparisons are misleading.
 
@@ -133,11 +139,16 @@ filter's measured transfer saving (~1.28× at grid 19 on an RTX 3070) is benchma
 
 ## 4. Benchmarked tuning — `keysPerWorkItem` sweep
 
-NVIDIA RTX 3070 Laptop GPU, OpenCL 3.0 CUDA, `batchSizeInBits = 20`, **current kernel (all stages,
-safegcd default)**. Fresh single-session re-sweep after Stage 4; candidates/s = JMH ops/s ×
-`2^batchSizeInBits`. Two modes shown — full transfer (`GridSizeSweepBenchmark`, every result read
-back) and compact (`GpuFuse8FilterBenchmark -p gpuFilter=true`, only filter hits read back, i.e. the
-real GPU-filter fast path):
+NVIDIA RTX 3070 Laptop GPU, OpenCL 3.0 CUDA, `batchSizeInBits = 20`, single-session re-sweep **after
+Stage 4** (safegcd); candidates/s = JMH ops/s × `2^batchSizeInBits`. Two modes shown — full transfer
+(`GridSizeSweepBenchmark`, every result read back) and compact (`GpuFuse8FilterBenchmark -p
+gpuFilter=true`, only filter hits read back, i.e. the real GPU-filter fast path):
+
+> **Note — this table predates the reduced-radix default (Stage 5) + refinement (b).** Its absolute
+> compact peak (≈ 138 M keys/s at kpwi=128) is therefore ~30% below current code, which reaches ≈ 200 M
+> keys/s at the *same* `batch=20, kpwi=128` (and ≈ 266 M at the joint `batch=24, kpwi=2048` optimum — see
+> the subsection below). Per §6 this table illustrates the **shape and peak *location*** (which are
+> unchanged), not current absolutes.
 
 | `keysPerWorkItem` | 1 | 8 | 16 | 32 | 64 | **128** | 256 |
 |---|--:|--:|--:|--:|--:|--:|--:|
@@ -185,9 +196,12 @@ RTX 3070 Laptop, candidates/s = JMH ops/s × `2^batchSizeInBits`) finds a far hi
 | **batch=23** | 233 | 242 | 260 | 248 | 154 ⬍ |
 | **batch=24** | — | — | 258 | 256 | **266 (peak)** |
 
-⬍ = occupancy collapse (`2^23 / 2048 = 4096` work-items, too few). **Peak ≈ 266 M keys/s at
+⬍ = occupancy collapse (`2^23 / 2048 = 4096` work-items, too few). The cells aggregate several
+back-to-back same-machine JMH runs (the `kpwi` sweep, its high-`kpwi` extension, and the radix A/B), so
+per §6 treat individual absolutes as ±~5% cross-run — but the **shape and the peak are cross-confirmed**
+(`batch=24/kpwi=2048` measured 262.7 and 265.7 in two separate runs). **Peak ≈ 266 M keys/s at
 `batchSizeInBits = 24`, `keysPerWorkItem = 2048`** — **≈ +33% over the documented `batch=20, kpwi=128`
-(200 M keys/s)**, both measured same-session.
+(≈ 200 M keys/s)**.
 
 **Why both axes want to be large — it's amortization, not work-item count.** `batch=20/kpwi=128` and
 `batch=24/kpwi=2048` use the *same* 8192 work-items, yet the latter is +33% faster. Two fixed costs are
