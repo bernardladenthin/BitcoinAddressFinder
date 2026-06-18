@@ -894,8 +894,9 @@ and the `copyfromhashcat` files are unchanged either way.
   ~**+22% end-to-end** (consistent across both A/B orderings: 189.3/152.1 = 1.24× and, reversed/cold,
   188.6/155.2 = 1.22×; tight ±1–2 ops/s error). The end-to-end gain is smaller than the isolated 1.56×
   because hashing is ~43% of the kernel (§6) and the per-key boundary conversions (increment-table
-  reads, coordinate outputs) cost a little — storing the `iG_table` in 2²⁶ form would remove those reads
-  and is the obvious next refinement. The isolated multiply confirms the carry-bound diagnosis (the
+  reads, coordinate outputs) cost a little — storing the `iG_table` in 2²⁶ form removes the increment-read
+  conversions and added a further **≈ +4.8%** (refinement (b) below, now done). The isolated multiply
+  confirms the carry-bound diagnosis (the
   `sqr_mod` finding above): not a thermal artifact — the radix-2³² multiply measured **6.57** cold in a
   fresh JVM (vs 6.53 hot). Reproduce the isolated multiply:
 
@@ -911,13 +912,29 @@ and the `copyfromhashcat` files are unchanged either way.
   ≈ **+8%** (both A/B orderings, error bars disjoint; see §4 "Cross-device") alongside the RTX 3070's
   ≈ +22%, never a regression on either. Correctness is identical (gated against bitcoinj with the flag
   on and off); set `false` to force the legacy radix-2³² walk for A/B.
-  (b) **Store `iG_table` in 2²⁶ form** (host build or a post-process kernel) to drop the per-key
-  increment-read conversions — the main remaining overhead diluting the gain.
-  (c) **Convert the comb anchor** to 2²⁶ too (needs a 2²⁶ Jacobian `point_add` in our own file, since
-  `copyfromhashcat` is untouched). Low payoff — the comb runs once per work-item vs the walk's
-  `keysPerWorkItem` iterations — so only worth it after (b).
-  (d) **Re-sweep `keysPerWorkItem`** with the flag on: the per-key cost balance shifted, so the §4
-  sweet spot may move.
+  (b) **Store `iG_table` in 2²⁶ form — ✅ DONE (≈ +4.8%).** A post-process kernel
+  (`convert_ig_table_to_fe10x26`, in our `inc_ecc_secp256k1_fe10x26.cl`, `#ifdef
+  USE_REDUCED_RADIX_FIELD`) lowers the vendored radix-2³² `iG_table` to the 2²⁶ layout (20 u32/entry)
+  once at init, so the walk reads each increment coordinate straight from the table — dropping the
+  three per-key `fe10x26_from_u32x8` conversions (Pass A `dx`, Pass B `x`/`y`). The vendored
+  `precompute_ig_table` / `copyfromhashcat` are untouched (host builds a scratch radix-2³² table, then
+  converts). Byte-identical vs bitcoinj (`ProbeAddressesOpenCLTest` 44/0, `ProbeAddressesManySeedsOpenCLTest`
+  2/0 flag on+off). **Measured** (RTX 3070, compact, `batchSizeInBits=20`, `keysPerWorkItem=128`, tight
+  6-iter A/B, disjoint error bars): **188.1 ± 0.84 vs 179.5 ± 0.32 ops/s = +4.8%**. Modest — consistent
+  with the §6 register-bound diagnosis (the conversion was cheap and largely latency-hidden) — but a
+  real, repeatable gain, so kept.
+  (c) **Convert the comb anchor to 2²⁶ — evaluated, not worth it (skipped).** Now that (b) removed the
+  per-key table conversions, the anchor is just **two** `fe10x26_from_u32x8` calls **once per
+  work-item** (lines `nx0`/`ny0`), amortized over `keysPerWorkItem` keys (< 0.1% at kpwi=128). Doing it
+  would require porting a full **2²⁶ Jacobian `point_add`/`point_double`** into our own file (the comb
+  is built on the vendored radix-2³² point ops, which stay untouched) — a large, high-risk rewrite for
+  a sub-noise payoff. Skipped; revisit only if the anchor ever shows up in a profile.
+  (d) **Re-sweep `keysPerWorkItem` with the flag on — ✅ DONE: sweet spot unchanged at 128.** Sweep on
+  the RTX 3070 (compact, `batchSizeInBits=20`, reduced-radix on, with (b)): 8 → 56.5, 16 → 93.7,
+  32 → 129.5, 64 → 157.8, **128 → 188.3 (peak)**, 256 → 130.3 ops/s. The per-key cost shift from
+  reduced-radix + (b) did **not** move the NVIDIA optimum — it remains **`keysPerWorkItem = 128`** (8 192
+  work-items for the 40 SMs), matching the §4 table. (AMD's optimum differs — 32 for `noinline`, ~64
+  inlined — see §4/§10 "Cross-device".)
 
 ### Candidates for a future stage
 
