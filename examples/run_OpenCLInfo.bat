@@ -32,6 +32,6 @@ java ^
 -Xmx512m ^
 -Dlogback.configurationFile=logbackConfiguration.xml ^
 -jar ^
-bitcoinaddressfinder-1.5.0-jar-with-dependencies.jar ^
+bitcoinaddressfinder-1.6.0-jar-with-dependencies.jar ^
 config_OpenCLInfo.json
 rem >> log_OpenCLInfo.txt 2>&1

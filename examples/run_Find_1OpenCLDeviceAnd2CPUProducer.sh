@@ -33,6 +33,6 @@ java \
 -Xmx16G \
 -Dlogback.configurationFile=logbackConfiguration.xml \
 -jar \
-bitcoinaddressfinder-1.5.0-jar-with-dependencies.jar \
+bitcoinaddressfinder-1.6.0-jar-with-dependencies.jar \
 config_Find_1OpenCLDeviceAnd2CPUProducer.json
 # >> log_Find_1OpenCLDeviceAnd2CPUProducer.txt 2>&1

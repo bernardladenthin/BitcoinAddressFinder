@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.6.0-SNAPSHOT] - in development
+## [1.6.0] - 2026-06-18
 
 ### Added
 - OpenSSF Best Practices passing-level artifacts: `CONTRIBUTING.md`, `SECURITY.md`,
@@ -91,8 +91,8 @@ First public pre-release version (Java 8).
 - LMDB database:
   <https://github.com/bernardladenthin/BitcoinAddressFinder#use-my-prepared-database>
 
-[Unreleased]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.5.0...HEAD
-[1.6.0-SNAPSHOT]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.3.0-SNAPSHOT...v1.4.0
 [1.3.0-SNAPSHOT]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.2.0-SNAPSHOT...v1.3.0-SNAPSHOT
