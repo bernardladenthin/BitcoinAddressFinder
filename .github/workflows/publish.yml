@@ -77,7 +77,13 @@ jobs:
         # first prove `mvn package` builds javadoc clean (a standalone `mvn javadoc:jar`
         # cannot — it always runs classpath mode and hides the trap). See CLAUDE.md
         # "Verifying Javadoc locally" and workspace/crossrepostatus.md.
-        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -DskipTests -Dmaven.javadoc.skip=true package
+        #
+        # -P assembly additionally builds the runnable fat jar-with-dependencies
+        # (bitcoinaddressfinder-<version>-jar-with-dependencies.jar). It lands in target/ and
+        # rides along in the `jars` upload-artifact below - a CI run artifact only, NOT a Maven
+        # Central / GitHub-Release asset. Documented as deliberate non-parity (BAF + jllama only)
+        # in workspace/crossrepostatus.md.
+        run: mvn --batch-mode --no-transfer-progress -P assembly -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -DskipTests -Dmaven.javadoc.skip=true package
       - uses: actions/upload-artifact@v7
         with: { name: jars, path: target/*.jar }
       - uses: actions/upload-artifact@v7
