@@ -923,12 +923,21 @@ and the `copyfromhashcat` files are unchanged either way.
   6-iter A/B, disjoint error bars): **188.1 ± 0.84 vs 179.5 ± 0.32 ops/s = +4.8%**. Modest — consistent
   with the §6 register-bound diagnosis (the conversion was cheap and largely latency-hidden) — but a
   real, repeatable gain, so kept.
-  (c) **Convert the comb anchor to 2²⁶ — evaluated, not worth it (skipped).** Now that (b) removed the
-  per-key table conversions, the anchor is just **two** `fe10x26_from_u32x8` calls **once per
-  work-item** (lines `nx0`/`ny0`), amortized over `keysPerWorkItem` keys (< 0.1% at kpwi=128). Doing it
-  would require porting a full **2²⁶ Jacobian `point_add`/`point_double`** into our own file (the comb
-  is built on the vendored radix-2³² point ops, which stay untouched) — a large, high-risk rewrite for
-  a sub-noise payoff. Skipped; revisit only if the anchor ever shows up in a profile.
+  (c) **Convert the comb anchor to 2²⁶ — ceiling-checked, not built (skipped).** The anchor is two
+  `fe10x26_from_u32x8` calls **once per work-item** (the `nx0`/`ny0` lowering), amortized over
+  `keysPerWorkItem` keys — a naïve compute estimate is < 0.1% at kpwi=128. A **ceiling measurement**
+  (timing-only `PROFILE_SKIP_ANCHOR_CONVERSION` stub replacing the two conversions with a cheap copy —
+  incorrect results, never shipped) surprisingly showed **199.6 ± 0.39 vs 190.3 ± 0.86 ops/s ≈ +4.9%**
+  at kpwi=128. But this is **not a faithful proxy for (c)**: the stub produces garbage 2²⁶ values and a
+  *different instruction stream*, and the coarse kernel stats are identical for both
+  (`privateMemBytes=1536`, `kernelMaxWorkGroupSize=256`), so the gap is an opaque codegen/register-
+  scheduling artifact — a real (c) (correct 2²⁶ comb) would have its own, larger footprint and could
+  land anywhere from a regression to +4.9%. Building it means porting a full **2²⁶ Jacobian
+  `point_add`/`point_double`** into our own file (the comb runs on the vendored radix-2³² point ops,
+  which stay untouched) with byte-for-byte parity gating — large and high-risk for an *uncertain*
+  payoff. **Skipped on spec.** Takeaway: the anchor region is more codegen-sensitive than the compute
+  estimate implies, so the kernel sits on a register/occupancy knife-edge (§6) — a careful, correctness-
+  preserving experiment could revisit it, but the blind 2²⁶-comb port is not justified.
   (d) **Re-sweep `keysPerWorkItem` with the flag on — ✅ DONE: sweet spot unchanged at 128.** Sweep on
   the RTX 3070 (compact, `batchSizeInBits=20`, reduced-radix on, with (b)): 8 → 56.5, 16 → 93.7,
   32 → 129.5, 64 → 157.8, **128 → 188.3 (peak)**, 256 → 130.3 ops/s. The per-key cost shift from
