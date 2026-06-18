@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-06-18
+
+### Fixed
+- Release/CI: re-release of `1.6.0` to complete the publish pipeline. The `1.6.0`
+  run published to Maven Central but did not attach the signed artifacts to the
+  GitHub release. No functional code changes versus `1.6.0`.
+
 ## [1.6.0] - 2026-06-18
 
 ### Added
@@ -91,7 +98,8 @@ First public pre-release version (Java 8).
 - LMDB database:
   <https://github.com/bernardladenthin/BitcoinAddressFinder#use-my-prepared-database>
 
-[Unreleased]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.3.0-SNAPSHOT...v1.4.0
