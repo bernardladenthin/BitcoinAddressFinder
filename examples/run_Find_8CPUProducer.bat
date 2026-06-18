@@ -32,6 +32,6 @@ java ^
 -Xmx16G ^
 -Dlogback.configurationFile=logbackConfiguration.xml ^
 -jar ^
-bitcoinaddressfinder-1.5.0-jar-with-dependencies.jar ^
+bitcoinaddressfinder-1.6.0-jar-with-dependencies.jar ^
 config_Find_8CPUProducer.json
 rem >> log_Find_8CPUProducer.txt 2>&1
