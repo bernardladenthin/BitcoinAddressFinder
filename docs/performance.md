@@ -169,6 +169,47 @@ Notes:
 Use `{"command":"OpenCLInfo"}` to confirm a device is present and pick `platformIndex` /
 `deviceIndex` before benchmarking.
 
+### Cross-device: AMD RX 7900 XTX (RDNA3) vs RTX 3070 Laptop (Ampere)
+
+The same kernel was swept on a second GPU — an **AMD Radeon RX 7900 XTX** (`gfx1100`, RDNA3, 48 CU,
+wave32, OpenCL 2.0 AMD-APP, Adrenalin 25.12.1). Two things differ from the RTX 3070 and both are
+expected from the architecture:
+
+**(1) The `keysPerWorkItem` sweet spot is different.** Compact mode, `batchSizeInBits = 20`, full
+kernel + safegcd, candidates/s = JMH ops/s × `2^20`:
+
+| `keysPerWorkItem` | 8 | 16 | **32** | 64 | 128 | 256 |
+|---|--:|--:|--:|--:|--:|--:|
+| RX 7900 XTX — M keys/s (compact) | 32.7 | 48.3 | **80.4 (peak)** | 69.1 | 50.5 | 28.2 |
+| RTX 3070 — M keys/s (compact) | 47 | 69 | 96 | 124 | **138 (peak)** | 93 |
+
+The RX 7900 XTX peaks at **`keysPerWorkItem = 32`** (≈ 32 768 work-items to fill its 48 CUs), whereas
+the RTX 3070 peaks at **128** (8 192 work-items for its 40 SMs). This is the same "match the work-item
+count to the device" rule from §4 — the optimum is genuinely per-device, so **sweep on your own
+hardware**. The RX 7900 XTX wants ~4× more work-items (smaller `keysPerWorkItem`) than the RTX 3070.
+
+**(2) Reduced-radix 2²⁶ (Stage 5) is also a win on AMD — but smaller (≈ +8% vs +22%).** Matched A/B at
+each device's own context (compact, `batchSizeInBits = 20`; RX 7900 XTX at its `keysPerWorkItem = 32`
+sweet spot), both orderings to defeat thermal bias (§6):
+
+| device | radix-2³² | reduced-radix 2²⁶ | delta |
+|---|--:|--:|--:|
+| RX 7900 XTX (avg of both orderings) | 75.3 ops/s | 81.4 ops/s | **≈ +8.1%** |
+| RTX 3070 (§5 Stage 5) | 155.2 ops/s | 188.6 ops/s | **≈ +22%** |
+
+On the RX 7900 XTX the two orderings gave +9.8% (false→true) and +6.4% (true→false); reduced-radix won
+in **both** (error bars disjoint), including when it ran second/warmer, so the gain is real, not
+ordering. It is smaller than on the RTX 3070 — plausibly because RDNA3's field throughput is less
+carry-bound, or because the per-key boundary conversions (§5 Stage 5) weigh more here — but it is a
+**positive cross-device confirmation**, which is what open point #4 was gated on (see §8 Stage 5).
+
+> **Methodology caveat — the AMD numbers are measured with `noinline` (§9).** The RX 7900 XTX build
+> uses `-D AMD_NOINLINE_HELPERS` because the inlined kernel takes 8–16+ min to compile on AMD (§9).
+> Out-of-line calls can cost runtime throughput, so the **absolute** AMD M keys/s above are likely
+> *understated* relative to a hypothetical inlined AMD build, and are **not** directly comparable to
+> the inlined RTX 3070 absolutes. What *is* comparable: the **sweet-spot location** (architectural)
+> and the **reduced-radix relative delta** (`noinline` is present in both A/B arms, so it cancels).
+
 ---
 
 ## 5. Optimization history (measured)
@@ -678,7 +719,7 @@ vendored field file. **Both states of every switch are built and run on a device
 | Build define | Config field | Default | OFF gated by | ON gated by | Correctness checkable? |
 |---|---|---|---|---|---|
 | *(none)* / `-D USE_LEGACY_BINARY_GCD_INV_MOD` | `useSafeGcdInverse` | safegcd | every `@OpenCLTest` (safegcd) | `OpenCLPrecomputeKernelTest#invModSafegcd_…` (built legacy) + `OpenCLKernelModeMatrixTest` | yes (both, vs bitcoinj / `x·x⁻¹≡1`) |
-| `-D USE_REDUCED_RADIX_FIELD` | `useReducedRadixField` | radix-2³² | every `@OpenCLTest` + `ProbeAddressesManySeedsOpenCLTest` | `ProbeAddressesManySeedsOpenCLTest` + `OpenCLKernelModeMatrixTest` | yes (both, vs bitcoinj) |
+| `-D USE_REDUCED_RADIX_FIELD` | `useReducedRadixField` | **2²⁶ (define on by default)** | `ProbeAddressesManySeedsOpenCLTest` + `OpenCLKernelModeMatrixTest` | every `@OpenCLTest` + `ProbeAddressesManySeedsOpenCLTest` | yes (both, vs bitcoinj) |
 | `-D PROFILE_SKIP_SECOND_HASH160` | `kernelProfileStage=ONE_HASH160` | `FULL` | every FULL test | `OpenCLContextTest#kernelProfileStage_buildsAndRuns` + `OpenCLKernelModeMatrixTest` | build+run only (mode emits wrong hashes by design) |
 | `-D PROFILE_SKIP_HASH160` | `kernelProfileStage=NO_HASH160` | `FULL` | every FULL test | `OpenCLContextTest#kernelProfileStage_buildsAndRuns` + `OpenCLKernelModeMatrixTest` | build+run only (mode emits wrong hashes by design) |
 
@@ -797,12 +838,14 @@ is forbidden — both address types are mandatory).
   branch/addressing overhead, so it loses. Reverted. Could be revisited on a *multiply-bound* device
   (or paired with a reduced-radix representation that shortens the add chain).
 
-### Stage 5 (opt-in) — reduced-radix 2²⁶ field in the scalar-walker (≈ +22% end-to-end, flag-gated)
+### Stage 5 — reduced-radix 2²⁶ field in the scalar-walker (≈ +22% end-to-end; now the default)
 
-The #1 EC lever is **implemented, parity-proven, integrated into the hot loop behind a flag, and
-benchmarked both in isolation and end-to-end**. It is **off by default** (`useReducedRadixField =
-false`) pending per-device confirmation; flipping the default is a one-line change now that it is
-proven. The comb anchor and the `copyfromhashcat` files are unchanged either way.
+The #1 EC lever is **implemented, parity-proven, integrated into the hot loop, and benchmarked both
+in isolation and end-to-end**. It is **now on by default** (`useReducedRadixField = true`) after the
+end-to-end gain was confirmed **cross-device** — ≈ +22% on the RTX 3070 and ≈ +8% on an AMD RX 7900
+XTX, never a regression on either (the bar open point #4 set; see §4 "Cross-device"). Set
+`useReducedRadixField = false` to force the legacy radix-2³² walk for A/B comparison. The comb anchor
+and the `copyfromhashcat` files are unchanged either way.
 
 - **What was built.** `src/main/resources/inc_ecc_secp256k1_fe10x26.cl` — a self-contained OpenCL port
   of libsecp256k1's `field_10x26_impl.h` (Pieter Wuille, MIT): `fe10x26_mul`, `fe10x26_sqr`,
@@ -863,8 +906,11 @@ proven. The comb anchor and the `copyfromhashcat` files are unchanged either way
   ```
 
 - **What remains (refinements, all optional).**
-  (a) **Flip the default** to `useReducedRadixField = true` once the +22% is confirmed on more than
-  this one RTX 3070 (the safegcd precedent: made default after a cross-device win). One-line change.
+  (a) **Flip the default — ✅ DONE.** `useReducedRadixField` now defaults to `true`. The cross-device
+  bar this item set is met: confirmed positive on a second architecture — **AMD RX 7900 XTX** (RDNA3)
+  ≈ **+8%** (both A/B orderings, error bars disjoint; see §4 "Cross-device") alongside the RTX 3070's
+  ≈ +22%, never a regression on either. Correctness is identical (gated against bitcoinj with the flag
+  on and off); set `false` to force the legacy radix-2³² walk for A/B.
   (b) **Store `iG_table` in 2²⁶ form** (host build or a post-process kernel) to drop the per-key
   increment-read conversions — the main remaining overhead diluting the gain.
   (c) **Convert the comb anchor** to 2²⁶ too (needs a 2²⁶ Jacobian `point_add` in our own file, since
@@ -962,7 +1008,168 @@ cost balance shifts):
 
 ---
 
-## 9. File map
+## 9. AMD GPUs — fixing the multi-minute kernel compile (`noinline`)
+
+**Symptom.** On AMD GPUs (measured: Radeon RX 7900 XTX, `gfx1100`, RDNA3, Adrenalin 25.12.1,
+OpenCL 2.0 AMD-APP) the **first** `clBuildProgram` of the full kernel took **8–16+ minutes** —
+single-threaded, one core pinned, multi-GB RAM — and routinely blew past the 180 s Surefire fork
+budget, so the OpenCL parity tests could not even run. A trivial `add` kernel compiles in **0.2 s** on
+the same device, so the OpenCL stack itself is healthy; the cost is specific to this one large kernel.
+NVIDIA (RTX 3070) builds the identical source in seconds.
+
+**Root cause — one giant inlined function.** AMD's OpenCL compiler is LLVM-based (the "LC" /
+`comgr` + `ld.lld` stack). At `-O3` it **inlines every `DECLSPEC` helper** (the comb's ~64
+`point_add`s, field `mul_mod`, the 600-divstep safegcd inverse, both 64-round SHA-256 → RIPEMD-160
+chains) into the single `generateKeysKernel_grid` function. Several LLVM back-end passes — greedy
+register allocation and SelectionDAG scheduling — scale **~super-linearly (≈ quadratically) per
+function**, so one enormous function explodes in time and memory. NVIDIA's separate ptxas back-end
+does not share LLVM's per-function scaling, which is why CUDA was always fast.
+
+**What does *not* work (measured, so you don't repeat it):**
+- **`-cl-opt-disable`** — fails to link: `ld.lld: undefined hidden symbol` for the `static`/`DECLSPEC`
+  helpers (the documented C99-`inline` trap; same failure as hashcat/darktable/CL2QCD).
+- **Removing `#pragma unroll` hints** — no effect (8m02s vs 8m04s). Those loops have compile-time
+  bounds, so LLVM unrolls them regardless of the hint. (To *reduce* straight-line size you would force
+  `#pragma unroll 1`, not delete the hint.)
+- **The `comgr` disk cache helps but is not a compile-time fix** — it caches a *successful* build
+  (`llvmcache-*` under `%LOCALAPPDATA%\comgr`; controlled by `AMD_COMGR_CACHE` / `AMD_COMGR_CACHE_DIR`),
+  giving a ~680× warm speedup (8 min → ~0.7 s), but only **after** one full slow compile completes
+  uninterrupted. Every earlier attempt was killed before it could populate the cache.
+
+**The fix — force the helpers out-of-line (`noinline`).** Build the kernel with
+`-D AMD_NOINLINE_HELPERS`, which makes the vendored `DECLSPEC` expand to
+`__attribute__((noinline))` (`copyfromhashcat/inc_vendor.h`). The kernel is then **partitioned into
+many small functions**, each compiling in roughly linear time, instead of one quadratic-cost giant.
+Note removing the `inline` *keyword* alone does nothing — LLVM still inlines at `-O3`; only the hard
+`noinline` attribute stops it.
+
+| Cold compile (fresh `comgr` cache), RX 7900 XTX | inlined (`noInlineHelpers=false`) | `-D AMD_NOINLINE_HELPERS` (AMD auto-default) |
+|---|--:|--:|
+| Stripped (no hash160, legacy inverse) | 8m 02s | **2.99 s** |
+| **Full (both hash160 chains + safegcd)** | **>16 min (never finished)** | **3.09 s** |
+
+**> 300× faster, byte-identical output.** Parity confirmed on the AMD GPU with the flag on:
+`ProbeAddressesOpenCLTest` 43 run / 0 fail in 21.6 s (byte-compared to bitcoinj across
+`keysPerWorkItem` 1…16). `noinline` is a compile directive only; it cannot change numerical results.
+
+**How to enable — tri-state, AMD auto-detected.** Runtime config flag
+`producerOpenCL.noInlineHelpers` (`CProducerOpenCL`) is a **nullable `Boolean`**:
+
+| value | behaviour |
+|---|---|
+| `null` (**default**) | **auto / vendor-detect**: the define is added **only when the selected device is AMD** (`CL_DEVICE_VENDOR` matches `"amd"` / `"advanced micro devices"`), off on every other vendor. |
+| `true` | force on (any vendor). |
+| `false` | force off (any vendor) — needed to A/B inlined vs out-of-line on an AMD device. |
+
+The decision is resolved against the device at `init()` by
+`OpenCLContext.resolveEffectiveNoInlineHelpers(name, vendor)` and **logged with its reason** (INFO for
+auto/explicit, WARN when explicitly `false` on AMD — which keeps the slow inlined compile). The vendor
+predicate is `OpenCLContext.isAmdVendor(...)`. Unit-gated by `OpenCLContextTest`
+(`isAmdVendor_*`, `resolveEffectiveNoInlineHelpers_*` with `LogCaptor` assertions on the log lines,
+`buildOptions*`) and `CProducerOpenCLTest` (tri-state default-`null` + JSON round-trips); parity by
+`ProbeAddressesOpenCLTest#createKeys_noInlineHelpers_resultsMatchReference`.
+
+**Why AMD-only and not a global default — answered by the NVIDIA A/B (RTX 3070).** Out-of-line calls
+cost *runtime* throughput (call overhead, lost cross-function optimisation, extra VGPR pressure at call
+sites). Track B (below) measured exactly how much: at the NVIDIA sweet spot (compact,
+`batchSizeInBits=20`, `keysPerWorkItem=128`, reduced-radix on) the out-of-line kernel ran
+**≈ 4.5× slower — ~45 vs ~200 ops/s, a ~77% throughput loss** — consistent across both A/B orderings
+and on AC power. That is far past any "few %" bar for a global default, so `noinline` is **auto-enabled
+for AMD only** (where the inlined kernel cannot compile in a practical time at all) and left off on
+NVIDIA (which compiles inlined in seconds and wants the throughput). Tuning lever still open: apply
+`noinline` *selectively* (heaviest helpers first — SHA-256, RIPEMD-160, safegcd) to keep most of the
+AMD compile-time win at a smaller runtime cost; re-run the parity gate after any change.
+
+---
+
+## 10. Device / vendor compatibility
+
+Devices the kernel has been built and run on (byte-identical to the bitcoinj reference unless noted):
+
+| Device | Architecture | OpenCL | Role | Notes |
+|---|---|---|---|---|
+| NVIDIA RTX 3070 Laptop | Ampere (40 SM) | 3.0 CUDA | primary perf / tuning | fast compile (ptxas); `keysPerWorkItem` sweet spot **128** |
+| AMD RX 7900 XTX | RDNA3 (`gfx1100`, 48 CU) | 2.0 AMD-APP | cross-device confirmation | `noInlineHelpers` **auto-enabled** (vendor-detect) for a practical compile (§9); sweet spot **32** |
+| pocl (CPU) | CPU | 3.0 platform / CL C 1.2 | CI `test-opencl` job | conformant; small grids only (per-fork timeout) |
+
+**Feature compatibility / requirements:**
+
+| Feature | Config (default) | Requirement | Status |
+|---|---|---|---|
+| Reduced-radix 2²⁶ field | `useReducedRadixField` (**`true`**) | none beyond base OpenCL | byte-identical on NVIDIA / AMD / pocl; ≈ +22% / +8% |
+| safegcd modular inverse | `useSafeGcdInverse` (`true`) | arithmetic (sign-extending) `>>` | NVIDIA / AMD / pocl comply; `false` → legacy binary-GCD fallback |
+| GPU Binary-Fuse-8 filter (compact) | `enableGpuFilter` (`false`) | OpenCL **≥ 2.0** device (global `atomic_add`) | gated by `assertCompactModeDeviceVersionSupported`; otherwise full transfer |
+| Out-of-line helpers | `noInlineHelpers` (`null` = **auto**) | none | AMD compile fix (§9); auto-enabled for AMD only (vendor-detect), off on NVIDIA (≈4.5× slower there); `true`/`false` force |
+| Device endianness | — (implicit) | **little-endian** device | big-endian rejected at init (`assertDeviceByteOrderSupported`) |
+
+**Compile-time, by vendor:** NVIDIA — seconds. AMD — 8–16+ min inlined, **≈ 3 s with `noInlineHelpers`** (§9); the `comgr` disk cache (`%LOCALAPPDATA%\comgr`) persists successful builds. pocl — fast; note `-cl-std=CL2.0` is rejected (CL C 1.2 only), so the kernel pins `-cl-std=CL1.2` (§5 Stage 0).
+
+### Track B (handoff) — NVIDIA `noinline` throughput A/B — ✅ RESOLVED
+
+**Question (closed):** could `noInlineHelpers` be enabled more broadly — auto-enabled for AMD, or made
+the global default — or must it stay opt-in? It was already **correctness-neutral** (byte-identical,
+gated by `ProbeAddressesOpenCLTest#createKeys_noInlineHelpers_resultsMatchReference`); the only open
+question was its **runtime throughput** cost.
+
+**Result (RTX 3070, Ampere).** `noInlineHelpers` was exposed as a `GpuFuse8FilterBenchmark` `@Param`
+(mirroring `useReducedRadixField`) and A/B-measured at the device sweet spot (compact,
+`batchSizeInBits=20`, `keysPerWorkItem=128`, reduced-radix on):
+
+| `noInlineHelpers` | throughput | relative |
+|---|--:|--:|
+| `false` (inlined) | **≈ 201 ops/s** (AC; 193/191 on battery) | 1.00× |
+| `true` (out-of-line) | **≈ 45 ops/s** | **≈ 0.23× (~4.5× slower)** |
+
+Identical across both A/B orderings (`false→true` and cold `true→false`) and on AC power — not thermal
+ordering. A ~77% throughput loss, far past any "few %" bar for a global default.
+
+**Decision (implemented).** Keep `noinline` **off for NVIDIA**, **auto-enable for AMD only** via vendor
+detection — the Track-B branch-2 policy. Implemented as a tri-state `@Nullable Boolean noInlineHelpers`
+(`null`=auto → AMD-only; `true`/`false` force), resolved + **logged** in
+`OpenCLContext.resolveEffectiveNoInlineHelpers(...)` (predicate `isAmdVendor(...)`); the config flag
+remains a manual override. See §9 "How to enable". Steps 1 (benchmark `@Param`), 2 (NVIDIA measure) and
+4 (policy + code) are **done**.
+
+**Quantified — what AMD pays (step 3): ✅ DONE.** A/B on the **RX 7900 XTX** (compact,
+`batchSizeInBits=20`, `keysPerWorkItem=32`, reduced-radix on; `-f 1 -wi 1 -w 30 -i 1 -r 240`):
+
+| `noInlineHelpers` | throughput | M keys/s | relative |
+|---|--:|--:|--:|
+| `false` (inlined) | **265.98 ops/s** | ≈ 279 | 1.00× |
+| `true` (out-of-line, the AMD auto-default) | **79.63 ops/s** | ≈ 83 | **≈ 0.30× (~3.34× slower)** |
+
+So `noinline` costs AMD **~3.3×** runtime throughput — same order as NVIDIA's ~4.5×, **not** a cheap
+fix. Key consequence of the `comgr` cache: the inlined 8–16 min compile is a **one-time** cost (warm
+hits are ~0.7 s thereafter), so a **long-running AMD scan is ~3.3× faster with `noInlineHelpers=false`**
+once the cache is warm. The `null`=auto default (out-of-line on AMD) optimises **first-run / test /
+CI** convenience — it must never pay a 16 min compile — at the price of steady-state throughput.
+Practical guidance: for a sustained production scan on AMD, warm the cache once and set
+`noInlineHelpers=false` at `keysPerWorkItem ≈ 64`; leave it on auto everywhere else. (The §4 sweet-spot
+sweep used the `noinline` build, peak at 32; the *inline* peak is ≈ 64 — measured in the step-3
+follow-ups below.)
+
+**Investigated — step 3 AMD-side follow-ups: ✅ DONE (neither changes the policy).**
+- **Selective `noinline` — tried, not viable.** Tagging only the 6 heaviest *structural* helpers out-of-line
+  (comb `point_mul_xy_comb`, `point_add`, `point_add_xy`, `inv_mod_safegcd`, `sha256_transform`,
+  `ripemd160_transform`) via a `NOINLINE_HEAVY` marker — while keeping the field multiply
+  (`mul_mod`/`fe10x26_mul`) inline — compiled in **~5.3 min** (vs ~16 min fully inlined, ~3 s blanket).
+  Still far over the 180 s test-fork budget, so it cannot serve as the AMD default. Root cause: the
+  **field multiply is both the compile bottleneck** (inlined into `point_add`/`point_add_xy`/conversions
+  everywhere) **and the runtime-hottest function** — keep it inline and compile stays minutes;
+  out-of-line it and runtime collapses toward the blanket's 3.3×. No split wins both, so the blanket
+  out-of-line stays the AMD auto path and the experiment was reverted.
+- **Inline `keysPerWorkItem` sweet spot ≈ 64** (re-sweep done; RX 7900 XTX, compact, `batchSizeInBits=20`,
+  reduced-radix on, warm cache): 8 → 144.6, 16 → 205.9, 32 → 269.5, **64 → 274.7**, 128 → 244.3 ops/s
+  (≈ 288 M keys/s at the peak). The inline build prefers slightly fatter work-items than the `noinline`
+  build (sweet spot 32, §4), so for a sustained production scan on AMD use `noInlineHelpers=false` at
+  `keysPerWorkItem ≈ 64` (a broad 32–64 plateau).
+
+**Inputs:** AMD compile/throughput numbers + sweet-spot sweep in §4 "Cross-device"; the `noinline`
+mechanism + `comgr` cache controls in §9.
+
+---
+
+## 11. File map
 
 | File | Role |
 |---|---|

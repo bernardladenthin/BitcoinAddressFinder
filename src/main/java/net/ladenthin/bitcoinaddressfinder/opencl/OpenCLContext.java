@@ -37,6 +37,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import lombok.ToString;
@@ -175,17 +176,110 @@ public class OpenCLContext implements ReleaseCLObject {
     static final String REDUCED_RADIX_FIELD_BUILD_OPTION = "-D USE_REDUCED_RADIX_FIELD";
 
     /**
-     * Assembles the {@code clBuildProgram} options string: the constant {@link #CL_BUILD_OPTIONS},
-     * plus {@link #LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION} when {@link CProducerOpenCL#useSafeGcdInverse}
-     * is {@code false}, the profiling define for a non-{@code FULL}
-     * {@link CProducerOpenCL#kernelProfileStage}, {@link #NV_VERBOSE_BUILD_OPTION} when
+     * Build define that forces the kernel's {@code DECLSPEC} helpers out-of-line
+     * ({@code __attribute__((noinline))}). Appended when the <em>effective</em> noinline decision is
+     * {@code true} (see {@link #resolveEffectiveNoInlineHelpers}); it slashes the AMD LLVM/comgr cold
+     * compile time (≈ minutes → seconds) by partitioning the otherwise-megamerged kernel, at a heavy
+     * runtime cost on other vendors (≈4.5× slower on NVIDIA). See {@code docs/performance.md}.
+     */
+    @VisibleForTesting
+    static final String NO_INLINE_HELPERS_BUILD_OPTION = "-D AMD_NOINLINE_HELPERS";
+
+    /**
+     * Returns whether an OpenCL {@code CL_DEVICE_VENDOR} string denotes an AMD device. Case-insensitive
+     * match on {@code "amd"} or {@code "advanced micro devices"} (the two forms AMD's OpenCL runtimes
+     * report). {@code null}/blank → {@code false}.
+     *
+     * @param deviceVendor the device's {@code CL_DEVICE_VENDOR} string (may be {@code null})
+     * @return {@code true} iff the vendor string identifies AMD
+     */
+    @VisibleForTesting
+    static boolean isAmdVendor(@Nullable String deviceVendor) {
+        if (deviceVendor == null) {
+            return false;
+        }
+        final String v = deviceVendor.toLowerCase(Locale.ROOT);
+        return v.contains("amd") || v.contains("advanced micro devices");
+    }
+
+    /**
+     * Resolves the <b>effective</b> {@code noInlineHelpers} decision for the selected device and logs
+     * the outcome with its reason. Honours the tri-state {@link CProducerOpenCL#noInlineHelpers}:
+     * <ul>
+     *   <li>{@code null} (auto) → {@code true} only when {@link #isAmdVendor(String)} matches the
+     *       device vendor (the AMD multi-minute-compile fix), {@code false} on every other vendor.</li>
+     *   <li>explicit {@link Boolean#TRUE}/{@link Boolean#FALSE} → used verbatim (vendor-detection
+     *       skipped); an explicit {@code false} on an AMD device additionally logs a slow-compile
+     *       warning.</li>
+     * </ul>
+     *
+     * <p>Logged because the choice materially changes both compile time (minutes vs seconds on AMD) and
+     * runtime throughput (≈4.5× on NVIDIA) — operators need an unambiguous record of which path ran and
+     * why. See {@code docs/performance.md} §9–§10.
+     *
+     * @param deviceName   the selected device's {@code CL_DEVICE_NAME} (for the log line)
+     * @param deviceVendor the selected device's {@code CL_DEVICE_VENDOR}
+     * @return the effective decision: {@code true} to build with {@link #NO_INLINE_HELPERS_BUILD_OPTION}
+     */
+    @VisibleForTesting
+    boolean resolveEffectiveNoInlineHelpers(String deviceName, @Nullable String deviceVendor) {
+        final Boolean configured = producerOpenCL.noInlineHelpers;
+        if (configured != null) {
+            if (!configured && isAmdVendor(deviceVendor)) {
+                LOGGER.warn(
+                        "noInlineHelpers is explicitly FALSE on AMD device '{}' (vendor '{}'): building the "
+                                + "fully-inlined kernel, which can take 8-16+ minutes to compile on AMD's LLVM/comgr "
+                                + "back-end (see docs/performance.md, AMD compile section). Set noInlineHelpers=null "
+                                + "(auto) to let the AMD-only out-of-line compile fix engage automatically.",
+                        deviceName,
+                        deviceVendor);
+            } else {
+                LOGGER.info(
+                        "noInlineHelpers={} (explicit configuration) for device '{}' (vendor '{}'); "
+                                + "vendor auto-detection skipped, {} the kernel.",
+                        configured,
+                        deviceName,
+                        deviceVendor,
+                        configured ? "out-of-lining (-D AMD_NOINLINE_HELPERS)" : "inlining");
+            }
+            return configured;
+        }
+        // null = auto: enable the out-of-line compile fix for AMD only.
+        if (isAmdVendor(deviceVendor)) {
+            LOGGER.info(
+                    "noInlineHelpers=auto: AMD device detected ('{}', vendor '{}') -> ENABLING "
+                            + "-D AMD_NOINLINE_HELPERS. Out-of-lining the DECLSPEC helpers cuts the AMD cold compile "
+                            + "from 8-16+ min to ~3 s (see docs/performance.md, AMD compile section). This costs "
+                            + "runtime throughput on other vendors (~4.5x slower on NVIDIA), so it is applied to AMD "
+                            + "only.",
+                    deviceName,
+                    deviceVendor);
+            return true;
+        }
+        LOGGER.info(
+                "noInlineHelpers=auto: non-AMD device ('{}', vendor '{}') -> keeping helpers INLINED for full "
+                        + "throughput (the AMD-only out-of-line compile fix is not needed here).",
+                deviceName,
+                deviceVendor);
+        return false;
+    }
+
+    /**
+     * Assembles the {@code clBuildProgram} options string for this context's producer configuration,
+     * using {@code effectiveNoInlineHelpers} for the {@link #NO_INLINE_HELPERS_BUILD_OPTION} decision
+     * (already resolved against the device vendor by {@link #resolveEffectiveNoInlineHelpers}). Includes
+     * {@link #CL_BUILD_OPTIONS}, plus {@link #LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION} when
+     * {@link CProducerOpenCL#useSafeGcdInverse} is {@code false}, the profiling define for a
+     * non-{@code FULL} {@link CProducerOpenCL#kernelProfileStage}, {@link #NV_VERBOSE_BUILD_OPTION} when
      * {@link CProducerOpenCL#logGpuDiagnostics} is set, and {@link #REDUCED_RADIX_FIELD_BUILD_OPTION}
      * when {@link CProducerOpenCL#useReducedRadixField} is set.
      *
-     * @return the build options string for this context's producer configuration
+     * @param effectiveNoInlineHelpers the resolved noinline decision (see
+     *     {@link #resolveEffectiveNoInlineHelpers})
+     * @return the build options string
      */
     @VisibleForTesting
-    String buildOptions() {
+    String buildOptions(boolean effectiveNoInlineHelpers) {
         final StringBuilder options = new StringBuilder(CL_BUILD_OPTIONS);
         if (!producerOpenCL.useSafeGcdInverse) {
             options.append(' ').append(LEGACY_BINARY_GCD_INV_MOD_BUILD_OPTION);
@@ -207,7 +301,23 @@ public class OpenCLContext implements ReleaseCLObject {
         if (producerOpenCL.useReducedRadixField) {
             options.append(' ').append(REDUCED_RADIX_FIELD_BUILD_OPTION);
         }
+        if (effectiveNoInlineHelpers) {
+            options.append(' ').append(NO_INLINE_HELPERS_BUILD_OPTION);
+        }
         return options.toString();
+    }
+
+    /**
+     * Config-only overload used where no device vendor is available (unit tests). Treats the tri-state
+     * {@link CProducerOpenCL#noInlineHelpers} as {@code true} iff explicitly {@link Boolean#TRUE}
+     * ({@code null} auto and {@link Boolean#FALSE} both omit the define); the vendor-aware auto path is
+     * exercised through {@link #resolveEffectiveNoInlineHelpers} + {@link #buildOptions(boolean)}.
+     *
+     * @return the build options string for the configured (non-auto-resolved) flags
+     */
+    @VisibleForTesting
+    String buildOptions() {
+        return buildOptions(Boolean.TRUE.equals(producerOpenCL.noInlineHelpers));
     }
 
     private static final ComparableVersion REQUIRED_COMPACT_MODE_VERSION = new ComparableVersion("2.0");
@@ -373,8 +483,12 @@ public class OpenCLContext implements ReleaseCLObject {
         program = clCreateProgramWithSource(context, openCLPrograms.length, openCLPrograms, null, null);
 
         // Build the program with the Stage-0 quick-win options (see CL_BUILD_OPTIONS), plus the
-        // per-config modular-inverse selector (see CProducerOpenCL.useSafeGcdInverse).
-        clBuildProgram(program, 0, null, buildOptions(), null, null);
+        // per-config modular-inverse selector (see CProducerOpenCL.useSafeGcdInverse). The noinline
+        // helper decision is resolved here against the selected device's vendor (auto-enabled for AMD
+        // only; logged) — see resolveEffectiveNoInlineHelpers.
+        final boolean effectiveNoInlineHelpers =
+                resolveEffectiveNoInlineHelpers(device.deviceName(), device.deviceVendor());
+        clBuildProgram(program, 0, null, buildOptions(effectiveNoInlineHelpers), null, null);
 
         if (producerOpenCL.logGpuDiagnostics) {
             logProgramBuildLog(device);

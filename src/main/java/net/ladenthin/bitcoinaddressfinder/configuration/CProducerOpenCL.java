@@ -7,6 +7,7 @@ import static org.jocl.CL.CL_DEVICE_TYPE_ALL;
 
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Configuration for the OpenCL (GPU) producer.
@@ -146,18 +147,55 @@ public class CProducerOpenCL extends CProducer {
     /**
      * Selects the field-arithmetic representation used in the scalar-walker hot loop.
      * <p>
-     * When {@code false} (default), the affine batched-addition walk computes coordinates in the
-     * vendored radix-2³² field ({@code copyfromhashcat/inc_ecc_secp256k1.cl}). When {@code true}, the
-     * kernel is built with {@code -D USE_REDUCED_RADIX_FIELD} and the walk holds coordinates in the
-     * reduced-radix 2²⁶ field ({@code inc_ecc_secp256k1_fe10x26.cl}), converting to radix-2³² only at
-     * the increment-table reads, the single per-sub-batch inverse, and the coordinate outputs.
+     * When {@code true} (default), the kernel is built with {@code -D USE_REDUCED_RADIX_FIELD} and the
+     * affine batched-addition walk holds coordinates in the reduced-radix 2²⁶ field
+     * ({@code inc_ecc_secp256k1_fe10x26.cl}), converting to radix-2³² only at the increment-table
+     * reads, the single per-sub-batch inverse, and the coordinate outputs. When {@code false}, the
+     * walk uses the vendored radix-2³² field ({@code copyfromhashcat/inc_ecc_secp256k1.cl}).
      * <p>
      * Motivation: the radix-2³² field multiply is carry-bound; the isolated {@code FieldMulBenchmark}
      * measured the 2²⁶ multiply ≈ 1.56× faster on an RTX 3070. The comb anchor and the
-     * {@code copyfromhashcat} files are unchanged either way. Off by default until the end-to-end gain
-     * is confirmed per device; correctness is identical (gated against bitcoinj by
-     * {@code ProbeAddressesOpenCLTest} / {@code ProbeAddressesManySeedsOpenCLTest} with the flag on).
-     * See {@code docs/performance.md} ("reduced-radix 2²⁶ field").
+     * {@code copyfromhashcat} files are unchanged either way.
+     * <p>
+     * <b>On by default</b> since the end-to-end gain was confirmed <b>cross-device</b>: ≈ +22% on an
+     * RTX 3070 (Ampere) and ≈ +8% on an AMD RX 7900 XTX (RDNA3), never a regression on either (see
+     * {@code docs/performance.md} §8 Stage 5 + §4 "Cross-device"). Set {@code false} to force the
+     * legacy radix-2³² walk for A/B comparison. Correctness is identical regardless of the setting —
+     * gated byte-for-byte against bitcoinj by {@code ProbeAddressesOpenCLTest} and
+     * {@code ProbeAddressesManySeedsOpenCLTest} (which builds the kernel with the flag both on and off).
      */
-    public boolean useReducedRadixField = false;
+    public boolean useReducedRadixField = true;
+
+    /**
+     * Forces the kernel's helper functions out-of-line to fix pathological OpenCL compile times on
+     * AMD GPUs. <b>Tri-state</b> — {@code null}, {@link Boolean#TRUE}, {@link Boolean#FALSE}:
+     * <ul>
+     *   <li>{@code null} (<b>default</b>) — <b>auto / vendor-detect</b>: the build define is enabled
+     *       <em>only when the selected device is AMD</em> and disabled on every other vendor. The
+     *       decision and reason are logged at {@code INFO} by
+     *       {@code OpenCLContext.resolveEffectiveNoInlineHelpers(...)}. This is the recommended
+     *       setting: AMD gets the compile-time fix automatically, NVIDIA keeps full throughput.</li>
+     *   <li>{@link Boolean#TRUE} — <b>force on</b> regardless of vendor: the kernel is always built
+     *       with {@code -D AMD_NOINLINE_HELPERS}.</li>
+     *   <li>{@link Boolean#FALSE} — <b>force off</b> regardless of vendor: the define is never added,
+     *       even on AMD (a slow-compile warning is logged). Needed to A/B inlined vs. out-of-line on
+     *       an AMD device.</li>
+     * </ul>
+     * <p>
+     * <b>Background.</b> With the kernel inlined, AMD's LLVM-based "LC"/comgr back-end (greedy register
+     * allocation + SelectionDAG scheduling) scales ~super-linearly per function, so the single giant
+     * {@code generateKeysKernel_grid} takes <b>8–16+ minutes</b> to build on AMD RDNA3 (the full kernel
+     * did not finish within 16&nbsp;min on an RX&nbsp;7900&nbsp;XTX / gfx1100). The {@code -D
+     * AMD_NOINLINE_HELPERS} define makes the vendored {@code DECLSPEC} helpers
+     * {@code __attribute__((noinline))}, partitioning the back-end work into many small functions and
+     * cutting the cold compile to <b>≈3&nbsp;s</b>. (Removing the {@code inline} hint alone does nothing
+     * — LLVM still inlines at {@code -O3}; only a hard {@code noinline} stops it.)
+     * <p>
+     * <b>Why AMD-only.</b> Out-of-line calls cost runtime throughput: a matched NVIDIA A/B measured the
+     * out-of-line kernel <b>≈4.5× slower</b> on an RTX 3070 (≈ 45 vs ≈ 200 ops/s; see
+     * {@code docs/performance.md} §9–§10). On NVIDIA the inlined kernel compiles in seconds anyway, so
+     * there is no reason to pay that cost — hence the {@code null}-default auto-detect applies the fix
+     * to AMD alone. See {@code docs/performance.md} ("slow AMD compile").
+     */
+    public @Nullable Boolean noInlineHelpers;
 }
