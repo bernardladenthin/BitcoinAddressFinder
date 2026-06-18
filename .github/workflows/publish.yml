@@ -10,8 +10,8 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
-      publish_release:
-        description: "Publish a RELEASE to Maven Central. Off by default; the release publish runs only when this is true AND the workflow is run on a v* tag."
+      publish_to_central:
+        description: "Deploy to Maven Central (snapshot if -SNAPSHOT, release if a vX.Y.Z tag)"
         type: boolean
         default: false
 
@@ -334,7 +334,7 @@ jobs:
   publish-snapshot:
     name: Publish Snapshot to Central
     needs: [check-snapshot, code-style]
-    if: needs.check-snapshot.result == 'success'
+    if: needs.check-snapshot.result == 'success' && inputs.publish_to_central
     runs-on: ubuntu-latest
     environment: maven-central
     steps:
@@ -394,7 +394,7 @@ jobs:
   publish-release:
     name: Publish Release to Central
     needs: [check-tag, code-style]
-    if: needs.check-tag.result == 'success' && inputs.publish_release
+    if: needs.check-tag.result == 'success' && inputs.publish_to_central
     runs-on: ubuntu-latest
     environment: maven-central
     permissions:
