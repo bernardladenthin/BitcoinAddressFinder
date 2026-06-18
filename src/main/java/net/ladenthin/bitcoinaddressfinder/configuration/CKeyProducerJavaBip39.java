@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.Instant;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -76,6 +77,7 @@ public class CKeyProducerJavaBip39 extends CKeyProducerJava {
      *
      * @return the creation time as an {@link Instant}
      */
+    @JsonIgnore
     public Instant getCreationTimeInstant() {
         return Instant.ofEpochSecond(this.creationTimeSeconds != null ? this.creationTimeSeconds : 0L);
     }
