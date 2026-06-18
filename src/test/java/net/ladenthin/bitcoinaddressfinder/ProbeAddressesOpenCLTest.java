@@ -668,6 +668,45 @@ public class ProbeAddressesOpenCLTest {
         }
     }
 
+    /**
+     * Byte-identical parity at a <b>large</b> {@code keysPerWorkItem} (2048) — the high-amortization
+     * regime that benchmarks identify as the throughput optimum (see {@code docs/performance.md} §4,
+     * "Joint (batch, kpwi) optimum"). {@link #createKeys_acrossKeysPerWorkItem_allResultsMatchReference}
+     * only covers {@code kpwi ≤ 16}; this pins the long affine walk, where a single work-item iterates
+     * the batched-inversion loop ~2048 times and consumes the full 2047-entry {@code i*G} increment
+     * table (built and, on the reduced-radix path, lowered to 2²⁶ by {@code convert_ig_table_to_fe10x26}).
+     * Uses {@code batchSizeInBits = 12} → 2 work-items × 2048 keys, so it also catches a cross-work-item
+     * or final-sub-batch error that only appears at long walk lengths. Every public key + hash160 is
+     * byte-compared to bitcoinj. Runs on the build-selected field path (reduced-radix 2²⁶ by default).
+     */
+    @Test
+    @OpenCLTest
+    public void createKeys_largeKeysPerWorkItem_resultsMatchReference() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+
+        final int bitsForBatch = 12;
+        final int largeKeysPerWorkItem = 2048;
+
+        KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
+
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.batchSizeInBits = bitsForBatch;
+        producerOpenCL.keysPerWorkItem = largeKeysPerWorkItem;
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+            openCLContext.init();
+            Random random = new Random(1337);
+            BigInteger secretKeyBase = keyUtility.createSecret(Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS, random);
+            BigInteger secretBase =
+                    keyUtility.alignDown(secretKeyBase, bitHelper.getLowBitMask(producerOpenCL.batchSizeInBits));
+
+            OpenCLGridResult createKeys = openCLContext.createKeys(secretBase);
+            PublicKeyBytes[] publicKeys = createKeys.getPublicKeyBytes();
+
+            assertThat(publicKeys.length, is(equalTo((int) bitHelper.convertBitsToSize(bitsForBatch))));
+            assertPublicKeyBytesCalculatedCorrect(publicKeys, secretBase, false, keyUtility);
+        }
+    }
+
     private static void assertAllRuntimePublicKeyCalculationsValid(PublicKeyBytes[] publicKeys) {
         for (int i = 0; i < publicKeys.length; i++) {
             assertRuntimePublicKeyCalculationValid(publicKeys[i]);

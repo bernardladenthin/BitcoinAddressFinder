@@ -123,6 +123,18 @@ public final class OpenClKernelConstants {
     /** Number of {@code u32} words in the two coordinates of an uncompressed point. */
     public static final int TWO_COORDINATE_NUM_WORDS = ONE_COORDINATE_NUM_WORDS * 2; // 16
 
+    // ==== reduced-radix 2^26 field (i*G table layout; see inc_ecc_secp256k1_fe10x26.cl) ====
+    /**
+     * Number of {@code u32} limbs per coordinate in the reduced-radix 2²⁶ field representation
+     * (libsecp256k1 {@code field_10x26}). Must equal {@code SECP256K1_FE10X26_NUM_LIMBS} in
+     * {@code inc_ecc_secp256k1_fe10x26.cl}.
+     */
+    public static final int FE10X26_ONE_COORDINATE_NUM_WORDS = 10;
+    /** Number of {@code u32} words in the two coordinates of a 2²⁶ point (one i*G table entry). */
+    public static final int FE10X26_TWO_COORDINATE_NUM_WORDS = FE10X26_ONE_COORDINATE_NUM_WORDS * 2; // 20
+    /** Number of bytes in one 2²⁶ i*G table entry ({@code [x(10)][y(10)]}). */
+    public static final int FE10X26_TWO_COORDINATES_NUM_BYTES = FE10X26_TWO_COORDINATE_NUM_WORDS * U32_NUM_BYTES; // 80
+
     // ==== public key length ====
     /** Number of bits in an uncompressed SEC public key. */
     public static final int SEC_PUBLIC_KEY_UNCOMPRESSED_NUM_BITS =

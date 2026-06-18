@@ -948,11 +948,11 @@ __kernel void generateKeysKernel_grid(
                     dx[j][w] = 0;
                 }
             } else {
-                u32 gx[ONE_COORDINATE_NUM_WORDS];
-                u32 ig_base = (m - 1) * TWO_COORDINATE_NUM_WORDS; // 16 words per table entry
-                copy_global_u32_array_private_u32(gx, &iG_table[ig_base], ONE_COORDINATE_NUM_WORDS);
+                // i*G table is stored in 2^26 form (refinement (b), convert_ig_table_to_fe10x26):
+                // read the x limbs straight in, with no per-key fe10x26_from_u32x8 conversion.
+                u32 ig_base = (m - 1) * SECP256K1_FE10X26_TWO_COORD_WORDS; // 20 words per 2^26 entry
                 u32 ngx[SECP256K1_FE10X26_NUM_LIMBS];
-                fe10x26_from_u32x8(ngx, gx);
+                copy_global_u32_array_private_u32(ngx, &iG_table[ig_base], SECP256K1_FE10X26_NUM_LIMBS);
                 fe10x26_sub(dx[j], ngx, nx0, 1); // dx_m = x_{mG} - x0 (magnitude 3)
             }
             fe10x26_mul(acc, acc, dx[j]); // acc = dx_0 * ... * dx_j (magnitude 1)
@@ -1006,15 +1006,12 @@ __kernel void generateKeysKernel_grid(
                 copy_private_u32_array_private_u32(x_littleEndian_local, x0, ONE_COORDINATE_NUM_WORDS);
                 copy_private_u32_array_private_u32(y_littleEndian_local, y0, ONE_COORDINATE_NUM_WORDS);
             } else {
-                u32 gx[ONE_COORDINATE_NUM_WORDS];
-                u32 gy[ONE_COORDINATE_NUM_WORDS];
-                u32 ig_base = (m - 1) * TWO_COORDINATE_NUM_WORDS;
-                copy_global_u32_array_private_u32(gx, &iG_table[ig_base], ONE_COORDINATE_NUM_WORDS);
-                copy_global_u32_array_private_u32(gy, &iG_table[ig_base + ONE_COORDINATE_NUM_WORDS], ONE_COORDINATE_NUM_WORDS);
+                // 2^26 i*G table (refinement (b)): read x and y limbs straight in, no conversion.
+                u32 ig_base = (m - 1) * SECP256K1_FE10X26_TWO_COORD_WORDS;
                 u32 ngx[SECP256K1_FE10X26_NUM_LIMBS];
                 u32 ngy[SECP256K1_FE10X26_NUM_LIMBS];
-                fe10x26_from_u32x8(ngx, gx);
-                fe10x26_from_u32x8(ngy, gy);
+                copy_global_u32_array_private_u32(ngx, &iG_table[ig_base], SECP256K1_FE10X26_NUM_LIMBS);
+                copy_global_u32_array_private_u32(ngy, &iG_table[ig_base + SECP256K1_FE10X26_NUM_LIMBS], SECP256K1_FE10X26_NUM_LIMBS);
 
                 // Affine slope law in 2^26. Magnitudes (mul/sqr inputs must stay <= 8): num=3,
                 // lambda/lam2=1, xr=3 then 5, t=7 then 1, ynew=3. Only the two emitted coordinates

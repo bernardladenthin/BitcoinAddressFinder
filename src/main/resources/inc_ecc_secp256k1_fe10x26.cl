@@ -55,6 +55,10 @@
 
 #define SECP256K1_FE10X26_NUM_LIMBS 10
 
+// Words per two-coordinate (x,y) 2^26 i*G table entry: [x(10)][y(10)]. Mirrors the host constant
+// OpenClKernelConstants.FE10X26_TWO_COORDINATE_NUM_WORDS (20).
+#define SECP256K1_FE10X26_TWO_COORD_WORDS (SECP256K1_FE10X26_NUM_LIMBS * 2)
+
 /*
  * Lift a radix-2^32 field element (u32 w[8], limb 0 = least significant) into
  * 2^26 form. Pure radix repack (no byte-endianness involved): both forms are
@@ -472,3 +476,45 @@ DECLSPEC void fe10x26_sqr(PRIVATE_AS u32 *r, PRIVATE_AS const u32 *a)
   d   += t2;
   r[2] = (u32) d;
 }
+
+#ifdef USE_REDUCED_RADIX_FIELD
+/*
+ * Lower the radix-2^32 i*G table (produced by the vendored precompute_ig_table kernel, 16 u32 per
+ * entry: [x(8)][y(8)]) into the reduced-radix 2^26 layout (20 u32 per entry: [x(10)][y(10)]), once at
+ * init. The 2^26 scalar-walker (generateKeysKernel_grid, USE_REDUCED_RADIX_FIELD) then reads the
+ * increment coordinates straight from the table with no per-key fe10x26_from_u32x8 conversion -- the
+ * conversion that previously diluted the 2^26 end-to-end gain (docs/performance.md Stage 5, refinement
+ * (b)). Single work item; `count` = number of entries = keysPerWorkItem - 1 (0 is a valid no-op for
+ * keysPerWorkItem == 1, leaving the one placeholder entry unwritten, exactly as precompute_ig_table
+ * does). Only compiled in 2^26 builds; only enqueued by the host when useReducedRadixField is set.
+ */
+__kernel void convert_ig_table_to_fe10x26 (__global u32 *out2p26, __global const u32 *in_radix32, const u32 count)
+{
+  for (u32 m = 0; m < count; m++)
+  {
+    const u32 in = m * 16; // 16 words per radix-2^32 entry: [x(8)][y(8)]
+
+    u32 gx[8];
+    u32 gy[8];
+    #pragma unroll
+    for (int i = 0; i < 8; i++)
+    {
+      gx[i] = in_radix32[in + i];
+      gy[i] = in_radix32[in + 8 + i];
+    }
+
+    u32 nx[SECP256K1_FE10X26_NUM_LIMBS];
+    u32 ny[SECP256K1_FE10X26_NUM_LIMBS];
+    fe10x26_from_u32x8 (nx, gx);
+    fe10x26_from_u32x8 (ny, gy);
+
+    const u32 out = m * SECP256K1_FE10X26_TWO_COORD_WORDS; // 20 words per 2^26 entry: [x(10)][y(10)]
+    #pragma unroll
+    for (int i = 0; i < SECP256K1_FE10X26_NUM_LIMBS; i++)
+    {
+      out2p26[out + i] = nx[i];
+      out2p26[out + SECP256K1_FE10X26_NUM_LIMBS + i] = ny[i];
+    }
+  }
+}
+#endif
