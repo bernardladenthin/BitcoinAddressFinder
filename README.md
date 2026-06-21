@@ -1,3 +1,9 @@
+> [!NOTE]
+> **No IDE or local setup required.** This repository is optimized for fully AI-assisted development using [Claude Code](https://claude.ai/code). No local toolchain, no IDE, nothing to install — everything works completely through Claude.
+
+**AI:**  
+[![Claude](https://img.shields.io/badge/Claude-D97757?logo=claude&logoColor=fff)](#)  
+
 **Build:**  
 ![Java 21+](https://img.shields.io/badge/Java-21%2B-informational)  
 [![JPMS](https://img.shields.io/badge/JPMS-modular%20JAR-25A162)](https://openjdk.org/projects/jigsaw/)  
