@@ -779,21 +779,14 @@ SPDX-License-Identifier: Apache-2.0
             </plugin>
             <plugin>
                 <!--
-                  PIT mutation testing is gated at a 100% threshold on every CI
-                  build over the explicit list of classes that have reached 100%
-                  mutation parity (verified with pitest-maven 1.25.4). Expand the
-                  targetClasses list as more classes reach parity (see README
-                  TODO). The targeted classes are covered by fast, pure-Java unit
-                  tests (no LMDB / OpenCL / GPU needed), kept in lock-step in the
-                  targetTests list.
-
-                  CI invocation pattern (matches streambuffer):
-                      mvn test-compile org.pitest:pitest-maven:mutationCoverage
-                  PIT runs right after test-compile so the prepare-package-bound
-                  module-info-compile execution does not fire; module-info.class
-                  stays out of target/classes/ and the forked PIT JVMs continue
-                  to run in classpath mode (consistent with the rest of the test
-                  suite).
+                  Generic PIT policy (version, 100% gate, invocation, expansion rule):
+                  see ../workspace/policies/pit-mutation-testing.md.
+                  Repo-specific: the gated classes are covered by fast, pure-Java unit
+                  tests (no LMDB / OpenCL / GPU needed), kept in lock-step in targetTests.
+                  BAF-specific timing: running PIT right after test-compile (not a later
+                  phase) keeps the prepare-package-bound module-info-compile execution from
+                  firing, so module-info.class stays out of target/classes/ and the forked
+                  PIT JVMs run in classpath mode (consistent with the rest of the test suite).
                 -->
                 <groupId>org.pitest</groupId>
                 <artifactId>pitest-maven</artifactId>
