@@ -46,6 +46,8 @@ jobs:
           distribution: temurin
       - name: Spotless check (fail fast on format violations)
         run: mvn -B --no-transfer-progress spotless:check
+      - name: SpotBugs check (fail fast on static-analysis findings)
+        run: mvn -B --no-transfer-progress -DskipTests -Denforcer.skip=true compile spotbugs:check
       - name: Print internal package dependency graph (jdeps, informational)
         continue-on-error: true
         run: |
