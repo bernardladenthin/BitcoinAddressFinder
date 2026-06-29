@@ -43,7 +43,7 @@ SPDX-License-Identifier: Apache-2.0
         <sonar.organization>bernardladenthin</sonar.organization>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <slf4j.version>2.0.18</slf4j.version>
-        <logback.version>1.5.36</logback.version>
+        <logback.version>1.5.37</logback.version>
         <project.build.outputTimestamp>${git.commit.time}</project.build.outputTimestamp>
         <!-- Test JVM heap: -Xmx2g cap, no eager -Xms. With reuseForks=false a fresh JVM is
              spawned per test class (~180 sequential spawns); an eager -Xms1g committed 1 GB up
@@ -87,13 +87,13 @@ SPDX-License-Identifier: Apache-2.0
         <commons-io.version>2.22.0</commons-io.version>
         <commons-codec.version>1.22.0</commons-codec.version>
         <maven-artifact.version>3.9.16</maven-artifact.version>
-        <junit.version>6.1.0</junit.version>
+        <junit.version>6.1.1</junit.version>
         <hamcrest.version>3.0</hamcrest.version>
         <mockito.version>5.23.0</mockito.version>
         <logcaptor.version>2.12.6</logcaptor.version>
         <jmh.version>1.37</jmh.version>
         <spotless.version>3.7.0</spotless.version>
-        <palantir-java-format.version>2.92.0</palantir-java-format.version>
+        <palantir-java-format.version>2.94.0</palantir-java-format.version>
     </properties>
 
     <!--
