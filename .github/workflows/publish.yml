@@ -365,6 +365,11 @@ jobs:
             *-SNAPSHOT) echo "OK: -SNAPSHOT version, continuing snapshot deploy." ;;
             *) echo "::error::Refusing to publish non-SNAPSHOT version '$VERSION' from the snapshot job. Snapshot publishing requires a -SNAPSHOT version; releases go through the v* tag path."; exit 1 ;;
           esac
+      # Informational only (nothing depends on it): logs the effective POM with the same
+      # profile as the deploy below, so the resolved central-publishing configuration
+      # (waitUntil/waitMaxTime etc.) is visible for debugging.
+      - name: Show effective POM (debug)
+        run: mvn --batch-mode --no-transfer-progress -P release help:effective-pom
       - name: Deploy snapshot
         run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release deploy -DskipTests
         env:
@@ -427,6 +432,11 @@ jobs:
           server-password: MAVEN_PASSWORD
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      # Informational only (nothing depends on it): logs the effective POM with the same
+      # profile as the deploy below, so the resolved central-publishing configuration
+      # (waitUntil/waitMaxTime etc.) is visible for debugging.
+      - name: Show effective POM (debug)
+        run: mvn --batch-mode --no-transfer-progress -P release help:effective-pom
       - name: Deploy release
         run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release deploy -DskipTests
         env:

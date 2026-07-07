@@ -1060,6 +1060,8 @@ SPDX-License-Identifier: Apache-2.0
                             <publishingServerId>central</publishingServerId>
                             <autoPublish>true</autoPublish>
                             <waitUntil>published</waitUntil>
+                            <!-- seconds (6 h); the default 1800 timed out on a slow Central day (jllama 5.0.6 release) -->
+                            <waitMaxTime>21600</waitMaxTime>
                         </configuration>
                     </plugin>
                 </plugins>
