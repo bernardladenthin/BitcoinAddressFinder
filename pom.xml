@@ -1059,10 +1059,7 @@ SPDX-License-Identifier: Apache-2.0
                         <configuration>
                             <publishingServerId>central</publishingServerId>
                             <autoPublish>true</autoPublish>
-                            <!-- validated (not published): wait only for portal validation, which is where
-                                 real errors (bad signature, POM rules) surface; the publish step then runs
-                                 server-side via autoPublish. Waiting for "published" timed out on a slow
-                                 Central day (jllama 5.0.6 release) although the deployment published fine. -->
+                            <!-- validated: wait only for portal validation (where real errors surface), not the slow server-side publish; autoPublish completes it -->
                             <waitUntil>validated</waitUntil>
                             <!-- seconds; generous headroom for the validation poll (default 1800) -->
                             <waitMaxTime>21600</waitMaxTime>
