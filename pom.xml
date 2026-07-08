@@ -81,7 +81,7 @@ SPDX-License-Identifier: Apache-2.0
         <jsr305.version>3.0.2</jsr305.version>
         <jcip-annotations.version>1.0</jcip-annotations.version>
         <guava.version>33.6.0-jre</guava.version>
-        <jackson.version>2.22.0</jackson.version>
+        <jackson.version>2.22.1</jackson.version>
         <lmdbjava.version>0.9.3</lmdbjava.version>
         <jocl.version>2.0.6</jocl.version>
         <commons-io.version>2.22.0</commons-io.version>
@@ -242,7 +242,7 @@ SPDX-License-Identifier: Apache-2.0
                 <plugin>
                     <groupId>org.pitest</groupId>
                     <artifactId>pitest-maven</artifactId>
-                    <version>1.25.5</version>
+                    <version>1.25.6</version>
                 </plugin>
                 <plugin>
                     <groupId>org.sonatype.central</groupId>
