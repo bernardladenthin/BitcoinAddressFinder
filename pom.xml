@@ -242,7 +242,7 @@ SPDX-License-Identifier: Apache-2.0
                 <plugin>
                     <groupId>org.pitest</groupId>
                     <artifactId>pitest-maven</artifactId>
-                    <version>1.25.6</version>
+                    <version>1.25.7</version>
                 </plugin>
                 <plugin>
                     <groupId>org.sonatype.central</groupId>
