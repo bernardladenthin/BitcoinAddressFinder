@@ -76,7 +76,7 @@ SPDX-License-Identifier: Apache-2.0
         <jspecify.version>1.0.0</jspecify.version>
         <lombok.version>1.18.46</lombok.version>
         <bitcoinj.version>0.17.1</bitcoinj.version>
-        <bcprov.version>1.84</bcprov.version>
+        <bcprov.version>1.85</bcprov.version>
         <protobuf.version>4.35.1</protobuf.version>
         <jsr305.version>3.0.2</jsr305.version>
         <jcip-annotations.version>1.0</jcip-annotations.version>
