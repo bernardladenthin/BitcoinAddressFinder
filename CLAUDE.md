@@ -10,7 +10,7 @@ This document provides guidance for AI assistants working on the BitcoinAddressF
 
 - **Group ID:** `net.ladenthin`
 - **Artifact ID:** `bitcoinaddressfinder`
-- **Version:** 1.6.1
+- **Version:** 1.6.2-SNAPSHOT
 - **Java:** 21
 - **License:** Apache 2.0
 - **Author:** Bernard Ladenthin (Copyright 2017–2025)
@@ -512,7 +512,7 @@ Test-only:
 ./mvnw package -P assembly -DskipTests
 
 # Run (replace config path as needed)
-java -jar target/bitcoinaddressfinder-1.6.1-jar-with-dependencies.jar \
+java -jar target/bitcoinaddressfinder-1.6.2-SNAPSHOT-jar-with-dependencies.jar \
   examples/config_Find_8CPUProducer.json
 ```
 
