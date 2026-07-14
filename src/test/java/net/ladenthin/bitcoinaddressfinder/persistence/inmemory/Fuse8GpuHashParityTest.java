@@ -24,12 +24,13 @@ import org.junit.jupiter.api.Test;
  *
  * <p>{@link #gpuStyleContains(BinaryFuse8AddressPresence, byte[])} below is an independent
  * re-implementation of the lookup, written exactly as the OpenCL C will be written:
- * {@code key = bytes[0..7] big-endian}, {@code ph = hash64(key, seed)},
- * {@code h0 = reduce((int) ph, seg)}, {@code h1 = reduce(hash64(key, rotl(seed,21)), seg) + seg},
- * {@code h2 = reduce(hash64(key, rotl(seed,42)), seg) + 2*seg},
- * {@code hit = (fp[h0] ^ fp[h1] ^ fp[h2]) == fingerprint8(ph)}. The test asserts this agrees
- * with {@code containsAddress} on every one of 1 000 distinct hash160 inputs (members and
- * non-members alike). If the formula ever drifts, this test fails.
+ * {@code key = bytes[0..7] big-endian}, {@code hash = murmur64(key + seed)},
+ * {@code base = unsignedMulHigh(hash, segCountLen)}, {@code h0 = base},
+ * {@code h1 = base + segLen ^ ((hash >>> 18) & segMask)},
+ * {@code h2 = base + 2*segLen ^ (hash & segMask)},
+ * {@code hit = (fp[h0] ^ fp[h1] ^ fp[h2]) == fingerprint8(hash)}. The test asserts
+ * this agrees with {@code containsAddress} on every one of 1 000 distinct hash160 inputs (members
+ * and non-members alike). If the formula ever drifts, this test fails.
  */
 class Fuse8GpuHashParityTest {
 
@@ -53,32 +54,40 @@ class Fuse8GpuHashParityTest {
         return h;
     }
 
-    private static long rotl(long v, int r) {
-        return (v << r) | (v >>> (64 - r));
+    /** One fused position, computed inline exactly as the OpenCL kernel will compute it. */
+    private static int gpuStylePosition(int index, long hash, int segCountLen, int segLen, int segMask) {
+        long h = Math.unsignedMultiplyHigh(hash, Integer.toUnsignedLong(segCountLen));
+        h += (long) index * segLen;
+        if (index == 1) {
+            h ^= (hash >>> 18) & Integer.toUnsignedLong(segMask);
+        } else if (index == 2) {
+            h ^= hash & Integer.toUnsignedLong(segMask);
+        }
+        return (int) h;
     }
 
     /** Independent re-implementation of the lookup, written exactly as the OpenCL kernel will be. */
     private static boolean gpuStyleContains(BinaryFuse8AddressPresence filter, byte[] hash160) {
         byte[] fp = filter.getFingerprints();
         int segCountLen = filter.getSegmentCountLength();
-        if (segCountLen == 0) {
+        if (fp.length == 0) {
             return false;
         }
         long seed = filter.getSeed();
-        int seg = filter.getSegmentLength();
+        int segLen = filter.getSegmentLength();
+        int segMask = filter.getSegmentLengthMask();
 
         // Key extraction: first 8 bytes of hash160 as a big-endian uint64. This is exactly what
         // ByteBuffer.wrap(hash160).getLong(0) yields, and exactly what the kernel computes from
         // the two little-endian RIPEMD-160 output words via byte-swap.
         long key = ByteBuffer.wrap(hash160).getLong(0);
 
-        long ph = BinaryFuse8AddressPresence.hash64(key, seed);
-        int h0 = BinaryFuse8AddressPresence.reduce((int) ph, seg);
-        int h1 = BinaryFuse8AddressPresence.reduce((int) BinaryFuse8AddressPresence.hash64(key, rotl(seed, 21)), seg)
-                + seg;
-        int h2 = BinaryFuse8AddressPresence.reduce((int) BinaryFuse8AddressPresence.hash64(key, rotl(seed, 42)), seg)
-                + 2 * seg;
-        byte f8 = BinaryFuse8AddressPresence.fingerprint8(ph);
+        // Single mix per key: murmur64(key + seed). Positions come from bit-windows of this hash.
+        long hash = BinaryFuse8AddressPresence.murmur64(key + seed);
+        int h0 = gpuStylePosition(0, hash, segCountLen, segLen, segMask);
+        int h1 = gpuStylePosition(1, hash, segCountLen, segLen, segMask);
+        int h2 = gpuStylePosition(2, hash, segCountLen, segLen, segMask);
+        byte f8 = BinaryFuse8AddressPresence.fingerprint8(hash);
         return (byte) (fp[h0] ^ fp[h1] ^ fp[h2]) == f8;
     }
 

@@ -18,11 +18,22 @@ public class Statistics {
     @Deprecated
     public static final int ONE_SECOND_IN_MILLISECONDS = 1000;
 
+    /** Number of seconds per minute. */
+    private static final double SECONDS_PER_MINUTE = 60.0;
+
     /**
      * Builds the periodic human-readable statistics line logged by the consumer.
      *
-     * @param uptime                       elapsed run time in milliseconds
-     * @param keys                         total number of keys checked so far
+     * <p>The {@code Checked … keys} figure is the lifetime total; the keys/second and keys/minute
+     * figures are the <em>current windowed</em> throughput (averaged over
+     * {@code rateWindowSeconds}), not a lifetime average, so they track warm-up and thermal
+     * throttling rather than settling to a long-run mean.
+     *
+     * @param uptime                       elapsed run time in milliseconds (lifetime)
+     * @param keys                         total number of keys checked so far (lifetime)
+     * @param windowKeysPerSecond          current throughput in keys/second, averaged over the
+     *                                     trailing {@code rateWindowSeconds} window
+     * @param rateWindowSeconds            the trailing window (seconds) the rate is averaged over
      * @param keysSumOfTimeToCheckContains cumulative time (ms) spent in presence lookups
      * @param batchesByProducer            dispatched-batch counts keyed by producer label
      *                                     ({@code "<keyProducerId> (<Strategy>, <CPU|GPU>)"}); lets
@@ -41,6 +52,8 @@ public class Statistics {
     public String createStatisticsMessage(
             long uptime,
             long keys,
+            double windowKeysPerSecond,
+            long rateWindowSeconds,
             long keysSumOfTimeToCheckContains,
             Map<String, Long> batchesByProducer,
             long producersRunning,
@@ -49,12 +62,12 @@ public class Statistics {
             long producerBlocked,
             long keysQueueSize,
             long hits) {
-        // calculate uptime
+        // calculate uptime (lifetime)
         long uptimeInSeconds = uptime / (long) ONE_SECOND_IN_MILLISECONDS;
         long uptimeInMinutes = uptimeInSeconds / 60;
-        // calculate per time, prevent division by zero with Math.max
-        long keysPerSecond = keys / Math.max(uptimeInSeconds, 1);
-        long keysPerMinute = keys / Math.max(uptimeInMinutes, 1);
+        // current windowed throughput, rounded to the displayed k / M units
+        long keysPerSecondK = Math.round(windowKeysPerSecond / 1_000.0);
+        long keysPerMinuteM = Math.round(windowKeysPerSecond * SECONDS_PER_MINUTE / 1_000_000.0);
         // calculate average contains time
         long averageContainsTime = keysSumOfTimeToCheckContains / Math.max(keys, 1);
         // per-producer batch breakdown, rendered as "label=count, label=count" (or "none")
@@ -65,8 +78,8 @@ public class Statistics {
                         .collect(Collectors.joining(", "));
 
         return "Statistics: [Checked " + (keys / 1_000_000L) + " M keys in " + uptimeInMinutes + " minutes] ["
-                + (keysPerSecond / 1_000L) + " k keys/second] [" + (keysPerMinute / 1_000_000L)
-                + " M keys/minute] [Batches per producer: " + batches
+                + keysPerSecondK + " k keys/second over " + rateWindowSeconds + "s] [" + keysPerMinuteM
+                + " M keys/minute over " + rateWindowSeconds + "s] [Batches per producer: " + batches
                 + "] [Producers running: " + producersRunning + "] [Consumers running: " + consumersRunning
                 + "] [Consumer ready for work (queue empty): " + consumerReady
                 + "] [Producer blocked (queue full): " + producerBlocked + "] [Average contains time: "

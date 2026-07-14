@@ -282,8 +282,8 @@ Supported values:
 | `BLOOM`             | ~80 MB – ~1.5 GB (FPP)  | fast for misses      | yes              | when you want to skip LMDB for the common miss case but keep it open to verify hits      |
 | `HASHSET`           | ~80 B / entry           | fast                 | **no**           | small databases where memory is plentiful and exact lookup is required by callers       |
 | `TRUNCATED_LONG_64` | **~8 B / entry**        | **near HASHSET**     | **no**           | best in-RAM trade-off when you *do* want to drop LMDB — near-`HASHSET` latency at ~10× less RAM |
-| `BINARY_FUSE_8`     | **~1.3 B / entry**      | **fast**             | yes              | ultra-low RAM filter in front of LMDB; 0.4% of filter hits are verified against LMDB (also feeds the GPU pre-filter) |
-| `BINARY_FUSE_16`    | **~2.6 B / entry**      | **fast**             | yes              | like Fuse-8 but 0.0015% FPR — fewer LMDB verifications; use when Fuse-8's verification cost is measurable |
+| `BINARY_FUSE_8`     | **~1.13 B / entry**     | **fast**             | yes              | ultra-low RAM filter in front of LMDB; 0.4% of filter hits are verified against LMDB (also feeds the GPU pre-filter) |
+| `BINARY_FUSE_16`    | **~2.25 B / entry**     | **fast**             | yes              | like Fuse-8 but 0.0015% FPR — fewer LMDB verifications; use when Fuse-8's verification cost is measurable |
 
 #### Memory footprint per backend across the published database tiers
 
@@ -294,8 +294,12 @@ Supported values:
 | `HASHSET`           | ~8.0 GB                     | ~10 GB                   | ~110 GB ❌                |
 | `TRUNCATED_LONG_64` | **~0.8 GB**                 | **~1.1 GB**              | **~11 GB**                |
 | `BLOOM` (FPP 0.01)  | ~120 MB                     | ~150 MB                  | ~1.6 GB                   |
-| `BINARY_FUSE_8`     | **~130 MB**                 | **~172 MB**              | **~1.8 GB**               |
-| `BINARY_FUSE_16`    | ~260 MB                     | ~343 MB                  | ~3.6 GB                   |
+| `BINARY_FUSE_8`     | **~113 MB**                 | **~149 MB**              | **~1.5 GB**               |
+| `BINARY_FUSE_16`    | ~225 MB                     | ~298 MB                  | ~3.1 GB                   |
+
+> The Binary Fuse rows are ~1.125 B/entry (Fuse-8) and ~2.25 B/entry (Fuse-16). Only the 132 M
+> (Light DB) tier is directly measured (148,766,720 fingerprint slots); the 100 M and 1.377 B rows
+> are extrapolated from that ratio.
 
 #### Self-contained snapshots release the LMDB env
 
@@ -315,14 +319,18 @@ hash160 is the output of SHA-256 followed by RIPEMD-160 and is cryptographically
 
 #### Binary Fuse Filters — probabilistic presence with no false negatives
 
-`BINARY_FUSE_8` and `BINARY_FUSE_16` are static XOR filters (Graf &amp; Lemire, 2022). Each inserted key maps to three positions in a fingerprint array — one per segment — via independent MurmurHash3 invocations with rotated seeds. A simple XOR invariant across those three slots makes lookup a single three-read check:
+`BINARY_FUSE_8` and `BINARY_FUSE_16` are Binary Fuse Filters (Graf &amp; Lemire, 2022) — a faithful port of the reference *FastFilter* construction. Each inserted key derives a **single** 64-bit hash `murmur64(key + seed)`; its high bits pick a base slot and two low/mid bit-windows offset it into three **consecutive, overlapping** segments. A simple XOR invariant across those three slots makes lookup a single three-read check:
 
 ```
-h0 = reduce(hash64(key, seed),           segSize) + 0·segSize
-h1 = reduce(hash64(key, rotl(seed,21)),  segSize) + 1·segSize
-h2 = reduce(hash64(key, rotl(seed,42)),  segSize) + 2·segSize
-hit ⟺  fingerprints[h0] ⊕ fingerprints[h1] ⊕ fingerprints[h2] == fingerprint(key)
+hash = murmur64(key + seed)
+base = unsignedMulHigh(hash, segmentCountLength)          // in [0, segmentCountLength)
+h0 = base
+h1 = base + 1·segmentLength  ⊕ ((hash >>> 18) & segmentLengthMask)
+h2 = base + 2·segmentLength  ⊕ ( hash         & segmentLengthMask)
+hit ⟺  fingerprints[h0] ⊕ fingerprints[h1] ⊕ fingerprints[h2] == fingerprint(hash)
 ```
+
+Unlike a plain XOR filter's three *disjoint* segments (~1.23× space), the fused overlapping-segment geometry lets construction succeed on the first attempt at only ~1.125× space. Duplicate 64-bit keys (two distinct hash160 sharing their first 8 bytes) cannot be placed, so they are de-duplicated before construction — lossless, since every filter hit is verified against LMDB anyway.
 
 **No false negatives** — every key inserted via `populateFrom` is always found, so a filter **miss** is definitive.  
 **False-positive rate** — 1/256 ≈ 0.4% for Fuse-8 (8-bit fingerprint), 1/65536 ≈ 0.0015% for Fuse-16 (16-bit fingerprint). That FPR is far too high to report a filter hit as a final hit (at 0.4% roughly one in every 250 scanned addresses would be a spurious hit), so the filter is used **exactly like `BLOOM`**: a miss short-circuits without touching LMDB, a hit falls through to LMDB to confirm the address or reject it as a false positive.  
@@ -336,14 +344,14 @@ Choose between the two variants based on how expensive the LMDB verification of 
 
 | Backend             | ns / op |
 |--------------------:|--------:|
-| `LMDB_ONLY`         | 1301    |
-| `BLOOM`             |  731    |
-| `HASHSET`           |   85    |
-| `TRUNCATED_LONG_64` |  108    |
-| `BINARY_FUSE_8`     |   ~25   |
-| `BINARY_FUSE_16`    |   ~25   |
+| `LMDB_ONLY`         |  833    |
+| `BLOOM`             |  155    |
+| `HASHSET`           |   42    |
+| `TRUNCATED_LONG_64` |   40    |
+| `BINARY_FUSE_8`     |   ~20   |
+| `BINARY_FUSE_16`    |   ~23   |
 
-The default backend is `LMDB_ONLY` (no in-RAM structure, exact, can never produce a false hit). When you *do* want to trade RAM for speed, `TRUNCATED_LONG_64` reaches near-`HASHSET` latency at ~10× lower memory cost and is the best in-RAM choice for most cases. `BINARY_FUSE_8` and `BINARY_FUSE_16` offer even lower memory with O(1) lookup (3 direct array reads + 3 hashes) but keep LMDB open to verify hits; cache-cold latency grows with filter size, but for small-to-medium databases the three-read pattern typically stays in L2 or L3 cache.
+The default backend is `LMDB_ONLY` (no in-RAM structure, exact, can never produce a false hit). When you *do* want to trade RAM for speed, `TRUNCATED_LONG_64` reaches near-`HASHSET` latency at ~10× lower memory cost and is the best in-RAM choice for most cases. `BINARY_FUSE_8` and `BINARY_FUSE_16` offer even lower memory with O(1) lookup (3 direct array reads + 1 hash) but keep LMDB open to verify hits; cache-cold latency grows with filter size, but for small-to-medium databases the three-read pattern typically stays in L2 or L3 cache.
 
 Run the backend comparison benchmark yourself with:
 
@@ -402,7 +410,7 @@ Compact mode runs only when a filter was uploaded **and** `transferAll` is false
 
 **Device requirements** — compact mode needs an **OpenCL 2.0+** device (the `atomic_add` on global memory) and a little-endian device (the kernel canonicalises its output as little-endian). Both are checked at producer init and fail fast with a clear message; on an older device set `transferAll: true` to keep the full-transfer path. The GPU/CPU lookup parity (key extraction + hash formula) is pinned by `Fuse8GpuHashParityTest` and exercised end-to-end on a real OpenCL device by `OpenCLCompactOutputIntegrationTest`.
 
-**Measured speedup** — see [GPU Binary Fuse 8 filter — compact output vs. full transfer](#gpu-binary-fuse-8-filter--compact-output-vs-full-transfer) under Performance Benchmarks for an A/B measurement (~1.28× at grid 19 on an RTX 3070).
+**Measured speedup** — see [GPU Binary Fuse 8 filter — compact output vs. full transfer](#gpu-binary-fuse-8-filter--compact-output-vs-full-transfer) under Performance Benchmarks for an A/B measurement (~2.2× at grid 19 on an RTX 3070).
 
 #### Bloom filter — FPP tuning
 
@@ -684,7 +692,7 @@ If you're missing any information or have questions about usage or content, feel
 > ```json
 > "addressLookupBackend" : "TRUNCATED_LONG_64"
 > ```
-> See [Pluggable Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend) above for the full trade-off matrix and benchmark numbers. `TRUNCATED_LONG_64` loads every hash160 into RAM once at startup as 256 sorted `long[]` buckets (~1.1 GB for the Light DB), then closes the LMDB env and releases its mmap pages — near-`HASHSET` lookup latency at ~10× lower memory cost. If you have memory to spare and prefer exact-bit storage with no probabilistic fallthrough, `HASHSET` (~10 GB for the Light DB) is the next step up. If RAM is tight, `BINARY_FUSE_8` (~172 MB for the Light DB) is the lowest-footprint filter: like `BLOOM` it keeps LMDB open and verifies the ~0.4% of filter hits against it (rejecting false positives), but at a fraction of `BLOOM`'s memory. `BLOOM` (~150 MB) covers a similar niche.
+> See [Pluggable Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend) above for the full trade-off matrix and benchmark numbers. `TRUNCATED_LONG_64` loads every hash160 into RAM once at startup as 256 sorted `long[]` buckets (~1.1 GB for the Light DB), then closes the LMDB env and releases its mmap pages — near-`HASHSET` lookup latency at ~10× lower memory cost. If you have memory to spare and prefer exact-bit storage with no probabilistic fallthrough, `HASHSET` (~10 GB for the Light DB) is the next step up. If RAM is tight, `BINARY_FUSE_8` (~149 MB for the Light DB) is the lowest-footprint filter: like `BLOOM` it keeps LMDB open and verifies the ~0.4% of filter hits against it (rejecting false positives), but at a fraction of `BLOOM`'s memory. `BLOOM` (~150 MB) covers a similar niche.
 
 <details>
 <summary>Checksums lmdb_light.zip</summary>
@@ -1334,17 +1342,18 @@ back over PCIe.
 
 | GPU Filter (`enableGpuFilter`) | GPU Model              | Key Range (Bits) | Grid Size (Bits) | Effective Keys/s (~) | Speedup        |
 |--------------------------------|------------------------|------------------|------------------|----------------------|----------------|
-| Off — full transfer (legacy)   | NVIDIA RTX 3070 Laptop | 256              | 19               | 1,880,000 keys/s     | 1.00× baseline |
-| On — Binary Fuse 8 compact     | NVIDIA RTX 3070 Laptop | 256              | 19               | 2,410,000 keys/s     | **~1.28×**     |
+| Off — full transfer (legacy)   | NVIDIA RTX 3070 Laptop | 256              | 19               | 4,350,000 keys/s     | 1.00× baseline |
+| On — Binary Fuse 8 compact     | NVIDIA RTX 3070 Laptop | 256              | 19               | 9,710,000 keys/s     | **~2.2×**      |
 
 Measured against a ~1 M-entry filter at `batchSizeInBits = 19` (2¹⁹ ≈ 0.52 M candidates per
 launch), matching the grid size of the raw key-generation table above. The
 `GpuFuse8FilterBenchmark` JMH benchmark A/B-toggles compact mode against the legacy
-full-transfer path on the same kernel and batch; numbers above come from a single long
-measurement iteration (~200 s per arm) since the relevant one-time cost is OpenCL kernel
-compilation (done once in setup) and GPU clock ramp-up, not JVM warmup. The filter wins by
-collapsing the read-back from the full grid down to the ~0.4 % false-positive hits, so the
-advantage grows with `batchSizeInBits` (≈1.7× at grid 20). Run it yourself:
+full-transfer path on the same kernel and batch; numbers above are the mean of 3 measurement
+iterations (compact `18.52 ± 0.05` ops/s, very stable; full transfer `8.30` ops/s, noisier) —
+each op is one launch of 2¹⁹ candidates. The relevant one-time cost is OpenCL kernel compilation
+(done once in setup) and GPU clock ramp-up, not JVM warmup. The filter wins by collapsing the
+read-back from the full grid down to the ~0.4 % false-positive hits, so the advantage grows with
+`batchSizeInBits`. Run it yourself:
 
 ```bash
 mvn test-compile exec:java -Dexec.args="GpuFuse8FilterBenchmark"
@@ -1358,25 +1367,27 @@ and each launch is timestamped on the device. The same grid-19 run on the RTX 30
 
 | Phase | Off — full transfer | On — Binary Fuse 8 compact | Effect |
 |-------|--------------------:|---------------------------:|--------|
-| GPU kernel compute            | 196.2 ms | 200.8 ms | **+4.7 ms (~2.4%)** — the inline filter check |
-| PCIe read-back (device)       |   8.74 ms |  0.035 ms | **~250× less** — only the ~0.4% hits cross the bus |
-| Host-side parse (wall − device) | ~67.9 ms |  ~8.4 ms | **~8× less** — the consumer parses ~2 k hits, not 524 k results |
-| **Per-launch wall time**      | ~272.8 ms | ~209.3 ms |  |
+| GPU kernel compute            | 51.5 ms | 54.8 ms | **+3.3 ms (~6.5%)** — the inline filter check |
+| PCIe read-back (device)       |  8.75 ms | 0.059 ms | **~150× less** — only the ~0.4% hits cross the bus |
+| Host-side parse (wall − device) | ~58.6 ms |  ~0.3 ms | **~185× less** — the consumer parses ~2 k hits, not 524 k results |
+| **Per-launch wall time**      | ~118.8 ms | ~55.2 ms |  |
 
-The takeaway: **the GPU-side filtering is not expensive on the GPU.** It adds only ~2.4 % to
-kernel compute (a handful of integer ops + 3–6 fingerprint reads per candidate, versus the
-elliptic-curve math and two SHA-256 + two RIPEMD-160 hashes that dominate the kernel). The
-~1.28× end-to-end gain comes almost entirely from collapsing the PCIe transfer (~250×) and the
-host-side parse (~8×) — i.e. it offloads the address-presence check from the CPU at negligible
-GPU cost, which is exactly the design intent. (Profiling adds a little driver overhead and is
+The takeaway: **the GPU-side filtering is not expensive on the GPU.** It adds only ~6.5 % to
+kernel compute (a handful of integer ops + one `murmur64` hash + 3 fingerprint reads per
+candidate, versus the elliptic-curve math and two SHA-256 + two RIPEMD-160 hashes that dominate
+the kernel). The ~2.2× end-to-end gain comes almost entirely from collapsing the PCIe transfer
+(~150×) and the host-side parse (~185×) — i.e. it offloads the address-presence check from the
+CPU at negligible GPU cost, which is exactly the design intent. (Profiling adds a little driver overhead and is
 **off by default**; it is a diagnostic switch, never enabled by the runtime pipeline.)
 
 
 ## Logging and Runtime Statistics
 
 In `Find` mode the consumer logs a periodic, single-line statistics snapshot at `INFO`
-level. The interval is controlled by `consumerJava.printStatisticsEveryNSeconds`
-(default `60`). All logging goes through **SLF4J / Logback**, so format and destinations
+level. The print interval is controlled by `consumerJava.printStatisticsEveryNSeconds`
+(default `60`); the keys/second and keys/minute figures are a **current** throughput averaged
+over a trailing `consumerJava.statisticsRateWindowSeconds` window (default `60`), independent of
+the print interval. All logging goes through **SLF4J / Logback**, so format and destinations
 are fully configurable (see [Customizing Log Output](#customizing-log-output)).
 
 ### Reading the Statistics Line
@@ -1384,13 +1395,13 @@ are fully configurable (see [Customizing Log Output](#customizing-log-output)).
 A statistics line looks like this:
 
 ```
-Statistics: [Checked 1234 M keys in 5 minutes] [4100 k keys/second] [246 M keys/minute] [Batches per producer: exampleOpenCL (Random, GPU)=5012, exampleRandom (Random, CPU)=480] [Producers running: 2] [Consumers running: 4] [Consumer ready for work (queue empty): 5012] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
+Statistics: [Checked 1234 M keys in 5 minutes] [4100 k keys/second over 60s] [246 M keys/minute over 60s] [Batches per producer: exampleOpenCL (Random, GPU)=5012, exampleRandom (Random, CPU)=480] [Producers running: 2] [Consumers running: 4] [Consumer ready for work (queue empty): 5012] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
 ```
 
 | Field | Meaning |
 |---|---|
-| `Checked N M keys in M minutes` | Total candidate keys checked so far (millions) and elapsed minutes. |
-| `k keys/second` / `M keys/minute` | Throughput — **the headline performance number.** |
+| `Checked N M keys in M minutes` | **Lifetime** total candidate keys checked so far (millions) and elapsed minutes. |
+| `k keys/second over Ns` / `M keys/minute over Ns` | **Current** throughput, averaged over the trailing `statisticsRateWindowSeconds` window (the `over Ns` suffix shows the window). Unlike a lifetime average it tracks warm-up and thermal throttling and drops toward zero when producers stall. **The headline performance number.** |
 | `Batches per producer: <label>=N, …` | Dispatched-batch count per running producer, keyed by `<keyProducerId> (<Strategy>, <CPU\|GPU>)` so concurrently running producers are told apart. The **strategy** (`Random`, `Bip39`, `Incremental`, `Socket`, `WebSocket`, `Zmq`) is derived from the key producer; the **backend** (`CPU` for `producerJava`/`producerJavaSecretsFiles`, `GPU` for `producerOpenCL`) from the producer. `none` until the first batch. |
 | `Producers running: N` | Number of producers currently in the `RUNNING` state. |
 | `Consumers running: N` | Number of consumer worker threads currently running (≤ `consumerJava.threads`). |
@@ -1400,8 +1411,10 @@ Statistics: [Checked 1234 M keys in 5 minutes] [4100 k keys/second] [246 M keys/
 | `keys queue size: N` | Instantaneous depth of the producer→consumer queue (bounded by `consumerJava.queueSize`). |
 | `Hits: N` | Number of address matches found so far (see [Hit Logging](#hit-logging)). |
 
-> All counters are **cumulative since startup**. What matters for diagnosis is how fast a
-> counter *rises between two statistics lines*, not its absolute value.
+> The **count** fields (`Checked … keys`, `Consumer ready`, `Producer blocked`, `Hits`) are
+> **cumulative since startup** — for those, what matters is how fast they *rise between two
+> lines*, not the absolute value. The `keys/second` / `keys/minute` fields are already a
+> **current windowed rate**, so they read directly with no need to difference successive lines.
 
 ### Diagnosing Bottlenecks
 
@@ -1459,8 +1472,9 @@ Typical customizations:
 
 - **Write hits to their own file** — add a `FileAppender` and route the `ConsumerJava` logger
   (or filter on the `hit:` prefix) to it, so matches are never lost in console scrollback.
-- **Adjust the statistics cadence** — change `consumerJava.printStatisticsEveryNSeconds` in
-  the JSON config (this controls *when* the line is emitted; Logback controls *how/where*).
+- **Adjust the statistics cadence / rate window** — `consumerJava.printStatisticsEveryNSeconds`
+  controls *when* the line is emitted; `consumerJava.statisticsRateWindowSeconds` controls the
+  trailing window the keys/second rate is averaged over (Logback controls *how/where*).
 - **Machine-readable output** — the single-line, fixed-field statistics format is intentionally
   stable so an external supervisor or GUI can parse it (e.g. via an inter-process pipe) to plot
   throughput and the ready/blocked health counters over time.

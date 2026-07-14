@@ -22,6 +22,15 @@ public class CConsumerJava {
     public @NonNull CLMDBConfigurationReadOnly lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
     /** Interval, in seconds, at which throughput statistics are printed. */
     public int printStatisticsEveryNSeconds = 60;
+    /**
+     * Trailing window, in seconds, over which the current keys/second and keys/minute throughput
+     * is averaged. Independent of {@link #printStatisticsEveryNSeconds}, which only controls how
+     * often the line is printed. Unlike a lifetime average, this reflects <em>recent</em>
+     * performance: it rises while the GPU warms up (clocks ramp), falls under thermal throttling,
+     * and drops toward zero when producers stall — and it does not include the one-time startup
+     * dead time (filter build, kernel compile) once the window has advanced past it. Default: 60.
+     */
+    public int statisticsRateWindowSeconds = 60;
     /** Number of consumer worker threads. */
     public int threads = 4;
     /**

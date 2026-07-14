@@ -4,34 +4,50 @@
 package net.ladenthin.bitcoinaddressfinder.persistence.inmemory;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.stream.Stream;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Self-contained presence-only snapshot backed by a Binary Fuse Filter with 8-bit
  * fingerprints implementing {@link AddressPresence}.
  *
  * <h2>Algorithm</h2>
- * Binary Fuse Filters (Graf &amp; Lemire, 2022) are a variant of XOR filters that use
- * fused segments to guarantee successful construction for any input with high probability.
- * Each key maps to three positions — one per segment — using independent MurmurHash3
- * invocations. The three stored fingerprints satisfy an XOR invariant, enabling O(1)
- * lookup. No false negatives are possible.
+ * This is a faithful implementation of the Binary Fuse Filter (Graf &amp; Lemire, 2022), the
+ * same construction shipped by the reference <em>FastFilter</em> C library. Unlike a plain XOR
+ * filter (three <em>disjoint</em> segments, ~1.23&#x00d7; space) a binary fuse uses <em>fused,
+ * overlapping</em> segments: each key derives a single 64-bit hash whose high bits pick a base
+ * position and whose bit-windows pick three slots in three <em>consecutive</em> segments. This
+ * geometry makes construction succeed on the first attempt with very high probability at only
+ * ~1.125&#x00d7; space, avoiding the repeated re-seeding that a marginally-sized XOR layout
+ * suffers on large inputs.
  *
  * <h2>Hash design</h2>
- * Three independent positions are derived per key:
- * <ul>
- *   <li>{@code h0 = reduce(hash64(key, seed),           segSize) + 0 * segSize}</li>
- *   <li>{@code h1 = reduce(hash64(key, rotl(seed, 21)), segSize) + 1 * segSize}</li>
- *   <li>{@code h2 = reduce(hash64(key, rotl(seed, 42)), segSize) + 2 * segSize}</li>
- * </ul>
- * Using rotations of the seed produces independent 64-bit hashes per segment, preventing
- * the correlated-key collisions that occur with a single-hash bit-window approach.
- * The fingerprint is {@code (byte)(primaryHash ^ (primaryHash >>> 32))} where
- * {@code primaryHash = hash64(key, seed)}.
+ * A single mix {@code hash = murmur64(key + seed)} is computed per key. The three fingerprint
+ * positions are then, for {@code index} in {@code {0, 1, 2}}:
+ * <pre>{@code
+ *   base = unsignedMulHigh(hash, segmentCountLength)   // in [0, segmentCountLength)
+ *   h0   = base
+ *   h1   = base + segmentLength      ^ ((hash >>> 18) & segmentLengthMask)
+ *   h2   = base + 2 * segmentLength  ^ ( hash         & segmentLengthMask)
+ * }</pre>
+ * Because {@code segmentLength} is a power of two and the three indices land in three distinct
+ * segment-aligned blocks, the three positions are always distinct and within
+ * {@code [0, arrayLength)} where {@code arrayLength = (segmentCount + 2) * segmentLength}. The
+ * fingerprint is {@code (byte)(hash ^ (hash >>> 32))}.
+ *
+ * <h2>Duplicate keys</h2>
+ * The filter keys on the first 8 bytes of each hash160. Two distinct addresses that share those
+ * bytes collapse to the same 64-bit key; a binary fuse cannot place two identical keys, so such
+ * duplicates are removed before construction. This is lossless for a presence pre-filter: every
+ * filter hit is verified against the exact backend (LMDB) anyway, so collapsing two 64-bit-equal
+ * addresses into one slot never causes a missed balance.
  *
  * <h2>False-positive rate</h2>
  * With 8-bit fingerprints the theoretical FPR is approximately 1/256 &#x2248; 0.4&nbsp;%.
@@ -42,9 +58,9 @@ import org.jspecify.annotations.NonNull;
  * without consulting the delegate.
  *
  * <h2>Memory cost</h2>
- * Approximately 1.30&nbsp;bytes per entry (one {@code byte} slot per fingerprint position,
- * with the segment allocation overhead). Peak construction memory is approximately
- * 29&nbsp;bytes per entry (working arrays during the peeling algorithm).
+ * Approximately 1.13&nbsp;bytes per entry (one {@code byte} slot per fingerprint position, with
+ * the segment allocation overhead). Peak construction memory is dominated by the peeling working
+ * arrays.
  *
  * <h2>No false negatives</h2>
  * Every key that was inserted during {@link #populateFrom(AddressIterable)} will always be
@@ -63,28 +79,41 @@ import org.jspecify.annotations.NonNull;
 @ToString
 public final class BinaryFuse8AddressPresence implements AddressPresence {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(BinaryFuse8AddressPresence.class);
+
+    /** Human-readable prefix for construction progress log lines. */
+    private static final String PROGRESS_NAME = "Binary Fuse8 filter";
+
     /** Fixed length of a hash160 entry in bytes. */
     static final int BYTES_PER_ADDRESS = 20;
 
-    /** Initial seed value used for the first construction attempt. */
-    static final long INITIAL_SEED = 0xBEEF_CAFE_1234_5678L;
+    /** Fixed hypergraph arity: each key maps to three fingerprint slots. */
+    private static final int ARITY = 3;
+
+    /** Upper bound on the per-segment length, matching the reference implementation. */
+    private static final int MAX_SEGMENT_LENGTH = 262144;
 
     /** Maximum number of seed attempts before giving up construction. */
     private static final int MAX_SEED_ATTEMPTS = 100;
 
-    /** Number of segments in the fused layout. */
-    private static final int SEGMENT_COUNT = 3;
+    /** Initial construction seed; re-mixed on each failed attempt. */
+    static final long INITIAL_SEED = 0xBEEF_CAFE_1234_5678L;
 
     private final long seed;
-    private final int segSize;
+    private final int segmentLength;
+    private final int segmentLengthMask;
+    private final int segmentCountLength;
 
     // May be large — toString would be log-killing. slotCount() is included instead.
     @ToString.Exclude
     private final byte[] fingerprints;
 
-    private BinaryFuse8AddressPresence(long seed, int segSize, byte[] fingerprints) {
+    private BinaryFuse8AddressPresence(
+            long seed, int segmentLength, int segmentLengthMask, int segmentCountLength, byte[] fingerprints) {
         this.seed = seed;
-        this.segSize = segSize;
+        this.segmentLength = segmentLength;
+        this.segmentLengthMask = segmentLengthMask;
+        this.segmentCountLength = segmentCountLength;
         this.fingerprints = fingerprints;
     }
 
@@ -96,28 +125,43 @@ public final class BinaryFuse8AddressPresence implements AddressPresence {
      * @throws IllegalStateException if filter construction fails after {@value #MAX_SEED_ATTEMPTS} seed attempts
      */
     public static BinaryFuse8AddressPresence populateFrom(@NonNull AddressIterable source) {
-        long[] keys = collectKeys(source);
-        int n = keys.length;
+        long[] keys = deduplicate(collectKeys(source));
+        int size = keys.length;
 
-        if (n == 0) {
-            return new BinaryFuse8AddressPresence(INITIAL_SEED, 2, new byte[0]);
+        if (size == 0) {
+            LOGGER.info("{}: no addresses to index; filter is empty.", PROGRESS_NAME);
+            return new BinaryFuse8AddressPresence(INITIAL_SEED, 4, 3, 0, new byte[0]);
         }
 
-        int segSize = Math.max(2, (int) Math.ceil(n * 1.3 / 3.0) + 3);
-        int m = segSize * SEGMENT_COUNT;
+        int segmentLength = calculateSegmentLength(size);
+        int segmentLengthMask = segmentLength - 1;
+        double sizeFactor = calculateSizeFactor(size);
+        int capacity = (int) Math.round(size * sizeFactor);
+        int initSegmentCount = (capacity + segmentLength - 1) / segmentLength - (ARITY - 1);
+        int arrayLength = (initSegmentCount + ARITY - 1) * segmentLength;
+        int segmentCount = (arrayLength + segmentLength - 1) / segmentLength;
+        segmentCount = segmentCount <= ARITY - 1 ? 1 : segmentCount - (ARITY - 1);
+        arrayLength = (segmentCount + ARITY - 1) * segmentLength;
+        int segmentCountLength = segmentCount * segmentLength;
 
-        long seed = INITIAL_SEED;
-
+        long attemptSeed = INITIAL_SEED;
         for (int attempt = 0; attempt < MAX_SEED_ATTEMPTS; attempt++) {
-            byte[] table = tryBuild(keys, n, seed, segSize, m);
-            if (table.length != 0) {
-                return new BinaryFuse8AddressPresence(seed, segSize, table);
+            byte[] table = tryBuild(
+                    keys, attemptSeed, segmentLength, segmentLengthMask, segmentCountLength, arrayLength, attempt);
+            if (table != null) {
+                LOGGER.info("{}: ready ({} addresses, {} fingerprint slots).", PROGRESS_NAME, size, table.length);
+                return new BinaryFuse8AddressPresence(
+                        attemptSeed, segmentLength, segmentLengthMask, segmentCountLength, table);
             }
-            seed = hash64(seed, INITIAL_SEED);
+            LOGGER.info(
+                    "{}: construction attempt {} did not converge; retrying with a new seed.",
+                    PROGRESS_NAME,
+                    attempt + 1);
+            attemptSeed = murmur64(attemptSeed + INITIAL_SEED);
         }
 
         throw new IllegalStateException(
-                "BinaryFuse8 construction failed after " + MAX_SEED_ATTEMPTS + " seed attempts for n=" + n);
+                "BinaryFuse8 construction failed after " + MAX_SEED_ATTEMPTS + " seed attempts for n=" + size);
     }
 
     @Override
@@ -129,11 +173,11 @@ public final class BinaryFuse8AddressPresence implements AddressPresence {
             return false;
         }
         long key = hash160.getLong(hash160.position());
-        long ph = hash64(key, seed);
-        int h0 = reduce((int) hash64(key, seed), segSize);
-        int h1 = reduce((int) hash64(key, rotl(seed, 21)), segSize) + segSize;
-        int h2 = reduce((int) hash64(key, rotl(seed, 42)), segSize) + 2 * segSize;
-        byte fp = fingerprint8(ph);
+        long hash = mix(key, seed);
+        int h0 = hashPosition(0, hash, segmentCountLength, segmentLength, segmentLengthMask);
+        int h1 = hashPosition(1, hash, segmentCountLength, segmentLength, segmentLengthMask);
+        int h2 = hashPosition(2, hash, segmentCountLength, segmentLength, segmentLengthMask);
+        byte fp = fingerprint8(hash);
         return (byte) (fingerprints[h0] ^ fingerprints[h1] ^ fingerprints[h2]) == fp;
     }
 
@@ -145,7 +189,7 @@ public final class BinaryFuse8AddressPresence implements AddressPresence {
     /**
      * Returns the total number of fingerprint slots in the filter array.
      *
-     * @return the number of slots (approximately 1.30 &#x00d7; the inserted key count)
+     * @return the number of slots (approximately 1.13 &#x00d7; the inserted key count)
      */
     @ToString.Include
     public int slotCount() {
@@ -182,7 +226,7 @@ public final class BinaryFuse8AddressPresence implements AddressPresence {
     }
 
     /**
-     * Returns the construction seed of the first successful build.
+     * Returns the construction seed of the successful build.
      *
      * @return the seed value used by {@link #containsAddress(ByteBuffer)} for hashing
      */
@@ -191,47 +235,41 @@ public final class BinaryFuse8AddressPresence implements AddressPresence {
     }
 
     /**
-     * Returns the per-segment length used by the {@code reduce} position mapping.
+     * Returns the per-segment length (a power of two) used by the fused position mapping.
      *
      * @return the segment length
      */
     int getSegmentLength() {
-        return segSize;
+        return segmentLength;
     }
 
     /**
-     * Returns {@link #getSegmentLength()} minus one.
-     * <p>
-     * Provided as GPU-upload metadata to mirror the standard Binary Fuse filter layout; the
-     * {@code reduce}-based position mapping used here does not consume the mask directly.
+     * Returns {@code segmentLength - 1}, the mask applied to each within-segment bit-window.
      *
-     * @return {@code getSegmentLength() - 1}
+     * @return the segment-length mask
      */
     int getSegmentLengthMask() {
-        return segSize - 1;
+        return segmentLengthMask;
     }
 
     /**
-     * Returns the total number of fingerprint slots (the three segments combined).
-     * <p>
-     * Equals {@link #getFingerprints()}{@code .length}, so the value matches the size of the
-     * buffer uploaded to GPU VRAM exactly.
+     * Returns {@code segmentCount * segmentLength}, the exclusive upper bound of the base
+     * position produced by the high-bits reduction. This is <em>not</em> the fingerprint array
+     * length (which is {@code (segmentCount + 2) * segmentLength}).
      *
-     * @return the total slot count across all segments
+     * @return the segment-count length used by the position mapping
      */
     int getSegmentCountLength() {
-        return fingerprints.length;
+        return segmentCountLength;
     }
 
     /**
-     * MurmurHash3 64-bit finaliser seeded by XOR with {@code seed}.
+     * MurmurHash3 64-bit finaliser.
      *
-     * @param key  the 64-bit key extracted from the hash160
-     * @param seed the per-segment seed (main seed or a rotation of it)
-     * @return the 64-bit hash value
+     * @param h the value to mix
+     * @return the mixed 64-bit value
      */
-    static long hash64(long key, long seed) {
-        long h = key ^ seed;
+    static long murmur64(long h) {
         h ^= h >>> 33;
         h *= 0xff51afd7ed558ccdL;
         h ^= h >>> 33;
@@ -241,29 +279,65 @@ public final class BinaryFuse8AddressPresence implements AddressPresence {
     }
 
     /**
-     * 8-bit fingerprint extracted from a 64-bit hash value by XOR-folding the two 32-bit halves.
+     * Per-key mix: {@code murmur64(key + seed)}. A single mix drives all three positions and the
+     * fingerprint.
      *
-     * @param h the primary hash value
-     * @return the fingerprint byte
+     * @param key  the 64-bit key extracted from the hash160
+     * @param seed the construction seed
+     * @return the 64-bit mixed hash
      */
-    static byte fingerprint8(long h) {
-        return (byte) (h ^ (h >>> 32));
+    static long mix(long key, long seed) {
+        return murmur64(key + seed);
     }
 
     /**
-     * Maps a 32-bit hash value into the range {@code [0, m)} using a multiply-high trick
-     * that avoids modulo division.
+     * 8-bit fingerprint extracted from a 64-bit hash value by XOR-folding the two 32-bit halves.
      *
-     * @param h the 32-bit hash (treated as unsigned)
-     * @param m the range upper bound (exclusive)
-     * @return a value in {@code [0, m)}
+     * @param hash the per-key mixed hash
+     * @return the fingerprint byte
      */
-    static int reduce(int h, int m) {
-        return (int) ((Integer.toUnsignedLong(h) * (long) m) >>> 32);
+    static byte fingerprint8(long hash) {
+        return (byte) (hash ^ (hash >>> 32));
     }
 
-    private static long rotl(long v, int r) {
-        return (v << r) | (v >>> (64 - r));
+    /**
+     * Computes the fingerprint slot for one of the three fused positions of a key.
+     *
+     * @param index              the position index (0, 1 or 2)
+     * @param hash               the per-key mixed hash
+     * @param segmentCountLength {@code segmentCount * segmentLength}
+     * @param segmentLength      the per-segment length (power of two)
+     * @param segmentLengthMask  {@code segmentLength - 1}
+     * @return the slot index in {@code [0, (segmentCount + 2) * segmentLength)}
+     */
+    static int hashPosition(int index, long hash, int segmentCountLength, int segmentLength, int segmentLengthMask) {
+        long h = Math.unsignedMultiplyHigh(hash, Integer.toUnsignedLong(segmentCountLength));
+        h += (long) index * segmentLength;
+        // h0 is the bare base position; only h1 and h2 xor a within-segment window, drawn from
+        // distinct low/mid hash bit-ranges that do not overlap the high bits used by the base.
+        if (index == 1) {
+            h ^= (hash >>> 18) & Integer.toUnsignedLong(segmentLengthMask);
+        } else if (index == 2) {
+            h ^= hash & Integer.toUnsignedLong(segmentLengthMask);
+        }
+        return (int) h;
+    }
+
+    /** Reference segment-length heuristic for arity 3, capped at {@link #MAX_SEGMENT_LENGTH}. */
+    static int calculateSegmentLength(int size) {
+        if (size == 0) {
+            return 4;
+        }
+        int length = 1 << (int) Math.floor(Math.log(size) / Math.log(3.33) + 2.25);
+        return Math.min(length, MAX_SEGMENT_LENGTH);
+    }
+
+    /** Reference size-factor heuristic for arity 3. */
+    static double calculateSizeFactor(int size) {
+        if (size <= 1) {
+            return 0.0;
+        }
+        return Math.max(1.125, 0.875 + 0.25 * Math.log(1_000_000.0) / Math.log(size));
     }
 
     private static long[] collectKeys(AddressIterable source) {
@@ -271,56 +345,100 @@ public final class BinaryFuse8AddressPresence implements AddressPresence {
         if (count > Integer.MAX_VALUE) {
             throw new IllegalStateException("Source contains more than Integer.MAX_VALUE entries: " + count);
         }
+        LOGGER.info("{}: reading {} addresses from the source ...", PROGRESS_NAME, count);
         long[] keys = new long[(int) count];
         int[] idx = {0};
+        FilterBuildProgress progress =
+                new FilterBuildProgress(LOGGER::info, PROGRESS_NAME + ": reading addresses", count);
         try (Stream<ByteBuffer> stream = source.addresses()) {
             stream.forEach(bb -> {
                 if (idx[0] < keys.length && bb.remaining() == BYTES_PER_ADDRESS) {
                     keys[idx[0]++] = bb.getLong(bb.position());
+                    progress.report(idx[0]);
                 }
             });
         }
-        return keys;
+        // trim in case the source yielded fewer valid entries than count() reported
+        return idx[0] == keys.length ? keys : Arrays.copyOf(keys, idx[0]);
     }
 
-    private static byte[] tryBuild(long[] keys, int n, long seed, int segSize, int m) {
-        long seed1 = rotl(seed, 21);
-        long seed2 = rotl(seed, 42);
+    /**
+     * Removes duplicate 64-bit keys (produced when two distinct hash160 share their first 8 bytes).
+     * The input array is sorted in place; a compacted copy is returned only when duplicates exist.
+     */
+    private static long[] deduplicate(long[] keys) {
+        if (keys.length < 2) {
+            return keys;
+        }
+        Arrays.sort(keys);
+        int write = 1;
+        for (int read = 1; read < keys.length; read++) {
+            if (keys[read] != keys[write - 1]) {
+                keys[write++] = keys[read];
+            }
+        }
+        if (write == keys.length) {
+            return keys;
+        }
+        LOGGER.info(
+                "{}: removed {} truncation-collision duplicate key(s); {} unique keys remain.",
+                PROGRESS_NAME,
+                keys.length - write,
+                write);
+        return Arrays.copyOf(keys, write);
+    }
 
-        long[] primaryHashes = new long[n];
-        int[] count = new int[m];
-        int[] xorIdx = new int[m];
+    /**
+     * One construction attempt over the fused hypergraph. Returns the filled fingerprint table, or
+     * {@code null} if peeling could not place every key (the caller retries with a new seed).
+     */
+    private static byte @Nullable [] tryBuild(
+            long[] keys,
+            long seed,
+            int segmentLength,
+            int segmentLengthMask,
+            int segmentCountLength,
+            int arrayLength,
+            int attempt) {
+        String suffix = attempt == 0 ? "" : " (attempt " + (attempt + 1) + ")";
+        int size = keys.length;
 
-        for (int i = 0; i < n; i++) {
-            long ph = hash64(keys[i], seed);
-            primaryHashes[i] = ph;
-            int h0 = reduce((int) ph, segSize);
-            int h1 = reduce((int) hash64(keys[i], seed1), segSize) + segSize;
-            int h2 = reduce((int) hash64(keys[i], seed2), segSize) + 2 * segSize;
+        int[] count = new int[arrayLength];
+        int[] xorIdx = new int[arrayLength];
+
+        FilterBuildProgress indexing =
+                new FilterBuildProgress(LOGGER::info, PROGRESS_NAME + ": indexing" + suffix, size);
+        for (int i = 0; i < size; i++) {
+            long hash = mix(keys[i], seed);
+            int h0 = hashPosition(0, hash, segmentCountLength, segmentLength, segmentLengthMask);
+            int h1 = hashPosition(1, hash, segmentCountLength, segmentLength, segmentLengthMask);
+            int h2 = hashPosition(2, hash, segmentCountLength, segmentLength, segmentLengthMask);
             count[h0]++;
             count[h1]++;
             count[h2]++;
             xorIdx[h0] ^= i;
             xorIdx[h1] ^= i;
             xorIdx[h2] ^= i;
+            indexing.report(i + 1);
         }
 
         // Build initial queue of singleton positions.
-        // Maximum writes: m initial + 3*n from peeling (up to 3 positions per key peeled).
-        int[] queue = new int[m + 3 * n];
+        // Maximum enqueues: arrayLength initial + 3*size from peeling (up to 3 positions per key peeled).
+        int[] queue = new int[arrayLength + 3 * size];
         int qHead = 0;
         int qTail = 0;
-        for (int pos = 0; pos < m; pos++) {
+        for (int pos = 0; pos < arrayLength; pos++) {
             if (count[pos] == 1) {
                 queue[qTail++] = pos;
             }
         }
 
-        int[] order = new int[n];
-        int[] alone = new int[n];
+        int[] order = new int[size];
+        int[] alone = new int[size];
         int done = 0;
 
-        // Peeling loop: peel one singleton at a time
+        // Peeling loop: peel one singleton at a time.
+        FilterBuildProgress peeling = new FilterBuildProgress(LOGGER::info, PROGRESS_NAME + ": peeling" + suffix, size);
         while (qHead < qTail) {
             int pos = queue[qHead++];
             if (count[pos] != 1) {
@@ -330,11 +448,12 @@ public final class BinaryFuse8AddressPresence implements AddressPresence {
             order[done] = keyIdx;
             alone[done] = pos;
             done++;
+            peeling.report(done);
 
-            long key = keys[keyIdx];
-            int h0 = reduce((int) hash64(key, seed), segSize);
-            int h1 = reduce((int) hash64(key, seed1), segSize) + segSize;
-            int h2 = reduce((int) hash64(key, seed2), segSize) + 2 * segSize;
+            long hash = mix(keys[keyIdx], seed);
+            int h0 = hashPosition(0, hash, segmentCountLength, segmentLength, segmentLengthMask);
+            int h1 = hashPosition(1, hash, segmentCountLength, segmentLength, segmentLengthMask);
+            int h2 = hashPosition(2, hash, segmentCountLength, segmentLength, segmentLengthMask);
 
             count[h0]--;
             xorIdx[h0] ^= keyIdx;
@@ -355,19 +474,22 @@ public final class BinaryFuse8AddressPresence implements AddressPresence {
             }
         }
 
-        if (done < n) {
-            return new byte[0];
+        if (done < size) {
+            return null;
         }
 
-        // Reverse assignment: fill fingerprints from last peeled to first
-        byte[] table = new byte[m];
+        // Reverse assignment: fill fingerprints from last peeled to first.
+        byte[] table = new byte[arrayLength];
+        FilterBuildProgress assigning =
+                new FilterBuildProgress(LOGGER::info, PROGRESS_NAME + ": assigning" + suffix, size);
         for (int j = done - 1; j >= 0; j--) {
-            long key = keys[order[j]];
-            int h0 = reduce((int) hash64(key, seed), segSize);
-            int h1 = reduce((int) hash64(key, seed1), segSize) + segSize;
-            int h2 = reduce((int) hash64(key, seed2), segSize) + 2 * segSize;
+            int keyIdx = order[j];
+            long hash = mix(keys[keyIdx], seed);
+            int h0 = hashPosition(0, hash, segmentCountLength, segmentLength, segmentLengthMask);
+            int h1 = hashPosition(1, hash, segmentCountLength, segmentLength, segmentLengthMask);
+            int h2 = hashPosition(2, hash, segmentCountLength, segmentLength, segmentLengthMask);
             int pos = alone[j];
-            byte fp = fingerprint8(primaryHashes[order[j]]);
+            byte fp = fingerprint8(hash);
             if (pos == h0) {
                 table[h0] = (byte) (fp ^ table[h1] ^ table[h2]);
             } else if (pos == h1) {
@@ -375,6 +497,7 @@ public final class BinaryFuse8AddressPresence implements AddressPresence {
             } else {
                 table[h2] = (byte) (fp ^ table[h0] ^ table[h1]);
             }
+            assigning.report(done - j);
         }
 
         return table;

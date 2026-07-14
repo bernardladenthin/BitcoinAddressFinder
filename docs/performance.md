@@ -132,7 +132,7 @@ Independent of the EC knobs above but performance-relevant: the `LMDB_ONLY` defa
 and exact; the in-RAM filters (`BLOOM`, `HASHSET`, `TRUNCATED_LONG_64`, `BINARY_FUSE_8/16`) trade RAM
 for lookup speed; `producerOpenCL.enableGpuFilter` runs a Binary Fuse 8 pre-filter on the GPU so only
 candidate hits are transferred over PCIe. See the README for the user-facing comparison; the GPU
-filter's measured transfer saving (~1.28× at grid 19 on an RTX 3070) is benchmarked by
+filter's measured transfer saving (~2.2× at grid 19 on an RTX 3070) is benchmarked by
 `GpuFuse8FilterBenchmark`.
 
 ---

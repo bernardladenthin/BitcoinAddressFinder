@@ -124,19 +124,29 @@ class BinaryFuse16AddressPresenceTest {
     }
 
     @Test
-    void reduce_mapsUniformly() {
-        assertThat(BinaryFuse16AddressPresence.reduce(0, 100), is(equalTo(0)));
-        assertThat(BinaryFuse16AddressPresence.reduce(Integer.MAX_VALUE, 100), is(lessThan(100)));
-        assertThat(BinaryFuse16AddressPresence.reduce(-1, 100), is(lessThan(100)));
+    void hashPosition_positionsAreDistinctAndInRange() {
+        int segLen = 32;
+        int segMask = segLen - 1;
+        int segCountLen = segLen; // segmentCount * segmentLength = 1 * 32
+        int arrayLength = (1 + 2) * segLen;
+        long hash = BinaryFuse16AddressPresence.mix(0xABCDEF12345L, BinaryFuse16AddressPresence.INITIAL_SEED);
+        int h0 = BinaryFuse16AddressPresence.hashPosition(0, hash, segCountLen, segLen, segMask);
+        int h1 = BinaryFuse16AddressPresence.hashPosition(1, hash, segCountLen, segLen, segMask);
+        int h2 = BinaryFuse16AddressPresence.hashPosition(2, hash, segCountLen, segLen, segMask);
+        assertThat("positions must be distinct", h0 != h1 && h1 != h2 && h0 != h2, is(true));
+        for (int h : new int[] {h0, h1, h2}) {
+            assertThat(h, is(greaterThanOrEqualTo(0)));
+            assertThat(h, is(lessThan(arrayLength)));
+        }
     }
 
     @Test
-    void hash64_isDistributed() {
-        long h1 = BinaryFuse16AddressPresence.hash64(0x1234567890ABCDEFL, 0L);
-        long h2 = BinaryFuse16AddressPresence.hash64(0x1234567890ABCDEFL, 1L);
+    void mix_isDistributed() {
+        long h1 = BinaryFuse16AddressPresence.mix(0x1234567890ABCDEFL, 0L);
+        long h2 = BinaryFuse16AddressPresence.mix(0x1234567890ABCDEFL, 1L);
         assertThat(h1 == h2, is(false));
-        long h3 = BinaryFuse16AddressPresence.hash64(0L, 0L);
-        long h4 = BinaryFuse16AddressPresence.hash64(1L, 0L);
+        long h3 = BinaryFuse16AddressPresence.mix(0L, 0L);
+        long h4 = BinaryFuse16AddressPresence.mix(1L, 0L);
         assertThat(h3 == h4, is(false));
     }
 

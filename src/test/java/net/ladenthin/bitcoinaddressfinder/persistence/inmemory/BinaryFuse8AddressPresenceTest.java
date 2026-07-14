@@ -105,20 +105,31 @@ class BinaryFuse8AddressPresenceTest {
     }
 
     @Test
-    void hash64_isDistributed() {
-        long h1 = BinaryFuse8AddressPresence.hash64(0x1234567890ABCDEFL, 0L);
-        long h2 = BinaryFuse8AddressPresence.hash64(0x1234567890ABCDEFL, 1L);
+    void mix_isDistributed() {
+        long h1 = BinaryFuse8AddressPresence.mix(0x1234567890ABCDEFL, 0L);
+        long h2 = BinaryFuse8AddressPresence.mix(0x1234567890ABCDEFL, 1L);
         assertThat(h1 == h2, is(false));
-        long h3 = BinaryFuse8AddressPresence.hash64(0L, 0L);
-        long h4 = BinaryFuse8AddressPresence.hash64(1L, 0L);
+        long h3 = BinaryFuse8AddressPresence.mix(0L, 0L);
+        long h4 = BinaryFuse8AddressPresence.mix(1L, 0L);
         assertThat(h3 == h4, is(false));
     }
 
     @Test
-    void reduce_mapsUniformly() {
-        assertThat(BinaryFuse8AddressPresence.reduce(0, 100), is(equalTo(0)));
-        assertThat(BinaryFuse8AddressPresence.reduce(Integer.MAX_VALUE, 100), is(lessThan(100)));
-        assertThat(BinaryFuse8AddressPresence.reduce(-1, 100), is(lessThan(100)));
+    void hashPosition_positionsAreDistinctAndInRange() {
+        // A one-segment layout: segmentCount = 1, so arrayLength = (1 + 2) * segmentLength.
+        int segLen = 32;
+        int segMask = segLen - 1;
+        int segCountLen = segLen; // segmentCount * segmentLength = 1 * 32
+        int arrayLength = (1 + 2) * segLen;
+        long hash = BinaryFuse8AddressPresence.mix(0xABCDEF12345L, BinaryFuse8AddressPresence.INITIAL_SEED);
+        int h0 = BinaryFuse8AddressPresence.hashPosition(0, hash, segCountLen, segLen, segMask);
+        int h1 = BinaryFuse8AddressPresence.hashPosition(1, hash, segCountLen, segLen, segMask);
+        int h2 = BinaryFuse8AddressPresence.hashPosition(2, hash, segCountLen, segLen, segMask);
+        assertThat("positions must be distinct", h0 != h1 && h1 != h2 && h0 != h2, is(true));
+        for (int h : new int[] {h0, h1, h2}) {
+            assertThat(h, is(greaterThanOrEqualTo(0)));
+            assertThat(h, is(lessThan(arrayLength)));
+        }
     }
 
     @Test
@@ -142,6 +153,27 @@ class BinaryFuse8AddressPresenceTest {
         for (int i = 1; i <= 200; i++) {
             assertThat("entry " + i, presence.containsAddress(hash20(i % 256, i)), is(true));
         }
+    }
+
+    /**
+     * Two <em>distinct</em> 20-byte addresses that share their first 8 bytes collapse to the same
+     * 64-bit key (the filter keys on the first 8 bytes only). A binary fuse cannot place two
+     * identical keys, so {@code populateFrom} de-duplicates the truncated keys before construction.
+     * The build therefore succeeds, and both addresses are reported as present (they share the one
+     * surviving key). This is lossless for a presence pre-filter, since every hit is verified
+     * against the exact backend anyway.
+     */
+    @Test
+    void firstEightBytesCollide_deduplicated_buildsAndBothAddressesFound() {
+        // both addresses: identical first 8 bytes {1..8}; distinct tails (index 8 differs)
+        byte[] a = {1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        byte[] b = {1, 2, 3, 4, 5, 6, 7, 8, 99, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        ListIterable src = new ListIterable().add(ByteBuffer.wrap(a)).add(ByteBuffer.wrap(b));
+
+        BinaryFuse8AddressPresence presence = BinaryFuse8AddressPresence.populateFrom(src);
+
+        assertThat(presence.containsAddress(ByteBuffer.wrap(a)), is(true));
+        assertThat(presence.containsAddress(ByteBuffer.wrap(b)), is(true));
     }
 
     @Test
@@ -208,17 +240,17 @@ class BinaryFuse8AddressPresenceTest {
         // internally. Rebuild one inserted key's XOR invariant by hand with getSeed() and
         // assert the three fingerprint slots XOR to the key's fingerprint (i.e. it is a hit).
         long seed = presence.getSeed();
-        int seg = presence.getSegmentLength();
+        int segLen = presence.getSegmentLength();
+        int segMask = presence.getSegmentLengthMask();
+        int segCountLen = presence.getSegmentCountLength();
         byte[] fp = presence.getFingerprints();
         ByteBuffer member = hash20(0x20, 5);
         long key = member.getLong(member.position());
-        long ph = BinaryFuse8AddressPresence.hash64(key, seed);
-        int h0 = BinaryFuse8AddressPresence.reduce((int) ph, seg);
-        int h1 = BinaryFuse8AddressPresence.reduce((int) BinaryFuse8AddressPresence.hash64(key, rotl(seed, 21)), seg)
-                + seg;
-        int h2 = BinaryFuse8AddressPresence.reduce((int) BinaryFuse8AddressPresence.hash64(key, rotl(seed, 42)), seg)
-                + 2 * seg;
-        byte expectedFp = BinaryFuse8AddressPresence.fingerprint8(ph);
+        long hash = BinaryFuse8AddressPresence.mix(key, seed);
+        int h0 = BinaryFuse8AddressPresence.hashPosition(0, hash, segCountLen, segLen, segMask);
+        int h1 = BinaryFuse8AddressPresence.hashPosition(1, hash, segCountLen, segLen, segMask);
+        int h2 = BinaryFuse8AddressPresence.hashPosition(2, hash, segCountLen, segLen, segMask);
+        byte expectedFp = BinaryFuse8AddressPresence.fingerprint8(hash);
         assertThat((byte) (fp[h0] ^ fp[h1] ^ fp[h2]), is(equalTo(expectedFp)));
     }
 
@@ -240,7 +272,10 @@ class BinaryFuse8AddressPresenceTest {
         }
         BinaryFuse8AddressPresence presence = BinaryFuse8AddressPresence.populateFrom(src);
         assertThat(presence.getFingerprints().length, is(equalTo(presence.slotCount())));
-        assertThat(presence.getSegmentCountLength(), is(equalTo(presence.slotCount())));
+        // segmentCountLength is the base-position bound (segmentCount * segmentLength); the full
+        // fingerprint array carries two extra segments of headroom for the fused offsets.
+        assertThat(
+                presence.getSegmentCountLength(), is(equalTo(presence.slotCount() - 2 * presence.getSegmentLength())));
     }
 
     @Test
@@ -268,10 +303,6 @@ class BinaryFuse8AddressPresenceTest {
         for (int i = 0; i < 25; i++) {
             assertThat("entry " + (i + 1), presence.containsAddress(hash20(0x50, i + 1)), is(equalTo(before[i])));
         }
-    }
-
-    private static long rotl(long v, int r) {
-        return (v << r) | (v >>> (64 - r));
     }
 
     @Test

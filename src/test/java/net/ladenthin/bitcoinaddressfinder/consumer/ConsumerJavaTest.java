@@ -395,7 +395,7 @@ public class ConsumerJavaTest {
                     arguments,
                     hasItem(
                             equalTo(
-                                    "Statistics: [Checked 0 M keys in 0 minutes] [0 k keys/second] [0 M keys/minute] [Batches per producer: none] [Producers running: 0] [Consumers running: 0] [Consumer ready for work (queue empty): 0] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
+                                    "Statistics: [Checked 0 M keys in 0 minutes] [0 k keys/second over 60s] [0 M keys/minute over 60s] [Batches per producer: none] [Producers running: 0] [Consumers running: 0] [Consumer ready for work (queue empty): 0] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
         }
     }
 
@@ -406,6 +406,34 @@ public class ConsumerJavaTest {
 
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
         assertThrows(IllegalArgumentException.class, () -> consumerJava.startStatisticsTimer());
+    }
+
+    @Test
+    public void startStatisticsTimer_invalidRateWindow_throwsException() throws Exception {
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.printStatisticsEveryNSeconds = 1;
+        cConsumerJava.statisticsRateWindowSeconds = 0;
+
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        assertThrows(IllegalArgumentException.class, () -> consumerJava.startStatisticsTimer());
+    }
+
+    @Test
+    public void windowKeysPerSecond_computesRateOverTheWindow() {
+        // 5000 keys advanced over 1000 ms -> 5000 keys/s
+        assertThat(ConsumerJava.windowKeysPerSecond(1_000L, 0L, 2_000L, 5_000L), is(equalTo(5_000.0)));
+        // 3,000,000 keys over 2000 ms -> 1,500,000 keys/s
+        assertThat(ConsumerJava.windowKeysPerSecond(0L, 0L, 2_000L, 3_000_000L), is(equalTo(1_500_000.0)));
+    }
+
+    @Test
+    public void windowKeysPerSecond_nonPositiveIntervalOrNoAdvance_returnsZero() {
+        // zero elapsed time
+        assertThat(ConsumerJava.windowKeysPerSecond(1_000L, 0L, 1_000L, 5_000L), is(equalTo(0.0)));
+        // negative elapsed time
+        assertThat(ConsumerJava.windowKeysPerSecond(2_000L, 0L, 1_000L, 5_000L), is(equalTo(0.0)));
+        // odometer did not advance
+        assertThat(ConsumerJava.windowKeysPerSecond(1_000L, 5_000L, 2_000L, 5_000L), is(equalTo(0.0)));
     }
 
     @AwaitTimeTest

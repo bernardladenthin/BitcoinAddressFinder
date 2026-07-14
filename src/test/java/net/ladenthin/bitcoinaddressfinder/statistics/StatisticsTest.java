@@ -25,14 +25,25 @@ public class StatisticsTest {
 
         // act
         String result = statistics.createStatisticsMessage(
-                234_000L, 999_000_000L, 345_000_000_000L, batchesByProducer, 2L, 4L, 4567L, 1234L, 5678L, 6789L);
+                234_000L,
+                999_000_000L,
+                1_500_000.0,
+                60L,
+                345_000_000_000L,
+                batchesByProducer,
+                2L,
+                4L,
+                4567L,
+                1234L,
+                5678L,
+                6789L);
 
         // assert
         assertThat(
                 result,
                 is(
                         equalTo(
-                                "Statistics: [Checked 999 M keys in 3 minutes] [4269 k keys/second] [333 M keys/minute] [Batches per producer: exampleOpenCL (Random, GPU)=20, exampleRandom (Random, CPU)=10] [Producers running: 2] [Consumers running: 4] [Consumer ready for work (queue empty): 4567] [Producer blocked (queue full): 1234] [Average contains time: 345 ms] [keys queue size: 5678] [Hits: 6789]")));
+                                "Statistics: [Checked 999 M keys in 3 minutes] [1500 k keys/second over 60s] [90 M keys/minute over 60s] [Batches per producer: exampleOpenCL (Random, GPU)=20, exampleRandom (Random, CPU)=10] [Producers running: 2] [Consumers running: 4] [Consumer ready for work (queue empty): 4567] [Producer blocked (queue full): 1234] [Average contains time: 345 ms] [keys queue size: 5678] [Hits: 6789]")));
     }
 
     @Test
@@ -42,14 +53,14 @@ public class StatisticsTest {
 
         // act
         String result = statistics.createStatisticsMessage(
-                234_000L, 999_000_000L, 345_000_000_000L, new TreeMap<>(), 0L, 0L, 0L, 0L, 0L, 0L);
+                234_000L, 999_000_000L, 1_500_000.0, 60L, 345_000_000_000L, new TreeMap<>(), 0L, 0L, 0L, 0L, 0L, 0L);
 
         // assert
         assertThat(
                 result,
                 is(
                         equalTo(
-                                "Statistics: [Checked 999 M keys in 3 minutes] [4269 k keys/second] [333 M keys/minute] [Batches per producer: none] [Producers running: 0] [Consumers running: 0] [Consumer ready for work (queue empty): 0] [Producer blocked (queue full): 0] [Average contains time: 345 ms] [keys queue size: 0] [Hits: 0]")));
+                                "Statistics: [Checked 999 M keys in 3 minutes] [1500 k keys/second over 60s] [90 M keys/minute over 60s] [Batches per producer: none] [Producers running: 0] [Consumers running: 0] [Consumer ready for work (queue empty): 0] [Producer blocked (queue full): 0] [Average contains time: 345 ms] [keys queue size: 0] [Hits: 0]")));
     }
     // </editor-fold>
 
