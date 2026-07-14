@@ -19,6 +19,7 @@
         "disableAddressLookup": false
       },
       "printStatisticsEveryNSeconds": 10,
+      "statisticsRateWindowSeconds": 60,
       "threads": 8,
       "queuePollTimeoutMillis": 50,
       "queueSize": 4,

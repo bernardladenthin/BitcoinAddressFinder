@@ -375,10 +375,11 @@ cost here is OpenCL **kernel compilation**, which happens once in `OpenCLContext
 budget on duration rather than sample count gives the steadier read. For a quick sanity check
 use `-wi 2 -i 4` (~2 min for both arms). Use `OpenCLInfo` (`{"command":"OpenCLInfo"}`) to
 confirm a device is present and pick `platformIndex` / `deviceIndex` before benchmarking.
-`GpuFuse8FilterBenchmark` was validated this way on an NVIDIA RTX 3070 (OpenCL 3.0 CUDA): a
-single ~200 s iteration gave compact FUSE_8 mode ≈ **1.28× faster** than full transfer at
-`batchSizeInBits = 19` (matching the README key-gen table's grid size; the gain grows with
-batch size, ≈ 1.7× at grid 20). The full two-arm long run took ~7m45s of wall time.
+`GpuFuse8FilterBenchmark` was validated this way on an NVIDIA RTX 3070 (OpenCL 3.0 CUDA): with
+the real Binary Fuse filter, the mean of 3 measurement iterations gave compact FUSE_8 mode ≈ **2.2×
+faster** than full transfer at `batchSizeInBits = 19` (compact 18.5 ops/s → ~9.7 M vs full 8.3 ops/s
+→ ~4.35 M candidates/s; matching the README key-gen table's grid size; the gain grows with batch
+size). The compact arm is stable to ~0.2 %; the full-transfer arm is noisier.
 
 ---
 

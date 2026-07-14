@@ -15,18 +15,20 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Smoke-loads every {@code examples/config_Find_*.json} fixture through
- * {@link Main#loadConfiguration(Path)} and asserts that the new
- * {@code awaitTerminateSeconds} / {@code awaitQueueEmptySeconds} fields
- * are explicitly set in each file (i.e. the example configs document
- * the timeout fields rather than hiding them behind production defaults).
+ * {@link Main#loadConfiguration(Path)} and asserts that the
+ * {@code awaitTerminateSeconds} / {@code awaitQueueEmptySeconds} /
+ * {@code statisticsRateWindowSeconds} fields are explicitly set in each file
+ * (i.e. the example configs document these fields rather than hiding them
+ * behind production defaults).
  *
  * <p>This test fails-loud if any future contributor strips the fields back
- * out — the documented contract is that all Find examples carry the timeouts.
+ * out — the documented contract is that all Find examples carry them.
  */
 public class ConfigFixturesParseTest {
 
     private static final long EXPECTED_AWAIT_TERMINATE_SECONDS = 365L * 1000L * 24L * 3600L;
     private static final long EXPECTED_AWAIT_QUEUE_EMPTY_SECONDS = 60L;
+    private static final int EXPECTED_STATISTICS_RATE_WINDOW_SECONDS = 60;
 
     public ConfigFixturesParseTest() {}
 
@@ -49,6 +51,10 @@ public class ConfigFixturesParseTest {
                     name + " missing awaitQueueEmptySeconds",
                     raw.contains("\"awaitQueueEmptySeconds\""),
                     is(equalTo(true)));
+            assertThat(
+                    name + " missing statisticsRateWindowSeconds",
+                    raw.contains("\"statisticsRateWindowSeconds\""),
+                    is(equalTo(true)));
 
             CConfiguration parsed = Main.loadConfiguration(file);
             assertThat(name + " finder", parsed.finder, is(notNullValue()));
@@ -61,6 +67,10 @@ public class ConfigFixturesParseTest {
                     name + " awaitQueueEmptySeconds",
                     parsed.finder.consumerJava.awaitQueueEmptySeconds,
                     is(equalTo(EXPECTED_AWAIT_QUEUE_EMPTY_SECONDS)));
+            assertThat(
+                    name + " statisticsRateWindowSeconds",
+                    parsed.finder.consumerJava.statisticsRateWindowSeconds,
+                    is(equalTo(EXPECTED_STATISTICS_RATE_WINDOW_SECONDS)));
         }
     }
 }

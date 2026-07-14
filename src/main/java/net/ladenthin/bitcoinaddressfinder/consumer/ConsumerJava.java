@@ -5,7 +5,9 @@ package net.ladenthin.bitcoinaddressfinder.consumer;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -122,6 +124,18 @@ public class ConsumerJava implements Consumer {
      * scheduled-executor task that reads it on every tick (fb-contrib AT_NONATOMIC_64BIT_PRIMITIVE).
      */
     protected volatile long startTime = 0;
+
+    /** Cadence, in seconds, at which the throughput sampler records an odometer sample. */
+    private static final long RATE_SAMPLE_INTERVAL_SECONDS = 1L;
+
+    /**
+     * Trailing ring buffer of {@code [timestampMillis, checkedKeysSnapshot]} samples used to
+     * compute the current windowed keys/second. Only ever touched by the single-thread
+     * {@link #scheduledExecutorService} (both the sampler and the printer run on it), so it needs
+     * no synchronization.
+     */
+    @ToString.Exclude
+    private final Deque<long[]> rateSamples = new ArrayDeque<>();
 
     /** Consumer configuration. */
     protected final CConsumerJava consumerJava;
@@ -396,28 +410,87 @@ public class ConsumerJava implements Consumer {
     }
 
     /**
-     * Starts the periodic statistics-printing scheduler.
+     * Computes the windowed throughput in keys/second from the oldest retained sample to now.
+     * Pure and clock-free so the rate logic can be unit-tested without scheduling or a real clock.
+     *
+     * @param oldestSampleMillis timestamp (epoch ms) of the oldest sample still inside the window
+     * @param oldestSampleKeys   odometer value at {@code oldestSampleMillis}
+     * @param nowMillis          the current timestamp (epoch ms)
+     * @param nowKeys            the current odometer value
+     * @return keys/second averaged over {@code [oldestSampleMillis, nowMillis]}, or {@code 0} if
+     *     the interval is non-positive or the odometer did not advance
      */
+    static double windowKeysPerSecond(long oldestSampleMillis, long oldestSampleKeys, long nowMillis, long nowKeys) {
+        long deltaMillis = nowMillis - oldestSampleMillis;
+        if (deltaMillis <= 0L) {
+            return 0.0;
+        }
+        long deltaKeys = nowKeys - oldestSampleKeys;
+        if (deltaKeys <= 0L) {
+            return 0.0;
+        }
+        return deltaKeys * 1_000.0 / deltaMillis;
+    }
+
+    /**
+     * Starts the periodic statistics-printing scheduler plus the throughput sampler that feeds the
+     * trailing windowed keys/second rate. Both tasks run on the same single-thread scheduler.
+     */
+    @FireAndForget("scheduler shutdown via interrupt() drives both tasks' stop")
+    @SuppressWarnings("FutureReturnValueIgnored")
     public void startStatisticsTimer() {
         long period = consumerJava.printStatisticsEveryNSeconds;
         if (period <= 0) {
             throw new IllegalArgumentException(
                     "consumerJava.printStatisticsEveryNSeconds must be > 0 but was " + period);
         }
+        long rateWindowSeconds = consumerJava.statisticsRateWindowSeconds;
+        if (rateWindowSeconds <= 0) {
+            throw new IllegalArgumentException(
+                    "consumerJava.statisticsRateWindowSeconds must be > 0 but was " + rateWindowSeconds);
+        }
+        long rateWindowMillis = rateWindowSeconds * 1_000L;
 
         startTime = System.currentTimeMillis();
 
-        @FireAndForget("scheduler shutdown via interrupt() drives the task's stop")
-        @SuppressWarnings("FutureReturnValueIgnored")
-        Object unused = scheduledExecutorService.scheduleAtFixedRate(
+        // Sampler: record an odometer sample once per second and evict samples older than the
+        // window. Sampling only begins once keys actually flow, so the one-time startup dead time
+        // (filter build, kernel compile) never contaminates the window.
+        scheduledExecutorService.scheduleAtFixedRate(
                 () -> {
-                    // get transient information
-                    long uptime = Math.max(System.currentTimeMillis() - startTime, 1);
+                    long keysNow = checkedKeys.get();
+                    if (keysNow == 0L) {
+                        return;
+                    }
+                    long now = System.currentTimeMillis();
+                    rateSamples.addLast(new long[] {now, keysNow});
+                    long cutoff = now - rateWindowMillis;
+                    while (rateSamples.size() > 1 && Objects.requireNonNull(rateSamples.peekFirst())[0] < cutoff) {
+                        rateSamples.removeFirst();
+                    }
+                },
+                RATE_SAMPLE_INTERVAL_SECONDS,
+                RATE_SAMPLE_INTERVAL_SECONDS,
+                TimeUnit.SECONDS);
+
+        // Printer: emit the statistics line every period, using the current windowed rate.
+        scheduledExecutorService.scheduleAtFixedRate(
+                () -> {
+                    long now = System.currentTimeMillis();
+                    long keysNow = checkedKeys.get();
+                    double rate = 0.0;
+                    long[] oldest = rateSamples.peekFirst();
+                    if (oldest != null) {
+                        rate = windowKeysPerSecond(oldest[0], oldest[1], now, keysNow);
+                    }
+                    long uptime = Math.max(now - startTime, 1);
 
                     String message = new Statistics()
                             .createStatisticsMessage(
                                     uptime,
-                                    checkedKeys.get(),
+                                    keysNow,
+                                    rate,
+                                    rateWindowSeconds,
                                     checkedKeysSumOfTimeToCheckContains.get(),
                                     runtimeStatistics.batchesByProducerSnapshot(),
                                     runtimeStatistics.getRunningProducers(),

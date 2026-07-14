@@ -114,8 +114,8 @@ All three GPU-acceleration TODOs below connect to a single architectural choice:
 | **Filter checked by** | CPU, after kernel returns | GPU, inside the kernel |
 | **What crosses PCIe per batch** | every hash160 (all N work-items × 104 B) | only candidates that passed the filter (~0.4 % with Fuse-8) |
 | **CPU-side lookup cost** | ~25–108 ns per candidate (depends on backend) | ~0 — only LMDB verification on the tiny trickle |
-| **GPU VRAM consumed by filter** | 0 | ~172 MB (Light DB) / ~1.8 GB (Full DB) with Fuse-8 |
-| **Kernel complexity** | unchanged | +3 hash calls + 3 array reads + 1 XOR per work-item |
+| **GPU VRAM consumed by filter** | 0 | ~149 MB (Light DB) / ~1.5 GB (Full DB) with Fuse-8 |
+| **Kernel complexity** | unchanged | +1 hash call + 3 array reads + 1 XOR per work-item |
 | **GPU needed for filter** | no — CPU-only configs work identically | yes — filter must be uploaded to VRAM at startup |
 | **When it wins** | always (no extra GPU work) | when PCIe bandwidth or CPU filter throughput is the bottleneck |
 | **When it regresses** | never | when GPU was already at ~100 % ALU occupancy on ECC |
@@ -299,10 +299,10 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
   - `getPublicKeyFromByteBufferXY_offsetShiftedByHeaderAndIndex` — verify the first key's X bytes are at byte `4 + 4 = 8` (header + index field), not byte 0.
 
   **Step F — In-kernel Fuse8 check + compact output path** ✅ (kernel `.cl` file + `OpenClTask` + `OpenCLContext`)
-  Add 3 new kernel arguments (the 5 metadata ints are passed as one buffer rather than 5 scalars, matching the Step D upload): `fuse8_fp` (fingerprint buffer), `fuse8_meta` (`[seedLo, seedHi, segLen, segLenMask, segCountLen]` buffer), `transfer_all` (uint). The physical entry layout is unchanged from Step E (the unified 108-byte entry); only the *write decision* changes: in compact mode (`transfer_all == 0`) a work-item writes its entry **only if** its uncompressed OR compressed hash160 passes the filter, claiming the slot via `atomic_add` on the count word (which starts at 0). In full-transfer mode (`transfer_all != 0`) every work-item writes its entry at its own index and work-item 0 stamps the sentinel, exactly as Step E. The kernel's Fuse8 primitives (`fuse8_hash64`/`reduce`/`rotl`/`fingerprint`/`contains`) are a byte-exact port of the Java helpers, and `fuse8_key_from_ripemd` byte-swaps the two LE RIPEMD words to reproduce `ByteBuffer.getLong(0)`. `OpenClTask.executeKernel` binds the args, zero-initialises the count word via `clEnqueueWriteBuffer` before launch, and reads back only the bytes the count word reports (full → `workSize` entries; compact → K). `OpenCLContext` allocates a dummy empty filter on `init()` so the args are always bindable, tracks `gpuFilterUploaded`, and computes `transfer_all = transferAll || !gpuFilterUploaded`.
+  Add 3 new kernel arguments (the 5 metadata ints are passed as one buffer rather than 5 scalars, matching the Step D upload): `fuse8_fp` (fingerprint buffer), `fuse8_meta` (`[seedLo, seedHi, segLen, segLenMask, segCountLen]` buffer), `transfer_all` (uint). The physical entry layout is unchanged from Step E (the unified 108-byte entry); only the *write decision* changes: in compact mode (`transfer_all == 0`) a work-item writes its entry **only if** its uncompressed OR compressed hash160 passes the filter, claiming the slot via `atomic_add` on the count word (which starts at 0). In full-transfer mode (`transfer_all != 0`) every work-item writes its entry at its own index and work-item 0 stamps the sentinel, exactly as Step E. The kernel's Fuse8 primitives (`fuse8_murmur64`/`fuse8_mix`/`fuse8_position`/`fuse8_fingerprint`/`fuse8_contains`) are a byte-exact port of the Java helpers, and `fuse8_key_from_ripemd` byte-swaps the two LE RIPEMD words to reproduce `ByteBuffer.getLong(0)`. `OpenClTask.executeKernel` binds the args, zero-initialises the count word via `clEnqueueWriteBuffer` before launch, and reads back only the bytes the count word reports (full → `workSize` entries; compact → K). `OpenCLContext` allocates a dummy empty filter on `init()` so the args are always bindable, tracks `gpuFilterUploaded`, and computes `transfer_all = transferAll || !gpuFilterUploaded`.
   Test: `Fuse8GpuHashParityTest` (no GPU) pins the key-extraction + hash formula against `BinaryFuse8AddressPresence.containsAddress` over 1 000 distinct hash160 inputs (members + non-members), so any kernel drift fails in pure Java. The kernel build + compact execution are exercised end-to-end in Step I (GPU-gated).
 
-  **Hash strategy — MurmurHash3 finalizer (standard for XOR/fuse filters, ~20 lines total):**
+  **Hash strategy — MurmurHash3 finalizer + fused positions (real Binary Fuse Filter):**
   ```c
   static ulong murmur64(ulong h) {       // 5 lines — the entire hash primitive
       h ^= h >> 33;
@@ -313,15 +313,16 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
       return h;
   }
   // Key extraction: first 8 bytes of hash160 as big-endian uint64 — matches Java ByteBuffer.getLong(pos)
-  // h0/h1/h2 via reduce = (uint)(((ulong)(uint)ph * (ulong)seg) >> 32)  [no division]
-  // seed rotations: rotl(seed,21) and rotl(seed,42) for h1/h2 independence
-  // fingerprint: (uchar)(ph ^ (ph >> 32))
+  // per-key mix: hash = murmur64(key + seed)   [one hash drives all three positions + fingerprint]
+  // base = mul_hi(hash, segCountLen); h0 = base; h1 = base + segLen; h2 = base + 2*segLen
+  // within-segment windows: h1 ^= (hash >> 18) & segLenMask; h2 ^= hash & segLenMask   [h0 has none]
+  // fingerprint: (uchar)(hash ^ (hash >> 32))
   // XOR invariant: fp[h0]^fp[h1]^fp[h2] == fingerprint → hit
   ```
   **Critical**: key extraction in the kernel (`first 8 bytes of hash160 as big-endian ulong`) must match `BinaryFuse8AddressPresence.containsAddress()` exactly (`hash160.getLong(hash160.position())`). Any mismatch → false negatives (missed balance hits).
 
   Tests:
-  - `Fuse8GpuHashParityTest` (no GPU needed — pure Java): reimplements the GPU hash logic in Java (`key = ByteBuffer.wrap(h160).getLong(0); ph = hash64(key, seed); h0 = reduce((int)ph, seg); h1 = reduce((int)hash64(key, rotl(seed,21)), seg) + seg; ...`). For 1 000 distinct hash160 inputs, asserts that this Java reimplementation agrees with `BinaryFuse8AddressPresence.containsAddress()` on every hit/miss answer. This pins the exact key-extraction + hash formula in a runnable test before any OpenCL code is written — if the formulas drift, this test fails.
+  - `Fuse8GpuHashParityTest` (no GPU needed — pure Java): reimplements the GPU hash logic in Java (`key = ByteBuffer.wrap(h160).getLong(0); hash = murmur64(key + seed); base = mulHigh(hash, segCountLen); h0 = base; h1 = base + segLen ^ ((hash >>> 18) & segLenMask); h2 = base + 2*segLen ^ (hash & segLenMask); ...`). For 1 000 distinct hash160 inputs, asserts that this Java reimplementation agrees with `BinaryFuse8AddressPresence.containsAddress()` on every hit/miss answer. This pins the exact key-extraction + hash formula in a runnable test — if the formulas drift, this test fails.
 
   **Step G — Java compact-mode reader** ✅ (`opencl/OpenCLGridResult.java`)
   `getPublicKeyBytes()` dispatches on the count word: `0xFFFFFFFF` → `readFullTransfer()` (walk `workSize` entries), otherwise → `readCompact(count)` (walk K entries). Because the entry layout is unified, both paths share the same per-entry parser: read `work_item_index` (entry offset 0), derive secret via `KeyUtility.calculateSecretKey(secretBase, index, USE_OR)`, read X/Y/hash160u/hash160c at the unified `OUTPUT_ENTRY_*` offsets, assemble `PublicKeyBytes` via `PublicKeyBytes.assembleUncompressedPublicKey(x, y)`.

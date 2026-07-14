@@ -633,12 +633,12 @@ inline void ripemd160_hash_prebuilt_block_swap(const u32 *block, u32 *out_h)
 // ======================================================================================
 // ==== GPU-side Binary Fuse 8 filter (mirrors BinaryFuse8AddressPresence exactly) ======
 // ======================================================================================
-// These four primitives are a byte-exact port of the Java hash64 / reduce / fingerprint8
-// helpers. Any divergence produces silent false negatives (a stored address never flagged),
-// so they are pinned against the Java implementation by Fuse8GpuHashParityTest.
+// These primitives are a byte-exact port of the Java murmur64 / mix / fingerprint8 /
+// hashPosition helpers of the real Binary Fuse Filter (fused overlapping segments). Any
+// divergence produces silent false negatives (a stored address never flagged), so they are
+// pinned against the Java implementation by Fuse8GpuHashParityTest.
 
-inline ulong fuse8_hash64(ulong key, ulong seed) {
-    ulong h = key ^ seed;
+inline ulong fuse8_murmur64(ulong h) {
     h ^= h >> 33;
     h *= 0xff51afd7ed558ccdUL;
     h ^= h >> 33;
@@ -647,17 +647,30 @@ inline ulong fuse8_hash64(ulong key, ulong seed) {
     return h;
 }
 
-inline uint fuse8_reduce(uint h, uint m) {
-    // Multiply-high mapping into [0, m): (uint)(((ulong)h * (ulong)m) >> 32). No division.
-    return (uint)(((ulong)h * (ulong)m) >> 32);
-}
-
-inline ulong fuse8_rotl(ulong v, int r) {
-    return (v << r) | (v >> (64 - r));
+// Per-key mix: murmur64(key + seed). A single mix drives all three positions and the fingerprint.
+inline ulong fuse8_mix(ulong key, ulong seed) {
+    return fuse8_murmur64(key + seed);
 }
 
 inline uchar fuse8_fingerprint(ulong h) {
     return (uchar)(h ^ (h >> 32));
+}
+
+// One fused fingerprint position: high bits of the hash pick a base in [0, seg_count_len), then
+// index*seg selects one of three consecutive segments and a within-segment bit-window (masked by
+// seg_mask) offsets inside it. mul_hi is the unsigned 64x64->high64 multiply (== Java
+// Math.unsignedMultiplyHigh), matching the CPU base reduction exactly.
+inline uint fuse8_position(int index, ulong hash, uint seg_count_len, uint seg, uint seg_mask) {
+    ulong h = mul_hi(hash, (ulong)seg_count_len);
+    h += (ulong)((uint)index * seg);
+    // h0 is the bare base position; only h1 and h2 xor a within-segment window from distinct
+    // hash bit-ranges that do not overlap the high bits used by the base.
+    if (index == 1) {
+        h ^= (hash >> 18) & (ulong)seg_mask;
+    } else if (index == 2) {
+        h ^= hash & (ulong)seg_mask;
+    }
+    return (uint)h;
 }
 
 // Key extraction: the first 8 bytes of the hash160 read as a big-endian uint64. The two
@@ -669,15 +682,16 @@ inline ulong fuse8_key_from_ripemd(const u32 *h) {
 }
 
 // Returns true when the key is POSSIBLY present (no false negatives; ~0.4% false positives).
-inline bool fuse8_contains(__global const uchar *fp, ulong seed, uint seg, uint seg_count_len, ulong key) {
+inline bool fuse8_contains(
+    __global const uchar *fp, ulong seed, uint seg, uint seg_mask, uint seg_count_len, ulong key) {
     if (seg_count_len == 0) {
         return false; // empty filter never matches
     }
-    ulong ph = fuse8_hash64(key, seed);
-    uint h0 = fuse8_reduce((uint)ph, seg);
-    uint h1 = fuse8_reduce((uint)fuse8_hash64(key, fuse8_rotl(seed, 21)), seg) + seg;
-    uint h2 = fuse8_reduce((uint)fuse8_hash64(key, fuse8_rotl(seed, 42)), seg) + 2 * seg;
-    uchar f8 = fuse8_fingerprint(ph);
+    ulong hash = fuse8_mix(key, seed);
+    uint h0 = fuse8_position(0, hash, seg_count_len, seg, seg_mask);
+    uint h1 = fuse8_position(1, hash, seg_count_len, seg, seg_mask);
+    uint h2 = fuse8_position(2, hash, seg_count_len, seg, seg_mask);
+    uchar f8 = fuse8_fingerprint(hash);
     return (uchar)(fp[h0] ^ fp[h1] ^ fp[h2]) == f8;
 }
 
@@ -872,6 +886,7 @@ __kernel void generateKeysKernel_grid(
     // Load the Binary Fuse 8 filter metadata once (only consulted in compact mode).
     ulong fuse8_seed = ((ulong)fuse8_meta[1] << 32) | (ulong)fuse8_meta[0]; // [seedHi, seedLo]
     uint fuse8_seg = fuse8_meta[2];
+    uint fuse8_seg_mask = fuse8_meta[3];
     uint fuse8_seg_count_len = fuse8_meta[4];
 
     // Full-transfer mode: work-item 0 stamps the count header with the sentinel. Every
@@ -1137,8 +1152,10 @@ __kernel void generateKeysKernel_grid(
             } else {
                 ulong key_uncompressed = fuse8_key_from_ripemd(ripemd_uncompressed_h);
                 ulong key_compressed   = fuse8_key_from_ripemd(ripemd_compressed_h);
-                bool hit = fuse8_contains(fuse8_fp, fuse8_seed, fuse8_seg, fuse8_seg_count_len, key_uncompressed)
-                        || fuse8_contains(fuse8_fp, fuse8_seed, fuse8_seg, fuse8_seg_count_len, key_compressed);
+                bool hit = fuse8_contains(
+                                fuse8_fp, fuse8_seed, fuse8_seg, fuse8_seg_mask, fuse8_seg_count_len, key_uncompressed)
+                        || fuse8_contains(
+                                fuse8_fp, fuse8_seed, fuse8_seg, fuse8_seg_mask, fuse8_seg_count_len, key_compressed);
                 should_write = hit;
                 slot = 0;
                 if (hit) {

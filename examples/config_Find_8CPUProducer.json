@@ -59,6 +59,7 @@
         "logStatsOnClose": false
       },
       "printStatisticsEveryNSeconds": 10,
+      "statisticsRateWindowSeconds": 60,
       "threads": 4,
       "queuePollTimeoutMillis": 50,
       "queueSize": 4,
