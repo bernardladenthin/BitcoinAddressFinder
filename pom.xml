@@ -65,7 +65,7 @@ SPDX-License-Identifier: Apache-2.0
              section "jqwik prompt-injection in test output" for full context. -->
         <jqwik.version>1.9.3</jqwik.version>
         <archunit.version>1.4.2</archunit.version>
-        <spotbugs.version>4.10.2.0</spotbugs.version>
+        <spotbugs.version>4.10.3.0</spotbugs.version>
         <fb-contrib.version>7.7.4</fb-contrib.version>
         <findsecbugs.version>1.14.0</findsecbugs.version>
         <errorprone.version>2.50.0</errorprone.version>
@@ -76,7 +76,7 @@ SPDX-License-Identifier: Apache-2.0
         <jspecify.version>1.0.0</jspecify.version>
         <lombok.version>1.18.46</lombok.version>
         <bitcoinj.version>0.17.1</bitcoinj.version>
-        <bcprov.version>1.85</bcprov.version>
+        <bcprov.version>1.85.1</bcprov.version>
         <protobuf.version>4.35.1</protobuf.version>
         <jsr305.version>3.0.2</jsr305.version>
         <jcip-annotations.version>1.0</jcip-annotations.version>
@@ -93,7 +93,7 @@ SPDX-License-Identifier: Apache-2.0
         <logcaptor.version>2.12.6</logcaptor.version>
         <jmh.version>1.37</jmh.version>
         <spotless.version>3.8.0</spotless.version>
-        <palantir-java-format.version>2.94.0</palantir-java-format.version>
+        <palantir-java-format.version>2.96.0</palantir-java-format.version>
     </properties>
 
     <!--
