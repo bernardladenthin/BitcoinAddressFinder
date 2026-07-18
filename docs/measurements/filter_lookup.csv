@@ -57,3 +57,11 @@ ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,10000000,27.946,1.244,5,pr
 ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,50000000,31.030,1.117,5,prng,
 ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,100000000,34.395,2.609,5,prng,
 ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,132288304,37.137,2.136,5,prng,exact Light DB entry count - still behind BINARY_FUSE_8; error bars nearly touch
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOOM,500000000,85.157,4.963,4,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOOM,1000000000,87.227,4.068,4,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_8,500000000,39.573,2.841,4,prng,JIT-warmed instrument - still ahead of BLOCKED_BLOOM at this scale
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_8,1000000000,39.887,2.855,4,prng,no crossover even at 1B on 96 MB L3; curve is flat 500M->1B (DRAM-bound)
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,500000000,43.090,5.568,4,prng,widest error bar of the run
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,1000000000,40.819,1.353,4,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,500000000,42.149,1.525,4,prng,nominally behind BINARY_FUSE_8 but the intervals overlap
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,1000000000,42.705,1.741,4,prng,contradicts the single-shot FilterMeasurementMain reading of BLOCKED_BLOOM +17% on this host

@@ -252,19 +252,32 @@ layout's single-cache-line advantage should hold on both. It also contradicts th
 sweep, which on the 16 MB host has blocked Bloom ahead at 100 M entries (45.5 vs 59.6 ns) — two
 methods, one machine, opposite directions.
 
-The likely explanation is the measurement, not the filters: these throughput figures come from
-`FilterMeasurementMain`'s single-shot probe loop, executed immediately after a 14–53 minute build
-that leaves the machine in very different memory states per arm, with no JIT warmup discipline.
-**Treat the Full DB lookup column as unresolved.** The authoritative lookup comparison is
-`FilterLookupBenchmark` (storage-free, JMH-warmed) — but it currently stops at 100 M entries, an
-order of magnitude short of this tier, so extending it is the open item rather than trusting either
-number above. An earlier edition of this section asserted the 17 % lookup win as settled; it was
-based on a single machine and does not replicate.
+The explanation was the measurement, not the filters — **and the JMH sweep has now settled it.** The
+single-shot figures come from `FilterMeasurementMain`'s probe loop, executed immediately after a
+14–53 minute build that leaves the machine in very different memory states per arm, with no JIT
+warmup discipline. Extending the storage-free, JMH-warmed `FilterLookupBenchmark` to 500 M and 1 B
+entries on the 96 MB host puts the question to rest:
 
-Consequence for tuning: pick `BINARY_FUSE_8` for light/medium databases (lower RAM, marginally
-faster, and it is what feeds the GPU pre-filter); pick `BLOCKED_BLOOM` at the ≈ 1 B+ tier because it
-queries faster and builds faster there — not because fuse cannot be constructed. If footprint or FPR
-matters more than throughput, Fuse-8 is a legitimate Full DB choice given enough heap.
+| entries | `BINARY_FUSE_8` | `BLOCKED_BLOOM` | `BINARY_FUSE_16` | `BLOOM` |
+|--:|--:|--:|--:|--:|
+| 500 M | **39.6 ± 2.8** | 42.1 ± 1.5 | 43.1 ± 5.6 | 85.2 ± 5.0 |
+| 1 B | **39.9 ± 2.9** | 42.7 ± 1.7 | 40.8 ± 1.4 | 87.2 ± 4.1 |
+
+Two things follow. First, **the single-shot "blocked Bloom +17 %" reading on this host does not
+replicate** — the warmed instrument puts Fuse-8 nominally *ahead* at both sizes, so that column was
+indeed an artefact of the instrument. Second, **there is no crossover on a 96 MB-L3 host even at
+1 B entries.** Read the margin honestly, though: Fuse-8 leads by only ~6 %, and the intervals
+overlap at both points, so the fair statement is *blocked Bloom is not faster here*, not *Fuse-8
+wins*. Both curves are essentially flat from 500 M to 1 B (39.6 → 39.9 and 42.1 → 42.7), which is
+the expected signature of a fully DRAM-bound regime where neither layout has any cache left to lose.
+
+**Consequence: at the ≈ 1 B+ tier on a large-cache host, the `BLOCKED_BLOOM` recommendation rests on
+build time alone** — 1.8–2.0× faster to construct, reproduced on both machines — and not on lookup
+speed, which is a wash or slightly against it. On the 16 MB host the cache argument still applies and
+blocked Bloom wins on both counts. Pick `BINARY_FUSE_8` for light/medium databases (lower RAM,
+marginally faster, and it feeds the GPU pre-filter); pick `BLOCKED_BLOOM` at the ≈ 1 B+ tier for the
+build, or when the smaller L3 makes it faster too. If footprint or FPR outweighs build time, Fuse-8
+is a legitimate Full DB choice given enough heap.
 
 ###### Build time is I/O, and free RAM is the lever (`MDB_NORDAHEAD`)
 
@@ -338,14 +351,14 @@ non-member probes:
 
 **ryzen79800x3d8core-61g-win11**
 
-| Backend | 100 K | 1 M | 10 M | 50 M | 100 M | 132 M |
-|---|--:|--:|--:|--:|--:|--:|
-| `BINARY_FUSE_8` | 11.7 | 15.2 | 22.5 | 25.9 | 30.9 | 32.8 |
-| `BINARY_FUSE_16` | 11.8 | 20.2 | 30.2 | 31.0 | 35.4 | — |
-| `BLOCKED_BLOOM` | 14.9 | 22.5 | 27.9 | 31.0 | 34.4 | 37.1 |
-| `HASHSET` | 30.1 | 41.2 | 53.1 | — | — | — |
-| `BLOOM` | 50.1 | 56.5 | 62.9 | 64.1 | 73.0 | — |
-| `TRUNCATED_LONG_64` | 46.2 | 87.0 | 153.9 | 289.2 | 394.1 | — |
+| Backend | 100 K | 1 M | 10 M | 50 M | 100 M | 132 M | 500 M | 1000 M |
+|---|--:|--:|--:|--:|--:|--:|--:|--:|
+| `BINARY_FUSE_8` | 11.7 | 15.2 | 22.5 | 25.9 | 30.9 | 32.8 | 39.6 | 39.9 |
+| `BINARY_FUSE_16` | 11.8 | 20.2 | 30.2 | 31.0 | 35.4 | — | 43.1 | 40.8 |
+| `BLOCKED_BLOOM` | 14.9 | 22.5 | 27.9 | 31.0 | 34.4 | 37.1 | 42.1 | 42.7 |
+| `HASHSET` | 30.1 | 41.2 | 53.1 | — | — | — | — | — |
+| `BLOOM` | 50.1 | 56.5 | 62.9 | 64.1 | 73.0 | — | 85.2 | 87.2 |
+| `TRUNCATED_LONG_64` | 46.2 | 87.0 | 153.9 | 289.2 | 394.1 | — | — | — |
 
 <!-- END GENERATED:filter_lookup_table -->
 
