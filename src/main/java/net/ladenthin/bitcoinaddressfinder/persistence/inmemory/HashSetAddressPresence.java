@@ -11,7 +11,10 @@ import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
+import net.ladenthin.bitcoinaddressfinder.persistence.FilterBuildProgress;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Self-contained presence-only snapshot backed by a {@link HashSet} of read-only
@@ -44,6 +47,11 @@ import org.jspecify.annotations.NonNull;
 @EqualsAndHashCode
 public final class HashSetAddressPresence implements AddressPresence {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(HashSetAddressPresence.class);
+
+    /** Human-readable prefix for construction progress log lines. */
+    private static final String PROGRESS_NAME = "HashSet snapshot";
+
     // Potentially millions of ByteBuffer entries — toString'ing the whole Set would be
     // log-killing. The size() getter is included instead (see @ToString.Include below).
     @ToString.Exclude
@@ -64,11 +72,19 @@ public final class HashSetAddressPresence implements AddressPresence {
      */
     public static HashSetAddressPresence populateFrom(@NonNull AddressIterable source) {
         long expected = source.count();
+        LOGGER.info("{}: building over {} addresses ...", PROGRESS_NAME, expected);
         int initialCapacity = (int) Math.min(Integer.MAX_VALUE >> 1, Math.max(16L, expected));
         Set<ByteBuffer> set = new HashSet<>(initialCapacity);
+        FilterBuildProgress progress =
+                new FilterBuildProgress(LOGGER::info, PROGRESS_NAME + ": inserting addresses", expected);
+        long[] processed = {0L};
         try (Stream<ByteBuffer> stream = source.addresses()) {
-            stream.forEach(bb -> set.add(snapshot(bb)));
+            stream.forEach(bb -> {
+                set.add(snapshot(bb));
+                progress.report(++processed[0]);
+            });
         }
+        LOGGER.info("{}: ready ({} unique addresses).", PROGRESS_NAME, set.size());
         return new HashSetAddressPresence(set);
     }
 

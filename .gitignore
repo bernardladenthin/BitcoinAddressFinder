@@ -50,3 +50,6 @@ hs_err_pid*
 
 # Netbeans files
 nbactions.xml
+
+# Local scratch dir for running the jar against real databases (jars, logs, LMDBs)
+/runningtest/

@@ -39,6 +39,14 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
  *       ~2.28 B/entry, FPR &#x2248; 0.0015&nbsp;%. No false negatives. Same decorator behaviour
  *       as {@link #BINARY_FUSE_8}; LMDB stays open. Use when the 0.4&nbsp;% false-positive rate
  *       of {@link #BINARY_FUSE_8} sends too many hits to LMDB for verification.</li>
+ *   <li>{@link #BLOCKED_BLOOM} - Blocked Bloom filter in front of LMDB. Measured 1.56&nbsp;B/entry
+ *       (2.0&nbsp;GiB) on the Full DB and 2.06&nbsp;B/entry (256&nbsp;MiB) on the Light DB, with a
+ *       measured FPR of 0.49&nbsp;% and 0.18&nbsp;% respectively. No false negatives.
+ *       Same decorator behaviour as {@link #BINARY_FUSE_8}; LMDB stays open. Unlike the fuse filters
+ *       it builds in a single streaming pass with peak build memory ≈ the filter itself (~2&nbsp;GB
+ *       instead of the fuse construction's ~42&nbsp;GB), so it is the backend that builds on the
+ *       full billion-entry tier on a commodity-RAM machine, and its cache-line-aligned blocks feed
+ *       the GPU pre-filter with a single coalesced read per lookup.</li>
  * </ul>
  */
 public enum AddressLookupBackend {
@@ -68,5 +76,14 @@ public enum AddressLookupBackend {
      * No false negatives. Decorator like BINARY_FUSE_8; LMDB stays open. Use when the 0.4 %
      * false-positive rate of BINARY_FUSE_8 sends too many hits to LMDB for verification.
      */
-    BINARY_FUSE_16
+    BINARY_FUSE_16,
+
+    /**
+     * Blocked Bloom filter in front of LMDB. Auto-sized in power-of-two block counts: 2.0 GiB
+     * (1.56 B/entry, measured FPR 0.49 %) at the 1.377 B-entry Full DB tier, 256 MiB (2.06 B/entry,
+     * measured FPR 0.18 %) at the 132 M-entry Light DB tier. No false negatives. Decorator like BINARY_FUSE_8; LMDB stays open. Builds in a single streaming
+     * pass (peak build memory ≈ the filter itself), so it is the backend that scales to the full
+     * billion-entry database on commodity RAM where the fuse construction's ~42 GB peak does not fit.
+     */
+    BLOCKED_BLOOM
 }

@@ -21,6 +21,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerator;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8AddressPresence;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BlockedBloomAddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.HashSetAddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.TruncatedLong64SortedArrayPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
@@ -165,7 +166,7 @@ public class AddressLookupBenchmark {
     private static final double BLOOM_FPP = 0.01;
 
     /** Which lookup backend this trial measures. */
-    @Param({"LMDB_ONLY", "BLOOM", "HASHSET", "TRUNCATED_LONG_64", "BINARY_FUSE_8", "BINARY_FUSE_16"})
+    @Param({"LMDB_ONLY", "BLOOM", "HASHSET", "TRUNCATED_LONG_64", "BINARY_FUSE_8", "BINARY_FUSE_16", "BLOCKED_BLOOM"})
     public AddressLookupBackend backend;
 
     private Path tempDir;
@@ -258,6 +259,7 @@ public class AddressLookupBenchmark {
             case TRUNCATED_LONG_64 -> TruncatedLong64SortedArrayPresence.populateFrom(lmdb);
             case BINARY_FUSE_8 -> BinaryFuse8AddressPresence.populateFrom(lmdb);
             case BINARY_FUSE_16 -> BinaryFuse16AddressPresence.populateFrom(lmdb);
+            case BLOCKED_BLOOM -> BlockedBloomAddressPresence.populateFrom(lmdb);
         };
     }
 

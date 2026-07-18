@@ -11,8 +11,11 @@ import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.persistence.AbstractFilterAccelerator;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressLookup;
+import net.ladenthin.bitcoinaddressfinder.persistence.FilterBuildProgress;
 import org.bitcoinj.base.Coin;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Read-only accelerator that places a {@link BloomFilter} in front of an
@@ -38,6 +41,11 @@ import org.jspecify.annotations.NonNull;
  */
 @ToString(callSuper = true)
 public final class BloomFilterAccelerator extends AbstractFilterAccelerator<AddressLookup> implements AddressLookup {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterAccelerator.class);
+
+    /** Human-readable prefix for construction progress log lines. */
+    private static final String PROGRESS_NAME = "Bloom filter";
 
     // BloomFilter.toString dumps the full bit array — potentially millions of bits.
     @ToString.Exclude
@@ -91,15 +99,21 @@ public final class BloomFilterAccelerator extends AbstractFilterAccelerator<Addr
     public static BloomFilterAccelerator populateFrom(
             @NonNull AddressIterable source, @NonNull AddressLookup delegate, double falsePositiveProbability) {
         long count = source.count();
+        LOGGER.info("{}: building over {} addresses (fpp={}) ...", PROGRESS_NAME, count, falsePositiveProbability);
         BloomFilter<byte[]> bloom =
                 BloomFilter.create(Funnels.byteArrayFunnel(), Math.max(count, 1L), falsePositiveProbability);
+        FilterBuildProgress progress =
+                new FilterBuildProgress(LOGGER::info, PROGRESS_NAME + ": inserting addresses", count);
+        long[] processed = {0L};
         try (Stream<ByteBuffer> stream = source.addresses()) {
             stream.forEach(bb -> {
                 byte[] bytes = new byte[bb.remaining()];
                 bb.duplicate().get(bytes);
                 bloom.put(bytes);
+                progress.report(++processed[0]);
             });
         }
+        LOGGER.info("{}: ready ({} addresses inserted).", PROGRESS_NAME, processed[0]);
         return new BloomFilterAccelerator(bloom, delegate);
     }
 }

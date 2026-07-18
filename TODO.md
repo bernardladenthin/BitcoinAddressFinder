@@ -9,9 +9,68 @@ cross-cutting initiative.
 
 ### Persistence backends (genuinely open work)
 
-Implementation of `BLOOM` / `HASHSET` / `TRUNCATED_LONG_64` is DONE
+Implementation of `BLOOM` / `HASHSET` / `TRUNCATED_LONG_64` /
+`BINARY_FUSE_8` / `BINARY_FUSE_16` / `BLOCKED_BLOOM` is DONE
 (see "Done" history below). The remaining open items in the
 pluggable-persistence design plan:
+
+- **Prefetch/readahead the LMDB scan during filter construction (I/O-latency bound, measured).** Every
+  in-RAM backend is populated by a single-threaded cursor walk over the LMDB mmap, and on a database
+  larger than free RAM that walk — not the filter work — is what dominates the build. Measured while
+  building `BLOCKED_BLOOM` over the 1.377 B-entry Full DB (61 GB) with ~27 GB of the file warm in page
+  cache, per 10 % segment:
+
+  | segment | 0→9 % | 9→19 % | 19→29 % | 29→39 % | 39→49 % | 49→59 % | 59→69 % |
+  |---|--:|--:|--:|--:|--:|--:|--:|
+  | time | 48 s | 48 s | 47 s | 55 s | 110 s | 330 s | **325 s** |
+  | rate | 2.85 M/s | 2.87 M/s | 2.96 M/s | 2.49 M/s | 1.25 M/s | 0.42 M/s | **0.42 M/s** |
+
+  Two regimes, not an open-ended decline: ~2.9 M/s while pages are cached, then a ~7× drop that
+  **plateaus at a steady ~0.42 M/s** once the walk is fully in cold territory (the last two segments
+  match to within 2 %). The insert work per key is constant, so the entire curve is the cost of
+  *reaching* the next key. Practical consequence: a cold Full-DB build costs ~50-55 min and a
+  partially-warm one ~33 min, essentially all of it I/O wait. The process sat
+  **Root cause is read amplification, not an idle disk.** Measured in the cold regime on the NVMe
+  backing the database: **332 MB/s, 8 279 reads/s, 86 % disk-busy, queue depth 1**, with free RAM down
+  to 2.3 GB and the JVM working set at 54 GB. Useful entry throughput at that moment was only
+  0.43 M/s × ~44 B/entry ≈ **19 MB/s** — so roughly **17× more data is read than consumed**. Over the
+  39 %→89 % span the disk moved ~460 GB for ~30 GB of file content, against a 61 GB file: pages are
+  read, evicted before use, and re-read.
+
+  Mechanism: the database is built by inserting *random* hash160 keys, so LMDB B-tree pages in **key
+  order** are scattered in **file order**. A key-ordered cursor walk therefore jumps across the 61 GB
+  file, and the OS's ~40 KB readahead (332 MB ÷ 8 279 reads) drags in neighbours that are evicted
+  before their turn arrives. Once RAM is exhausted this degenerates into thrashing.
+
+  Fix candidates, cheapest first:
+  1. **Set `EnvFlags.MDB_NORDAHEAD` on the read-only env** (`LMDBPersistence` currently passes only
+     `MDB_RDONLY_ENV` + `MDB_NOLOCK`). LMDB documents this flag for exactly this case — a database
+     larger than RAM — to stop the OS prefetching pages that will not be used. Should be config-gated
+     (it is a pessimisation when the DB *does* fit in RAM, e.g. the Light DB) and A/B'd with
+     `FilterMeasurementMain`.
+  2. Raise the effective queue depth — the disk sat at **QD 1**, so it is latency-serialized even
+     while 86 % busy; overlapping reads could recover throughput.
+  3. Rebuild/compact the database in key order so the logical walk becomes physically sequential
+     (largest win, but a one-off offline cost on a 61 GB store).
+
+  Note this supersedes an earlier reading of these numbers as "the SSD is idle at 4 K IOPS, add
+  readahead" — that sample was taken while the page cache was still warm and the working set growing.
+  The disk is *not* idle, and adding more readahead would make the amplification worse. None of this
+  touches filter logic and it benefits *every* backend (`HASHSET` and `TRUNCATED_LONG_64` walk the
+  same cursor — the latter twice). Re-measure with `FilterMeasurementMain` (see
+  `docs/performance.md` §6); the per-10 % progress lines make the curve directly visible.
+
+- **Port the GPU pre-filter to `BLOCKED_BLOOM`** (currently always Binary Fuse 8). Two motivations:
+  (a) a blocked-Bloom probe is **one 64-byte coalesced read** per candidate vs. Fuse-8's three
+  scattered `__global` reads, and (b) Fuse-8 **cannot be built** at the ≈ 1 B+ tier (≈ 29 B/entry
+  peeling peak ⇒ ~42 GB heap at the Full DB), so today the largest databases cannot use a GPU
+  pre-filter at all. The CPU implementation was written byte-exact for this port and the formula is
+  pinned by `BlockedBloomAddressPresenceTest#gpuStyleLookup_agreesWithContainsAddress`. Work needed:
+  new kernel arguments (the signature hard-codes `fuse8_fp` / `fuse8_meta`), host-side VRAM upload,
+  and a `gpuFilterType` config field defaulting to the present Fuse-8 behaviour so existing configs
+  are byte-for-byte unaffected; then an on-hardware A/B against the working Fuse-8 path. Kept
+  deliberately separate from the CPU-backend work so the proven GPU path stayed untouched — see
+  `docs/performance.md` §8 "Candidates for a future stage" for the full design note.
 
 - **Add open-addressing primitive hash table backend** (fastutil `Long2LongOpenHashMap` or hand-rolled over `long[]`) — would offer O(1) average vs. the sorted array's O(log n) per lookup with similar cache profile. Deferred because `TRUNCATED_LONG_64` is already the fastest backend in practice and the marginal speedup would not change the recommended default.
 

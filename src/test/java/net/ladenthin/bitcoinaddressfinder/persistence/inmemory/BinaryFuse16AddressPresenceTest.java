@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder.persistence.inmemory;
 import static net.ladenthin.bitcoinaddressfinder.persistence.inmemory.InMemoryTestSupport.hash20;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThan;
@@ -159,6 +160,41 @@ class BinaryFuse16AddressPresenceTest {
         BinaryFuse16AddressPresence presence = BinaryFuse16AddressPresence.populateFrom(src);
         for (int i = 1; i <= 200; i++) {
             assertThat("entry " + i, presence.containsAddress(hash20(i % 256, i)), is(true));
+        }
+    }
+
+    /**
+     * Directly pins the queue-sizing fix at billion-entry scale (arithmetic only). The old
+     * {@code arrayLength + 3 * size} sizing overflowed {@code int}, yielding a capacity smaller than
+     * {@code arrayLength}; the corrected {@code arrayLength} sizing stays positive and sufficient.
+     * See the Fuse-8 twin for the full rationale.
+     */
+    @Test
+    void peelingQueueLength_billionScale_isSufficientAndDoesNotOverflow() {
+        int arrayLength = 1_549_000_000;
+        int size = 1_377_000_000;
+        int capacity = BinaryFuse16AddressPresence.peelingQueueLength(arrayLength, size);
+        assertThat("capacity must not overflow to a non-positive value", capacity, is(greaterThan(0)));
+        assertThat(
+                "capacity must cover every position (>= arrayLength)", capacity, is(greaterThanOrEqualTo(arrayLength)));
+    }
+
+    /**
+     * Regression guard for the peeling-queue sizing (queue = {@code arrayLength}, since each
+     * position is enqueued at most once). Builds a filter large enough to exercise peeling near
+     * the queue capacity and asserts no exception and no false negatives. See the Fuse-8 twin for
+     * the full rationale.
+     */
+    @Test
+    void peelingQueue_largePopulation_buildsWithoutOverflowAndFindsAll() {
+        int n = 200_000;
+        ListIterable src = new ListIterable();
+        for (int i = 0; i < n; i++) {
+            src.add(hash20(i % 256, i));
+        }
+        BinaryFuse16AddressPresence presence = BinaryFuse16AddressPresence.populateFrom(src);
+        for (int i = 0; i < n; i++) {
+            assertThat("member " + i, presence.containsAddress(hash20(i % 256, i)), is(true));
         }
     }
 

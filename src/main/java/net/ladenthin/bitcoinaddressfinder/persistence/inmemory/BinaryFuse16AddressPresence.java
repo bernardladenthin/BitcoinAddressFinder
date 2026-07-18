@@ -5,10 +5,10 @@ package net.ladenthin.bitcoinaddressfinder.persistence.inmemory;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.stream.Stream;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
+import net.ladenthin.bitcoinaddressfinder.persistence.FilterBuildProgress;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -234,6 +234,24 @@ public final class BinaryFuse16AddressPresence implements AddressPresence {
         return (int) h;
     }
 
+    /**
+     * Exact capacity of the peeling queue for a build with {@code arrayLength} fingerprint slots
+     * and {@code size} keys. During peeling, position counts only decrease, so every position
+     * reaches {@code count == 1} at most once and is therefore enqueued at most once — the total
+     * number of enqueues can never exceed the number of positions ({@code arrayLength}), regardless
+     * of {@code size}. Sizing the queue as {@code arrayLength} is therefore both sufficient and free
+     * of the {@code int} overflow that the earlier {@code arrayLength + 3 * size} sizing incurred
+     * above ~716&nbsp;M keys (where {@code 3 * size} wraps past {@link Integer#MAX_VALUE}).
+     *
+     * @param arrayLength the number of fingerprint slots (positions); the exact capacity
+     * @param size        the number of keys being inserted; does not affect the capacity
+     * @return {@code arrayLength} — always {@code >= arrayLength} and never overflowed
+     */
+    static int peelingQueueLength(int arrayLength, int size) {
+        // Intentionally independent of size: max enqueues == arrayLength (each position at most once).
+        return arrayLength;
+    }
+
     /** Reference segment-length heuristic for arity 3, capped at {@link #MAX_SEGMENT_LENGTH}. */
     static int calculateSegmentLength(int size) {
         if (size == 0) {
@@ -261,14 +279,12 @@ public final class BinaryFuse16AddressPresence implements AddressPresence {
         int[] idx = {0};
         FilterBuildProgress progress =
                 new FilterBuildProgress(LOGGER::info, PROGRESS_NAME + ": reading addresses", count);
-        try (Stream<ByteBuffer> stream = source.addresses()) {
-            stream.forEach(bb -> {
-                if (idx[0] < keys.length && bb.remaining() == BYTES_PER_ADDRESS) {
-                    keys[idx[0]++] = bb.getLong(bb.position());
-                    progress.report(idx[0]);
-                }
-            });
-        }
+        source.forEachAddress(bb -> {
+            if (idx[0] < keys.length && bb.remaining() == BYTES_PER_ADDRESS) {
+                keys[idx[0]++] = bb.getLong(bb.position());
+                progress.report(idx[0]);
+            }
+        });
         return idx[0] == keys.length ? keys : Arrays.copyOf(keys, idx[0]);
     }
 
@@ -332,9 +348,9 @@ public final class BinaryFuse16AddressPresence implements AddressPresence {
             indexing.report(i + 1);
         }
 
-        // Build initial queue of singleton positions.
-        // Maximum enqueues: arrayLength initial + 3*size from peeling (up to 3 positions per key peeled).
-        int[] queue = new int[arrayLength + 3 * size];
+        // Peeling queue of singleton positions; see peelingQueueLength for the exact-capacity /
+        // no-overflow rationale (each position is enqueued at most once).
+        int[] queue = new int[peelingQueueLength(arrayLength, size)];
         int qHead = 0;
         int qTail = 0;
         for (int pos = 0; pos < arrayLength; pos++) {

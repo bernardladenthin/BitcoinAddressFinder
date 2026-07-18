@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Spliterators;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import lombok.ToString;
@@ -34,6 +35,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.lmdbjava.BufferProxy;
 import org.lmdbjava.ByteBufferProxy;
+import org.lmdbjava.Cursor;
 import org.lmdbjava.CursorIterable;
 import org.lmdbjava.Dbi;
 import org.lmdbjava.Env;
@@ -285,6 +287,27 @@ public class LMDBPersistence implements Persistence, AddressIterable {
         });
     }
 
+    /**
+     * Lower-overhead override of {@link AddressIterable#forEachAddress(Consumer)}: iterates a raw
+     * LMDB {@link Cursor} directly, avoiding the {@code Stream}/{@code Spliterator}/{@code Iterator}
+     * per-entry dispatch of {@link #addresses()}. This is the throughput path used when populating
+     * the in-memory / GPU filters from a large database. The buffer passed to {@code action} is the
+     * cursor's key view, valid only until the next advance — read it immediately, do not retain it.
+     */
+    @Override
+    public void forEachAddress(Consumer<ByteBuffer> action) {
+        Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
+        Dbi<ByteBuffer> localLmdb_h160ToAmount = Objects.requireNonNull(lmdb_h160ToAmount);
+        try (Txn<ByteBuffer> txn = localEnv.txnRead();
+                Cursor<ByteBuffer> cursor = localLmdb_h160ToAmount.openCursor(txn)) {
+            boolean hasNext = cursor.first();
+            while (hasNext) {
+                action.accept(cursor.key());
+                hasNext = cursor.next();
+            }
+        }
+    }
+
     @Override
     public void writeAllAmountsToAddressFile(
             File file, CAddressFileOutputFormat addressFileOutputFormat, AtomicBoolean shouldRun) throws IOException {
@@ -412,15 +435,13 @@ public class LMDBPersistence implements Persistence, AddressIterable {
         Dbi<ByteBuffer> localLmdb_h160ToAmount = Objects.requireNonNull(lmdb_h160ToAmount);
         Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
 
-        long count = 0;
+        // O(1): LMDB maintains the exact entry count in the database metadata (Stat.entries), so read
+        // it directly instead of iterating every entry with a cursor. The cursor scan is a full pass
+        // over the database — a few seconds on small databases, but tens of minutes on billion-entry
+        // ones (and it ran once here just to size the fingerprint array before construction).
         try (Txn<ByteBuffer> txn = localEnv.txnRead()) {
-            try (CursorIterable<ByteBuffer> iterable = localLmdb_h160ToAmount.iterate(txn, KeyRange.all())) {
-                for (final CursorIterable.KeyVal<ByteBuffer> ignored : iterable) {
-                    count++;
-                }
-            }
+            return localLmdb_h160ToAmount.stat(txn).entries;
         }
-        return count;
     }
 
     @Override
@@ -461,7 +482,6 @@ public class LMDBPersistence implements Persistence, AddressIterable {
         LOGGER.info("IncreasedCounter: " + getIncreasedCounter());
         LOGGER.info("IncreasedSum: " + new ByteConversion().bytesToMib(getIncreasedSum()) + " MiB");
         LOGGER.info("Stat: " + localEnv.stat());
-        // Attention: slow!
         long count = count();
         LOGGER.info("LMDB contains " + count + " unique entries.");
         LOGGER.info("##### END: LMDB stats #####");

@@ -129,11 +129,94 @@ for a high-kpwi deployment but waste scratch when kpwi is small (the arrays are 
 ### Address-lookup backend (`addressLookupBackend`) and the GPU filter
 
 Independent of the EC knobs above but performance-relevant: the `LMDB_ONLY` default keeps LMDB open
-and exact; the in-RAM filters (`BLOOM`, `HASHSET`, `TRUNCATED_LONG_64`, `BINARY_FUSE_8/16`) trade RAM
-for lookup speed; `producerOpenCL.enableGpuFilter` runs a Binary Fuse 8 pre-filter on the GPU so only
-candidate hits are transferred over PCIe. See the README for the user-facing comparison; the GPU
-filter's measured transfer saving (~2.2× at grid 19 on an RTX 3070) is benchmarked by
-`GpuFuse8FilterBenchmark`.
+and exact; the in-RAM filters (`BLOOM`, `HASHSET`, `TRUNCATED_LONG_64`, `BINARY_FUSE_8/16`,
+`BLOCKED_BLOOM`) trade RAM for lookup speed; `producerOpenCL.enableGpuFilter` runs a Binary Fuse 8
+pre-filter on the GPU so only candidate hits are transferred over PCIe. See the README for the
+user-facing comparison; the GPU filter's measured transfer saving (~2.2× at grid 19 on an RTX 3070)
+is benchmarked by `GpuFuse8FilterBenchmark`.
+
+#### Filter construction cost — why `BLOCKED_BLOOM` exists
+
+Lookup latency is only half the story; at the largest database tier the **build** is the binding
+constraint. Measured with `FilterMeasurementMain` (see §6) against the real Light DB
+(132,288,304 entries) — build wall-clock, retained heap after a full GC, and 5 M random-non-member
+probes, with zero false negatives across 20 k sampled real members in every row:
+
+| Backend             | build time | retained RAM | B / entry | lookups/s | measured FPR |
+|---------------------|-----------:|-------------:|----------:|----------:|-------------:|
+| `BLOCKED_BLOOM`     | **34.8 s** |    259.5 MiB |     2.057 |   11.54 M |    0.258 %   |
+| `BINARY_FUSE_8`     |     68.8 s | **143.4 MiB**| **1.137** | **12.93 M**|   0.390 %   |
+| `BINARY_FUSE_16`    |     70.6 s |    287.4 MiB |     2.278 |   12.30 M | **0.002 %**  |
+| `TRUNCATED_LONG_64` |     41.9 s |   1082.2 MiB |     8.578 |    1.52 M |  0.000 %     |
+
+At this tier the differences are minor in every column — blocked Bloom builds ~2× faster (single
+streaming pass vs. peeling), costs ~1.8× the RAM of Fuse-8, looks up ~11 % slower.
+
+##### `k` sweep — why the default is 8 (measured, not derived)
+
+Same harness, Light DB, filter size pinned at 256 MiB (16.47 effective bits/entry):
+
+| `k` | FPR | lookups/s |
+|----:|----:|----------:|
+|   1 | 5.964 % | **12.74 M** |
+|   2 | 1.378 % | 11.77 M |
+|   4 | 0.307 % | 10.73 M |
+|   6 | 0.193 % | 10.62 M |
+| **8** | **0.184 %** | 9.85 M |
+|  11 | 0.219 % | 9.52 M |
+|  16 | 0.361 % | 8.49 M |
+
+FPR is **not monotone in `k`** — it bottoms at 8 and rises again as the shared 512-bit block saturates.
+The blocked optimum sits *below* the unblocked textbook value `(m/n)·ln2 ≈ 11` because confining all
+probes to one block adds per-block load variance, which penalises large `k`. `k = 1` degenerates to a
+plain direct-addressed bitmap: fastest lookups in the table and its FPR matches closed-form
+`1 − e^(−n/m)` = 5.97 % (measured 5.964 %), but ~1 query in 17 then falls through to LMDB, which costs
+far more than the ~29 % probe saving.
+
+**Stride parity bug (fixed).** The probe walk `bit_i = (x + i·y) mod 512` has period
+`512 / gcd(y, 512)`. An unconstrained `y` makes 1 key in 512 place every probe on one bit (1 in 256 →
+2 bits, 1 in 128 → 4). Forcing `y` odd guarantees distinct probes and measured **0.258 % → 0.184 %**
+at identical size and `k`. Note the original theory-vs-measurement gap was *initially misattributed
+entirely to this effect*; the corrected decomposition is unblocked ideal 0.052 % → blocking penalty
+~0.184 % → stride degeneracy 0.258 %, i.e. the blocking penalty is the larger term.
+
+##### Size sweep at `k = 8` — and why Fuse-8 survives
+
+| size | B/entry | FPR | lookups/s |
+|-----:|--------:|----:|----------:|
+|  68 MiB | 0.537 | 30.82 % |  7.31 M |
+| 132 MiB | 1.045 |  2.937 % |  8.82 M |
+| 260 MiB | 2.059 |  0.184 % |  9.85 M |
+| 516 MiB | 4.089 |  0.039 % | 12.00 M |
+
+Larger filters look up **faster** here: `containsAddress` short-circuits on the first unset bit, so a
+saturated filter runs more probes before answering "no" — speed tracks sparsity, not size. At matched
+footprint (1.045 vs 1.137 B/entry) Fuse-8's 0.390 % beats blocked Bloom's 2.937 % by ~7.5×, which is
+the quantitative reason Fuse-8 was kept rather than superseded.
+
+**The decisive difference is peak *build* memory, which this table cannot show.** The Binary Fuse
+peeling construction holds keys + counters + XOR accumulator + peeling queue + order/alone arrays
+live simultaneously — ≈ 29 B/entry at peak, i.e. **≈ 42 GB of heap at the 1.377 B-entry Full DB**.
+That cannot coexist with the OS page cache the 61 GB LMDB mmap wants on a 63 GB machine: the build
+thrashes and does not complete, even though the *finished* filter would be only ~1.5 GB. The blocked
+Bloom build allocates the bit array once and streams — **peak build memory ≈ the filter itself**
+(2 GiB, auto-sized to 2²⁵ blocks × 512 bits at the Full DB tier), so it builds where fuse cannot.
+
+Consequence for tuning: pick `BINARY_FUSE_8` for light/medium databases (lower RAM, marginally
+faster, and it is what feeds the GPU pre-filter); pick `BLOCKED_BLOOM` at the ≈ 1 B+ tier, where it
+is the only in-front-of-LMDB filter that can be constructed at all. The two were measured against
+each other precisely to decide whether one could be removed — they cannot, their optimal domains are
+disjoint, so `BLOCKED_BLOOM` was added rather than substituted.
+
+##### Cache-hot vs cache-cold — do not extrapolate the JMH microbenchmark
+
+`AddressLookupBenchmark` (2048 entries, everything L1-resident) measures `BLOCKED_BLOOM` at ~30 ns/op
+against Fuse-8's ~19 ns/op: with no cache misses the comparison reduces to instruction count, and
+`k = 8` dependent bit-probes lose to 3 array reads. That ordering **inverts in significance** at real
+sizes — on the 132 M-entry Light DB the gap narrows to 11.54 M vs 12.93 M lookups/s (≈ 87 vs 77 ns),
+because the cost becomes memory latency and blocked Bloom's `k` probes are confined to a **single
+512-bit (64-byte) block** — one cache line, one coalesced transaction — while a fuse lookup makes
+three scattered reads. Always size expectations from the real-database table, not the JMH row.
 
 ---
 
@@ -659,6 +742,35 @@ for the Stage 4 whole-kernel A/B; `-p profiling=true` to split device kernel vs 
 -p inputBits=256,160` for the Stage 4 isolated/width A/B). GPU benchmarks self-skip when no
 OpenCL 2.0+ device is present.
 
+#### Filter build/lookup against a *real* database — `FilterMeasurementMain`
+
+JMH's `AddressLookupBenchmark` builds a 2048-entry throwaway LMDB, so it can only measure the
+cache-hot lookup path — it can say nothing about build time, build-peak memory, or cache-cold
+latency, which is where the backend choice is actually decided (see §3). `FilterMeasurementMain` is a
+plain `main` (no JMH, no `@Test`) that builds one backend from a **real** LMDB directory and reports
+build wall-clock, retained heap after a full GC, cache-cold lookup throughput over 5 M random
+non-members, the measured FPR, and a no-false-negative check over sampled real members:
+
+```bash
+# after the classpath step above
+java -Xmx6g \
+     --add-opens=java.base/java.lang=ALL-UNNAMED \
+     --add-opens=java.base/java.io=ALL-UNNAMED \
+     --add-opens=java.base/java.nio=ALL-UNNAMED \
+     --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED \
+     --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED \
+     --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+     -cp "target/test-classes;target/classes;$(cat target/cp-test.txt)" \
+     net.ladenthin.bitcoinaddressfinder.benchmark.FilterMeasurementMain \
+     /path/to/lmdb BLOCKED_BLOOM 5000000
+```
+
+Backend is one of `BLOCKED_BLOOM`, `BINARY_FUSE_8`, `BINARY_FUSE_16`, `TRUNCATED_LONG_64`,
+`HASHSET`. It prints a single machine-readable `RESULT,...` CSV line. Size `-Xmx` to the backend
+under test: the streaming backends need little more than the finished structure, but
+`BINARY_FUSE_8/16` need ≈ 29 B/entry at peak — **do not** point the fuse backends at a billion-entry
+database on a commodity-RAM machine, that is the build that thrashes (§3).
+
 ### Stage attribution — where kernel time goes (permanent, re-runnable)
 
 The per-key kernel pipeline is **EC point generation → uncompressed hash160 → compressed hash160 →
@@ -1093,6 +1205,24 @@ cost balance shifts):
 > ~43% is a target for making *both* chains faster, never for computing only one. (The diagnostic
 > `kernelProfileStage` modes that skip a chain are timing-only and must never be used in production.)
 
+- **GPU-side `BLOCKED_BLOOM` pre-filter (designed, not implemented).** The GPU pre-filter is
+  currently *always* Binary Fuse 8 (`fuse8_contains`, three scattered `__global` reads per candidate).
+  The blocked-Bloom layout is a better fit for a GPU by construction: every one of a key's `k` bit
+  probes is confined to one 512-bit block, i.e. **one 64-byte coalesced transaction per candidate**
+  instead of three scattered reads. It is also the only filter that can be *built* at the ≈ 1 B+ tier
+  (§3), which is exactly the tier where the GPU filter matters most — so today the largest databases
+  cannot use a GPU pre-filter at all. The port is mechanical because the CPU implementation was
+  written byte-exact for it (`BlockedBloomAddressPresenceTest#gpuStyleLookup_agreesWithContainsAddress`
+  pins the formula against an independent re-implementation written the way the kernel must compute
+  it). What it requires, and why it was **not** done alongside the CPU backend: the kernel signature
+  currently hard-codes `fuse8_fp` / `fuse8_meta` parameters, so a second filter type means new kernel
+  arguments plus host-side upload and config plumbing (`gpuFilterType`, defaulting to the present
+  Fuse-8 behaviour so existing configs are untouched), and it must be A/B'd on real hardware against
+  the working Fuse-8 path before it can be trusted. That is a self-contained change with its own
+  validation, deliberately kept out of the CPU-backend work so the proven GPU path stayed untouched.
+  Expected payoff: the transfer saving is unchanged (both filters cut the same readback), the gain
+  would be in filter-probe latency inside the kernel plus, more importantly, **GPU filtering becoming
+  available at the Full DB tier at all**.
 - **Faster hash160 (both chains kept).** Hashing is ~43% (§6), so SHA-256 / RIPEMD-160
   micro-optimisation, or sharing more work between the uncompressed and compressed chains (they share
   the X coordinate; the compressed SEC prefix transform is already reused via `REUSE_FOR_COMPRESSED`),

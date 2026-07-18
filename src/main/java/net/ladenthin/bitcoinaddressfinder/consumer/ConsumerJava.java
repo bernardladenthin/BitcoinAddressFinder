@@ -37,6 +37,8 @@ import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16Addre
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8GpuFilterData;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuseAccelerator;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BlockedBloomAccelerator;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BlockedBloomAddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.HashSetAddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.TruncatedLong64SortedArrayPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
@@ -406,6 +408,7 @@ public class ConsumerJava implements Consumer {
             case TRUNCATED_LONG_64 -> TruncatedLong64SortedArrayPresence.populateFrom(lmdb);
             case BINARY_FUSE_8 -> new BinaryFuseAccelerator(BinaryFuse8AddressPresence.populateFrom(lmdb), lmdb);
             case BINARY_FUSE_16 -> new BinaryFuseAccelerator(BinaryFuse16AddressPresence.populateFrom(lmdb), lmdb);
+            case BLOCKED_BLOOM -> new BlockedBloomAccelerator(BlockedBloomAddressPresence.populateFrom(lmdb), lmdb);
         };
     }
 

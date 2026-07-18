@@ -14,7 +14,10 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.Random;
+import java.util.Set;
+import java.util.stream.Stream;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
@@ -270,6 +273,43 @@ public class LMDBPersistenceTest {
         }
     }
     // </editor-fold>
+
+    @Test
+    public void forEachAddress_visitsSameEntriesAsAddressesStream() throws IOException {
+        // arrange
+        int keysToAdd = 5000;
+        File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
+
+        CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
+        cLMDBConfigurationWrite.initialMapSizeInMiB = 16;
+        cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
+
+        try (LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils)) {
+            lmdbPersistence.init();
+            fillWithRandomKeys(keysToAdd, lmdbPersistence);
+
+            // reference set collected via the default Stream-based addresses() path
+            Set<Long> viaStream = new HashSet<>();
+            try (Stream<ByteBuffer> stream = lmdbPersistence.addresses()) {
+                stream.forEach(bb -> viaStream.add(bb.getLong(bb.position())));
+            }
+
+            // act: the raw-cursor forEachAddress override must visit exactly the same entries
+            Set<Long> viaForEach = new HashSet<>();
+            int[] visited = {0};
+            lmdbPersistence.forEachAddress(bb -> {
+                visited[0]++;
+                viaForEach.add(bb.getLong(bb.position()));
+            });
+
+            // assert
+            assertThat(
+                    "forEachAddress must visit count() entries",
+                    (long) visited[0],
+                    is(equalTo(lmdbPersistence.count())));
+            assertThat("forEachAddress must visit the same entries as addresses()", viaForEach, is(equalTo(viaStream)));
+        }
+    }
 
     private void fillWithRandomKeys(int keysToAdd, LMDBPersistence lmdbPersistence) {
         // arrange - fill
