@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
+import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence;
@@ -80,6 +81,17 @@ public final class FilterMeasurementMain {
         int bitsPerEntry = args.length >= 5 ? Integer.parseInt(args[4]) : -1;
         // Opt into MDB_NORDAHEAD to A/B the OS read-ahead behaviour on a larger-than-RAM database.
         boolean noReadAhead = args.length >= 6 && Boolean.parseBoolean(args[5]);
+
+        // A synthetic source removes LMDB (and therefore page-cache behaviour and read
+        // amplification) from the measurement. Used for questions that do not depend on real data,
+        // e.g. sweeping k at a chosen bits-per-entry: the optimum is a function of bit density and
+        // per-block load, both scale-independent, so it can be answered at a small entry count
+        // instead of rebuilding over a billion-entry database for tens of minutes per data point.
+        if (lmdbDir.startsWith("prng:")) {
+            long synthetic = Long.parseLong(lmdbDir.substring("prng:".length()));
+            runSynthetic(synthetic, backend, probeCount, k, bitsPerEntry);
+            return;
+        }
 
         Network network = new NetworkParameterFactory().getNetwork();
         PersistenceUtils persistenceUtils = new PersistenceUtils(network);
@@ -162,7 +174,61 @@ public final class FilterMeasurementMain {
         }
     }
 
-    private static AddressPresence build(String backend, LMDBPersistence lmdb, int k, int bitsPerEntry) {
+    /** Measures against generated addresses; mirrors the LMDB path but skips storage entirely. */
+    private static void runSynthetic(long count, String backend, int probeCount, int k, int bitsPerEntry) {
+        PrngAddressIterable source = new PrngAddressIterable(0xC0FFEEL, count);
+        log("synthetic source: " + count + " generated addresses; backend=" + backend);
+
+        long usedBefore = usedHeapAfterGc();
+        long t0 = System.nanoTime();
+        AddressPresence filter = build(backend, source, k, bitsPerEntry);
+        long buildNanos = System.nanoTime() - t0;
+        long usedAfter = usedHeapAfterGc();
+        long retainedBytes = Math.max(0, usedAfter - usedBefore);
+
+        // No false negatives: a sample of real members must all be reported present.
+        int falseNegatives = 0;
+        int sample = (int) Math.min(20_000L, count);
+        ByteBuffer probe = ByteBuffer.allocate(HASH160_LENGTH);
+        for (int i = 0; i < sample; i++) {
+            probe.clear();
+            probe.put(PrngAddressIterable.addressAt(0xC0FFEEL, i));
+            probe.flip();
+            if (!filter.containsAddress(probe)) {
+                falseNegatives++;
+            }
+        }
+
+        // Probes come from a different seed, so they are non-members by construction.
+        long positives = 0;
+        long tl0 = System.nanoTime();
+        for (int i = 0; i < probeCount; i++) {
+            probe.clear();
+            probe.put(PrngAddressIterable.addressAt(0x5EED_1234_ABCDL, i));
+            probe.flip();
+            if (filter.containsAddress(probe)) {
+                positives++;
+            }
+        }
+        long lookupNanos = System.nanoTime() - tl0;
+
+        System.out.printf(
+                "RESULT,backend=%s,k=%d,bpe=%d,source=prng,entries=%d,buildSec=%.2f,retainedMiB=%.1f,"
+                        + "bytesPerEntry=%.3f,lookupsPerSec=%.0f,fpr=%.6f,falseNegatives=%d,probes=%d%n",
+                backend,
+                k,
+                bitsPerEntry,
+                count,
+                buildNanos / 1e9,
+                retainedBytes / (1024.0 * 1024.0),
+                count == 0 ? 0 : (double) retainedBytes / count,
+                probeCount / (lookupNanos / 1e9),
+                (double) positives / probeCount,
+                falseNegatives,
+                probeCount);
+    }
+
+    private static AddressPresence build(String backend, AddressIterable lmdb, int k, int bitsPerEntry) {
         return switch (backend) {
             case "BINARY_FUSE_8" -> BinaryFuse8AddressPresence.populateFrom(lmdb);
             case "BINARY_FUSE_16" -> BinaryFuse16AddressPresence.populateFrom(lmdb);

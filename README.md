@@ -419,6 +419,16 @@ Setting `"useNoReadAhead": true` opens LMDB with `MDB_NORDAHEAD`, asking the OS 
 
 Two things worth noting. First, **more bits is not monotonically better** — the FPR bottoms out at `k = 8` and climbs again, because every additional probe fills the shared 512-bit block faster. Second, the blocked optimum (8) sits **below** the textbook unblocked prediction `(m/n)·ln2 ≈ 11`: confining all probes to one block introduces per-block load variance, which penalises high `k`. This is why `DEFAULT_K = 8` is an empirical result rather than a formula.
 
+The sweep above is at the Light DB's bit density (16.47 bits/entry). Because the power-of-two block sizing lands the **Full DB** at 12.5 bits/entry instead, the optimum shifts — measured at exactly that density (10,737,418 synthetic entries × `bitsPerEntry = 12` reproduces 12.5 b/e; bit density and per-block load are scale-independent, so this answers the same question as a billion-entry build in seconds rather than tens of minutes per point):
+
+| `k` | 4 | 6 | **7** | 8 | 9 | 10 | 12 |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| FPR @ 12.5 b/e | 0.670 % | 0.463 % | **0.460 %** | 0.478 % | 0.511 % | 0.560 % | 0.716 % |
+
+The optimum at Full DB density is `k = 7`, but `k = 8` trails it by only 3.8 % — and `k = 8` *is* optimal at the Light DB density. **`DEFAULT_K = 8` is therefore kept**: a single constant cannot be optimal at both tiers, and 8 is optimal at one and within 4 % at the other. (Sanity check: this synthetic model predicts 0.478 % at `k = 8`, against 0.485 % measured on the real 1.377 B-entry database — the proxy reproduces reality closely.)
+
+Across both densities the blocked optimum lands near **`k ≈ 0.55 × bits/entry`** rather than the textbook `0.693 ×` (16.47 b/e → 8 measured vs 11.4 predicted; 12.5 b/e → 7 measured vs 8.7 predicted). The gap is the per-block load variance that blocking introduces.
+
 **`k = 1` is exactly a direct-addressed bitmap** (a.k.a. prefix bitset — one bit per hash position, no comparison at all). It is the fastest row in the table, and its FPR matches closed-form theory `1 − e^(−n/m)` = 5.97 % against 5.964 % measured — a near-perfect fit, which is itself the evidence that the deviation at higher `k` really is the blocking penalty and not a hashing flaw. But at 5.96 % FPR roughly **1 query in 17 falls through to LMDB**, and that verification cost dwarfs the ~29 % lookup-speed saving. Hence `k = 8`, not `k = 1`.
 
 ##### Size sweep (`k = 8`)
@@ -472,30 +482,23 @@ Two differences in the Full DB example are worth calling out, because both are c
 
 The 2048-entry table above measures one point on a curve, and it is the least representative one. `FilterLookupBenchmark` sweeps the entry count instead, and removes LMDB entirely — addresses come from a seeded PRNG (`PrngAddressIterable`), so there is no page-cache behaviour, no read amplification, and no run-to-run variance from what the OS happened to cache. Only the filter is measured. Average ns per `containsAddress` against non-member probes:
 
-| Backend             | 100 K | 1 M | 10 M | growth 100 K→10 M |
-|---------------------|------:|----:|-----:|------------------:|
-| `BLOOM` (Guava)     | 113.0 | 125.1 | 171.6 | 1.52× |
-| `HASHSET`           |  56.1 | 103.4 | 222.1 | 3.96× |
-| `TRUNCATED_LONG_64` |  79.1 | 144.7 | **363.0** | **4.59×** |
-| `BINARY_FUSE_8`     | **13.0** | **18.3** | 37.2 | 2.85× |
-| `BINARY_FUSE_16`    |  15.1 |  19.2 |  47.6 | 3.15× |
-| `BLOCKED_BLOOM`     |  23.6 |  31.1 | **36.8** | **1.56×** |
+| Backend             | 100 K | 1 M | 10 M | 50 M | 100 M |
+|---------------------|------:|----:|-----:|-----:|------:|
+| `BINARY_FUSE_8`     | **13.1** | **18.5** | **22.4** | 52.1 | 59.6 |
+| `BINARY_FUSE_16`    |  15.1 |  19.2 |  34.4 | 60.9 |  63.5 |
+| `BLOCKED_BLOOM`     |  23.9 |  31.2 |  38.0 | **40.5** | **45.5** |
+| `HASHSET`           |  52.1 |  92.9 | 145.1 | — | — |
+| `TRUNCATED_LONG_64` |  80.1 | 145.4 | 348.6 | 533.3 | 612.2 |
+| `BLOOM`             |  85.4 |  98.9 | 114.1 | 203.2 | 203.8 |
 
-What this shows, none of which is visible at 2048 entries:
+`HASHSET` is omitted above 10 M — at ~80 B/entry it needs ~8 GB at 100 M.
 
-- **The two Binary Fuse filters are the fastest until ~10 M entries**, where `BLOCKED_BLOOM` catches up (36.8 vs 37.2 ns). `BLOCKED_BLOOM` has by far the flattest curve of any real filter (1.56×) because all `k` probes share one 64-byte block — one cache line per lookup regardless of filter size — while a fuse lookup makes three scattered reads. Above ~10 M entries the blocked layout is the better structure. (Caveat: the Fuse-8 10 M point carries a ±50 ns error bar, wider than the score; treat the crossover as "they converge", not a precise threshold.)
-- **`BLOOM` is the slowest filter** — ~6.5× slower than Fuse-8 even after tuning. The table above predates that tuning; `BLOOM` now measures ~85 ns at 100 K (was 113 ns). What was investigated, in order:
+**There is a crossover, and it sits between 10 M and 50 M entries.** Below it `BINARY_FUSE_8` wins by ~1.7×; above it `BLOCKED_BLOOM` wins by ~1.3×. The mechanism is visible in the step sizes: from 10 M to 50 M Fuse-8 degrades by 2.3× (22.4 → 52.1 ns) while blocked Bloom barely moves (38.0 → 40.5 ns, 1.07×). That is exactly where the Fuse-8 array outgrows L3 cache (~11 MB at 10 M, ~57 MB at 50 M). Once neither filter is cache-resident, a fuse lookup pays **three** scattered cache misses while a blocked-Bloom lookup pays **one** — all `k` probes share a single 512-bit block. Blocked Bloom is the flattest structure in the table (1.9× from 100 K to 100 M, against Fuse-8's 4.5×).
 
-  | change | 100 K | allocation |
-  |---|--:|--:|
-  | original (hash 20 bytes, `new byte[20]` per lookup) | 113.0 ns | 176 B/op |
-  | reuse the array instead of allocating | 113.9 ns | 176 B/op |
-  | **key on the first 8 bytes (`longFunnel`)** | **85.4 ns** | 200 B/op |
+Practical reading: the crossover lands *below* both published database tiers, so at the Light DB (132 M) and Full DB (1.377 B) the blocked layout is on the winning side of it.
 
-  The intuitive fix — removing the per-lookup `byte[20]` — **changed nothing measurable**. The allocation was never the bottleneck: Guava allocates a `Hasher` internally on every `mightContain` call (the 176 B/op, unchanged across all three variants), which dominates our 20 bytes. Hashing *work* was the real cost, so keying on 8 bytes instead of 20 bought ~22 % — while *increasing* allocation to 200 B/op through boxing, which makes the point twice over.
-
-  What remains is structural in Guava and cannot be fixed from our side: `k` probes scattered across the entire bit array (k cache misses instead of one), and bits stored in a lock-free atomic array. `BLOOM` is retained for existing configurations; `BINARY_FUSE_8` supersedes it on every axis.
-- **`TRUNCATED_LONG_64` is the worst scaler in the table** (4.59×) and at 10 M entries is the slowest backend measured — 1.6× slower than `HASHSET`, not "near-`HASHSET`". Its binary search costs ~log₂(n/256) dependent cache misses per query, which is cheap while the buckets sit in cache and expensive once they do not. **The "near-`HASHSET` latency" claim holds only for small databases.**
+- **`TRUNCATED_LONG_64` degrades worst of all** (7.6× from 100 K to 100 M, ending at 612 ns — 13× slower than blocked Bloom). Its binary search costs ~log₂(n/256) dependent cache misses. The "near-`HASHSET` latency" characterisation holds only for small databases.
+- **`BLOOM` is the slowest filter** despite scaling flatly (2.4×). See the tuning history below; what remains is structural in Guava.
 
 Run it yourself:
 

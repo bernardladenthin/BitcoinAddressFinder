@@ -259,27 +259,34 @@ no dependence on what the OS happened to have cached — only the filter is meas
 entry count, which is the axis that decides the ranking. Average ns per `containsAddress` on
 non-member probes:
 
-| Backend             | 100 K | 1 M | 10 M | growth |
-|---------------------|------:|----:|-----:|-------:|
-| `BLOOM` (Guava)     | 113.0 | 125.1 | 171.6 | 1.52× |
-| `HASHSET`           |  56.1 | 103.4 | 222.1 | 3.96× |
-| `TRUNCATED_LONG_64` |  79.1 | 144.7 | **363.0** | **4.59×** |
-| `BINARY_FUSE_8`     | **13.0** | **18.3** | 37.2 | 2.85× |
-| `BINARY_FUSE_16`    |  15.1 |  19.2 |  47.6 | 3.15× |
-| `BLOCKED_BLOOM`     |  23.6 |  31.1 | **36.8** | **1.56×** |
+| Backend             | 100 K | 1 M | 10 M | 50 M | 100 M |
+|---------------------|------:|----:|-----:|-----:|------:|
+| `BINARY_FUSE_8`     | **13.1** | **18.5** | **22.4** | 52.1 | 59.6 |
+| `BINARY_FUSE_16`    |  15.1 |  19.2 |  34.4 | 60.9 |  63.5 |
+| `BLOCKED_BLOOM`     |  23.9 |  31.2 |  38.0 | **40.5** | **45.5** |
+| `HASHSET`           |  52.1 |  92.9 | 145.1 | — | — |
+| `TRUNCATED_LONG_64` |  80.1 | 145.4 | 348.6 | 533.3 | 612.2 |
+| `BLOOM`             |  85.4 |  98.9 | 114.1 | 203.2 | 203.8 |
 
-- **Fuse-8 wins below ~10 M entries; `BLOCKED_BLOOM` converges with it there** (36.8 vs 37.2 ns) and
-  owns the flattest curve of any real filter (1.56×), because all `k` probes occupy one 64-byte block
-  — one cache line per lookup at any filter size — against a fuse lookup's three scattered reads.
-  *Caveat:* the Fuse-8 10 M point has a ±50 ns error bar (wider than the score itself), so read this
-  as convergence, not a sharp threshold; re-run that point with more iterations before relying on it.
-- **`BLOOM` is 3–5× slower than any other filter.** Guava hashes the whole 20-byte value with
-  Murmur3-128, scatters `k` probes across the entire bit array, and uses an atomic bit array; our
-  `BloomFilterAccelerator` additionally allocates a `byte[20]` per lookup. Its good scaling (1.52×)
-  reflects that fixed per-call overhead dominates, not efficiency.
-- **`TRUNCATED_LONG_64` scales worst (4.59×)** and is the slowest backend at 10 M. Its binary search
-  costs ~log₂(n/256) dependent cache misses. The "near-`HASHSET` latency" characterisation in older
-  docs is a small-database result and was corrected accordingly.
+- **The crossover between `BINARY_FUSE_8` and `BLOCKED_BLOOM` lies between 10 M and 50 M entries.**
+  Below it Fuse-8 wins by ~1.7×, above it blocked Bloom wins by ~1.3×. The step sizes show why: from
+  10 M to 50 M Fuse-8 degrades 2.3× (22.4 → 52.1 ns) while blocked Bloom moves 1.07× (38.0 → 40.5 ns).
+  That is where the Fuse-8 array outgrows L3 (~11 MB at 10 M, ~57 MB at 50 M); once neither filter is
+  cache-resident a fuse lookup costs **three** scattered misses against blocked Bloom's **one**, since
+  all `k` probes share a 512-bit block. Blocked Bloom is the flattest structure measured (1.9× from
+  100 K to 100 M vs Fuse-8's 4.5×). Both published database tiers sit above the crossover.
+- **`TRUNCATED_LONG_64` degrades worst** (7.6×, ending at 612 ns) — ~log₂(n/256) dependent cache
+  misses per query. The "near-`HASHSET` latency" claim in older docs is a small-database result.
+- **`BLOOM` remains slowest** even after being retuned to key on 8 bytes; the residue is structural in
+  Guava (k scattered probes, atomic bit array).
+
+> **Measurement history — this table was wrong twice before it was right.** An earlier edition put the
+> crossover *at* 10 M based on a Fuse-8 data point of 37.2 ± 50.3 ns, an error bar wider than the
+> score. Re-measuring with five iterations gave 22.4 ± 0.4 ns, which then suggested there was *no*
+> crossover at all — an equally premature conclusion, drawn from data that stopped at 10 M. Extending
+> the sweep to 50 M and 100 M produced the result above. The lesson is recorded rather than tidied
+> away: a sweep that stops short of the interesting regime is as misleading as a noisy point inside
+> it.
 
 ##### Cache-hot vs cache-cold — do not extrapolate the JMH microbenchmark
 

@@ -84,7 +84,13 @@ public enum AddressLookupBackend {
     /**
      * Blocked Bloom filter in front of LMDB. Auto-sized in power-of-two block counts: 2.0 GiB
      * (1.56 B/entry, measured FPR 0.49 %) at the 1.377 B-entry Full DB tier, 256 MiB (2.06 B/entry,
-     * measured FPR 0.18 %) at the 132 M-entry Light DB tier. No false negatives. Decorator like BINARY_FUSE_8; LMDB stays open. Builds in a single streaming
+     * measured FPR 0.18 %) at the 132 M-entry Light DB tier. No false negatives.
+     *
+     * <p><b>Faster than {@link #BINARY_FUSE_8} above ~10-50 M entries</b>, slower below it: all
+     * {@code k} probes share one 512-bit block, so a cache-cold lookup costs one cache miss against
+     * a fuse lookup's three. Measured 40.5 vs 52.1 ns at 50 M and 45.5 vs 59.6 ns at 100 M, against
+     * 22.4 vs 38.0 ns at 10 M where the fuse array still fits in L3. Both published database tiers
+     * sit above that crossover. Decorator like BINARY_FUSE_8; LMDB stays open. Builds in a single streaming
      * pass (peak build memory ≈ the filter itself), so it is the backend that scales to the full
      * billion-entry database on commodity RAM where the fuse construction's ~42 GB peak does not fit.
      */
