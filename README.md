@@ -440,8 +440,13 @@ The probe sequence is `bit_i = (x + i·y) mod 512`, whose period is `512 / gcd(y
 
 **Which to choose:**
 
-- **Light/medium databases → `BINARY_FUSE_8`.** Lower RAM, marginally faster lookups, and it is the filter that feeds the GPU pre-filter. Nothing here supersedes it.
-- **The largest databases (≈ 1 B+ entries) → `BLOCKED_BLOOM`.** It is the only in-front-of-LMDB filter whose construction fits.
+- **Light/medium databases → `BINARY_FUSE_8`.** Lower RAM, marginally faster lookups, and it is the filter that feeds the GPU pre-filter. Nothing here supersedes it. Ready-to-run example: [`examples/config_Find_LightDB_BinaryFuse8.json`](examples/config_Find_LightDB_BinaryFuse8.json).
+- **The largest databases (≈ 1 B+ entries) → `BLOCKED_BLOOM`.** It is the only in-front-of-LMDB filter whose construction fits. Ready-to-run example: [`examples/config_Find_FullDB_BlockedBloom.json`](examples/config_Find_FullDB_BlockedBloom.json).
+
+Two differences in the Full DB example are worth calling out, because both are consequences of scale rather than taste:
+
+- **`"logStatsOnInit": false`** — the stats dump iterates the entire database. On the Light DB that is a few seconds and gives you a warm cache for free; at 1.377 B entries it is a second full pass over 61 GB before the build even starts.
+- **`batchSizeInBits: 19`, `keysPerWorkItem: 128`** instead of `18`/`16` — a larger grid pays off once the GPU pre-filter keeps the readback compact. These are the values used in this project's own Full DB runs; the genuinely optimal pair is device-specific, so sweep it on your own hardware (see [`docs/performance.md`](docs/performance.md) §4).
 
 `BLOCKED_BLOOM` is therefore an **addition, not a replacement** — the two filters have genuinely different optimal domains, so neither was removed.
 
