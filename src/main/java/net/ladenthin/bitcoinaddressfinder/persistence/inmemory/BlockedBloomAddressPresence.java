@@ -245,6 +245,20 @@ public final class BlockedBloomAddressPresence implements AddressPresence {
     }
 
     /**
+     * Builds the VRAM-upload payload for the GPU probe.
+     *
+     * <p>Shares the {@code long[]} rather than copying it: the array reaches 2 GiB at the Full DB
+     * tier, and the payload is a short-lived staging object that is dropped after the one-time
+     * upload. Callers must treat it as read-only.
+     *
+     * @return the payload consumed by {@code blockedbloom_contains}
+     */
+    @SuppressWarnings("EI_EXPOSE_REP")
+    public BlockedBloomGpuFilterData toGpuFilterData() {
+        return new BlockedBloomGpuFilterData(words, logBlocks, k);
+    }
+
+    /**
      * Returns the backing bit array, exposed for GPU VRAM upload and tests. The reference (not a
      * copy) is returned deliberately; callers must treat it as read-only.
      *

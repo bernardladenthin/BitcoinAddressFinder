@@ -896,6 +896,121 @@ public class OpenCLContext implements ReleaseCLObject {
         }
     }
 
+    // Filter-probe microbenchmark state. Held across calls on purpose: the filter reaches gigabytes
+    // at production sizes, so uploading it per measured invocation would measure PCIe, not the probe.
+    private @Nullable cl_kernel benchFilterKernel;
+    private @Nullable cl_mem benchFilterMem;
+    private @Nullable cl_mem benchFilterMetaMem;
+    private @Nullable cl_mem benchFilterKeysMem;
+    private @Nullable cl_mem benchFilterHitsMem;
+    private int benchFilterProbeCount;
+
+    /**
+     * Benchmark hook: uploads a Binary Fuse 8 filter and a probe-key array, and binds the
+     * {@code benchmarkFilterFuse8} kernel. Pairs with {@link #runBenchFilterProbe()} and
+     * {@link #releaseBenchFilterProbe()}.
+     *
+     * <p>Split into prepare/run/release so the multi-gigabyte upload happens once, outside the
+     * timed region — measuring it per invocation would report PCIe bandwidth rather than probe cost.
+     *
+     * @param fingerprints the fuse fingerprint array
+     * @param meta         {@code [seedLo, seedHi, segLen, segLenMask, segCountLen]}
+     * @param probeKeys    the 64-bit keys to probe, one per work-item
+     */
+    @VisibleForTesting
+    public void prepareBenchFilterProbeFuse8(byte[] fingerprints, int[] meta, long[] probeKeys) {
+        prepareBenchFilterProbe("benchmarkFilterFuse8", Pointer.to(fingerprints), fingerprints.length, meta, probeKeys);
+    }
+
+    /**
+     * Benchmark hook: uploads a blocked Bloom filter and a probe-key array, and binds the
+     * {@code benchmarkFilterBlockedBloom} kernel. See
+     * {@link #prepareBenchFilterProbeFuse8(byte[], int[], long[])} for the lifecycle.
+     *
+     * @param words     the blocked Bloom bit array
+     * @param meta      {@code [logBlocks, k]}
+     * @param probeKeys the 64-bit keys to probe, one per work-item
+     */
+    @VisibleForTesting
+    public void prepareBenchFilterProbeBlockedBloom(long[] words, int[] meta, long[] probeKeys) {
+        prepareBenchFilterProbe(
+                "benchmarkFilterBlockedBloom",
+                Pointer.to(words),
+                (long) words.length * Sizeof.cl_ulong,
+                meta,
+                probeKeys);
+    }
+
+    private void prepareBenchFilterProbe(
+            String kernelName, Pointer filterHost, long filterBytes, int[] meta, long[] probeKeys) {
+        final cl_context localContext = Objects.requireNonNull(context);
+        final cl_program localProgram = Objects.requireNonNull(program);
+
+        releaseBenchFilterProbe(); // idempotent: a second prepare must not leak the first upload
+        benchFilterProbeCount = probeKeys.length;
+        benchFilterKernel = clCreateKernel(localProgram, kernelName, null);
+        benchFilterMem =
+                clCreateBuffer(localContext, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, filterBytes, filterHost, null);
+        benchFilterMetaMem = clCreateBuffer(
+                localContext,
+                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                (long) meta.length * Sizeof.cl_uint,
+                Pointer.to(meta),
+                null);
+        benchFilterKeysMem = clCreateBuffer(
+                localContext,
+                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                (long) probeKeys.length * Sizeof.cl_ulong,
+                Pointer.to(probeKeys),
+                null);
+        benchFilterHitsMem = clCreateBuffer(localContext, CL_MEM_WRITE_ONLY, benchFilterProbeCount, null, null);
+
+        final cl_kernel k = Objects.requireNonNull(benchFilterKernel);
+        clSetKernelArg(k, 0, Sizeof.cl_mem, Pointer.to(Objects.requireNonNull(benchFilterMem)));
+        clSetKernelArg(k, 1, Sizeof.cl_mem, Pointer.to(Objects.requireNonNull(benchFilterMetaMem)));
+        clSetKernelArg(k, 2, Sizeof.cl_mem, Pointer.to(Objects.requireNonNull(benchFilterKeysMem)));
+        clSetKernelArg(k, 3, Sizeof.cl_mem, Pointer.to(Objects.requireNonNull(benchFilterHitsMem)));
+        clSetKernelArg(k, 4, Sizeof.cl_uint, Pointer.to(new int[] {benchFilterProbeCount}));
+    }
+
+    /**
+     * Benchmark hook: probes every prepared key on the device and blocks until the kernel finishes.
+     * This is the timed region of the filter A/B — no host transfer occurs, so it measures the probe.
+     *
+     * @return the number of work-items launched, so callers can normalise to a per-probe cost
+     * @throws IllegalStateException if no filter probe has been prepared
+     */
+    @VisibleForTesting
+    public int runBenchFilterProbe() {
+        final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
+        final cl_kernel k = benchFilterKernel;
+        if (k == null) {
+            throw new IllegalStateException("prepareBenchFilterProbe* must be called before runBenchFilterProbe()");
+        }
+        clEnqueueNDRangeKernel(localQueue, k, 1, null, new long[] {benchFilterProbeCount}, null, 0, null, null);
+        clFinish(localQueue);
+        return benchFilterProbeCount;
+    }
+
+    /** Releases the filter-probe benchmark buffers and kernel. Safe to call repeatedly. */
+    @VisibleForTesting
+    public void releaseBenchFilterProbe() {
+        for (cl_mem mem : new cl_mem[] {benchFilterMem, benchFilterMetaMem, benchFilterKeysMem, benchFilterHitsMem}) {
+            if (mem != null) {
+                clReleaseMemObject(mem);
+            }
+        }
+        benchFilterMem = null;
+        benchFilterMetaMem = null;
+        benchFilterKeysMem = null;
+        benchFilterHitsMem = null;
+        if (benchFilterKernel != null) {
+            clReleaseKernel(benchFilterKernel);
+            benchFilterKernel = null;
+        }
+        benchFilterProbeCount = 0;
+    }
+
     /**
      * Benchmark hook: launches the {@code bench_fe_mul} microbenchmark kernel (see
      * {@code inc_ecc_secp256k1custom.cl}) over {@code globalWorkSize} work-items, each performing

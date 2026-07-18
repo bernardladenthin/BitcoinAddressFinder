@@ -1,0 +1,5 @@
+machine_id,date,gpu,filter,entries,probe_count,ms_per_op,error_ms,probes_per_second,jmh_iterations,notes
+ryzen75800h-63g-win11,2026-07-18,NVIDIA GeForce RTX 3070 Laptop GPU,BINARY_FUSE_8,10000000,4194304,1.773,0.003,2365651438,3,three scattered global reads per probe
+ryzen75800h-63g-win11,2026-07-18,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,10000000,4194304,1.024,0.016,4096000000,3,one coalesced 64-byte transaction per probe
+ryzen75800h-63g-win11,2026-07-18,NVIDIA GeForce RTX 3070 Laptop GPU,BINARY_FUSE_8,100000000,4194304,3.015,0.020,1391145937,3,
+ryzen75800h-63g-win11,2026-07-18,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,100000000,4194304,1.351,0.009,3104592154,3,advantage grows with filter size as it outgrows GPU cache

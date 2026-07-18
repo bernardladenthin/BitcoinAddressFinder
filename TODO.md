@@ -77,20 +77,20 @@ pluggable-persistence design plan:
   same cursor — the latter twice). Re-measure with `FilterMeasurementMain` (see
   `docs/performance.md` §6); the per-10 % progress lines make the curve directly visible.
 
-- **Port the GPU pre-filter to `BLOCKED_BLOOM`** (currently always Binary Fuse 8). Two motivations:
-  (a) a blocked-Bloom probe is **one 64-byte coalesced read** per candidate vs. Fuse-8's three
-  scattered `__global` reads, and (b) blocked Bloom already measures ~17 % faster than Fuse-8 on the
-  CPU at the Full DB tier, where the fuse array (~1.5 GB) is far past any cache. **Note the second
-  motivation originally given here — that Fuse-8 cannot be built at that tier — was refuted:** it
-  builds in 1 564 s on a 61.6 GB host, so the GPU pre-filter *is* available there today with Fuse-8.
-  The port is therefore an optimisation, not an enabler, which lowers its priority. The largest
-  pre-filter at all. The CPU implementation was written byte-exact for this port and the formula is
-  pinned by `BlockedBloomAddressPresenceTest#gpuStyleLookup_agreesWithContainsAddress`. Work needed:
-  new kernel arguments (the signature hard-codes `fuse8_fp` / `fuse8_meta`), host-side VRAM upload,
-  and a `gpuFilterType` config field defaulting to the present Fuse-8 behaviour so existing configs
-  are byte-for-byte unaffected; then an on-hardware A/B against the working Fuse-8 path. Kept
-  deliberately separate from the CPU-backend work so the proven GPU path stayed untouched — see
-  `docs/performance.md` §8 "Candidates for a future stage" for the full design note.
+- **Port the GPU pre-filter to `BLOCKED_BLOOM` — probe measured (1.7-2.2x), integration outstanding.**
+  The device probe `blockedbloom_contains` and the two A/B kernels `benchmarkFilterFuse8` /
+  `benchmarkFilterBlockedBloom` are in `inc_ecc_secp256k1custom.cl`, driven by
+  `GpuFilterProbeBenchmark` through `OpenCLContext.prepareBenchFilterProbe*` (JOCL stays inside the
+  `opencl` package, per the `joclConfinedToOpencl` architecture rule). Measured on an RTX 3070:
+  1.773 -> 1.024 ms at 10 M entries (1.73x) and 3.015 -> 1.351 ms at 100 M (2.23x), the advantage
+  growing with filter size. Far larger than the CPU margin, which is the coalescing argument
+  behaving as expected on hardware with no large cache.
+
+  Still to do for production: new kernel arguments (the signature hard-codes `fuse8_fp` /
+  `fuse8_meta`), host-side VRAM upload of the blocked payload (`BlockedBloomGpuFilterData` exists),
+  and a `gpuFilterType` config field defaulting to Fuse-8 so existing configs are unaffected. Expect
+  a much smaller end-to-end gain than the probe ratio: the probe is a minority of kernel time behind
+  EC generation and hashing.
 
 - **Add open-addressing primitive hash table backend** (fastutil `Long2LongOpenHashMap` or hand-rolled over `long[]`) — would offer O(1) average vs. the sorted array's O(log n) per lookup with similar cache profile. Deferred because `TRUNCATED_LONG_64` is already the fastest backend in practice and the marginal speedup would not change the recommended default.
 

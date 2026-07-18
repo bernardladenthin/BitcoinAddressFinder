@@ -243,6 +243,48 @@ def plot_full_db(build: pd.DataFrame) -> pathlib.Path:
     return out
 
 
+def plot_gpu_probe(gpu: pd.DataFrame) -> pathlib.Path:
+    """GPU filter-probe A/B: throughput per filter and size, grouped by device.
+
+    Plotted as probes/s rather than ms/op so higher is better and devices with different probe
+    counts stay comparable.
+    """
+    fig, ax = plt.subplots(figsize=(9, 4.8), dpi=150)
+    if gpu.empty:
+        ax.text(0.5, 0.5, "no GPU probe measurements yet", ha="center", va="center", fontsize=11)
+        _style(ax, "GPU filter probe", "", "")
+    else:
+        devices = sorted(gpu["gpu"].unique())
+        sizes = sorted(gpu["entries"].unique())
+        def short(device: str) -> str:
+            return device.replace("NVIDIA GeForce ", "").replace("AMD Radeon ", "")
+
+        labels = [f"{short(d)}\n{int(n / 1e6)} M entries" for d in devices for n in sizes]
+        width = 0.36
+        for offset, backend in zip((-width / 2, width / 2), ("BINARY_FUSE_8", "BLOCKED_BLOOM")):
+            values, positions = [], []
+            idx = 0
+            for device in devices:
+                for size in sizes:
+                    row = gpu[(gpu["gpu"] == device) & (gpu["entries"] == size) & (gpu["filter"] == backend)]
+                    values.append(row["probes_per_second"].iloc[0] / 1e9 if not row.empty else 0.0)
+                    positions.append(idx + offset)
+                    idx += 1
+            ax.bar(positions, values, width, label=backend, color=COLOURS[backend])
+            for x, v in zip(positions, values):
+                if v > 0:
+                    ax.text(x, v, f"{v:.2f}", ha="center", va="bottom", fontsize=8)
+        ax.set_xticks(range(len(labels)))
+        ax.set_xticklabels(labels, fontsize=8)
+        _style(ax, "GPU filter probe throughput (higher is better)", "", "G probes/s")
+        ax.legend(fontsize=8, frameon=False)
+    fig.tight_layout()
+    out = PLOTS / "gpu_filter_probe.png"
+    fig.savefig(out)
+    plt.close(fig)
+    return out
+
+
 def twin_axis(ax):
     """Second y-axis sharing the x-axis (kept separate so styling stays in one place)."""
     twin = ax.twinx()
@@ -315,6 +357,7 @@ def main() -> int:
     k_sweep = pd.read_csv(HERE / "k_sweep.csv")
     sizing = pd.read_csv(HERE / "filter_sizing.csv")
     build = pd.read_csv(HERE / "filter_build.csv")
+    gpu = pd.read_csv(HERE / "gpu_filter_probe.csv")
 
     if args.machine_id:
         machines = {k: v for k, v in machines.items() if k == args.machine_id}
@@ -322,6 +365,7 @@ def main() -> int:
         k_sweep = k_sweep[k_sweep["machine_id"] == args.machine_id]
         sizing = sizing[sizing["machine_id"] == args.machine_id]
         build = build[build["machine_id"] == args.machine_id]
+        gpu = gpu[gpu["machine_id"] == args.machine_id]
         if lookup.empty:
             print(f"no rows for machine_id={args.machine_id!r}", file=sys.stderr)
             return 1
@@ -331,6 +375,7 @@ def main() -> int:
         plot_k_sweep(k_sweep),
         plot_sizing(sizing),
         plot_full_db(build),
+        plot_gpu_probe(gpu),
     ):
         print(f"wrote {produced.relative_to(HERE.parent.parent)}")
 

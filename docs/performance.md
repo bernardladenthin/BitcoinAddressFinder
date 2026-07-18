@@ -1445,24 +1445,32 @@ cost balance shifts):
 > ~43% is a target for making *both* chains faster, never for computing only one. (The diagnostic
 > `kernelProfileStage` modes that skip a chain are timing-only and must never be used in production.)
 
-- **GPU-side `BLOCKED_BLOOM` pre-filter (designed, not implemented).** The GPU pre-filter is
-  currently *always* Binary Fuse 8 (`fuse8_contains`, three scattered `__global` reads per candidate).
-  The blocked-Bloom layout is a better fit for a GPU by construction: every one of a key's `k` bit
-  probes is confined to one 512-bit block, i.e. **one 64-byte coalesced transaction per candidate**
-  instead of three scattered reads. It is also the only filter that can be *built* at the ≈ 1 B+ tier
-  (§3), which is exactly the tier where the GPU filter matters most — so today the largest databases
-  cannot use a GPU pre-filter at all. The port is mechanical because the CPU implementation was
-  written byte-exact for it (`BlockedBloomAddressPresenceTest#gpuStyleLookup_agreesWithContainsAddress`
-  pins the formula against an independent re-implementation written the way the kernel must compute
-  it). What it requires, and why it was **not** done alongside the CPU backend: the kernel signature
-  currently hard-codes `fuse8_fp` / `fuse8_meta` parameters, so a second filter type means new kernel
-  arguments plus host-side upload and config plumbing (`gpuFilterType`, defaulting to the present
-  Fuse-8 behaviour so existing configs are untouched), and it must be A/B'd on real hardware against
-  the working Fuse-8 path before it can be trusted. That is a self-contained change with its own
-  validation, deliberately kept out of the CPU-backend work so the proven GPU path stayed untouched.
-  Expected payoff: the transfer saving is unchanged (both filters cut the same readback), the gain
-  would be in filter-probe latency inside the kernel plus, more importantly, **GPU filtering becoming
-  available at the Full DB tier at all**.
+- **GPU-side `BLOCKED_BLOOM` pre-filter — probe measured, integration outstanding.** The device-side
+  probe (`blockedbloom_contains`) and two dedicated A/B kernels (`benchmarkFilterFuse8`,
+  `benchmarkFilterBlockedBloom`) are implemented; the production kernel still uses Fuse-8 only.
+
+  ![GPU filter probe](measurements/plots/gpu_filter_probe.png)
+
+  Measured on an RTX 3070 Laptop (`GpuFilterProbeBenchmark`, 4.19 M probes per launch, all misses):
+
+  | entries | `BINARY_FUSE_8` | `BLOCKED_BLOOM` | ratio |
+  |--:|--:|--:|--:|
+  | 10 M | 1.773 ± 0.003 ms | **1.024 ± 0.016 ms** | **1.73×** |
+  | 100 M | 3.015 ± 0.020 ms | **1.351 ± 0.009 ms** | **2.23×** |
+
+  **The GPU margin is far larger than the CPU one, and it grows with filter size.** On the CPU the
+  blocked layout is worth 13-36 % at best and *loses* below ~15 M entries; here it is 1.7-2.2× ahead
+  and pulling away. That is the coalescing argument showing its full effect: a GPU has no large
+  cache to hide three scattered reads behind, so collapsing them into one 64-byte transaction matters
+  much more than it does on a CPU. The measurement is deliberately isolated in its own kernel —
+  inside `generateKeysKernel_grid` the probe sits behind EC generation and two hash160 chains
+  (~57 %/43 % of kernel time, § 6), which would have masked a factor this size down to a few percent.
+
+  What remains for production use: new kernel arguments (the signature hard-codes `fuse8_fp` /
+  `fuse8_meta`), host-side VRAM upload for the blocked payload, and a `gpuFilterType` config field
+  defaulting to the present Fuse-8 behaviour so existing configs are byte-for-byte unaffected. The
+  end-to-end gain will be much smaller than the probe ratio above, since the probe is a minority of
+  kernel time — that is exactly what the integration then has to measure.
 - **Faster hash160 (both chains kept).** Hashing is ~43% (§6), so SHA-256 / RIPEMD-160
   micro-optimisation, or sharing more work between the uncompressed and compressed chains (they share
   the X coordinate; the compressed SEC prefix transform is already reused via `REUSE_FOR_COMPRESSED`),

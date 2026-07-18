@@ -695,6 +695,93 @@ inline bool fuse8_contains(
     return (uchar)(fp[h0] ^ fp[h1] ^ fp[h2]) == f8;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Blocked Bloom filter probe (byte-exact port of BlockedBloomAddressPresence).
+//
+// Why it exists next to the fuse8 probe: a fuse lookup reads three *scattered* fingerprints, i.e.
+// three uncoalesced global transactions per candidate. This layout confines all k probes of a key
+// to one 512-bit block = 64 bytes = a single coalesced transaction. On the CPU that is worth
+// 13-36% at the billion-entry tier on a 16 MB-L3 host; whether it pays off on a GPU is what the
+// benchmark kernels below exist to answer.
+//
+// Any divergence from the Java implementation produces silent FALSE NEGATIVES (a stored address
+// never flagged), which is the one failure mode this project cannot tolerate. The formula is
+// pinned against Java by BlockedBloomAddressPresenceTest#gpuStyleLookup_agreesWithContainsAddress.
+//
+//   key   = hash160[0..7] big-endian            (same extraction as the fuse filter)
+//   a     = murmur64(key)
+//   b     = murmur64(key + GOLDEN)
+//   block = a >> (64 - log_blocks)
+//   x     = (uint)b
+//   y     = (uint)(b >> 32) | 1                  <-- stride MUST be odd, see below
+//   bit_i = (x + i*y) & 511                      for i in 0..k-1
+//
+// The "| 1" is load-bearing, not cosmetic: the probe walk has period 512/gcd(y,512), so an even
+// stride collapses it. 1 key in 512 would otherwise place every probe on a single bit. Measured
+// on the CPU this cost a factor ~5 in false-positive rate.
+#define BLOCKEDBLOOM_GOLDEN 0x9E3779B97F4A7C15UL
+#define BLOCKEDBLOOM_BLOCK_MASK 511u
+#define BLOCKEDBLOOM_LONGS_PER_BLOCK 8u
+
+// Returns true when the key is POSSIBLY present (no false negatives).
+inline bool blockedbloom_contains(
+    __global const ulong *words, uint log_blocks, uint k, ulong key) {
+    if (log_blocks == 0u || k == 0u) {
+        return false; // empty/degenerate filter never matches
+    }
+    ulong a = fuse8_murmur64(key);
+    ulong b = fuse8_murmur64(key + BLOCKEDBLOOM_GOLDEN);
+    // One coalesced 64-byte region per key: every probe below indexes inside [base, base+8).
+    uint base = ((uint)(a >> (64u - log_blocks))) * BLOCKEDBLOOM_LONGS_PER_BLOCK;
+    uint x = (uint)b;
+    uint y = ((uint)(b >> 32)) | 1u;
+    for (uint i = 0u; i < k; i++) {
+        uint bit = (x + i * y) & BLOCKEDBLOOM_BLOCK_MASK;
+        if ((words[base + (bit >> 6)] & (1UL << (bit & 63u))) == 0UL) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Filter micro-benchmark kernels.
+//
+// Deliberately separate from generateKeysKernel_grid: in the production kernel the filter probe is
+// a small tail behind EC point generation and two hash160 chains (~57%/43% of kernel time per
+// docs/performance.md), so an A/B there would be swamped by work both arms share. These kernels do
+// nothing but probe, over a caller-supplied key array, so the measured difference *is* the filter.
+//
+// Both write a per-work-item 0/1 hit flag rather than using an atomic counter: atomics would
+// serialise on contention and confound the very thing being measured.
+
+__kernel void benchmarkFilterFuse8(
+    __global const uchar *fp,
+    __global const uint *meta,      // [seedLo, seedHi, segLen, segLenMask, segCountLen]
+    __global const ulong *keys,
+    __global uchar *hits,
+    const uint key_count) {
+    uint gid = get_global_id(0);
+    if (gid >= key_count) {
+        return;
+    }
+    ulong seed = ((ulong)meta[1] << 32) | (ulong)meta[0];
+    hits[gid] = fuse8_contains(fp, seed, meta[2], meta[3], meta[4], keys[gid]) ? (uchar)1 : (uchar)0;
+}
+
+__kernel void benchmarkFilterBlockedBloom(
+    __global const ulong *words,
+    __global const uint *meta,      // [logBlocks, k]
+    __global const ulong *keys,
+    __global uchar *hits,
+    const uint key_count) {
+    uint gid = get_global_id(0);
+    if (gid >= key_count) {
+        return;
+    }
+    hits[gid] = blockedbloom_contains(words, meta[0], meta[1], keys[gid]) ? (uchar)1 : (uchar)0;
+}
+
 /**
  * Sub-batch size for Montgomery's simultaneous inversion in the scalar-walker loop.
  *
