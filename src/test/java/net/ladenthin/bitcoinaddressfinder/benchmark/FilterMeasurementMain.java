@@ -47,7 +47,7 @@ import org.bitcoinj.base.Network;
  *        --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED \
  *        -Xmx8g -cp "target/test-classes;target/classes;$(cat target/cp-test.txt)" \
  *        net.ladenthin.bitcoinaddressfinder.benchmark.FilterMeasurementMain \
- *        &lt;lmdbDir&gt; &lt;BACKEND&gt; [probeCount]
+ *        &lt;lmdbDir&gt; &lt;BACKEND&gt; [probeCount] [k] [bitsPerEntry] [noReadAhead]
  * </pre>
  * where {@code BACKEND} is one of {@code BINARY_FUSE_8}, {@code BINARY_FUSE_16},
  * {@code BLOCKED_BLOOM}, {@code TRUNCATED_LONG_64}, {@code HASHSET}. Prints one CSV line to stdout.
@@ -63,7 +63,7 @@ public final class FilterMeasurementMain {
     /**
      * Runs one measurement.
      *
-     * @param args {@code <lmdbDir> <BACKEND> [probeCount]}
+     * @param args {@code <lmdbDir> <BACKEND> [probeCount] [k] [bitsPerEntry] [noReadAhead]}
      * @throws Exception if LMDB cannot be opened
      */
     public static void main(String[] args) throws Exception {
@@ -78,6 +78,8 @@ public final class FilterMeasurementMain {
         // Optional BLOCKED_BLOOM tuning knobs; -1 means "use the class defaults".
         int k = args.length >= 4 ? Integer.parseInt(args[3]) : -1;
         int bitsPerEntry = args.length >= 5 ? Integer.parseInt(args[4]) : -1;
+        // Opt into MDB_NORDAHEAD to A/B the OS read-ahead behaviour on a larger-than-RAM database.
+        boolean noReadAhead = args.length >= 6 && Boolean.parseBoolean(args[5]);
 
         Network network = new NetworkParameterFactory().getNetwork();
         PersistenceUtils persistenceUtils = new PersistenceUtils(network);
@@ -87,12 +89,14 @@ public final class FilterMeasurementMain {
         cfg.useProxyOptimal = true;
         cfg.logStatsOnInit = false;
         cfg.logStatsOnClose = false;
+        cfg.useNoReadAhead = noReadAhead;
 
         LMDBPersistence lmdb = new LMDBPersistence(cfg, persistenceUtils);
         lmdb.init();
         try {
             long count = lmdb.count();
-            log("opened " + lmdbDir + " with " + count + " entries; backend=" + backend);
+            log("opened " + lmdbDir + " with " + count + " entries; backend=" + backend + "; noReadAhead="
+                    + noReadAhead);
 
             // Sample real members (first N addresses) to check the no-false-negative contract later.
             List<byte[]> members = sampleMembers(lmdb, 20_000);
@@ -139,11 +143,12 @@ public final class FilterMeasurementMain {
 
             // Machine-readable CSV line, prefixed so it is greppable in a noisy log.
             System.out.printf(
-                    "RESULT,backend=%s,k=%d,bpe=%d,entries=%d,buildSec=%.2f,retainedMiB=%.1f,bytesPerEntry=%.3f,"
+                    "RESULT,backend=%s,k=%d,bpe=%d,nordahead=%b,entries=%d,buildSec=%.2f,retainedMiB=%.1f,bytesPerEntry=%.3f,"
                             + "lookupsPerSec=%.0f,fpr=%.6f,falseNegatives=%d,probes=%d%n",
                     backend,
                     k,
                     bitsPerEntry,
+                    noReadAhead,
                     count,
                     buildSec,
                     retainedMiB,

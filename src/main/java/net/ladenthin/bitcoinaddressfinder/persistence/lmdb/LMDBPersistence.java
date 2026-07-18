@@ -121,12 +121,19 @@ public class LMDBPersistence implements Persistence, AddressIterable {
         CLMDBConfigurationReadOnly localLmdbConfigurationReadOnly = Objects.requireNonNull(lmdbConfigurationReadOnly);
         BufferProxy<ByteBuffer> bufferProxy =
                 getBufferProxyByUseProxyOptimal(localLmdbConfigurationReadOnly.useProxyOptimal);
+        // MDB_NORDAHEAD is opt-in: it helps when the database exceeds RAM (a key-ordered walk over a
+        // randomly-keyed store is physically scattered, so OS read-ahead fetches pages that are
+        // evicted before use) and hurts when the database fits, where read-ahead is a genuine win.
+        // See CLMDBConfigurationReadOnly#useNoReadAhead for the measured amplification figures.
+        EnvFlags[] envFlags = localLmdbConfigurationReadOnly.useNoReadAhead
+                ? new EnvFlags[] {EnvFlags.MDB_RDONLY_ENV, EnvFlags.MDB_NOLOCK, EnvFlags.MDB_NORDAHEAD}
+                : new EnvFlags[] {EnvFlags.MDB_RDONLY_ENV, EnvFlags.MDB_NOLOCK};
+        if (localLmdbConfigurationReadOnly.useNoReadAhead) {
+            LOGGER.info("Opening LMDB read-only with MDB_NORDAHEAD (OS read-ahead disabled).");
+        }
         env = Env.create(bufferProxy)
                 .setMaxDbs(DB_COUNT)
-                .open(
-                        new File(localLmdbConfigurationReadOnly.lmdbDirectory),
-                        EnvFlags.MDB_RDONLY_ENV,
-                        EnvFlags.MDB_NOLOCK);
+                .open(new File(localLmdbConfigurationReadOnly.lmdbDirectory), envFlags);
         lmdb_h160ToAmount = env.openDbi(DB_NAME_HASH160_TO_COINT);
     }
 

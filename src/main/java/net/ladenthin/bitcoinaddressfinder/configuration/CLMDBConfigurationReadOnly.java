@@ -28,6 +28,28 @@ public class CLMDBConfigurationReadOnly {
     public boolean useProxyOptimal = true;
 
     /**
+     * Whether to open the environment with {@code MDB_NORDAHEAD}, disabling the OS read-ahead the
+     * kernel would otherwise apply to the memory-mapped database file.
+     *
+     * <p><b>Set this when the database is larger than available RAM.</b> The store is written in
+     * random hash160 order, so LMDB B-tree pages that are adjacent in <em>key</em> order are
+     * scattered in <em>file</em> order. A key-ordered cursor walk — which is exactly what every
+     * in-RAM backend performs while populating — therefore jumps across the whole file, and OS
+     * read-ahead drags in neighbouring pages that are evicted again before their turn arrives. Once
+     * RAM is exhausted this degenerates into thrashing: measured while building over the 61&nbsp;GB
+     * / 1.377&nbsp;B-entry database, the NVMe ran 86&nbsp;% busy delivering 332&nbsp;MB/s while only
+     * ~19&nbsp;MB/s of that was useful entry data — roughly <b>17&times; read amplification</b>.
+     *
+     * <p><b>Leave this off when the database fits in RAM.</b> For a store the OS can cache in full
+     * (for example the ~5.8&nbsp;GB light database on a 64&nbsp;GB machine) read-ahead is a genuine
+     * win, and disabling it is a pessimisation. This is why the flag is configurable rather than
+     * always-on.
+     *
+     * <p>Defaults to {@code false}, preserving the previous behaviour exactly.
+     */
+    public boolean useNoReadAhead = false;
+
+    /**
      * Whether to log detailed LMDB statistics when initializing the environment.
      * This causes a full iteration over the database, which can be expensive on large datasets,
      * but also results in the data being fully cached by the OS.

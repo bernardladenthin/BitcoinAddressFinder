@@ -208,6 +208,36 @@ is the only in-front-of-LMDB filter that can be constructed at all. The two were
 each other precisely to decide whether one could be removed — they cannot, their optimal domains are
 disjoint, so `BLOCKED_BLOOM` was added rather than substituted.
 
+##### Lookup latency vs database size — the storage-free sweep
+
+`FilterLookupBenchmark` (JMH) removes LMDB from the comparison entirely: addresses come from a
+seeded PRNG (`PrngAddressIterable`), so there is no page-cache behaviour, no read amplification, and
+no dependence on what the OS happened to have cached — only the filter is measured. It sweeps the
+entry count, which is the axis that decides the ranking. Average ns per `containsAddress` on
+non-member probes:
+
+| Backend             | 100 K | 1 M | 10 M | growth |
+|---------------------|------:|----:|-----:|-------:|
+| `BLOOM` (Guava)     | 113.0 | 125.1 | 171.6 | 1.52× |
+| `HASHSET`           |  56.1 | 103.4 | 222.1 | 3.96× |
+| `TRUNCATED_LONG_64` |  79.1 | 144.7 | **363.0** | **4.59×** |
+| `BINARY_FUSE_8`     | **13.0** | **18.3** | 37.2 | 2.85× |
+| `BINARY_FUSE_16`    |  15.1 |  19.2 |  47.6 | 3.15× |
+| `BLOCKED_BLOOM`     |  23.6 |  31.1 | **36.8** | **1.56×** |
+
+- **Fuse-8 wins below ~10 M entries; `BLOCKED_BLOOM` converges with it there** (36.8 vs 37.2 ns) and
+  owns the flattest curve of any real filter (1.56×), because all `k` probes occupy one 64-byte block
+  — one cache line per lookup at any filter size — against a fuse lookup's three scattered reads.
+  *Caveat:* the Fuse-8 10 M point has a ±50 ns error bar (wider than the score itself), so read this
+  as convergence, not a sharp threshold; re-run that point with more iterations before relying on it.
+- **`BLOOM` is 3–5× slower than any other filter.** Guava hashes the whole 20-byte value with
+  Murmur3-128, scatters `k` probes across the entire bit array, and uses an atomic bit array; our
+  `BloomFilterAccelerator` additionally allocates a `byte[20]` per lookup. Its good scaling (1.52×)
+  reflects that fixed per-call overhead dominates, not efficiency.
+- **`TRUNCATED_LONG_64` scales worst (4.59×)** and is the slowest backend at 10 M. Its binary search
+  costs ~log₂(n/256) dependent cache misses. The "near-`HASHSET` latency" characterisation in older
+  docs is a small-database result and was corrected accordingly.
+
 ##### Cache-hot vs cache-cold — do not extrapolate the JMH microbenchmark
 
 `AddressLookupBenchmark` (2048 entries, everything L1-resident) measures `BLOCKED_BLOOM` at ~30 ns/op

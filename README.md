@@ -281,7 +281,7 @@ Supported values:
 | `LMDB_ONLY`         | minimal (mmap only)     | slowest              | yes              | **default** — exact, no filter, can never produce a false hit; also the simplest base for GPU pre-filtering |
 | `BLOOM`             | ~80 MB – ~1.5 GB (FPP)  | fast for misses      | yes              | when you want to skip LMDB for the common miss case but keep it open to verify hits      |
 | `HASHSET`           | ~80 B / entry           | fast                 | **no**           | small databases where memory is plentiful and exact lookup is required by callers       |
-| `TRUNCATED_LONG_64` | **~8 B / entry**        | **near HASHSET**     | **no**           | best in-RAM trade-off when you *do* want to drop LMDB — near-`HASHSET` latency at ~10× less RAM |
+| `TRUNCATED_LONG_64` | **~8 B / entry**        | fast when small, **degrades with size** | **no**           | best in-RAM trade-off when you *do* want to drop LMDB *and* the database is small; latency scales worse than any other backend (see the size sweep) |
 | `BINARY_FUSE_8`     | **~1.13 B / entry**     | **fast**             | yes              | ultra-low RAM filter in front of LMDB; 0.4% of filter hits are verified against LMDB (also feeds the GPU pre-filter) |
 | `BINARY_FUSE_16`    | **~2.25 B / entry**     | **fast**             | yes              | like Fuse-8 but 0.0015% FPR — fewer LMDB verifications; use when Fuse-8's verification cost is measurable |
 | `BLOCKED_BLOOM`     | **1.56–2.06 B / entry** | **fast**             | yes              | **the largest databases** — the only filter whose *construction* fits commodity RAM (single streaming pass, peak ≈ the filter itself) where Binary Fuse's ~42 GB peeling peak does not |
@@ -457,16 +457,42 @@ The probe sequence is `bit_i = (x + i·y) mod 512`, whose period is `512 / gcd(y
 | `BINARY_FUSE_16`    |   ~23   |
 | `BLOCKED_BLOOM`     |   ~30   |
 
-> **This table is the cache-*hot* regime and does not generalise.** With only 2048 entries every
-> filter fits in L1, so the measurement reduces to instruction count — and `BLOCKED_BLOOM`'s `k = 8`
-> dependent bit-probes lose to Fuse-8's 3 array reads (30 vs 19 ns/op). At real database sizes the
-> ranking nearly closes: on the 132 M-entry Light DB the same two backends measure 11.54 M vs
-> 12.93 M lookups/s (≈ 87 vs 77 ns), because once the filter no longer fits in cache the cost is
-> dominated by *memory* latency, and all 8 blocked-Bloom probes land in a single 64-byte cache line
-> while Fuse-8 makes 3 scattered reads. Size your expectations from the real-database table above,
-> not from this one.
+> **This table is the cache-*hot* regime and does not generalise — see the scale sweep below.**
+> With only 2048 entries every filter fits in L1, so the measurement reduces to instruction count.
+> The ranking changes substantially at real database sizes.
 
-The default backend is `LMDB_ONLY` (no in-RAM structure, exact, can never produce a false hit). When you *do* want to trade RAM for speed, `TRUNCATED_LONG_64` reaches near-`HASHSET` latency at ~10× lower memory cost and is the best in-RAM choice for most cases. `BINARY_FUSE_8` and `BINARY_FUSE_16` offer even lower memory with O(1) lookup (3 direct array reads + 1 hash) but keep LMDB open to verify hits; cache-cold latency grows with filter size, but for small-to-medium databases the three-read pattern typically stays in L2 or L3 cache.
+#### Lookup latency vs database size (`FilterLookupBenchmark`)
+
+The 2048-entry table above measures one point on a curve, and it is the least representative one. `FilterLookupBenchmark` sweeps the entry count instead, and removes LMDB entirely — addresses come from a seeded PRNG (`PrngAddressIterable`), so there is no page-cache behaviour, no read amplification, and no run-to-run variance from what the OS happened to cache. Only the filter is measured. Average ns per `containsAddress` against non-member probes:
+
+| Backend             | 100 K | 1 M | 10 M | growth 100 K→10 M |
+|---------------------|------:|----:|-----:|------------------:|
+| `BLOOM` (Guava)     | 113.0 | 125.1 | 171.6 | 1.52× |
+| `HASHSET`           |  56.1 | 103.4 | 222.1 | 3.96× |
+| `TRUNCATED_LONG_64` |  79.1 | 144.7 | **363.0** | **4.59×** |
+| `BINARY_FUSE_8`     | **13.0** | **18.3** | 37.2 | 2.85× |
+| `BINARY_FUSE_16`    |  15.1 |  19.2 |  47.6 | 3.15× |
+| `BLOCKED_BLOOM`     |  23.6 |  31.1 | **36.8** | **1.56×** |
+
+What this shows, none of which is visible at 2048 entries:
+
+- **The two Binary Fuse filters are the fastest until ~10 M entries**, where `BLOCKED_BLOOM` catches up (36.8 vs 37.2 ns). `BLOCKED_BLOOM` has by far the flattest curve of any real filter (1.56×) because all `k` probes share one 64-byte block — one cache line per lookup regardless of filter size — while a fuse lookup makes three scattered reads. Above ~10 M entries the blocked layout is the better structure. (Caveat: the Fuse-8 10 M point carries a ±50 ns error bar, wider than the score; treat the crossover as "they converge", not a precise threshold.)
+- **`BLOOM` is 3–5× slower than every other filter** and ~8.7× slower than Fuse-8 at 100 K. Guava's `BloomFilter` hashes the full 20-byte array with Murmur3-128, spreads `k` probes over the entire bit array, and stores bits in a lock-free (atomic) array; on top of that our `BloomFilterAccelerator` allocates a fresh `byte[20]` on **every** lookup. It scales well (1.52×) only because that fixed per-call overhead dominates its memory cost. `BLOOM` is retained for compatibility; `BINARY_FUSE_8` supersedes it on every axis.
+- **`TRUNCATED_LONG_64` is the worst scaler in the table** (4.59×) and at 10 M entries is the slowest backend measured — 1.6× slower than `HASHSET`, not "near-`HASHSET`". Its binary search costs ~log₂(n/256) dependent cache misses per query, which is cheap while the buckets sit in cache and expensive once they do not. **The "near-`HASHSET` latency" claim holds only for small databases.**
+
+Run it yourself:
+
+```bash
+# all backends at one size
+java ... org.openjdk.jmh.Main FilterLookupBenchmark -p entries=1000000 -f 1 -wi 3 -i 5
+
+# scale sweep, filters only (HASHSET needs ~80 B/entry, so give it heap or omit it)
+java ... org.openjdk.jmh.Main FilterLookupBenchmark \
+    -p backend=BLOOM,BINARY_FUSE_8,BINARY_FUSE_16,BLOCKED_BLOOM \
+    -p entries=1000000,10000000,50000000 -f 1 -wi 3 -i 5
+```
+
+The default backend is `LMDB_ONLY` (no in-RAM structure, exact, can never produce a false hit). When you *do* want to trade RAM for speed, `TRUNCATED_LONG_64` reaches near-`HASHSET` latency at ~10× lower memory cost **on small databases** — but see the size sweep above: its binary search degrades faster than any other backend, and by 10 M entries it is the slowest option measured. `BINARY_FUSE_8` and `BINARY_FUSE_16` offer even lower memory with O(1) lookup (3 direct array reads + 1 hash) but keep LMDB open to verify hits; cache-cold latency grows with filter size, but for small-to-medium databases the three-read pattern typically stays in L2 or L3 cache.
 
 Run the backend comparison benchmark yourself with:
 

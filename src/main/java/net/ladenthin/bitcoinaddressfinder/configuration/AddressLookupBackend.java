@@ -26,9 +26,12 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
  *       enclosing chain must fall through to the LMDB delegate to disambiguate a
  *       collision but in practice that is expected ~10&#x207B;&#x00b9;&#x00b9; per
  *       query at the project's largest published database size. ~8 B/entry, primitive
- *       {@code long} binary search uses the JDK intrinsic and is typically the fastest
- *       lookup of any backend (~10&#x00d7; more compact than HASHSET at near-HASHSET
- *       latency).</li>
+ *       {@code long} binary search uses the JDK intrinsic and is among the fastest
+ *       lookups on a <em>small</em> database (~10&#x00d7; more compact than HASHSET at
+ *       near-HASHSET latency). Latency degrades with size faster than any other backend,
+ *       however: the search costs ~log&#x2082;(n/256) dependent cache misses, measured at
+ *       79 / 145 / 363 ns for 100&nbsp;K / 1&nbsp;M / 10&nbsp;M entries, by which point it is
+ *       the slowest backend measured. See {@code FilterLookupBenchmark}.</li>
  *   <li>{@link #BINARY_FUSE_8} - Binary Fuse Filter (8-bit fingerprints) in front of LMDB.
  *       ~1.14 B/entry, FPR &#x2248; 0.4&nbsp;%. No false negatives. Like {@link #BLOOM} it is a
  *       decorator: a filter miss is definitive, a filter hit falls through to LMDB to reject
