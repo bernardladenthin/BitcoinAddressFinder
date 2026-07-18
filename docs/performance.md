@@ -271,10 +271,31 @@ overlap at both points, so the fair statement is *blocked Bloom is not faster he
 wins*. Both curves are essentially flat from 500 M to 1 B (39.6 → 39.9 and 42.1 → 42.7), which is
 the expected signature of a fully DRAM-bound regime where neither layout has any cache left to lose.
 
+**The same sweep on the 16 MB host completes the picture — and inverts the answer, as the cache
+story predicts:**
+
+| entries | `BINARY_FUSE_8` | `BLOCKED_BLOOM` | `BINARY_FUSE_16` | `BLOOM` |
+|--:|--:|--:|--:|--:|
+| 500 M | 89.4 ± 3.7 | **57.2 ± 10.1** | 82.0 ± 9.3 | 243.3 ± 21.8 |
+| 1 B | 91.7 ± 14.2 | **79.8 ± 9.5** | 88.8 ± 7.2 | 293.1 ± 18.6 |
+
+Blocked Bloom leads by 36 % at 500 M and 13 % at 1 B here, against Fuse-8 leading by ~6 % on the
+96 MB host — so the backend ranking at the Full DB tier genuinely flips with cache size, and the
+claim that it does is now measured on both hosts rather than inferred from 100 M. The magnitude of
+the cache effect is worth stating plainly: **the identical Fuse-8 array costs 91.7 ns on 16 MB of L3
+and 39.9 ns on 96 MB — 2.3× from cache alone**, on otherwise comparable 8C/16T parts.
+
+**One methodological result deserves recording: the single-shot loop reported the opposite winner on
+_both_ hosts.** It claimed blocked Bloom +17 % where the warmed instrument finds Fuse-8 ahead, and
+Fuse-8 +26 % where the warmed instrument finds blocked Bloom ahead. Two independent inversions is a
+systematic artefact rather than noise, so **`filter_build.csv`'s `lookups_per_sec` column must not be
+used to compare backends** — only its build-time, size and FPR columns are trustworthy. The column is
+retained for provenance, not for conclusions.
+
 **Consequence: at the ≈ 1 B+ tier on a large-cache host, the `BLOCKED_BLOOM` recommendation rests on
 build time alone** — 1.8–2.0× faster to construct, reproduced on both machines — and not on lookup
 speed, which is a wash or slightly against it. On the 16 MB host the cache argument still applies and
-blocked Bloom wins on both counts. Pick `BINARY_FUSE_8` for light/medium databases (lower RAM,
+blocked Bloom wins on both counts — now measured at 500 M and 1 B, not extrapolated. Pick `BINARY_FUSE_8` for light/medium databases (lower RAM,
 marginally faster, and it feeds the GPU pre-filter); pick `BLOCKED_BLOOM` at the ≈ 1 B+ tier for the
 build, or when the smaller L3 makes it faster too. If footprint or FPR outweighs build time, Fuse-8
 is a legitimate Full DB choice given enough heap.
@@ -340,14 +361,14 @@ non-member probes:
 
 **ryzen75800h-63g-win11**
 
-| Backend | 100 K | 1 M | 10 M | 50 M | 100 M |
-|---|--:|--:|--:|--:|--:|
-| `BINARY_FUSE_8` | 13.1 | 18.5 | 22.4 | 52.1 | 59.6 |
-| `BINARY_FUSE_16` | 15.1 | 19.2 | 34.4 | 60.9 | 63.5 |
-| `BLOCKED_BLOOM` | 23.9 | 31.2 | 38.0 | 40.5 | 45.5 |
-| `HASHSET` | 52.1 | 92.9 | 145.1 | — | — |
-| `BLOOM` | 85.4 | 98.9 | 114.1 | 203.2 | 203.8 |
-| `TRUNCATED_LONG_64` | 80.1 | 145.4 | 348.6 | 533.3 | 612.2 |
+| Backend | 100 K | 1 M | 10 M | 50 M | 100 M | 500 M | 1000 M |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| `BINARY_FUSE_8` | 13.1 | 18.5 | 22.4 | 52.1 | 59.6 | 89.4 | 91.7 |
+| `BINARY_FUSE_16` | 15.1 | 19.2 | 34.4 | 60.9 | 63.5 | 82.0 | 88.8 |
+| `BLOCKED_BLOOM` | 23.9 | 31.2 | 38.0 | 40.5 | 45.5 | 57.2 | 79.8 |
+| `HASHSET` | 52.1 | 92.9 | 145.1 | — | — | — | — |
+| `BLOOM` | 85.4 | 98.9 | 114.1 | 203.2 | 203.8 | 243.3 | 293.1 |
+| `TRUNCATED_LONG_64` | 80.1 | 145.4 | 348.6 | 533.3 | 612.2 | — | — |
 
 **ryzen79800x3d8core-61g-win11**
 

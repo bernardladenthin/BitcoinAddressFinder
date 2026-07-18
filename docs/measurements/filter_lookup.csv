@@ -65,3 +65,11 @@ ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,500000000,43.090,5.568,4,
 ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,1000000000,40.819,1.353,4,prng,
 ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,500000000,42.149,1.525,4,prng,nominally behind BINARY_FUSE_8 but the intervals overlap
 ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,1000000000,42.705,1.741,4,prng,contradicts the single-shot FilterMeasurementMain reading of BLOCKED_BLOOM +17% on this host
+ryzen75800h-63g-win11,2026-07-18,BLOOM,500000000,243.325,21.847,4,prng,
+ryzen75800h-63g-win11,2026-07-18,BLOOM,1000000000,293.073,18.637,4,prng,
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_8,500000000,89.376,3.739,4,prng,~2.3x slower than the 96 MB-L3 host at the same size - cache alone
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_8,1000000000,91.701,14.226,4,prng,flat 500M->1B; fully DRAM-bound
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_16,500000000,81.986,9.327,4,prng,
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_16,1000000000,88.826,7.239,4,prng,
+ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,500000000,57.241,10.056,4,prng,36% ahead of BINARY_FUSE_8 on 16 MB L3 - opposite of the 96 MB-L3 host
+ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,1000000000,79.844,9.517,4,prng,still ahead at 1B (13%) but the margin narrows and error bars widen

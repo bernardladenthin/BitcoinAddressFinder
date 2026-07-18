@@ -410,7 +410,16 @@ Same harness, same machine (64 GB RAM), against the 61 GB / 1,377,478,516-entry 
 
   **Blocked Bloom builds ~1.8–2.0× faster on both machines** — that is the reproducible result, and it is what the recommendation rests on. Fuse-8 is 27 % smaller with a ~19 % better FPR, both bit-identical across hosts.
 
-  **The lookup row contradicts itself between machines** (Fuse-8 +26 % on one, blocked Bloom +17 % on the other) and also contradicts this project's own JMH sweep on the same host. At 1.5–2 GB neither filter fits any cache, so no cache argument explains the flip. These figures come from a single-shot probe loop run right after a multi-GB build; treat them as unresolved rather than as a ranking. See [`docs/performance.md`](docs/performance.md) for the full analysis.
+  **The lookup row above is an artefact — do not use it.** It comes from a single-shot probe loop run right after a multi-GB build, and re-measuring with the warmed, storage-free JMH instrument inverts the answer on *both* machines. Measured ns/op at 1 B entries:
+
+  | | `BINARY_FUSE_8` | `BLOCKED_BLOOM` |
+  |---|--:|--:|
+  | 16 MB L3 host | 91.7 | **79.8** |
+  | 96 MB L3 host | **39.9** | 42.7 |
+
+  So the ranking flips with cache size: blocked Bloom leads by 13–36 % where L3 is modest, Fuse-8 by ~6 % (intervals overlapping) where it is large. Note the same Fuse-8 array costs 91.7 vs 39.9 ns on the two hosts — **2.3× from cache alone**. Full analysis in [`docs/performance.md`](docs/performance.md).
+
+  **Recommendation:** `BLOCKED_BLOOM` by default at this tier — it builds ~1.8–2.0× faster on both machines, the one result that reproduces everywhere, and queries faster wherever L3 is modest. `BINARY_FUSE_8` is the better pick on a large-cache host when footprint or FPR matters, being 27 % smaller with a 19 % better FPR.
 
 **Build time is dominated by LMDB I/O, not by the filter**, and the lever is **free RAM**. The database is written in random hash160 order, so a key-ordered cursor walk is physically scattered across the 61 GB file; with headroom the pages accumulate, without it they are evicted before reuse and re-read. Measured mid-build under memory pressure: the NVMe ran 86 % busy at 332 MB/s while yielding only ~19 MB/s of useful entry data — roughly **17× read amplification**. The same build took **1,869 s with ~2 GB free** but **1,043 s starting from an emptied cache with 58 GB free** — nearly 2× faster from the *colder* start.
 
