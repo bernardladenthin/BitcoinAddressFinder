@@ -1473,6 +1473,25 @@ cost balance shifts):
   size; on a large-cache GPU the two effects compete. Same mechanism as the CPU crossover, one level
   down the hierarchy.
 
+  > **Caveat: that 100 M filter is ~2× oversized, and the rounding is ours.** `chooseLogBlocks`
+  > rounds the block count *up to a power of two* so the block index can be a shift, so a requested
+  > 11 bits/entry becomes whatever the next power of two yields:
+  >
+  > | entries | blocked Bloom | effective bits/entry | vs requested | Fuse-8 |
+  > |--:|--:|--:|--:|--:|
+  > | 10 M | 16 MB | 13.42 | 1.22× | 11 MB |
+  > | 100 M | **256 MB** | **21.47** | **1.95×** | 109 MB |
+  >
+  > At 100 M the filter is nearly double the size it was asked for — precisely the condition behind
+  > "it spills harder" above. Sized correctly it would be ~131 MB, close to Fuse-8's 109 MB rather
+  > than 2.3× larger, so **the 1.13× measured there is partly a measurement of this rounding rather
+  > than of the blocked layout.** The 10 M point is only 1.22× oversized and shows a healthier 1.60×,
+  > which fits that reading. The fix is cheap and known — `block = mulhi(hash, numBlocks)` (Lemire's
+  > fastrange) admits any block count, and both sides already use that primitive for the fuse base
+  > position — but it changes the filter geometry and so invalidates every size and FPR figure
+  > recorded so far. See `TODO.md`; this is the weakest point on the board and the likeliest to
+  > improve.
+
   Either way the GPU margin exceeds the CPU one, where the blocked layout is worth 13-36 % at best
   and *loses* below ~15 M entries. The measurement is deliberately isolated in its own kernel —
   inside `generateKeysKernel_grid` the probe sits behind EC generation and two hash160 chains

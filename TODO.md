@@ -77,6 +77,20 @@ pluggable-persistence design plan:
   same cursor — the latter twice). Re-measure with `FilterMeasurementMain` (see
   `docs/performance.md` §6); the per-10 % progress lines make the curve directly visible.
 
+- **Size blocked Bloom with a multiply-shift instead of power-of-two block counts.**
+  `chooseLogBlocks` rounds the block count up to a power of two so the block index is a shift. The
+  cost is up to 2x wasted memory at unlucky entry counts: at 100 M a requested 11 bits/entry becomes
+  21.47 (256 MB instead of ~131 MB); at 10 M it becomes 13.42 (1.22x). That waste is not academic --
+  it is the most likely cause of the weakest GPU result measured (RDNA3 at 100 M, only 1.13x over
+  Fuse-8, where a 256 MB filter spills a 96 MB Infinity Cache that a correctly sized ~131 MB one
+  largely would not).
+
+  Fix: `block = mulhi(hash, numBlocks)` (Lemire's fastrange), which admits any block count. Both
+  sides already use that primitive for the fuse base position (`Math.unsignedMultiplyHigh` /
+  `mul_hi`), so the change itself is small. It alters the filter geometry, so it invalidates every
+  recorded size and FPR figure and requires re-running the k-sweep, the sizing sweep and the GPU A/B.
+  Highest-value remaining change: it improves RAM, CPU cache behaviour and the GPU spill case at once.
+
 - **Port the GPU pre-filter to `BLOCKED_BLOOM` — probe measured (1.7-2.2x), integration outstanding.**
   The device probe `blockedbloom_contains` and the two A/B kernels `benchmarkFilterFuse8` /
   `benchmarkFilterBlockedBloom` are in `inc_ecc_secp256k1custom.cl`, driven by
