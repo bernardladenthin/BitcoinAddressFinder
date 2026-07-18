@@ -55,6 +55,7 @@
       "lmdbConfigurationReadOnly": {
         "lmdbDirectory": "lmdb",
         "useProxyOptimal": true,
+        "useNoReadAhead": false,
         "logStatsOnInit": true,
         "logStatsOnClose": false
       },
