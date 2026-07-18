@@ -56,12 +56,11 @@ class BloomFilterAcceleratorTest {
         return b;
     }
 
-    private static BloomFilter<byte[]> bloomWith(int... values) {
-        BloomFilter<byte[]> bloom = BloomFilter.create(Funnels.byteArrayFunnel(), Math.max(values.length, 1), 0.01);
+    private static BloomFilter<Long> bloomWith(int... values) {
+        BloomFilter<Long> bloom = BloomFilter.create(Funnels.longFunnel(), Math.max(values.length, 1), 0.01);
         for (int v : values) {
-            byte[] bytes = new byte[20];
-            ByteBuffer.wrap(bytes).putInt(0, v);
-            bloom.put(bytes);
+            ByteBuffer b = hash(v);
+            bloom.put(b.getLong(b.position()));
         }
         return bloom;
     }
@@ -69,7 +68,7 @@ class BloomFilterAcceleratorTest {
     @Test
     void containsAddress_bloomSaysAbsent_returnsFalseAndDoesNotCallDelegate() {
         RecordingLookup delegate = new RecordingLookup();
-        BloomFilter<byte[]> bloom = bloomWith(42, 43);
+        BloomFilter<Long> bloom = bloomWith(42, 43);
         BloomFilterAccelerator accelerator = new BloomFilterAccelerator(bloom, delegate);
 
         boolean result = accelerator.containsAddress(hash(999));
@@ -82,7 +81,7 @@ class BloomFilterAcceleratorTest {
     void containsAddress_bloomSaysMaybe_delegatesToBackend_andReturnsBackendAnswer() {
         RecordingLookup delegate = new RecordingLookup();
         delegate.contains.add(hash(42));
-        BloomFilter<byte[]> bloom = bloomWith(42);
+        BloomFilter<Long> bloom = bloomWith(42);
         BloomFilterAccelerator accelerator = new BloomFilterAccelerator(bloom, delegate);
 
         boolean result = accelerator.containsAddress(hash(42));
@@ -96,7 +95,7 @@ class BloomFilterAcceleratorTest {
         // A Bloom-filter false positive: the bloom contains the value, but the backend does not.
         RecordingLookup delegate = new RecordingLookup();
         // delegate.contains intentionally empty
-        BloomFilter<byte[]> bloom = bloomWith(42);
+        BloomFilter<Long> bloom = bloomWith(42);
         BloomFilterAccelerator accelerator = new BloomFilterAccelerator(bloom, delegate);
 
         boolean result = accelerator.containsAddress(hash(42));
@@ -113,7 +112,7 @@ class BloomFilterAcceleratorTest {
         // The accelerator drains the input ByteBuffer to extract bytes for Bloom;
         // it must rewind so the same buffer is reusable by the caller.
         RecordingLookup delegate = new RecordingLookup();
-        BloomFilter<byte[]> bloom = bloomWith();
+        BloomFilter<Long> bloom = bloomWith();
         BloomFilterAccelerator accelerator = new BloomFilterAccelerator(bloom, delegate);
 
         ByteBuffer buf = hash(7);
@@ -175,7 +174,7 @@ class BloomFilterAcceleratorTest {
         // Bloom filters carry no value information, so getAmount must always consult the delegate.
         RecordingLookup delegate = new RecordingLookup();
         delegate.amounts.put(hash(42), Coin.valueOf(12345));
-        BloomFilter<byte[]> bloom = bloomWith();
+        BloomFilter<Long> bloom = bloomWith();
         BloomFilterAccelerator accelerator = new BloomFilterAccelerator(bloom, delegate);
 
         Coin amount = accelerator.getAmount(hash(42));

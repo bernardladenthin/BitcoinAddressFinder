@@ -484,7 +484,17 @@ The 2048-entry table above measures one point on a curve, and it is the least re
 What this shows, none of which is visible at 2048 entries:
 
 - **The two Binary Fuse filters are the fastest until ~10 M entries**, where `BLOCKED_BLOOM` catches up (36.8 vs 37.2 ns). `BLOCKED_BLOOM` has by far the flattest curve of any real filter (1.56×) because all `k` probes share one 64-byte block — one cache line per lookup regardless of filter size — while a fuse lookup makes three scattered reads. Above ~10 M entries the blocked layout is the better structure. (Caveat: the Fuse-8 10 M point carries a ±50 ns error bar, wider than the score; treat the crossover as "they converge", not a precise threshold.)
-- **`BLOOM` is 3–5× slower than every other filter** and ~8.7× slower than Fuse-8 at 100 K. Guava's `BloomFilter` hashes the full 20-byte array with Murmur3-128, spreads `k` probes over the entire bit array, and stores bits in a lock-free (atomic) array; on top of that our `BloomFilterAccelerator` allocates a fresh `byte[20]` on **every** lookup. It scales well (1.52×) only because that fixed per-call overhead dominates its memory cost. `BLOOM` is retained for compatibility; `BINARY_FUSE_8` supersedes it on every axis.
+- **`BLOOM` is the slowest filter** — ~6.5× slower than Fuse-8 even after tuning. The table above predates that tuning; `BLOOM` now measures ~85 ns at 100 K (was 113 ns). What was investigated, in order:
+
+  | change | 100 K | allocation |
+  |---|--:|--:|
+  | original (hash 20 bytes, `new byte[20]` per lookup) | 113.0 ns | 176 B/op |
+  | reuse the array instead of allocating | 113.9 ns | 176 B/op |
+  | **key on the first 8 bytes (`longFunnel`)** | **85.4 ns** | 200 B/op |
+
+  The intuitive fix — removing the per-lookup `byte[20]` — **changed nothing measurable**. The allocation was never the bottleneck: Guava allocates a `Hasher` internally on every `mightContain` call (the 176 B/op, unchanged across all three variants), which dominates our 20 bytes. Hashing *work* was the real cost, so keying on 8 bytes instead of 20 bought ~22 % — while *increasing* allocation to 200 B/op through boxing, which makes the point twice over.
+
+  What remains is structural in Guava and cannot be fixed from our side: `k` probes scattered across the entire bit array (k cache misses instead of one), and bits stored in a lock-free atomic array. `BLOOM` is retained for existing configurations; `BINARY_FUSE_8` supersedes it on every axis.
 - **`TRUNCATED_LONG_64` is the worst scaler in the table** (4.59×) and at 10 M entries is the slowest backend measured — 1.6× slower than `HASHSET`, not "near-`HASHSET`". Its binary search costs ~log₂(n/256) dependent cache misses per query, which is cheap while the buckets sit in cache and expensive once they do not. **The "near-`HASHSET` latency" claim holds only for small databases.**
 
 Run it yourself:
