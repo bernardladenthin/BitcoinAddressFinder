@@ -109,6 +109,26 @@ public class FilterLookupBenchmark {
     @Param({"100000", "1000000", "10000000"})
     public long entries;
 
+    /**
+     * Blocked Bloom bits per entry; {@code -1} uses the class default.
+     *
+     * <p>Exposed because the density is the dominant lever for this backend and it is not a free
+     * choice: a sparser filter answers a miss sooner (the probe loop short-circuits at the first
+     * unset bit) while a denser one uses less memory and moves fewer bytes on a GPU. Ignored by
+     * every other backend.
+     */
+    @Param({"-1"})
+    public int bitsPerEntry;
+
+    /**
+     * Blocked Bloom bits probed per key; {@code -1} uses the class default.
+     *
+     * <p>Coupled to {@link #bitsPerEntry} by the measured rule {@code k ≈ 0.55 × bitsPerEntry};
+     * sweeping one without the other measures the mismatch rather than the geometry.
+     */
+    @Param({"-1"})
+    public int k;
+
     private AddressPresence lookup;
     private byte[][] probes;
     private ByteBuffer reusedKeyBuffer;
@@ -151,7 +171,10 @@ public class FilterLookupBenchmark {
             case "TRUNCATED_LONG_64" -> TruncatedLong64SortedArrayPresence.populateFrom(source);
             case "BINARY_FUSE_8" -> BinaryFuse8AddressPresence.populateFrom(source);
             case "BINARY_FUSE_16" -> BinaryFuse16AddressPresence.populateFrom(source);
-            case "BLOCKED_BLOOM" -> BlockedBloomAddressPresence.populateFrom(source);
+            case "BLOCKED_BLOOM" ->
+                bitsPerEntry > 0 && k > 0
+                        ? BlockedBloomAddressPresence.populateFrom(source, k, bitsPerEntry)
+                        : BlockedBloomAddressPresence.populateFrom(source);
             default -> throw new IllegalArgumentException("unknown backend: " + backend);
         };
 

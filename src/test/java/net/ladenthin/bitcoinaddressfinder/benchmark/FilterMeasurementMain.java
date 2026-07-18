@@ -55,7 +55,9 @@ import org.bitcoinj.base.Network;
  *        &lt;lmdbDir&gt; &lt;BACKEND&gt; [probeCount] [k] [bitsPerEntry] [noReadAhead]
  * </pre>
  * where {@code BACKEND} is one of {@code BINARY_FUSE_8}, {@code BINARY_FUSE_16},
- * {@code BLOCKED_BLOOM}, {@code TRUNCATED_LONG_64}, {@code HASHSET}. Prints one CSV line to stdout.
+ * {@code BLOCKED_BLOOM}, {@code TRUNCATED_LONG_64}, {@code HASHSET}, or {@code LMDB_ONLY} to measure
+ * the exact-lookup cost itself (no filter is built; the LMDB store answers directly). Prints one CSV
+ * line to stdout.
  */
 public final class FilterMeasurementMain {
 
@@ -120,7 +122,10 @@ public final class FilterMeasurementMain {
 
             long usedBefore = usedHeapAfterGc();
             long t0 = System.nanoTime();
-            AddressPresence filter = build(backend, lmdb, k, bitsPerEntry);
+            // LMDB_ONLY measures the exact-verification cost every probabilistic backend pays on a
+            // filter hit. Both density models in docs/performance.md assume that figure rather than
+            // measuring it, and it decides whether 11 or 17 bits/entry is the better default.
+            AddressPresence filter = "LMDB_ONLY".equals(backend) ? lmdb : build(backend, lmdb, k, bitsPerEntry);
             long buildNanos = System.nanoTime() - t0;
             long usedAfter = usedHeapAfterGc();
             long retainedBytes = Math.max(0, usedAfter - usedBefore);

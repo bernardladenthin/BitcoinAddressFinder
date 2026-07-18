@@ -101,6 +101,14 @@ public class GpuFilterProbeBenchmark {
     @Param({"4194304"})
     public int probeCount;
 
+    /** Blocked Bloom bits per entry; {@code -1} uses the class default. Ignored by {@code FUSE8}. */
+    @Param({"-1"})
+    public int bitsPerEntry;
+
+    /** Blocked Bloom bits probed per key; {@code -1} uses the class default. Ignored by {@code FUSE8}. */
+    @Param({"-1"})
+    public int k;
+
     private OpenCLContext context;
 
     /** Creates a new benchmark instance (no-arg constructor for JMH). */
@@ -145,8 +153,10 @@ public class GpuFilterProbeBenchmark {
                 context.prepareBenchFilterProbeFuse8(data.fingerprints(), meta, probeKeys);
             }
             case "BLOCKED_BLOOM" -> {
-                BlockedBloomGpuFilterData data =
-                        BlockedBloomAddressPresence.populateFrom(source).toGpuFilterData();
+                BlockedBloomGpuFilterData data = (bitsPerEntry > 0 && k > 0
+                                ? BlockedBloomAddressPresence.populateFrom(source, k, bitsPerEntry)
+                                : BlockedBloomAddressPresence.populateFrom(source))
+                        .toGpuFilterData();
                 context.prepareBenchFilterProbeBlockedBloom(data.words(), data.toMetadata(), probeKeys);
             }
             default -> throw new IllegalArgumentException("unknown filter: " + filter);
