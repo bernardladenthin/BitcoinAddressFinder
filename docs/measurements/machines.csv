@@ -1,2 +1,0 @@
-pc_id,cpu,cores_physical,cores_logical,l3_mb,ram_gb,gpu,storage,os,jdk,notes
-ryzen5800h-64g-win11,AMD Ryzen 7 5800H,8,16,16,63.3,NVIDIA RTX 3070 Laptop,Samsung 990 PRO 4TB NVMe,Windows 11 Pro 10.0.26200,21.0.9,Reference machine for all 2026-07 filter measurements

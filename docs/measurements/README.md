@@ -22,7 +22,8 @@ That regenerates `plots/*.png` and the generated tables in one step.
 
 | File | Contents |
 |---|---|
-| `machines.csv` | One row per machine, keyed by `pc_id`. Every measurement row references it. |
+| `machines.json` | Machine registry keyed by `machine_id`, written by `register_machine.py`. Every measurement row references it. |
+| `register_machine.py` | Detects this machine's CPU/L3/RAM/GPU/OS/JDK and registers it. Run once per machine. |
 | `filter_lookup.csv` | Lookup latency (ns/op) per backend and entry count — `FilterLookupBenchmark`. |
 | `filter_build.csv` | Build time, retained memory, FPR against **real** LMDB databases — `FilterMeasurementMain`. |
 | `k_sweep.csv` | Blocked Bloom false-positive rate vs `k`, per bit density. |
@@ -36,13 +37,22 @@ Results are hardware-dependent — most of all the lookup-latency curves, whose 
 array outgrows L3, so a machine with a different cache will place it elsewhere. That is exactly why
 measurements are keyed by machine rather than averaged.
 
-1. **Register the machine.** Append a row to `machines.csv` with a new `pc_id`. Use something stable
-   and descriptive, e.g. `ryzen5800h-64g-win11`. Fill in at least `l3_mb` and `ram_gb` — the plots
-   annotate the L3 boundary from it.
+1. **Register the machine.** This detects the hardware and writes `machines.json` for you — no
+   hand-editing:
 
+   ```bash
+   python docs/measurements/register_machine.py --set storage="<your disk>"
+   python docs/measurements/register_machine.py --dry-run          # preview only
+   python docs/measurements/register_machine.py --id my-own-name   # override the generated id
    ```
-   pc_id,cpu,cores_physical,cores_logical,l3_mb,ram_gb,gpu,storage,os,jdk,notes
-   ```
+
+   It prints the `machine_id` to use in every measurement row (e.g. `ryzen75800h-63g-win11`) and is
+   idempotent — re-running updates the same entry instead of duplicating it. Anything it cannot
+   detect stays `null` and can be filled in with `--set`, including nested fields
+   (`--set cpu.l3_mb=32`).
+
+   **Check `l3_mb`.** If detection failed there, set it manually: the lookup-latency plot annotates
+   the L3 boundary from this value, and the whole crossover story is expressed in terms of it.
 
 2. **Materialise the classpath** (once):
 
@@ -90,7 +100,7 @@ measurements are keyed by machine rather than averaged.
        /path/to/lmdb BLOCKED_BLOOM 5000000
    ```
 
-4. **Append the rows** to the matching CSV with your `pc_id`, then re-run `plot.py`. Plots draw one
+4. **Append the rows** to the matching CSV with your `machine_id`, then re-run `plot.py`. Plots draw one
    line per machine, so several machines can coexist in one figure.
 
 ## Measurement hygiene

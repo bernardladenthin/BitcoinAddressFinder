@@ -1,5 +1,5 @@
-pc_id,date,entries,source,bits_per_entry_config,bits_per_entry_effective,k,retained_mib,bytes_per_entry,fpr,lookups_per_sec,notes
-ryzen5800h-64g-win11,2026-07-18,132288304,lmdb_light,4,4.06,8,67.8,0.537,0.308223,7308166,saturated: dense filter runs more probes before answering no
-ryzen5800h-64g-win11,2026-07-18,132288304,lmdb_light,8,8.12,8,131.8,1.045,0.029365,8821393,
-ryzen5800h-64g-win11,2026-07-18,132288304,lmdb_light,11,16.24,8,259.8,2.059,0.001838,9848272,shipped default
-ryzen5800h-64g-win11,2026-07-18,132288304,lmdb_light,17,32.50,8,515.8,4.089,0.000392,12004332,sparser filter is faster: earlier short-circuit
+machine_id,date,entries,source,bits_per_entry_config,bits_per_entry_effective,k,retained_mib,bytes_per_entry,fpr,lookups_per_sec,notes
+ryzen75800h-63g-win11,2026-07-18,132288304,lmdb_light,4,4.06,8,67.8,0.537,0.308223,7308166,saturated: dense filter runs more probes before answering no
+ryzen75800h-63g-win11,2026-07-18,132288304,lmdb_light,8,8.12,8,131.8,1.045,0.029365,8821393,
+ryzen75800h-63g-win11,2026-07-18,132288304,lmdb_light,11,16.24,8,259.8,2.059,0.001838,9848272,shipped default
+ryzen75800h-63g-win11,2026-07-18,132288304,lmdb_light,17,32.50,8,515.8,4.089,0.000392,12004332,sparser filter is faster: earlier short-circuit

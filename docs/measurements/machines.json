@@ -1,0 +1,23 @@
+{
+  "machines": {
+    "ryzen75800h-63g-win11": {
+      "cpu": {
+        "cores_logical": 16,
+        "cores_physical": 8,
+        "l3_mb": 16,
+        "model": "AMD Ryzen 7 5800H with Radeon Graphics"
+      },
+      "gpu": "NVIDIA GeForce RTX 3070 Laptop GPU",
+      "jdk": "21.0.9",
+      "notes": "Reference machine for the 2026-07 filter measurements",
+      "os": {
+        "name": "Microsoft Windows 11 Pro",
+        "version": "10.0.26200"
+      },
+      "ram_gb": 63.3,
+      "registered": "2026-07-18",
+      "storage": "Samsung 990 PRO 4TB NVMe",
+      "updated": "2026-07-18"
+    }
+  }
+}

@@ -1,8 +1,8 @@
-pc_id,date,backend,entries,source,build_seconds,retained_mib,bytes_per_entry,lookups_per_sec,fpr,false_negatives,probes,free_ram_gb_at_start,notes
-ryzen5800h-64g-win11,2026-07-18,BLOCKED_BLOOM,132288304,lmdb_light,43.27,259.8,2.059,9848272,0.001838,0,5000000,,k=8 bpe=11 -> 16.24 bits/entry
-ryzen5800h-64g-win11,2026-07-18,BINARY_FUSE_8,132288304,lmdb_light,68.84,143.4,1.137,12932318,0.003900,0,5000000,,
-ryzen5800h-64g-win11,2026-07-18,BINARY_FUSE_16,132288304,lmdb_light,70.60,287.4,2.278,12302683,0.000020,0,5000000,,
-ryzen5800h-64g-win11,2026-07-18,TRUNCATED_LONG_64,132288304,lmdb_light,41.90,1082.2,8.578,1522736,0.000000,0,5000000,,
-ryzen5800h-64g-win11,2026-07-18,BLOCKED_BLOOM,1377478516,lmdb_full,1869.74,2051.8,1.562,9531275,0.004849,0,5000000,2,RAM contended after 12 GB JMH heap; I/O bound
-ryzen5800h-64g-win11,2026-07-18,BLOCKED_BLOOM,1377478516,lmdb_full,1042.83,2052.1,1.562,9168029,0.004847,0,2000000,35.4,cold cache but ample headroom
-ryzen5800h-64g-win11,2026-07-18,BLOCKED_BLOOM,1377478516,lmdb_full,965.84,2052.1,1.562,9350011,0.004847,0,2000000,28.7,MDB_NORDAHEAD set but no-op on Windows; difference is run-to-run variance
+machine_id,date,backend,entries,source,build_seconds,retained_mib,bytes_per_entry,lookups_per_sec,fpr,false_negatives,probes,free_ram_gb_at_start,notes
+ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,132288304,lmdb_light,43.27,259.8,2.059,9848272,0.001838,0,5000000,,k=8 bpe=11 -> 16.24 bits/entry
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_8,132288304,lmdb_light,68.84,143.4,1.137,12932318,0.003900,0,5000000,,
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_16,132288304,lmdb_light,70.60,287.4,2.278,12302683,0.000020,0,5000000,,
+ryzen75800h-63g-win11,2026-07-18,TRUNCATED_LONG_64,132288304,lmdb_light,41.90,1082.2,8.578,1522736,0.000000,0,5000000,,
+ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,1377478516,lmdb_full,1869.74,2051.8,1.562,9531275,0.004849,0,5000000,2,RAM contended after 12 GB JMH heap; I/O bound
+ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,1377478516,lmdb_full,1042.83,2052.1,1.562,9168029,0.004847,0,2000000,35.4,cold cache but ample headroom
+ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,1377478516,lmdb_full,965.84,2052.1,1.562,9350011,0.004847,0,2000000,28.7,MDB_NORDAHEAD set but no-op on Windows; difference is run-to-run variance

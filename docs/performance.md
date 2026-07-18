@@ -845,9 +845,10 @@ OpenCL 2.0+ device is present.
 
 Every number in this section comes from CSVs under [`measurements/`](measurements/), which are the
 single source of truth: the plots and the tables marked `GENERATED` are both produced from them by
-`python docs/measurements/plot.py`. Each row carries a `pc_id` referencing
-[`measurements/machines.csv`](measurements/machines.csv), so results from different hardware can be
-added and compared without touching prose — see [`measurements/README.md`](measurements/README.md).
+`python docs/measurements/plot.py`. Each row carries a `machine_id` referencing
+[`measurements/machines.json`](measurements/machines.json) — written by `register_machine.py`, which
+detects the hardware itself — so results from different machines can be added and compared without
+touching prose — see [`measurements/README.md`](measurements/README.md).
 
 #### Filter build/lookup against a *real* database — `FilterMeasurementMain`
 

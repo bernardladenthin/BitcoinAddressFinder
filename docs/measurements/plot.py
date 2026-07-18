@@ -12,16 +12,17 @@ those markers; edit the CSV and re-run this script.
 Usage::
 
     python docs/measurements/plot.py                 # all machines
-    python docs/measurements/plot.py --pc-id <id>    # restrict to one machine
+    python docs/measurements/plot.py --machine-id <id>   # restrict to one machine
 
-Adding your own machine: append a row to machines.csv with a new ``pc_id``, run the benchmarks (see
-README.md here), append the result rows carrying that ``pc_id``, and re-run this script. Plots draw
+Adding your own machine: run ``register_machine.py`` (writes ``machines.json``), run the benchmarks
+(see README.md here), append the result rows carrying that ``machine_id``, and re-run this script. Plots draw
 one line per machine, so results from different hardware can be compared directly.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import pathlib
 import sys
 
@@ -34,6 +35,7 @@ import pandas as pd  # noqa: E402
 HERE = pathlib.Path(__file__).resolve().parent
 PLOTS = HERE / "plots"
 PERFORMANCE_MD = HERE.parent / "performance.md"
+REGISTRY = HERE / "machines.json"
 
 # Stable colour per backend so every plot reads the same way.
 COLOURS = {
@@ -61,13 +63,13 @@ def _style(ax, title: str, xlabel: str, ylabel: str) -> None:
 def plot_lookup_latency(lookup: pd.DataFrame, machines: pd.DataFrame) -> pathlib.Path:
     """Latency vs database size, log-log. The crossover is the point of this figure."""
     fig, ax = plt.subplots(figsize=(9, 5.5), dpi=150)
-    for pc_id, per_machine in lookup.groupby("pc_id"):
-        multi = lookup["pc_id"].nunique() > 1
+    for machine_id, per_machine in lookup.groupby("machine_id"):
+        multi = lookup["machine_id"].nunique() > 1
         for backend in ORDER:
             rows = per_machine[per_machine["backend"] == backend].sort_values("entries")
             if rows.empty:
                 continue
-            label = f"{backend} ({pc_id})" if multi else backend
+            label = f"{backend} ({machine_id})" if multi else backend
             ax.errorbar(
                 rows["entries"],
                 rows["ns_per_op"],
@@ -85,14 +87,18 @@ def plot_lookup_latency(lookup: pd.DataFrame, machines: pd.DataFrame) -> pathlib
 
     # Mark the L3 boundary that explains the crossover, once per machine that has data.
     # Binary Fuse 8 stores ~1.14 bytes/entry, so it leaves L3 at roughly this entry count.
-    present = set(lookup["pc_id"].unique())
-    for _, machine in machines[machines["pc_id"].isin(present)].iterrows():
-        l3_mb = float(machine["l3_mb"])
+    present = set(lookup["machine_id"].unique())
+    for machine_id in sorted(present):
+        machine = machines.get(machine_id, {})
+        l3_mb = (machine.get("cpu") or {}).get("l3_mb")
+        if not l3_mb:
+            continue  # nothing to annotate without a cache size
+        l3_mb = float(l3_mb)
         fuse_leaves_l3 = l3_mb * 1024 * 1024 / 1.14
         ax.axvline(fuse_leaves_l3, color="#444444", linestyle="--", linewidth=1.0, alpha=0.7)
         label = f"Fuse-8 outgrows L3 ({l3_mb:.0f} MB)"
         if len(present) > 1:
-            label += f" — {machine['pc_id']}"
+            label += f" — {machine_id}"
         ax.annotate(
             label,
             xy=(fuse_leaves_l3, ax.get_ylim()[1] * 0.55),
@@ -115,7 +121,7 @@ def plot_lookup_latency(lookup: pd.DataFrame, machines: pd.DataFrame) -> pathlib
 def plot_k_sweep(k_sweep: pd.DataFrame) -> pathlib.Path:
     """False-positive rate vs k, one line per bit density. Shows the non-monotonic optimum."""
     fig, ax = plt.subplots(figsize=(9, 5.0), dpi=150)
-    for (pc_id, density), rows in k_sweep.groupby(["pc_id", "bits_per_entry_effective"]):
+    for (machine_id, density), rows in k_sweep.groupby(["machine_id", "bits_per_entry_effective"]):
         rows = rows.sort_values("k")
         line = ax.plot(
             rows["k"],
@@ -196,14 +202,14 @@ def latency_table(lookup: pd.DataFrame) -> str:
     def human(n: int) -> str:
         return f"{n // 1_000_000} M" if n >= 1_000_000 else f"{n // 1_000} K"
 
-    multi = lookup["pc_id"].nunique() > 1
+    multi = lookup["machine_id"].nunique() > 1
     blocks = []
-    for pc_id, rows in lookup.groupby("pc_id"):
+    for machine_id, rows in lookup.groupby("machine_id"):
         pivot = rows.pivot_table(index="backend", columns="entries", values="ns_per_op", aggfunc="mean")
         pivot = pivot.reindex([b for b in ORDER if b in pivot.index])
         lines = []
         if multi:
-            lines.append(f"\n**{pc_id}**\n")
+            lines.append(f"\n**{machine_id}**\n")
         lines.append("| Backend | " + " | ".join(human(c) for c in pivot.columns) + " |")
         lines.append("|---|" + "|".join(["--:"] * len(pivot.columns)) + "|")
         for backend, row in pivot.iterrows():
@@ -216,12 +222,12 @@ def latency_table(lookup: pd.DataFrame) -> str:
 def k_table(k_sweep: pd.DataFrame) -> str:
     """Markdown table of FPR by k, one block per bit density (and per machine when several)."""
     lines = []
-    multi = k_sweep["pc_id"].nunique() > 1
-    for (pc_id, density), rows in k_sweep.groupby(["pc_id", "bits_per_entry_effective"]):
+    multi = k_sweep["machine_id"].nunique() > 1
+    for (machine_id, density), rows in k_sweep.groupby(["machine_id", "bits_per_entry_effective"]):
         rows = rows.sort_values("k")
         ks = " | ".join(str(int(k)) for k in rows["k"])
         fprs = " | ".join(f"{v * 100:.3f} %" for v in rows["fpr"])
-        tag = f"{density:.2f} bits/entry" + (f" — {pc_id}" if multi else "")
+        tag = f"{density:.2f} bits/entry" + (f" — {machine_id}" if multi else "")
         lines.append(f"\n**{tag}**\n")
         lines.append(f"| `k` | {ks} |")
         lines.append("|---|" + "|".join(["--:"] * len(rows)) + "|")
@@ -242,22 +248,22 @@ def inject(markdown: str, name: str, body: str) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--pc-id", help="restrict to a single machine from machines.csv")
+    parser.add_argument("--machine-id", help="restrict to a single machine from machines.json")
     args = parser.parse_args()
 
     PLOTS.mkdir(exist_ok=True)
-    machines = pd.read_csv(HERE / "machines.csv")
+    machines = json.loads(REGISTRY.read_text(encoding="utf-8"))["machines"]
     lookup = pd.read_csv(HERE / "filter_lookup.csv")
     k_sweep = pd.read_csv(HERE / "k_sweep.csv")
     sizing = pd.read_csv(HERE / "filter_sizing.csv")
 
-    if args.pc_id:
-        machines = machines[machines["pc_id"] == args.pc_id]
-        lookup = lookup[lookup["pc_id"] == args.pc_id]
-        k_sweep = k_sweep[k_sweep["pc_id"] == args.pc_id]
-        sizing = sizing[sizing["pc_id"] == args.pc_id]
+    if args.machine_id:
+        machines = {k: v for k, v in machines.items() if k == args.machine_id}
+        lookup = lookup[lookup["machine_id"] == args.machine_id]
+        k_sweep = k_sweep[k_sweep["machine_id"] == args.machine_id]
+        sizing = sizing[sizing["machine_id"] == args.machine_id]
         if lookup.empty:
-            print(f"no rows for pc_id={args.pc_id!r}", file=sys.stderr)
+            print(f"no rows for machine_id={args.machine_id!r}", file=sys.stderr)
             return 1
 
     for produced in (plot_lookup_latency(lookup, machines), plot_k_sweep(k_sweep), plot_sizing(sizing)):
