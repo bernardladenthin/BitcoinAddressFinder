@@ -21,7 +21,8 @@ import org.jspecify.annotations.NonNull;
  *
  * <p>The blocked Bloom filter's advantage over the Binary Fuse filters is that it is built in a
  * single streaming pass (peak build memory ≈ the filter itself — measured 2.0&nbsp;GiB for
- * 1.377&nbsp;B entries), so it scales to the full database tier where the fuse construction's ~42&nbsp;GB peak does not fit.
+ * 1.377&nbsp;B entries), so it builds roughly 1.8&times; faster than the fuse construction at the full
+ * database tier and queries ~17&nbsp;% faster there, the fuse array being far past any cache at ~1.5&nbsp;GB.
  *
  * <h2>Concurrency</h2>
  * Thread-safe for concurrent reads as long as the wrapped filter and delegate are.

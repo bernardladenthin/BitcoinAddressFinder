@@ -47,7 +47,7 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
  *       measured FPR of 0.49&nbsp;% and 0.18&nbsp;% respectively. No false negatives.
  *       Same decorator behaviour as {@link #BINARY_FUSE_8}; LMDB stays open. Unlike the fuse filters
  *       it builds in a single streaming pass with peak build memory ≈ the filter itself (~2&nbsp;GB
- *       instead of the fuse construction's ~42&nbsp;GB), so it is the backend that builds on the
+ *       against the fuse construction's ~42&nbsp;GB peak), so it is the backend that builds fastest on the
  *       full billion-entry tier on a commodity-RAM machine, and its cache-line-aligned blocks feed
  *       the GPU pre-filter with a single coalesced read per lookup.</li>
  * </ul>
@@ -92,7 +92,10 @@ public enum AddressLookupBackend {
      * 22.4 vs 38.0 ns at 10 M where the fuse array still fits in L3. Both published database tiers
      * sit above that crossover. Decorator like BINARY_FUSE_8; LMDB stays open. Builds in a single streaming
      * pass (peak build memory ≈ the filter itself), so it is the backend that scales to the full
-     * billion-entry database on commodity RAM where the fuse construction's ~42 GB peak does not fit.
+     * billion-entry database roughly 1.8x faster than the fuse construction, and queries it ~17 %
+     * faster (measured 859 s / 7.17 M lookups per s against 1 564 s / 6.13 M on one 61.6 GB host).
+     * Fuse-8 does build at that tier -- an earlier claim that it could not was refuted -- but costs
+     * more time for less throughput, while remaining 27 % smaller with a slightly better FPR.
      */
     BLOCKED_BLOOM
 }

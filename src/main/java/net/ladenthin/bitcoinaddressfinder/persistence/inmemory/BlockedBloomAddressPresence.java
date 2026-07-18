@@ -17,7 +17,8 @@ import org.slf4j.LoggerFactory;
  *
  * <h2>Why blocked Bloom</h2>
  * Unlike {@link BinaryFuse8AddressPresence} (which needs a multi-array peeling construction with
- * ~29&nbsp;bytes/entry <em>peak</em> heap — ~42&nbsp;GB for a billion-entry database), a blocked
+ * ~29&nbsp;bytes/entry <em>peak</em> heap — ~42&nbsp;GB for a billion-entry database, which is heavy
+ * but, contrary to an earlier claim here, not prohibitive), a blocked
  * Bloom filter is built in a <b>single streaming pass</b>: allocate the bit array once, then for
  * each key set {@code k} bits. Peak build memory is therefore just the filter itself (~2&nbsp;GB),
  * so it builds on databases of any size, including the full 1.38&nbsp;B-entry tier.

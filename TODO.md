@@ -79,8 +79,11 @@ pluggable-persistence design plan:
 
 - **Port the GPU pre-filter to `BLOCKED_BLOOM`** (currently always Binary Fuse 8). Two motivations:
   (a) a blocked-Bloom probe is **one 64-byte coalesced read** per candidate vs. Fuse-8's three
-  scattered `__global` reads, and (b) Fuse-8 **cannot be built** at the ≈ 1 B+ tier (≈ 29 B/entry
-  peeling peak ⇒ ~42 GB heap at the Full DB), so today the largest databases cannot use a GPU
+  scattered `__global` reads, and (b) blocked Bloom already measures ~17 % faster than Fuse-8 on the
+  CPU at the Full DB tier, where the fuse array (~1.5 GB) is far past any cache. **Note the second
+  motivation originally given here — that Fuse-8 cannot be built at that tier — was refuted:** it
+  builds in 1 564 s on a 61.6 GB host, so the GPU pre-filter *is* available there today with Fuse-8.
+  The port is therefore an optimisation, not an enabler, which lowers its priority. The largest
   pre-filter at all. The CPU implementation was written byte-exact for this port and the formula is
   pinned by `BlockedBloomAddressPresenceTest#gpuStyleLookup_agreesWithContainsAddress`. Work needed:
   new kernel arguments (the signature hard-codes `fuse8_fp` / `fuse8_meta`), host-side VRAM upload,
