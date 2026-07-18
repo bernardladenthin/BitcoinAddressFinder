@@ -1,4 +1,22 @@
-> [!NOTE]
+**One configuration covers both database tiers:** [`examples/config_Find_AnyDB_BlockedBloom.json`](examples/config_Find_AnyDB_BlockedBloom.json).
+
+The reason is the **JVM heap**, which turns out to matter more than the tier does. The shipped run scripts use `-Xmx16G`, and against that budget:
+
+| Backend | Light DB (132 M) | Full DB (1.377 B) |
+|---|---|---|
+| `BLOCKED_BLOOM` | ✅ ~260 MB | ✅ ~2 GB |
+| `BINARY_FUSE_8` | ✅ ~3.8 GB peak | ❌ **~42 GB peak — will not build** |
+
+Binary Fuse peels through auxiliary arrays at ~29 B/entry, so at the Full DB tier it needs roughly 42 GB of heap. Blocked Bloom streams and never needs more than the finished filter. That single fact makes `BLOCKED_BLOOM` the safe default for anyone who might point the same config at either database — it also builds ~1.8–2.0× faster there, and is faster to query on any machine with a modest L3.
+
+**When to deviate:**
+
+- **`BINARY_FUSE_8` on a large-cache host** (≳ 64 MB L3, e.g. AMD 3D V-Cache) where footprint or FPR matters: it is 27 % smaller with a 19 % better FPR, and queries ~6 % faster there. At the Full DB tier it additionally needs `-Xmx48g` or so; below ~500 M entries the default heap is fine.
+- **`BINARY_FUSE_8` for small/medium databases generally** — it is the fastest filter measured below ~15 M entries on any machine, and it is what feeds the GPU pre-filter.
+
+**What actually varies with database size** is narrower than it looks — essentially one setting: `logStatsOnInit`. It prints LMDB statistics by iterating the whole store, a few seconds on the Light DB but a full extra pass over 61 GB on the Full DB, so the shipped config leaves it `false`. The GPU grid (`batchSizeInBits`, `keysPerWorkItem`) is a property of your *device*, not of the database — sweep it per §4 of [`docs/performance.md`](docs/performance.md) rather than copying a value.
+
+##### Why `k = 8` — the measured sweep> [!NOTE]
 > **No IDE or local setup required.** This repository is optimized for fully AI-assisted development using [Claude Code](https://claude.ai/code). No local toolchain, no IDE, nothing to install — everything works completely through Claude.
 
 **AI:**  
@@ -472,13 +490,10 @@ The probe sequence is `bit_i = (x + i·y) mod 512`, whose period is `512 / gcd(y
 
 **Which to choose:**
 
-- **Light/medium databases → `BINARY_FUSE_8`.** Lower RAM, marginally faster lookups, and it is the filter that feeds the GPU pre-filter. Nothing here supersedes it. Ready-to-run example: [`examples/config_Find_LightDB_BinaryFuse8.json`](examples/config_Find_LightDB_BinaryFuse8.json).
-- **The largest databases (≈ 1 B+ entries) → `BLOCKED_BLOOM`.** It is the only in-front-of-LMDB filter whose construction fits. Ready-to-run example: [`examples/config_Find_FullDB_BlockedBloom.json`](examples/config_Find_FullDB_BlockedBloom.json).
+- **Small/medium databases (below ~15 M entries) → `BINARY_FUSE_8`.** Fastest filter measured at that scale on either machine, lowest RAM, and it is what feeds the GPU pre-filter.
+- **Large databases → depends on the scanning host's L3 cache, not on the tier.** `BLOCKED_BLOOM` is the safe default: it builds ~1.8–2.0× faster, fits the shipped `-Xmx16G`, and queries faster wherever L3 is modest. `BINARY_FUSE_8` wins by ~6 % on a large-cache host and is 27 % smaller, but needs ~42 GB of heap to build at the 1.377 B tier.
 
-Two differences in the Full DB example are worth calling out, because both are consequences of scale rather than taste:
-
-- **`"logStatsOnInit": false`** — the stats dump iterates the entire database. On the Light DB that is a few seconds and gives you a warm cache for free; at 1.377 B entries it is a second full pass over 61 GB before the build even starts.
-- **`batchSizeInBits: 19`, `keysPerWorkItem: 128`** instead of `18`/`16` — a larger grid pays off once the GPU pre-filter keeps the readback compact. These are the values used in this project's own Full DB runs; the genuinely optimal pair is device-specific, so sweep it on your own hardware (see [`docs/performance.md`](docs/performance.md) §4).
+Ready-to-run example covering both tiers: [`examples/config_Find_AnyDB_BlockedBloom.json`](examples/config_Find_AnyDB_BlockedBloom.json).
 
 `BLOCKED_BLOOM` is therefore an **addition, not a replacement** — the two filters have genuinely different optimal domains, so neither was removed.
 
