@@ -83,14 +83,18 @@ def plot_lookup_latency(lookup: pd.DataFrame, machines: pd.DataFrame) -> pathlib
     ax.set_yscale("log")
     _style(ax, "Lookup latency vs database size (lower is better)", "entries in filter", "ns per containsAddress")
 
-    # Mark the L3 boundary that explains the crossover, using the reference machine's cache size.
-    if not machines.empty and "l3_mb" in machines:
-        l3_mb = float(machines.iloc[0]["l3_mb"])
-        # Binary Fuse 8 stores ~1.14 bytes/entry, so it leaves L3 at roughly this entry count.
+    # Mark the L3 boundary that explains the crossover, once per machine that has data.
+    # Binary Fuse 8 stores ~1.14 bytes/entry, so it leaves L3 at roughly this entry count.
+    present = set(lookup["pc_id"].unique())
+    for _, machine in machines[machines["pc_id"].isin(present)].iterrows():
+        l3_mb = float(machine["l3_mb"])
         fuse_leaves_l3 = l3_mb * 1024 * 1024 / 1.14
         ax.axvline(fuse_leaves_l3, color="#444444", linestyle="--", linewidth=1.0, alpha=0.7)
+        label = f"Fuse-8 outgrows L3 ({l3_mb:.0f} MB)"
+        if len(present) > 1:
+            label += f" — {machine['pc_id']}"
         ax.annotate(
-            f"Fuse-8 outgrows L3 ({l3_mb:.0f} MB)",
+            label,
             xy=(fuse_leaves_l3, ax.get_ylim()[1] * 0.55),
             xytext=(6, 0),
             textcoords="offset points",
@@ -183,30 +187,42 @@ def twin_axis(ax):
 
 
 def latency_table(lookup: pd.DataFrame) -> str:
-    """Markdown pivot of latency by backend and entry count, generated from the CSV."""
-    pivot = lookup.pivot_table(index="backend", columns="entries", values="ns_per_op", aggfunc="min")
-    pivot = pivot.reindex([b for b in ORDER if b in pivot.index])
+    """Markdown latency tables generated from the CSV, one per machine.
+
+    Machines are never merged: cache sizes differ, and the whole point of the figure is that the
+    crossover moves with L3. Aggregating across hardware would average that away.
+    """
 
     def human(n: int) -> str:
         return f"{n // 1_000_000} M" if n >= 1_000_000 else f"{n // 1_000} K"
 
-    header = "| Backend | " + " | ".join(human(c) for c in pivot.columns) + " |"
-    sep = "|---|" + "|".join(["--:"] * len(pivot.columns)) + "|"
-    lines = [header, sep]
-    for backend, row in pivot.iterrows():
-        cells = ["—" if pd.isna(v) else f"{v:.1f}" for v in row]
-        lines.append(f"| `{backend}` | " + " | ".join(cells) + " |")
-    return "\n".join(lines)
+    multi = lookup["pc_id"].nunique() > 1
+    blocks = []
+    for pc_id, rows in lookup.groupby("pc_id"):
+        pivot = rows.pivot_table(index="backend", columns="entries", values="ns_per_op", aggfunc="mean")
+        pivot = pivot.reindex([b for b in ORDER if b in pivot.index])
+        lines = []
+        if multi:
+            lines.append(f"\n**{pc_id}**\n")
+        lines.append("| Backend | " + " | ".join(human(c) for c in pivot.columns) + " |")
+        lines.append("|---|" + "|".join(["--:"] * len(pivot.columns)) + "|")
+        for backend, row in pivot.iterrows():
+            cells = ["—" if pd.isna(v) else f"{v:.1f}" for v in row]
+            lines.append(f"| `{backend}` | " + " | ".join(cells) + " |")
+        blocks.append("\n".join(lines))
+    return "\n".join(blocks)
 
 
 def k_table(k_sweep: pd.DataFrame) -> str:
-    """Markdown table of FPR by k, one row per bit density."""
+    """Markdown table of FPR by k, one block per bit density (and per machine when several)."""
     lines = []
-    for density, rows in k_sweep.groupby("bits_per_entry_effective"):
+    multi = k_sweep["pc_id"].nunique() > 1
+    for (pc_id, density), rows in k_sweep.groupby(["pc_id", "bits_per_entry_effective"]):
         rows = rows.sort_values("k")
         ks = " | ".join(str(int(k)) for k in rows["k"])
         fprs = " | ".join(f"{v * 100:.3f} %" for v in rows["fpr"])
-        lines.append(f"\n**{density:.2f} bits/entry**\n")
+        tag = f"{density:.2f} bits/entry" + (f" — {pc_id}" if multi else "")
+        lines.append(f"\n**{tag}**\n")
         lines.append(f"| `k` | {ks} |")
         lines.append("|---|" + "|".join(["--:"] * len(rows)) + "|")
         lines.append(f"| FPR | {fprs} |")
