@@ -29,7 +29,11 @@ import org.bitcoinj.base.Network;
  * <ol>
  *   <li><b>build time</b> — wall-clock to construct the in-memory snapshot from the LMDB stream;</li>
  *   <li><b>retained heap</b> — used heap after a full GC with the filter reachable, minus the same
- *       measured before the build (approximate but dominated by the multi-GB filter);</li>
+ *       measured before the build. <b>This is an estimate, not the structure's size.</b> It also
+ *       captures whatever else the harness happens to be holding, so it is only meaningful once the
+ *       filter dominates the heap: at multi-GB scale the error is negligible, but at ~10 M entries
+ *       it has been observed to report ~26 MiB where the backing array is exactly 16 MiB. Derive
+ *       bits-per-entry analytically (block count × 512 ÷ entries) rather than from this figure;</li>
  *   <li><b>lookup throughput</b> — probes/second for {@code containsAddress} over random non-members
  *       (the overwhelmingly common miss path during a key scan);</li>
  *   <li><b>false-positive rate</b> — fraction of those random non-members the filter lets through

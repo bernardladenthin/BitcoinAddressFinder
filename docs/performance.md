@@ -324,9 +324,25 @@ non-member probes:
   The mechanism is visible in the margins: Fuse-8's lead shrinks between 50 M and 100 M, which is
   exactly where its array (~1.14 B/entry) grows past 96 MB — so the crossover should lie not far
   beyond 100 M rather than far away. Practical consequence: **the "blocked Bloom wins at production
-  scale" conclusion is machine-specific.** On a large-cache host, Fuse-8 remains the faster choice at
-  both published tiers, which is the opposite recommendation. Pick the backend against the cache size
-  of the machine that will run the scan, not against a single published table.
+  scale" conclusion is machine-specific — but only for the tiers where both filters can actually be
+  built.** Two different resources gate the choice, and conflating them inverts the recommendation:
+
+  | resource | decides | scale at which it binds |
+  |---|---|---|
+  | **RAM** | whether `BINARY_FUSE_8` can be *built at all* (peeling peaks at ~29 B/entry) | ~42 GB at the 1.377 B-entry Full DB |
+  | **L3 cache** | which filter is *faster* when both exist | crossover at ~15 M entries per 16 MB of L3 |
+
+  So at the **Light DB** tier (132 M) both are buildable and the choice is genuinely
+  cache-dependent — a large-cache host should prefer Fuse-8 there. At the **Full DB** tier (1.377 B)
+  the question does not arise on either machine measured here: Fuse-8's construction needs ~42 GB of
+  heap, which does not fit alongside the 61 GB LMDB mapping on a 64 GB host, so it never completes.
+  Note this applies to the 96 MB-L3 machine too (61.6 GB RAM) — its cache advantage cannot be spent
+  on a filter that cannot be constructed. **`BLOCKED_BLOOM` therefore remains the Full DB
+  recommendation regardless of cache size**, and would only be revisited on a host with enough RAM
+  (roughly ≥ 128 GB) to build the fuse filter in the first place.
+
+  Pick against *both* properties of the machine that will run the scan: RAM first (is Fuse-8 even
+  constructible at your scale?), then cache (which is faster) — not against a single published table.
 - **`TRUNCATED_LONG_64` degrades worst** (7.6×, ending at 612 ns) — ~log₂(n/256) dependent cache
   misses per query. The "near-`HASHSET` latency" claim in older docs is a small-database result.
 - **`BLOOM` remains slowest** even after being retuned to key on 8 bytes; the residue is structural in
