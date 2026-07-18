@@ -222,21 +222,32 @@ accumulate; without it they are evicted before reuse and re-read. Measured mid-b
 case: the NVMe ran 86 % busy at 332 MB/s while yielding only ~19 MB/s of useful entry data — ~17×
 read amplification. **Free RAM, not cache warmth, is the variable that matters.**
 
-`CLMDBConfigurationReadOnly.useNoReadAhead` opens the read-only env with `MDB_NORDAHEAD`, which stops
-the OS prefetching neighbours that will be evicted before their turn. Cold-cache A/B, each arm
-preceded by a 46 GiB `PageCacheBuster` pass:
+`CLMDBConfigurationReadOnly.useNoReadAhead` opens the read-only env with `MDB_NORDAHEAD`, asking the
+OS not to prefetch neighbours that will be evicted before their turn.
+
+> **Platform limitation — the flag does nothing on Windows.** LMDB does not implement `MDB_NORDAHEAD`
+> on Windows; lmdbjava's own javadoc states *"Don't do readahead (no effect on Windows) … The option
+> is not implemented on Windows."* It is a POSIX-only lever (there it maps to a `madvise`-style hint).
+
+A cold-cache A/B was nevertheless run on Windows, each arm preceded by a 46 GiB `PageCacheBuster`
+pass, before that limitation was checked:
 
 | arm | build | free RAM at start | FPR | retained |
 |---|--:|--:|--:|--:|
 | baseline | 1 042.8 s | 35.4 GB | 0.004847 | 2052.1 MiB |
-| `MDB_NORDAHEAD` | **965.8 s** | 28.7 GB | 0.004847 | 2052.1 MiB |
+| `MDB_NORDAHEAD` (no-op here) | 965.8 s | 28.7 GB | 0.004847 | 2052.1 MiB |
 
-**7.4 % faster while starting with 19 % less free RAM** — the win came against a headwind, so the
-true effect is probably larger. FPR and retained size are bit-identical across arms, confirming the
-flag changes only I/O. Treat 7.4 % as a lower bound with caveats: **n = 1 per arm**, and this
-configuration began with 58 GB free, so amplification was already mild; the flag should help more
-under the memory pressure it targets. Default is `false`, because read-ahead genuinely helps when the
-database fits in RAM. The two were measured against
+**That 7.4 % difference is not an effect of the flag — it is run-to-run variance**, since both arms
+executed identical code paths. Retained size and FPR being bit-identical is consistent with exactly
+that. The result is retained here for one genuinely useful reason: it calibrates the **noise floor of
+this measurement at roughly 7-8 % for n = 1**, so any future full-DB build effect smaller than that
+cannot be distinguished from noise without repeats.
+
+**`MDB_NORDAHEAD` therefore remains unvalidated in this project.** Settling it requires running the
+same A/B on Linux, where the flag is actually implemented — ideally with alternating arm order,
+matched free RAM, and enough repeats to beat the ~8 % noise floor established above. The default
+stays `false`, which is also correct on POSIX whenever the database fits in RAM, since read-ahead is
+a genuine win in that case. The two were measured against
 each other precisely to decide whether one could be removed — they cannot, their optimal domains are
 disjoint, so `BLOCKED_BLOOM` was added rather than substituted.
 

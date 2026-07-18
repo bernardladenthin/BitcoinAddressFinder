@@ -49,23 +49,22 @@ pluggable-persistence design plan:
   before their turn arrives. Once RAM is exhausted this degenerates into thrashing.
 
   Fix candidates, cheapest first:
-  1. **`EnvFlags.MDB_NORDAHEAD` — DONE and measured (~7 % build-time win).** Implemented as the
-     opt-in `CLMDBConfigurationReadOnly#useNoReadAhead` (default `false`, since read-ahead is a
-     genuine win when the database fits in RAM). Cold-cache A/B over the Full DB, each arm preceded
-     by a 46 GiB `PageCacheBuster` pass:
+  1. **`EnvFlags.MDB_NORDAHEAD` — implemented, but STILL UNVALIDATED (Windows no-op).** Available as
+     the opt-in `CLMDBConfigurationReadOnly#useNoReadAhead`, default `false`. **LMDB does not
+     implement this flag on Windows** — lmdbjava's javadoc: *"Don't do readahead (no effect on
+     Windows) … The option is not implemented on Windows."* It is a POSIX-only lever.
 
-     | arm | build | free RAM at start | FPR | retained |
-     |---|--:|--:|--:|--:|
-     | baseline | 1 042.8 s | 35.4 GB | 0.004847 | 2052.1 MiB |
-     | `MDB_NORDAHEAD` | **965.8 s** | 28.7 GB | 0.004847 | 2052.1 MiB |
+     A cold-cache A/B was run on Windows before that was checked (each arm preceded by a 46 GiB
+     `PageCacheBuster` pass): baseline 1 042.8 s vs `MDB_NORDAHEAD` 965.8 s. **That 7.4 % gap is
+     run-to-run variance, not an effect** — both arms executed identical code paths, and FPR
+     (0.004847) plus retained size (2052.1 MiB) were bit-identical. Useful byproduct: it calibrates
+     the **noise floor of the full-DB build measurement at ~7-8 % for n = 1**, so smaller effects
+     need repeats to be credible.
 
-     **7.4 % faster while starting with 19 % less free RAM**, i.e. the win was achieved against a
-     headwind, so the true effect is likely somewhat larger. FPR and retained size are bit-identical
-     across arms, confirming the flag affects only I/O. Caveats: **n = 1 per arm** (no error bars),
-     and this configuration had 58 GB free at the outset so amplification was already low — the flag
-     should matter *more* under real memory pressure (the 1 869 s regime), which has not been
-     isolated. Worth repeating with alternating arm order and matched free-RAM before treating 7.4 %
-     as the headline figure.
+     **To settle it:** run the same A/B on Linux, where the flag actually does something, with
+     alternating arm order, matched free RAM, and enough repeats to beat that ~8 % noise floor. Note
+     CI already runs Ubuntu, so a Linux measurement is reachable. Lesson recorded: check a flag's
+     platform support *before* spending measurement time on it.
   2. Raise the effective queue depth — the disk sat at **QD 1**, so it is latency-serialized even
      while 86 % busy; overlapping reads could recover throughput.
   3. Rebuild/compact the database in key order so the logical walk becomes physically sequential

@@ -31,7 +31,13 @@ public class CLMDBConfigurationReadOnly {
      * Whether to open the environment with {@code MDB_NORDAHEAD}, disabling the OS read-ahead the
      * kernel would otherwise apply to the memory-mapped database file.
      *
-     * <p><b>Set this when the database is larger than available RAM.</b> The store is written in
+     * <p><b>No effect on Windows.</b> LMDB does not implement {@code MDB_NORDAHEAD} there (see
+     * {@code org.lmdbjava.EnvFlags#MDB_NORDAHEAD}: <em>"The option is not implemented on
+     * Windows."</em>), so setting this is harmless but does nothing. It is a POSIX-only lever, and
+     * its benefit is <b>currently unvalidated</b> in this project — the only A/B run so far was on
+     * Windows, where it is a no-op.
+     *
+     * <p><b>Set this when the database is larger than available RAM</b> (on POSIX). The store is written in
      * random hash160 order, so LMDB B-tree pages that are adjacent in <em>key</em> order are
      * scattered in <em>file</em> order. A key-ordered cursor walk — which is exactly what every
      * in-RAM backend performs while populating — therefore jumps across the whole file, and OS
