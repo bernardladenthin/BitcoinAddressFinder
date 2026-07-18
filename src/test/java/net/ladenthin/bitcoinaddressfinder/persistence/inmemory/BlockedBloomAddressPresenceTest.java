@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder.persistence.inmemory;
 import static net.ladenthin.bitcoinaddressfinder.persistence.inmemory.InMemoryTestSupport.hash20;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThan;
 
@@ -80,48 +81,30 @@ class BlockedBloomAddressPresenceTest {
     }
 
     @Test
-    void chooseLogBlocks_billionScale_sizesToTwoGiB() {
-        // 1.5 B entries at 11 bits/entry -> 2^25 blocks x 512 bits = 2^34 bits = 2 GiB.
-        int logBlocks = BlockedBloomAddressPresence.chooseLogBlocks(1_500_000_000L, 11);
-        assertThat(logBlocks, is(equalTo(25)));
-        long totalBits = (1L << logBlocks) * BlockedBloomAddressPresence.BLOCK_BITS;
-        assertThat(totalBits, is(equalTo(1L << 34))); // 2 GiB
+    void chooseBlocks_sizesExactly_withoutPowerOfTwoRounding() {
+        // The whole point of fastrange: the block count is whatever the request implies, so the
+        // filter is never silently rounded up. Requiring 2^n used to nearly double it at 100 M.
+        long entries = 100_000_000L;
+        int blocks = BlockedBloomAddressPresence.chooseBlocks(entries, 11);
+        assertThat(blocks, is(equalTo((int) Math.ceil(entries * 11.0 / BlockedBloomAddressPresence.BLOCK_BITS))));
+
+        double bitsPerEntry = (double) blocks * BlockedBloomAddressPresence.BLOCK_BITS / entries;
+        // Requested 11; the old power-of-two sizing delivered 21.47 here.
+        assertThat(bitsPerEntry, is(lessThan(11.001)));
+        assertThat(bitsPerEntry, is(greaterThan(10.999)));
     }
 
     @Test
-    void chooseLogBlocks_isClampedToArrayLimit() {
-        // Even absurd inputs must keep numBlocks * LONGS_PER_BLOCK within Integer.MAX_VALUE.
-        int logBlocks = BlockedBloomAddressPresence.chooseLogBlocks(Long.MAX_VALUE, 64);
-        assertThat(logBlocks, is(lessThan(29)));
+    void chooseBlocks_isClampedToArrayLimit() {
+        // words = blocks * LONGS_PER_BLOCK must stay within Integer.MAX_VALUE elements.
+        int blocks = BlockedBloomAddressPresence.chooseBlocks(Long.MAX_VALUE, 64);
+        assertThat((long) blocks * BlockedBloomAddressPresence.LONGS_PER_BLOCK, is(lessThan((long) Integer.MAX_VALUE)));
     }
 
-    /**
-     * Independent re-implementation of the lookup, written exactly as the OpenCL kernel will be —
-     * key = bytes[0..7] big-endian, {@code a=murmur64(key)}, {@code b=murmur64(key+GOLDEN)},
-     * {@code block=a>>>(64-logBlocks)}, {@code bit_i=(x + i*y) & 511} with {@code x=(int)b} and the
-     * stride {@code y=((int)(b>>>32))|1} forced odd. Pins the byte-exact formula the GPU must
-     * reproduce.
-     */
-    private static boolean gpuStyleContains(BlockedBloomAddressPresence filter, byte[] hash160) {
-        long[] words = filter.getWords();
-        if (words.length == 0) {
-            return false;
-        }
-        int logBlocks = filter.getLogBlocks();
-        int k = filter.getK();
-        long key = ByteBuffer.wrap(hash160).getLong(0);
-        long a = BlockedBloomAddressPresence.murmur64(key);
-        long b = BlockedBloomAddressPresence.murmur64(key + BlockedBloomAddressPresence.GOLDEN);
-        int base = ((int) (a >>> (64 - logBlocks))) * BlockedBloomAddressPresence.LONGS_PER_BLOCK;
-        int x = (int) b;
-        int y = ((int) (b >>> 32)) | 1; // stride forced odd - see BlockedBloomAddressPresence#oddStride
-        for (int i = 0; i < k; i++) {
-            int bit = (x + i * y) & BlockedBloomAddressPresence.BLOCK_MASK;
-            if ((words[base + (bit >>> 6)] & (1L << (bit & 63))) == 0L) {
-                return false;
-            }
-        }
-        return true;
+    @Test
+    void chooseBlocks_isAtLeastOne() {
+        assertThat(BlockedBloomAddressPresence.chooseBlocks(0L, 11), is(equalTo(1)));
+        assertThat(BlockedBloomAddressPresence.chooseBlocks(1L, 1), is(equalTo(1)));
     }
 
     /**
@@ -148,6 +131,36 @@ class BlockedBloomAddressPresenceTest {
             }
             assertThat("key " + i + " must probe " + k + " distinct bits", positions.size(), is(equalTo(k)));
         }
+    }
+
+    /**
+     * Independent re-implementation of the lookup, written exactly as the OpenCL kernel computes it —
+     * key = bytes[0..7] big-endian, {@code a=murmur64(key)}, {@code b=murmur64(key+GOLDEN)},
+     * {@code block=unsignedMultiplyHigh(a, numBlocks)} (the kernel's {@code mul_hi}),
+     * {@code bit_i=(x + i*y) & 511} with {@code x=(int)b} and the stride {@code y=((int)(b>>>32))|1}
+     * forced odd. Pins the byte-exact formula the GPU must reproduce; divergence would mean silent
+     * false negatives.
+     */
+    private static boolean gpuStyleContains(BlockedBloomAddressPresence filter, byte[] hash160) {
+        long[] words = filter.getWords();
+        if (words.length == 0) {
+            return false;
+        }
+        int numBlocks = filter.getNumBlocks();
+        int k = filter.getK();
+        long key = ByteBuffer.wrap(hash160).getLong(0);
+        long a = BlockedBloomAddressPresence.murmur64(key);
+        long b = BlockedBloomAddressPresence.murmur64(key + BlockedBloomAddressPresence.GOLDEN);
+        int base = ((int) Math.unsignedMultiplyHigh(a, numBlocks)) * BlockedBloomAddressPresence.LONGS_PER_BLOCK;
+        int x = (int) b;
+        int y = ((int) (b >>> 32)) | 1; // stride forced odd - see BlockedBloomAddressPresence#oddStride
+        for (int i = 0; i < k; i++) {
+            int bit = (x + i * y) & BlockedBloomAddressPresence.BLOCK_MASK;
+            if ((words[base + (bit >>> 6)] & (1L << (bit & 63))) == 0L) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Test

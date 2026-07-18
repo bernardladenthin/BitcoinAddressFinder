@@ -711,7 +711,7 @@ inline bool fuse8_contains(
 //   key   = hash160[0..7] big-endian            (same extraction as the fuse filter)
 //   a     = murmur64(key)
 //   b     = murmur64(key + GOLDEN)
-//   block = a >> (64 - log_blocks)
+//   block = mul_hi(a, num_blocks)               // Lemire fastrange: any block count, not just 2^n
 //   x     = (uint)b
 //   y     = (uint)(b >> 32) | 1                  <-- stride MUST be odd, see below
 //   bit_i = (x + i*y) & 511                      for i in 0..k-1
@@ -725,14 +725,17 @@ inline bool fuse8_contains(
 
 // Returns true when the key is POSSIBLY present (no false negatives).
 inline bool blockedbloom_contains(
-    __global const ulong *words, uint log_blocks, uint k, ulong key) {
-    if (log_blocks == 0u || k == 0u) {
+    __global const ulong *words, uint num_blocks, uint k, ulong key) {
+    if (num_blocks == 0u || k == 0u) {
         return false; // empty/degenerate filter never matches
     }
     ulong a = fuse8_murmur64(key);
     ulong b = fuse8_murmur64(key + BLOCKEDBLOOM_GOLDEN);
+    // mul_hi is the unsigned 64x64->high64 multiply (== Java Math.unsignedMultiplyHigh), mapping the
+    // hash uniformly onto [0, num_blocks) without requiring a power-of-two count -- the same
+    // primitive fuse8_position uses for its base. Requiring 2^n wasted up to 2x the memory.
     // One coalesced 64-byte region per key: every probe below indexes inside [base, base+8).
-    uint base = ((uint)(a >> (64u - log_blocks))) * BLOCKEDBLOOM_LONGS_PER_BLOCK;
+    uint base = ((uint)mul_hi(a, (ulong)num_blocks)) * BLOCKEDBLOOM_LONGS_PER_BLOCK;
     uint x = (uint)b;
     uint y = ((uint)(b >> 32)) | 1u;
     for (uint i = 0u; i < k; i++) {
@@ -771,7 +774,7 @@ __kernel void benchmarkFilterFuse8(
 
 __kernel void benchmarkFilterBlockedBloom(
     __global const ulong *words,
-    __global const uint *meta,      // [logBlocks, k]
+    __global const uint *meta,      // [numBlocks, k]
     __global const ulong *keys,
     __global uchar *hits,
     const uint key_count) {

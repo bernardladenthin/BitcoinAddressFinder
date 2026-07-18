@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  *   key = hash160[0..7] as big-endian long        // same extraction as the fuse filter
  *   a   = murmur64(key)
  *   b   = murmur64(key + GOLDEN)
- *   block = (int)(a >>> (64 - logBlocks))          // uniform block in [0, 2^logBlocks)
+ *   block = unsignedMultiplyHigh(a, numBlocks)     // uniform block in [0, numBlocks)
  *   x     = (int)b
  *   y     = (int)(b >>> 32) | 1                    // stride MUST be odd - see oddStride()
  *   for i in 0..k-1:  bit = (x + i * y) & 511      // k distinct positions in [0, 512)
@@ -84,12 +84,12 @@ public final class BlockedBloomAddressPresence implements AddressPresence {
     static final int DEFAULT_BITS_PER_ENTRY = 11;
 
     private final long[] words;
-    private final int logBlocks;
+    private final int numBlocks;
     private final int k;
 
-    private BlockedBloomAddressPresence(long[] words, int logBlocks, int k) {
+    private BlockedBloomAddressPresence(long[] words, int numBlocks, int k) {
         this.words = words;
-        this.logBlocks = logBlocks;
+        this.numBlocks = numBlocks;
         this.k = k;
     }
 
@@ -114,11 +114,10 @@ public final class BlockedBloomAddressPresence implements AddressPresence {
      */
     public static BlockedBloomAddressPresence populateFrom(@NonNull AddressIterable source, int k, int bitsPerEntry) {
         long count = source.count();
-        int logBlocks = chooseLogBlocks(count, bitsPerEntry);
-        long numBlocks = 1L << logBlocks;
-        int wordCount = (int) (numBlocks * LONGS_PER_BLOCK);
+        int numBlocks = chooseBlocks(count, bitsPerEntry);
+        int wordCount = numBlocks * LONGS_PER_BLOCK;
 
-        long totalBits = numBlocks * BLOCK_BITS;
+        long totalBits = (long) numBlocks * BLOCK_BITS;
         LOGGER.info(
                 "{}: building over {} addresses -> {} blocks x {} bits = {} MiB ({} bits/entry, k={}) ...",
                 PROGRESS_NAME,
@@ -130,7 +129,6 @@ public final class BlockedBloomAddressPresence implements AddressPresence {
                 k);
 
         long[] words = new long[wordCount];
-        int blockShift = 64 - logBlocks;
         // Streaming single pass over the whole database. At the billion-entry tier this runs for
         // many minutes with no other output, so report bounded progress (see FilterBuildProgress).
         FilterBuildProgress progress =
@@ -138,13 +136,13 @@ public final class BlockedBloomAddressPresence implements AddressPresence {
         long[] processed = {0L};
         source.forEachAddress(bb -> {
             if (bb.remaining() == BYTES_PER_ADDRESS) {
-                setKey(words, bb.getLong(bb.position()), blockShift, k);
+                setKey(words, bb.getLong(bb.position()), numBlocks, k);
             }
             progress.report(++processed[0]);
         });
 
         LOGGER.info("{}: ready ({} blocks, k={}, {} addresses inserted).", PROGRESS_NAME, numBlocks, k, processed[0]);
-        return new BlockedBloomAddressPresence(words, logBlocks, k);
+        return new BlockedBloomAddressPresence(words, numBlocks, k);
     }
 
     @Override
@@ -158,7 +156,7 @@ public final class BlockedBloomAddressPresence implements AddressPresence {
         long key = hash160.getLong(hash160.position());
         long a = murmur64(key);
         long b = murmur64(key + GOLDEN);
-        int block = (int) (a >>> (64 - logBlocks));
+        int block = (int) Math.unsignedMultiplyHigh(a, numBlocks);
         int base = block * LONGS_PER_BLOCK;
         int x = (int) b;
         int y = oddStride(b);
@@ -199,10 +197,10 @@ public final class BlockedBloomAddressPresence implements AddressPresence {
     }
 
     /** Sets the {@code k} bits of one key. Shared by construction (kept branch-light for the hot pass). */
-    private static void setKey(long[] words, long key, int blockShift, int k) {
+    private static void setKey(long[] words, long key, int numBlocks, int k) {
         long a = murmur64(key);
         long b = murmur64(key + GOLDEN);
-        int base = ((int) (a >>> blockShift)) * LONGS_PER_BLOCK;
+        int base = ((int) Math.unsignedMultiplyHigh(a, numBlocks)) * LONGS_PER_BLOCK;
         int x = (int) b;
         int y = oddStride(b);
         for (int i = 0; i < k; i++) {
@@ -212,21 +210,24 @@ public final class BlockedBloomAddressPresence implements AddressPresence {
     }
 
     /**
-     * Chooses {@code logBlocks} so the filter holds at least {@code bitsPerEntry} bits per entry,
-     * rounded up to a power-of-two block count. Clamped so the backing {@code long[]} stays within
-     * {@link Integer#MAX_VALUE} elements.
+     * Chooses the block count so the filter holds at least {@code bitsPerEntry} bits per entry.
+     *
+     * <p>Any count is admissible, not just powers of two, because the block index is derived with a
+     * multiply-shift ({@code unsignedMultiplyHigh(hash, numBlocks)}, Lemire's fastrange) rather than
+     * a mask. Requiring a power of two used to waste up to 2&times; the memory: at 100 M entries a
+     * requested 11 bits/entry rounded up to 21.47 (256 MiB instead of ~131 MiB), which measurably
+     * hurt the GPU probe by spilling caches a correctly sized filter would have fit in.
      *
      * @param count        the entry count
      * @param bitsPerEntry the target bits per entry
-     * @return the base-2 logarithm of the block count
+     * @return the block count, at least 1 and small enough that the backing {@code long[]} stays
+     *     within {@link Integer#MAX_VALUE} elements
      */
-    static int chooseLogBlocks(long count, int bitsPerEntry) {
-        long targetBlocks = (long) Math.ceil((double) Math.max(count, 1) * bitsPerEntry / BLOCK_BITS);
-        int raw = targetBlocks <= 1 ? 0 : (64 - Long.numberOfLeadingZeros(targetBlocks - 1));
-        // Lower bound 1: at least one block, and the block shift (64 - logBlocks) must be a valid
-        // (1..63) Java shift — a shift of 64 is a no-op. Upper bound 27: words = numBlocks *
-        // LONGS_PER_BLOCK must stay within Integer.MAX_VALUE (2^27 blocks -> 2^30 longs).
-        return Math.max(1, Math.min(raw, 27));
+    static int chooseBlocks(long count, int bitsPerEntry) {
+        long blocks = (long) Math.ceil((double) Math.max(count, 1L) * bitsPerEntry / BLOCK_BITS);
+        // words = blocks * LONGS_PER_BLOCK must stay addressable by an int.
+        long maxBlocks = Integer.MAX_VALUE / LONGS_PER_BLOCK;
+        return (int) Math.max(1L, Math.min(blocks, maxBlocks));
     }
 
     /**
@@ -255,7 +256,7 @@ public final class BlockedBloomAddressPresence implements AddressPresence {
      */
     @SuppressWarnings("EI_EXPOSE_REP")
     public BlockedBloomGpuFilterData toGpuFilterData() {
-        return new BlockedBloomGpuFilterData(words, logBlocks, k);
+        return new BlockedBloomGpuFilterData(words, numBlocks, k);
     }
 
     /**
@@ -270,12 +271,13 @@ public final class BlockedBloomAddressPresence implements AddressPresence {
     }
 
     /**
-     * Returns {@code log2(numBlocks)}; the block for a key is {@code (int)(murmur64(key) >>> (64 - logBlocks))}.
+     * Returns the block count; the block for a key is
+     * {@code (int) Math.unsignedMultiplyHigh(murmur64(key), numBlocks)}.
      *
-     * @return the base-2 logarithm of the block count
+     * @return the number of 512-bit blocks
      */
-    int getLogBlocks() {
-        return logBlocks;
+    int getNumBlocks() {
+        return numBlocks;
     }
 
     /**
@@ -293,6 +295,6 @@ public final class BlockedBloomAddressPresence implements AddressPresence {
      * @return the block count
      */
     long blockCount() {
-        return 1L << logBlocks;
+        return numBlocks;
     }
 }

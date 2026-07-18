@@ -970,6 +970,13 @@ for the Stage 4 whole-kernel A/B; `-p profiling=true` to split device kernel vs 
 -p inputBits=256,160` for the Stage 4 isolated/width A/B). GPU benchmarks self-skip when no
 OpenCL 2.0+ device is present.
 
+> **⚠ Blocked Bloom figures below predate the fastrange sizing change (2026-07-19) and are being
+> re-measured.** The block count is no longer rounded up to a power of two, so the filter is smaller
+> at the same `bitsPerEntry` — 131 MiB instead of 256 MiB at 100 M entries, 1806 instead of 2048 MiB
+> at the Full DB tier, and exactly the requested 11 bits/entry everywhere instead of 11-21.5. Sizes,
+> false-positive rates, the `k` optimum and the GPU ratios all move as a result. Binary Fuse, Bloom,
+> HashSet and truncated-long figures are unaffected.
+
 #### Where the measurement data lives
 
 Every number in this section comes from CSVs under [`measurements/`](measurements/), which are the

@@ -108,6 +108,29 @@ measurements are keyed by machine rather than averaged.
 4. **Append the rows** to the matching CSV with your `machine_id`, then re-run `plot.py`. Plots draw one
    line per machine, so several machines can coexist in one figure.
 
+## ⚠ Blocked Bloom geometry changed — rows before 2026-07-19 are stale
+
+`chooseBlocks` now sizes the filter with a multiply-shift (`mulhi(hash, numBlocks)`, Lemire's
+fastrange) instead of rounding the block count up to a power of two. Every blocked-Bloom size, FPR
+and throughput figure recorded before that change describes a **differently sized filter** and is
+not comparable to anything measured after it:
+
+| entries | old (2ⁿ) | new | effective bits/entry |
+|--:|--:|--:|--:|
+| 10 M | 16 MiB | 13 MiB | 13.42 → 11.00 |
+| 100 M | 256 MiB | **131 MiB** | 21.47 → 11.00 |
+| 1.377 B | 2048 MiB | 1806 MiB | 12.47 → 11.00 |
+
+Two things follow for anyone re-measuring:
+
+- **The same `bitsPerEntry` now yields fewer bits than before**, because it is no longer rounded up.
+  Expect a *higher* FPR at the same setting — the filter is smaller, not worse per bit.
+- **The `k` optimum shifts with it.** The empirical rule from the earlier sweeps is
+  `k ≈ 0.55 × bits/entry`, so at a true 11 bits/entry the optimum is nearer 6 than the shipped
+  default of 8. `DEFAULT_K` is deliberately left at 8 until the re-run says otherwise.
+
+Stale rows are kept rather than deleted, for provenance; date and the notes column identify them.
+
 ## Measurement hygiene
 
 Lessons that cost real time in this project:
