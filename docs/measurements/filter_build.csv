@@ -6,3 +6,5 @@ ryzen75800h-63g-win11,2026-07-18,TRUNCATED_LONG_64,132288304,lmdb_light,41.90,10
 ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,1377478516,lmdb_full,1869.74,2051.8,1.562,9531275,0.004849,0,5000000,2,RAM contended after 12 GB JMH heap; I/O bound
 ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,1377478516,lmdb_full,1042.83,2052.1,1.562,9168029,0.004847,0,2000000,35.4,cold cache but ample headroom
 ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,1377478516,lmdb_full,965.84,2052.1,1.562,9350011,0.004847,0,2000000,28.7,MDB_NORDAHEAD set but no-op on Windows; difference is run-to-run variance
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_8,1377478516,lmdb_full,1564.49,1504.1,1.145,6128185,0.003933,0,2000000,52.7,BUILDS at the Full DB tier on 61.6 GB with -Xmx48g - refutes the not-buildable claim; read phase thrashed to 1.1M/s but peeling itself ran at ~19M/s in 1m16s
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,1377478516,lmdb_full,859.47,2080.1,1.583,7174005,0.004847,0,2000000,49.2,same-machine control for the BINARY_FUSE_8 row above - 1.8x faster build and 17% faster lookups; Fuse-8 is 27% smaller with 19% better FPR

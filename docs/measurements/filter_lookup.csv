@@ -45,13 +45,15 @@ ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_8,1000000,15.223,0.205,5,prn
 ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_8,10000000,22.493,1.218,5,prng,filter ~11.4 MB well inside 96 MB L3
 ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_8,50000000,25.901,0.552,5,prng,filter ~57 MB still fits 96 MB L3 - still ahead of BLOCKED_BLOOM
 ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_8,100000000,30.950,1.289,5,prng,filter ~114 MB just exceeds L3; still ahead - crossover lies beyond 100M
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_8,132288304,32.837,2.149,5,prng,exact Light DB entry count - measured not extrapolated; still ahead of BLOCKED_BLOOM but only by ~12%
 ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,100000,11.841,0.338,5,prng,
 ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,1000000,20.196,0.923,5,prng,
 ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,10000000,30.193,1.515,5,prng,
-ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,50000000,37.026,1.108,5,prng,
-ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,100000000,35.059,1.677,5,prng,within error of the 50M point
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,50000000,30.978,0.922,8,prng,re-measured at -i 8; supersedes a 37.026 +/- 1.108 reading that made 100M look faster than 50M
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,100000000,35.402,0.949,8,prng,re-measured at -i 8; the 50M point was the faulty one - this one barely moved
 ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,100000,14.865,0.274,5,prng,
 ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,1000000,22.481,0.650,5,prng,
 ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,10000000,27.946,1.244,5,prng,filter ~26 MB still inside 96 MB L3
 ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,50000000,31.030,1.117,5,prng,
 ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,100000000,34.395,2.609,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,132288304,37.137,2.136,5,prng,exact Light DB entry count - still behind BINARY_FUSE_8; error bars nearly touch
