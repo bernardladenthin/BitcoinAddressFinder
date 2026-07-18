@@ -284,7 +284,7 @@ Supported values:
 | `TRUNCATED_LONG_64` | **~8 B / entry**        | fast when small, **degrades with size** | **no**           | best in-RAM trade-off when you *do* want to drop LMDB *and* the database is small; latency scales worse than any other backend (see the size sweep) |
 | `BINARY_FUSE_8`     | **~1.13 B / entry**     | **fast**             | yes              | ultra-low RAM filter in front of LMDB; 0.4% of filter hits are verified against LMDB (also feeds the GPU pre-filter) |
 | `BINARY_FUSE_16`    | **~2.25 B / entry**     | **fast**             | yes              | like Fuse-8 but 0.0015% FPR — fewer LMDB verifications; use when Fuse-8's verification cost is measurable |
-| `BLOCKED_BLOOM`     | **1.56–2.06 B / entry** | **fast**             | yes              | **the largest databases** — builds ~1.8× faster and queries ~17 % faster than Fuse-8 at the 1.377 B tier (measured), at the cost of ~38 % more memory and a slightly higher FPR |
+| `BLOCKED_BLOOM`     | **1.56–2.06 B / entry** | **fast**             | yes              | **the largest databases** — builds ~1.8–2.0× faster than Fuse-8 at the 1.377 B tier (reproduced on two machines), at the cost of ~38 % more memory and a slightly higher FPR |
 
 #### Memory footprint per backend across the published database tiers
 
@@ -353,7 +353,7 @@ The Binary Fuse filters are excellent at **rest** (1.13 B/entry is unbeatable) b
 
 > **Correction.** An earlier edition of this document claimed that made `BINARY_FUSE_8` *unbuildable* at the Full DB tier on commodity hardware. **That was wrong**, and it was the stated reason this backend existed. Independently retested on a 61.6 GB host (cache cleared first, `-Xmx48g`), Fuse-8 builds in 1 564 s to 1 504 MiB with a 0.393 % FPR and no false negatives. The original observation — a build that appeared to hang — was the **I/O-bound ingest** stalling under memory pressure, not the peeling step: peeling itself finished in 76 s at ~19 M keys/s. Two different phenomena were conflated.
 
-`BLOCKED_BLOOM` is still the better choice at that tier, but for measured reasons rather than an impossibility.
+`BLOCKED_BLOOM` is still the better choice at that tier, but because it builds roughly twice as fast — not because fuse is impossible, and not on lookup speed, which does not reproduce across machines.
 
 `BLOCKED_BLOOM` exists to close exactly that gap. It is a **blocked Bloom filter**: allocate the bit array once, then stream every address through it setting `k` bits. There is no peeling, no auxiliary array, no second pass — **peak build memory is the filter itself** (~2 GB at the Full DB tier), so it builds anywhere the finished filter fits.
 
@@ -398,19 +398,19 @@ Same harness, same machine (64 GB RAM), against the 61 GB / 1,377,478,516-entry 
 | false negatives | **0** |
 | build time | 1,869 s (31 min, I/O-bound — see below) |
 
-- **Faster to build and to query than Fuse-8 at this tier.** Same-machine comparison on a 61.6 GB host (cross-machine numbers are unusable here — the build is I/O-bound, so free RAM moves it more than the CPU does):
+- **Faster to build than Fuse-8 at this tier — the lookup question is unresolved.** Both backends measured on both hosts, each arm preceded by a cache-clearing pass, at `-Xmx48g`:
 
-  | | `BINARY_FUSE_8` | `BLOCKED_BLOOM` |
-  |---|--:|--:|
-  | build | 1 564 s | **859 s** |
-  | lookups/s | 6.13 M | **7.17 M** |
-  | retained | **1 504 MiB** | 2 080 MiB |
-  | FPR | **0.393 %** | 0.485 % |
+  | | 16 MB L3 host | | 96 MB L3 host | |
+  |---|--:|--:|--:|--:|
+  | | `BINARY_FUSE_8` | `BLOCKED_BLOOM` | `BINARY_FUSE_8` | `BLOCKED_BLOOM` |
+  | build | 3 186 s | **1 617 s** | 1 564 s | **859 s** |
+  | lookups/s | **9.37 M** | 7.44 M | 6.13 M | **7.17 M** |
+  | retained | **1 504 MiB** | 2 080 MiB | **1 504 MiB** | 2 080 MiB |
+  | FPR | **0.393 %** | 0.485 % | **0.393 %** | 0.485 % |
 
-  At ~1.5 GB the fuse array is far past any L3, so its three scattered misses lose to blocked Bloom's single cache line — the same mechanism that sets the crossover, here observed at the extreme end. Fuse-8 remains defensible when footprint or FPR matters more than throughput.
-- **Size matched the analytic prediction exactly**: 2²⁵ blocks × 512 bits = 2 GiB.
-- **Lookup cost barely moved despite an 8× larger filter** — 9.53 M/s here vs 9.85 M/s on the 256 MiB Light DB filter. This is the blocked layout paying off: all `k` probes share one 64-byte block, so a cache-cold lookup costs one cache line regardless of filter size.
-- **FPR is higher than the Light DB's 0.184 %** because the power-of-two block sizing lands this tier at 12.5 effective bits/entry versus the Light DB's 16.47 — not because the filter behaves differently at scale.
+  **Blocked Bloom builds ~1.8–2.0× faster on both machines** — that is the reproducible result, and it is what the recommendation rests on. Fuse-8 is 27 % smaller with a ~19 % better FPR, both bit-identical across hosts.
+
+  **The lookup row contradicts itself between machines** (Fuse-8 +26 % on one, blocked Bloom +17 % on the other) and also contradicts this project's own JMH sweep on the same host. At 1.5–2 GB neither filter fits any cache, so no cache argument explains the flip. These figures come from a single-shot probe loop run right after a multi-GB build; treat them as unresolved rather than as a ranking. See [`docs/performance.md`](docs/performance.md) for the full analysis.
 
 **Build time is dominated by LMDB I/O, not by the filter**, and the lever is **free RAM**. The database is written in random hash160 order, so a key-ordered cursor walk is physically scattered across the 61 GB file; with headroom the pages accumulate, without it they are evicted before reuse and re-read. Measured mid-build under memory pressure: the NVMe ran 86 % busy at 332 MB/s while yielding only ~19 MB/s of useful entry data — roughly **17× read amplification**. The same build took **1,869 s with ~2 GB free** but **1,043 s starting from an emptied cache with 58 GB free** — nearly 2× faster from the *colder* start.
 

@@ -195,6 +195,54 @@ def plot_sizing(sizing: pd.DataFrame) -> pathlib.Path:
     return out
 
 
+def plot_full_db(build: pd.DataFrame) -> pathlib.Path:
+    """Full DB tier: the same-machine BINARY_FUSE_8 vs BLOCKED_BLOOM comparison, per machine.
+
+    Deliberately shows build time and lookup throughput side by side, because the two disagree about
+    which backend wins and that disagreement is the finding. Only the comparable arms are plotted:
+    rows carrying an explicit note about a differing heap or cache state are excluded, since a
+    -Xmx6g run is not comparable to a -Xmx48g one on this path.
+    """
+    full = build[(build["entries"] == 1_377_478_516) & (build["backend"].isin(["BINARY_FUSE_8", "BLOCKED_BLOOM"]))]
+    # Keep only machines where BOTH backends were measured, i.e. a genuine same-machine control.
+    paired = full.groupby("machine_id")["backend"].nunique()
+    full = full[full["machine_id"].isin(paired[paired == 2].index)]
+    full = full.sort_values(["machine_id", "backend"]).groupby(["machine_id", "backend"], as_index=False).last()
+
+    machine_ids = sorted(full["machine_id"].unique())
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.6), dpi=150)
+    width = 0.36
+    for ax, (column, ylabel, title, scale) in zip(
+        axes,
+        [
+            ("build_seconds", "build time [s]", "Build time (lower is better)", 1.0),
+            ("lookups_per_sec", "M lookups/s", "Lookup throughput (higher is better)", 1e-6),
+        ],
+    ):
+        for offset, backend in zip((-width / 2, width / 2), ("BINARY_FUSE_8", "BLOCKED_BLOOM")):
+            values = [
+                full[(full["machine_id"] == m) & (full["backend"] == backend)][column].iloc[0] * scale
+                for m in machine_ids
+            ]
+            positions = [i + offset for i in range(len(machine_ids))]
+            ax.bar(positions, values, width, label=backend, color=COLOURS[backend])
+            for x, v in zip(positions, values):
+                ax.text(x, v, f"{v:,.0f}" if scale == 1.0 else f"{v:.2f}", ha="center", va="bottom", fontsize=8)
+        ax.set_xticks(range(len(machine_ids)))
+        ax.set_xticklabels([m.replace("-win11", "") for m in machine_ids], fontsize=8)
+        _style(ax, title, "", ylabel)
+    axes[0].legend(fontsize=8, frameon=False)
+    fig.suptitle(
+        "Full DB tier (1.377 B entries): build agrees across machines, lookup does not",
+        fontsize=11,
+    )
+    fig.tight_layout()
+    out = PLOTS / "full_db_backends.png"
+    fig.savefig(out)
+    plt.close(fig)
+    return out
+
+
 def twin_axis(ax):
     """Second y-axis sharing the x-axis (kept separate so styling stays in one place)."""
     twin = ax.twinx()
@@ -266,17 +314,24 @@ def main() -> int:
     lookup = pd.read_csv(HERE / "filter_lookup.csv")
     k_sweep = pd.read_csv(HERE / "k_sweep.csv")
     sizing = pd.read_csv(HERE / "filter_sizing.csv")
+    build = pd.read_csv(HERE / "filter_build.csv")
 
     if args.machine_id:
         machines = {k: v for k, v in machines.items() if k == args.machine_id}
         lookup = lookup[lookup["machine_id"] == args.machine_id]
         k_sweep = k_sweep[k_sweep["machine_id"] == args.machine_id]
         sizing = sizing[sizing["machine_id"] == args.machine_id]
+        build = build[build["machine_id"] == args.machine_id]
         if lookup.empty:
             print(f"no rows for machine_id={args.machine_id!r}", file=sys.stderr)
             return 1
 
-    for produced in (plot_lookup_latency(lookup, machines), plot_k_sweep(k_sweep), plot_sizing(sizing)):
+    for produced in (
+        plot_lookup_latency(lookup, machines),
+        plot_k_sweep(k_sweep),
+        plot_sizing(sizing),
+        plot_full_db(build),
+    ):
         print(f"wrote {produced.relative_to(HERE.parent.parent)}")
 
     if PERFORMANCE_MD.exists():
