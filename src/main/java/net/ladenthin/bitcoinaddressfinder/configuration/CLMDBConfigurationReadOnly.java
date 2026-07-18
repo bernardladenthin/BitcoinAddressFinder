@@ -94,6 +94,36 @@ public class CLMDBConfigurationReadOnly {
     public double bloomFilterFpp = 0.1;
 
     /**
+     * Bits per entry for {@link AddressLookupBackend#BLOCKED_BLOOM}; {@code 0} uses the built-in
+     * default. Consulted only by that backend.
+     *
+     * <p>This is the dominant accuracy/size lever, and the right value is <b>deployment-dependent
+     * rather than universal</b>. A sparser filter answers a miss sooner, because the probe loop
+     * short-circuits at the first unset bit; a denser one uses less memory and moves fewer bytes on
+     * a GPU. Which wins depends on what a false positive costs — every filter hit is verified
+     * against LMDB, so the answer is set by how expensive that verification is on <em>your</em>
+     * storage and database size, not by the filter.
+     *
+     * <p>Measured false-positive rates at the matching {@code k} (see
+     * {@link #blockedBloomK}): ~2.6 % at 8 bits/entry, 0.75 % at 11, 0.31 % at 14, 0.16 % at 17,
+     * 0.11 % at 21. Raise it when a verification is expensive (large database, cold storage); lower
+     * it when memory or VRAM is the constraint.
+     */
+    public int blockedBloomBitsPerEntry = 0;
+
+    /**
+     * Bits probed per key for {@link AddressLookupBackend#BLOCKED_BLOOM}; {@code 0} uses the
+     * built-in default. Consulted only by that backend.
+     *
+     * <p><b>Change this together with {@link #blockedBloomBitsPerEntry}.</b> The two are coupled by
+     * the measured rule {@code k ≈ 0.55 × bitsPerEntry}, which sits below the textbook unblocked
+     * {@code (m/n)·ln2} because confining all probes to one 512-bit block adds per-block load
+     * variance. Setting one alone lands off the optimum — measured at three densities: 16.24
+     * bits/entry → k=8, 12.50 → k=7, 11.00 → k=6.
+     */
+    public int blockedBloomK = 0;
+
+    /**
      * If true, {@code containsAddress(...)} will always return {@code false}, skipping both LMDB and in-memory lookups.
      *
      * This disables all address existence checks and is useful for performance benchmarking or dry-run scenarios

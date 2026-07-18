@@ -24,6 +24,7 @@ import java.util.regex.Pattern;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.AddressLookupBackend;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
+import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.core.FireAndForget;
 import net.ladenthin.bitcoinaddressfinder.core.InterruptedRuntimeException;
@@ -320,7 +321,7 @@ public class ConsumerJava implements Consumer {
         lmdb.init();
         persistence = lmdb;
 
-        AddressPresence chain = buildLookupChain(lmdb, cfg.addressLookupBackend, cfg.bloomFilterFpp);
+        AddressPresence chain = buildLookupChain(lmdb, cfg.addressLookupBackend, cfg.bloomFilterFpp, cfg);
         lookup = chain;
 
         // Build the GPU pre-filter payload now, while LMDB is guaranteed open. This must happen
@@ -399,8 +400,16 @@ public class ConsumerJava implements Consumer {
         return BinaryFuse8AddressPresence.populateFrom(lmdb).toGpuFilterData();
     }
 
+    /** Honours the configured blocked-Bloom geometry, falling back to the defaults when unset. */
+    private static BlockedBloomAddressPresence buildBlockedBloom(LMDBPersistence lmdb, CLMDBConfigurationReadOnly cfg) {
+        if (cfg.blockedBloomBitsPerEntry > 0 && cfg.blockedBloomK > 0) {
+            return BlockedBloomAddressPresence.populateFrom(lmdb, cfg.blockedBloomK, cfg.blockedBloomBitsPerEntry);
+        }
+        return BlockedBloomAddressPresence.populateFrom(lmdb);
+    }
+
     private static AddressPresence buildLookupChain(
-            LMDBPersistence lmdb, AddressLookupBackend choice, double bloomFpp) {
+            LMDBPersistence lmdb, AddressLookupBackend choice, double bloomFpp, CLMDBConfigurationReadOnly cfg) {
         return switch (choice) {
             case LMDB_ONLY -> lmdb;
             case BLOOM -> BloomFilterAccelerator.populateFrom(lmdb, lmdb, bloomFpp);
@@ -408,7 +417,7 @@ public class ConsumerJava implements Consumer {
             case TRUNCATED_LONG_64 -> TruncatedLong64SortedArrayPresence.populateFrom(lmdb);
             case BINARY_FUSE_8 -> new BinaryFuseAccelerator(BinaryFuse8AddressPresence.populateFrom(lmdb), lmdb);
             case BINARY_FUSE_16 -> new BinaryFuseAccelerator(BinaryFuse16AddressPresence.populateFrom(lmdb), lmdb);
-            case BLOCKED_BLOOM -> new BlockedBloomAccelerator(BlockedBloomAddressPresence.populateFrom(lmdb), lmdb);
+            case BLOCKED_BLOOM -> new BlockedBloomAccelerator(buildBlockedBloom(lmdb, cfg), lmdb);
         };
     }
 

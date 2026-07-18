@@ -132,7 +132,10 @@ public final class FilterMeasurementMain {
 
             // No false negatives: every sampled real member must be reported present by the filter.
             int falseNegatives = 0;
-            ByteBuffer probe = ByteBuffer.allocate(HASH160_LENGTH);
+            // Direct, not heap: LMDB rejects heap buffers as keys (BufferMustBeDirectException), and the
+            // LMDB_ONLY backend probes the store itself. Direct is also what production passes, so the
+            // in-memory backends are measured on the same buffer type they see in the consumer.
+            ByteBuffer probe = ByteBuffer.allocateDirect(HASH160_LENGTH);
             for (byte[] m : members) {
                 probe.clear();
                 probe.put(m);
@@ -198,7 +201,7 @@ public final class FilterMeasurementMain {
         // No false negatives: a sample of real members must all be reported present.
         int falseNegatives = 0;
         int sample = (int) Math.min(20_000L, count);
-        ByteBuffer probe = ByteBuffer.allocate(HASH160_LENGTH);
+        ByteBuffer probe = ByteBuffer.allocateDirect(HASH160_LENGTH);
         for (int i = 0; i < sample; i++) {
             probe.clear();
             probe.put(PrngAddressIterable.addressAt(0xC0FFEEL, i));
