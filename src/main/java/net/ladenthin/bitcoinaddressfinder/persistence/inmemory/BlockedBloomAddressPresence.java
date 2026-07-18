@@ -77,10 +77,36 @@ public final class BlockedBloomAddressPresence implements AddressPresence {
     /** Golden-ratio constant used to derive the second, independent hash. */
     static final long GOLDEN = 0x9E37_79B9_7F4A_7C15L;
 
-    /** Default number of bits set per key. */
-    static final int DEFAULT_K = 8;
+    /**
+     * Default number of bits set per key.
+     *
+     * <p><b>Measured, not derived.</b> At the shipped {@link #DEFAULT_BITS_PER_ENTRY} the optimum is
+     * {@code k = 6}: sweeping k at a true 11 bits/entry gives FPR 0.998 / 0.811 / <b>0.753</b> /
+     * 0.759 / 0.802 / 0.993 % for k = 4 / 5 / <b>6</b> / 7 / 8 / 10, reproduced bit-identically on two
+     * machines. {@code k = 6} also probes fewer bits, so it is simultaneously the faster and the more
+     * accurate choice — the shipped {@code k = 8} cost ~6.5 % relative FPR and ~20 % throughput.
+     *
+     * <p>The optimum tracks bit density by the empirical rule {@code k ≈ 0.55 × bitsPerEntry}, which
+     * sits below the textbook unblocked {@code (m/n)·ln2 ≈ 0.693 ×} because confining all probes to
+     * one block adds per-block load variance. Measured at three densities: 16.24 b/e → k=8,
+     * 12.50 b/e → k=7, 11.00 b/e → k=6. <b>Raise this together with
+     * {@link #DEFAULT_BITS_PER_ENTRY}</b>; the two are coupled, and changing one alone lands off the
+     * optimum, which is exactly what happened when the sizing moved to fastrange while k stayed at 8.
+     */
+    static final int DEFAULT_K = 6;
 
-    /** Default target bits per entry used to auto-size the filter (~2&nbsp;GiB at 1.5&nbsp;B keys). */
+    /**
+     * Default target bits per entry used to auto-size the filter.
+     *
+     * <p>Since the block count is chosen with a multiply-shift rather than rounded up to a power of
+     * two, this is now the <em>literal</em> density: 11 bits/entry everywhere, where the old sizing
+     * delivered anywhere from 11 to 21.5 depending on how the entry count happened to fall. That
+     * makes the filter smaller (131 MiB instead of 256 MiB at 100 M entries) but denser, and density
+     * costs lookup speed — {@code containsAddress} short-circuits at the first unset bit, so more set
+     * bits means more probes before a miss can be answered.
+     *
+     * <p>Coupled to {@link #DEFAULT_K}: see the rule documented there before changing either.
+     */
     static final int DEFAULT_BITS_PER_ENTRY = 11;
 
     private final long[] words;
