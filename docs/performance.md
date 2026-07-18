@@ -1451,18 +1451,30 @@ cost balance shifts):
 
   ![GPU filter probe](measurements/plots/gpu_filter_probe.png)
 
-  Measured on an RTX 3070 Laptop (`GpuFilterProbeBenchmark`, 4.19 M probes per launch, all misses):
+  Measured with `GpuFilterProbeBenchmark` (4.19 M probes per launch, all misses) on **two vendors**:
 
-  | entries | `BINARY_FUSE_8` | `BLOCKED_BLOOM` | ratio |
-  |--:|--:|--:|--:|
-  | 10 M | 1.773 ± 0.003 ms | **1.024 ± 0.016 ms** | **1.73×** |
-  | 100 M | 3.015 ± 0.020 ms | **1.351 ± 0.009 ms** | **2.23×** |
+  | entries | device | `BINARY_FUSE_8` | `BLOCKED_BLOOM` | ratio |
+  |--:|---|--:|--:|--:|
+  | 10 M | RTX 3070 Laptop (Ampere) | 1.773 ± 0.003 ms | **1.024 ± 0.016 ms** | **1.73×** |
+  | 100 M | RTX 3070 Laptop (Ampere) | 3.015 ± 0.020 ms | **1.351 ± 0.009 ms** | **2.23×** |
+  | 10 M | `gfx1100` / RX 7900 XTX (RDNA3) | 0.300 ± 0.036 ms | **0.187 ± 0.017 ms** | **1.60×** |
+  | 100 M | `gfx1100` / RX 7900 XTX (RDNA3) | 0.738 ± 0.021 ms | **0.655 ± 0.032 ms** | **1.13×** |
 
-  **The GPU margin is far larger than the CPU one, and it grows with filter size.** On the CPU the
-  blocked layout is worth 13-36 % at best and *loses* below ~15 M entries; here it is 1.7-2.2× ahead
-  and pulling away. That is the coalescing argument showing its full effect: a GPU has no large
-  cache to hide three scattered reads behind, so collapsing them into one 64-byte transaction matters
-  much more than it does on a CPU. The measurement is deliberately isolated in its own kernel —
+  **`BLOCKED_BLOOM` wins on both vendors at both sizes — but only the *direction* is portable, not
+  the trend.** On NVIDIA the advantage *grows* with filter size (1.73× → 2.23×); on RDNA3 it
+  *shrinks* (1.60× → 1.13×). The cross-vendor check therefore confirms the coalescing argument and
+  refutes the "and it pulls away" corollary, which was an Ampere-specific observation.
+
+  The likely mechanism is the 7900 XTX's **96 MB Infinity Cache**, which the RTX 3070 Laptop (4 MB
+  L2) has no analogue for. At 10 M both structures are cache-resident there (fuse ~11 MB, blocked
+  ~16 MB) and the blocked layout wins purely on transaction count. At 100 M both spill — but blocked
+  Bloom is the *larger* structure (~256 MB vs ~114 MB), so it spills harder, and its size disadvantage
+  eats most of its coalescing advantage. On a GPU with little cache, coalescing dominates at every
+  size; on a large-cache GPU the two effects compete. Same mechanism as the CPU crossover, one level
+  down the hierarchy.
+
+  Either way the GPU margin exceeds the CPU one, where the blocked layout is worth 13-36 % at best
+  and *loses* below ~15 M entries. The measurement is deliberately isolated in its own kernel —
   inside `generateKeysKernel_grid` the probe sits behind EC generation and two hash160 chains
   (~57 %/43 % of kernel time, § 6), which would have masked a factor this size down to a few percent.
 
@@ -1471,6 +1483,12 @@ cost balance shifts):
   defaulting to the present Fuse-8 behaviour so existing configs are byte-for-byte unaffected. The
   end-to-end gain will be much smaller than the probe ratio above, since the probe is a minority of
   kernel time — that is exactly what the integration then has to measure.
+
+  **The cross-vendor result argues for keeping `gpuFilterType` selectable rather than hard-switching
+  the default.** Blocked Bloom is ahead everywhere measured, so defaulting to it is defensible — but
+  the payoff ranges from 2.23× down to 1.13× depending on vendor *and* filter size, and on a
+  large-cache GPU at large filter sizes it is close enough that the ~2.2× larger VRAM footprint may
+  not be worth it. That trade is per-device, which is precisely what a config field is for.
 - **Faster hash160 (both chains kept).** Hashing is ~43% (§6), so SHA-256 / RIPEMD-160
   micro-optimisation, or sharing more work between the uncompressed and compressed chains (they share
   the X coordinate; the compressed SEC prefix transform is already reused via `REUSE_FOR_COMPRESSED`),

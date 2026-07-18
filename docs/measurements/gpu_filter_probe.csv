@@ -3,3 +3,7 @@ ryzen75800h-63g-win11,2026-07-18,NVIDIA GeForce RTX 3070 Laptop GPU,BINARY_FUSE_
 ryzen75800h-63g-win11,2026-07-18,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,10000000,4194304,1.024,0.016,4096000000,3,one coalesced 64-byte transaction per probe
 ryzen75800h-63g-win11,2026-07-18,NVIDIA GeForce RTX 3070 Laptop GPU,BINARY_FUSE_8,100000000,4194304,3.015,0.020,1391145937,3,
 ryzen75800h-63g-win11,2026-07-18,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,100000000,4194304,1.351,0.009,3104592154,3,advantage grows with filter size as it outgrows GPU cache
+ryzen79800x3d8core-61g-win11,2026-07-18,gfx1100,BINARY_FUSE_8,10000000,4194304,0.300,0.036,13981013333,3,RX 7900 XTX (RDNA3); both filters fit the 96 MB Infinity Cache at this size
+ryzen79800x3d8core-61g-win11,2026-07-18,gfx1100,BLOCKED_BLOOM,10000000,4194304,0.187,0.017,22429433155,3,1.60x over fuse - coalescing advantage reproduces on AMD
+ryzen79800x3d8core-61g-win11,2026-07-18,gfx1100,BINARY_FUSE_8,100000000,4194304,0.738,0.021,5683338753,3,~114 MB filter just exceeds the 96 MB Infinity Cache
+ryzen79800x3d8core-61g-win11,2026-07-18,gfx1100,BLOCKED_BLOOM,100000000,4194304,0.655,0.032,6403517557,3,only 1.13x - advantage SHRINKS with size on RDNA3 where it GROWS on NVIDIA; ~256 MB spills the Infinity Cache harder than fuse does
