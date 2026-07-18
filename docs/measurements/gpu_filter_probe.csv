@@ -7,3 +7,7 @@ ryzen79800x3d8core-61g-win11,2026-07-18,gfx1100,BINARY_FUSE_8,10000000,4194304,0
 ryzen79800x3d8core-61g-win11,2026-07-18,gfx1100,BLOCKED_BLOOM,10000000,4194304,0.187,0.017,22429433155,3,1.60x over fuse - coalescing advantage reproduces on AMD
 ryzen79800x3d8core-61g-win11,2026-07-18,gfx1100,BINARY_FUSE_8,100000000,4194304,0.738,0.021,5683338753,3,~114 MB filter just exceeds the 96 MB Infinity Cache
 ryzen79800x3d8core-61g-win11,2026-07-18,gfx1100,BLOCKED_BLOOM,100000000,4194304,0.655,0.032,6403517557,3,only 1.13x - advantage SHRINKS with size on RDNA3 where it GROWS on NVIDIA; ~256 MB spills the Infinity Cache harder than fuse does
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BINARY_FUSE_8,10000000,4194304,0.298,0.007,14074845638,3,fastrange re-run - unchanged control (was 0.300); fuse is not affected by the sizing change
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM,10000000,4194304,0.202,0.008,20763881188,3,fastrange sizing 13 MiB (was 16 MiB at 2^n); 1.48x over fuse
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BINARY_FUSE_8,100000000,4194304,0.740,0.014,5667978378,3,fastrange re-run - unchanged control (was 0.738)
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM,100000000,4194304,0.460,0.013,9118052174,3,fastrange sizing 131 MiB (was 256 MiB at 2^n) - 30% faster; ratio 1.13x -> 1.61x so the advantage GROWS with size on RDNA3 after all

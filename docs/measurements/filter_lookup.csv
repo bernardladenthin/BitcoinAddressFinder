@@ -73,3 +73,11 @@ ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_16,500000000,81.986,9.327,4,prng,
 ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_16,1000000000,88.826,7.239,4,prng,
 ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,500000000,57.241,10.056,4,prng,36% ahead of BINARY_FUSE_8 on 16 MB L3 - opposite of the 96 MB-L3 host
 ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,1000000000,79.844,9.517,4,prng,still ahead at 1B (13%) but the margin narrows and error bars widen
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,100000,19.639,0.446,4,prng,fastrange sizing - supersedes the 2^n rows above; denser filter short-circuits later so CPU lookups got SLOWER (was 14.865)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,1000000,24.174,0.929,4,prng,fastrange sizing (was 22.481)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,10000000,29.315,0.320,4,prng,fastrange sizing 13 MiB instead of 16 MiB (was 27.946)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,100000000,36.174,2.772,4,prng,fastrange sizing 131 MiB instead of 256 MiB (was 34.395)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,500000000,44.177,2.580,4,prng,fastrange sizing (was 42.149)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,45.032,3.259,4,prng,fastrange sizing (was 42.705); BINARY_FUSE_8 now leads at every measured size on this host
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,50000000,31.329,2.618,4,prng,fastrange sizing (was 31.030) - added so the whole row is one geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,132288304,38.512,1.916,4,prng,fastrange sizing at the exact Light DB size (was 37.137); BINARY_FUSE_8 32.8 now leads more clearly

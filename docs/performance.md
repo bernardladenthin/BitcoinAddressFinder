@@ -174,6 +174,12 @@ Same harness, Light DB, filter size pinned at 256 MiB (16.47 effective bits/entr
 |---|--:|--:|--:|--:|--:|--:|--:|
 | FPR | 5.964 % | 1.378 % | 0.307 % | 0.193 % | 0.184 % | 0.219 % | 0.361 % |
 
+**11.00 bits/entry — ryzen79800x3d8core-61g-win11**
+
+| `k` | 4 | 5 | 6 | 7 | 8 | 10 |
+|---|--:|--:|--:|--:|--:|--:|
+| FPR | 0.998 % | 0.811 % | 0.753 % | 0.759 % | 0.802 % | 0.993 % |
+
 **12.50 bits/entry — ryzen79800x3d8core-61g-win11**
 
 | `k` | 4 | 6 | 7 | 8 | 9 | 10 | 12 |
@@ -376,7 +382,7 @@ non-member probes:
 |---|--:|--:|--:|--:|--:|--:|--:|--:|
 | `BINARY_FUSE_8` | 11.7 | 15.2 | 22.5 | 25.9 | 30.9 | 32.8 | 39.6 | 39.9 |
 | `BINARY_FUSE_16` | 11.8 | 20.2 | 30.2 | 31.0 | 35.4 | — | 43.1 | 40.8 |
-| `BLOCKED_BLOOM` | 14.9 | 22.5 | 27.9 | 31.0 | 34.4 | 37.1 | 42.1 | 42.7 |
+| `BLOCKED_BLOOM` | 19.6 | 24.2 | 29.3 | 31.3 | 36.2 | 38.5 | 44.2 | 45.0 |
 | `HASHSET` | 30.1 | 41.2 | 53.1 | — | — | — | — | — |
 | `BLOOM` | 50.1 | 56.5 | 62.9 | 64.1 | 73.0 | — | 85.2 | 87.2 |
 | `TRUNCATED_LONG_64` | 46.2 | 87.0 | 153.9 | 289.2 | 394.1 | — | — | — |
@@ -1464,21 +1470,24 @@ cost balance shifts):
   |--:|---|--:|--:|--:|
   | 10 M | RTX 3070 Laptop (Ampere) | 1.773 ± 0.003 ms | **1.024 ± 0.016 ms** | **1.73×** |
   | 100 M | RTX 3070 Laptop (Ampere) | 3.015 ± 0.020 ms | **1.351 ± 0.009 ms** | **2.23×** |
-  | 10 M | `gfx1100` / RX 7900 XTX (RDNA3) | 0.300 ± 0.036 ms | **0.187 ± 0.017 ms** | **1.60×** |
-  | 100 M | `gfx1100` / RX 7900 XTX (RDNA3) | 0.738 ± 0.021 ms | **0.655 ± 0.032 ms** | **1.13×** |
+  | 10 M | `gfx1100` / RX 7900 XTX (RDNA3) | 0.298 ± 0.007 ms | **0.202 ± 0.008 ms** | **1.48×** |
+  | 100 M | `gfx1100` / RX 7900 XTX (RDNA3) | 0.740 ± 0.014 ms | **0.460 ± 0.013 ms** | **1.61×** |
 
-  **`BLOCKED_BLOOM` wins on both vendors at both sizes — but only the *direction* is portable, not
-  the trend.** On NVIDIA the advantage *grows* with filter size (1.73× → 2.23×); on RDNA3 it
-  *shrinks* (1.60× → 1.13×). The cross-vendor check therefore confirms the coalescing argument and
-  refutes the "and it pulls away" corollary, which was an Ampere-specific observation.
+  **`BLOCKED_BLOOM` wins on both vendors at both sizes, and the advantage grows with filter size on
+  both.** The AMD rows above are the *fastrange* re-run; the first RDNA3 measurement gave 1.60× →
+  **1.13×** and was written up here as "the trend reverses on RDNA3, so it is Ampere-specific". That
+  conclusion was wrong, and the cause was ours, not the hardware: at 100 M the old power-of-two block
+  rounding inflated the blocked filter to 256 MiB (21.47 bits/entry) instead of the requested 131 MiB
+  (11.00). Sizing it correctly made that point **30 % faster** (0.655 → 0.460 ms) and restored the
+  growing trend, 1.48× → 1.61×. Fuse-8 moved 0.300 → 0.298 and 0.738 → 0.740 ms across the same two
+  runs — an unchanged control, since fuse never used that rounding.
 
-  The likely mechanism is the 7900 XTX's **96 MB Infinity Cache**, which the RTX 3070 Laptop (4 MB
-  L2) has no analogue for. At 10 M both structures are cache-resident there (fuse ~11 MB, blocked
-  ~16 MB) and the blocked layout wins purely on transaction count. At 100 M both spill — but blocked
-  Bloom is the *larger* structure (~256 MB vs ~114 MB), so it spills harder, and its size disadvantage
-  eats most of its coalescing advantage. On a GPU with little cache, coalescing dominates at every
-  size; on a large-cache GPU the two effects compete. Same mechanism as the CPU crossover, one level
-  down the hierarchy.
+  The residual vendor difference is one of *magnitude*, not direction: NVIDIA gains 1.73× → 2.23×,
+  RDNA3 1.48× → 1.61×. A plausible reading is the 7900 XTX's **96 MB Infinity Cache**, which the RTX
+  3070 Laptop (4 MB L2) has no analogue for — with more cache to hide scattered reads behind, the
+  coalescing win is worth proportionally less. That is a hypothesis, not a measurement: it would need
+  a size sweep past the Infinity Cache boundary to test, and the last explanation offered for an AMD
+  anomaly here turned out to be an artefact of our own sizing.
 
   > **Caveat: that 100 M filter is ~2× oversized, and the rounding is ours.** `chooseLogBlocks`
   > rounds the block count *up to a power of two* so the block index can be a shift, so a requested
@@ -1499,8 +1508,16 @@ cost balance shifts):
   > recorded so far. See `TODO.md`; this is the weakest point on the board and the likeliest to
   > improve.
 
-  Either way the GPU margin exceeds the CPU one, where the blocked layout is worth 13-36 % at best
-  and *loses* below ~15 M entries. The measurement is deliberately isolated in its own kernel —
+  **The fastrange change pulls CPU and GPU in opposite directions, and that is the useful lesson.**
+  The same re-sizing that made the GPU 100 M probe 30 % *faster* made every CPU lookup 5-32 %
+  *slower* (§3 table: 100 K 14.9 → 19.6 ns, 1 B 42.7 → 45.0 ns). Both follow from one cause. On the
+  GPU the cost is moving bytes, so halving the structure helps. On the CPU `containsAddress`
+  short-circuits at the first unset bit, so speed tracks *sparsity*, not size — a filter squeezed
+  from 21.5 to 11.0 bits/entry sets more of its bits and runs more probes before it can answer "no".
+  Same change, opposite sign, because the two devices are bound by different things.
+
+  Either way the GPU margin exceeds the CPU one, where the blocked layout now *loses to Fuse-8 at
+  every measured size*. The measurement is deliberately isolated in its own kernel —
   inside `generateKeysKernel_grid` the probe sits behind EC generation and two hash160 chains
   (~57 %/43 % of kernel time, § 6), which would have masked a factor this size down to a few percent.
 
@@ -1510,11 +1527,11 @@ cost balance shifts):
   end-to-end gain will be much smaller than the probe ratio above, since the probe is a minority of
   kernel time — that is exactly what the integration then has to measure.
 
-  **The cross-vendor result argues for keeping `gpuFilterType` selectable rather than hard-switching
-  the default.** Blocked Bloom is ahead everywhere measured, so defaulting to it is defensible — but
-  the payoff ranges from 2.23× down to 1.13× depending on vendor *and* filter size, and on a
-  large-cache GPU at large filter sizes it is close enough that the ~2.2× larger VRAM footprint may
-  not be worth it. That trade is per-device, which is precisely what a config field is for.
+  **After the fastrange fix the case for defaulting to blocked Bloom is considerably stronger.** The
+  payoff is now 1.48–2.23× across both vendors and both sizes, growing with filter size everywhere,
+  and the VRAM cost fell with it — at 100 M the blocked payload is 131 MiB against fuse's ~114 MiB,
+  not the 256 MiB that made the trade look questionable. `gpuFilterType` is still worth having, but
+  as a per-device tuning knob rather than a hedge against the filter being the wrong choice.
 - **Faster hash160 (both chains kept).** Hashing is ~43% (§6), so SHA-256 / RIPEMD-160
   micro-optimisation, or sharing more work between the uncompressed and compressed chains (they share
   the X coordinate; the compressed SEC prefix transform is already reused via `REUSE_FOR_COMPRESSED`),
