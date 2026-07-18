@@ -18,6 +18,25 @@
       "registered": "2026-07-18",
       "storage": "Samsung 990 PRO 4TB NVMe",
       "updated": "2026-07-18"
+    },
+    "ryzen79800x3d8core-61g-win11": {
+      "cpu": {
+        "cores_logical": 16,
+        "cores_physical": 8,
+        "l3_mb": 96,
+        "model": "AMD Ryzen 7 9800X3D 8-Core Processor"
+      },
+      "gpu": "AMD Radeon(TM) Graphics, AMD Radeon RX 7900 XTX",
+      "jdk": "21.0.7",
+      "notes": "",
+      "os": {
+        "name": "Microsoft Windows 11 Pro",
+        "version": "10.0.26200"
+      },
+      "ram_gb": 61.6,
+      "registered": "2026-07-18",
+      "storage": "Samsung SSD 990 PRO 4TB NVMe",
+      "updated": "2026-07-18"
     }
   }
 }

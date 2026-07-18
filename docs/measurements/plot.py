@@ -63,8 +63,13 @@ def _style(ax, title: str, xlabel: str, ylabel: str) -> None:
 def plot_lookup_latency(lookup: pd.DataFrame, machines: pd.DataFrame) -> pathlib.Path:
     """Latency vs database size, log-log. The crossover is the point of this figure."""
     fig, ax = plt.subplots(figsize=(9, 5.5), dpi=150)
+    # Colour identifies the backend; line style identifies the machine. Without the second channel
+    # the same backend on two machines draws in one colour and the figure becomes unreadable.
+    styles = ["-", "--", ":", "-."]
+    order_of_machines = sorted(lookup["machine_id"].unique())
+    multi = len(order_of_machines) > 1
     for machine_id, per_machine in lookup.groupby("machine_id"):
-        multi = lookup["machine_id"].nunique() > 1
+        style = styles[order_of_machines.index(machine_id) % len(styles)]
         for backend in ORDER:
             rows = per_machine[per_machine["backend"] == backend].sort_values("entries")
             if rows.empty:
@@ -79,6 +84,7 @@ def plot_lookup_latency(lookup: pd.DataFrame, machines: pd.DataFrame) -> pathlib
                 linewidth=1.8,
                 capsize=3,
                 color=COLOURS.get(backend),
+                linestyle=style,
                 label=label,
             )
     ax.set_xscale("log")
@@ -121,15 +127,19 @@ def plot_lookup_latency(lookup: pd.DataFrame, machines: pd.DataFrame) -> pathlib
 def plot_k_sweep(k_sweep: pd.DataFrame) -> pathlib.Path:
     """False-positive rate vs k, one line per bit density. Shows the non-monotonic optimum."""
     fig, ax = plt.subplots(figsize=(9, 5.0), dpi=150)
+    # FPR is hardware-independent, so curves from different machines at the same density overlap
+    # exactly. Name the machine in the legend anyway, otherwise the duplicate labels read as a bug.
+    multi = k_sweep["machine_id"].nunique() > 1
     for (machine_id, density), rows in k_sweep.groupby(["machine_id", "bits_per_entry_effective"]):
         rows = rows.sort_values("k")
+        label = f"{density:.2f} bits/entry" + (f" — {machine_id}" if multi else "")
         line = ax.plot(
             rows["k"],
             rows["fpr"] * 100.0,
             marker="o",
             markersize=5,
             linewidth=1.8,
-            label=f"{density:.2f} bits/entry",
+            label=label,
         )[0]
         best = rows.loc[rows["fpr"].idxmin()]
         ax.annotate(
