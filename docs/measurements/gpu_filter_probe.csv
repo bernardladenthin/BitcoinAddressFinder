@@ -11,3 +11,7 @@ ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BINARY_FUSE_8,10000000,4194304,0
 ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM,10000000,4194304,0.202,0.008,20763881188,3,fastrange sizing 13 MiB (was 16 MiB at 2^n); 1.48x over fuse
 ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BINARY_FUSE_8,100000000,4194304,0.740,0.014,5667978378,3,fastrange re-run - unchanged control (was 0.738)
 ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM,100000000,4194304,0.460,0.013,9118052174,3,fastrange sizing 131 MiB (was 256 MiB at 2^n) - 30% faster; ratio 1.13x -> 1.61x so the advantage GROWS with size on RDNA3 after all
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BINARY_FUSE_8,10000000,4194304,0.298,0.021,14074845638,3,fastrange + k=6 - unchanged control - third consecutive run at 0.298-0.300
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM,10000000,4194304,0.188,0.011,22310127659,3,fastrange + k=6; slight gain over k=8 (0.202)
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BINARY_FUSE_8,100000000,4194304,0.739,0.006,5675647496,3,fastrange + k=6 - unchanged control
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM,100000000,4194304,0.478,0.035,8774694561,3,fastrange + k=6; no gain over k=8 (0.460) - on GPU all k probes share one 512-bit block so k is nearly free

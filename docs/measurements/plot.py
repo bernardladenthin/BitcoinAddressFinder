@@ -356,7 +356,13 @@ def _latest_only(frame: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
     """
     if frame.empty or "date" not in frame:
         return frame
-    return frame.sort_values("date").drop_duplicates(subset=keys, keep="last")
+    # Sort stably on (date, file order) and keep the last. File order is the tiebreaker because
+    # re-runs on the *same* date are common — two sweeps of one point can differ only in a setting
+    # such as k, and the later row in the file is the newer measurement. Without an explicit
+    # tiebreaker pandas' default quicksort is unstable and would pick between them arbitrarily.
+    ordered = frame.reset_index(drop=True).rename_axis("_row").reset_index()
+    ordered = ordered.sort_values(["date", "_row"], kind="mergesort")
+    return ordered.drop_duplicates(subset=keys, keep="last").drop(columns="_row")
 
 
 def main() -> int:

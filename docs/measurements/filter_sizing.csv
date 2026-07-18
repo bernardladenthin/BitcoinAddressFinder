@@ -3,3 +3,8 @@ ryzen75800h-63g-win11,2026-07-18,132288304,lmdb_light,4,4.06,8,67.8,0.537,0.3082
 ryzen75800h-63g-win11,2026-07-18,132288304,lmdb_light,8,8.12,8,131.8,1.045,0.029365,8821393,
 ryzen75800h-63g-win11,2026-07-18,132288304,lmdb_light,11,16.24,8,259.8,2.059,0.001838,9848272,shipped default
 ryzen75800h-63g-win11,2026-07-18,132288304,lmdb_light,17,32.50,8,515.8,4.089,0.000392,12004332,sparser filter is faster: earlier short-circuit
+ryzen79800x3d8core-61g-win11,2026-07-19,10000000,prng,8,8.00,4,18.4,1.925,0.025976,23598792,fastrange + matched k (k ~ 0.55 x b/e); k varies across this sweep unlike the 2026-07-18 rows which fix k=8
+ryzen79800x3d8core-61g-win11,2026-07-19,10000000,prng,11,11.00,6,22.4,2.345,0.007531,22283502,shipped default after DEFAULT_K 8 -> 6
+ryzen79800x3d8core-61g-win11,2026-07-19,10000000,prng,14,14.00,8,26.4,2.764,0.003106,20966470,best FPR-per-MiB step in this sweep
+ryzen79800x3d8core-61g-win11,2026-07-19,10000000,prng,17,17.00,9,30.4,3.184,0.001627,20835721,lowest total cost if a false positive costs ~2 us of LMDB
+ryzen79800x3d8core-61g-win11,2026-07-19,10000000,prng,21,21.00,12,34.4,3.604,0.001079,19400618,diminishing returns: 1.5x better FPR for 25% more memory and 7% less speed

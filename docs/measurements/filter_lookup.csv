@@ -81,3 +81,11 @@ ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,500000000,44.177,2.580,4,p
 ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,45.032,3.259,4,prng,fastrange sizing (was 42.705); BINARY_FUSE_8 now leads at every measured size on this host
 ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,50000000,31.329,2.618,4,prng,fastrange sizing (was 31.030) - added so the whole row is one geometry
 ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,132288304,38.512,1.916,4,prng,fastrange sizing at the exact Light DB size (was 37.137); BINARY_FUSE_8 32.8 now leads more clearly
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,100000,17.895,0.652,4,prng,fastrange + k=6; recovers most of the k=8 regression (19.639) but still short of the old sparse 2^n geometry (14.865)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,1000000,22.315,0.296,4,prng,fastrange + k=6; fully recovered vs 2^n (22.481)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,10000000,27.668,1.533,4,prng,fastrange + k=6; fully recovered vs 2^n (27.946)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,50000000,29.061,0.664,4,prng,fastrange + k=6; now FASTER than the 2^n geometry (31.030) at half the size
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,100000000,34.542,1.301,4,prng,fastrange + k=6; fully recovered vs 2^n (34.395)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,132288304,36.317,2.020,4,prng,fastrange + k=6; now faster than the 2^n geometry (37.137)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,500000000,42.373,4.118,4,prng,fastrange + k=6; fully recovered vs 2^n (42.149)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,44.317,2.068,4,prng,fastrange + k=6; partially recovered vs 2^n (42.705) - still ~4% short

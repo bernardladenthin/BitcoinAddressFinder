@@ -213,8 +213,42 @@ entirely to this effect*; the corrected decomposition is unblocked ideal 0.052 %
 | 260 MiB | 2.059 |  0.184 % |  9.85 M |
 | 516 MiB | 4.089 |  0.039 % | 12.00 M |
 
-Larger filters look up **faster** here: `containsAddress` short-circuits on the first unset bit, so a
-saturated filter runs more probes before answering "no" — speed tracks sparsity, not size. At matched
+###### Size sweep at *matched* `k` — the trade-off has an interior optimum
+
+The sweep above holds `k = 8` while size varies. Sweeping size with `k` tracked to it
+(`k ≈ 0.55 × bits/entry`) answers a different and more practical question — what to configure —
+and gives the opposite speed trend, because the rising `k` costs more probes than the rising
+sparsity saves (`ryzen79800x3d8core-61g-win11`, 10 M PRNG entries, fastrange):
+
+| bits/entry | `k` | size | FPR | lookups/s |
+|--:|--:|--:|--:|--:|
+| 8 | 4 | 9 MiB | 2.598 % | 23.60 M |
+| 11 | 6 | 13 MiB | 0.753 % | 22.28 M |
+| 14 | 8 | 16 MiB | 0.311 % | 20.97 M |
+| 17 | 9 | 20 MiB | 0.163 % | 20.84 M |
+| 21 | 12 | 25 MiB | 0.108 % | 19.40 M |
+
+**Speed varies by 22 % across this range while FPR varies by 24×**, so the choice is dominated by
+what a false positive costs. A false positive is an LMDB lookup that the filter was supposed to
+prevent, so the figure of merit is `filter_ns + FPR × lmdb_ns`, not lookups/s:
+
+| bits/entry | filter only | + FPR × 200 ns | + FPR × 2 µs |
+|--:|--:|--:|--:|
+| 8 | 42.4 ns | 47.6 | 94.3 |
+| 11 | 44.9 ns | **46.4** | 59.9 |
+| 14 | 47.7 ns | 48.3 | 53.9 |
+| 17 | 48.0 ns | 48.3 | **51.3** |
+| 21 | 51.5 ns | 51.8 | 53.7 |
+
+So the optimum moves with the *database*, not the CPU: ~11 bits/entry when a miss is cheap (warm
+page cache), ~14-17 when it costs microseconds (cold NVMe, the Full DB case). The shipped 11 is the
+right default for the light tier; a Full-DB scan on cold storage would likely do better at 14.
+Treat the second and third columns as a model, not a measurement — the LMDB miss costs are assumed,
+not measured here, and closing that would need an end-to-end scan.
+
+Larger filters look up **faster** at *fixed* `k`: `containsAddress` short-circuits on the first unset
+bit, so a saturated filter runs more probes before answering "no" — speed tracks sparsity, not size.
+At matched
 footprint (1.045 vs 1.137 B/entry) Fuse-8's 0.390 % beats blocked Bloom's 2.937 % by ~7.5×, which is
 the quantitative reason Fuse-8 was kept rather than superseded.
 
@@ -382,7 +416,7 @@ non-member probes:
 |---|--:|--:|--:|--:|--:|--:|--:|--:|
 | `BINARY_FUSE_8` | 11.7 | 15.2 | 22.5 | 25.9 | 30.9 | 32.8 | 39.6 | 39.9 |
 | `BINARY_FUSE_16` | 11.8 | 20.2 | 30.2 | 31.0 | 35.4 | — | 43.1 | 40.8 |
-| `BLOCKED_BLOOM` | 19.6 | 24.2 | 29.3 | 31.3 | 36.2 | 38.5 | 44.2 | 45.0 |
+| `BLOCKED_BLOOM` | 17.9 | 22.3 | 27.7 | 29.1 | 34.5 | 36.3 | 42.4 | 44.3 |
 | `HASHSET` | 30.1 | 41.2 | 53.1 | — | — | — | — | — |
 | `BLOOM` | 50.1 | 56.5 | 62.9 | 64.1 | 73.0 | — | 85.2 | 87.2 |
 | `TRUNCATED_LONG_64` | 46.2 | 87.0 | 153.9 | 289.2 | 394.1 | — | — | — |
@@ -1508,16 +1542,34 @@ cost balance shifts):
   > recorded so far. See `TODO.md`; this is the weakest point on the board and the likeliest to
   > improve.
 
-  **The fastrange change pulls CPU and GPU in opposite directions, and that is the useful lesson.**
-  The same re-sizing that made the GPU 100 M probe 30 % *faster* made every CPU lookup 5-32 %
-  *slower* (§3 table: 100 K 14.9 → 19.6 ns, 1 B 42.7 → 45.0 ns). Both follow from one cause. On the
-  GPU the cost is moving bytes, so halving the structure helps. On the CPU `containsAddress`
-  short-circuits at the first unset bit, so speed tracks *sparsity*, not size — a filter squeezed
-  from 21.5 to 11.0 bits/entry sets more of its bits and runs more probes before it can answer "no".
-  Same change, opposite sign, because the two devices are bound by different things.
+  **The CPU regression first attributed to fastrange was mostly a `k` artefact.** Measured at the
+  then-default `k=8`, the smaller filter looked 5-32 % slower on the CPU, and that was written up
+  here as an intrinsic cost of the denser geometry. Re-measuring at the density-matched `k=6`
+  recovers nearly all of it — and at 50 M and 132 M the new geometry is now *faster* than the old
+  one at half the size:
 
-  Either way the GPU margin exceeds the CPU one, where the blocked layout now *loses to Fuse-8 at
-  every measured size*. The measurement is deliberately isolated in its own kernel —
+  | entries | old 2ⁿ, k=8 | fastrange, k=8 | fastrange, k=6 |
+  |--:|--:|--:|--:|
+  | 100 K | 14.9 | 19.6 | 17.9 |
+  | 10 M | 27.9 | 29.3 | **27.7** |
+  | 50 M | 31.0 | 31.3 | **29.1** |
+  | 132 M | 37.1 | 38.5 | **36.3** |
+  | 1 B | 42.7 | 45.0 | 44.3 |
+
+  Only 100 K stays clearly behind (17.9 vs 14.9): at that size the old power-of-two rounding was
+  most generous, so the sparsity it bought was largest. Two lessons worth keeping: a geometry change
+  invalidates the `k` that was tuned for the old geometry, and re-measuring one without the other
+  attributes the difference to the wrong variable.
+
+  **`k` is a CPU lever, not a GPU one.** The same `k=8 → 6` change is worth up to ~7 % on the CPU but
+  nothing measurable on the GPU (100 M: 0.460 → 0.478 ms, intervals overlapping). That asymmetry is
+  the blocked layout working as designed: all `k` probes land inside one 512-bit block, so on the GPU
+  — where the cost is the memory transaction — dropping two probes changes almost nothing, while on
+  the CPU, where `containsAddress` short-circuits at the first unset bit, each probe is real work.
+
+  Either way the GPU margin exceeds the CPU one, where the blocked layout still loses to Fuse-8 at
+  every measured size even after the `k` fix. The measurement is deliberately isolated in its own
+  kernel —
   inside `generateKeysKernel_grid` the probe sits behind EC generation and two hash160 chains
   (~57 %/43 % of kernel time, § 6), which would have masked a factor this size down to a few percent.
 
