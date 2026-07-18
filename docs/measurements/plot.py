@@ -1,0 +1,260 @@
+#!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+"""Render the measurement CSVs into plots and into the generated tables in docs/performance.md.
+
+The CSVs in this directory are the single source of truth. Markdown cannot import data, so the
+tables in performance.md are *generated* from the same CSVs and rewritten in place between
+``<!-- BEGIN GENERATED:name -->`` / ``<!-- END GENERATED:name -->`` markers. Never hand-edit inside
+those markers; edit the CSV and re-run this script.
+
+Usage::
+
+    python docs/measurements/plot.py                 # all machines
+    python docs/measurements/plot.py --pc-id <id>    # restrict to one machine
+
+Adding your own machine: append a row to machines.csv with a new ``pc_id``, run the benchmarks (see
+README.md here), append the result rows carrying that ``pc_id``, and re-run this script. Plots draw
+one line per machine, so results from different hardware can be compared directly.
+"""
+
+from __future__ import annotations
+
+import argparse
+import pathlib
+import sys
+
+import matplotlib
+
+matplotlib.use("Agg")  # headless: never try to open a window
+import matplotlib.pyplot as plt  # noqa: E402
+import pandas as pd  # noqa: E402
+
+HERE = pathlib.Path(__file__).resolve().parent
+PLOTS = HERE / "plots"
+PERFORMANCE_MD = HERE.parent / "performance.md"
+
+# Stable colour per backend so every plot reads the same way.
+COLOURS = {
+    "BINARY_FUSE_8": "#1f77b4",
+    "BINARY_FUSE_16": "#17becf",
+    "BLOCKED_BLOOM": "#d62728",
+    "BLOOM": "#7f7f7f",
+    "HASHSET": "#2ca02c",
+    "TRUNCATED_LONG_64": "#ff7f0e",
+}
+# Slowest last, so the legend reads best-to-worst.
+ORDER = ["BINARY_FUSE_8", "BINARY_FUSE_16", "BLOCKED_BLOOM", "HASHSET", "BLOOM", "TRUNCATED_LONG_64"]
+
+
+def _style(ax, title: str, xlabel: str, ylabel: str) -> None:
+    ax.set_title(title, fontsize=12, pad=12)
+    ax.set_xlabel(xlabel, fontsize=10)
+    ax.set_ylabel(ylabel, fontsize=10)
+    ax.grid(True, which="both", alpha=0.25, linewidth=0.6)
+    ax.set_axisbelow(True)
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
+
+
+def plot_lookup_latency(lookup: pd.DataFrame, machines: pd.DataFrame) -> pathlib.Path:
+    """Latency vs database size, log-log. The crossover is the point of this figure."""
+    fig, ax = plt.subplots(figsize=(9, 5.5), dpi=150)
+    for pc_id, per_machine in lookup.groupby("pc_id"):
+        multi = lookup["pc_id"].nunique() > 1
+        for backend in ORDER:
+            rows = per_machine[per_machine["backend"] == backend].sort_values("entries")
+            if rows.empty:
+                continue
+            label = f"{backend} ({pc_id})" if multi else backend
+            ax.errorbar(
+                rows["entries"],
+                rows["ns_per_op"],
+                yerr=rows["error_ns"],
+                marker="o",
+                markersize=4,
+                linewidth=1.8,
+                capsize=3,
+                color=COLOURS.get(backend),
+                label=label,
+            )
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    _style(ax, "Lookup latency vs database size (lower is better)", "entries in filter", "ns per containsAddress")
+
+    # Mark the L3 boundary that explains the crossover, using the reference machine's cache size.
+    if not machines.empty and "l3_mb" in machines:
+        l3_mb = float(machines.iloc[0]["l3_mb"])
+        # Binary Fuse 8 stores ~1.14 bytes/entry, so it leaves L3 at roughly this entry count.
+        fuse_leaves_l3 = l3_mb * 1024 * 1024 / 1.14
+        ax.axvline(fuse_leaves_l3, color="#444444", linestyle="--", linewidth=1.0, alpha=0.7)
+        ax.annotate(
+            f"Fuse-8 outgrows L3 ({l3_mb:.0f} MB)",
+            xy=(fuse_leaves_l3, ax.get_ylim()[1] * 0.55),
+            xytext=(6, 0),
+            textcoords="offset points",
+            rotation=90,
+            fontsize=8,
+            color="#444444",
+            va="top",
+        )
+
+    ax.legend(fontsize=8, frameon=False, ncol=2)
+    fig.tight_layout()
+    out = PLOTS / "filter_lookup_latency.png"
+    fig.savefig(out)
+    plt.close(fig)
+    return out
+
+
+def plot_k_sweep(k_sweep: pd.DataFrame) -> pathlib.Path:
+    """False-positive rate vs k, one line per bit density. Shows the non-monotonic optimum."""
+    fig, ax = plt.subplots(figsize=(9, 5.0), dpi=150)
+    for (pc_id, density), rows in k_sweep.groupby(["pc_id", "bits_per_entry_effective"]):
+        rows = rows.sort_values("k")
+        line = ax.plot(
+            rows["k"],
+            rows["fpr"] * 100.0,
+            marker="o",
+            markersize=5,
+            linewidth=1.8,
+            label=f"{density:.2f} bits/entry",
+        )[0]
+        best = rows.loc[rows["fpr"].idxmin()]
+        ax.annotate(
+            f"optimum k={int(best['k'])}",
+            xy=(best["k"], best["fpr"] * 100.0),
+            xytext=(0, -20),
+            textcoords="offset points",
+            ha="center",
+            fontsize=8,
+            color=line.get_color(),
+            arrowprops={"arrowstyle": "->", "color": line.get_color(), "lw": 0.9},
+        )
+    ax.set_yscale("log")
+    _style(ax, "Blocked Bloom: false-positive rate vs k (lower is better)", "k (bits set per key)", "measured FPR [%]")
+    ax.legend(fontsize=9, frameon=False, title="bit density")
+    fig.tight_layout()
+    out = PLOTS / "blocked_bloom_k_sweep.png"
+    fig.savefig(out)
+    plt.close(fig)
+    return out
+
+
+def plot_sizing(sizing: pd.DataFrame) -> pathlib.Path:
+    """FPR and lookup speed vs filter size — the size/accuracy trade-off on one axis pair."""
+    fig, ax = plt.subplots(figsize=(9, 5.0), dpi=150)
+    rows = sizing.sort_values("bits_per_entry_effective")
+    ax.plot(rows["bits_per_entry_effective"], rows["fpr"] * 100.0, marker="o", color="#d62728", linewidth=1.8)
+    ax.set_yscale("log")
+    _style(
+        ax,
+        "Blocked Bloom: accuracy and speed vs filter size (k = 8)",
+        "effective bits per entry",
+        "measured FPR [%]",
+    )
+    twin = twin_axis(ax)
+    twin.plot(
+        rows["bits_per_entry_effective"],
+        rows["lookups_per_sec"] / 1e6,
+        marker="s",
+        linestyle="--",
+        color="#1f77b4",
+        linewidth=1.6,
+    )
+    twin.set_ylabel("M lookups/s", fontsize=10, color="#1f77b4")
+    twin.tick_params(axis="y", colors="#1f77b4")
+    ax.plot([], [], marker="s", linestyle="--", color="#1f77b4", label="lookups/s (right axis)")
+    ax.plot([], [], marker="o", color="#d62728", label="FPR (left axis)")
+    ax.legend(fontsize=9, frameon=False)
+    fig.tight_layout()
+    out = PLOTS / "blocked_bloom_sizing.png"
+    fig.savefig(out)
+    plt.close(fig)
+    return out
+
+
+def twin_axis(ax):
+    """Second y-axis sharing the x-axis (kept separate so styling stays in one place)."""
+    twin = ax.twinx()
+    twin.spines["top"].set_visible(False)
+    return twin
+
+
+def latency_table(lookup: pd.DataFrame) -> str:
+    """Markdown pivot of latency by backend and entry count, generated from the CSV."""
+    pivot = lookup.pivot_table(index="backend", columns="entries", values="ns_per_op", aggfunc="min")
+    pivot = pivot.reindex([b for b in ORDER if b in pivot.index])
+
+    def human(n: int) -> str:
+        return f"{n // 1_000_000} M" if n >= 1_000_000 else f"{n // 1_000} K"
+
+    header = "| Backend | " + " | ".join(human(c) for c in pivot.columns) + " |"
+    sep = "|---|" + "|".join(["--:"] * len(pivot.columns)) + "|"
+    lines = [header, sep]
+    for backend, row in pivot.iterrows():
+        cells = ["—" if pd.isna(v) else f"{v:.1f}" for v in row]
+        lines.append(f"| `{backend}` | " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
+def k_table(k_sweep: pd.DataFrame) -> str:
+    """Markdown table of FPR by k, one row per bit density."""
+    lines = []
+    for density, rows in k_sweep.groupby("bits_per_entry_effective"):
+        rows = rows.sort_values("k")
+        ks = " | ".join(str(int(k)) for k in rows["k"])
+        fprs = " | ".join(f"{v * 100:.3f} %" for v in rows["fpr"])
+        lines.append(f"\n**{density:.2f} bits/entry**\n")
+        lines.append(f"| `k` | {ks} |")
+        lines.append("|---|" + "|".join(["--:"] * len(rows)) + "|")
+        lines.append(f"| FPR | {fprs} |")
+    return "\n".join(lines)
+
+
+def inject(markdown: str, name: str, body: str) -> str:
+    """Replace the content between the BEGIN/END markers for ``name``."""
+    begin, end = f"<!-- BEGIN GENERATED:{name} -->", f"<!-- END GENERATED:{name} -->"
+    if begin not in markdown or end not in markdown:
+        print(f"  ! markers for '{name}' not found in performance.md — skipped", file=sys.stderr)
+        return markdown
+    head = markdown[: markdown.index(begin) + len(begin)]
+    tail = markdown[markdown.index(end) :]
+    return f"{head}\n<!-- Generated by docs/measurements/plot.py — edit the CSV, not this block. -->\n\n{body}\n\n{tail}"
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--pc-id", help="restrict to a single machine from machines.csv")
+    args = parser.parse_args()
+
+    PLOTS.mkdir(exist_ok=True)
+    machines = pd.read_csv(HERE / "machines.csv")
+    lookup = pd.read_csv(HERE / "filter_lookup.csv")
+    k_sweep = pd.read_csv(HERE / "k_sweep.csv")
+    sizing = pd.read_csv(HERE / "filter_sizing.csv")
+
+    if args.pc_id:
+        machines = machines[machines["pc_id"] == args.pc_id]
+        lookup = lookup[lookup["pc_id"] == args.pc_id]
+        k_sweep = k_sweep[k_sweep["pc_id"] == args.pc_id]
+        sizing = sizing[sizing["pc_id"] == args.pc_id]
+        if lookup.empty:
+            print(f"no rows for pc_id={args.pc_id!r}", file=sys.stderr)
+            return 1
+
+    for produced in (plot_lookup_latency(lookup, machines), plot_k_sweep(k_sweep), plot_sizing(sizing)):
+        print(f"wrote {produced.relative_to(HERE.parent.parent)}")
+
+    if PERFORMANCE_MD.exists():
+        md = PERFORMANCE_MD.read_text(encoding="utf-8")
+        md = inject(md, "filter_lookup_table", latency_table(lookup))
+        md = inject(md, "k_sweep_table", k_table(k_sweep))
+        PERFORMANCE_MD.write_text(md, encoding="utf-8", newline="")
+        print(f"updated {PERFORMANCE_MD.relative_to(HERE.parent.parent)}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
