@@ -26,14 +26,14 @@ That regenerates `plots/*.png` and the generated tables in one step.
 | `register_machine.py` | Detects this machine's CPU/L3/RAM/GPU/OS/JDK and registers it. Run once per machine. |
 | `filter_lookup.csv` | Lookup latency (ns/op) per backend and entry count — `FilterLookupBenchmark`. |
 | `filter_build.csv` | Build time, retained memory, FPR against **real** LMDB databases — `FilterMeasurementMain`. |
+| `k_sweep.csv` | Blocked Bloom false-positive rate vs `k`, per bit density. |
+| `filter_sizing.csv` | Blocked Bloom FPR and speed vs filter size at fixed `k`. |
+| `plot.py` | Reads all of the above; writes `plots/*.png` and the generated tables. |
 
 > **`retained_mib` is a GC-delta estimate, not the structure size.** It includes harness heap, so it
 > is only trustworthy once the filter dominates — at ~10 M entries it has reported ~26 MiB for a
 > 16 MiB array. `bits_per_entry_effective` is therefore derived analytically (block count × 512 ÷
 > entries), never from `retained_mib`. Keep it that way when adding rows.
-| `k_sweep.csv` | Blocked Bloom false-positive rate vs `k`, per bit density. |
-| `filter_sizing.csv` | Blocked Bloom FPR and speed vs filter size at fixed `k`. |
-| `plot.py` | Reads all of the above; writes `plots/*.png` and the generated tables. |
 
 ## Adding your own machine
 
