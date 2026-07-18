@@ -204,7 +204,39 @@ Bloom build allocates the bit array once and streams — **peak build memory ≈
 
 Consequence for tuning: pick `BINARY_FUSE_8` for light/medium databases (lower RAM, marginally
 faster, and it is what feeds the GPU pre-filter); pick `BLOCKED_BLOOM` at the ≈ 1 B+ tier, where it
-is the only in-front-of-LMDB filter that can be constructed at all. The two were measured against
+is the only in-front-of-LMDB filter that can be constructed at all.
+
+###### Build time is I/O, and free RAM is the lever (`MDB_NORDAHEAD`)
+
+At the Full DB tier the build is bound by the LMDB walk, not the filter. Two measurements of the
+*same* 1.377 B-entry build make the mechanism concrete:
+
+| run | free RAM at start | build |
+|---|--:|--:|
+| RAM contended (after a 12 GB-heap JMH run) | ~2 GB | 1 869 s |
+| cache emptied, ample headroom | 58 GB | 1 043 s |
+
+Nearly 2× faster from the *colder* start — because the store is written in random hash160 order, so a
+key-ordered cursor walk is physically scattered across the 61 GB file. With headroom, pages
+accumulate; without it they are evicted before reuse and re-read. Measured mid-build in the contended
+case: the NVMe ran 86 % busy at 332 MB/s while yielding only ~19 MB/s of useful entry data — ~17×
+read amplification. **Free RAM, not cache warmth, is the variable that matters.**
+
+`CLMDBConfigurationReadOnly.useNoReadAhead` opens the read-only env with `MDB_NORDAHEAD`, which stops
+the OS prefetching neighbours that will be evicted before their turn. Cold-cache A/B, each arm
+preceded by a 46 GiB `PageCacheBuster` pass:
+
+| arm | build | free RAM at start | FPR | retained |
+|---|--:|--:|--:|--:|
+| baseline | 1 042.8 s | 35.4 GB | 0.004847 | 2052.1 MiB |
+| `MDB_NORDAHEAD` | **965.8 s** | 28.7 GB | 0.004847 | 2052.1 MiB |
+
+**7.4 % faster while starting with 19 % less free RAM** — the win came against a headwind, so the
+true effect is probably larger. FPR and retained size are bit-identical across arms, confirming the
+flag changes only I/O. Treat 7.4 % as a lower bound with caveats: **n = 1 per arm**, and this
+configuration began with 58 GB free, so amplification was already mild; the flag should help more
+under the memory pressure it targets. Default is `false`, because read-ahead genuinely helps when the
+database fits in RAM. The two were measured against
 each other precisely to decide whether one could be removed — they cannot, their optimal domains are
 disjoint, so `BLOCKED_BLOOM` was added rather than substituted.
 

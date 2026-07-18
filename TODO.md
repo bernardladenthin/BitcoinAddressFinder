@@ -28,8 +28,14 @@ pluggable-persistence design plan:
   Two regimes, not an open-ended decline: ~2.9 M/s while pages are cached, then a ~7× drop that
   **plateaus at a steady ~0.42 M/s** once the walk is fully in cold territory (the last two segments
   match to within 2 %). The insert work per key is constant, so the entire curve is the cost of
-  *reaching* the next key. Practical consequence: a cold Full-DB build costs ~50-55 min and a
-  partially-warm one ~33 min, essentially all of it I/O wait. The process sat
+  *reaching* the next key.
+
+  **The dominant variable is free RAM, not cache warmth** — an earlier reading of these numbers had
+  that causality backwards. The 1 869 s build above began with RAM already contended (~2 GB free
+  after a 12 GB-heap JMH run), so pages were evicted before reuse and re-read. A later build of the
+  *same* database starting from a deliberately emptied cache but **58 GB free** took **1 043 s** —
+  nearly 2× faster despite being colder, because file pages could accumulate instead of evicting one
+  another. Cache warmth helps only the prefix; headroom helps the whole pass. The process sat
   **Root cause is read amplification, not an idle disk.** Measured in the cold regime on the NVMe
   backing the database: **332 MB/s, 8 279 reads/s, 86 % disk-busy, queue depth 1**, with free RAM down
   to 2.3 GB and the JVM working set at 54 GB. Useful entry throughput at that moment was only
@@ -43,11 +49,23 @@ pluggable-persistence design plan:
   before their turn arrives. Once RAM is exhausted this degenerates into thrashing.
 
   Fix candidates, cheapest first:
-  1. **Set `EnvFlags.MDB_NORDAHEAD` on the read-only env** (`LMDBPersistence` currently passes only
-     `MDB_RDONLY_ENV` + `MDB_NOLOCK`). LMDB documents this flag for exactly this case — a database
-     larger than RAM — to stop the OS prefetching pages that will not be used. Should be config-gated
-     (it is a pessimisation when the DB *does* fit in RAM, e.g. the Light DB) and A/B'd with
-     `FilterMeasurementMain`.
+  1. **`EnvFlags.MDB_NORDAHEAD` — DONE and measured (~7 % build-time win).** Implemented as the
+     opt-in `CLMDBConfigurationReadOnly#useNoReadAhead` (default `false`, since read-ahead is a
+     genuine win when the database fits in RAM). Cold-cache A/B over the Full DB, each arm preceded
+     by a 46 GiB `PageCacheBuster` pass:
+
+     | arm | build | free RAM at start | FPR | retained |
+     |---|--:|--:|--:|--:|
+     | baseline | 1 042.8 s | 35.4 GB | 0.004847 | 2052.1 MiB |
+     | `MDB_NORDAHEAD` | **965.8 s** | 28.7 GB | 0.004847 | 2052.1 MiB |
+
+     **7.4 % faster while starting with 19 % less free RAM**, i.e. the win was achieved against a
+     headwind, so the true effect is likely somewhat larger. FPR and retained size are bit-identical
+     across arms, confirming the flag affects only I/O. Caveats: **n = 1 per arm** (no error bars),
+     and this configuration had 58 GB free at the outset so amplification was already low — the flag
+     should matter *more* under real memory pressure (the 1 869 s regime), which has not been
+     isolated. Worth repeating with alternating arm order and matched free-RAM before treating 7.4 %
+     as the headline figure.
   2. Raise the effective queue depth — the disk sat at **QD 1**, so it is latency-serialized even
      while 86 % busy; overlapping reads could recover throughput.
   3. Rebuild/compact the database in key order so the logical walk becomes physically sequential
