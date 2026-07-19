@@ -1938,3 +1938,8 @@ mechanism + `comgr` cache controls in §9.
 | `src/test/java/.../benchmark/GpuFuse8FilterBenchmark.java` | Filter/transfer-path benchmark |
 | `src/test/java/.../ProbeAddressesOpenCLTest.java` | Primary byte-identical parity gate |
 | `src/test/java/.../opencl/OpenCLContext{IG,Comb}TableTest.java` | Pure-Java table-generator parity (no GPU) |
+
+---
+
+For the complete filter comparison — sizes, false-positive rates, CPU and GPU probe latency, build
+cost, the cost model and the recommended cascade — see [filter-selection.md](filter-selection.md).
