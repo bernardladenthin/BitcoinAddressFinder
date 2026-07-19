@@ -108,7 +108,54 @@ class BinaryFuseAcceleratorTest {
         BinaryFuse16AddressPresence filter = BinaryFuse16AddressPresence.populateFrom(source);
         BinaryFuseAccelerator accelerator = new BinaryFuseAccelerator(filter, new RecordingPresence());
 
-        assertThat("Fuse-16 has no GPU path", accelerator.getGpuFilterData().isPresent(), is(false));
+        // Fuse-16 does have a GPU path — but through getGpuFilterData16(), not this accessor. The
+        // two widths stay type-distinct on purpose: handing a 16-bit payload to the 8-bit upload
+        // would have the device read two adjacent slots as one fingerprint, matching almost nothing
+        // and silently dropping funded addresses. Returning empty here is what forces the caller to
+        // pick the right one.
+        assertThat(
+                "the 8-bit accessor must not answer for a 16-bit filter",
+                accelerator.getGpuFilterData().isPresent(),
+                is(false));
+    }
+
+    @Test
+    void getGpuFilterData16_fuse16Wrapped_returnsPayload() {
+        ListIterable source = new ListIterable().add(7).add(8).add(9);
+        BinaryFuse16AddressPresence filter = BinaryFuse16AddressPresence.populateFrom(source);
+        BinaryFuseAccelerator accelerator = new BinaryFuseAccelerator(filter, new RecordingPresence());
+
+        assertThat(accelerator.getGpuFilterData16().isPresent(), is(true));
+        assertThat(accelerator.getGpuFilterData16().get().fingerprints().length > 0, is(true));
+    }
+
+    @Test
+    void getGpuFilterData16_fuse8Wrapped_returnsEmpty() {
+        ListIterable source = new ListIterable().add(7).add(8).add(9);
+        BinaryFuse8AddressPresence filter = BinaryFuse8AddressPresence.populateFrom(source);
+        BinaryFuseAccelerator accelerator = new BinaryFuseAccelerator(filter, new RecordingPresence());
+
+        // The symmetric guard. Without it a Fuse-8 filter could supply a payload to the 16-bit
+        // upload path, which is the exact direction that produces silent false negatives.
+        assertThat(
+                "the 16-bit accessor must not answer for an 8-bit filter",
+                accelerator.getGpuFilterData16().isPresent(),
+                is(false));
+    }
+
+    @Test
+    void bothAccessors_neverAnswerForTheSameFilter() {
+        // Whatever is wrapped, at most one width may claim it. If both ever answered, the caller's
+        // choice would decide how the device interprets the buffer, with no error either way.
+        ListIterable source = new ListIterable().add(7).add(8).add(9);
+        for (AddressPresence filter : new AddressPresence[] {
+            BinaryFuse8AddressPresence.populateFrom(source), BinaryFuse16AddressPresence.populateFrom(source)
+        }) {
+            BinaryFuseAccelerator accelerator = new BinaryFuseAccelerator(filter, new RecordingPresence());
+            boolean eight = accelerator.getGpuFilterData().isPresent();
+            boolean sixteen = accelerator.getGpuFilterData16().isPresent();
+            assertThat("exactly one width must claim " + filter.getClass().getSimpleName(), eight ^ sixteen, is(true));
+        }
     }
 
     @Test
