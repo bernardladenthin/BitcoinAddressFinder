@@ -33,6 +33,6 @@ java \
 -Xmx8g \
 -Dlogback.configurationFile=logbackConfiguration.xml \
 -jar \
-bitcoinaddressfinder-1.6.1-jar-with-dependencies.jar \
+bitcoinaddressfinder-1.7.0-jar-with-dependencies.jar \
 config_TuneConfiguration.json
 # >> log_TuneConfiguration.txt 2>&1

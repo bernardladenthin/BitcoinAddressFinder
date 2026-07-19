@@ -32,6 +32,6 @@ java ^
 -Xmx16G ^
 -Dlogback.configurationFile=logbackConfiguration.xml ^
 -jar ^
-bitcoinaddressfinder-1.6.1-jar-with-dependencies.jar ^
+bitcoinaddressfinder-1.7.0-jar-with-dependencies.jar ^
 config_Find_1CPUProducerBip39.json
 rem >> log_Find_1CPUProducerBip39.txt 2>&1

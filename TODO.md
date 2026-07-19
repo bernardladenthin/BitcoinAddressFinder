@@ -77,34 +77,31 @@ pluggable-persistence design plan:
   same cursor — the latter twice). Re-measure with `FilterMeasurementMain` (see
   `docs/performance.md` §6); the per-10 % progress lines make the curve directly visible.
 
-- **Size blocked Bloom with a multiply-shift instead of power-of-two block counts.**
-  `chooseLogBlocks` rounds the block count up to a power of two so the block index is a shift. The
-  cost is up to 2x wasted memory at unlucky entry counts: at 100 M a requested 11 bits/entry becomes
-  21.47 (256 MB instead of ~131 MB); at 10 M it becomes 13.42 (1.22x). That waste is not academic --
-  it is the most likely cause of the weakest GPU result measured (RDNA3 at 100 M, only 1.13x over
-  Fuse-8, where a 256 MB filter spills a 96 MB Infinity Cache that a correctly sized ~131 MB one
-  largely would not).
+- **Size blocked Bloom with a multiply-shift instead of power-of-two block counts.** ✅ **DONE.**
+  `chooseBlocks` now sizes exactly via Lemire's fastrange (`block = unsignedMultiplyHigh(hash,
+  numBlocks)` on the CPU, `mul_hi` on the GPU), so a requested 11 bits/entry is delivered as 11, not
+  rounded up to as much as 21.47. This removed the up-to-2x memory waste and confirmed the predicted
+  RDNA3 improvement: at 100 M the blocked-Bloom filter dropped from 256 MB (2ⁿ) to ~131 MB and its
+  GPU advantage over Fuse-8 grew from 1.13x to 1.61x once it stopped spilling the 96 MB Infinity
+  Cache. The k-sweep, sizing sweep and GPU A/B were all re-run against the new geometry; the shipped
+  default is now `DEFAULT_K = 6` at 11 bits/entry. Pinned by
+  `BlockedBloomAddressPresenceTest#chooseBlocks_sizesExactly_withoutPowerOfTwoRounding`.
 
-  Fix: `block = mulhi(hash, numBlocks)` (Lemire's fastrange), which admits any block count. Both
-  sides already use that primitive for the fuse base position (`Math.unsignedMultiplyHigh` /
-  `mul_hi`), so the change itself is small. It alters the filter geometry, so it invalidates every
-  recorded size and FPR figure and requires re-running the k-sweep, the sizing sweep and the GPU A/B.
-  Highest-value remaining change: it improves RAM, CPU cache behaviour and the GPU spill case at once.
+- **Selectable GPU pre-filter (`gpuFilterType`) + `BINARY_FUSE_16` kernel.** ✅ **DONE** for the fuse
+  widths; blocked Bloom on the GPU is a **deliberate no**, not an open item. The production kernel
+  now branches on a `filter_type` uniform, `CProducerOpenCL.gpuFilterType` (default `FUSE_8`) selects
+  the width, and `fuse16_contains` is byte-exact against Java (`BinaryFuse16GpuAgreementTest`, plus
+  the end-to-end `OpenCLFilterHitSetIntegrationTest` on both NVIDIA and RDNA3). A width mismatch is
+  refused at dispatch rather than silently dropping addresses.
 
-- **Port the GPU pre-filter to `BLOCKED_BLOOM` — probe measured (1.7-2.2x), integration outstanding.**
-  The device probe `blockedbloom_contains` and the two A/B kernels `benchmarkFilterFuse8` /
-  `benchmarkFilterBlockedBloom` are in `inc_ecc_secp256k1custom.cl`, driven by
-  `GpuFilterProbeBenchmark` through `OpenCLContext.prepareBenchFilterProbe*` (JOCL stays inside the
-  `opencl` package, per the `joclConfinedToOpencl` architecture rule). Measured on an RTX 3070:
-  1.773 -> 1.024 ms at 10 M entries (1.73x) and 3.015 -> 1.351 ms at 100 M (2.23x), the advantage
-  growing with filter size. Far larger than the CPU margin, which is the coalescing argument
-  behaving as expected on hardware with no large cache.
-
-  Still to do for production: new kernel arguments (the signature hard-codes `fuse8_fp` /
-  `fuse8_meta`), host-side VRAM upload of the blocked payload (`BlockedBloomGpuFilterData` exists),
-  and a `gpuFilterType` config field defaulting to Fuse-8 so existing configs are unaffected. Expect
-  a much smaller end-to-end gain than the probe ratio: the probe is a minority of kernel time behind
-  EC generation and hashing.
+  Why blocked Bloom is **not** wired in despite winning the isolated probe (1.6–2.3x, confirmed on
+  RDNA3): the pre-filter's job is to hand the single consumer as little as possible, and blocked
+  Bloom passes ~2x more candidates at equal footprint because its false-positive rate is higher. The
+  measured end-to-end cascade (`docs/filter-selection.md` §7) shows the GPU filter choice is decided
+  by FPR-per-VRAM-byte, not probe speed — so `FUSE_16` is the pre-filter to prefer where the device
+  allocation limit allows it, and `FUSE_8` otherwise. The device probe `blockedbloom_contains` and
+  the `benchmarkFilterBlockedBloom` kernel remain for the benchmark only. Re-open this only if a
+  future device makes blocked Bloom win on *total* cost, not probe latency.
 
 - **Add open-addressing primitive hash table backend** (fastutil `Long2LongOpenHashMap` or hand-rolled over `long[]`) — would offer O(1) average vs. the sorted array's O(log n) per lookup with similar cache profile. Deferred because `TRUNCATED_LONG_64` is already the fastest backend in practice and the marginal speedup would not change the recommended default.
 
@@ -347,7 +344,16 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
 
   **After this TODO is done:** the GPU-side filter (see next TODO) reuses the same `murmur64` / `reduce` / fingerprint formula verbatim in OpenCL C. The Java and GPU lookup paths are verifiable against each other with identical test inputs.
 
-- **GPU-side Binary Fuse 8 filter — Part 2 implementation plan (atomic steps).** Uses the CPU-side `BinaryFuse8AddressPresence` (✅ done) uploaded to GPU VRAM so the kernel checks the filter inline and transmits only hits over PCIe. Controlled by two new config flags: `enableGpuFilter` (default `false`) and `transferAll` (default `false`; forced `true` automatically when `ConsumerJava.enableVanity = true`, since vanity scanning requires all results on the CPU). Each of the 9 steps below is independently committable and must compile + pass existing tests before the next step begins.
+- **GPU-side Binary Fuse 8 filter — Part 2 implementation plan (atomic steps).** ✅ **DONE.** Shipped
+  as designed: `enableGpuFilter` and `transferAll` exist on `CProducerOpenCL` with the documented
+  defaults, `generateKeysKernel_grid` runs the inline filter with the compact/full-transfer count-word
+  protocol below, and the whole path is covered end-to-end by `OpenCLCompactOutputIntegrationTest` and
+  `OpenCLFilterHitSetIntegrationTest` (real device, both NVIDIA and RDNA3). The 16-bit width and the
+  `gpuFilterType` selector were added on top later (see the "Selectable GPU pre-filter" entry above).
+  The design record below is kept because it documents the count-word wire protocol the reader still
+  relies on.
+
+  Original plan (uses the CPU-side `BinaryFuse8AddressPresence`, uploaded to GPU VRAM so the kernel checks the filter inline and transmits only hits over PCIe. Controlled by two new config flags: `enableGpuFilter` (default `false`) and `transferAll` (default `false`; forced `true` automatically when `ConsumerJava.enableVanity = true`, since vanity scanning requires all results on the CPU). Each of the 9 steps below is independently committable and must compile + pass existing tests before the next step begins).
 
   **Unified output buffer format (ONE physical layout, two write modes).** There is a *single* physical output layout, used unchanged by every kernel launch — there is **not** a separate full-transfer stride. This is deliberate: two different strides (104 vs 108) would make the destination-buffer sizing bound (`MAXIMUM_CHUNK_ELEMENTS` / `BIT_COUNT_FOR_MAX_CHUNKS_ARRAY`) depend on which format is active. With one stride the bound is computed off a single true entry size and the buffer is always `OUTPUT_HEADER_SIZE_BYTES + N × OUTPUT_ENTRY_SIZE_BYTES`, which is also exactly compact mode's worst case (every candidate is a filter hit), so one allocation safely covers both modes.
 
