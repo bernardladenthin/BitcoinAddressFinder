@@ -50,9 +50,12 @@ OPENS="--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.io
 # Blocked Bloom is swept across densities because that is its actual design space; the fuse filters
 # and the exact snapshots have no equivalent knob. k follows the measured optimum per density
 # (5/6/7/7/8/9 at 8/11/14/17/21/26) - NOT a proportional rule, which was tried and refuted.
-BB_DENSITIES="11:6 17:7 26:9"
+# The first three are the density sweep; 9:5 and 18:7 exist to match the fuse footprints exactly
+# (block 4). Their FPR must be MEASURED, not interpolated - estimating 9:5 from the 11:6 value was
+# 25 % off (guessed 1.3 %, measured 1.63 %), and an earlier interpolation rule for k was refuted.
+BB_DENSITIES="11:6 17:7 26:9 9:5 18:7"
 
-echo "=== 1/4  memory, build time and false-positive rate (storage-free) ==="
+echo "=== 1/5  memory, build time and false-positive rate (storage-free) ==="
 echo "backend,entries,bits_per_entry,k,build_seconds,exact_bytes,exact_bytes_per_entry,fpr,false_negatives" \
   > "$OUT/accuracy_and_size.csv"
 for N in ${ENTRIES//,/ }; do
@@ -73,7 +76,7 @@ for N in ${ENTRIES//,/ }; do
   done
 done
 
-echo "=== 2/4  lookup latency - every backend in ONE JMH session ==="
+echo "=== 2/5  lookup latency - every backend in ONE JMH session ==="
 # ONE java invocation, no loop. An earlier revision of this script looped over the densities with a
 # JVM launch each, which put every Blocked-Bloom-vs-fuse comparison in a different session - exactly
 # the error the header warns about. It showed up as the largest filter measuring FASTEST with the
@@ -89,11 +92,24 @@ java -Xmx40g $OPENS -cp "$CP" org.openjdk.jmh.Main FilterLookupBenchmark \
   -f 1 -wi 2 -w 2 -i 5 -r 3 -jvmArgsAppend "-Xmx40g" > "$OUT/lookup.log" 2>&1
 echo "  lookup done (all backends, one session)"
 
-echo "=== 3/4  construction cost, storage-free - ONE session ==="
-java -Xmx40g $OPENS -cp "$CP" org.openjdk.jmh.Main FilterBuildBenchmark   -p "backend=BINARY_FUSE_8,BINARY_FUSE_16$BB_PARAMS" -p entries="$ENTRIES"   -f 1 -i 3 -jvmArgsAppend "-Xmx40g" > "$OUT/build.log" 2>&1
+echo "=== 3/5  construction cost, storage-free - ONE session ==="
+# -wi 1 is essential: with SingleShotTime the first shot carries the whole JIT compilation. Running
+# without it produced error bars LARGER than the means (+-8010 ms on a 4282 ms measurement).
+# Discarding that one shot cut the spread by a factor of 6 to 74.
+java -Xmx40g $OPENS -cp "$CP" org.openjdk.jmh.Main FilterBuildBenchmark   -p "backend=BINARY_FUSE_8,BINARY_FUSE_16$BB_PARAMS" -p entries="$ENTRIES"   -f 1 -wi 1 -i 5 -jvmArgsAppend "-Xmx40g" > "$OUT/build.log" 2>&1
 echo "  build done (all backends, one session)"
 
-echo "=== 4/4  GPU probe - the axis where the two filter families differ most ==="
+echo "=== 4/5  equal MEMORY budget - the comparison the recommendation rests on ==="
+# Every other block compares backends at equal ENTRY COUNT, which means unequal memory: at 1e9
+# entries fuse-8 occupies 1.13 GB while blocked bloom at bpe 26 occupies 3.25 GB. Two things vary
+# at once there (filter type AND size), so part of any latency difference is just cache behaviour.
+# Here the footprint is held constant and only the filter type varies. Blocked Bloom densities are
+# chosen to match the fuse footprints: fuse-8 = 1.126 B/entry = 9.0 bits -> bpe 9, k 5;
+# fuse-16 = 2.252 B/entry = 18.0 bits -> bpe 18, k 7.
+java -Xmx40g $OPENS -cp "$CP" org.openjdk.jmh.Main FilterLookupBenchmark   -p "backend=BINARY_FUSE_8,BLOCKED_BLOOM:9:5,BINARY_FUSE_16,BLOCKED_BLOOM:18:7"   -p entries="$ENTRIES" -f 1 -wi 2 -w 2 -i 5 -r 3   -jvmArgsAppend "-Xmx40g" > "$OUT/budget.log" 2>&1
+echo "  equal-memory budget done (one session)"
+
+echo "=== 5/5  GPU probe - the axis where the two filter families differ most ==="
 # Skipped automatically when no OpenCL device is present (the benchmark's assume throws and JMH
 # reports ERROR rows). Blocked Bloom confines all probes to one 64-byte block, i.e. one coalesced
 # transaction, where a fuse lookup makes three scattered reads. The GPU cannot hide those in cache

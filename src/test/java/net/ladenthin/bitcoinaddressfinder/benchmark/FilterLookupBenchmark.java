@@ -193,8 +193,7 @@ public class FilterLookupBenchmark {
         if (firstColon >= 0) {
             String[] parts = backend.split(":");
             if (parts.length != 3) {
-                throw new IllegalArgumentException(
-                        "backend must be NAME or NAME:bitsPerEntry:k, was: " + backend);
+                throw new IllegalArgumentException("backend must be NAME or NAME:bitsPerEntry:k, was: " + backend);
             }
             name = parts[0];
             effectiveBitsPerEntry = Integer.parseInt(parts[1]);

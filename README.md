@@ -1,22 +1,4 @@
-**One configuration covers both database tiers:** [`examples/config_Find_AnyDB_BlockedBloom.json`](examples/config_Find_AnyDB_BlockedBloom.json).
-
-The reason is the **JVM heap**, which turns out to matter more than the tier does. The shipped run scripts use `-Xmx16G`, and against that budget:
-
-| Backend | Light DB (132 M) | Full DB (1.377 B) |
-|---|---|---|
-| `BLOCKED_BLOOM` | ✅ ~260 MB | ✅ ~2 GB |
-| `BINARY_FUSE_8` | ✅ ~3.8 GB peak | ❌ **~42 GB peak — will not build** |
-
-Binary Fuse peels through auxiliary arrays at ~29 B/entry, so at the Full DB tier it needs roughly 42 GB of heap. Blocked Bloom streams and never needs more than the finished filter. That single fact makes `BLOCKED_BLOOM` the safe default for anyone who might point the same config at either database — it also builds ~1.8–2.0× faster there, and is faster to query on any machine with a modest L3.
-
-**When to deviate:**
-
-- **`BINARY_FUSE_8` on a large-cache host** (≳ 64 MB L3, e.g. AMD 3D V-Cache) where footprint or FPR matters: it is 27 % smaller with a 19 % better FPR, and queries ~6 % faster there. At the Full DB tier it additionally needs `-Xmx48g` or so; below ~500 M entries the default heap is fine.
-- **`BINARY_FUSE_8` for small/medium databases generally** — it is the fastest filter measured below ~15 M entries on any machine, and it is what feeds the GPU pre-filter.
-
-**What actually varies with database size** is narrower than it looks — essentially one setting: `logStatsOnInit`. It prints LMDB statistics by iterating the whole store, a few seconds on the Light DB but a full extra pass over 61 GB on the Full DB, so the shipped config leaves it `false`. The GPU grid (`batchSizeInBits`, `keysPerWorkItem`) is a property of your *device*, not of the database — sweep it per §4 of [`docs/performance.md`](docs/performance.md) rather than copying a value.
-
-##### Why `k = 8` — the measured sweep> [!NOTE]
+> [!NOTE]
 > **No IDE or local setup required.** This repository is optimized for fully AI-assisted development using [Claude Code](https://claude.ai/code). No local toolchain, no IDE, nothing to install — everything works completely through Claude.
 
 **AI:**  
@@ -292,6 +274,64 @@ As of version 1.6.0, the address presence check is decoupled from the on-disk LM
 
 **The default is `LMDB_ONLY`: no in-RAM filter, LMDB stays open and answers every lookup exactly.** This is the safest baseline — an exact backend can never report a false positive as a hit — and the in-RAM filters below are opt-in optimisations you add only when you want them. (Note the GPU pre-filter, `producerOpenCL.enableGpuFilter`, is independent of this setting and works with the `LMDB_ONLY` default; see below.)
 
+#### Which filter to pick
+
+**If you want one answer: `BINARY_FUSE_8`.** It is the recommended filter for both database tiers,
+on CPU and on GPU.
+
+That recommendation rests on a distinction worth stating explicitly, because the raw speed numbers
+point the other way. What matters is not how fast a filter answers, but the **total** cost of a
+lookup:
+
+```
+total = probe + false-positive-rate × verification
+```
+
+A probe costs tens of nanoseconds. A verification — the LMDB read a false positive forces — costs
+**4.1 µs warm and 292.7 µs cold**, i.e. 60× to 4 000× more. Any filter comparison that stops at the
+probe measures the term that barely counts.
+
+Measured at 1 billion entries, filters sized to the *same* footprint so only the type varies:
+
+| Filter | Memory | Probe | FPR | Total, warm | Total, cold |
+|---|--:|--:|--:|--:|--:|
+| `BINARY_FUSE_8` | 1.13 B/entry | 76.7 ns | 0.387 % | **92.6 ns** | **1 211 ns** |
+| `BLOCKED_BLOOM` (bpe 9) | 1.13 B/entry | **63.4 ns** | 1.628 % | 130.2 ns | 4 829 ns |
+| `BINARY_FUSE_16` | 2.25 B/entry | 80.4 ns | 0.0016 % | 80.5 ns | **85.1 ns** |
+| `BLOCKED_BLOOM` (bpe 18) | 2.25 B/entry | **54.4 ns** | 0.134 % | **59.9 ns** | 447 ns |
+
+Blocked Bloom wins every probe column — by 17–38 % on CPU and by 1.6–2.3× on GPU, because all its
+`k` bits sit in one 512-bit block, i.e. one coalesced memory transaction, where a fuse lookup makes
+three scattered reads. It still loses the total, because its false-positive rate is 4× higher at the
+same size, and false positives are what actually cost time.
+
+On the GPU the effect is starker, not weaker: a probe there costs **0.7 ns**, so the filter is no
+longer the bottleneck at all. Per key, Fuse-8 totals 16.6 ns against Blocked Bloom's 31.3 ns —
+Blocked Bloom is twice as fast at the one thing that stopped mattering.
+
+**Deviate when:**
+
+- **`BINARY_FUSE_16`** — CPU-only runs against a cold database, if you can spare 2× the memory. Its
+  0.0016 % FPR makes verification cost vanish: 85 ns against Fuse-8's 1 211 ns, a **14× win**. This
+  is the largest single effect in the whole comparison. It has no GPU kernel.
+- **`BLOCKED_BLOOM`** — when build time dominates, e.g. you rebuild often. It constructs **3× faster**
+  (14.6 s vs 43.8 s at 100 M) and streams in one pass, where Binary Fuse peels through auxiliary
+  arrays at ~29 B/entry — roughly 40 GB of transient heap at the Full DB tier, against 1.9 GB for
+  Blocked Bloom. Use a *low* density (`bpe` 9–11); at higher densities `BINARY_FUSE_16` dominates it
+  outright, being both smaller and 37× more accurate.
+- **`LMDB_ONLY`** — whenever a false positive is unacceptable rather than merely costly.
+
+> **On GPU, check the buffer limit, not the VRAM total.** The filter is a single OpenCL allocation
+> and cannot exceed `CL_DEVICE_MAX_MEM_ALLOC_SIZE`, which is commonly a *quarter* of VRAM — 2047 MB
+> on an 8 GB RTX 3070 despite 8191 MB total. At the Full DB tier that admits `BINARY_FUSE_8`
+> (1.58 GB) and low-density `BLOCKED_BLOOM` (1.89 GB), and rules out `BINARY_FUSE_16` (3.14 GB) and
+> dense `BLOCKED_BLOOM`. Run `{"command":"OpenCLInfo"}` to read your device's limit.
+
+All numbers above come from the storage-free bench in
+[`docs/measurements/bench_filters.sh`](docs/measurements/bench_filters.sh), which measures the
+filters without LMDB behind them so the results reproduce across machines. Run it yourself; the
+false-positive rates are deterministic and must match to the digit.
+
 Supported values:
 
 | Value               | RAM cost                | Lookup latency       | LMDB stays open? | Best for                                                                                |
@@ -302,7 +342,7 @@ Supported values:
 | `TRUNCATED_LONG_64` | **~8 B / entry**        | fast when small, **degrades with size** | **no**           | best in-RAM trade-off when you *do* want to drop LMDB *and* the database is small; latency scales worse than any other backend (see the size sweep) |
 | `BINARY_FUSE_8`     | **~1.13 B / entry**     | **fast**             | yes              | ultra-low RAM filter in front of LMDB; 0.4% of filter hits are verified against LMDB (also feeds the GPU pre-filter) |
 | `BINARY_FUSE_16`    | **~2.25 B / entry**     | **fast**             | yes              | like Fuse-8 but 0.0015% FPR — fewer LMDB verifications; use when Fuse-8's verification cost is measurable |
-| `BLOCKED_BLOOM`     | **1.56–2.06 B / entry** | **fast**             | yes              | **the largest databases** — builds ~1.8–2.0× faster than Fuse-8 at the 1.377 B tier (reproduced on two machines), at the cost of ~38 % more memory and a slightly higher FPR |
+| `BLOCKED_BLOOM`     | **1.375 B / entry** (bpe 11, configurable) | **fastest probe** | yes              | rebuild-heavy workloads — constructs 3× faster and streams in one pass instead of peeling through ~29 B/entry of auxiliary arrays; loses on *total* cost because its FPR is ~4× higher at equal size |
 
 #### Memory footprint per backend across the published database tiers
 
@@ -315,18 +355,23 @@ Supported values:
 | `BLOOM` (FPP 0.01)  | ~120 MB                     | ~150 MB                  | ~1.6 GB                   |
 | `BINARY_FUSE_8`     | **~113 MB**                 | **~149 MB**              | **~1.5 GB**               |
 | `BINARY_FUSE_16`    | ~225 MB                     | ~298 MB                  | ~3.1 GB                   |
-| `BLOCKED_BLOOM`     | ~256 MB                     | **~260 MB** (measured)   | **~2.0 GB** (measured)    |
+| `BLOCKED_BLOOM`     | **~138 MB**                 | **~182 MB**              | **~1.89 GB**              |
 
-> The Binary Fuse rows are ~1.125 B/entry (Fuse-8) and ~2.25 B/entry (Fuse-16). Only the 132 M
-> (Light DB) tier is directly measured (148,766,720 fingerprint slots); the 100 M and 1.377 B rows
-> are extrapolated from that ratio.
+> Every row is now **exact**, reported by each backend's `sizeInBytes()` rather than estimated from
+> heap deltas. The old estimates ran ~25 % high (1.412 vs the true 1.126 B/entry for Fuse-8), which
+> made them unusable for a comparison in which memory is a decision criterion.
 >
-> **`BLOCKED_BLOOM` sizes in power-of-two block counts**, so its per-entry cost is a step function
-> rather than a constant: the filter is auto-sized to at least 11 bits/entry and then rounded **up**
-> to the next power-of-two block count. At 132 M entries that lands on 2²² blocks = **256 MiB**
-> (≈ 16.2 bits/entry, 2.06 B/entry — measured 259.5 MiB); at 1.377 B entries it lands on 2²⁵ blocks
-> = 2³⁴ bits = **2 GiB** (≈ 12.5 bits/entry, measured 1.562 B/entry). Within one power-of-two step the
-> per-entry cost therefore *falls* as the database grows.
+> Per-entry constants: Fuse-8 **1.126 B**, Fuse-16 **2.252 B**, Blocked Bloom **1.375 B** at the
+> default 11 bits/entry. Blocked Bloom's density is configurable via `blockedBloomBitsPerEntry`
+> and `blockedBloomK`; the measured optimum for `k` is **5/6/7/7/8/9** at 8/11/14/17/21/26 bits per
+> entry. It saturates sub-linearly, so there is no proportional rule — an earlier
+> `k ≈ 0.55 × bitsPerEntry` was inferred from the low end of that sweep and overshoots by 2 at the
+> top.
+>
+> **Blocked Bloom no longer rounds to power-of-two block counts.** It sizes exactly via *fastrange*
+> (`unsignedMultiplyHigh(hash, numBlocks)`, `mul_hi` on the GPU). The old rounding wasted up to 2×:
+> a request for 11 bits/entry at 100 M entries delivered 21.47. Per-entry cost is now a constant, not
+> a step function that fell as the database grew.
 
 #### Self-contained snapshots release the LMDB env
 
@@ -426,7 +471,7 @@ Same harness, same machine (64 GB RAM), against the 61 GB / 1,377,478,516-entry 
   | retained | **1 504 MiB** | 2 080 MiB | **1 504 MiB** | 2 080 MiB |
   | FPR | **0.393 %** | 0.485 % | **0.393 %** | 0.485 % |
 
-  **Blocked Bloom builds ~1.8–2.0× faster on both machines** — that is the reproducible result, and it is what the recommendation rests on. Fuse-8 is 27 % smaller with a ~19 % better FPR, both bit-identical across hosts.
+  **Blocked Bloom builds faster on both machines.** The 1.8–2.0× seen here is an *LMDB-bound* figure; measured storage-free the true algorithmic factor is **3.0×** (14.6 s vs 43.8 s at 100 M), because these runs spend most of their time on a scattered 61 GB cursor walk that is common to both filters and dilutes the difference. Fuse-8 is 27 % smaller with a ~19 % better FPR, both bit-identical across hosts.
 
   **The lookup row above is an artefact — do not use it.** It comes from a single-shot probe loop run right after a multi-GB build, and re-measuring with the warmed, storage-free JMH instrument inverts the answer on *both* machines. Measured ns/op at 1 B entries:
 
@@ -437,13 +482,23 @@ Same harness, same machine (64 GB RAM), against the 61 GB / 1,377,478,516-entry 
 
   So the ranking flips with cache size: blocked Bloom leads by 13–36 % where L3 is modest, Fuse-8 by ~6 % (intervals overlapping) where it is large. Note the same Fuse-8 array costs 91.7 vs 39.9 ns on the two hosts — **2.3× from cache alone**. Full analysis in [`docs/performance.md`](docs/performance.md).
 
-  **Recommendation:** `BLOCKED_BLOOM` by default at this tier — it builds ~1.8–2.0× faster on both machines, the one result that reproduces everywhere, and queries faster wherever L3 is modest. `BINARY_FUSE_8` is the better pick on a large-cache host when footprint or FPR matters, being 27 % smaller with a 19 % better FPR.
+  **Recommendation: `BINARY_FUSE_8`** — see [Which filter to pick](#which-filter-to-pick). Blocked Bloom wins every *probe* column on this page, and still loses the *total*: at equal footprint its false-positive rate is ~4× higher, and a false positive costs 4.1 µs warm to 292.7 µs cold against tens of nanoseconds for the probe. The probe is the term that barely counts. Blocked Bloom remains the pick when build time dominates (3× faster, one streaming pass, no ~29 B/entry peeling arrays).
 
 **Build time is dominated by LMDB I/O, not by the filter**, and the lever is **free RAM**. The database is written in random hash160 order, so a key-ordered cursor walk is physically scattered across the 61 GB file; with headroom the pages accumulate, without it they are evicted before reuse and re-read. Measured mid-build under memory pressure: the NVMe ran 86 % busy at 332 MB/s while yielding only ~19 MB/s of useful entry data — roughly **17× read amplification**. The same build took **1,869 s with ~2 GB free** but **1,043 s starting from an emptied cache with 58 GB free** — nearly 2× faster from the *colder* start.
 
 Setting `"useNoReadAhead": true` opens LMDB with `MDB_NORDAHEAD`, asking the OS not to prefetch neighbours that get evicted before use. **This flag has no effect on Windows** — LMDB does not implement it there (see the `MDB_NORDAHEAD` javadoc in lmdbjava: *"The option is not implemented on Windows"*), so it is a POSIX-only lever. On Linux it is the standard remedy for the amplification described above; **it is currently unvalidated in this project**, because the only measurements taken so far were on Windows where it does nothing. It defaults to `false`. See `docs/performance.md` for the measurement history and `TODO.md` for the remaining levers (higher queue depth, key-order compaction).
 
 ##### Why `k = 8` — the measured sweep
+
+> [!IMPORTANT]
+> **Superseded.** This sweep was measured when Blocked Bloom rounded its block count up to a power
+> of two, which forced ~16.5 effective bits/entry at the Light DB tier and made `k = 8` optimal.
+> Sizing is now exact via *fastrange*, the shipped defaults are **`DEFAULT_K = 6` at 11 bits/entry**,
+> and the optimum is density-dependent: **5/6/7/7/8/9** at 8/11/14/17/21/26 bits per entry. The
+> analysis below still explains *why* the blocked optimum sits below the textbook
+> `(m/n)·ln2` prediction — that reasoning is unchanged — but read every `k = 8` in it as "the
+> optimum at 16.5 bits/entry", not as the current default.
+
 
 `k` (bits set per key) is the accuracy knob. Too few and the filter is too permissive; too many and each block saturates, *raising* the FPR again. The optimum is not guessed — it is measured. Light DB, filter size held constant at 256 MiB (16.47 effective bits/entry), 5 M random-non-member probes per row:
 
@@ -491,7 +546,7 @@ The probe sequence is `bit_i = (x + i·y) mod 512`, whose period is `512 / gcd(y
 **Which to choose:**
 
 - **Small/medium databases (below ~15 M entries) → `BINARY_FUSE_8`.** Fastest filter measured at that scale on either machine, lowest RAM, and it is what feeds the GPU pre-filter.
-- **Large databases → depends on the scanning host's L3 cache, not on the tier.** `BLOCKED_BLOOM` is the safe default: it builds ~1.8–2.0× faster, fits the shipped `-Xmx16G`, and queries faster wherever L3 is modest. `BINARY_FUSE_8` wins by ~6 % on a large-cache host and is 27 % smaller, but needs ~42 GB of heap to build at the 1.377 B tier.
+- **Large databases → `BINARY_FUSE_8`**, on either host. Cache size changes which filter *probes* faster, but not which one is cheaper overall: verification cost dominates, and Fuse-8's FPR is ~4× lower at equal footprint. Budget ~40 GB of transient heap to build it at the 1.377 B tier (the peeling arrays need ~29 B/entry); `BLOCKED_BLOOM` needs only the finished 1.89 GB and builds 3× faster, so prefer it if you rebuild often or cannot spare the heap.
 
 Ready-to-run example covering both tiers: [`examples/config_Find_AnyDB_BlockedBloom.json`](examples/config_Find_AnyDB_BlockedBloom.json).
 

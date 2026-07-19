@@ -27,3 +27,11 @@ ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOO
 ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,100000000,4194304,1.511,0.007,2775846459,3,fastrange bpe=21 k=12; block D single session
 ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,10000000,4194304,1.246,0.040,3366215088,3,fastrange bpe=26 k=14; block D single session
 ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,100000000,4194304,1.497,0.025,2801806279,3,fastrange bpe=26 k=14; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BINARY_FUSE_8,10000000,4194304,1.775,0.005,2362988169,3,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM:11:6,10000000,4194304,0.895,0.011,4686373184,3,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM:17:7,10000000,4194304,1.027,0.013,4084035053,3,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM:26:9,10000000,4194304,1.111,0.023,3775251125,3,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BINARY_FUSE_8,100000000,4194304,2.999,0.046,1398567522,3,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM:11:6,100000000,4194304,1.451,0.045,2890629910,3,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM:17:7,100000000,4194304,1.366,0.003,3070500732,3,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM:26:9,100000000,4194304,1.322,0.01,3172695915,3,single-session run; densities encoded as NAME:bpe:k

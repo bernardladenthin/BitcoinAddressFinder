@@ -38,11 +38,17 @@ import org.openjdk.jmh.annotations.Warmup;
  * a multi-pass peeling construction over auxiliary arrays. That difference is real and worth
  * quantifying — it just cannot be quantified through a cold 61&nbsp;GB mmap.
  *
- * <h2>Single-shot on purpose</h2>
+ * <h2>Single-shot, but with one warmup shot discarded</h2>
  * A build is a one-time cost, so {@link Mode#SingleShotTime} measures exactly one construction per
- * iteration rather than a steady-state rate. There is no warmup that would make a cold build fast,
- * and averaging repeated builds would report a JIT-warmed best case the operator never sees on the
- * first run. Expect wide error bars at large sizes; they are honest.
+ * iteration rather than a steady-state rate.
+ *
+ * <p>The warmup iteration is <b>not</b> optional, despite the temptation to argue that a cold first
+ * build is what the operator actually sees. Running with {@code -wi 0} produced error bars
+ * <em>larger than the means</em> — 4282&nbsp;&plusmn;&nbsp;8010&nbsp;ms at 10&nbsp;M — because the
+ * first shot carries the entire JIT compilation of the construction path while the rest do not, so
+ * the "measurement" was really a bimodal mixture of two different programs. Discarding that one shot
+ * cut the spread by a factor of 6 to 74 (to 3793&nbsp;&plusmn;&nbsp;762&nbsp;ms). A dispersion that
+ * exceeds the mean is not an honest wide error bar, it is an unusable one.
  *
  * <h2>Memory</h2>
  * The Binary Fuse peeling construction peaks at ~29&nbsp;B/entry, so 100&nbsp;M entries needs
@@ -51,14 +57,14 @@ import org.openjdk.jmh.annotations.Warmup;
  *
  * <h2>Run</h2>
  * <pre>
- * java ... org.openjdk.jmh.Main FilterBuildBenchmark -p entries=10000000,100000000 -f 1 -i 3
+ * java ... org.openjdk.jmh.Main FilterBuildBenchmark -p entries=10000000,100000000 -f 1 -wi 1 -i 5
  * </pre>
  */
 @BenchmarkMode(Mode.SingleShotTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Benchmark)
-@Warmup(iterations = 0)
-@Measurement(iterations = 3)
+@Warmup(iterations = 1)
+@Measurement(iterations = 5)
 @Fork(1)
 public class FilterBuildBenchmark {
 
@@ -105,8 +111,7 @@ public class FilterBuildBenchmark {
         if (backend.indexOf(':') >= 0) {
             String[] parts = backend.split(":");
             if (parts.length != 3) {
-                throw new IllegalArgumentException(
-                        "backend must be NAME or NAME:bitsPerEntry:k, was: " + backend);
+                throw new IllegalArgumentException("backend must be NAME or NAME:bitsPerEntry:k, was: " + backend);
             }
             name = parts[0];
             bpe = Integer.parseInt(parts[1]);

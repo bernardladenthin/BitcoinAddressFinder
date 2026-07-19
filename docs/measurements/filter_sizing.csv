@@ -8,3 +8,10 @@ ryzen79800x3d8core-61g-win11,2026-07-19,10000000,prng,11,11.00,6,22.4,2.345,0.00
 ryzen79800x3d8core-61g-win11,2026-07-19,10000000,prng,14,14.00,8,26.4,2.764,0.003106,20966470,best FPR-per-MiB step in this sweep
 ryzen79800x3d8core-61g-win11,2026-07-19,10000000,prng,17,17.00,9,30.4,3.184,0.001627,20835721,lowest total cost if a false positive costs ~2 us of LMDB
 ryzen79800x3d8core-61g-win11,2026-07-19,10000000,prng,21,21.00,12,34.4,3.604,0.001079,19400618,diminishing returns: 1.5x better FPR for 25% more memory and 7% less speed
+ryzen75800h-63g-win11,2026-07-19,100000000,prng,-1,9.008,-1,,1.126,0.003874,,"exact sizeInBytes() not a heap estimate; backend=BINARY_FUSE_8; 5M probes; all configs one source"
+ryzen75800h-63g-win11,2026-07-19,100000000,prng,-1,18.016,-1,,2.252,1.6e-05,,"exact sizeInBytes() not a heap estimate; backend=BINARY_FUSE_16; 5M probes; all configs one source"
+ryzen75800h-63g-win11,2026-07-19,100000000,prng,11,11.0,6,,1.375,0.007563,,"exact sizeInBytes() not a heap estimate; backend=BLOCKED_BLOOM; 5M probes; all configs one source"
+ryzen75800h-63g-win11,2026-07-19,100000000,prng,17,17.0,7,,2.125,0.001555,,"exact sizeInBytes() not a heap estimate; backend=BLOCKED_BLOOM; 5M probes; all configs one source"
+ryzen75800h-63g-win11,2026-07-19,100000000,prng,26,26.0,9,,3.25,0.000592,,"exact sizeInBytes() not a heap estimate; backend=BLOCKED_BLOOM; 5M probes; all configs one source"
+ryzen75800h-63g-win11,2026-07-19,100000000,prng,9,9.0,5,,1.125,0.016283,,"exact sizeInBytes() not a heap estimate; backend=BLOCKED_BLOOM; 5M probes; all configs one source"
+ryzen75800h-63g-win11,2026-07-19,100000000,prng,18,18.0,7,,2.25,0.00134,,"exact sizeInBytes() not a heap estimate; backend=BLOCKED_BLOOM; 5M probes; all configs one source"

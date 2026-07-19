@@ -147,8 +147,7 @@ public class GpuFilterProbeBenchmark {
         if (filter.indexOf(':') >= 0) {
             String[] parts = filter.split(":");
             if (parts.length != 3) {
-                throw new IllegalArgumentException(
-                        "filter must be NAME or NAME:bitsPerEntry:k, was: " + filter);
+                throw new IllegalArgumentException("filter must be NAME or NAME:bitsPerEntry:k, was: " + filter);
             }
             name = parts[0];
             bpe = Integer.parseInt(parts[1]);
