@@ -276,14 +276,18 @@ memory.
 The filter choice above is portable: false-positive rates are deterministic and the cost model holds
 across hardware. The **grid** parameters (`batchSizeInBits`, `keysPerWorkItem`) are not — they are a
 property of the specific GPU, and copying another machine's values leaves throughput on the table.
-`TuneConfiguration` measures them on yours; full arm tables are in
-[`tune_arms.csv`](measurements/tune_arms.csv). The two machines measured so far disagree on the
-optimum:
+`TuneConfiguration` measures them on yours. Arm tables: [`tune_arms.csv`](measurements/tune_arms.csv)
+(RTX 3070 grid + the cascade run) and the full 25-arm RDNA3 sweep in
+[`tuner_ryzen9800x3d_gfx1100.csv`](measurements/tuner_ryzen9800x3d_gfx1100.csv). The two machines
+disagree on the optimum:
 
-| Machine | Winner | Note |
-|---|---|---|
-| RTX 3070 Laptop | `batchSizeInBits=22`, `keysPerWorkItem=256` | `kpwi=256` is optimal at `bits=22` and the **worst** choice of all at `bits=18` (5.8× spread) |
-| RX 7900 XTX | `batchSizeInBits=22`, `keysPerWorkItem=64` | `kpwi=256` is past-peak here; best-to-worst spread widens to 24.9× |
+| Machine | Winner | Peak throughput | Note |
+|---|---|--:|---|
+| RTX 3070 Laptop | `bits=22`, `kpwi=256` | 229–234 M/s | `kpwi=256` is optimal at `bits=22` and the **worst** of all at `bits=18` (5.8× spread) |
+| RX 7900 XTX | `bits=22`, `kpwi=64` | 130.2 M/s | `kpwi=256` is past-peak (110.1 M); spread widens to 24.9× (worst arm `19/1` at 5.24 M/s) |
+
+(Absolute rates are not vendor-comparable here — `noInlineHelpers=auto` gave the AMD run its
+out-of-lined kernel — but the *location* of the optimum is what transfers, and that is what differs.)
 
 The `batchSizeInBits` agrees but `keysPerWorkItem` does not, and the two parameters interact — the
 right `keysPerWorkItem` depends on `batchSizeInBits`, so sweeping one axis alone finds a false
