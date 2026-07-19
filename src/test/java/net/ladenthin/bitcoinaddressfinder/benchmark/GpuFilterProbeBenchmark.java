@@ -10,6 +10,8 @@ import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.OpenCLPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16GpuFilterData;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8GpuFilterData;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BlockedBloomAddressPresence;
@@ -90,7 +92,7 @@ public class GpuFilterProbeBenchmark {
     private static final long PROBE_SEED = 0x5EED_1234_ABCDL;
 
     /** Which filter this trial probes. */
-    @Param({"FUSE8", "BLOCKED_BLOOM"})
+    @Param({"FUSE8", "FUSE16", "BLOCKED_BLOOM"})
     public String filter;
 
     /** Addresses in the filter — drives its size, hence its coalescing and memory behaviour. */
@@ -166,6 +168,18 @@ public class GpuFilterProbeBenchmark {
                     data.segmentCountLength()
                 };
                 context.prepareBenchFilterProbeFuse8(data.fingerprints(), meta, probeKeys);
+            }
+            case "FUSE16" -> {
+                BinaryFuse16GpuFilterData data =
+                        BinaryFuse16AddressPresence.populateFrom(source).toGpuFilterData();
+                int[] meta = {
+                    (int) data.seed(),
+                    (int) (data.seed() >>> 32),
+                    data.segmentLength(),
+                    data.segmentLengthMask(),
+                    data.segmentCountLength()
+                };
+                context.prepareBenchFilterProbeFuse16(data.fingerprints(), meta, probeKeys);
             }
             case "BLOCKED_BLOOM" -> {
                 BlockedBloomGpuFilterData data = (bpe > 0 && probesPerKey > 0

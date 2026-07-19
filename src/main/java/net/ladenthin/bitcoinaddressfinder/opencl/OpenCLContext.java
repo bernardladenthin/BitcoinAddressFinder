@@ -42,6 +42,7 @@ import java.util.Objects;
 import java.util.Optional;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.configuration.GpuFilterType;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
@@ -384,6 +385,18 @@ public class OpenCLContext implements ReleaseCLObject {
     private @Nullable cl_mem fuse8MetadataMem;
 
     /**
+     * Which fingerprint width was actually uploaded, or {@code null} when only the placeholder is
+     * bound.
+     *
+     * <p>Exists solely to make a width mismatch loud. The device cannot detect one: a Fuse-8 buffer
+     * probed as {@code ushort*} reads two adjacent slots as one 16-bit fingerprint, which almost
+     * never matches, so the filter rejects nearly everything — including funded addresses — while
+     * the scan keeps running and reports nothing. That is indistinguishable from an honest empty
+     * result, so it is checked on the host instead, where it can throw.
+     */
+    private @Nullable GpuFilterType uploadedFilterType;
+
+    /**
      * Whether a real GPU filter has been uploaded via {@link #uploadGpuFilter}. {@code false}
      * means the buffers hold a dummy empty filter (allocated in {@link #init()} so the kernel
      * arguments are always bindable) and the kernel must run in full-transfer mode.
@@ -678,6 +691,53 @@ public class OpenCLContext implements ReleaseCLObject {
             byte[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
         allocateFilterBuffers(fingerprints, seedLo, seedHi, segLen, segLenMask, segCountLen);
         gpuFilterUploaded = true;
+        uploadedFilterType = GpuFilterType.FUSE_8;
+    }
+
+    /**
+     * Uploads a Binary Fuse <b>16</b> filter to GPU VRAM, using the same two device buffers and the
+     * same five-word metadata block as {@link #uploadGpuFilter(byte[], int, int, int, int, int)}.
+     *
+     * <p>The kernel takes a single {@code uchar*} fingerprint argument for both widths and casts it
+     * to {@code ushort*} when {@code filter_type} says so, which is why the 16-bit slots are
+     * flattened to raw bytes here rather than uploaded as a typed buffer. The byte order is
+     * <b>little-endian</b>, matching how a Java {@code short[]} is laid out on the little-endian
+     * devices this project supports (a big-endian device is rejected outright in {@link #init()},
+     * see {@code assertDeviceByteOrderSupported}) — so the device reads back exactly the values the
+     * CPU filter holds.
+     *
+     * <p>Which width the kernel <em>probes</em> is decided separately, by
+     * {@code producerOpenCL.gpuFilterType}. Uploading through this method and leaving that setting
+     * at {@code FUSE_8} does not throw: it reinterprets 16-bit slots as 8-bit ones and silently
+     * misses stored addresses. The two must be configured together.
+     *
+     * @param fingerprints the 16-bit fingerprint slot array
+     * @param seedLo       low 32 bits of the construction seed
+     * @param seedHi       high 32 bits of the construction seed
+     * @param segLen       per-segment {@code reduce} length
+     * @param segLenMask   {@code segLen - 1}
+     * @param segCountLen  total fingerprint slot count ({@code fingerprints.length})
+     * @throws IllegalStateException if the context has not been initialised
+     */
+    public void uploadGpuFilter16(
+            short[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
+        allocateFilterBuffers(toLittleEndianBytes(fingerprints), seedLo, seedHi, segLen, segLenMask, segCountLen);
+        gpuFilterUploaded = true;
+        uploadedFilterType = GpuFilterType.FUSE_16;
+    }
+
+    /**
+     * Flattens a {@code short[]} into its little-endian byte image, i.e. exactly the memory layout
+     * the device expects when it casts the fingerprint buffer to {@code ushort*}.
+     *
+     * @param values the 16-bit slot values
+     * @return a byte array of length {@code 2 * values.length}, low byte of each slot first
+     */
+    @VisibleForTesting
+    static byte[] toLittleEndianBytes(short[] values) {
+        final byte[] bytes = new byte[values.length * Short.BYTES];
+        ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(values);
+        return bytes;
     }
 
     private void allocateFilterBuffers(
@@ -719,6 +779,7 @@ public class OpenCLContext implements ReleaseCLObject {
     }
 
     private void releaseGpuFilter() {
+        uploadedFilterType = null;
         if (fuse8FingerprintsMem != null) {
             clReleaseMemObject(fuse8FingerprintsMem);
             fuse8FingerprintsMem = null;
@@ -923,6 +984,24 @@ public class OpenCLContext implements ReleaseCLObject {
     }
 
     /**
+     * Benchmark hook: uploads a Binary Fuse 16 filter and a probe-key array, and binds the
+     * {@code benchmarkFilterFuse16} kernel. See
+     * {@link #prepareBenchFilterProbeFuse8(byte[], int[], long[])} for the lifecycle.
+     *
+     * <p>The slot array is flattened to its little-endian byte image, exactly as the production
+     * upload does, so this benchmark exercises the same memory layout the kernel will see in a real
+     * run rather than a convenient one.
+     *
+     * @param fingerprints the 16-bit fingerprint slot array
+     * @param meta         {@code [seedLo, seedHi, segLen, segLenMask, segCountLen]}
+     * @param probeKeys    the 64-bit keys to probe, one per work-item
+     */
+    public void prepareBenchFilterProbeFuse16(short[] fingerprints, int[] meta, long[] probeKeys) {
+        final byte[] bytes = toLittleEndianBytes(fingerprints);
+        prepareBenchFilterProbe("benchmarkFilterFuse16", Pointer.to(bytes), bytes.length, meta, probeKeys);
+    }
+
+    /**
      * Benchmark hook: uploads a blocked Bloom filter and a probe-key array, and binds the
      * {@code benchmarkFilterBlockedBloom} kernel. See
      * {@link #prepareBenchFilterProbeFuse8(byte[], int[], long[])} for the lifecycle.
@@ -1098,6 +1177,17 @@ public class OpenCLContext implements ReleaseCLObject {
         // Compact (filter) mode only when a real filter is uploaded AND the caller did not force
         // full transfer; otherwise run full transfer (no filter, or vanity forced transferAll).
         final int transferAll = (producerOpenCL.transferAll || !gpuFilterUploaded) ? 1 : 0;
+        // Tells the kernel how wide the uploaded fingerprint slots are. This MUST agree with the
+        // upload method that was actually used; the device cannot detect a mismatch and it surfaces
+        // only as silently missed addresses, so it is asserted here rather than trusted.
+        final GpuFilterType configuredType = producerOpenCL.gpuFilterType;
+        if (transferAll == 0 && uploadedFilterType != configuredType) {
+            throw new IllegalStateException("GPU filter width mismatch: kernel would probe as "
+                    + configuredType + " but the uploaded payload is "
+                    + (uploadedFilterType == null ? "absent" : uploadedFilterType.toString())
+                    + ". This would silently drop funded addresses; refusing to dispatch.");
+        }
+        final int filterType = configuredType.getWireValue();
 
         localOpenClTask.setSrcPrivateKeyChunk(privateKeyBase);
         ByteBuffer dstByteBuffer = localOpenClTask.executeKernel(
@@ -1106,6 +1196,7 @@ public class OpenCLContext implements ReleaseCLObject {
                 localFuse8FingerprintsMem,
                 localFuse8MetadataMem,
                 transferAll,
+                filterType,
                 localIgTableMem,
                 localCombTableMem);
 

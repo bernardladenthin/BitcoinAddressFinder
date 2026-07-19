@@ -186,6 +186,80 @@ public final class BinaryFuse16AddressPresence implements AddressPresence {
     }
 
     /**
+     * Returns an immutable payload describing this filter for GPU VRAM upload.
+     * <p>
+     * Public bridge accessor: the engine layer reads this single object (instead of the
+     * package-private getters, which are not visible across packages) and decomposes it into
+     * the primitive arguments accepted by the OpenCL upload path. This keeps the OpenCL layer
+     * free of any dependency on this persistence type.
+     * <p>
+     * The payload type is deliberately distinct from {@link BinaryFuse8GpuFilterData} rather than
+     * a shared supertype: the fingerprint width <em>is</em> the filter, so uploading a 16-bit
+     * payload and probing it as 8-bit (or the reverse) would not fail loudly — it would silently
+     * produce false negatives, i.e. a funded address that is never reported. Keeping the two types
+     * unrelated makes that mix-up a compile error.
+     *
+     * @return the GPU-upload payload (fingerprints reference plus seed and segment metadata)
+     */
+    public BinaryFuse16GpuFilterData toGpuFilterData() {
+        return new BinaryFuse16GpuFilterData(
+                getFingerprints(), getSeed(), getSegmentLength(), getSegmentLengthMask(), getSegmentCountLength());
+    }
+
+    /**
+     * Returns the fingerprint slot array, exposed for GPU VRAM upload and tests.
+     * <p>
+     * The reference (not a defensive copy) is returned deliberately: the array can be large
+     * (two bytes per slot, ~2.25 B per indexed address) and is treated as read-only by every
+     * caller (the GPU upload path copies it into device memory; tests only read it). Callers
+     * must not mutate it.
+     *
+     * @return the fingerprint short array; its length equals {@link #slotCount()}
+     */
+    @SuppressWarnings("EI_EXPOSE_REP")
+    short[] getFingerprints() {
+        return fingerprints;
+    }
+
+    /**
+     * Returns the construction seed of the successful build.
+     *
+     * @return the seed value used by {@link #containsAddress(ByteBuffer)} for hashing
+     */
+    long getSeed() {
+        return seed;
+    }
+
+    /**
+     * Returns the per-segment length (a power of two) used by the fused position mapping.
+     *
+     * @return the segment length
+     */
+    int getSegmentLength() {
+        return segmentLength;
+    }
+
+    /**
+     * Returns {@code segmentLength - 1}, the mask applied to each within-segment bit-window.
+     *
+     * @return the segment-length mask
+     */
+    int getSegmentLengthMask() {
+        return segmentLengthMask;
+    }
+
+    /**
+     * Returns {@code segmentCount * segmentLength}, the exclusive upper bound of the base
+     * position produced by the high-bits reduction. This is <em>not</em> the fingerprint array
+     * length (which is {@code (segmentCount + 2) * segmentLength}).
+     *
+     * @return the segment-count length used by the position mapping
+     */
+    int getSegmentCountLength() {
+        return segmentCountLength;
+    }
+
+    /**
      * MurmurHash3 64-bit finaliser.
      *
      * @param h the value to mix

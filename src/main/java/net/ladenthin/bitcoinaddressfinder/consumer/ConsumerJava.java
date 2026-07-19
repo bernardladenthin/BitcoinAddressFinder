@@ -25,6 +25,7 @@ import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.AddressLookupBackend;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
+import net.ladenthin.bitcoinaddressfinder.configuration.GpuFilterType;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.core.FireAndForget;
 import net.ladenthin.bitcoinaddressfinder.core.InterruptedRuntimeException;
@@ -35,6 +36,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerator;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16GpuFilterData;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8GpuFilterData;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuseAccelerator;
@@ -182,6 +184,23 @@ public class ConsumerJava implements Consumer {
     @ToString.Exclude
     private @Nullable BinaryFuse8GpuFilterData gpuFilterData;
 
+    /**
+     * The Binary Fuse 16 GPU-upload payload, built by {@link #initLMDB()} instead of
+     * {@link #gpuFilterData} when the requested {@link GpuFilterType} is
+     * {@link GpuFilterType#FUSE_16}. At most one of the two is ever non-{@code null}: the width is
+     * chosen once, up-front, and building both would double a multi-GB allocation for no purpose.
+     */
+    @ToString.Exclude
+    private @Nullable BinaryFuse16GpuFilterData gpuFilterData16;
+
+    /**
+     * Fingerprint width the GPU pre-filter payload is built for. Set by the engine alongside
+     * {@link #gpuFilterRequested}, before {@link #initLMDB()} runs, from the OpenCL producer
+     * configuration. Defaults to {@link GpuFilterType#FUSE_8} so a caller that only sets the
+     * request flag keeps the previous behaviour exactly.
+     */
+    private volatile GpuFilterType gpuFilterType = GpuFilterType.FUSE_8;
+
     private final PersistenceUtils persistenceUtils;
 
     // List of Future<Void> for the in-flight consumer iterations; toString is identity-style noise.
@@ -328,7 +347,11 @@ public class ConsumerJava implements Consumer {
         // before the self-contained close below, otherwise a HASHSET/TRUNCATED_LONG_64 backend
         // would have already released the only source the filter can be built from.
         if (gpuFilterRequested) {
-            gpuFilterData = computeGpuFilterPayload(chain, lmdb);
+            if (gpuFilterType == GpuFilterType.FUSE_16) {
+                gpuFilterData16 = computeGpuFilterPayload16(chain, lmdb);
+            } else {
+                gpuFilterData = computeGpuFilterPayload(chain, lmdb);
+            }
         }
 
         if (!chain.requiresBackend()) {
@@ -379,6 +402,37 @@ public class ConsumerJava implements Consumer {
      */
     public void discardGpuFilterData() {
         gpuFilterData = null;
+        gpuFilterData16 = null;
+    }
+
+    /**
+     * Selects the fingerprint width of the GPU pre-filter payload built by {@link #initLMDB()}.
+     * Must be called <em>before</em> {@link #initLMDB()}, for the same reason as
+     * {@link #setGpuFilterRequested(boolean)}: the payload is built while LMDB is still open.
+     *
+     * <p>Only one width is built. Which one has to be known up-front because a Binary Fuse filter
+     * over the full address set is a multi-GB allocation and a full LMDB scan; speculatively
+     * building both would double both costs to discard one of them.
+     *
+     * @param type the fingerprint width to build; {@link GpuFilterType#FUSE_8} by default
+     */
+    public void setGpuFilterType(GpuFilterType type) {
+        this.gpuFilterType = type;
+    }
+
+    /**
+     * Returns the Binary Fuse 16 GPU-upload payload built by {@link #initLMDB()}, if the requested
+     * {@link GpuFilterType} was {@link GpuFilterType#FUSE_16}.
+     *
+     * <p>A separate accessor from {@link #getGpuFilterData()} rather than a common return type: the
+     * two payloads are not interchangeable, and confusing them on the upload path yields silent
+     * false negatives rather than a failure. The caller asks for the width it intends to probe.
+     *
+     * @return the Binary Fuse 16 GPU-upload payload, or {@link Optional#empty()} if a 16-bit filter
+     *     was not requested, has already been discarded, or {@link #initLMDB()} has not run
+     */
+    public Optional<BinaryFuse16GpuFilterData> getGpuFilterData16() {
+        return Optional.ofNullable(gpuFilterData16);
     }
 
     /**
@@ -398,6 +452,31 @@ public class ConsumerJava implements Consumer {
             }
         }
         return BinaryFuse8AddressPresence.populateFrom(lmdb).toGpuFilterData();
+    }
+
+    /**
+     * Binary Fuse 16 counterpart of {@link #computeGpuFilterPayload(AddressPresence,
+     * AddressIterable)}. Reuses the CPU lookup's filter only when the backend is
+     * {@code BINARY_FUSE_16} — i.e. when the widths actually match — and otherwise builds a fresh
+     * transient 16-bit filter from the LMDB address stream.
+     *
+     * <p>The reuse branch is deliberately width-exact. A {@code BINARY_FUSE_8} CPU lookup cannot be
+     * reused here even though it is also a {@link BinaryFuseAccelerator}: its 8-bit slots are a
+     * different filter, and uploading them to be probed as 16-bit would silently miss stored
+     * addresses.
+     *
+     * @param chain the lookup chain just built by {@link #initLMDB()}
+     * @param lmdb  the open LMDB persistence (also an {@link AddressIterable} source)
+     * @return the 16-bit GPU-upload payload (never {@code null})
+     */
+    private static BinaryFuse16GpuFilterData computeGpuFilterPayload16(AddressPresence chain, AddressIterable lmdb) {
+        if (chain instanceof BinaryFuseAccelerator accelerator) {
+            Optional<BinaryFuse16GpuFilterData> existing = accelerator.getGpuFilterData16();
+            if (existing.isPresent()) {
+                return existing.get();
+            }
+        }
+        return BinaryFuse16AddressPresence.populateFrom(lmdb).toGpuFilterData();
     }
 
     /** Honours the configured blocked-Bloom geometry, falling back to the defaults when unset. */
