@@ -73,4 +73,24 @@ public class ConfigFixturesParseTest {
                     is(equalTo(EXPECTED_STATISTICS_RATE_WINDOW_SECONDS)));
         }
     }
+
+    /**
+     * The tuning example carries a nested {@code finder} rather than a top-level one, so it is not
+     * part of the loop above. It is smoke-loaded here for the same reason: an example config that
+     * no longer parses is a broken promise to whoever copies it.
+     */
+    @Test
+    public void tuneConfigurationExampleConfig_parses() throws Exception {
+        Path file = Path.of("examples", "config_TuneConfiguration.json");
+
+        CConfiguration parsed = Main.loadConfiguration(file);
+
+        assertThat("tuneConfiguration", parsed.tuneConfiguration, is(notNullValue()));
+        assertThat("tuneConfiguration.finder", parsed.tuneConfiguration.finder, is(notNullValue()));
+        assertThat(
+                "tuneConfiguration.finder.consumerJava",
+                parsed.tuneConfiguration.finder.consumerJava,
+                is(notNullValue()));
+        assertThat("producerOpenCL", parsed.tuneConfiguration.finder.producerOpenCL.size(), is(equalTo(1)));
+    }
 }

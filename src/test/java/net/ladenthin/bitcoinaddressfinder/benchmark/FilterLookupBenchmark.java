@@ -8,6 +8,7 @@ package net.ladenthin.bitcoinaddressfinder.benchmark;
 import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
+import net.ladenthin.bitcoinaddressfinder.persistence.PrngAddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerator;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8AddressPresence;

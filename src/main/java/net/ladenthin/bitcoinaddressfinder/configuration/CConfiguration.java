@@ -24,4 +24,6 @@ public class CConfiguration {
     public @Nullable CAddressFilesToLMDB addressFilesToLMDB;
     /** Configuration for the {@code Find} command. */
     public @Nullable CFinder finder;
+    /** Configuration for the {@code TuneConfiguration} command. */
+    public @Nullable CTuneConfiguration tuneConfiguration;
 }

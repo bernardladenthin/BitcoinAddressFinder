@@ -17,10 +17,12 @@ import java.util.concurrent.TimeUnit;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.command.AddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.command.LMDBToAddressFile;
+import net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBToAddressFile;
+import net.ladenthin.bitcoinaddressfinder.configuration.CTuneConfiguration;
 import net.ladenthin.bitcoinaddressfinder.core.Interruptable;
 import net.ladenthin.bitcoinaddressfinder.core.InterruptedRuntimeException;
 import net.ladenthin.bitcoinaddressfinder.engine.Finder;
@@ -258,6 +260,12 @@ public class Main implements Runnable, Interruptable {
                     AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(cAddressFilesToLMDB);
                     interruptables.add(addressFilesToLMDB);
                     addressFilesToLMDB.run();
+                }
+                case TuneConfiguration -> {
+                    CTuneConfiguration cTuneConfiguration = Objects.requireNonNull(configuration.tuneConfiguration);
+                    TuneConfiguration tuneConfiguration = new TuneConfiguration(cTuneConfiguration);
+                    interruptables.add(tuneConfiguration);
+                    tuneConfiguration.run();
                 }
                 case OpenCLInfo -> {
                     OpenCLBuilder openCLBuilder = new OpenCLBuilder();

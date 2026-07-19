@@ -171,6 +171,22 @@ Copyright (c) 2017-2025 Bernard Ladenthin
 
 Every `examples/run_*.bat` has a matching `examples/run_*.sh` (same JVM flags); use the `.sh` on Linux/macOS and the `.bat` on Windows.
 
+### Tune the configuration for your own machine
+
+Every grid and filter recommendation in this README and in [`docs/filter-selection.md`](docs/filter-selection.md) was measured on one developer's hardware. The `TuneConfiguration` command measures *yours*:
+
+```bash
+java -jar bitcoinaddressfinder-1.6.1-jar-with-dependencies.jar config_TuneConfiguration.json
+```
+
+It sweeps `batchSizeInBits` × `keysPerWorkItem`, measures the **net end-to-end throughput** of each combination (candidate keys per second through the whole pipeline, not kernel time), and prints a table of every arm plus the winning configuration as a ready-to-paste JSON file. It also measures what one database lookup costs on your storage in its current state — the term that ranges from 4.1 µs warm to 292.7 µs cold, and the one the `FUSE_8` / `FUSE_16` choice hinges on. Every number in the report is labelled **MEASURED** (here, on this machine) or **DOCUMENTED / ESTIMATED** (a published constant), so it is always clear which is which.
+
+Honest expectations:
+
+* **It takes minutes.** The run time is `arms × (warmupSecondsPerArm + secondsPerArm)`; the defaults give 25 arms × 25 s ≈ 10 minutes, plus a one-time filter build (~44 s per 100 M entries).
+* **It does not read or rebuild your database.** The grid sweep builds its pre-filter from a deterministic PRNG source sized to `targetDatabaseEntries` — set that to the size of the database you *intend* to run against. Only the optional verification-cost stage touches LMDB, and only if `lmdbConfigurationReadOnly.lmdbDirectory` points at a real database. With no database configured the command still runs end to end and falls back to the documented lookup cost.
+* **`sweepFilterTypes` is off by default, and should stay off unless you need it.** Enabling it forces a second full filter build (~150 s at the 132 M Light DB tier, ~26 minutes at the 1.377 B Full DB tier) to measure the `FUSE_8` / `FUSE_16` choice instead of deriving it from `total = probe + fpr × verification`.
+
 ## ✨ Features
 * 📐 Supports blockchain addresses based on [secp256k1](https://en.bitcoin.it/wiki/Secp256k1)
 * 🛡️ Unit-tested, trusted open source that can be compiled easily by yourself

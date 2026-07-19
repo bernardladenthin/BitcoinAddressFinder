@@ -3,17 +3,23 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 // @formatter:on
-package net.ladenthin.bitcoinaddressfinder.benchmark;
+package net.ladenthin.bitcoinaddressfinder.persistence;
 
 import java.nio.ByteBuffer;
 import java.util.function.Consumer;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
-import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 
 /**
  * Synthetic {@link AddressIterable} of deterministically generated hash160 values, used to compare
  * address-lookup backends without involving LMDB.
+ *
+ * <h2>Why this lives in main scope rather than under the benchmarks</h2>
+ * It began as a benchmark-only fixture, but the {@code TuneConfiguration} command needs exactly the
+ * same source at runtime: it sizes a filter to the database the user <em>intends</em> to run
+ * against, without requiring that database to exist. Production code cannot reference test classes,
+ * so the class moved here rather than being duplicated — one implementation keeps the tuner's filter
+ * bit-for-bit identical to the one the benchmarks characterise.
  *
  * <h2>Why synthetic</h2>
  * Measuring filters against a real LMDB store conflates two very different costs. On a database

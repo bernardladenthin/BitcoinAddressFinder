@@ -364,6 +364,45 @@ public class ConsumerJava implements Consumer {
     }
 
     /**
+     * Initialises this consumer against an already-built presence lookup, instead of opening LMDB.
+     *
+     * <p>Alternative entry point to {@link #initLMDB()} for callers that legitimately have no
+     * database: the {@code TuneConfiguration} command measures pipeline throughput with a filter
+     * sized to the database the operator <em>intends</em> to use, which need not exist yet. Without
+     * this seam such a caller would have to fabricate an empty scratch LMDB purely to satisfy
+     * {@link #initLMDB()} — a directory written and deleted for no reason, whose emptiness would
+     * then also mis-size any GPU filter payload built from it.
+     *
+     * <p>{@link #persistence} is deliberately left {@code null}: there is nothing to close, and
+     * {@link #interrupt()} already treats a null persistence as "nothing to release". The supplied
+     * lookup's lifecycle belongs to the caller.
+     *
+     * <p>Not a substitute for {@link #initLMDB()} in a scan: no GPU filter payload is built here,
+     * because a caller that supplies its own lookup necessarily also owns whatever it wants
+     * uploaded to the device.
+     *
+     * @param lookup the presence lookup the scan hot path should query
+     */
+    public void initWithLookup(AddressPresence lookup) {
+        this.lookup = lookup;
+    }
+
+    /**
+     * Returns the running total of address lookups performed by this consumer.
+     *
+     * <p>One <em>address</em>, not one candidate key: the scan checks both the compressed and the
+     * uncompressed hash160 of every key, so a saturated pipeline advances this by two per candidate.
+     * Exposed so the {@code TuneConfiguration} command can read net throughput from the same
+     * odometer the statistics line renders, rather than introducing a parallel counter that could
+     * disagree with the log.
+     *
+     * @return the number of address lookups performed since this consumer started
+     */
+    public long getCheckedKeys() {
+        return checkedKeys.get();
+    }
+
+    /**
      * Requests (or clears the request for) the Binary Fuse 8 GPU pre-filter to be built during
      * {@link #initLMDB()}. Must be called <em>before</em> {@link #initLMDB()}.
      *

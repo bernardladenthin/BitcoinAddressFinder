@@ -14,5 +14,15 @@ public enum CCommand {
     /** Import one or more address files into the LMDB database. */
     AddressFilesToLMDB,
     /** Print information about the available OpenCL platforms and devices. */
-    OpenCLInfo
+    OpenCLInfo,
+    /**
+     * Measure end-to-end pipeline throughput on this machine, sweep the tunable producer
+     * parameters, and print the winning configuration as a ready-to-paste JSON fragment.
+     *
+     * <p>Distinct from the JMH benchmarks under {@code src/test}: those measure isolated
+     * components (filter probe latency, kernel time, build cost) and compose a prediction
+     * arithmetically. This command measures the composed pipeline itself, on the operator's own
+     * hardware, so the recommendation does not rest on numbers taken from somebody else's GPU.
+     */
+    TuneConfiguration
 }

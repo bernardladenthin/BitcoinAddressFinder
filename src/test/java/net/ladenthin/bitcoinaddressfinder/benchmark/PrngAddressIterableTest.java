@@ -17,6 +17,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
+import net.ladenthin.bitcoinaddressfinder.persistence.PrngAddressIterable;
 import org.junit.jupiter.api.Test;
 
 /**
