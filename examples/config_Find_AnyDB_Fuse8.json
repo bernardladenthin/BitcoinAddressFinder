@@ -16,7 +16,7 @@
         "useNoReadAhead": false,
         "logStatsOnInit": false,
         "logStatsOnClose": false,
-        "addressLookupBackend": "BLOCKED_BLOOM",
+        "addressLookupBackend": "BINARY_FUSE_8",
         "disableAddressLookup": false
       },
       "printStatisticsEveryNSeconds": 10,

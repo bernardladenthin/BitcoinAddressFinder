@@ -548,7 +548,16 @@ The probe sequence is `bit_i = (x + i·y) mod 512`, whose period is `512 / gcd(y
 - **Small/medium databases (below ~15 M entries) → `BINARY_FUSE_8`.** Fastest filter measured at that scale on either machine, lowest RAM, and it is what feeds the GPU pre-filter.
 - **Large databases → `BINARY_FUSE_8`**, on either host. Cache size changes which filter *probes* faster, but not which one is cheaper overall: verification cost dominates, and Fuse-8's FPR is ~4× lower at equal footprint. Budget ~40 GB of transient heap to build it at the 1.377 B tier (the peeling arrays need ~29 B/entry); `BLOCKED_BLOOM` needs only the finished 1.89 GB and builds 3× faster, so prefer it if you rebuild often or cannot spare the heap.
 
-Ready-to-run example covering both tiers: [`examples/config_Find_AnyDB_BlockedBloom.json`](examples/config_Find_AnyDB_BlockedBloom.json).
+Ready-to-run example covering both tiers: [`examples/config_Find_AnyDB_Fuse8.json`](examples/config_Find_AnyDB_Fuse8.json).
+
+`BINARY_FUSE_8` is the recommended backend for both the Light and the Full database, on CPU and on
+GPU — see [Which filter to pick](#which-filter-to-pick). It is the smallest filter measured
+(1.126 B/entry), has the lowest total cost per lookup once verification is counted, is the only
+in-RAM filter with a GPU kernel, and at 1.58 GB stays under the single-allocation limit that
+typically caps an OpenCL buffer at a quarter of VRAM. Building it at the Full DB tier needs roughly
+40 GB of transient heap for the peeling arrays, so raise `-Xmx` accordingly; if that heap is
+unavailable or you rebuild often, `BLOCKED_BLOOM` builds 3x faster in a single streaming pass and
+needs only its finished 1.89 GB.
 
 `BLOCKED_BLOOM` is therefore an **addition, not a replacement** — the two filters have genuinely different optimal domains, so neither was removed.
 
