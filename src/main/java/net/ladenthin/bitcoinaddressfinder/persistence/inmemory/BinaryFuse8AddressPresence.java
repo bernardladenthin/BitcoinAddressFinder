@@ -181,6 +181,16 @@ public final class BinaryFuse8AddressPresence implements AddressPresence {
         return (byte) (fingerprints[h0] ^ fingerprints[h1] ^ fingerprints[h2]) == fp;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Exactly the fingerprint array — one byte per slot, ~1.125 slots per entry.
+     */
+    @Override
+    public long sizeInBytes() {
+        return fingerprints.length;
+    }
+
     @Override
     public boolean requiresBackend() {
         return false;

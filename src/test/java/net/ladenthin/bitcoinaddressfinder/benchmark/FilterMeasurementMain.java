@@ -167,7 +167,7 @@ public final class FilterMeasurementMain {
 
             // Machine-readable CSV line, prefixed so it is greppable in a noisy log.
             System.out.printf(
-                    "RESULT,backend=%s,k=%d,bpe=%d,nordahead=%b,entries=%d,buildSec=%.2f,retainedMiB=%.1f,bytesPerEntry=%.3f,"
+                    "RESULT,backend=%s,k=%d,bpe=%d,nordahead=%b,entries=%d,buildSec=%.2f,exactBytes=%d,exactBytesPerEntry=%.3f,retainedMiB=%.1f,bytesPerEntry=%.3f,"
                             + "lookupsPerSec=%.0f,fpr=%.6f,falseNegatives=%d,probes=%d%n",
                     backend,
                     k,
@@ -175,6 +175,8 @@ public final class FilterMeasurementMain {
                     noReadAhead,
                     count,
                     buildSec,
+                    filter.sizeInBytes(),
+                    count == 0 || filter.sizeInBytes() < 0 ? 0.0 : (double) filter.sizeInBytes() / count,
                     retainedMiB,
                     retainedBytesPerEntry,
                     lookupsPerSec,
@@ -225,13 +227,15 @@ public final class FilterMeasurementMain {
         long lookupNanos = System.nanoTime() - tl0;
 
         System.out.printf(
-                "RESULT,backend=%s,k=%d,bpe=%d,source=prng,entries=%d,buildSec=%.2f,retainedMiB=%.1f,"
+                "RESULT,backend=%s,k=%d,bpe=%d,source=prng,entries=%d,buildSec=%.2f,exactBytes=%d,exactBytesPerEntry=%.3f,retainedMiB=%.1f,"
                         + "bytesPerEntry=%.3f,lookupsPerSec=%.0f,fpr=%.6f,falseNegatives=%d,probes=%d%n",
                 backend,
                 k,
                 bitsPerEntry,
                 count,
                 buildNanos / 1e9,
+                filter.sizeInBytes(),
+                count == 0 || filter.sizeInBytes() < 0 ? 0.0 : (double) filter.sizeInBytes() / count,
                 retainedBytes / (1024.0 * 1024.0),
                 count == 0 ? 0 : (double) retainedBytes / count,
                 probeCount / (lookupNanos / 1e9),

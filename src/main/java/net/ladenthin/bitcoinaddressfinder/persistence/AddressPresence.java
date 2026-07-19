@@ -58,4 +58,23 @@ public interface AddressPresence {
      * @return {@code true} if this lookup must keep its backing delegate open
      */
     boolean requiresBackend();
+
+    /**
+     * Exact size of the in-memory structure in bytes, or {@code -1} when this backend cannot report
+     * one.
+     *
+     * <p>Reported by the backend itself rather than estimated, because the obvious alternative —
+     * measuring used heap around construction — is unreliable at the sizes that matter: it also
+     * captures whatever else the process holds, and has been observed reporting 26&nbsp;MiB for a
+     * 16&nbsp;MiB array. Choosing a filter is a trade between memory, lookup speed and
+     * false-positive rate, so the memory term has to be exact for the comparison to mean anything.
+     *
+     * <p>Backends whose footprint is dominated by per-object overhead rather than a flat array (for
+     * example a {@code HashSet} of boxed buffers) return {@code -1} instead of guessing.
+     *
+     * @return the structure size in bytes, or {@code -1} if unknown
+     */
+    default long sizeInBytes() {
+        return -1L;
+    }
 }

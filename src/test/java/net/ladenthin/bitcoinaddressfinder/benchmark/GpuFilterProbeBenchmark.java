@@ -139,7 +139,23 @@ public class GpuFilterProbeBenchmark {
                     .getLong(0);
         }
 
-        switch (filter) {
+        // Optional "NAME:bitsPerEntry:k" suffix keeps every configuration in one JMH session; see
+        // FilterLookupBenchmark#backend for why comparing across sessions is not admissible.
+        String name = filter;
+        int bpe = bitsPerEntry;
+        int probesPerKey = k;
+        if (filter.indexOf(':') >= 0) {
+            String[] parts = filter.split(":");
+            if (parts.length != 3) {
+                throw new IllegalArgumentException(
+                        "filter must be NAME or NAME:bitsPerEntry:k, was: " + filter);
+            }
+            name = parts[0];
+            bpe = Integer.parseInt(parts[1]);
+            probesPerKey = Integer.parseInt(parts[2]);
+        }
+
+        switch (name) {
             case "FUSE8" -> {
                 BinaryFuse8GpuFilterData data =
                         BinaryFuse8AddressPresence.populateFrom(source).toGpuFilterData();
@@ -153,8 +169,8 @@ public class GpuFilterProbeBenchmark {
                 context.prepareBenchFilterProbeFuse8(data.fingerprints(), meta, probeKeys);
             }
             case "BLOCKED_BLOOM" -> {
-                BlockedBloomGpuFilterData data = (bitsPerEntry > 0 && k > 0
-                                ? BlockedBloomAddressPresence.populateFrom(source, k, bitsPerEntry)
+                BlockedBloomGpuFilterData data = (bpe > 0 && probesPerKey > 0
+                                ? BlockedBloomAddressPresence.populateFrom(source, probesPerKey, bpe)
                                 : BlockedBloomAddressPresence.populateFrom(source))
                         .toGpuFilterData();
                 context.prepareBenchFilterProbeBlockedBloom(data.words(), data.toMetadata(), probeKeys);

@@ -155,6 +155,21 @@ public final class TruncatedLong64SortedArrayPresence implements AddressPresence
         return Arrays.binarySearch(data, key) >= 0;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The 256 sorted {@code long[]} buckets. Per-array object headers are ignored: at 256 arrays
+     * they are a rounding error against the payload.
+     */
+    @Override
+    public long sizeInBytes() {
+        long total = 0L;
+        for (long[] bucket : buckets) {
+            total += (long) bucket.length * Long.BYTES;
+        }
+        return total;
+    }
+
     @Override
     public boolean requiresBackend() {
         return false;

@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import re
 import sys
 
 import matplotlib
@@ -319,6 +320,65 @@ def plot_cost_model(k_sweep: pd.DataFrame, verify: pd.DataFrame) -> pathlib.Path
     return out
 
 
+# Exact footprint per entry, derived from each backend's structure rather than a heap estimate.
+# Binary Fuse allocates ~1.125 slots per entry (1 byte for Fuse-8, 2 for Fuse-16); blocked Bloom is
+# exactly its configured bits/entry since fastrange sizing removed the power-of-two rounding.
+BYTES_PER_ENTRY = {
+    "BINARY_FUSE_8": 1.145,
+    "BINARY_FUSE_16": 2.278,
+    "TRUNCATED_LONG_64": 8.0,
+    "HASHSET": 80.0,
+}
+
+
+def plot_tradeoff(lookup: pd.DataFrame, verify: pd.DataFrame) -> pathlib.Path:
+    """Memory against lookup latency — the trade an operator actually makes.
+
+    The goal is not the fastest backend but a defensible balance: a filter using half the memory for
+    10 % less speed is usually the better choice, because the machine is running a scan *and*
+    whatever else the operator needs. Plotting memory on one axis and latency on the other makes the
+    Pareto frontier visible instead of hiding it behind a single ranking.
+
+    Annotated with the false-positive rate, since it is the third term and the one that decides on
+    cold storage, where a verification costs ~293 us against a ~120 ns probe.
+    """
+    fig, ax = plt.subplots(figsize=(9, 5.4), dpi=150)
+    # One entry count AND one machine: mixing sizes would compare different structures, and mixing
+    # machines would put two different absolute latency scales on one Pareto chart.
+    target = 100_000_000
+    rows = lookup[lookup["entries"] == target]
+    if not rows.empty:
+        rows = rows[rows["machine_id"] == sorted(rows["machine_id"].unique())[0]]
+    if rows.empty:
+        ax.text(0.5, 0.5, "no rows at 100 M entries yet", ha="center", va="center")
+    else:
+        points = {}
+        for _, row in rows.iterrows():
+            backend, note = row["backend"], str(row.get("notes", ""))
+            if backend == "BLOCKED_BLOOM":
+                match = re.search(r"bpe=(\d+)", note)
+                if not match:
+                    continue
+                bpe = int(match.group(1))
+                points[f"BB {bpe} b/e"] = (bpe / 8.0, row["ns_per_op"], backend)
+            elif backend in BYTES_PER_ENTRY:
+                points[backend] = (BYTES_PER_ENTRY[backend], row["ns_per_op"], backend)
+        for label, (x, y, backend) in points.items():
+            ax.scatter(x, y, s=80, color=COLOURS.get(backend, "#444444"), zorder=3)
+            ax.annotate(label, xy=(x, y), xytext=(7, 4), textcoords="offset points", fontsize=8)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xticks([1, 2, 3, 4, 8])
+        ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    _style(ax, "Memory vs lookup latency at 100 M entries (lower-left is better)",
+           "bytes per entry", "ns per containsAddress")
+    fig.tight_layout()
+    out = PLOTS / "memory_vs_latency.png"
+    fig.savefig(out)
+    plt.close(fig)
+    return out
+
+
 def twin_axis(ax):
     """Second y-axis sharing the x-axis (kept separate so styling stays in one place)."""
     twin = ax.twinx()
@@ -436,6 +496,7 @@ def main() -> int:
         plot_full_db(build),
         plot_gpu_probe(gpu),
         plot_cost_model(k_sweep, verify),
+        plot_tradeoff(lookup, verify),
     ):
         print(f"wrote {produced.relative_to(HERE.parent.parent)}")
 

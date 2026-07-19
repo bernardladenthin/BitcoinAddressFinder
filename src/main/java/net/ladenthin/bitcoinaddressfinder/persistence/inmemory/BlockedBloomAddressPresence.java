@@ -226,6 +226,16 @@ public final class BlockedBloomAddressPresence implements AddressPresence {
         return true;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Exactly the bit array: {@code numBlocks × 512} bits. Nothing else is retained.
+     */
+    @Override
+    public long sizeInBytes() {
+        return (long) words.length * Long.BYTES;
+    }
+
     @Override
     public boolean requiresBackend() {
         return true;

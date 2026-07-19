@@ -98,7 +98,22 @@ public class FilterLookupBenchmark {
     /** Guava Bloom false-positive probability, matching the project default. */
     private static final double BLOOM_FPP = 0.01;
 
-    /** Which backend this trial measures. */
+    /**
+     * Which backend this trial measures, optionally with a density appended as
+     * {@code NAME:bitsPerEntry:k} (for example {@code BLOCKED_BLOOM:17:7}).
+     *
+     * <h3>Why the density is encoded here instead of in its own parameter</h3>
+     * Comparing backends is only valid <b>within one JMH session</b> — identical configurations
+     * measured in separate sessions differed by up to 34&nbsp;% on this project's hardware, which
+     * silently reversed two conclusions before it was noticed. Density as a separate {@code @Param}
+     * forces exactly that mistake: JMH takes the cross product, so sweeping it would also run the
+     * fuse backends against meaningless density values, and the natural workaround — one JVM launch
+     * per density — puts the densities in different sessions. Folding the density into the backend
+     * name keeps every configuration in a single {@code -p backend=...} list, hence a single session.
+     *
+     * <p>{@link #bitsPerEntry} and {@link #k} remain as parameters for one-off runs; the suffix wins
+     * when both are given.
+     */
     @Param({"BLOOM", "HASHSET", "TRUNCATED_LONG_64", "BINARY_FUSE_8", "BINARY_FUSE_16", "BLOCKED_BLOOM"})
     public String backend;
 
@@ -123,8 +138,11 @@ public class FilterLookupBenchmark {
     /**
      * Blocked Bloom bits probed per key; {@code -1} uses the class default.
      *
-     * <p>Coupled to {@link #bitsPerEntry} by the measured rule {@code k ≈ 0.55 × bitsPerEntry};
-     * sweeping one without the other measures the mismatch rather than the geometry.
+     * <p>Must be swept together with {@link #bitsPerEntry}: varying one alone measures a mismatched
+     * geometry rather than the filter. The optimum saturates sub-linearly with density — measured
+     * 5/6/7/7/8/9 at bits per entry 8/11/14/17/21/26 — so there is no proportional rule to apply.
+     * (An earlier {@code k ≈ 0.55 × bitsPerEntry} was inferred from the low end of that sweep and
+     * withdrawn once the high end was measured; it overshoots by 2 at bits per entry 26.)
      */
     @Param({"-1"})
     public int k;
@@ -165,15 +183,35 @@ public class FilterLookupBenchmark {
     @Setup(Level.Trial)
     public void setUp() {
         PrngAddressIterable source = new PrngAddressIterable(MEMBER_SEED, entries);
-        lookup = switch (backend) {
+
+        // Split an optional "NAME:bitsPerEntry:k" suffix; see the backend field javadoc for why the
+        // density travels inside the name rather than as its own cross-producted @Param.
+        String name = backend;
+        int effectiveBitsPerEntry = bitsPerEntry;
+        int effectiveK = k;
+        int firstColon = backend.indexOf(':');
+        if (firstColon >= 0) {
+            String[] parts = backend.split(":");
+            if (parts.length != 3) {
+                throw new IllegalArgumentException(
+                        "backend must be NAME or NAME:bitsPerEntry:k, was: " + backend);
+            }
+            name = parts[0];
+            effectiveBitsPerEntry = Integer.parseInt(parts[1]);
+            effectiveK = Integer.parseInt(parts[2]);
+        }
+        final int bpe = effectiveBitsPerEntry;
+        final int probes_ = effectiveK;
+
+        lookup = switch (name) {
             case "BLOOM" -> BloomFilterAccelerator.populateFrom(source, new AbsentDelegate(), BLOOM_FPP);
             case "HASHSET" -> HashSetAddressPresence.populateFrom(source);
             case "TRUNCATED_LONG_64" -> TruncatedLong64SortedArrayPresence.populateFrom(source);
             case "BINARY_FUSE_8" -> BinaryFuse8AddressPresence.populateFrom(source);
             case "BINARY_FUSE_16" -> BinaryFuse16AddressPresence.populateFrom(source);
             case "BLOCKED_BLOOM" ->
-                bitsPerEntry > 0 && k > 0
-                        ? BlockedBloomAddressPresence.populateFrom(source, k, bitsPerEntry)
+                bpe > 0 && probes_ > 0
+                        ? BlockedBloomAddressPresence.populateFrom(source, probes_, bpe)
                         : BlockedBloomAddressPresence.populateFrom(source);
             default -> throw new IllegalArgumentException("unknown backend: " + backend);
         };
