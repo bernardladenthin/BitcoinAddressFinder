@@ -1,0 +1,5 @@
+machine_id,date,database,entries,cache_state,lookups_per_second,microseconds_per_verification,probes,notes
+ryzen75800h-63g-win11,2026-07-19,lmdb_light,132288304,cold,9472,105.6,200000,after PageCacheBuster 46 GiB
+ryzen75800h-63g-win11,2026-07-19,lmdb_light,132288304,warm,243850,4.1,200000,immediately after the cold run
+ryzen75800h-63g-win11,2026-07-19,lmdb_full,1377478516,cold,3417,292.7,50000,after PageCacheBuster 46 GiB
+ryzen75800h-63g-win11,2026-07-19,lmdb_full,1377478516,warm,148200,6.7,50000,immediately after the cold run

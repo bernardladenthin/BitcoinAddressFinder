@@ -285,6 +285,40 @@ def plot_gpu_probe(gpu: pd.DataFrame) -> pathlib.Path:
     return out
 
 
+def plot_cost_model(k_sweep: pd.DataFrame, verify: pd.DataFrame) -> pathlib.Path:
+    """Total cost per query = filter probe + FPR x verification, across densities.
+
+    This is the figure that decides the density, because it is the only one that includes what a
+    false positive actually costs. A verification was long assumed to be ~200 ns; measured, it is
+    4-7 us warm and 105-293 us cold, so at large cold databases the FPR term dominates the filter
+    term by three orders of magnitude and the densest affordable filter wins.
+    """
+    fig, ax = plt.subplots(figsize=(9, 5.0), dpi=150)
+    # One curve per measured verification cost, so the reader can locate their own deployment.
+    scenarios = []
+    for _, row in verify.iterrows():
+        scenarios.append((f"{row['database']} {row['cache_state']}", float(row["microseconds_per_verification"]) * 1000.0))
+    best = k_sweep[k_sweep["source"] == "prng"].sort_values("fpr").groupby("bits_per_entry_config").first()
+    best = best[best.index.isin([8, 11, 14, 17, 21, 26])].sort_index()
+    if best.empty:
+        ax.text(0.5, 0.5, "no density surface yet", ha="center", va="center")
+    else:
+        # A filter probe is ~50-140 ns depending on size; use a flat mid estimate so the figure
+        # isolates the FPR term, which spans orders of magnitude and is what actually decides.
+        probe_ns = 120.0
+        for label, v_ns in sorted(scenarios, key=lambda x: x[1]):
+            total = [probe_ns + f * v_ns for f in best["fpr"]]
+            ax.plot(best.index, total, marker="o", linewidth=1.8, label=f"{label} ({v_ns/1000:.1f} us)")
+        ax.set_yscale("log")
+    _style(ax, "Total cost per query = probe + FPR x verification", "bits per entry", "ns per query (log)")
+    ax.legend(fontsize=8, frameon=False, title="verification cost")
+    fig.tight_layout()
+    out = PLOTS / "cost_model.png"
+    fig.savefig(out)
+    plt.close(fig)
+    return out
+
+
 def twin_axis(ax):
     """Second y-axis sharing the x-axis (kept separate so styling stays in one place)."""
     twin = ax.twinx()
@@ -377,6 +411,7 @@ def main() -> int:
     sizing = pd.read_csv(HERE / "filter_sizing.csv")
     build = pd.read_csv(HERE / "filter_build.csv")
     gpu = pd.read_csv(HERE / "gpu_filter_probe.csv")
+    verify = pd.read_csv(HERE / "lmdb_verification_cost.csv")
 
     # Re-measurements supersede earlier rows for the same point; keep only the newest of each.
     lookup = _latest_only(lookup, ["machine_id", "backend", "entries"])
@@ -400,6 +435,7 @@ def main() -> int:
         plot_sizing(sizing),
         plot_full_db(build),
         plot_gpu_probe(gpu),
+        plot_cost_model(k_sweep, verify),
     ):
         print(f"wrote {produced.relative_to(HERE.parent.parent)}")
 

@@ -1,0 +1,10 @@
+machine_id,date,gpu,backend,gpu_filter,bits_per_entry,k,addresses_per_second_k,duration_min,notes
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,true,,,1180,13,"counts consumer-CHECKED addresses; with the GPU filter on only ~0.8% of generated keys reach the consumer, so gpuOn and gpuOff values are NOT comparable"
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,false,,,13216,13,"counts consumer-CHECKED addresses; with the GPU filter on only ~0.8% of generated keys reach the consumer, so gpuOn and gpuOff values are NOT comparable"
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BINARY_FUSE_8,true,,,1169,13,"counts consumer-CHECKED addresses; with the GPU filter on only ~0.8% of generated keys reach the consumer, so gpuOn and gpuOff values are NOT comparable"
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BINARY_FUSE_8,false,,,12132,13,"counts consumer-CHECKED addresses; with the GPU filter on only ~0.8% of generated keys reach the consumer, so gpuOn and gpuOff values are NOT comparable"
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,LMDB_ONLY,true,,,1116,13,"counts consumer-CHECKED addresses; with the GPU filter on only ~0.8% of generated keys reach the consumer, so gpuOn and gpuOff values are NOT comparable"
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,LMDB_ONLY,false,,,2714,13,"counts consumer-CHECKED addresses; with the GPU filter on only ~0.8% of generated keys reach the consumer, so gpuOn and gpuOff values are NOT comparable"
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,false,11,6,13314,13,density sweep on the light DB (warm)
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,false,17,9,12792,13,density sweep on the light DB (warm)
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,false,26,14,13591,13,density sweep on the light DB (warm)

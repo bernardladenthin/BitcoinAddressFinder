@@ -86,12 +86,24 @@ public final class BlockedBloomAddressPresence implements AddressPresence {
      * machines. {@code k = 6} also probes fewer bits, so it is simultaneously the faster and the more
      * accurate choice — the shipped {@code k = 8} cost ~6.5 % relative FPR and ~20 % throughput.
      *
-     * <p>The optimum tracks bit density by the empirical rule {@code k ≈ 0.55 × bitsPerEntry}, which
-     * sits below the textbook unblocked {@code (m/n)·ln2 ≈ 0.693 ×} because confining all probes to
-     * one block adds per-block load variance. Measured at three densities: 16.24 b/e → k=8,
-     * 12.50 b/e → k=7, 11.00 b/e → k=6. <b>Raise this together with
-     * {@link #DEFAULT_BITS_PER_ENTRY}</b>; the two are coupled, and changing one alone lands off the
-     * optimum, which is exactly what happened when the sizing moved to fastrange while k stayed at 8.
+     * <p><b>The optimum grows sub-linearly with density and saturates.</b> Measured across a full
+     * density × k grid:
+     *
+     * <pre>
+     *   bits/entry   8   11   14   17   21   26
+     *   optimum k    5    6    7    7    8    9
+     * </pre>
+     *
+     * The ratio k/bitsPerEntry falls from 0.63 to 0.35, so an earlier "{@code k ≈ 0.55 ×
+     * bitsPerEntry}" rule — derived from three densities that all happened to lie between 11 and 16
+     * — does <b>not</b> extrapolate and has been withdrawn. It would put k at 14 for 26 bits/entry
+     * where the measured optimum is 9. The saturation is expected for this layout: all probes are
+     * confined to one 512-bit block, so past a point extra probes only fill the same block faster.
+     * The textbook unblocked {@code (m/n)·ln2} is even further off, for the same reason.
+     *
+     * <p><b>Raise this together with {@link #DEFAULT_BITS_PER_ENTRY}</b>; the two are coupled, and
+     * changing one alone lands off the optimum — which is exactly what happened when the sizing
+     * moved to fastrange while k stayed at 8.
      */
     static final int DEFAULT_K = 6;
 
@@ -105,7 +117,26 @@ public final class BlockedBloomAddressPresence implements AddressPresence {
      * costs lookup speed — {@code containsAddress} short-circuits at the first unset bit, so more set
      * bits means more probes before a miss can be answered.
      *
-     * <p>Coupled to {@link #DEFAULT_K}: see the rule documented there before changing either.
+     * <p><b>The right value depends on what a false positive costs, which was measured and is far
+     * higher than long assumed.</b> Every filter hit is verified against LMDB, and that verification
+     * costs 4.1&nbsp;µs on a warm 132&nbsp;M-entry store, 6.7&nbsp;µs warm at 1.377&nbsp;B, and
+     * <b>105&nbsp;µs / 293&nbsp;µs cold</b> — against a filter probe of roughly 120&nbsp;ns. Earlier
+     * reasoning in this project assumed ~200&nbsp;ns and was wrong by a factor of 20 to 1500.
+     *
+     * <p>Total cost per query is therefore {@code probe + FPR × verification}, and the FPR term
+     * dominates whenever the database does not fit in RAM:
+     *
+     * <pre>
+     *   verification    knee of the curve      beyond the knee
+     *   4-7 µs (warm)   ~14 bits/entry         no further gain, only memory
+     *   105-293 µs      still falling at 26    denser is better as far as measured
+     * </pre>
+     *
+     * The default of 11 predates that measurement. For a warm light database it is defensible; for a
+     * large or cold store, 14-17 is clearly better and 21-26 better still. It is left at 11 pending
+     * a second machine's confirmation rather than changed on one host's data.
+     *
+     * <p>Coupled to {@link #DEFAULT_K}: see the table documented there before changing either.
      */
     static final int DEFAULT_BITS_PER_ENTRY = 11;
 

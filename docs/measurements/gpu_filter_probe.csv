@@ -15,3 +15,15 @@ ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BINARY_FUSE_8,10000000,4194304,0
 ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM,10000000,4194304,0.188,0.011,22310127659,3,fastrange + k=6; slight gain over k=8 (0.202)
 ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BINARY_FUSE_8,100000000,4194304,0.739,0.006,5675647496,3,fastrange + k=6 - unchanged control
 ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM,100000000,4194304,0.478,0.035,8774694561,3,fastrange + k=6; no gain over k=8 (0.460) - on GPU all k probes share one 512-bit block so k is nearly free
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,10000000,4194304,0.722,0.001,5809285319,3,fastrange bpe=8 k=4; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,100000000,4194304,1.390,0.003,3017484892,3,fastrange bpe=8 k=4; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,10000000,4194304,0.898,0.008,4670717149,3,fastrange bpe=11 k=6; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,100000000,4194304,1.454,0.017,2884665750,3,fastrange bpe=11 k=6; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,10000000,4194304,1.022,0.020,4104015656,3,fastrange bpe=14 k=8; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,100000000,4194304,1.483,0.011,2828256237,3,fastrange bpe=14 k=8; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,10000000,4194304,1.101,0.012,3809540418,3,fastrange bpe=17 k=9; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,100000000,4194304,1.463,0.007,2866920027,3,fastrange bpe=17 k=9; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,10000000,4194304,1.186,0.024,3536512648,3,fastrange bpe=21 k=12; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,100000000,4194304,1.511,0.007,2775846459,3,fastrange bpe=21 k=12; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,10000000,4194304,1.246,0.040,3366215088,3,fastrange bpe=26 k=14; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,100000000,4194304,1.497,0.025,2801806279,3,fastrange bpe=26 k=14; block D single session

@@ -89,3 +89,33 @@ ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,100000000,34.542,1.301,4,p
 ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,132288304,36.317,2.020,4,prng,fastrange + k=6; now faster than the 2^n geometry (37.137)
 ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,500000000,42.373,4.118,4,prng,fastrange + k=6; fully recovered vs 2^n (42.149)
 ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,44.317,2.068,4,prng,fastrange + k=6; partially recovered vs 2^n (42.705) - still ~4% short
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000,29.740,0.490,5,prng,fastrange bpe=8 k=4; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,10000000,34.922,1.174,5,prng,fastrange bpe=8 k=4; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,100000000,48.042,2.549,5,prng,fastrange bpe=8 k=4; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,500000000,57.729,2.871,5,prng,fastrange bpe=8 k=4; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,52.266,4.671,5,prng,fastrange bpe=8 k=4; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000,32.058,0.387,5,prng,fastrange bpe=11 k=6; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,10000000,36.881,0.710,5,prng,fastrange bpe=11 k=6; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,100000000,46.704,1.683,5,prng,fastrange bpe=11 k=6; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,500000000,67.483,36.457,5,prng,fastrange bpe=11 k=6; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,58.780,1.884,5,prng,fastrange bpe=11 k=6; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000,33.318,0.221,5,prng,fastrange bpe=14 k=8; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,10000000,38.647,6.467,5,prng,fastrange bpe=14 k=8; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,100000000,53.628,0.720,5,prng,fastrange bpe=14 k=8; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,500000000,64.504,2.633,5,prng,fastrange bpe=14 k=8; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,63.347,3.786,5,prng,fastrange bpe=14 k=8; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000,32.207,0.613,5,prng,fastrange bpe=17 k=9; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,10000000,36.821,1.022,5,prng,fastrange bpe=17 k=9; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,100000000,55.313,5.096,5,prng,fastrange bpe=17 k=9; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,500000000,64.842,4.125,5,prng,fastrange bpe=17 k=9; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,71.933,7.295,5,prng,fastrange bpe=17 k=9; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000,34.085,0.431,5,prng,fastrange bpe=21 k=12; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,10000000,38.324,1.246,5,prng,fastrange bpe=21 k=12; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,100000000,66.815,6.281,5,prng,fastrange bpe=21 k=12; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,500000000,67.735,2.771,5,prng,fastrange bpe=21 k=12; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,64.781,2.950,5,prng,fastrange bpe=21 k=12; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000,33.158,0.486,5,prng,fastrange bpe=26 k=14; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,10000000,39.825,2.366,5,prng,fastrange bpe=26 k=14; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,100000000,50.169,5.534,5,prng,fastrange bpe=26 k=14; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,500000000,61.430,3.161,5,prng,fastrange bpe=26 k=14; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,72.662,14.727,5,prng,fastrange bpe=26 k=14; block C single session

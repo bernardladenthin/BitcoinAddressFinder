@@ -115,11 +115,11 @@ public class CLMDBConfigurationReadOnly {
      * Bits probed per key for {@link AddressLookupBackend#BLOCKED_BLOOM}; {@code 0} uses the
      * built-in default. Consulted only by that backend.
      *
-     * <p><b>Change this together with {@link #blockedBloomBitsPerEntry}.</b> The two are coupled by
-     * the measured rule {@code k ≈ 0.55 × bitsPerEntry}, which sits below the textbook unblocked
-     * {@code (m/n)·ln2} because confining all probes to one 512-bit block adds per-block load
-     * variance. Setting one alone lands off the optimum — measured at three densities: 16.24
-     * bits/entry → k=8, 12.50 → k=7, 11.00 → k=6.
+     * <p><b>Change this together with {@link #blockedBloomBitsPerEntry}.</b> The measured optima are
+     * {@code k = 5 / 6 / 7 / 7 / 8 / 9} at {@code bitsPerEntry = 8 / 11 / 14 / 17 / 21 / 26}: the
+     * optimum grows sub-linearly and saturates, because all probes share one 512-bit block. A
+     * proportional rule does not extrapolate — an earlier {@code k ≈ 0.55 × bitsPerEntry} would say
+     * 14 where the measured optimum at 26 bits/entry is 9.
      */
     public int blockedBloomK = 0;
 
