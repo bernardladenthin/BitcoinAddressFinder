@@ -176,8 +176,16 @@ Every `examples/run_*.bat` has a matching `examples/run_*.sh` (same JVM flags); 
 Every grid and filter recommendation in this README and in [`docs/filter-selection.md`](docs/filter-selection.md) was measured on one developer's hardware. The `TuneConfiguration` command measures *yours*:
 
 ```bash
-java -jar bitcoinaddressfinder-1.6.1-jar-with-dependencies.jar config_TuneConfiguration.json
+# Use the launcher — it carries the --add-opens the JVM needs for LMDB access:
+examples/run_TuneConfiguration.sh          # Linux/macOS
+examples\run_TuneConfiguration.bat         # Windows
 ```
+
+> The bare `java -jar … config_TuneConfiguration.json` works **only** when no real database is
+> configured. The moment `lmdbConfigurationReadOnly.lmdbDirectory` points at an actual LMDB, the
+> lookup path reflects into `java.nio`/`sun.nio.ch` and the JVM throws
+> `InaccessibleObjectException` without the `--add-opens` flags the launcher sets. Use the launcher,
+> or copy its flag list, whenever you point the tuner at a database.
 
 It sweeps `batchSizeInBits` × `keysPerWorkItem`, measures the **net end-to-end throughput** of each combination (candidate keys per second through the whole pipeline, not kernel time), and prints a table of every arm plus the winning configuration as a ready-to-paste JSON file. It also measures what one database lookup costs on your storage in its current state — the term that ranges from 4.1 µs warm to 292.7 µs cold, and the one the `FUSE_8` / `FUSE_16` choice hinges on. Every number in the report is labelled **MEASURED** (here, on this machine) or **DOCUMENTED / ESTIMATED** (a published constant), so it is always clear which is which.
 

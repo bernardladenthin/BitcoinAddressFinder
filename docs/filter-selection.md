@@ -141,8 +141,19 @@ entry means only more writes within the same single pass.
 total = probe + false-positive-rate × verification
 ```
 
-Verification is the LMDB read a false positive forces. Measured at **4.1 µs warm to 292.7 µs cold** —
-60× to 4 000× the cost of a probe. At 1e9 entries, filters at equal footprint:
+Verification is the LMDB read a false positive forces. It spans **4.1 µs warm to 292.7 µs cold** on
+the early microbenchmark, and the `TuneConfiguration` command has since measured it against two real
+databases in their actual page-cache state:
+
+| Machine | Database | Measured verification cost |
+|---|---|--:|
+| Ryzen 9800X3D / RX 7900 XTX | (operator's LMDB) | **195.56 µs** |
+| Ryzen 5800H / RTX 3070 | 5.5 GB LMDB, cold | **385.65 µs** |
+
+Both land near the **cold** end, i.e. 50–95× my original warm estimate of 4.1 µs — a real scan
+against real storage pays far more per false positive than the warm figure suggests, which is
+exactly why the tuner reports this term as ESTIMATED unless it measures your database directly. At
+385.65 µs a false positive costs ~5 000× a probe. At 1e9 entries, filters at equal footprint:
 
 | Filter | Memory | Probe | FPR | Total warm | Total cold |
 |---|--:|--:|--:|--:|--:|
@@ -183,10 +194,36 @@ passes the CPU stage as well and the second filter is a no-op. This is pinned by
 `FilterCascadeTest#sameFilterTwice_rejectsNothing`, and it is why the recommended pairing
 deliberately uses two *different* filters.
 
-Why the cascade matters at all: `ConsumerJava` is single-threaded by design (to avoid LMDB
-contention), so it is the pipeline's bottleneck. The GPU can generate candidates far faster than one
-thread can verify them, and every stage that rejects a candidate earlier multiplies the throughput
-ceiling.
+### Measured end-to-end, and what it corrects
+
+Running the full pipeline against the 5.5 GB LMDB on the RTX 3070, winner grid, only the GPU filter
+type varied (`TuneConfiguration` with `sweepFilterTypes`):
+
+| GPU filter | Net throughput | Survivors reaching the consumer |
+|---|--:|--:|
+| `FUSE_8` | 231.4 M/s | **3 615 569 /s** |
+| `FUSE_16` | 233.4 M/s | **14 141 /s** |
+
+Two separate facts, and the second corrects an earlier overclaim of mine:
+
+- **Consumer load: 256× lower** — matching the 242× false-positive-rate ratio almost exactly. The
+  cascade does what the arithmetic said. This is the measured payoff.
+- **Net throughput: unchanged** (231 ≈ 233 M/s, within noise). On this rig the **GPU is the
+  bottleneck**, not the consumer: even Fuse-8's 3.6 M survivors/s did not saturate the (default
+  8-thread) consumer against a warm-cached database, so the better filter did not raise the ceiling.
+  An earlier version of this document claimed a flat "20× throughput" for the cascade; that was the
+  cost-per-candidate model mistaken for pipeline throughput, and the measurement refutes it.
+
+So `FUSE_16` on the device is best understood as **free insurance**: identical throughput, 256× less
+pressure on the serial verification path. It converts to an actual throughput *win* only when the
+consumer saturates — slower or genuinely cold storage (where the 385.65 µs cold cost bites), several
+GPUs feeding one consumer, or a heavier lookup backend. The cost model quantifies that regime: at the
+measured 385.65 µs, FUSE_8 totals 1 571 ns per candidate against FUSE_16's 87 ns, an 18× gap that
+appears the moment verification, not key generation, is the limiting stage.
+
+The lesson is the general one from this whole investigation: net throughput is `min(stage rates)`,
+not the sum of per-candidate costs. A stage improvement only moves the ceiling if that stage is the
+one holding it down.
 
 ---
 
@@ -211,8 +248,12 @@ your device's limit before choosing.
 **GPU runs — `gpuFilterType = FUSE_16` with `addressLookupBackend = BINARY_FUSE_8`**
 → [`examples/config_Find_GPU_Fuse16Cascade.json`](../examples/config_Find_GPU_Fuse16Cascade.json)
 
-Costs **+2.6 % GPU time** and hands the single-threaded consumer **242× less work**: 16 candidates
-per million instead of 3 874. The two stages are different filters, so they compound.
+Measured net throughput is **unchanged** versus Fuse-8 on the device (231 vs 233 M/s, within noise —
+the isolated probe benchmark's +2.6 % disappears once key generation, not the probe, sets the rate),
+while the work reaching the consumer drops **256×** (14 141/s against 3 615 569/s). It is free
+insurance: same speed, a serial verification path that stays far from saturation, and a real
+throughput win the moment storage is the bottleneck. The two stages are different filters, so they
+compound (§7).
 
 Where the device allocation limit cannot hold Fuse-16, swap them
 → [`examples/config_Find_GPU_LowVram.json`](../examples/config_Find_GPU_LowVram.json). Fuse-8 fits
@@ -227,3 +268,25 @@ build in a single streaming pass, with none of the ~29 B/entry peeling arrays. A
 
 **Never `TRUNCATED_LONG_64`** for this purpose — an order of magnitude slower at seven times the
 memory.
+
+---
+
+## 10. Grid tuning is machine-specific — measure it, don't copy it
+
+The filter choice above is portable: false-positive rates are deterministic and the cost model holds
+across hardware. The **grid** parameters (`batchSizeInBits`, `keysPerWorkItem`) are not — they are a
+property of the specific GPU, and copying another machine's values leaves throughput on the table.
+`TuneConfiguration` measures them on yours; full arm tables are in
+[`tune_arms.csv`](measurements/tune_arms.csv). The two machines measured so far disagree on the
+optimum:
+
+| Machine | Winner | Note |
+|---|---|---|
+| RTX 3070 Laptop | `batchSizeInBits=22`, `keysPerWorkItem=256` | `kpwi=256` is optimal at `bits=22` and the **worst** choice of all at `bits=18` (5.8× spread) |
+| RX 7900 XTX | `batchSizeInBits=22`, `keysPerWorkItem=64` | `kpwi=256` is past-peak here; best-to-worst spread widens to 24.9× |
+
+The `batchSizeInBits` agrees but `keysPerWorkItem` does not, and the two parameters interact — the
+right `keysPerWorkItem` depends on `batchSizeInBits`, so sweeping one axis alone finds a false
+optimum. This is the whole reason the tuner exists rather than a documented constant. Note the
+device's own suggested-config heuristic pointed at `bits=21` on the 3070, which the sweep beat with
+`bits=22`; treat the heuristic as a starting point, not an answer.

@@ -311,6 +311,26 @@ public class LMDBPersistenceTest {
         }
     }
 
+    /**
+     * {@code close()} must be safe to call when {@code init()} never ran (or threw before opening
+     * the environment). This is not a theoretical case: {@code close()} runs in the caller's
+     * {@code finally} block, so a failed {@code init()} — for example an
+     * {@code InaccessibleObjectException} when the JVM is launched without the required
+     * {@code --add-opens} — is immediately followed by {@code close()}. If {@code close()} raised its
+     * own {@code NullPointerException} there, it would replace the real cause in the stack trace and
+     * leave the operator debugging the wrong failure. This test fails if the null-guard is dropped.
+     */
+    @Test
+    public void close_withoutInit_doesNotThrow_soItCannotMaskAnInitFailure() {
+        CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
+        cLMDBConfigurationWrite.lmdbDirectory =
+                folder.resolve("never-opened").toFile().getAbsolutePath();
+
+        LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils);
+        // No init() call — the environment was never opened. close() must be a quiet no-op.
+        lmdbPersistence.close();
+    }
+
     private void fillWithRandomKeys(int keysToAdd, LMDBPersistence lmdbPersistence) {
         // arrange - fill
         for (int i = 0; i < keysToAdd; i++) {

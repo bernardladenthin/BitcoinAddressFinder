@@ -205,8 +205,18 @@ public class LMDBPersistence implements Persistence, AddressIterable {
 
     @Override
     public void close() {
-        Dbi<ByteBuffer> localLmdb_h160ToAmount = Objects.requireNonNull(lmdb_h160ToAmount);
-        Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
+        // Null-safe on purpose: close() runs in the caller's finally block, so if init() threw
+        // before these fields were assigned (e.g. an InaccessibleObjectException because the JVM was
+        // launched without the required --add-opens), requireNonNull here would raise a fresh NPE
+        // that MASKS the original failure. The operator would then see a NullPointerException from
+        // close() instead of the real cause. Skip whatever was never opened and let the original
+        // exception propagate.
+        Dbi<ByteBuffer> localLmdb_h160ToAmount = lmdb_h160ToAmount;
+        Env<ByteBuffer> localEnv = env;
+
+        if (localLmdb_h160ToAmount == null || localEnv == null) {
+            return;
+        }
 
         logStatsIfConfigured(false);
         localLmdb_h160ToAmount.close();
