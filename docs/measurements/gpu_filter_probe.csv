@@ -53,3 +53,21 @@ ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:17:7,1000000000,41
 ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:26:9,1000000000,4194304,0.855,0.023,4905618713,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
 ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:9:5,1000000000,4194304,0.852,0.025,4922892019,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
 ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:18:7,1000000000,4194304,0.843,0.017,4975449585,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BINARY_FUSE_8,10000000,4194304,0.289,0.016,14513162630,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:11:6,10000000,4194304,0.183,0.029,22919693989,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:17:7,10000000,4194304,0.185,0.015,22671913514,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:26:9,10000000,4194304,0.197,0.015,21290883249,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:9:5,10000000,4194304,0.182,0.010,23045626374,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:18:7,10000000,4194304,0.187,0.002,22429433155,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BINARY_FUSE_8,100000000,4194304,0.73,0.032,5745621918,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:11:6,100000000,4194304,0.463,0.022,9058971922,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:17:7,100000000,4194304,0.576,0.026,7281777778,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:26:9,100000000,4194304,0.682,0.022,6150005865,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:9:5,100000000,4194304,0.394,0.017,10645441624,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:18:7,100000000,4194304,0.589,0.021,7121059423,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BINARY_FUSE_8,1000000000,4194304,2.132,0.022,1967309568,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:11:6,1000000000,4194304,0.842,0.008,4981358670,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:17:7,1000000000,4194304,0.843,0.027,4975449585,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:26:9,1000000000,4194304,0.854,0.014,4911362998,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:9:5,1000000000,4194304,0.851,0.021,4928676851,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:18:7,1000000000,4194304,0.843,0.032,4975449585,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM

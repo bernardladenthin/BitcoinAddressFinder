@@ -169,3 +169,27 @@ ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:9:5,1000000000,43.047,1.53
 ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:18:7,10000000,25.066,0.855,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
 ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:18:7,100000000,34.352,1.493,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
 ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:18:7,1000000000,41.258,1.490,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-20,BINARY_FUSE_8,10000000,22.050,1.433,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BINARY_FUSE_8,100000000,31.020,2.225,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BINARY_FUSE_8,1000000000,39.437,1.428,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BINARY_FUSE_16,10000000,22.177,1.677,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BINARY_FUSE_16,100000000,34.958,1.056,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BINARY_FUSE_16,1000000000,39.978,1.739,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,TRUNCATED_LONG_64,10000000,146.431,3.891,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,TRUNCATED_LONG_64,100000000,398.538,23.507,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,TRUNCATED_LONG_64,1000000000,779.269,19.189,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:11:6,10000000,27.188,1.250,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:11:6,100000000,33.708,1.954,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:11:6,1000000000,43.147,1.045,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:17:7,10000000,25.246,1.397,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:17:7,100000000,34.362,2.409,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:17:7,1000000000,41.682,1.617,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:26:9,10000000,24.636,1.008,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:26:9,100000000,36.298,1.209,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:26:9,1000000000,41.606,1.204,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:9:5,10000000,26.961,0.942,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:9:5,100000000,32.641,0.184,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:9:5,1000000000,42.808,2.633,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:18:7,10000000,25.036,1.483,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:18:7,100000000,34.273,0.663,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:18:7,1000000000,41.461,2.110,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
