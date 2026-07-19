@@ -145,3 +145,27 @@ ryzen75800h-63g-win11,2026-07-19,BINARY_FUSE_16,100000000,65.759,0.701,5,prng,eq
 ryzen75800h-63g-win11,2026-07-19,BINARY_FUSE_16,1000000000,80.436,1.513,5,prng,equal-memory budget pair; single-session run; densities encoded as NAME:bpe:k
 ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM:18:7,100000000,40.698,1.939,5,prng,equal-memory budget pair; single-session run; densities encoded as NAME:bpe:k
 ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM:18:7,1000000000,54.41,6.663,5,prng,equal-memory budget pair; single-session run; densities encoded as NAME:bpe:k
+ryzen79800x3d8core-61g-win11,2026-07-19,BINARY_FUSE_8,10000000,21.722,1.184,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BINARY_FUSE_8,100000000,30.956,1.509,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BINARY_FUSE_8,1000000000,38.868,1.327,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BINARY_FUSE_16,10000000,22.093,1.927,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BINARY_FUSE_16,100000000,34.953,0.980,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BINARY_FUSE_16,1000000000,39.161,1.950,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,TRUNCATED_LONG_64,10000000,147.466,3.950,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,TRUNCATED_LONG_64,100000000,390.640,17.648,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,TRUNCATED_LONG_64,1000000000,786.555,23.120,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:11:6,10000000,27.292,0.797,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:11:6,100000000,33.584,1.248,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:11:6,1000000000,43.598,2.034,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:17:7,10000000,25.306,0.652,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:17:7,100000000,34.267,2.192,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:17:7,1000000000,41.782,1.518,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:26:9,10000000,24.766,0.775,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:26:9,100000000,35.292,1.191,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:26:9,1000000000,41.161,1.698,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:9:5,10000000,27.008,1.248,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:9:5,100000000,32.974,0.826,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:9:5,1000000000,43.047,1.535,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:18:7,10000000,25.066,0.855,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:18:7,100000000,34.352,1.493,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:18:7,1000000000,41.258,1.490,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
