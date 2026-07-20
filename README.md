@@ -269,7 +269,7 @@ The OpenCL kernel then evaluates `secretBase + i` for `i &#x2208; [0, 2^batchSiz
 | `18`              | 262,144                 | typical OpenCL device &#x2014; used by `config_Find_1OpenCLDevice.json` |
 | `20`&#x2013;`21`  | 1M&#x2013;2M            | high-end OpenCL device |
 
-**Upper bound**: [`PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY`](src/main/java/net/ladenthin/bitcoinaddressfinder/PublicKeyBytes.java) &#x2014; derived from `Integer.MAX_VALUE / CHUNK_SIZE_NUM_BYTES` so per-batch result arrays cannot exceed Java's 32-bit array-length limit. **Default**: `0` (sequential, no batching).
+**Upper bound**: [`OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY`](src/main/java/net/ladenthin/bitcoinaddressfinder/constants/OpenClKernelConstants.java) (`= 24`) &#x2014; derived from `Integer.MAX_VALUE / CHUNK_SIZE_NUM_BYTES` so per-batch result arrays cannot exceed Java's 32-bit array-length limit. **Default**: `0` (sequential, no batching).
 
 #### Relation to `keysPerWorkItem`
 
@@ -1600,7 +1600,11 @@ For technical details, see:
 
 #### Performance Benchmarks
 
-> **Note:** OpenCL generates uncompressed keys. Compressed keys can be derived from uncompressed ones with minimal overhead.
+> **Note:** the kernel computes each public-key point once (the uncompressed form); the compressed
+> form is derived from the same point with negligible overhead, and **both** the compressed and
+> uncompressed address are checked. `Effective Keys/s` counts **keys (EC points)**, so the number of
+> addresses examined is twice this rate — see
+> [Keys versus addresses](#keys-versus-addresses).
 
 | GPU Model                   | CPU                 | Key Range (Bits) | Grid Size (Bits) | Effective Keys/s (~)   |
 |-----------------------------|---------------------|------------------|------------------|------------------------|
@@ -1674,7 +1678,7 @@ CPU at negligible GPU cost, which is exactly the design intent. (Profiling adds 
 
 In `Find` mode the consumer logs a periodic, single-line statistics snapshot at `INFO`
 level. The print interval is controlled by `consumerJava.printStatisticsEveryNSeconds`
-(default `60`); the keys/second and keys/minute figures are a **current** throughput averaged
+(default `60`); the `Generated` and `-> LMDB` rates are a **current** throughput averaged
 over a trailing `consumerJava.statisticsRateWindowSeconds` window (default `60`), independent of
 the print interval. All logging goes through **SLF4J / Logback**, so format and destinations
 are fully configurable (see [Customizing Log Output](#customizing-log-output)).
@@ -1684,13 +1688,15 @@ are fully configurable (see [Customizing Log Output](#customizing-log-output)).
 A statistics line looks like this:
 
 ```
-Statistics: [Checked 1234 M keys in 5 minutes] [4100 k keys/second over 60s] [246 M keys/minute over 60s] [Batches per producer: exampleOpenCL (Random, GPU)=5012, exampleRandom (Random, CPU)=480] [Producers running: 2] [Consumers running: 4] [Consumer ready for work (queue empty): 5012] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
+Statistics: [uptime 43 min] [Generated 128 M/s (333258 M total)] [-> LMDB 2 M/s (5196 M lookups total), 99.22% pre-filtered] [rate window 60s] [Batches per producer: exampleKeyProducerSecureRandomId (Random, GPU)=79455] [Producers running: 1] [Consumers running: 8] [Consumer ready for work (queue empty): 167939] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
 ```
 
 | Field | Meaning |
 |---|---|
-| `Checked N M keys in M minutes` | **Lifetime** total candidate keys checked so far (millions) and elapsed minutes. |
-| `k keys/second over Ns` / `M keys/minute over Ns` | **Current** throughput, averaged over the trailing `statisticsRateWindowSeconds` window (the `over Ns` suffix shows the window). Unlike a lifetime average it tracks warm-up and thermal throttling and drops toward zero when producers stall. **The headline performance number.** |
+| `uptime N min` | **Lifetime** elapsed minutes since the scan started. |
+| `Generated <rate> (<N> M total)` | **The headline performance number: the rate of candidate private keys the producers fully compute** (windowed rate + lifetime total in millions). On a GPU run this is the real key-generation output. It counts **keys (EC points)**, not addresses — see *Keys vs. addresses* below. Auto-scales across `/s`, `k/s`, `M/s`, `G/s`. |
+| `-> LMDB <rate> (<N> M lookups total), NN.NN% pre-filtered` | The rate of hash160 **address** lookups that survive the GPU pre-filter and actually reach the consumer/LMDB (windowed rate + lifetime total). `pre-filtered` is the share of the potential address lookups the filter eliminated before LMDB (see below); it is omitted when no pre-filter is active (full transfer). |
+| `rate window Ns` | The trailing window (`statisticsRateWindowSeconds`) the two rates are averaged over. |
 | `Batches per producer: <label>=N, …` | Dispatched-batch count per running producer, keyed by `<keyProducerId> (<Strategy>, <CPU\|GPU>)` so concurrently running producers are told apart. The **strategy** (`Random`, `Bip39`, `Incremental`, `Socket`, `WebSocket`, `Zmq`) is derived from the key producer; the **backend** (`CPU` for `producerJava`/`producerJavaSecretsFiles`, `GPU` for `producerOpenCL`) from the producer. `none` until the first batch. |
 | `Producers running: N` | Number of producers currently in the `RUNNING` state. |
 | `Consumers running: N` | Number of consumer worker threads currently running (≤ `consumerJava.threads`). |
@@ -1700,10 +1706,30 @@ Statistics: [Checked 1234 M keys in 5 minutes] [4100 k keys/second over 60s] [24
 | `keys queue size: N` | Instantaneous depth of the producer→consumer queue (bounded by `consumerJava.queueSize`). |
 | `Hits: N` | Number of address matches found so far (see [Hit Logging](#hit-logging)). |
 
-> The **count** fields (`Checked … keys`, `Consumer ready`, `Producer blocked`, `Hits`) are
-> **cumulative since startup** — for those, what matters is how fast they *rise between two
-> lines*, not the absolute value. The `keys/second` / `keys/minute` fields are already a
-> **current windowed rate**, so they read directly with no need to difference successive lines.
+#### Keys versus addresses
+
+Why `Generated` and `-> LMDB` count different things: `Generated` counts **candidate private keys** — secp256k1 points, one full scalar multiplication each.
+From every such key the tool derives **two** hash160 addresses: the **compressed** and the
+**uncompressed** form, and both are checked. So the number of *addresses* examined is **twice** the
+`Generated` rate:
+
+- `Generated 128 M/s` ⇒ 128 M keys/s ⇒ **~256 M addresses/s** (compressed + uncompressed) hashed and
+  probed against the filter.
+- `-> LMDB` counts those address lookups (post-filter), **not** keys. With a strong GPU pre-filter
+  almost none survive, so `-> LMDB` is a tiny fraction of `Generated`.
+- `pre-filtered` is measured against that doubled figure: it is the share of the `2 × Generated`
+  potential address lookups the pre-filter removed before LMDB. In the line above, `2 M/s` reach LMDB
+  out of `~256 M/s` potential ⇒ `99.22 % pre-filtered`.
+
+This split is deliberate. An earlier version reported only the surviving (`-> LMDB`) rate, which
+**collapses** when a GPU pre-filter is on — making a hard-working GPU look idle. `Generated` now shows
+the real output rate next to it, so a **healthy GPU run reads as high `Generated`, low `-> LMDB`, high
+`pre-filtered`**.
+
+> The **total** fields (`Generated … total`, `-> LMDB … total`, `Consumer ready`, `Producer blocked`,
+> `Hits`) are **cumulative since startup** — for those, what matters is how fast they *rise between two
+> lines*, not the absolute value. The `Generated` / `-> LMDB` **rates** are already a **current
+> windowed rate**, so they read directly with no need to difference successive lines.
 
 ### Diagnosing Bottlenecks
 
@@ -1727,8 +1753,8 @@ problem signal:
 |---|---|---|---|
 | ~0 | rising | ~0 | **Healthy** (the normal GPU-scanning state) — the CPU keeps up easily. If throughput is below expectations, the limit is the producer/GPU side, not the consumer. |
 | rising | ~0 | near `queueSize` | **CPU-bound — the warning state.** The consumer can't keep up. Use a faster [lookup backend](#-pluggable-address-lookup-backends-addresslookupbackend), raise `consumerJava.threads`, or reduce the producer rate. |
-| ~0 | ~0 | mid-range | **Balanced** — neither side waits; watch `keys/second`. |
-| ~0 | rising | ~0 | with `keys/second` ≈ 0 → **nothing is producing** — check the producer/key-producer configuration. |
+| ~0 | ~0 | mid-range | **Balanced** — neither side waits; watch `Generated`. |
+| ~0 | rising | ~0 | with `Generated` ≈ 0 → **nothing is producing** — check the producer/key-producer configuration. |
 
 Rule of thumb: **`Producer blocked` climbing = act (CPU too slow); `Consumer ready` climbing = fine.**
 
@@ -1763,7 +1789,7 @@ Typical customizations:
   (or filter on the `hit:` prefix) to it, so matches are never lost in console scrollback.
 - **Adjust the statistics cadence / rate window** — `consumerJava.printStatisticsEveryNSeconds`
   controls *when* the line is emitted; `consumerJava.statisticsRateWindowSeconds` controls the
-  trailing window the keys/second rate is averaged over (Logback controls *how/where*).
+  trailing window the `Generated` / `-> LMDB` rates are averaged over (Logback controls *how/where*).
 - **Machine-readable output** — the single-line, fixed-field statistics format is intentionally
   stable so an external supervisor or GUI can parse it (e.g. via an inter-process pipe) to plot
   throughput and the ready/blocked health counters over time.

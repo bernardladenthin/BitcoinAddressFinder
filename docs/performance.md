@@ -99,8 +99,8 @@ Log₂ of the per-launch work size; each launch produces `2^batchSizeInBits` can
 | `18` | 262,144 | typical OpenCL device |
 | `20`–`21` | 1M–2M | high-end OpenCL device |
 
-Upper bound: `PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY` (so per-batch result arrays stay within
-Java's 32-bit array-length limit). Larger batches improve GPU occupancy and amortize launch overhead,
+Upper bound: `OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY` (`= 24`, so per-batch result arrays
+stay within Java's 32-bit array-length limit). Larger batches improve GPU occupancy and amortize launch overhead,
 but cost more VRAM for the result buffer and more host readback per launch.
 
 ### `KEYS_BATCH_INV` (compile-time)
@@ -1113,11 +1113,14 @@ kernel. Measured with the actual jar on the light database, 13 min per configura
 - Density barely moves it either on a warm light DB: 13 314 / 12 792 / 13 591 at 11 / 17 / 26
   bits/entry, a 6 % spread with no clear ordering.
 
-> **⚠ The two rows are not comparable to each other.** `keys/second` counts addresses the *consumer
-> checked*. With the GPU filter on, only ~0.8 % of generated keys reach the consumer, so the figure
-> collapses even though the GPU is doing **11× more work** (2 715 vs 243 batches in the same minute).
-> Read within a row, never across. This is a genuine reporting trap in the tool: switching the GPU
-> filter on makes the displayed throughput fall by 11× while actual key generation rises by 11×.
+> **⚠ The two rows are not comparable to each other.** These figures were captured with the old
+> statistics metric, which reported only the rate of addresses the *consumer checked*. With the GPU
+> filter on, only ~0.8 % of generated keys reach the consumer, so that figure collapses even though the
+> GPU is doing **11× more work** (2 715 vs 243 batches in the same minute). Read within a row, never
+> across. **The runtime log no longer has this trap:** it now reports `Generated` (the real
+> key-generation rate) and `-> LMDB` (the surviving, post-filter address lookups) as **separate** fields
+> plus the `pre-filtered` share, so a filtered GPU run reads as high `Generated` / low `-> LMDB`. See the
+> [statistics-line reference](../README.md#reading-the-statistics-line).
 
 #### Where the measurement data lives
 
