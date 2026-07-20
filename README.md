@@ -300,49 +300,46 @@ As of version 1.6.0, the address presence check is decoupled from the on-disk LM
 
 #### Which filter to pick
 
-**If you want one answer: `BINARY_FUSE_8`.** It is the recommended filter for both database tiers,
-on CPU and on GPU.
+**Most users should just run the shipped example
+[`examples/config_Find_GPU_Fuse16Cascade.json`](examples/config_Find_GPU_Fuse16Cascade.json)** — it
+is already set to the recommended combination. There are two independent knobs, and the defaults are:
 
-That recommendation rests on a distinction worth stating explicitly, because the raw speed numbers
-point the other way. What matters is not how fast a filter answers, but the **total** cost of a
-lookup:
+| Knob | Recommended | Why |
+|---|---|---|
+| **GPU pre-filter** (`gpuFilterType`, needs `enableGpuFilter`) | **`FUSE_16`** | raises end-to-end throughput **1.2×–7.2×**; fits VRAM even at the Full DB tier |
+| **Consumer backend** (`addressLookupBackend`) | **`BINARY_FUSE_8`** | small, cheap independent second stage — or `LMDB_ONLY` for exact, false-positive-free checks |
 
-```
-total = probe + false-positive-rate × verification
-```
+They form a **cascade**: the GPU pre-filter decides what crosses PCIe, the consumer backend re-checks
+the survivors. Because the two filters hash independently, the second stage rejects what the first
+let through — so they must be *different* filters. Full analysis, with all measurements, in
+[`docs/filter-selection.md`](docs/filter-selection.md) and
+[`docs/performance.md`](docs/performance.md).
 
-A probe costs tens of nanoseconds. A verification — the LMDB read a false positive forces — costs
-**4.1 µs warm and 292.7 µs cold**, i.e. 60× to 4 000× more. Any filter comparison that stops at the
-probe measures the term that barely counts.
+**Why `FUSE_16` on the GPU, even though it is not the fastest to probe.** Blocked Bloom probes
+1.6–2.3× faster on the device, but the device is not the bottleneck — the single consumer thread,
+verifying survivors against LMDB, is. A faster probe that passes *more* candidates (a higher
+false-positive rate) just floods that thread. `FUSE_16`'s 0.0016 % FPR hands it **256× less work**
+than `FUSE_8` and removes it as the bottleneck. Measured end-to-end against a real database, only the
+GPU filter varied:
 
-Measured at 1 billion entries, filters sized to the *same* footprint so only the type varies:
+| Consumer threads | `FUSE_8` net throughput | `FUSE_16` net throughput | Speed-up |
+|--:|--:|--:|--:|
+| 8 | 188.6 M/s | 227.8 M/s | 1.21× |
+| 1 | 31.7 M/s | 228.3 M/s | **7.24×** |
 
-| Filter | Memory | Probe | FPR | Total, warm | Total, cold |
-|---|--:|--:|--:|--:|--:|
-| `BINARY_FUSE_8` | 1.13 B/entry | 76.7 ns | 0.387 % | **92.6 ns** | **1 211 ns** |
-| `BLOCKED_BLOOM` (bpe 9) | 1.13 B/entry | **63.4 ns** | 1.628 % | 130.2 ns | 4 829 ns |
-| `BINARY_FUSE_16` | 2.25 B/entry | 80.4 ns | 0.0016 % | 80.5 ns | **85.1 ns** |
-| `BLOCKED_BLOOM` (bpe 18) | 2.25 B/entry | **54.4 ns** | 0.134 % | **59.9 ns** | 447 ns |
-
-Blocked Bloom wins every probe column — by 17–38 % on CPU and by 1.6–2.3× on GPU, because all its
-`k` bits sit in one 512-bit block, i.e. one coalesced memory transaction, where a fuse lookup makes
-three scattered reads. It still loses the total, because its false-positive rate is 4× higher at the
-same size, and false positives are what actually cost time.
-
-On the GPU the effect is starker, not weaker: a probe there costs **0.7 ns**, so the filter is no
-longer the bottleneck at all. Per key, Fuse-8 totals 16.6 ns against Blocked Bloom's 31.3 ns —
-Blocked Bloom is twice as fast at the one thing that stopped mattering.
+The gain grows as the consumer gets tighter — fewer threads, colder storage, or several GPUs feeding
+one consumer — and is never negative. It costs 2× the VRAM (2.25 vs 1.13 B/entry), which fits an 8 GB
+card at every tier.
 
 **Deviate when:**
 
-- **`BINARY_FUSE_16`** — CPU-only runs against a cold database, if you can spare 2× the memory. Its
-  0.0016 % FPR makes verification cost vanish: 85 ns against Fuse-8's 1 211 ns, a **14× win**. This
-  is the largest single effect in the whole comparison. It has no GPU kernel.
-- **`BLOCKED_BLOOM`** — when build time dominates, e.g. you rebuild often. It constructs **3× faster**
-  (14.6 s vs 43.8 s at 100 M) and streams in one pass, where Binary Fuse peels through auxiliary
-  arrays at ~29 B/entry — roughly 40 GB of transient heap at the Full DB tier, against 1.9 GB for
-  Blocked Bloom. Use a *low* density (`bpe` 9–11); at higher densities `BINARY_FUSE_16` dominates it
-  outright, being both smaller and 37× more accurate.
+- **CPU-only runs (no GPU): `BINARY_FUSE_16`** as the consumer backend. Against a cold database its
+  0.0016 % FPR makes verification cost vanish — the largest single effect in the whole comparison.
+- **Rebuild often, or short on build RAM: `BLOCKED_BLOOM`** (low density, `bpe` 9–11). It builds
+  **3–4× faster** in a single streaming pass, where Binary Fuse peels through ~29 B/entry of
+  auxiliary arrays (~40 GB transient at the Full DB tier). At `bpe` ≥ 17 `BINARY_FUSE_16` dominates
+  it on both memory and accuracy. It is not offered as a GPU pre-filter on purpose — its faster probe
+  passes more candidates to the consumer, which loses net throughput.
 - **`LMDB_ONLY`** — whenever a false positive is unacceptable rather than merely costly.
 
 > **On GPU, `CL_DEVICE_MAX_MEM_ALLOC_SIZE` is a reported floor, not a hard cap.** The filter is a
@@ -568,21 +565,22 @@ This sweep is also the clearest statement of why Fuse-8 was **not** removed: at 
 
 The probe sequence is `bit_i = (x + i·y) mod 512`, whose period is `512 / gcd(y, 512)`. With an unconstrained stride `y`, 1 key in 512 draws `y ≡ 0 (mod 512)` and places **all `k` probes on a single bit**; 1 in 256 reaches only 2 distinct bits, 1 in 128 only 4. Those degenerate keys are near-useless filter entries and measurably inflate the aggregate FPR — **0.258 % before the fix versus 0.184 % after**, at identical size and `k`. Forcing `y` odd makes `gcd(y, 512) = 1`, so the probes are always distinct. Cost: one OR instruction. `BlockedBloomAddressPresenceTest#probePositions_areAlwaysDistinct_becauseStrideIsOdd` fails if it is ever dropped.
 
-**Which to choose:**
+**Which consumer backend to choose** (`addressLookupBackend`; the GPU pre-filter is a separate knob — see [Which filter to pick](#which-filter-to-pick)):
 
-- **Small/medium databases (below ~15 M entries) → `BINARY_FUSE_8`.** Fastest filter measured at that scale on either machine, lowest RAM, and it is what feeds the GPU pre-filter.
-- **Large databases → `BINARY_FUSE_8`**, on either host. Cache size changes which filter *probes* faster, but not which one is cheaper overall: verification cost dominates, and Fuse-8's FPR is ~4× lower at equal footprint. Budget ~40 GB of transient heap to build it at the 1.377 B tier (the peeling arrays need ~29 B/entry); `BLOCKED_BLOOM` needs only the finished 1.89 GB and builds 3× faster, so prefer it if you rebuild often or cannot spare the heap.
+- **Small/medium databases (below ~15 M entries) → `BINARY_FUSE_8`.** Fastest filter measured at that scale on either machine, and lowest RAM.
+- **Large databases → `BINARY_FUSE_8`**, on either host. Cache size changes which filter *probes* faster, but not which one is cheaper overall: verification cost dominates, and Fuse-8's FPR is ~4× lower at equal footprint. Against genuinely cold storage `BINARY_FUSE_16` pulls ahead (its FPR is two orders of magnitude lower). Budget ~40 GB of transient heap to build Fuse at the 1.377 B tier (the peeling arrays need ~29 B/entry); `BLOCKED_BLOOM` needs only the finished 1.89 GB and builds 3× faster, so prefer it if you rebuild often or cannot spare the heap.
 
-Ready-to-run example covering both tiers: [`examples/config_Find_AnyDB_Fuse8.json`](examples/config_Find_AnyDB_Fuse8.json).
+Ready-to-run example covering both tiers, on GPU:
+[`examples/config_Find_GPU_Fuse16Cascade.json`](examples/config_Find_GPU_Fuse16Cascade.json) —
+`FUSE_16` GPU pre-filter + `BINARY_FUSE_8` consumer backend, the recommended cascade (see
+[Which filter to pick](#which-filter-to-pick)).
 
-`BINARY_FUSE_8` is a safe simple default for the consumer backend (`addressLookupBackend`) on both
-tiers — see [Which filter to pick](#which-filter-to-pick) for the full picture, including when
-`BINARY_FUSE_16` is the better consumer choice (cold storage) and why the GPU **pre-filter**
-(`gpuFilterType`) should usually be `FUSE_16`. Fuse-8 is the smallest filter measured (1.126 B/entry),
-has a low total cost per lookup once verification is counted, and is the only in-RAM filter with a
-GPU kernel. Building it at the Full DB tier needs roughly 40 GB of transient heap for the peeling
-arrays, so raise `-Xmx` accordingly; if that heap is unavailable or you rebuild often, `BLOCKED_BLOOM`
-builds 3–4× faster in a single streaming pass and needs only its finished 1.89 GB.
+For the **consumer backend** specifically, `BINARY_FUSE_8` is the safe simple default on both tiers;
+`BINARY_FUSE_16` is the better consumer choice against cold storage, where its far lower FPR makes
+verification cost vanish. Both fuse widths now have a GPU kernel. Building Fuse at the Full DB tier
+needs roughly 40 GB of transient heap for the peeling arrays, so raise `-Xmx` accordingly; if that
+heap is unavailable or you rebuild often, `BLOCKED_BLOOM` builds 3–4× faster in a single streaming
+pass and needs only its finished 1.89 GB.
 
 `BLOCKED_BLOOM` is therefore an **addition, not a replacement** — the two filters have genuinely different optimal domains, so neither was removed.
 

@@ -76,6 +76,7 @@
         "shutdownTimeoutSeconds": 300,
         "enableGpuFilter": true,
         "transferAll": false,
+        "gpuFilterType": "FUSE_16",
         "useSafeGcdInverse": true
       }
     ]

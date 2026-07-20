@@ -381,7 +381,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
                 totalNanos += System.nanoTime() - before;
             }
             double micros = totalNanos / (samples * 1_000.0d);
-            LOGGER.info("Measured verification cost: {} µs per lookup (mean of {}).", format(micros), samples);
+            LOGGER.info("Measured verification cost: {} us per lookup (mean of {}).", format(micros), samples);
             return micros;
         }
     }
@@ -813,20 +813,20 @@ public class TuneConfiguration implements Runnable, Interruptable {
                     format(best.candidatesPerSecond())));
         }
 
-        report.append('\n').append("Filter choice — total = probe + fpr × verification:\n");
+        report.append('\n').append("Filter choice - total = probe + fpr x verification:\n");
         Double measured = measuredVerificationCostMicros;
         if (measured != null) {
             report.append(String.format(
-                    Locale.ROOT, "  verification cost   %s µs   MEASURED on this database%n", format(measured)));
+                    Locale.ROOT, "  verification cost   %s us   MEASURED on this database%n", format(measured)));
         } else {
             report.append(String.format(
                             Locale.ROOT,
-                            "  verification cost   %s µs   ESTIMATED (documented warm value; no database was%n",
+                            "  verification cost   %s us   ESTIMATED (documented warm value; no database was%n",
                             format(VERIFICATION_COST_WARM_MICROS)))
                     .append(String.format(
                             Locale.ROOT,
                             "                                    configured to measure. The documented cold value is%n"
-                                    + "                                    %s µs — a 70× spread, so measure it if the%n"
+                                    + "                                    %s us - a 70x spread, so measure it if the%n"
                                     + "                                    filter choice matters to you.)%n",
                             format(VERIFICATION_COST_COLD_MICROS)));
         }
