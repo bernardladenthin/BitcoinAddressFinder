@@ -171,6 +171,29 @@ Copyright (c) 2017-2025 Bernard Ladenthin
 
 Every `examples/run_*.bat` has a matching `examples/run_*.sh` (same JVM flags); use the `.sh` on Linux/macOS and the `.bat` on Windows.
 
+### What a healthy run looks like
+
+On startup the tool builds the GPU pre-filter from your database and *then* begins scanning. The log walks through four one-time build phases — **reading → indexing → peeling → assigning** — prints a **`ready`** line, and from then on emits a periodic **`Statistics`** line. That ticking `Statistics` line is how you know it is running correctly. Abridged real output (one line per phase):
+
+```text
+… BinaryFuse8AddressPresence - Binary Fuse8 filter: reading 132288304 addresses from the source …
+… BinaryFuse8AddressPresence - Binary Fuse8 filter: reading addresses: 99% (132288300/132288304), 15.4M/s, ETA 0s, elapsed 8s.
+… BinaryFuse8AddressPresence - Binary Fuse8 filter: indexing:  99% (132207500/132207501), 22.2M/s, ETA 0s, elapsed 5s.
+… BinaryFuse8AddressPresence - Binary Fuse8 filter: peeling:   99% (132207500/132207501), 12.6M/s, ETA 0s, elapsed 10s.
+… BinaryFuse8AddressPresence - Binary Fuse8 filter: assigning: 99% (132207500/132207501), 21.1M/s, ETA 0s, elapsed 6s.
+… BinaryFuse8AddressPresence - Binary Fuse8 filter: ready (132207501 addresses, 148766720 fingerprint slots).
+… ConsumerJava - start consumeKeysRunner
+… AbstractProducer - Init producer.
+… ConsumerJava - Statistics: [uptime 0 min] [Generated 129 M/s (859 M total)] [-> LMDB 2 M/s (13 M lookups total), 99.22% pre-filtered] … [Hits: 0]
+```
+
+What to look for:
+
+* **The four build phases run once, at startup** (a few seconds each per 100 M addresses). This is the filter being built from your database — it is normal for the tool to sit here briefly before the first `Statistics` line, with no keys scanned yet.
+* **`ready (… addresses, … fingerprint slots)`** means the filter is built and scanning is about to start.
+* **`Statistics: … [Generated N/s …] [-> LMDB M/s …, NN.NN% pre-filtered] … [Hits: 0]`** is the running heartbeat. `Generated` is the raw key rate; `-> LMDB` is how many candidates survive the GPU pre-filter and reach the database; `pre-filtered` is the share the filter eliminated (so the CPU/LMDB never sees them). `Hits: 0` is expected — a hit means a funded address was actually found.
+* The filter is named after your `gpuFilterType`: the excerpt above is a `FUSE_8` run, whereas the recommended default `FUSE_16` logs `Binary Fuse16 filter: …` and drives the `pre-filtered` share even higher (fewer survivors reach LMDB). See [docs/filter-selection.md](docs/filter-selection.md) for the trade-off.
+
 ### Tune the configuration for your own machine
 
 Every grid and filter recommendation in this README and in [`docs/filter-selection.md`](docs/filter-selection.md) was measured on one developer's hardware. The `TuneConfiguration` command measures *yours*:

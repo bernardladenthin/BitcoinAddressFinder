@@ -84,8 +84,14 @@ public class CTuneConfiguration {
      * <p>Each candidate is crossed with every {@link #keysPerWorkItemCandidates} entry, so the arm
      * count — and the run time, {@code arms × (warmupSecondsPerArm + secondsPerArm)} — is the
      * product of the two list lengths.
+     *
+     * <p>The default sweeps up to the hard framework maximum {@code
+     * net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY}
+     * (24). A candidate too large for the current device (its output buffer scales as {@code 2^bits})
+     * is not fatal: the sweep catches the driver's rejection, records that arm as unusable, and
+     * continues — so probing the top of the range costs at worst a few skipped arms on a small card.
      */
-    public List<Integer> batchSizeInBitsCandidates = new ArrayList<>(List.of(18, 19, 20, 21, 22));
+    public List<Integer> batchSizeInBitsCandidates = new ArrayList<>(List.of(18, 19, 20, 21, 22, 23, 24));
 
     /**
      * Candidate {@code keysPerWorkItem} values to sweep. Must be powers of two.

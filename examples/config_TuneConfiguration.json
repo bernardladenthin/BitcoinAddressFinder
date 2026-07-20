@@ -4,7 +4,7 @@
     "secondsPerArm": 20,
     "warmupSecondsPerArm": 5,
     "targetDatabaseEntries": 132288304,
-    "batchSizeInBitsCandidates": [18, 19, 20, 21, 22],
+    "batchSizeInBitsCandidates": [18, 19, 20, 21, 22, 23, 24],
     "keysPerWorkItemCandidates": [1, 4, 16, 64, 256],
     "sweepFilterTypes": false,
     "verificationCostSamples": 2000,

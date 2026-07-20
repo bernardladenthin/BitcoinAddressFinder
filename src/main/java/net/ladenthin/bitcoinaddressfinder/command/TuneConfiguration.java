@@ -496,13 +496,19 @@ public class TuneConfiguration implements Runnable, Interruptable {
                     null);
         } catch (Exception | OutOfMemoryError e) {
             // A grid that is too large for the device is an expected outcome, not a fatal one: the
-            // sweep deliberately probes high batchSizeInBits values (e.g. 24, whose compact output
-            // buffer approaches ~1.8 GB) that a smaller card cannot allocate. Such an arm must be
-            // recorded as unusable and the sweep must continue to the next candidate. The device
-            // rejection surfaces either as a JOCL CLException (a RuntimeException) or, if a host-side
-            // allocation runs out first, as OutOfMemoryError — hence both are caught here. An OOM
-            // originating from a failed native/device allocation leaves the JVM heap itself intact,
-            // so continuing is safe; releaseProducer in the finally frees whatever was allocated.
+            // sweep deliberately probes high batchSizeInBits values up to the framework cap
+            // BIT_COUNT_FOR_MAX_CHUNKS_ARRAY (24), whose output buffer scales as 2^bits (~1.8 GB at
+            // 24) and can exceed what a smaller card allocates. Such an arm must be recorded as
+            // unusable and the sweep must continue to the next candidate.
+            //
+            // The device rejection surfaces as a JOCL CLException — a RuntimeException carrying a
+            // status such as CL_INVALID_BUFFER_SIZE / CL_MEM_OBJECT_ALLOCATION_FAILURE — which
+            // catch (Exception) already covers. This was confirmed on real hardware, not assumed:
+            // OpenCLContextAllocationFailureTest requests an impossible allocation and asserts the
+            // thrown type is a CLException, never an OutOfMemoryError. OutOfMemoryError is caught too
+            // only as belt-and-suspenders in case a host-side staging allocation runs out first; an
+            // OOM from a failed native/device allocation leaves the JVM heap intact, so continuing is
+            // safe. releaseProducer in the finally frees whatever was allocated.
             LOGGER.warn(
                     "Arm batchSizeInBits={} keysPerWorkItem={} failed (likely too large for this device); "
                             + "recording it as unusable and continuing.",

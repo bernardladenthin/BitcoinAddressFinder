@@ -945,6 +945,52 @@ public class OpenCLContext implements ReleaseCLObject {
     }
 
     /**
+     * Test hook: attempts to allocate a device buffer of {@code bytes}, <b>forces the driver to
+     * actually back it</b>, and releases it. Its only purpose is to let a test observe, on a real
+     * device, <b>how an over-large allocation actually fails</b>.
+     *
+     * <p><b>Why the fill/read step is required.</b> {@code clCreateBuffer} alone is not a reliable
+     * probe: some drivers (NVIDIA, measured on an RTX 3070) allocate <em>lazily</em> and return
+     * success from {@code clCreateBuffer} even for an absurd multi-exabyte request, deferring the
+     * backing storage until first use. Only touching the buffer (a blocking 1-byte read here) forces
+     * the driver to materialize it, which is where an impossible size is rejected. This is the same
+     * reason the real RDNA3 failure appeared with {@code CL_MEM_COPY_HOST_PTR} (which must pin host
+     * memory immediately), not with a bare create.
+     *
+     * <p>With JOCL exceptions enabled ({@link #EXCEPTIONS_ENABLED}) the rejection surfaces as a JOCL
+     * {@link org.jocl.CLException} — a {@link RuntimeException} carrying a status such as {@code
+     * CL_MEM_OBJECT_ALLOCATION_FAILURE} / {@code CL_OUT_OF_RESOURCES} / {@code CL_INVALID_BUFFER_SIZE}
+     * — and <b>never</b> an {@link OutOfMemoryError}. That is the evidence behind {@code
+     * TuneConfiguration.runArm}'s per-arm catch: the sweep probes {@code batchSizeInBits} up to {@link
+     * net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
+     * whose output buffer scales as {@code 2^bits} and can exceed what a smaller card allocates.
+     * Because the device failure is a {@code CLException} (a {@code RuntimeException}), catching {@code
+     * Exception} suffices to record that arm as unusable and continue (the catch also keeps {@code
+     * OutOfMemoryError} for the independent case of a host-side readback buffer running out first). It
+     * complements {@link OpenClConfigSuggestion}, which derives a <em>starting</em> batch from {@code
+     * CL_DEVICE_MAX_MEM_ALLOC_SIZE} but is clamped well below the hard cap the tuner reaches.
+     *
+     * @param bytes requested buffer size; pass a value larger than the device's global memory to
+     *     force the rejection path
+     */
+    @VisibleForTesting
+    void allocateDeviceReadWriteBufferForTesting(long bytes) {
+        final cl_context localContext = Objects.requireNonNull(context, "init() must run before allocating a buffer");
+        final cl_command_queue localQueue =
+                Objects.requireNonNull(commandQueue, "init() must run before allocating a buffer");
+        final cl_mem mem = clCreateBuffer(localContext, CL_MEM_READ_WRITE, bytes, null, null);
+        try {
+            // Force the (possibly lazy) driver to materialize the backing storage; this is where an
+            // impossible size is rejected with a CLException.
+            final byte[] probe = new byte[1];
+            clEnqueueReadBuffer(localQueue, mem, CL_TRUE, 0L, 1L, Pointer.to(probe), 0, null, null);
+            clFinish(localQueue);
+        } finally {
+            clReleaseMemObject(mem);
+        }
+    }
+
+    /**
      * Test hook: runs a single-work-item fixed-base precompute kernel from the already-built program
      * (e.g. {@code precompute_ig_table}, {@code precompute_comb_table} in
      * {@code copyfromhashcat/inc_ecc_secp256k1.cl}) into a fresh {@code CL_MEM_READ_WRITE} buffer and
