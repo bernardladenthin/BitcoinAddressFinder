@@ -7,7 +7,7 @@ cross-cutting initiative.
 
 ## Open — BAF-specific
 
-### GPU filter upload fails under host-memory pressure (`CL_MEM_OBJECT_ALLOCATION_FAILURE`) ✅ FIXED (pending AMD re-verification)
+### GPU filter upload fails under host-memory pressure (`CL_MEM_OBJECT_ALLOCATION_FAILURE`) ✅ FIXED & VERIFIED on RDNA3
 
 Uploading the Full-DB Fuse-16 fingerprint buffer (1 549 795 328 slots × 2 B = **3.10 GB**) failed at
 `clCreateBuffer` with `CL_MEM_OBJECT_ALLOCATION_FAILURE` even though the device had ample room —
@@ -33,9 +33,14 @@ calls `System.gc()` before a large direct-buffer allocation for the same native-
 reason. Unit-tested with a mocked `GcTrigger` (`OpenCLContextGpuFilterWidthTest`); a hardware retest
 is not possible on the 3070 (it never reproduced the failure — NVIDIA's driver pins differently).
 
-**Pending:** the AMD machine should re-run the Full-DB Fuse-16 probe at plain `-Xmx48g` (the setting
-that failed before) to confirm the fix removes the failure there — the isolation above proves a GC
-resolves it, but the in-pipeline fix has not been exercised on the reproducing hardware.
+**Verified on the reproducing hardware.** The AMD machine (gfx1100 / RX 7900 XTX, driver 3679.0
+PAL/LC, Win 11, JDK 21.0.7) re-ran the Full-DB Fuse-16 probe at plain `-Xmx48g` — the exact command
+that failed before — and it now completes cleanly: **0** `CL_MEM_OBJECT_ALLOCATION_FAILURE` in the
+whole log, no `MaxHeapFreeRatio` workaround needed, 2.265 ± 0.007 ms/op (≈ 1.852 G probes/s) across
+three iterations. That matches the pre-fix workaround measurement (2.257 ms/op), i.e. the
+`System.gc()` hint costs no measurable throughput — it only fixes the allocation. Same `-Xmx48g`
+command line: yesterday FAIL, today with the fix PASS — the A/B control the no-op-`GcTrigger`
+cross-check would have forced, obtained via the commit instead.
 
 This became visible only *after* the `short[]`-direct upload fix; before that the Java-side `byte[]`
 overflow (`NegativeArraySizeException`) always struck first, so it is a second, independent defect
