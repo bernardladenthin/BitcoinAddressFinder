@@ -445,6 +445,34 @@ public class OpenCLContext implements ReleaseCLObject {
         this.bitHelper = bitHelper;
     }
 
+    /** Reclaims the heap before a filter upload; injectable so the trigger can be verified. */
+    private GcTrigger gcTrigger = GcTrigger.SYSTEM;
+
+    /**
+     * Overrides the garbage-collection trigger. For tests only, so the reclaim-before-upload
+     * behaviour can be asserted against a mock without a real {@code System.gc()}.
+     *
+     * @param gcTrigger the trigger to use
+     */
+    @VisibleForTesting
+    void setGcTrigger(GcTrigger gcTrigger) {
+        this.gcTrigger = gcTrigger;
+    }
+
+    /**
+     * Reclaims the JVM heap right before a fingerprint buffer is created, so the driver can pin the
+     * host staging region {@code CL_MEM_COPY_HOST_PTR} needs. A filter is uploaded once, at startup,
+     * immediately after its build — no size gate is worth its complexity: the collection is a
+     * one-time cost of a few milliseconds, and skipping it risks the
+     * {@code CL_MEM_OBJECT_ALLOCATION_FAILURE} measured on RDNA3 when the build's ~40&nbsp;GB of
+     * transient garbage still occupies the heap. See {@link GcTrigger} for the cause and the JDK
+     * precedent.
+     */
+    @VisibleForTesting
+    void reclaimHeapBeforeUpload() {
+        gcTrigger.requestGc();
+    }
+
     /**
      * Initialises the OpenCL context, command queue, program and kernel.
      *
@@ -780,6 +808,9 @@ public class OpenCLContext implements ReleaseCLObject {
         // the padding byte is never read.
         final Pointer host = fingerprintByteSize <= 0L ? Pointer.to(new byte[] {0}) : fingerprintHost;
         final long byteSize = fingerprintByteSize <= 0L ? 1L : fingerprintByteSize;
+        // An upload right after a filter build can fail to pin host memory while the build's
+        // transient garbage still occupies the heap (measured on RDNA3); reclaim it first.
+        reclaimHeapBeforeUpload();
         final cl_mem localFpMem =
                 clCreateBuffer(localContext, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, byteSize, host, null);
 
@@ -1011,9 +1042,9 @@ public class OpenCLContext implements ReleaseCLObject {
      * {@code benchmarkFilterFuse16} kernel. See
      * {@link #prepareBenchFilterProbeFuse8(byte[], int[], long[])} for the lifecycle.
      *
-     * <p>The slot array is flattened to its little-endian byte image, exactly as the production
-     * upload does, so this benchmark exercises the same memory layout the kernel will see in a real
-     * run rather than a convenient one.
+     * <p>The {@code short[]} slot array is uploaded directly (no byte-array flattening), exactly as
+     * the production upload does, so this benchmark exercises the same path — including the Full-DB
+     * case whose byte image would exceed {@code Integer.MAX_VALUE}.
      *
      * @param fingerprints the 16-bit fingerprint slot array
      * @param meta         {@code [seedLo, seedHi, segLen, segLenMask, segCountLen]}
@@ -1057,6 +1088,9 @@ public class OpenCLContext implements ReleaseCLObject {
         releaseBenchFilterProbe(); // idempotent: a second prepare must not leak the first upload
         benchFilterProbeCount = probeKeys.length;
         benchFilterKernel = clCreateKernel(localProgram, kernelName, null);
+        // Same host-memory-pinning trap as the production upload: reclaim the build's transient
+        // garbage so the driver can pin the staging region (see reclaimHeapBeforeUpload).
+        reclaimHeapBeforeUpload();
         benchFilterMem =
                 clCreateBuffer(localContext, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, filterBytes, filterHost, null);
         benchFilterMetaMem = clCreateBuffer(

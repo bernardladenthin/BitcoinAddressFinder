@@ -7,14 +7,14 @@ cross-cutting initiative.
 
 ## Open — BAF-specific
 
-### GPU filter upload fails under host-memory pressure (`CL_MEM_OBJECT_ALLOCATION_FAILURE`)
+### GPU filter upload fails under host-memory pressure (`CL_MEM_OBJECT_ALLOCATION_FAILURE`) ✅ FIXED (pending AMD re-verification)
 
-Uploading the Full-DB Fuse-16 fingerprint buffer (1 549 795 328 slots × 2 B = **3.10 GB**) can fail at
-`clCreateBuffer` with `CL_MEM_OBJECT_ALLOCATION_FAILURE` even though the device has ample room —
+Uploading the Full-DB Fuse-16 fingerprint buffer (1 549 795 328 slots × 2 B = **3.10 GB**) failed at
+`clCreateBuffer` with `CL_MEM_OBJECT_ALLOCATION_FAILURE` even though the device had ample room —
 measured on an RX 7900 XTX where `CL_DEVICE_MAX_MEM_ALLOC_SIZE` is 20 876 MB, i.e. 6.7× the request.
 
-**It is host memory, not VRAM.** `CL_MEM_COPY_HOST_PTR` makes the driver pin a host-side staging
-region, and after the 1.377 B-entry peel (~29 B/entry ≈ 40 GB peak) too much of the JVM heap is still
+**It was host memory, not VRAM.** `CL_MEM_COPY_HOST_PTR` makes the driver pin a host-side staging
+region, and after the 1.377 B-entry peel (~29 B/entry ≈ 40 GB peak) too much of the JVM heap was still
 occupied by uncollected garbage. Isolated with a minimal JOCL probe on a 61.6 GB host, requesting the
 same 3.10 GB buffer:
 
@@ -25,11 +25,17 @@ same 3.10 GB buffer:
 | 33.9 GiB live | **FAIL (−4)** |
 | 30 GiB of garbage, then `System.gc()` → 2.9 GiB live / 9.8 GiB committed | OK |
 
-The last row is the fix: the buffer is allocatable the moment the heap is actually collected, so
-releasing the CPU-side copy (or forcing a collection) between building the filter and uploading it
-should remove the failure mode. Workaround until then: give the JVM less heap —
-`-Xmx44g -XX:MinHeapFreeRatio=5 -XX:MaxHeapFreeRatio=20` completed the same run at 2.257 ms/op,
-where plain `-Xmx48g` failed.
+**Fix:** `OpenCLContext.reclaimHeapBeforeUpload()` now runs a GC (via the injectable `GcTrigger`,
+default `System.gc()`) immediately before every filter buffer is created — production upload and
+benchmark hook alike. No size gate: a filter is uploaded once, at startup, right after its build, so
+the collection is a one-time cost of milliseconds. This mirrors `java.nio.Bits.reserveMemory`, which
+calls `System.gc()` before a large direct-buffer allocation for the same native-memory-pressure
+reason. Unit-tested with a mocked `GcTrigger` (`OpenCLContextGpuFilterWidthTest`); a hardware retest
+is not possible on the 3070 (it never reproduced the failure — NVIDIA's driver pins differently).
+
+**Pending:** the AMD machine should re-run the Full-DB Fuse-16 probe at plain `-Xmx48g` (the setting
+that failed before) to confirm the fix removes the failure there — the isolation above proves a GC
+resolves it, but the in-pipeline fix has not been exercised on the reproducing hardware.
 
 This became visible only *after* the `short[]`-direct upload fix; before that the Java-side `byte[]`
 overflow (`NegativeArraySizeException`) always struck first, so it is a second, independent defect

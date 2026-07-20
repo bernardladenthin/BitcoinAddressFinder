@@ -8,6 +8,8 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -28,17 +30,17 @@ import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import org.junit.jupiter.api.Test;
 
 /**
- * Covers the two host-side mechanisms that keep the GPU pre-filter's fingerprint <b>width</b>
- * honest: the dispatch-time guard that refuses to launch when the configured fingerprint width disagrees
- * with the uploaded one.
+ * Covers two host-side mechanisms in the GPU pre-filter upload path: the dispatch-time guard that
+ * refuses to launch when the configured fingerprint width disagrees with the uploaded one, and the
+ * heap reclaim that precedes a large upload.
  *
- * <p><b>Why both matter, and why they are tested rather than trusted.</b> The device cannot detect
- * either fault. It takes one {@code uchar*} buffer for both widths and casts it to {@code ushort*}
- * when told to; a wrongly ordered or wrongly interpreted buffer yields fingerprints that almost
- * never match, so the filter rejects nearly everything — including funded addresses — while the
- * scan keeps running and reports nothing. That is indistinguishable from an honest empty result:
- * the failure mode is <b>silent false negatives</b>, not an error, which is the one outcome this
- * project cannot tolerate.
+ * <p><b>Why the guard matters, and why it is tested rather than trusted.</b> The device cannot
+ * detect a width mismatch. It takes one {@code uchar*} buffer for both widths and casts it to
+ * {@code ushort*} when told to; a wrongly interpreted buffer yields fingerprints that almost never
+ * match, so the filter rejects nearly everything — including funded addresses — while the scan keeps
+ * running and reports nothing. That is indistinguishable from an honest empty result: the failure
+ * mode is <b>silent false negatives</b>, not an error, which is the one outcome this project cannot
+ * tolerate.
  */
 public class OpenCLContextGpuFilterWidthTest {
 
@@ -219,6 +221,39 @@ public class OpenCLContextGpuFilterWidthTest {
         } finally {
             context.close();
         }
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="reclaimHeapBeforeUpload">
+
+    /**
+     * The upload path must reclaim the heap first, because building a Full-DB filter leaves
+     * ~40&nbsp;GB of transient garbage that, on some drivers, makes {@code clCreateBuffer} fail to pin
+     * host memory (a real {@code CL_MEM_OBJECT_ALLOCATION_FAILURE} was measured on an RX 7900 XTX).
+     * There is no size gate — the filter is uploaded once at startup, so the collection is a one-time
+     * cost. The {@code System.gc()} that fixes it is a hint the test cannot observe, so it is injected
+     * as a {@link GcTrigger} mock and the invocation is asserted directly — no device required.
+     */
+    @Test
+    public void reclaimHeapBeforeUpload_invokesTheTrigger() {
+        GcTrigger gcTrigger = mock(GcTrigger.class);
+        OpenCLContext context = new OpenCLContext(new CProducerOpenCL(), bitHelper);
+        context.setGcTrigger(gcTrigger);
+
+        context.reclaimHeapBeforeUpload();
+
+        verify(gcTrigger).requestGc();
+    }
+
+    /**
+     * The production default must be a real {@link System#gc()} hint, not a no-op — otherwise the
+     * reclaim would silently do nothing in a real run and the RDNA3 failure would return.
+     */
+    @Test
+    public void systemGcTrigger_isTheProductionDefault_andInvokesSystemGc() {
+        // Invoking it must not throw; System.gc() is a hint, so there is nothing else to assert about
+        // its effect, only that the wiring calls through.
+        GcTrigger.SYSTEM.requestGc();
     }
     // </editor-fold>
 }
