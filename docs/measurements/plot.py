@@ -244,6 +244,34 @@ def plot_full_db(build: pd.DataFrame) -> pathlib.Path:
     return out
 
 
+def _canonical_gpu_filter(filter_name: str, notes: str) -> str | None:
+    """Map the many spellings of a GPU-probe filter to the one name the A/B chart plots.
+
+    The probe CSV logs the same filter under several labels across benchmark runs:
+    the fuse width appears as ``BINARY_FUSE_8`` or the short alias ``FUSE8`` (and ``FUSE16``), and
+    blocked Bloom is logged either bare (``BLOCKED_BLOOM``) or density-encoded as
+    ``BLOCKED_BLOOM:<bits_per_entry>:<k>`` once the density sweep started. The device A/B chart
+    compares FUSE-8 against blocked Bloom **at its production default density (11 bits/entry, k=6)**,
+    so every alias for those two must collapse to one canonical name and everything else must be
+    dropped. The bug this fixes: 1 B-entry rows exist only in the encoded form, so an exact
+    ``== "BLOCKED_BLOOM"`` match silently omitted them (and ``FUSE8`` omitted the 3070's 1 B fuse
+    bar), leaving whole size groups empty on the plot.
+
+    Returns ``None`` for rows that belong to other figures (``FUSE16``, and the non-default
+    ``BLOCKED_BLOOM:<bpe>:<k>`` sizing-sweep points).
+    """
+    if filter_name in ("BINARY_FUSE_8", "FUSE8"):
+        return "BINARY_FUSE_8"
+    if filter_name == "BLOCKED_BLOOM:11:6":
+        return "BLOCKED_BLOOM"
+    if filter_name == "BLOCKED_BLOOM":
+        # Bare rows predate the encoding; accept only the default density, identified by an explicit
+        # bpe=11 note or the absence of any bpe marker (the original default, before the sweep).
+        match = re.search(r"bpe=(\d+)", str(notes))
+        return "BLOCKED_BLOOM" if match is None or match.group(1) == "11" else None
+    return None
+
+
 def plot_gpu_probe(gpu: pd.DataFrame) -> pathlib.Path:
     """GPU filter-probe A/B: throughput per filter and size, grouped by device.
 
@@ -472,6 +500,13 @@ def main() -> int:
     build = pd.read_csv(HERE / "filter_build.csv")
     gpu = pd.read_csv(HERE / "gpu_filter_probe.csv")
     verify = pd.read_csv(HERE / "lmdb_verification_cost.csv")
+
+    # Collapse the filter-name aliases (FUSE8, BLOCKED_BLOOM:11:6, …) to the two canonical backends
+    # the A/B chart plots, and drop rows belonging to other figures, BEFORE deduping — otherwise the
+    # newest-per-point key would treat each alias as a separate point and the encoded 1 B rows would
+    # never reach the chart.
+    gpu = gpu.assign(filter=gpu.apply(lambda r: _canonical_gpu_filter(r["filter"], r.get("notes", "")), axis=1))
+    gpu = gpu[gpu["filter"].notna()]
 
     # Re-measurements supersede earlier rows for the same point; keep only the newest of each.
     lookup = _latest_only(lookup, ["machine_id", "backend", "entries"])
