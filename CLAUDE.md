@@ -10,7 +10,7 @@ This document provides guidance for AI assistants working on the BitcoinAddressF
 
 - **Group ID:** `net.ladenthin`
 - **Artifact ID:** `bitcoinaddressfinder`
-- **Version:** 1.7.0-SNAPSHOT
+- **Version:** 1.7.0
 - **Java:** 21
 - **License:** Apache 2.0
 - **Author:** Bernard Ladenthin (Copyright 2017–2025)
