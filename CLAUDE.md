@@ -311,7 +311,7 @@ See `examples/config_*.json` for all configuration variants.
 
 - Tests use forked JVMs (1 fork, no reuse) for isolation.
 - There is **no JUnit per-test timeout**. The only hard bound is the Surefire
-  whole-fork timeout (`forkedProcessTimeoutInSeconds`, 180s in `pom.xml`): with
+  whole-fork timeout (`forkedProcessTimeoutInSeconds`, 240s in `pom.xml`): with
   `reuseForks=false` it must cover JVM startup + every method of one test class +
   JVM shutdown. A fork that exceeds it is killed and the build fails with
   "There was a timeout in the fork" — without per-test diagnostics. Test classes
