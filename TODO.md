@@ -7,6 +7,34 @@ cross-cutting initiative.
 
 ## Open — BAF-specific
 
+### GPU filter upload fails under host-memory pressure (`CL_MEM_OBJECT_ALLOCATION_FAILURE`)
+
+Uploading the Full-DB Fuse-16 fingerprint buffer (1 549 795 328 slots × 2 B = **3.10 GB**) can fail at
+`clCreateBuffer` with `CL_MEM_OBJECT_ALLOCATION_FAILURE` even though the device has ample room —
+measured on an RX 7900 XTX where `CL_DEVICE_MAX_MEM_ALLOC_SIZE` is 20 876 MB, i.e. 6.7× the request.
+
+**It is host memory, not VRAM.** `CL_MEM_COPY_HOST_PTR` makes the driver pin a host-side staging
+region, and after the 1.377 B-entry peel (~29 B/entry ≈ 40 GB peak) too much of the JVM heap is still
+occupied by uncollected garbage. Isolated with a minimal JOCL probe on a 61.6 GB host, requesting the
+same 3.10 GB buffer:
+
+| heap state at `clCreateBuffer` | result |
+|---|---|
+| empty heap, plain alloc *and* `COPY_HOST_PTR` | OK |
+| 23.6 GiB live | OK |
+| 33.9 GiB live | **FAIL (−4)** |
+| 30 GiB of garbage, then `System.gc()` → 2.9 GiB live / 9.8 GiB committed | OK |
+
+The last row is the fix: the buffer is allocatable the moment the heap is actually collected, so
+releasing the CPU-side copy (or forcing a collection) between building the filter and uploading it
+should remove the failure mode. Workaround until then: give the JVM less heap —
+`-Xmx44g -XX:MinHeapFreeRatio=5 -XX:MaxHeapFreeRatio=20` completed the same run at 2.257 ms/op,
+where plain `-Xmx48g` failed.
+
+This became visible only *after* the `short[]`-direct upload fix; before that the Java-side `byte[]`
+overflow (`NegativeArraySizeException`) always struck first, so it is a second, independent defect
+rather than a regression of that fix.
+
 ### Persistence backends (genuinely open work)
 
 Implementation of `BLOOM` / `HASHSET` / `TRUNCATED_LONG_64` /
