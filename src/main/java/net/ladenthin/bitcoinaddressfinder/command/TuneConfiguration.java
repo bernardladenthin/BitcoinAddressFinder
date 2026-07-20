@@ -494,9 +494,18 @@ public class TuneConfiguration implements Runnable, Interruptable {
                     addressesCheckedPerSecond,
                     elapsedSeconds,
                     null);
-        } catch (Exception e) {
+        } catch (Exception | OutOfMemoryError e) {
+            // A grid that is too large for the device is an expected outcome, not a fatal one: the
+            // sweep deliberately probes high batchSizeInBits values (e.g. 24, whose compact output
+            // buffer approaches ~1.8 GB) that a smaller card cannot allocate. Such an arm must be
+            // recorded as unusable and the sweep must continue to the next candidate. The device
+            // rejection surfaces either as a JOCL CLException (a RuntimeException) or, if a host-side
+            // allocation runs out first, as OutOfMemoryError — hence both are caught here. An OOM
+            // originating from a failed native/device allocation leaves the JVM heap itself intact,
+            // so continuing is safe; releaseProducer in the finally frees whatever was allocated.
             LOGGER.warn(
-                    "Arm batchSizeInBits={} keysPerWorkItem={} failed; recording it as unusable and continuing.",
+                    "Arm batchSizeInBits={} keysPerWorkItem={} failed (likely too large for this device); "
+                            + "recording it as unusable and continuing.",
                     batchSizeInBits,
                     keysPerWorkItem,
                     e);
