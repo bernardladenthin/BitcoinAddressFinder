@@ -1872,40 +1872,51 @@ BitcoinAddressFinder can simulate this type of scenario by generating keys using
 
 ## Similar projects
 
-A non-exhaustive list of related tools and services. **Type** is a rough category for orientation, not an endorsement or a feature guarantee.
+How **BitcoinAddressFinder** (pinned first, in bold) compares to related tools. Its distinguishing mix is
+GPU **and** CPU generation, 100+ coins, an offline check against a local database of known addresses,
+and optional vanity — where most others focus on one of those.
 
-| Project | Type |
-|---|---|
-| [LBC](https://lbc.cryptoguru.org/) | Puzzle solver — server-based, no altcoin/vanity |
-| [privatekeys.pw — scanner](https://privatekeys.pw/scanner/bitcoin) | Online key scanner |
-| [privatekeys.pw — cloud search](https://privatekeys.pw/cloud-search/) | Online cloud key search |
-| [allprivatekeys.com — get lucky](https://allprivatekeys.com/get-lucky) | Online random key try |
-| [allprivatekeys.com — vanity address](https://allprivatekeys.com/vanity-address) | Online vanity generator |
-| [treyyoder/bitcoin-wallet-finder](https://github.com/treyyoder/bitcoin-wallet-finder) | Wallet / balance finder |
-| [albertobsd/keyhunt](https://github.com/albertobsd/keyhunt) | CPU key / puzzle hunter |
-| [brichard19/BitCrack](https://github.com/brichard19/BitCrack) | GPU brute-forcer (CUDA/OpenCL secp256k1) |
-| [kanhavishva/KeyHunt-Cuda](https://github.com/kanhavishva/KeyHunt-Cuda) | GPU key / puzzle hunter (CUDA; [VanitySearch](https://github.com/JeanLucPons/VanitySearch)-based) |
-| [mvrc42/bitp0wn](https://github.com/mvrc42/bitp0wn) | Key-recovery experiments |
-| [JeanLucPons/BTCCollider](https://github.com/JeanLucPons/BTCCollider) | Address collider (RIPEMD-160) |
-| [JeanLucPons/VanitySearch](https://github.com/JeanLucPons/VanitySearch) | GPU vanity generator |
-| [JamieAcharya/Bitcoin-Private-Key-Finder](https://github.com/JamieAcharya/Bitcoin-Private-Key-Finder) | Key finder |
-| [mingfunwong/all-bitcoin-private-key](https://github.com/mingfunwong/all-bitcoin-private-key) | Key enumeration |
-| [Frankenmint/PKGenerator_Checker](https://github.com/Frankenmint/PKGenerator_Checker) | Key generator + balance checker |
-| [Henshall/BitcoinPrivateKeyHunter](https://github.com/Henshall/BitcoinPrivateKeyHunter) | Key hunter |
-| [Xefrok/BitBruteForce-Wallet](https://github.com/Xefrok/BitBruteForce-Wallet) | Brute-forcer |
-| [Isaacdelly/Plutus](https://github.com/Isaacdelly/Plutus) | Balance checker |
-| [Noname400/Hunt-to-Mnemonic](https://github.com/Noname400/Hunt-to-Mnemonic) | Mnemonic hunter |
-| [Py-Project/Bitcoin-wallet-cracker](https://github.com/Py-Project/Bitcoin-wallet-cracker) | Wallet cracker |
-| [johncantrell97/bip39-solver-gpu](https://github.com/johncantrell97/bip39-solver-gpu) | BIP39 seed solver (GPU) |
-| [ilkerccom/bitcrackrandomiser](https://github.com/ilkerccom/bitcrackrandomiser) | BitCrack randomiser (puzzle) |
-| [btcpuzzle.info](https://btcpuzzle.info/) | Puzzle site |
-| [oritwoen/vgen](https://github.com/oritwoen/vgen) | Vanity generator |
-| [vlnahp/KeyZero](https://github.com/vlnahp/KeyZero) | Key finder |
-| [samr7/vanitygen](https://github.com/samr7/vanitygen) | CPU vanity generator (the classic) |
-| [10gic/vanitygen-plusplus](https://github.com/10gic/vanitygen-plusplus) | Vanity generator (multi-coin fork) |
-| [gurnec/btcrecover](https://github.com/gurnec/btcrecover) | Wallet password / seed recovery |
-| [Coding-Enthusiast/FinderOuter](https://github.com/Coding-Enthusiast/FinderOuter) | Wallet recovery (.NET) |
-| [prof7bit/wallet-key-tool](https://github.com/prof7bit/wallet-key-tool) | Wallet key import/export (GUI) |
+**Legend:** ✅ yes · ❌ no · ❓ unclear / unverified. **Columns:** *GPU* / *CPU* = compute backend · *Coins* =
+many non-Bitcoin coins · *DB* = checks generated addresses against a set of known/funded addresses ·
+*Vanity* = pattern/prefix matching · *Offline* = runs without contacting a server · *OSS* = open source.
+
+> Marks for third-party projects are best-effort, inferred from each project's public description, and may
+> be imprecise or outdated — corrections via PR are welcome. Categorisation is for orientation, not an
+> endorsement.
+
+| Project | GPU | CPU | Coins | DB | Vanity | Offline | OSS | Main goal |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|---|
+| **[BitcoinAddressFinder](https://github.com/bernardladenthin/BitcoinAddressFinder)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **Scan random/sequential keys for 100+ coins and check them against a local address database; optional vanity** |
+| [LBC](https://lbc.cryptoguru.org/) | ❓ | ✅ | ❌ | ✅ | ❌ | ❌ | ❓ | Distributed pool solving the Bitcoin puzzle transaction |
+| [privatekeys.pw — scanner](https://privatekeys.pw/scanner/bitcoin) | ❌ | ❌ | ❓ | ✅ | ❌ | ❌ | ❌ | Browse/scan random keys online |
+| [privatekeys.pw — cloud search](https://privatekeys.pw/cloud-search/) | ❌ | ❌ | ❓ | ✅ | ❌ | ❌ | ❌ | Cloud key-search service |
+| [allprivatekeys.com — get lucky](https://allprivatekeys.com/get-lucky) | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | Try random keys online for a hit |
+| [allprivatekeys.com — vanity](https://allprivatekeys.com/vanity-address) | ❌ | ❌ | ❓ | ❌ | ✅ | ❌ | ❌ | Online vanity address generator |
+| [treyyoder/bitcoin-wallet-finder](https://github.com/treyyoder/bitcoin-wallet-finder) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ | ✅ | Generate keys and check balances via an online API |
+| [albertobsd/keyhunt](https://github.com/albertobsd/keyhunt) | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | CPU hunter with several search modes (address, BSGS, xpoint) |
+| [brichard19/BitCrack](https://github.com/brichard19/BitCrack) | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ | GPU brute-force of a keyspace for target addresses |
+| [kanhavishva/KeyHunt-Cuda](https://github.com/kanhavishva/KeyHunt-Cuda) | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ | CUDA hunter for puzzle/target addresses ([VanitySearch](https://github.com/JeanLucPons/VanitySearch)-based) |
+| [mvrc42/bitp0wn](https://github.com/mvrc42/bitp0wn) | ❌ | ✅ | ❌ | ❓ | ❌ | ✅ | ✅ | Educational key-recovery / attack experiments |
+| [JeanLucPons/BTCCollider](https://github.com/JeanLucPons/BTCCollider) | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ | Find RIPEMD-160 address collisions (birthday paradox) |
+| [JeanLucPons/VanitySearch](https://github.com/JeanLucPons/VanitySearch) | ✅ | ✅ | ❓ | ❌ | ✅ | ✅ | ✅ | GPU/CPU vanity address generator |
+| [JamieAcharya/Bitcoin-Private-Key-Finder](https://github.com/JamieAcharya/Bitcoin-Private-Key-Finder) | ❌ | ✅ | ❌ | ✅ | ❌ | ❓ | ✅ | Generate keys and check for a balance |
+| [mingfunwong/all-bitcoin-private-key](https://github.com/mingfunwong/all-bitcoin-private-key) | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ | Enumerate the private-key space (demonstration) |
+| [Frankenmint/PKGenerator_Checker](https://github.com/Frankenmint/PKGenerator_Checker) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ | ✅ | Generate keys and check balances online |
+| [Henshall/BitcoinPrivateKeyHunter](https://github.com/Henshall/BitcoinPrivateKeyHunter) | ❌ | ✅ | ❌ | ✅ | ❌ | ❓ | ✅ | Hunt for funded keys |
+| [Xefrok/BitBruteForce-Wallet](https://github.com/Xefrok/BitBruteForce-Wallet) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ | ✅ | Brute-force wallets and check balances |
+| [Isaacdelly/Plutus](https://github.com/Isaacdelly/Plutus) | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | Keys vs a local database of funded addresses |
+| [Noname400/Hunt-to-Mnemonic](https://github.com/Noname400/Hunt-to-Mnemonic) | ❌ | ✅ | ❌ | ❓ | ❌ | ❓ | ✅ | Search for BIP39 mnemonics |
+| [Py-Project/Bitcoin-wallet-cracker](https://github.com/Py-Project/Bitcoin-wallet-cracker) | ❌ | ✅ | ❌ | ✅ | ❌ | ❓ | ✅ | Scan/crack wallets |
+| [johncantrell97/bip39-solver-gpu](https://github.com/johncantrell97/bip39-solver-gpu) | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ | GPU search of BIP39 seed space for a known address |
+| [ilkerccom/bitcrackrandomiser](https://github.com/ilkerccom/bitcrackrandomiser) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ | Randomised pool wrapper around BitCrack (puzzle) |
+| [btcpuzzle.info](https://btcpuzzle.info/) | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | Bitcoin puzzle info / pool site |
+| [oritwoen/vgen](https://github.com/oritwoen/vgen) | ❓ | ✅ | ❓ | ❌ | ✅ | ✅ | ✅ | Vanity address generator |
+| [vlnahp/KeyZero](https://github.com/vlnahp/KeyZero) | ❓ | ✅ | ❓ | ✅ | ❌ | ❓ | ✅ | Key finder / scanner |
+| [samr7/vanitygen](https://github.com/samr7/vanitygen) | ✅ | ✅ | ❓ | ❌ | ✅ | ✅ | ✅ | The original vanity generator (CPU + OpenCL) |
+| [10gic/vanitygen-plusplus](https://github.com/10gic/vanitygen-plusplus) | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | Vanitygen fork supporting many coins |
+| [gurnec/btcrecover](https://github.com/gurnec/btcrecover) | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | Recover your own wallet password / BIP39 seed |
+| [Coding-Enthusiast/FinderOuter](https://github.com/Coding-Enthusiast/FinderOuter) | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ | Recover damaged keys / seeds / addresses you own |
+| [prof7bit/wallet-key-tool](https://github.com/prof7bit/wallet-key-tool) | ❌ | ✅ | ❓ | ❌ | ❌ | ✅ | ✅ | GUI to import/export/convert wallet keys |
 
 ### Deep learning private key prediction
 An export of the full database can be used to predict private keys with deep learning. A funny idea: https://github.com/DRSZL/BitcoinTensorFlowPrivateKeyPrediction
