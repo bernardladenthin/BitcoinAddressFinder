@@ -699,12 +699,11 @@ public class OpenCLContext implements ReleaseCLObject {
      * same five-word metadata block as {@link #uploadGpuFilter(byte[], int, int, int, int, int)}.
      *
      * <p>The kernel takes a single {@code uchar*} fingerprint argument for both widths and casts it
-     * to {@code ushort*} when {@code filter_type} says so, which is why the 16-bit slots are
-     * flattened to raw bytes here rather than uploaded as a typed buffer. The byte order is
-     * <b>little-endian</b>, matching how a Java {@code short[]} is laid out on the little-endian
-     * devices this project supports (a big-endian device is rejected outright in {@link #init()},
-     * see {@code assertDeviceByteOrderSupported}) — so the device reads back exactly the values the
-     * CPU filter holds.
+     * to {@code ushort*} when {@code filter_type} says so. The 16-bit slots are uploaded as the
+     * {@code short[]} directly (see {@code allocateFilterBuffersShort}); the device sees the array's
+     * native <b>little-endian</b> bytes — a big-endian device is rejected outright in {@link #init()}
+     * (see {@code assertDeviceByteOrderSupported}) — so it reads back exactly the values the CPU
+     * filter holds, without a byte-array copy that would overflow at the Full DB tier.
      *
      * <p>Which width the kernel <em>probes</em> is decided separately, by
      * {@code producerOpenCL.gpuFilterType}. Uploading through this method and leaving that setting
@@ -721,27 +720,53 @@ public class OpenCLContext implements ReleaseCLObject {
      */
     public void uploadGpuFilter16(
             short[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
-        allocateFilterBuffers(toLittleEndianBytes(fingerprints), seedLo, seedHi, segLen, segLenMask, segCountLen);
+        allocateFilterBuffersShort(fingerprints, seedLo, seedHi, segLen, segLenMask, segCountLen);
         gpuFilterUploaded = true;
         uploadedFilterType = GpuFilterType.FUSE_16;
     }
 
-    /**
-     * Flattens a {@code short[]} into its little-endian byte image, i.e. exactly the memory layout
-     * the device expects when it casts the fingerprint buffer to {@code ushort*}.
-     *
-     * @param values the 16-bit slot values
-     * @return a byte array of length {@code 2 * values.length}, low byte of each slot first
-     */
-    @VisibleForTesting
-    static byte[] toLittleEndianBytes(short[] values) {
-        final byte[] bytes = new byte[values.length * Short.BYTES];
-        ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(values);
-        return bytes;
-    }
-
+    /** Fuse-8 buffer upload: the {@code byte[]} slot array goes to the device as-is. */
     private void allocateFilterBuffers(
             byte[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
+        // Avoid Pointer.to on a zero-length array (the empty-filter placeholder); the pointer would
+        // be unused anyway because FromPointer pads a zero-size upload with its own dummy byte.
+        final Pointer host = fingerprints.length == 0 ? Pointer.to(new byte[] {0}) : Pointer.to(fingerprints);
+        allocateFilterBuffersFromPointer(
+                host, (long) fingerprints.length, seedLo, seedHi, segLen, segLenMask, segCountLen);
+    }
+
+    /**
+     * Fuse-16 buffer upload: the {@code short[]} slot array goes to the device <b>directly</b> via
+     * {@code Pointer.to(short[])}, never flattened into a {@code byte[]} first.
+     *
+     * <p>Flattening was wrong twice over at the Full DB tier: {@code slots * 2} overflowed a 32-bit
+     * {@code int} to a negative length, and a Java {@code byte[]} cannot exceed
+     * {@code Integer.MAX_VALUE} elements anyway, so a 3.1&nbsp;GB fuse-16 filter (1.55&nbsp;billion
+     * 16-bit slots) could not be represented as bytes at all. Uploading the {@code short[]} directly
+     * — exactly as the fuse-8 path uploads its {@code byte[]} and blocked bloom its {@code long[]} —
+     * removes the byte-array limit; the device sees the array's native little-endian bytes, and a
+     * big-endian device is rejected in {@link #init()}.
+     */
+    private void allocateFilterBuffersShort(
+            short[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
+        allocateFilterBuffersFromPointer(
+                Pointer.to(fingerprints),
+                (long) fingerprints.length * Short.BYTES,
+                seedLo,
+                seedHi,
+                segLen,
+                segLenMask,
+                segCountLen);
+    }
+
+    private void allocateFilterBuffersFromPointer(
+            Pointer fingerprintHost,
+            long fingerprintByteSize,
+            int seedLo,
+            int seedHi,
+            int segLen,
+            int segLenMask,
+            int segCountLen) {
         final cl_context localContext = context;
         if (localContext == null || closed) {
             throw new IllegalStateException("uploadGpuFilter called before init() or after close()");
@@ -751,14 +776,12 @@ public class OpenCLContext implements ReleaseCLObject {
         releaseGpuFilter();
 
         // Zero-size device buffers are invalid; pad an empty filter to a single zero byte. The
-        // kernel relies on segCountLen == 0 (not the buffer length) to detect the empty filter.
-        final byte[] fingerprintBytes = fingerprints.length == 0 ? new byte[1] : fingerprints;
-        final cl_mem localFpMem = clCreateBuffer(
-                localContext,
-                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                (long) fingerprintBytes.length,
-                Pointer.to(fingerprintBytes),
-                null);
+        // kernel relies on segCountLen == 0 (not the buffer length) to detect the empty filter, so
+        // the padding byte is never read.
+        final Pointer host = fingerprintByteSize <= 0L ? Pointer.to(new byte[] {0}) : fingerprintHost;
+        final long byteSize = fingerprintByteSize <= 0L ? 1L : fingerprintByteSize;
+        final cl_mem localFpMem =
+                clCreateBuffer(localContext, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, byteSize, host, null);
 
         final int[] metadata = new int[] {seedLo, seedHi, segLen, segLenMask, segCountLen};
         final cl_mem localMetaMem;
@@ -997,8 +1020,14 @@ public class OpenCLContext implements ReleaseCLObject {
      * @param probeKeys    the 64-bit keys to probe, one per work-item
      */
     public void prepareBenchFilterProbeFuse16(short[] fingerprints, int[] meta, long[] probeKeys) {
-        final byte[] bytes = toLittleEndianBytes(fingerprints);
-        prepareBenchFilterProbe("benchmarkFilterFuse16", Pointer.to(bytes), bytes.length, meta, probeKeys);
+        // Upload the short[] directly (no byte[] flattening) so a Full-DB-sized filter, whose byte
+        // image exceeds Integer.MAX_VALUE, still uploads. See allocateFilterBuffersShort.
+        prepareBenchFilterProbe(
+                "benchmarkFilterFuse16",
+                Pointer.to(fingerprints),
+                (long) fingerprints.length * Short.BYTES,
+                meta,
+                probeKeys);
     }
 
     /**

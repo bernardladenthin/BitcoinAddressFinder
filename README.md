@@ -456,7 +456,7 @@ hit  ⟺ every bit_i is set
 So a lookup touches **exactly one 64-byte region** instead of the three scattered reads a fuse lookup makes. That is what makes the extra bit-probes nearly free once the filter no longer fits in cache — and it is the property that makes this layout the natural candidate for a future GPU-side filter (one coalesced read per candidate).
 
 **No false negatives** — every inserted key always passes, so a filter **miss** is definitive.
-**False-positive rate** — ~0.26 % measured at the Light DB tier (`k = 8`, ~16 bits/entry). Like the fuse filters this is far too high to report unverified, so `BlockedBloomAccelerator` is a **decorator**: `requiresBackend()` returns `true`, a miss short-circuits, a hit falls through to LMDB to confirm or reject.
+**False-positive rate** — ~0.76 % at the shipped default (`k = 6`, 11 bits/entry; fastrange sizes it to exactly that density at every tier). Like the fuse filters this is far too high to report unverified, so `BlockedBloomAccelerator` is a **decorator**: `requiresBackend()` returns `true`, a miss short-circuits, a hit falls through to LMDB to confirm or reject.
 
 **Measured against a real database** (`FilterMeasurementMain`, Light DB = 132,288,304 entries; build time, retained heap after GC, and 5 M random-non-member probes; zero false negatives on 20 k sampled real members in every row):
 
@@ -467,11 +467,16 @@ So a lookup touches **exactly one 64-byte region** instead of the three scattere
 | `BINARY_FUSE_16`    |     70.6 s |    287.4 MiB |     2.278 |   12.30 M | **0.002 %**  |
 | `TRUNCATED_LONG_64` |     41.9 s |   1082.2 MiB |     8.578 |    1.52 M |  0.000 %     |
 
-Reading the table: `BLOCKED_BLOOM` builds **~2× faster** than either fuse variant (streaming vs. peeling), costs ~1.8× the RAM of Fuse-8, and looks up ~11 % slower — all three differences are minor. The decisive difference is not in this table at all: it is that at the **Full DB** tier the fuse rows cannot be produced on this machine and the blocked-Bloom row still can.
+> The `BLOCKED_BLOOM` row here was measured before *fastrange*, at the old power-of-two default
+> (~16 bits/entry). At the current default (11 bits/entry, `k = 6`) it is smaller — **1.375 B/entry**
+> — but has a higher FPR of **~0.76 %**; the build-time and lookup columns are representative either
+> way.
 
-##### Full DB (1.377 B entries) — the case the fuse filters cannot build
+Reading the table: `BLOCKED_BLOOM` builds **~2× faster** than either fuse variant (streaming vs. peeling), costs somewhat more RAM at the same density, and looks up in the same ballpark — the differences are modest. Its decisive advantage shows at the **Full DB** tier, in build cost and heap, not in whether fuse can build at all (it can — see below).
 
-Same harness, same machine (64 GB RAM), against the 61 GB / 1,377,478,516-entry database, built in a **6 GB heap**:
+##### Full DB (1.377 B entries) — where blocked Bloom's cheaper build matters
+
+Same harness, same machine (64 GB RAM), against the 61 GB / 1,377,478,516-entry database. Blocked Bloom builds it in a **6 GB heap** (it only needs the finished filter); the fuse filters build here too, but their multi-pass peeling needs ~40 GB of transient heap (`-Xmx48g`), so an under-sized heap OOMs mid-peel — that, not any algorithmic limit, is what an earlier version of this document mistook for "fuse cannot build at the Full DB tier". Blocked-Bloom row:
 
 | metric | measured |
 |---|--:|
@@ -510,56 +515,32 @@ Same harness, same machine (64 GB RAM), against the 61 GB / 1,377,478,516-entry 
 
 Setting `"useNoReadAhead": true` opens LMDB with `MDB_NORDAHEAD`, asking the OS not to prefetch neighbours that get evicted before use. **This flag has no effect on Windows** — LMDB does not implement it there (see the `MDB_NORDAHEAD` javadoc in lmdbjava: *"The option is not implemented on Windows"*), so it is a POSIX-only lever. On Linux it is the standard remedy for the amplification described above; **it is currently unvalidated in this project**, because the only measurements taken so far were on Windows where it does nothing. It defaults to `false`. See `docs/performance.md` for the measurement history and `TODO.md` for the remaining levers (higher queue depth, key-order compaction).
 
-##### Why `k = 8` — the measured sweep
+##### Why `k = 6` — the measured sweep, and how the optimum shifts with density
 
-> [!IMPORTANT]
-> **Superseded.** This sweep was measured when Blocked Bloom rounded its block count up to a power
-> of two, which forced ~16.5 effective bits/entry at the Light DB tier and made `k = 8` optimal.
-> Sizing is now exact via *fastrange*, the shipped defaults are **`DEFAULT_K = 6` at 11 bits/entry**,
-> and the optimum is density-dependent: **5/6/7/7/8/9** at 8/11/14/17/21/26 bits per entry. The
-> analysis below still explains *why* the blocked optimum sits below the textbook
-> `(m/n)·ln2` prediction — that reasoning is unchanged — but read every `k = 8` in it as "the
-> optimum at 16.5 bits/entry", not as the current default.
+`k` (bits set per key) is the accuracy knob. Too few and the filter is too permissive; too many and the shared 512-bit block saturates, *raising* the FPR again. The optimum is not guessed — it is measured. Since *fastrange* replaced power-of-two block rounding, the density is exactly what you configure, and the shipped default is **`DEFAULT_K = 6` at `DEFAULT_BITS_PER_ENTRY = 11`**. At that default density (10 M synthetic entries, 2 M random-non-member probes per row):
 
+| `k` | 4 | 5 | **6** | 7 | 8 | 10 |
+|---|--:|--:|--:|--:|--:|--:|
+| FPR @ 11 b/e | 0.997 % | 0.805 % | **0.758 %** | 0.764 % | 0.806 % | 0.996 % |
 
-`k` (bits set per key) is the accuracy knob. Too few and the filter is too permissive; too many and each block saturates, *raising* the FPR again. The optimum is not guessed — it is measured. Light DB, filter size held constant at 256 MiB (16.47 effective bits/entry), 5 M random-non-member probes per row:
+**More bits is not monotonically better** — the FPR bottoms out at `k = 6` and climbs again, because every additional probe fills the same 512-bit block faster. And the blocked optimum sits **below** the textbook unblocked prediction `(m/n)·ln2 ≈ 7.6` for 11 b/e: confining all probes to one block introduces per-block load variance, which penalises high `k`. So `DEFAULT_K` is an empirical result, not a formula.
 
-| `k` | measured FPR | lookups/s | note |
-|----:|-------------:|----------:|------|
-|   1 |    5.964 %   | **12.74 M** | degenerates to a plain **bitmap** (see below) |
-|   2 |    1.378 %   |  11.77 M  | |
-|   4 |    0.307 %   |  10.73 M  | |
-|   6 |    0.193 %   |  10.62 M  | |
-| **8** | **0.184 %** |   9.85 M  | **optimum — the shipped default** |
-|  11 |    0.219 %   |   9.52 M  | past optimum: blocks saturate |
-|  16 |    0.361 %   |   8.49 M  | clearly worse *and* slowest |
+The optimum is **density-dependent** and must be raised together with `bitsPerEntry`. Measured across the whole surface (10 M entries, fastrange sizing, so the effective density equals the configured one exactly):
 
-Two things worth noting. First, **more bits is not monotonically better** — the FPR bottoms out at `k = 8` and climbs again, because every additional probe fills the shared 512-bit block faster. Second, the blocked optimum (8) sits **below** the textbook unblocked prediction `(m/n)·ln2 ≈ 11`: confining all probes to one block introduces per-block load variance, which penalises high `k`. This is why `DEFAULT_K = 8` is an empirical result rather than a formula.
+| bits/entry | 8 | 11 *(default)* | 14 | 17 | 21 | 26 |
+|---|--:|--:|--:|--:|--:|--:|
+| **optimum `k`** | **5** | **6** | **7** | **7** | **8** | **9** |
+| FPR at optimum | 2.44 % | 0.758 % | 0.306 % | 0.153 % | 0.086 % | 0.055 % |
 
-The sweep above is at the Light DB's bit density (16.47 bits/entry). Because the power-of-two block sizing lands the **Full DB** at 12.5 bits/entry instead, the optimum shifts — measured at exactly that density (10,737,418 synthetic entries × `bitsPerEntry = 12` reproduces 12.5 b/e; bit density and per-block load are scale-independent, so this answers the same question as a billion-entry build in seconds rather than tens of minutes per point):
+The optimum **saturates sub-linearly**: the ratio `k / bits-per-entry` *falls* from 0.63 at 8 b/e to 0.35 at 26 b/e, so there is **no proportional rule**. (An earlier `k ≈ 0.55 × bits/entry` was inferred from the middle of this range — it happens to fit near 11 b/e but overshoots by 2 at the top.) If you raise `blockedBloomBitsPerEntry`, raise `blockedBloomK` to the matching column, or you measure a mismatched geometry rather than a denser filter.
 
-| `k` | 4 | 6 | **7** | 8 | 9 | 10 | 12 |
-|---|--:|--:|--:|--:|--:|--:|--:|
-| FPR @ 12.5 b/e | 0.670 % | 0.463 % | **0.460 %** | 0.478 % | 0.511 % | 0.560 % | 0.716 % |
+**`k = 1` would be a direct-addressed bitmap** — one bit per hash, no shared block, fastest of all — but its FPR is `1 − e^(−n/m)` ≈ 6 % at these densities, so roughly 1 query in 17 falls through to LMDB. That verification cost dwarfs any lookup-speed saving, which is why the default is a multi-probe `k`, not 1.
 
-The optimum at Full DB density is `k = 7`, but `k = 8` trails it by only 3.8 % — and `k = 8` *is* optimal at the Light DB density. **`DEFAULT_K = 8` is therefore kept**: a single constant cannot be optimal at both tiers, and 8 is optimal at one and within 4 % at the other. (Sanity check: this synthetic model predicts 0.478 % at `k = 8`, against 0.485 % measured on the real 1.377 B-entry database — the proxy reproduces reality closely.)
+##### Size (density) and lookup speed
 
-Across both densities the blocked optimum lands near **`k ≈ 0.55 × bits/entry`** rather than the textbook `0.693 ×` (16.47 b/e → 8 measured vs 11.4 predicted; 12.5 b/e → 7 measured vs 8.7 predicted). The gap is the per-block load variance that blocking introduces.
+Because `containsAddress` short-circuits on the first *unset* bit, a sparser (lower-density, lower-`k`) filter answers a miss sooner — **lookup speed tracks sparsity, not size**. That is the opposite of intuition and matters when tuning: a denser blocked-bloom filter buys a lower FPR but each probe is slightly slower, and the two effects trade off through the cost model (§ [`docs/filter-selection.md`](docs/filter-selection.md)).
 
-**`k = 1` is exactly a direct-addressed bitmap** (a.k.a. prefix bitset — one bit per hash position, no comparison at all). It is the fastest row in the table, and its FPR matches closed-form theory `1 − e^(−n/m)` = 5.97 % against 5.964 % measured — a near-perfect fit, which is itself the evidence that the deviation at higher `k` really is the blocking penalty and not a hashing flaw. But at 5.96 % FPR roughly **1 query in 17 falls through to LMDB**, and that verification cost dwarfs the ~29 % lookup-speed saving. Hence `k = 8`, not `k = 1`.
-
-##### Size sweep (`k = 8`)
-
-| size | B / entry | measured FPR | lookups/s |
-|-----:|----------:|-------------:|----------:|
-|  68 MiB |  0.537 |   30.82 %  |  7.31 M |
-| 132 MiB |  1.045 |    2.937 % |  8.82 M |
-| 260 MiB |  2.059 |    0.184 % |  9.85 M |
-| 516 MiB |  4.089 |    0.039 % | 12.00 M |
-
-Counter-intuitively **larger filters look up faster**. `containsAddress` short-circuits on the first *unset* bit, so a dense, near-saturated filter must execute more probes before it can answer "no". Lookup speed tracks sparsity, not size.
-
-This sweep is also the clearest statement of why Fuse-8 was **not** removed: at comparable footprint (1.045 vs 1.137 B/entry) Fuse-8's 0.390 % beats blocked Bloom's 2.937 % by ~7.5×. Per byte stored, the fuse construction is simply the better filter — blocked Bloom's justification is build feasibility at the billion-entry tier, nothing else.
+This is also the clearest statement of why blocked Bloom is an **addition, not a replacement** for the fuse filters: at equal footprint the fuse construction always has the lower FPR (e.g. at ~1.13 B/entry, Fuse-8's 0.39 % against blocked bloom's 1.6 %; at ~2.25 B/entry, Fuse-16's 0.0016 % against 0.13 %). Per byte stored, fuse is simply the better filter — blocked bloom's justification is its ~3–4× faster single-pass build and its faster GPU probe, not accuracy per byte.
 
 ##### Probe stride must be odd
 
