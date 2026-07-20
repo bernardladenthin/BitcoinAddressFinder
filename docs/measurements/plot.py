@@ -1,0 +1,568 @@
+#!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+"""Render the measurement CSVs into plots and into the generated tables in docs/performance.md.
+
+The CSVs in this directory are the single source of truth. Markdown cannot import data, so the
+tables in performance.md are *generated* from the same CSVs and rewritten in place between
+``<!-- BEGIN GENERATED:name -->`` / ``<!-- END GENERATED:name -->`` markers. Never hand-edit inside
+those markers; edit the CSV and re-run this script.
+
+Usage::
+
+    python docs/measurements/plot.py                 # all machines
+    python docs/measurements/plot.py --machine-id <id>   # restrict to one machine
+
+Adding your own machine: run ``register_machine.py`` (writes ``machines.json``), run the benchmarks
+(see README.md here), append the result rows carrying that ``machine_id``, and re-run this script. Plots draw
+one line per machine, so results from different hardware can be compared directly.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import pathlib
+import re
+import sys
+
+import matplotlib
+
+matplotlib.use("Agg")  # headless: never try to open a window
+import matplotlib.pyplot as plt  # noqa: E402
+import pandas as pd  # noqa: E402
+
+HERE = pathlib.Path(__file__).resolve().parent
+PLOTS = HERE / "plots"
+PERFORMANCE_MD = HERE.parent / "performance.md"
+REGISTRY = HERE / "machines.json"
+
+# Stable colour per backend so every plot reads the same way.
+COLOURS = {
+    "BINARY_FUSE_8": "#1f77b4",
+    "BINARY_FUSE_16": "#17becf",
+    "BLOCKED_BLOOM": "#d62728",
+    "BLOOM": "#7f7f7f",
+    "HASHSET": "#2ca02c",
+    "TRUNCATED_LONG_64": "#ff7f0e",
+}
+# Slowest last, so the legend reads best-to-worst.
+ORDER = ["BINARY_FUSE_8", "BINARY_FUSE_16", "BLOCKED_BLOOM", "HASHSET", "BLOOM", "TRUNCATED_LONG_64"]
+
+
+def _style(ax, title: str, xlabel: str, ylabel: str) -> None:
+    ax.set_title(title, fontsize=12, pad=12)
+    ax.set_xlabel(xlabel, fontsize=10)
+    ax.set_ylabel(ylabel, fontsize=10)
+    ax.grid(True, which="both", alpha=0.25, linewidth=0.6)
+    ax.set_axisbelow(True)
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
+
+
+def plot_lookup_latency(lookup: pd.DataFrame, machines: pd.DataFrame) -> pathlib.Path:
+    """Latency vs database size, log-log. The crossover is the point of this figure."""
+    fig, ax = plt.subplots(figsize=(9, 5.5), dpi=150)
+    # Colour identifies the backend; line style identifies the machine. Without the second channel
+    # the same backend on two machines draws in one colour and the figure becomes unreadable.
+    styles = ["-", "--", ":", "-."]
+    order_of_machines = sorted(lookup["machine_id"].unique())
+    multi = len(order_of_machines) > 1
+    for machine_id, per_machine in lookup.groupby("machine_id"):
+        style = styles[order_of_machines.index(machine_id) % len(styles)]
+        for backend in ORDER:
+            rows = per_machine[per_machine["backend"] == backend].sort_values("entries")
+            if rows.empty:
+                continue
+            label = f"{backend} ({machine_id})" if multi else backend
+            ax.errorbar(
+                rows["entries"],
+                rows["ns_per_op"],
+                yerr=rows["error_ns"],
+                marker="o",
+                markersize=4,
+                linewidth=1.8,
+                capsize=3,
+                color=COLOURS.get(backend),
+                linestyle=style,
+                label=label,
+            )
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    _style(ax, "Lookup latency vs database size (lower is better)", "entries in filter", "ns per containsAddress")
+
+    # Mark the L3 boundary that explains the crossover, once per machine that has data.
+    # Binary Fuse 8 stores ~1.14 bytes/entry, so it leaves L3 at roughly this entry count.
+    present = set(lookup["machine_id"].unique())
+    for machine_id in sorted(present):
+        machine = machines.get(machine_id, {})
+        l3_mb = (machine.get("cpu") or {}).get("l3_mb")
+        if not l3_mb:
+            continue  # nothing to annotate without a cache size
+        l3_mb = float(l3_mb)
+        fuse_leaves_l3 = l3_mb * 1024 * 1024 / 1.14
+        ax.axvline(fuse_leaves_l3, color="#444444", linestyle="--", linewidth=1.0, alpha=0.7)
+        label = f"Fuse-8 outgrows L3 ({l3_mb:.0f} MB)"
+        if len(present) > 1:
+            label += f" — {machine_id}"
+        ax.annotate(
+            label,
+            xy=(fuse_leaves_l3, ax.get_ylim()[1] * 0.55),
+            xytext=(6, 0),
+            textcoords="offset points",
+            rotation=90,
+            fontsize=8,
+            color="#444444",
+            va="top",
+        )
+
+    ax.legend(fontsize=8, frameon=False, ncol=2)
+    fig.tight_layout()
+    out = PLOTS / "filter_lookup_latency.png"
+    fig.savefig(out)
+    plt.close(fig)
+    return out
+
+
+def plot_k_sweep(k_sweep: pd.DataFrame) -> pathlib.Path:
+    """False-positive rate vs k, one line per bit density. Shows the non-monotonic optimum."""
+    fig, ax = plt.subplots(figsize=(9, 5.0), dpi=150)
+    # FPR is hardware-independent, so curves from different machines at the same density overlap
+    # exactly. Name the machine in the legend anyway, otherwise the duplicate labels read as a bug.
+    multi = k_sweep["machine_id"].nunique() > 1
+    for (machine_id, density), rows in k_sweep.groupby(["machine_id", "bits_per_entry_effective"]):
+        rows = rows.sort_values("k")
+        label = f"{density:.2f} bits/entry" + (f" — {machine_id}" if multi else "")
+        line = ax.plot(
+            rows["k"],
+            rows["fpr"] * 100.0,
+            marker="o",
+            markersize=5,
+            linewidth=1.8,
+            label=label,
+        )[0]
+        best = rows.loc[rows["fpr"].idxmin()]
+        ax.annotate(
+            f"optimum k={int(best['k'])}",
+            xy=(best["k"], best["fpr"] * 100.0),
+            xytext=(0, -20),
+            textcoords="offset points",
+            ha="center",
+            fontsize=8,
+            color=line.get_color(),
+            arrowprops={"arrowstyle": "->", "color": line.get_color(), "lw": 0.9},
+        )
+    ax.set_yscale("log")
+    _style(ax, "Blocked Bloom: false-positive rate vs k (lower is better)", "k (bits set per key)", "measured FPR [%]")
+    ax.legend(fontsize=9, frameon=False, title="bit density")
+    fig.tight_layout()
+    out = PLOTS / "blocked_bloom_k_sweep.png"
+    fig.savefig(out)
+    plt.close(fig)
+    return out
+
+
+def plot_sizing(sizing: pd.DataFrame) -> pathlib.Path:
+    """FPR and lookup speed vs filter size — the size/accuracy trade-off on one axis pair.
+
+    This figure needs BOTH axes populated (FPR *and* a measured lookup speed) and must stay one
+    monotonic sweep. The ``filter_sizing.csv`` has since grown to hold rows this figure must not mix:
+    exact-size-only rows with no ``lookups_per_sec`` (they feed the memory/latency figures), and
+    sizing sweeps from other machines and at other ``k`` values. Sorting all of them by x and joining
+    them with a line produced a zigzag that crossed machines, densities and k. So restrict to the
+    single largest self-consistent series — one machine at one ``k``, with a real lookup speed — and
+    let the title report that ``k``.
+    """
+    fig, ax = plt.subplots(figsize=(9, 5.0), dpi=150)
+    speed = sizing.dropna(subset=["lookups_per_sec"])
+    if speed.empty:
+        ax.text(0.5, 0.5, "no sizing rows with a measured lookup speed", ha="center", va="center")
+        _style(ax, "Blocked Bloom: accuracy and speed vs filter size", "effective bits per entry", "measured FPR [%]")
+        fig.tight_layout()
+        out = PLOTS / "blocked_bloom_sizing.png"
+        fig.savefig(out)
+        plt.close(fig)
+        return out
+
+    machine_id, k = speed.groupby(["machine_id", "k"]).size().idxmax()
+    rows = speed[(speed["machine_id"] == machine_id) & (speed["k"] == k)].sort_values("bits_per_entry_effective")
+    ax.plot(rows["bits_per_entry_effective"], rows["fpr"] * 100.0, marker="o", color="#d62728", linewidth=1.8)
+    ax.set_yscale("log")
+    _style(
+        ax,
+        f"Blocked Bloom: accuracy and speed vs filter size (k = {int(k)})",
+        "effective bits per entry",
+        "measured FPR [%]",
+    )
+    twin = twin_axis(ax)
+    twin.plot(
+        rows["bits_per_entry_effective"],
+        rows["lookups_per_sec"] / 1e6,
+        marker="s",
+        linestyle="--",
+        color="#1f77b4",
+        linewidth=1.6,
+    )
+    twin.set_ylabel("M lookups/s", fontsize=10, color="#1f77b4")
+    twin.tick_params(axis="y", colors="#1f77b4")
+    ax.plot([], [], marker="s", linestyle="--", color="#1f77b4", label="lookups/s (right axis)")
+    ax.plot([], [], marker="o", color="#d62728", label="FPR (left axis)")
+    ax.legend(fontsize=9, frameon=False)
+    fig.tight_layout()
+    out = PLOTS / "blocked_bloom_sizing.png"
+    fig.savefig(out)
+    plt.close(fig)
+    return out
+
+
+def plot_full_db(build: pd.DataFrame) -> pathlib.Path:
+    """Full DB tier: the same-machine BINARY_FUSE_8 vs BLOCKED_BLOOM comparison, per machine.
+
+    Deliberately shows build time and lookup throughput side by side, because the two disagree about
+    which backend wins and that disagreement is the finding. Only the comparable arms are plotted:
+    rows carrying an explicit note about a differing heap or cache state are excluded, since a
+    -Xmx6g run is not comparable to a -Xmx48g one on this path.
+    """
+    full = build[(build["entries"] == 1_377_478_516) & (build["backend"].isin(["BINARY_FUSE_8", "BLOCKED_BLOOM"]))]
+    # Keep only machines where BOTH backends were measured, i.e. a genuine same-machine control.
+    paired = full.groupby("machine_id")["backend"].nunique()
+    full = full[full["machine_id"].isin(paired[paired == 2].index)]
+    full = full.sort_values(["machine_id", "backend"]).groupby(["machine_id", "backend"], as_index=False).last()
+
+    machine_ids = sorted(full["machine_id"].unique())
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.6), dpi=150)
+    width = 0.36
+    for ax, (column, ylabel, title, scale) in zip(
+        axes,
+        [
+            ("build_seconds", "build time [s]", "Build time (lower is better)", 1.0),
+            ("lookups_per_sec", "M lookups/s", "Lookup throughput (higher is better)", 1e-6),
+        ],
+    ):
+        for offset, backend in zip((-width / 2, width / 2), ("BINARY_FUSE_8", "BLOCKED_BLOOM")):
+            values = [
+                full[(full["machine_id"] == m) & (full["backend"] == backend)][column].iloc[0] * scale
+                for m in machine_ids
+            ]
+            positions = [i + offset for i in range(len(machine_ids))]
+            ax.bar(positions, values, width, label=backend, color=COLOURS[backend])
+            for x, v in zip(positions, values):
+                ax.text(x, v, f"{v:,.0f}" if scale == 1.0 else f"{v:.2f}", ha="center", va="bottom", fontsize=8)
+        ax.set_xticks(range(len(machine_ids)))
+        ax.set_xticklabels([m.replace("-win11", "") for m in machine_ids], fontsize=8)
+        _style(ax, title, "", ylabel)
+    axes[0].legend(fontsize=8, frameon=False)
+    fig.suptitle(
+        "Full DB tier (1.377 B entries): build agrees across machines, lookup does not",
+        fontsize=11,
+    )
+    fig.tight_layout()
+    out = PLOTS / "full_db_backends.png"
+    fig.savefig(out)
+    plt.close(fig)
+    return out
+
+
+def _canonical_gpu_filter(filter_name: str, notes: str) -> str | None:
+    """Map the many spellings of a GPU-probe filter to the one name the A/B chart plots.
+
+    The probe CSV logs the same filter under several labels across benchmark runs:
+    the fuse width appears as ``BINARY_FUSE_8`` or the short alias ``FUSE8`` (and ``FUSE16``), and
+    blocked Bloom is logged either bare (``BLOCKED_BLOOM``) or density-encoded as
+    ``BLOCKED_BLOOM:<bits_per_entry>:<k>`` once the density sweep started. The device A/B chart
+    compares FUSE-8 against blocked Bloom **at its production default density (11 bits/entry, k=6)**,
+    so every alias for those two must collapse to one canonical name and everything else must be
+    dropped. The bug this fixes: 1 B-entry rows exist only in the encoded form, so an exact
+    ``== "BLOCKED_BLOOM"`` match silently omitted them (and ``FUSE8`` omitted the 3070's 1 B fuse
+    bar), leaving whole size groups empty on the plot.
+
+    Returns ``None`` for rows that belong to other figures (``FUSE16``, and the non-default
+    ``BLOCKED_BLOOM:<bpe>:<k>`` sizing-sweep points).
+    """
+    if filter_name in ("BINARY_FUSE_8", "FUSE8"):
+        return "BINARY_FUSE_8"
+    if filter_name == "BLOCKED_BLOOM:11:6":
+        return "BLOCKED_BLOOM"
+    if filter_name == "BLOCKED_BLOOM":
+        # Bare rows predate the encoding; accept only the default density, identified by an explicit
+        # bpe=11 note or the absence of any bpe marker (the original default, before the sweep).
+        match = re.search(r"bpe=(\d+)", str(notes))
+        return "BLOCKED_BLOOM" if match is None or match.group(1) == "11" else None
+    return None
+
+
+def plot_gpu_probe(gpu: pd.DataFrame) -> pathlib.Path:
+    """GPU filter-probe A/B: throughput per filter and size, grouped by device.
+
+    Plotted as probes/s rather than ms/op so higher is better and devices with different probe
+    counts stay comparable.
+    """
+    fig, ax = plt.subplots(figsize=(9, 4.8), dpi=150)
+    if gpu.empty:
+        ax.text(0.5, 0.5, "no GPU probe measurements yet", ha="center", va="center", fontsize=11)
+        _style(ax, "GPU filter probe", "", "")
+    else:
+        devices = sorted(gpu["gpu"].unique())
+        sizes = sorted(gpu["entries"].unique())
+        def short(device: str) -> str:
+            return device.replace("NVIDIA GeForce ", "").replace("AMD Radeon ", "")
+
+        labels = [f"{short(d)}\n{int(n / 1e6)} M entries" for d in devices for n in sizes]
+        width = 0.36
+        for offset, backend in zip((-width / 2, width / 2), ("BINARY_FUSE_8", "BLOCKED_BLOOM")):
+            values, positions = [], []
+            idx = 0
+            for device in devices:
+                for size in sizes:
+                    row = gpu[(gpu["gpu"] == device) & (gpu["entries"] == size) & (gpu["filter"] == backend)]
+                    values.append(row["probes_per_second"].iloc[0] / 1e9 if not row.empty else 0.0)
+                    positions.append(idx + offset)
+                    idx += 1
+            ax.bar(positions, values, width, label=backend, color=COLOURS[backend])
+            for x, v in zip(positions, values):
+                if v > 0:
+                    ax.text(x, v, f"{v:.2f}", ha="center", va="bottom", fontsize=8)
+        ax.set_xticks(range(len(labels)))
+        ax.set_xticklabels(labels, fontsize=8)
+        _style(ax, "GPU filter probe throughput (higher is better)", "", "G probes/s")
+        ax.legend(fontsize=8, frameon=False)
+    fig.tight_layout()
+    out = PLOTS / "gpu_filter_probe.png"
+    fig.savefig(out)
+    plt.close(fig)
+    return out
+
+
+def plot_cost_model(k_sweep: pd.DataFrame, verify: pd.DataFrame) -> pathlib.Path:
+    """Total cost per query = filter probe + FPR x verification, across densities.
+
+    This is the figure that decides the density, because it is the only one that includes what a
+    false positive actually costs. A verification was long assumed to be ~200 ns; measured, it is
+    4-7 us warm and 105-293 us cold, so at large cold databases the FPR term dominates the filter
+    term by three orders of magnitude and the densest affordable filter wins.
+    """
+    fig, ax = plt.subplots(figsize=(9, 5.0), dpi=150)
+    # One curve per measured verification cost, so the reader can locate their own deployment.
+    scenarios = []
+    for _, row in verify.iterrows():
+        scenarios.append((f"{row['database']} {row['cache_state']}", float(row["microseconds_per_verification"]) * 1000.0))
+    best = k_sweep[k_sweep["source"] == "prng"].sort_values("fpr").groupby("bits_per_entry_config").first()
+    best = best[best.index.isin([8, 11, 14, 17, 21, 26])].sort_index()
+    if best.empty:
+        ax.text(0.5, 0.5, "no density surface yet", ha="center", va="center")
+    else:
+        # A filter probe is ~50-140 ns depending on size; use a flat mid estimate so the figure
+        # isolates the FPR term, which spans orders of magnitude and is what actually decides.
+        probe_ns = 120.0
+        for label, v_ns in sorted(scenarios, key=lambda x: x[1]):
+            total = [probe_ns + f * v_ns for f in best["fpr"]]
+            ax.plot(best.index, total, marker="o", linewidth=1.8, label=f"{label} ({v_ns/1000:.1f} us)")
+        ax.set_yscale("log")
+    _style(ax, "Total cost per query = probe + FPR x verification", "bits per entry", "ns per query (log)")
+    ax.legend(fontsize=8, frameon=False, title="verification cost")
+    fig.tight_layout()
+    out = PLOTS / "cost_model.png"
+    fig.savefig(out)
+    plt.close(fig)
+    return out
+
+
+# Exact footprint per entry, derived from each backend's structure rather than a heap estimate.
+# Binary Fuse allocates ~1.125 slots per entry (1 byte for Fuse-8, 2 for Fuse-16); blocked Bloom is
+# exactly its configured bits/entry since fastrange sizing removed the power-of-two rounding.
+BYTES_PER_ENTRY = {
+    "BINARY_FUSE_8": 1.145,
+    "BINARY_FUSE_16": 2.278,
+    "TRUNCATED_LONG_64": 8.0,
+    "HASHSET": 80.0,
+}
+
+
+def plot_tradeoff(lookup: pd.DataFrame, verify: pd.DataFrame) -> pathlib.Path:
+    """Memory against lookup latency — the trade an operator actually makes.
+
+    The goal is not the fastest backend but a defensible balance: a filter using half the memory for
+    10 % less speed is usually the better choice, because the machine is running a scan *and*
+    whatever else the operator needs. Plotting memory on one axis and latency on the other makes the
+    Pareto frontier visible instead of hiding it behind a single ranking.
+
+    Annotated with the false-positive rate, since it is the third term and the one that decides on
+    cold storage, where a verification costs ~293 us against a ~120 ns probe.
+    """
+    fig, ax = plt.subplots(figsize=(9, 5.4), dpi=150)
+    # One entry count AND one machine: mixing sizes would compare different structures, and mixing
+    # machines would put two different absolute latency scales on one Pareto chart.
+    target = 100_000_000
+    rows = lookup[lookup["entries"] == target]
+    if not rows.empty:
+        rows = rows[rows["machine_id"] == sorted(rows["machine_id"].unique())[0]]
+    if rows.empty:
+        ax.text(0.5, 0.5, "no rows at 100 M entries yet", ha="center", va="center")
+    else:
+        points = {}
+        for _, row in rows.iterrows():
+            backend, note = row["backend"], str(row.get("notes", ""))
+            if backend == "BLOCKED_BLOOM":
+                match = re.search(r"bpe=(\d+)", note)
+                if not match:
+                    continue
+                bpe = int(match.group(1))
+                points[f"BB {bpe} b/e"] = (bpe / 8.0, row["ns_per_op"], backend)
+            elif backend in BYTES_PER_ENTRY:
+                points[backend] = (BYTES_PER_ENTRY[backend], row["ns_per_op"], backend)
+        for label, (x, y, backend) in points.items():
+            ax.scatter(x, y, s=80, color=COLOURS.get(backend, "#444444"), zorder=3)
+            ax.annotate(label, xy=(x, y), xytext=(7, 4), textcoords="offset points", fontsize=8)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xticks([1, 2, 3, 4, 8])
+        ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    _style(ax, "Memory vs lookup latency at 100 M entries (lower-left is better)",
+           "bytes per entry", "ns per containsAddress")
+    fig.tight_layout()
+    out = PLOTS / "memory_vs_latency.png"
+    fig.savefig(out)
+    plt.close(fig)
+    return out
+
+
+def twin_axis(ax):
+    """Second y-axis sharing the x-axis (kept separate so styling stays in one place)."""
+    twin = ax.twinx()
+    twin.spines["top"].set_visible(False)
+    return twin
+
+
+def latency_table(lookup: pd.DataFrame) -> str:
+    """Markdown latency tables generated from the CSV, one per machine.
+
+    Machines are never merged: cache sizes differ, and the whole point of the figure is that the
+    crossover moves with L3. Aggregating across hardware would average that away.
+    """
+
+    def human(n: int) -> str:
+        return f"{n // 1_000_000} M" if n >= 1_000_000 else f"{n // 1_000} K"
+
+    multi = lookup["machine_id"].nunique() > 1
+    blocks = []
+    for machine_id, rows in lookup.groupby("machine_id"):
+        pivot = rows.pivot_table(index="backend", columns="entries", values="ns_per_op", aggfunc="mean")
+        pivot = pivot.reindex([b for b in ORDER if b in pivot.index])
+        lines = []
+        if multi:
+            lines.append(f"\n**{machine_id}**\n")
+        lines.append("| Backend | " + " | ".join(human(c) for c in pivot.columns) + " |")
+        lines.append("|---|" + "|".join(["--:"] * len(pivot.columns)) + "|")
+        for backend, row in pivot.iterrows():
+            cells = ["—" if pd.isna(v) else f"{v:.1f}" for v in row]
+            lines.append(f"| `{backend}` | " + " | ".join(cells) + " |")
+        blocks.append("\n".join(lines))
+    return "\n".join(blocks)
+
+
+def k_table(k_sweep: pd.DataFrame) -> str:
+    """Markdown table of FPR by k, one block per bit density (and per machine when several)."""
+    lines = []
+    multi = k_sweep["machine_id"].nunique() > 1
+    for (machine_id, density), rows in k_sweep.groupby(["machine_id", "bits_per_entry_effective"]):
+        rows = rows.sort_values("k")
+        ks = " | ".join(str(int(k)) for k in rows["k"])
+        fprs = " | ".join(f"{v * 100:.3f} %" for v in rows["fpr"])
+        tag = f"{density:.2f} bits/entry" + (f" — {machine_id}" if multi else "")
+        lines.append(f"\n**{tag}**\n")
+        lines.append(f"| `k` | {ks} |")
+        lines.append("|---|" + "|".join(["--:"] * len(rows)) + "|")
+        lines.append(f"| FPR | {fprs} |")
+    return "\n".join(lines)
+
+
+def inject(markdown: str, name: str, body: str) -> str:
+    """Replace the content between the BEGIN/END markers for ``name``."""
+    begin, end = f"<!-- BEGIN GENERATED:{name} -->", f"<!-- END GENERATED:{name} -->"
+    if begin not in markdown or end not in markdown:
+        print(f"  ! markers for '{name}' not found in performance.md — skipped", file=sys.stderr)
+        return markdown
+    head = markdown[: markdown.index(begin) + len(begin)]
+    tail = markdown[markdown.index(end) :]
+    return f"{head}\n<!-- Generated by docs/measurements/plot.py — edit the CSV, not this block. -->\n\n{body}\n\n{tail}"
+
+
+def _latest_only(frame: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
+    """Keep only the newest row per measurement point.
+
+    Superseded rows stay in the CSVs for provenance (see README: the blocked-Bloom geometry changed
+    on 2026-07-19, so every earlier blocked-Bloom row describes a differently sized filter). Without
+    this, ``pivot_table``'s ``mean`` would average the old and new geometry into a number that
+    describes neither — the same silent-blending failure the per-machine split exists to prevent.
+    """
+    if frame.empty or "date" not in frame:
+        return frame
+    # Sort stably on (date, file order) and keep the last. File order is the tiebreaker because
+    # re-runs on the *same* date are common — two sweeps of one point can differ only in a setting
+    # such as k, and the later row in the file is the newer measurement. Without an explicit
+    # tiebreaker pandas' default quicksort is unstable and would pick between them arbitrarily.
+    ordered = frame.reset_index(drop=True).rename_axis("_row").reset_index()
+    ordered = ordered.sort_values(["date", "_row"], kind="mergesort")
+    return ordered.drop_duplicates(subset=keys, keep="last").drop(columns="_row")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--machine-id", help="restrict to a single machine from machines.json")
+    args = parser.parse_args()
+
+    PLOTS.mkdir(exist_ok=True)
+    machines = json.loads(REGISTRY.read_text(encoding="utf-8"))["machines"]
+    lookup = pd.read_csv(HERE / "filter_lookup.csv")
+    k_sweep = pd.read_csv(HERE / "k_sweep.csv")
+    sizing = pd.read_csv(HERE / "filter_sizing.csv")
+    build = pd.read_csv(HERE / "filter_build.csv")
+    gpu = pd.read_csv(HERE / "gpu_filter_probe.csv")
+    verify = pd.read_csv(HERE / "lmdb_verification_cost.csv")
+
+    # Collapse the filter-name aliases (FUSE8, BLOCKED_BLOOM:11:6, …) to the two canonical backends
+    # the A/B chart plots, and drop rows belonging to other figures, BEFORE deduping — otherwise the
+    # newest-per-point key would treat each alias as a separate point and the encoded 1 B rows would
+    # never reach the chart.
+    gpu = gpu.assign(filter=gpu.apply(lambda r: _canonical_gpu_filter(r["filter"], r.get("notes", "")), axis=1))
+    gpu = gpu[gpu["filter"].notna()]
+
+    # Re-measurements supersede earlier rows for the same point; keep only the newest of each.
+    lookup = _latest_only(lookup, ["machine_id", "backend", "entries"])
+    k_sweep = _latest_only(k_sweep, ["machine_id", "bits_per_entry_effective", "k"])
+    gpu = _latest_only(gpu, ["machine_id", "gpu", "filter", "entries"])
+
+    if args.machine_id:
+        machines = {k: v for k, v in machines.items() if k == args.machine_id}
+        lookup = lookup[lookup["machine_id"] == args.machine_id]
+        k_sweep = k_sweep[k_sweep["machine_id"] == args.machine_id]
+        sizing = sizing[sizing["machine_id"] == args.machine_id]
+        build = build[build["machine_id"] == args.machine_id]
+        gpu = gpu[gpu["machine_id"] == args.machine_id]
+        if lookup.empty:
+            print(f"no rows for machine_id={args.machine_id!r}", file=sys.stderr)
+            return 1
+
+    for produced in (
+        plot_lookup_latency(lookup, machines),
+        plot_k_sweep(k_sweep),
+        plot_sizing(sizing),
+        plot_full_db(build),
+        plot_gpu_probe(gpu),
+        plot_cost_model(k_sweep, verify),
+        plot_tradeoff(lookup, verify),
+    ):
+        print(f"wrote {produced.relative_to(HERE.parent.parent)}")
+
+    if PERFORMANCE_MD.exists():
+        md = PERFORMANCE_MD.read_text(encoding="utf-8")
+        md = inject(md, "filter_lookup_table", latency_table(lookup))
+        md = inject(md, "k_sweep_table", k_table(k_sweep))
+        PERFORMANCE_MD.write_text(md, encoding="utf-8", newline="")
+        print(f"updated {PERFORMANCE_MD.relative_to(HERE.parent.parent)}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

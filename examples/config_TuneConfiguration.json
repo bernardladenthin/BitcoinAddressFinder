@@ -1,0 +1,63 @@
+{
+  "command": "TuneConfiguration",
+  "tuneConfiguration": {
+    "secondsPerArm": 20,
+    "warmupSecondsPerArm": 5,
+    "targetDatabaseEntries": 132288304,
+    "batchSizeInBitsCandidates": [18, 19, 20, 21, 22, 23, 24],
+    "keysPerWorkItemCandidates": [1, 4, 16, 64, 256],
+    "sweepFilterTypes": false,
+    "verificationCostSamples": 2000,
+    "finder": {
+      "keyProducerJavaRandom": [
+        {
+          "keyProducerId": "exampleKeyProducerSecureRandomId",
+          "randomAlgorithm": "SECURE_RANDOM",
+          "customSeed": 0,
+          "privateKeyMaxNumBits": 256
+        }
+      ],
+      "consumerJava": {
+        "lmdbConfigurationReadOnly": {
+          "lmdbDirectory": "lmdb",
+          "useProxyOptimal": true,
+          "useNoReadAhead": false,
+          "logStatsOnInit": false,
+          "logStatsOnClose": false,
+          "addressLookupBackend": "LMDB_ONLY",
+          "disableAddressLookup": false
+        },
+        "printStatisticsEveryNSeconds": 10,
+        "statisticsRateWindowSeconds": 60,
+        "threads": 8,
+        "queuePollTimeoutMillis": 50,
+        "queueSize": 4,
+        "awaitQueueEmptySeconds": 60,
+        "runtimePublicKeyCalculationCheck": false,
+        "enableVanity": false
+      },
+      "awaitTerminateSeconds": 31536000000,
+      "producerJava": [],
+      "producerJavaSecretsFiles": [],
+      "producerOpenCL": [
+        {
+          "platformIndex": 0,
+          "deviceType": -1,
+          "deviceIndex": 0,
+          "maxResultReaderThreads": 4,
+          "keyProducerId": "exampleKeyProducerSecureRandomId",
+          "batchSizeInBits": 18,
+          "keysPerWorkItem": 16,
+          "batchUsePrivateKeyIncrement": true,
+          "logSecretBase": false,
+          "runOnce": false,
+          "shutdownTimeoutSeconds": 300,
+          "enableGpuFilter": true,
+          "transferAll": false,
+          "gpuFilterType": "FUSE_8",
+          "useSafeGcdInverse": true
+        }
+      ]
+    }
+  }
+}

@@ -65,12 +65,32 @@ public final class BinaryFuseAccelerator extends AbstractFilterAccelerator<Addre
      * {@link BinaryFuse8AddressPresence}.
      *
      * @return the Binary Fuse 8 GPU-upload payload, or {@link Optional#empty()} if the wrapped
-     *     filter is not a {@link BinaryFuse8AddressPresence} (e.g. the 16-bit variant, which has
-     *     no GPU path)
+     *     filter is not a {@link BinaryFuse8AddressPresence} (e.g. the 16-bit variant, whose
+     *     payload is obtained from {@link #getGpuFilterData16()} instead)
      */
     public Optional<BinaryFuse8GpuFilterData> getGpuFilterData() {
         if (filter instanceof BinaryFuse8AddressPresence fuse8) {
             return Optional.of(fuse8.toGpuFilterData());
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Returns the GPU VRAM-upload payload of the wrapped filter, if it is a
+     * {@link BinaryFuse16AddressPresence}.
+     *
+     * <p>Deliberately a <em>second, separate</em> accessor rather than one that returns a common
+     * supertype of both payloads: the fingerprint width is what defines the filter, so a payload of
+     * one width uploaded and probed as the other does not throw — it silently reports misses for
+     * addresses that are present. A caller that wants 16-bit fingerprints must therefore ask for
+     * them by name and cannot accidentally be handed the 8-bit payload.
+     *
+     * @return the Binary Fuse 16 GPU-upload payload, or {@link Optional#empty()} if the wrapped
+     *     filter is not a {@link BinaryFuse16AddressPresence}
+     */
+    public Optional<BinaryFuse16GpuFilterData> getGpuFilterData16() {
+        if (filter instanceof BinaryFuse16AddressPresence fuse16) {
+            return Optional.of(fuse16.toGpuFilterData());
         }
         return Optional.empty();
     }

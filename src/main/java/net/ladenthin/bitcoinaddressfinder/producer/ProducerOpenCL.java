@@ -81,6 +81,23 @@ public class ProducerOpenCL extends AbstractProducer {
     private volatile @Nullable GpuFilterSnapshot gpuFilterSnapshot;
 
     /**
+     * The Binary Fuse 16 counterpart of {@link GpuFilterSnapshot}. Kept as its own record rather
+     * than folding both widths into one type so that a 16-bit payload can never be handed to the
+     * 8-bit upload path — that mistake produces silent false negatives, not an exception.
+     */
+    @SuppressWarnings("ArrayRecordComponent")
+    private record GpuFilterSnapshot16(
+            short[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {}
+
+    /**
+     * Binary Fuse 16 filter staged for GPU upload, or {@code null} when no 16-bit filter is
+     * configured. At most one of this and {@link #gpuFilterSnapshot} is ever non-{@code null}.
+     * Volatile for the same single-write / single-read cross-thread visibility reason.
+     */
+    @ToString.Exclude
+    private volatile @Nullable GpuFilterSnapshot16 gpuFilterSnapshot16;
+
+    /**
      * Stages a Binary Fuse 8 filter for upload to this producer's GPU at {@link #initProducer()}.
      *
      * <p>The OpenCL layer accepts only primitives, so the engine decomposes the filter's payload
@@ -96,6 +113,27 @@ public class ProducerOpenCL extends AbstractProducer {
      */
     public void setGpuFilter(byte[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
         gpuFilterSnapshot = new GpuFilterSnapshot(fingerprints, seedLo, seedHi, segLen, segLenMask, segCountLen);
+    }
+
+    /**
+     * Stages a Binary Fuse <b>16</b> filter for upload at {@link #initProducer()}.
+     *
+     * <p>Separate from {@link #setGpuFilter} and holding a {@code short[]} rather than a widened
+     * common type on purpose: the fingerprint width is the filter, so a payload staged at one width
+     * and probed at the other yields silent false negatives instead of an error. Distinct staging
+     * methods make the width explicit at the call site, and the caller is responsible for setting
+     * {@code producerOpenCL.gpuFilterType} to match.
+     *
+     * @param fingerprints the 16-bit fingerprint slot array
+     * @param seedLo       low 32 bits of the construction seed
+     * @param seedHi       high 32 bits of the construction seed
+     * @param segLen       per-segment {@code reduce} length
+     * @param segLenMask   {@code segLen - 1}
+     * @param segCountLen  total fingerprint slot count
+     */
+    public void setGpuFilter16(
+            short[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
+        gpuFilterSnapshot16 = new GpuFilterSnapshot16(fingerprints, seedLo, seedHi, segLen, segLenMask, segCountLen);
     }
 
     /**
@@ -195,6 +233,17 @@ public class ProducerOpenCL extends AbstractProducer {
                 // The GPU copy is now the live one; release the host-side reference so the
                 // fingerprint byte[] (potentially megabytes for large address sets) can be GC'd.
                 gpuFilterSnapshot = null;
+            }
+            final GpuFilterSnapshot16 snapshot16 = gpuFilterSnapshot16;
+            if (snapshot16 != null) {
+                localOpenCLContext.uploadGpuFilter16(
+                        snapshot16.fingerprints(),
+                        snapshot16.seedLo(),
+                        snapshot16.seedHi(),
+                        snapshot16.segLen(),
+                        snapshot16.segLenMask(),
+                        snapshot16.segCountLen());
+                gpuFilterSnapshot16 = null;
             }
         } catch (Exception e) {
             localOpenCLContext.close();

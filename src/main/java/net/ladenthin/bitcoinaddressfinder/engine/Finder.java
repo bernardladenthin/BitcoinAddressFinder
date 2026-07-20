@@ -15,6 +15,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.configuration.GpuFilterType;
 import net.ladenthin.bitcoinaddressfinder.consumer.Consumer;
 import net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.core.FireAndForget;
@@ -31,6 +32,7 @@ import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocket;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaZmq;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16GpuFilterData;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8GpuFilterData;
 import net.ladenthin.bitcoinaddressfinder.producer.Producer;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerJava;
@@ -204,6 +206,7 @@ public class Finder implements Interruptable {
         // Decide up-front whether the GPU pre-filter is needed so initLMDB() can build it while
         // LMDB is still open — a self-contained backend closes the env at the end of initLMDB().
         localConsumerJava.setGpuFilterRequested(isGpuFilterRequested());
+        localConsumerJava.setGpuFilterType(resolveGpuFilterType());
         localConsumerJava.initLMDB();
         localConsumerJava.startConsumer();
         localConsumerJava.startStatisticsTimer();
@@ -225,6 +228,46 @@ public class Finder implements Interruptable {
         }
         List<CProducerOpenCL> configs = finder.producerOpenCL;
         return configs != null && configs.stream().anyMatch(c -> c.enableGpuFilter && !c.transferAll);
+    }
+
+    /**
+     * Resolves the single fingerprint width the GPU pre-filter payload is built for.
+     *
+     * <p>The payload is built <b>once</b> and shared by every compact-mode producer (it is a full
+     * LMDB scan and a multi-GB allocation), so one width has to win. The first compact-mode
+     * producer's {@code gpuFilterType} decides; any other compact-mode producer configured for a
+     * different width is overridden to match, with a warning — the same "config is corrected and
+     * logged" pattern as {@link #applyVanityFullTransferOverride()}. Silently leaving a producer's
+     * {@code gpuFilterType} pointing at a width it was not given would not fail: the kernel would
+     * reinterpret the uploaded slots and report misses for addresses that are present.
+     *
+     * @return the width to build, defaulting to {@link GpuFilterType#FUSE_8} when no compact-mode
+     *     producer is configured (in which case nothing is built anyway)
+     */
+    @VisibleForTesting
+    GpuFilterType resolveGpuFilterType() {
+        List<CProducerOpenCL> configs = finder.producerOpenCL;
+        if (configs == null) {
+            return GpuFilterType.FUSE_8;
+        }
+        GpuFilterType resolved = null;
+        for (CProducerOpenCL config : configs) {
+            if (!config.enableGpuFilter || config.transferAll) {
+                continue;
+            }
+            if (resolved == null) {
+                resolved = config.gpuFilterType;
+            } else if (config.gpuFilterType != resolved) {
+                LOGGER.warn(
+                        "producerOpenCL.gpuFilterType differs between compact-mode producers ({} vs {}); "
+                                + "the GPU filter is built once and shared, so {} is forced on all of them.",
+                        config.gpuFilterType,
+                        resolved,
+                        resolved);
+                config.gpuFilterType = resolved;
+            }
+        }
+        return resolved == null ? GpuFilterType.FUSE_8 : resolved;
     }
 
     /**
@@ -315,16 +358,24 @@ public class Finder implements Interruptable {
             return;
         }
 
-        // The payload was built once during the consumer's initLMDB() (while LMDB was open).
+        // The payload was built once during the consumer's initLMDB() (while LMDB was open), at the
+        // single width resolved by resolveGpuFilterType(); exactly one of the two is present.
         Optional<BinaryFuse8GpuFilterData> payload = localConsumer.getGpuFilterData();
-        if (payload.isEmpty()) {
+        Optional<BinaryFuse16GpuFilterData> payload16 = localConsumer.getGpuFilterData16();
+        if (payload16.isPresent()) {
+            BinaryFuse16GpuFilterData data16 = payload16.get();
+            for (int i = 0; i < openCLProducers.size(); i++) {
+                stageGpuFilter16OnProducer(configs.get(i), openCLProducers.get(i), data16);
+            }
+        } else if (payload.isPresent()) {
+            BinaryFuse8GpuFilterData data = payload.get();
+            for (int i = 0; i < openCLProducers.size(); i++) {
+                stageGpuFilterOnProducer(configs.get(i), openCLProducers.get(i), data);
+            }
+        } else {
             LOGGER.warn("producerOpenCL.enableGpuFilter is true but the GPU filter payload is absent; "
                     + "running full transfer.");
             return;
-        }
-        BinaryFuse8GpuFilterData data = payload.get();
-        for (int i = 0; i < openCLProducers.size(); i++) {
-            stageGpuFilterOnProducer(configs.get(i), openCLProducers.get(i), data);
         }
         // Release the host-side copy now it is staged on every producer; each producer frees its
         // own copy after the one-time VRAM upload in initProducer().
@@ -346,6 +397,34 @@ public class Finder implements Interruptable {
         }
         long seed = data.seed();
         producer.setGpuFilter(
+                data.fingerprints(),
+                (int) seed,
+                (int) (seed >>> 32),
+                data.segmentLength(),
+                data.segmentLengthMask(),
+                data.segmentCountLength());
+    }
+
+    /**
+     * Binary Fuse 16 counterpart of
+     * {@link #stageGpuFilterOnProducer(CProducerOpenCL, ProducerOpenCL, BinaryFuse8GpuFilterData)}.
+     *
+     * <p>Routed to the producer's dedicated 16-bit staging method rather than through a shared,
+     * width-agnostic one: the fingerprint width defines the filter, and staging a payload at the
+     * wrong width produces silent false negatives instead of an error, so the width is kept
+     * explicit and type-checked all the way down to the VRAM upload.
+     *
+     * @param config   the producer configuration
+     * @param producer the producer to stage the filter on
+     * @param data     the 16-bit GPU-upload payload built once by {@link #uploadGpuFilterToProducers()}
+     */
+    private void stageGpuFilter16OnProducer(
+            CProducerOpenCL config, ProducerOpenCL producer, BinaryFuse16GpuFilterData data) {
+        if (!config.enableGpuFilter || config.transferAll) {
+            return;
+        }
+        long seed = data.seed();
+        producer.setGpuFilter16(
                 data.fingerprints(),
                 (int) seed,
                 (int) (seed >>> 32),

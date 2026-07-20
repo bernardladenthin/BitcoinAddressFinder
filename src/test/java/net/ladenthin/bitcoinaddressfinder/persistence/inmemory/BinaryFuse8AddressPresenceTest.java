@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder.persistence.inmemory;
 import static net.ladenthin.bitcoinaddressfinder.persistence.inmemory.InMemoryTestSupport.hash20;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThan;
@@ -174,6 +175,45 @@ class BinaryFuse8AddressPresenceTest {
 
         assertThat(presence.containsAddress(ByteBuffer.wrap(a)), is(true));
         assertThat(presence.containsAddress(ByteBuffer.wrap(b)), is(true));
+    }
+
+    /**
+     * Directly pins the queue-sizing fix at billion-entry scale (arithmetic only, no allocation).
+     * The old {@code arrayLength + 3 * size} sizing overflowed {@code int} here — {@code 3 * size}
+     * wraps past {@link Integer#MAX_VALUE} to a negative value — producing a capacity <em>smaller</em>
+     * than {@code arrayLength} (an undersized queue). The corrected {@code arrayLength} sizing stays
+     * positive and sufficient. This is the red-without-the-fix, green-with-it guard; the real
+     * billion-entry build cannot be exercised in a unit test (tens of GB of arrays).
+     */
+    @Test
+    void peelingQueueLength_billionScale_isSufficientAndDoesNotOverflow() {
+        // Full-DB scale (~1.377 B keys): arrayLength ~1.55 B (< Integer.MAX_VALUE), size ~1.38 B.
+        int arrayLength = 1_549_000_000;
+        int size = 1_377_000_000;
+        int capacity = BinaryFuse8AddressPresence.peelingQueueLength(arrayLength, size);
+        assertThat("capacity must not overflow to a non-positive value", capacity, is(greaterThan(0)));
+        assertThat(
+                "capacity must cover every position (>= arrayLength)", capacity, is(greaterThanOrEqualTo(arrayLength)));
+    }
+
+    /**
+     * Regression guard for the peeling-queue sizing at moderate scale. The queue is sized exactly
+     * {@code arrayLength} because counts only decrease during peeling, so each position is enqueued
+     * at most once. A queue smaller than that would throw {@link ArrayIndexOutOfBoundsException}
+     * during peeling. This builds a filter large enough to exercise peeling near the queue capacity
+     * and asserts it completes with no exception and no false negatives.
+     */
+    @Test
+    void peelingQueue_largePopulation_buildsWithoutOverflowAndFindsAll() {
+        int n = 200_000;
+        ListIterable src = new ListIterable();
+        for (int i = 0; i < n; i++) {
+            src.add(hash20(i % 256, i));
+        }
+        BinaryFuse8AddressPresence presence = BinaryFuse8AddressPresence.populateFrom(src);
+        for (int i = 0; i < n; i++) {
+            assertThat("member " + i, presence.containsAddress(hash20(i % 256, i)), is(true));
+        }
     }
 
     @Test

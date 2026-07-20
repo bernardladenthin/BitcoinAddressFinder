@@ -9,6 +9,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -25,6 +26,7 @@ import net.ladenthin.bitcoinaddressfinder.cli.Main;
 import net.ladenthin.bitcoinaddressfinder.configuration.CCommand;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import nl.altindag.log.LogCaptor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -239,6 +241,48 @@ public class MainTest {
             // assert: finally block ran -> runLatch counted down (shutdown hook would not hang)
             assertThat(main.getRunLatch().getCount(), is(equalTo(0L)));
         }
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="serialisation round-trips">
+    /**
+     * A configuration the tool serialises must be readable by the tool. {@code CProducer} exposes a
+     * derived {@code getOverallWorkSize()}; under Jackson's default getter visibility that is written
+     * as an {@code "overallWorkSize"} property with no matching field, so loading the output back
+     * throws {@code UnrecognizedPropertyException}. This is not hypothetical — it broke the config
+     * printed by {@code TuneConfiguration} and logged by {@code Main}. The whole value of that output
+     * is that a user can paste it and run it, so it must round-trip. This fails if the field-only
+     * visibility is dropped from either serialiser.
+     */
+    @Test
+    public void configurationToJson_withOpenCLProducer_roundTripsBackThroughFromJson() throws IOException {
+        CConfiguration configuration = new CConfiguration();
+        configuration.command = CCommand.Find;
+        configuration.finder = new CFinder();
+        configuration.finder.producerOpenCL.add(new CProducerOpenCL());
+
+        String json = Main.configurationToJson(configuration);
+        assertThat("the derived getter must not leak into the output", json, not(containsString("overallWorkSize")));
+
+        // The load path that a pasted file would take; it must not throw.
+        CConfiguration reloaded = Main.fromJson(json);
+        assertThat(reloaded.command, is(equalTo(CCommand.Find)));
+        assertThat(reloaded.finder.producerOpenCL.size(), is(equalTo(1)));
+    }
+
+    @Test
+    public void configurationToYAML_withOpenCLProducer_roundTripsBackThroughFromYaml() throws IOException {
+        CConfiguration configuration = new CConfiguration();
+        configuration.command = CCommand.Find;
+        configuration.finder = new CFinder();
+        configuration.finder.producerOpenCL.add(new CProducerOpenCL());
+
+        String yaml = Main.configurationToYAML(configuration);
+        assertThat(yaml, not(containsString("overallWorkSize")));
+
+        CConfiguration reloaded = Main.fromYaml(yaml);
+        assertThat(reloaded.command, is(equalTo(CCommand.Find)));
+        assertThat(reloaded.finder.producerOpenCL.size(), is(equalTo(1)));
     }
     // </editor-fold>
 }

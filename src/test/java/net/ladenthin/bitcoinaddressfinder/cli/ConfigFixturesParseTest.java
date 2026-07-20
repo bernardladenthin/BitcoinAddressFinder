@@ -10,7 +10,9 @@ import static org.hamcrest.Matchers.notNullValue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -72,5 +74,48 @@ public class ConfigFixturesParseTest {
                     parsed.finder.consumerJava.statisticsRateWindowSeconds,
                     is(equalTo(EXPECTED_STATISTICS_RATE_WINDOW_SECONDS)));
         }
+    }
+
+    /**
+     * The tuning example carries a nested {@code finder} rather than a top-level one, so it is not
+     * part of the loop above. It is smoke-loaded here for the same reason: an example config that
+     * no longer parses is a broken promise to whoever copies it.
+     */
+    @Test
+    public void tuneConfigurationExampleConfig_parses() throws Exception {
+        Path file = Path.of("examples", "config_TuneConfiguration.json");
+
+        CConfiguration parsed = Main.loadConfiguration(file);
+
+        assertThat("tuneConfiguration", parsed.tuneConfiguration, is(notNullValue()));
+        assertThat("tuneConfiguration.finder", parsed.tuneConfiguration.finder, is(notNullValue()));
+        assertThat(
+                "tuneConfiguration.finder.consumerJava",
+                parsed.tuneConfiguration.finder.consumerJava,
+                is(notNullValue()));
+        assertThat("producerOpenCL", parsed.tuneConfiguration.finder.producerOpenCL.size(), is(equalTo(1)));
+    }
+
+    /**
+     * The tuning example must sweep {@code batchSizeInBits} all the way to the hard framework
+     * maximum, {@link OpenClKernelConstants#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY}. Anchoring the assertion
+     * on the constant (rather than a literal 24) means the fixture and the framework cap can never
+     * silently drift apart: raising the cap without extending the example, or trimming the example
+     * below the cap, fails here. Sweeping the top of the range is safe because a candidate too large
+     * for the current device is caught and skipped (see {@code TuneConfiguration.runArm} and
+     * {@code OpenCLContextAllocationFailureTest}).
+     */
+    @Test
+    public void tuneConfigurationExampleConfig_sweepsBatchSizeUpToTechnicalMaximum() throws Exception {
+        Path file = Path.of("examples", "config_TuneConfiguration.json");
+
+        CConfiguration parsed = Main.loadConfiguration(file);
+
+        assertThat("tuneConfiguration", parsed.tuneConfiguration, is(notNullValue()));
+        int highestCandidate = Collections.max(parsed.tuneConfiguration.batchSizeInBitsCandidates);
+        assertThat(
+                "example config must sweep batchSizeInBits up to the framework maximum",
+                highestCandidate,
+                is(equalTo(OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY)));
     }
 }

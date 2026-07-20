@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.cli;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
@@ -17,10 +19,12 @@ import java.util.concurrent.TimeUnit;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.command.AddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.command.LMDBToAddressFile;
+import net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBToAddressFile;
+import net.ladenthin.bitcoinaddressfinder.configuration.CTuneConfiguration;
 import net.ladenthin.bitcoinaddressfinder.core.Interruptable;
 import net.ladenthin.bitcoinaddressfinder.core.InterruptedRuntimeException;
 import net.ladenthin.bitcoinaddressfinder.engine.Finder;
@@ -145,7 +149,26 @@ public class Main implements Runnable, Interruptable {
     public static String configurationToJson(CConfiguration configuration) throws IOException {
         ObjectMapper mapper = new ObjectMapper();
         mapper.enable(SerializationFeature.INDENT_OUTPUT);
+        applyFieldOnlyVisibility(mapper);
         return mapper.writeValueAsString(configuration);
+    }
+
+    /**
+     * Restricts serialisation to public fields, never getters.
+     *
+     * <p>The configuration POJOs are plain field carriers, but {@code CProducer} also exposes the
+     * derived {@code getOverallWorkSize()}. With Jackson's default visibility that getter is written
+     * out as an {@code "overallWorkSize"} property, and reading the file back fails with
+     * {@code UnrecognizedPropertyException} because no such field exists — so a config the tool
+     * itself printed could not be loaded by the tool. Every serialisation path here feeds output a
+     * user may paste back in, so all of them must round-trip.
+     *
+     * @param mapper the mapper to configure in place
+     */
+    private static void applyFieldOnlyVisibility(ObjectMapper mapper) {
+        mapper.setVisibility(PropertyAccessor.GETTER, JsonAutoDetect.Visibility.NONE);
+        mapper.setVisibility(PropertyAccessor.IS_GETTER, JsonAutoDetect.Visibility.NONE);
+        mapper.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.PUBLIC_ONLY);
     }
 
     /**
@@ -157,6 +180,7 @@ public class Main implements Runnable, Interruptable {
      */
     public static String configurationToYAML(CConfiguration configuration) throws IOException {
         YAMLMapper mapper = new YAMLMapper();
+        applyFieldOnlyVisibility(mapper);
         return mapper.writeValueAsString(configuration);
     }
 
@@ -258,6 +282,12 @@ public class Main implements Runnable, Interruptable {
                     AddressFilesToLMDB addressFilesToLMDB = new AddressFilesToLMDB(cAddressFilesToLMDB);
                     interruptables.add(addressFilesToLMDB);
                     addressFilesToLMDB.run();
+                }
+                case TuneConfiguration -> {
+                    CTuneConfiguration cTuneConfiguration = Objects.requireNonNull(configuration.tuneConfiguration);
+                    TuneConfiguration tuneConfiguration = new TuneConfiguration(cTuneConfiguration);
+                    interruptables.add(tuneConfiguration);
+                    tuneConfiguration.run();
                 }
                 case OpenCLInfo -> {
                     OpenCLBuilder openCLBuilder = new OpenCLBuilder();

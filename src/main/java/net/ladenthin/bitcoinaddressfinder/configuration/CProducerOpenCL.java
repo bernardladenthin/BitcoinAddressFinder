@@ -88,6 +88,22 @@ public class CProducerOpenCL extends CProducer {
     public boolean transferAll = false;
 
     /**
+     * Selects which Binary Fuse width the GPU pre-filter uses (see {@link GpuFilterType}).
+     * <p>
+     * <b>Only takes effect in compact mode</b>, i.e. when {@link #enableGpuFilter} is {@code true}
+     * <em>and</em> {@link #transferAll} is {@code false}. With {@code enableGpuFilter = false} no
+     * filter is uploaded at all, and with {@code transferAll = true} the kernel emits every
+     * work-item result without probing — in both cases this setting is inert.
+     * <p>
+     * Default {@link GpuFilterType#FUSE_8}: it is the width that fits under every device
+     * allocation limit measured so far, so the default never fails to upload.
+     * {@link GpuFilterType#FUSE_16} costs twice the VRAM and hands ~240&times; fewer false
+     * positives to the single-threaded consumer; prefer it whenever
+     * {@code CL_DEVICE_MAX_MEM_ALLOC_SIZE} has room for it.
+     */
+    public GpuFilterType gpuFilterType = GpuFilterType.FUSE_8;
+
+    /**
      * Selects the modular-inverse implementation compiled into the OpenCL kernel.
      * <p>
      * When {@code true} (default), {@code inv_mod} uses the <b>safegcd</b> path (a port of

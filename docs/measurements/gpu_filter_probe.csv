@@ -1,0 +1,81 @@
+machine_id,date,gpu,filter,entries,probe_count,ms_per_op,error_ms,probes_per_second,jmh_iterations,notes
+ryzen75800h-63g-win11,2026-07-18,NVIDIA GeForce RTX 3070 Laptop GPU,BINARY_FUSE_8,10000000,4194304,1.773,0.003,2365651438,3,three scattered global reads per probe
+ryzen75800h-63g-win11,2026-07-18,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,10000000,4194304,1.024,0.016,4096000000,3,one coalesced 64-byte transaction per probe
+ryzen75800h-63g-win11,2026-07-18,NVIDIA GeForce RTX 3070 Laptop GPU,BINARY_FUSE_8,100000000,4194304,3.015,0.020,1391145937,3,
+ryzen75800h-63g-win11,2026-07-18,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,100000000,4194304,1.351,0.009,3104592154,3,advantage grows with filter size as it outgrows GPU cache
+ryzen79800x3d8core-61g-win11,2026-07-18,gfx1100,BINARY_FUSE_8,10000000,4194304,0.300,0.036,13981013333,3,RX 7900 XTX (RDNA3); both filters fit the 96 MB Infinity Cache at this size
+ryzen79800x3d8core-61g-win11,2026-07-18,gfx1100,BLOCKED_BLOOM,10000000,4194304,0.187,0.017,22429433155,3,1.60x over fuse - coalescing advantage reproduces on AMD
+ryzen79800x3d8core-61g-win11,2026-07-18,gfx1100,BINARY_FUSE_8,100000000,4194304,0.738,0.021,5683338753,3,~114 MB filter just exceeds the 96 MB Infinity Cache
+ryzen79800x3d8core-61g-win11,2026-07-18,gfx1100,BLOCKED_BLOOM,100000000,4194304,0.655,0.032,6403517557,3,only 1.13x - advantage SHRINKS with size on RDNA3 where it GROWS on NVIDIA; ~256 MB spills the Infinity Cache harder than fuse does
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BINARY_FUSE_8,10000000,4194304,0.298,0.007,14074845638,3,fastrange re-run - unchanged control (was 0.300); fuse is not affected by the sizing change
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM,10000000,4194304,0.202,0.008,20763881188,3,fastrange sizing 13 MiB (was 16 MiB at 2^n); 1.48x over fuse
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BINARY_FUSE_8,100000000,4194304,0.740,0.014,5667978378,3,fastrange re-run - unchanged control (was 0.738)
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM,100000000,4194304,0.460,0.013,9118052174,3,fastrange sizing 131 MiB (was 256 MiB at 2^n) - 30% faster; ratio 1.13x -> 1.61x so the advantage GROWS with size on RDNA3 after all
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BINARY_FUSE_8,10000000,4194304,0.298,0.021,14074845638,3,fastrange + k=6 - unchanged control - third consecutive run at 0.298-0.300
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM,10000000,4194304,0.188,0.011,22310127659,3,fastrange + k=6; slight gain over k=8 (0.202)
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BINARY_FUSE_8,100000000,4194304,0.739,0.006,5675647496,3,fastrange + k=6 - unchanged control
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM,100000000,4194304,0.478,0.035,8774694561,3,fastrange + k=6; no gain over k=8 (0.460) - on GPU all k probes share one 512-bit block so k is nearly free
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,10000000,4194304,0.722,0.001,5809285319,3,fastrange bpe=8 k=4; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,100000000,4194304,1.390,0.003,3017484892,3,fastrange bpe=8 k=4; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,10000000,4194304,0.898,0.008,4670717149,3,fastrange bpe=11 k=6; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,100000000,4194304,1.454,0.017,2884665750,3,fastrange bpe=11 k=6; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,10000000,4194304,1.022,0.020,4104015656,3,fastrange bpe=14 k=8; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,100000000,4194304,1.483,0.011,2828256237,3,fastrange bpe=14 k=8; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,10000000,4194304,1.101,0.012,3809540418,3,fastrange bpe=17 k=9; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,100000000,4194304,1.463,0.007,2866920027,3,fastrange bpe=17 k=9; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,10000000,4194304,1.186,0.024,3536512648,3,fastrange bpe=21 k=12; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,100000000,4194304,1.511,0.007,2775846459,3,fastrange bpe=21 k=12; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,10000000,4194304,1.246,0.040,3366215088,3,fastrange bpe=26 k=14; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM,100000000,4194304,1.497,0.025,2801806279,3,fastrange bpe=26 k=14; block D single session
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BINARY_FUSE_8,10000000,4194304,1.775,0.005,2362988169,3,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM:11:6,10000000,4194304,0.895,0.011,4686373184,3,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM:17:7,10000000,4194304,1.027,0.013,4084035053,3,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM:26:9,10000000,4194304,1.111,0.023,3775251125,3,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BINARY_FUSE_8,100000000,4194304,2.999,0.046,1398567522,3,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM:11:6,100000000,4194304,1.451,0.045,2890629910,3,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM:17:7,100000000,4194304,1.366,0.003,3070500732,3,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM:26:9,100000000,4194304,1.322,0.01,3172695915,3,single-session run; densities encoded as NAME:bpe:k
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BINARY_FUSE_8,10000000,4194304,0.292,0.014,14364054795,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:11:6,10000000,4194304,0.184,0.013,22795130435,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:17:7,10000000,4194304,0.185,0.012,22671913514,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:26:9,10000000,4194304,0.197,0.016,21290883249,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:9:5,10000000,4194304,0.183,0.010,22919693989,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:18:7,10000000,4194304,0.188,0.009,22310127660,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BINARY_FUSE_8,100000000,4194304,0.726,0.058,5777278237,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:11:6,100000000,4194304,0.467,0.033,8981379015,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:17:7,100000000,4194304,0.574,0.026,7307149826,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:26:9,100000000,4194304,0.683,0.017,6141001464,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:9:5,100000000,4194304,0.393,0.020,10672529262,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:18:7,100000000,4194304,0.591,0.034,7096961083,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BINARY_FUSE_8,1000000000,4194304,2.13,0.037,1969156808,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:11:6,1000000000,4194304,0.843,0.039,4975449585,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:17:7,1000000000,4194304,0.846,0.026,4957806147,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:26:9,1000000000,4194304,0.855,0.023,4905618713,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:9:5,1000000000,4194304,0.852,0.025,4922892019,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-19,gfx1100,BLOCKED_BLOOM:18:7,1000000000,4194304,0.843,0.017,4975449585,3,bench_filters.sh block 5 re-run at -Xmx48g equivalent; single session
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BINARY_FUSE_8,10000000,4194304,0.289,0.016,14513162630,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:11:6,10000000,4194304,0.183,0.029,22919693989,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:17:7,10000000,4194304,0.185,0.015,22671913514,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:26:9,10000000,4194304,0.197,0.015,21290883249,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:9:5,10000000,4194304,0.182,0.010,23045626374,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:18:7,10000000,4194304,0.187,0.002,22429433155,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BINARY_FUSE_8,100000000,4194304,0.73,0.032,5745621918,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:11:6,100000000,4194304,0.463,0.022,9058971922,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:17:7,100000000,4194304,0.576,0.026,7281777778,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:26:9,100000000,4194304,0.682,0.022,6150005865,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:9:5,100000000,4194304,0.394,0.017,10645441624,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:18:7,100000000,4194304,0.589,0.021,7121059423,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BINARY_FUSE_8,1000000000,4194304,2.132,0.022,1967309568,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:11:6,1000000000,4194304,0.842,0.008,4981358670,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:17:7,1000000000,4194304,0.843,0.027,4975449585,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:26:9,1000000000,4194304,0.854,0.014,4911362998,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:9:5,1000000000,4194304,0.851,0.021,4928676851,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,BLOCKED_BLOOM:18:7,1000000000,4194304,0.843,0.032,4975449585,3,bench_filters.sh block 5 second run at HEAP=48g - FUSE8@1B completed in-session no OOM
+ryzen75800h-63g-win11,2026-07-20,NVIDIA GeForce RTX 3070 Laptop GPU,FUSE8,1000000000,4194304,3.144,0.037,1334066157,3,"48g re-run at 1B (fixes the earlier 8g OOM); single JMH session"
+ryzen75800h-63g-win11,2026-07-20,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM:11:6,1000000000,4194304,1.52,0.051,2759410526,3,"48g re-run at 1B (fixes the earlier 8g OOM); single JMH session"
+ryzen75800h-63g-win11,2026-07-20,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM:17:7,1000000000,4194304,1.396,0.022,3004515759,3,"48g re-run at 1B (fixes the earlier 8g OOM); single JMH session"
+ryzen75800h-63g-win11,2026-07-20,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM:26:9,1000000000,4194304,1.35,0.029,3106891851,3,"single 3099 MiB buffer allocated+probed OK despite CL_DEVICE_MAX_MEM_ALLOC_SIZE=2047 MB - the reported cap is a spec floor, not a hard limit; 48g re-run at 1B (fixes the earlier 8g OOM); single JMH session"
+ryzen75800h-63g-win11,2026-07-20,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM:9:5,1000000000,4194304,1.522,0.012,2755784494,3,"48g re-run at 1B (fixes the earlier 8g OOM); single JMH session"
+ryzen75800h-63g-win11,2026-07-20,NVIDIA GeForce RTX 3070 Laptop GPU,BLOCKED_BLOOM:18:7,1000000000,4194304,1.388,0.016,3021832853,3,"48g re-run at 1B (fixes the earlier 8g OOM); single JMH session"
+ryzen75800h-63g-win11,2026-07-20,NVIDIA GeForce RTX 3070 Laptop GPU,FUSE16,1377478516,4194304,3.159,,1327731560,2,"Full DB tier: 3.1 GB single fingerprint buffer uploaded+probed on the 3070 despite CL_DEVICE_MAX_MEM_ALLOC_SIZE=2047 MB - confirms the cap is a spec floor; required the short[]-direct upload fix (byte[] flattening overflowed)"
+ryzen79800x3d8core-61g-win11,2026-07-20,gfx1100,FUSE16,1377478516,4194304,2.257,,1858353567,2,"Full DB tier cross-vendor check: same 3.1 GB buffer uploaded+probed on RDNA3 (AMD PAL/LC 3679.0) - confirms the short[]-direct upload fix is not NVIDIA-specific. Here CL_DEVICE_MAX_MEM_ALLOC_SIZE=20876 MB so the cap was never in play; the fix is what matters. measured with the -Xmx44g -XX:MaxHeapFreeRatio=20 workaround at the time (pre-fix); the reclaim-heap fix (commit e3f3e72, System.gc before upload) was subsequently VERIFIED on this same RDNA3 to make plain -Xmx48g succeed with no workaround at 2.265 ms/op (3 stable iterations), so the fix costs no measurable throughput - see TODO"

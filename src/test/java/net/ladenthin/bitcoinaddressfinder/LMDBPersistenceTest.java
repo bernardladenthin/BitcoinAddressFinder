@@ -14,7 +14,10 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.Random;
+import java.util.Set;
+import java.util.stream.Stream;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
@@ -270,6 +273,63 @@ public class LMDBPersistenceTest {
         }
     }
     // </editor-fold>
+
+    @Test
+    public void forEachAddress_visitsSameEntriesAsAddressesStream() throws IOException {
+        // arrange
+        int keysToAdd = 5000;
+        File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
+
+        CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
+        cLMDBConfigurationWrite.initialMapSizeInMiB = 16;
+        cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
+
+        try (LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils)) {
+            lmdbPersistence.init();
+            fillWithRandomKeys(keysToAdd, lmdbPersistence);
+
+            // reference set collected via the default Stream-based addresses() path
+            Set<Long> viaStream = new HashSet<>();
+            try (Stream<ByteBuffer> stream = lmdbPersistence.addresses()) {
+                stream.forEach(bb -> viaStream.add(bb.getLong(bb.position())));
+            }
+
+            // act: the raw-cursor forEachAddress override must visit exactly the same entries
+            Set<Long> viaForEach = new HashSet<>();
+            int[] visited = {0};
+            lmdbPersistence.forEachAddress(bb -> {
+                visited[0]++;
+                viaForEach.add(bb.getLong(bb.position()));
+            });
+
+            // assert
+            assertThat(
+                    "forEachAddress must visit count() entries",
+                    (long) visited[0],
+                    is(equalTo(lmdbPersistence.count())));
+            assertThat("forEachAddress must visit the same entries as addresses()", viaForEach, is(equalTo(viaStream)));
+        }
+    }
+
+    /**
+     * {@code close()} must be safe to call when {@code init()} never ran (or threw before opening
+     * the environment). This is not a theoretical case: {@code close()} runs in the caller's
+     * {@code finally} block, so a failed {@code init()} — for example an
+     * {@code InaccessibleObjectException} when the JVM is launched without the required
+     * {@code --add-opens} — is immediately followed by {@code close()}. If {@code close()} raised its
+     * own {@code NullPointerException} there, it would replace the real cause in the stack trace and
+     * leave the operator debugging the wrong failure. This test fails if the null-guard is dropped.
+     */
+    @Test
+    public void close_withoutInit_doesNotThrow_soItCannotMaskAnInitFailure() {
+        CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
+        cLMDBConfigurationWrite.lmdbDirectory =
+                folder.resolve("never-opened").toFile().getAbsolutePath();
+
+        LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils);
+        // No init() call — the environment was never opened. close() must be a quiet no-op.
+        lmdbPersistence.close();
+    }
 
     private void fillWithRandomKeys(int keysToAdd, LMDBPersistence lmdbPersistence) {
         // arrange - fill

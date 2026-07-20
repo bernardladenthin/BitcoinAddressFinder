@@ -24,6 +24,8 @@ import java.util.regex.Pattern;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.AddressLookupBackend;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
+import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
+import net.ladenthin.bitcoinaddressfinder.configuration.GpuFilterType;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.core.FireAndForget;
 import net.ladenthin.bitcoinaddressfinder.core.InterruptedRuntimeException;
@@ -34,9 +36,12 @@ import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.bloom.BloomFilterAccelerator;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16GpuFilterData;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8GpuFilterData;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuseAccelerator;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BlockedBloomAccelerator;
+import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BlockedBloomAddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.HashSetAddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.TruncatedLong64SortedArrayPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
@@ -179,6 +184,23 @@ public class ConsumerJava implements Consumer {
     @ToString.Exclude
     private @Nullable BinaryFuse8GpuFilterData gpuFilterData;
 
+    /**
+     * The Binary Fuse 16 GPU-upload payload, built by {@link #initLMDB()} instead of
+     * {@link #gpuFilterData} when the requested {@link GpuFilterType} is
+     * {@link GpuFilterType#FUSE_16}. At most one of the two is ever non-{@code null}: the width is
+     * chosen once, up-front, and building both would double a multi-GB allocation for no purpose.
+     */
+    @ToString.Exclude
+    private @Nullable BinaryFuse16GpuFilterData gpuFilterData16;
+
+    /**
+     * Fingerprint width the GPU pre-filter payload is built for. Set by the engine alongside
+     * {@link #gpuFilterRequested}, before {@link #initLMDB()} runs, from the OpenCL producer
+     * configuration. Defaults to {@link GpuFilterType#FUSE_8} so a caller that only sets the
+     * request flag keeps the previous behaviour exactly.
+     */
+    private volatile GpuFilterType gpuFilterType = GpuFilterType.FUSE_8;
+
     private final PersistenceUtils persistenceUtils;
 
     // List of Future<Void> for the in-flight consumer iterations; toString is identity-style noise.
@@ -318,14 +340,18 @@ public class ConsumerJava implements Consumer {
         lmdb.init();
         persistence = lmdb;
 
-        AddressPresence chain = buildLookupChain(lmdb, cfg.addressLookupBackend, cfg.bloomFilterFpp);
+        AddressPresence chain = buildLookupChain(lmdb, cfg.addressLookupBackend, cfg.bloomFilterFpp, cfg);
         lookup = chain;
 
         // Build the GPU pre-filter payload now, while LMDB is guaranteed open. This must happen
         // before the self-contained close below, otherwise a HASHSET/TRUNCATED_LONG_64 backend
         // would have already released the only source the filter can be built from.
         if (gpuFilterRequested) {
-            gpuFilterData = computeGpuFilterPayload(chain, lmdb);
+            if (gpuFilterType == GpuFilterType.FUSE_16) {
+                gpuFilterData16 = computeGpuFilterPayload16(chain, lmdb);
+            } else {
+                gpuFilterData = computeGpuFilterPayload(chain, lmdb);
+            }
         }
 
         if (!chain.requiresBackend()) {
@@ -335,6 +361,45 @@ public class ConsumerJava implements Consumer {
             lmdb.close();
             persistence = null;
         }
+    }
+
+    /**
+     * Initialises this consumer against an already-built presence lookup, instead of opening LMDB.
+     *
+     * <p>Alternative entry point to {@link #initLMDB()} for callers that legitimately have no
+     * database: the {@code TuneConfiguration} command measures pipeline throughput with a filter
+     * sized to the database the operator <em>intends</em> to use, which need not exist yet. Without
+     * this seam such a caller would have to fabricate an empty scratch LMDB purely to satisfy
+     * {@link #initLMDB()} — a directory written and deleted for no reason, whose emptiness would
+     * then also mis-size any GPU filter payload built from it.
+     *
+     * <p>{@link #persistence} is deliberately left {@code null}: there is nothing to close, and
+     * {@link #interrupt()} already treats a null persistence as "nothing to release". The supplied
+     * lookup's lifecycle belongs to the caller.
+     *
+     * <p>Not a substitute for {@link #initLMDB()} in a scan: no GPU filter payload is built here,
+     * because a caller that supplies its own lookup necessarily also owns whatever it wants
+     * uploaded to the device.
+     *
+     * @param lookup the presence lookup the scan hot path should query
+     */
+    public void initWithLookup(AddressPresence lookup) {
+        this.lookup = lookup;
+    }
+
+    /**
+     * Returns the running total of address lookups performed by this consumer.
+     *
+     * <p>One <em>address</em>, not one candidate key: the scan checks both the compressed and the
+     * uncompressed hash160 of every key, so a saturated pipeline advances this by two per candidate.
+     * Exposed so the {@code TuneConfiguration} command can read net throughput from the same
+     * odometer the statistics line renders, rather than introducing a parallel counter that could
+     * disagree with the log.
+     *
+     * @return the number of address lookups performed since this consumer started
+     */
+    public long getCheckedKeys() {
+        return checkedKeys.get();
     }
 
     /**
@@ -376,6 +441,37 @@ public class ConsumerJava implements Consumer {
      */
     public void discardGpuFilterData() {
         gpuFilterData = null;
+        gpuFilterData16 = null;
+    }
+
+    /**
+     * Selects the fingerprint width of the GPU pre-filter payload built by {@link #initLMDB()}.
+     * Must be called <em>before</em> {@link #initLMDB()}, for the same reason as
+     * {@link #setGpuFilterRequested(boolean)}: the payload is built while LMDB is still open.
+     *
+     * <p>Only one width is built. Which one has to be known up-front because a Binary Fuse filter
+     * over the full address set is a multi-GB allocation and a full LMDB scan; speculatively
+     * building both would double both costs to discard one of them.
+     *
+     * @param type the fingerprint width to build; {@link GpuFilterType#FUSE_8} by default
+     */
+    public void setGpuFilterType(GpuFilterType type) {
+        this.gpuFilterType = type;
+    }
+
+    /**
+     * Returns the Binary Fuse 16 GPU-upload payload built by {@link #initLMDB()}, if the requested
+     * {@link GpuFilterType} was {@link GpuFilterType#FUSE_16}.
+     *
+     * <p>A separate accessor from {@link #getGpuFilterData()} rather than a common return type: the
+     * two payloads are not interchangeable, and confusing them on the upload path yields silent
+     * false negatives rather than a failure. The caller asks for the width it intends to probe.
+     *
+     * @return the Binary Fuse 16 GPU-upload payload, or {@link Optional#empty()} if a 16-bit filter
+     *     was not requested, has already been discarded, or {@link #initLMDB()} has not run
+     */
+    public Optional<BinaryFuse16GpuFilterData> getGpuFilterData16() {
+        return Optional.ofNullable(gpuFilterData16);
     }
 
     /**
@@ -397,8 +493,41 @@ public class ConsumerJava implements Consumer {
         return BinaryFuse8AddressPresence.populateFrom(lmdb).toGpuFilterData();
     }
 
+    /**
+     * Binary Fuse 16 counterpart of {@link #computeGpuFilterPayload(AddressPresence,
+     * AddressIterable)}. Reuses the CPU lookup's filter only when the backend is
+     * {@code BINARY_FUSE_16} — i.e. when the widths actually match — and otherwise builds a fresh
+     * transient 16-bit filter from the LMDB address stream.
+     *
+     * <p>The reuse branch is deliberately width-exact. A {@code BINARY_FUSE_8} CPU lookup cannot be
+     * reused here even though it is also a {@link BinaryFuseAccelerator}: its 8-bit slots are a
+     * different filter, and uploading them to be probed as 16-bit would silently miss stored
+     * addresses.
+     *
+     * @param chain the lookup chain just built by {@link #initLMDB()}
+     * @param lmdb  the open LMDB persistence (also an {@link AddressIterable} source)
+     * @return the 16-bit GPU-upload payload (never {@code null})
+     */
+    private static BinaryFuse16GpuFilterData computeGpuFilterPayload16(AddressPresence chain, AddressIterable lmdb) {
+        if (chain instanceof BinaryFuseAccelerator accelerator) {
+            Optional<BinaryFuse16GpuFilterData> existing = accelerator.getGpuFilterData16();
+            if (existing.isPresent()) {
+                return existing.get();
+            }
+        }
+        return BinaryFuse16AddressPresence.populateFrom(lmdb).toGpuFilterData();
+    }
+
+    /** Honours the configured blocked-Bloom geometry, falling back to the defaults when unset. */
+    private static BlockedBloomAddressPresence buildBlockedBloom(LMDBPersistence lmdb, CLMDBConfigurationReadOnly cfg) {
+        if (cfg.blockedBloomBitsPerEntry > 0 && cfg.blockedBloomK > 0) {
+            return BlockedBloomAddressPresence.populateFrom(lmdb, cfg.blockedBloomK, cfg.blockedBloomBitsPerEntry);
+        }
+        return BlockedBloomAddressPresence.populateFrom(lmdb);
+    }
+
     private static AddressPresence buildLookupChain(
-            LMDBPersistence lmdb, AddressLookupBackend choice, double bloomFpp) {
+            LMDBPersistence lmdb, AddressLookupBackend choice, double bloomFpp, CLMDBConfigurationReadOnly cfg) {
         return switch (choice) {
             case LMDB_ONLY -> lmdb;
             case BLOOM -> BloomFilterAccelerator.populateFrom(lmdb, lmdb, bloomFpp);
@@ -406,6 +535,7 @@ public class ConsumerJava implements Consumer {
             case TRUNCATED_LONG_64 -> TruncatedLong64SortedArrayPresence.populateFrom(lmdb);
             case BINARY_FUSE_8 -> new BinaryFuseAccelerator(BinaryFuse8AddressPresence.populateFrom(lmdb), lmdb);
             case BINARY_FUSE_16 -> new BinaryFuseAccelerator(BinaryFuse16AddressPresence.populateFrom(lmdb), lmdb);
+            case BLOCKED_BLOOM -> new BlockedBloomAccelerator(buildBlockedBloom(lmdb, cfg), lmdb);
         };
     }
 
@@ -463,7 +593,10 @@ public class ConsumerJava implements Consumer {
                         return;
                     }
                     long now = System.currentTimeMillis();
-                    rateSamples.addLast(new long[] {now, keysNow});
+                    // Sample both odometers together: checked (post-filter, reaching LMDB) and
+                    // generated (pre-filter, the producers' total output), so both windowed rates
+                    // come from the same trailing window.
+                    rateSamples.addLast(new long[] {now, keysNow, runtimeStatistics.getGeneratedKeys()});
                     long cutoff = now - rateWindowMillis;
                     while (rateSamples.size() > 1 && Objects.requireNonNull(rateSamples.peekFirst())[0] < cutoff) {
                         rateSamples.removeFirst();
@@ -478,10 +611,13 @@ public class ConsumerJava implements Consumer {
                 () -> {
                     long now = System.currentTimeMillis();
                     long keysNow = checkedKeys.get();
+                    long generatedNow = runtimeStatistics.getGeneratedKeys();
                     double rate = 0.0;
+                    double generatedRate = 0.0;
                     long[] oldest = rateSamples.peekFirst();
                     if (oldest != null) {
                         rate = windowKeysPerSecond(oldest[0], oldest[1], now, keysNow);
+                        generatedRate = windowKeysPerSecond(oldest[0], oldest[2], now, generatedNow);
                     }
                     long uptime = Math.max(now - startTime, 1);
 
@@ -490,6 +626,8 @@ public class ConsumerJava implements Consumer {
                                     uptime,
                                     keysNow,
                                     rate,
+                                    generatedNow,
+                                    generatedRate,
                                     rateWindowSeconds,
                                     checkedKeysSumOfTimeToCheckContains.get(),
                                     runtimeStatistics.batchesByProducerSnapshot(),

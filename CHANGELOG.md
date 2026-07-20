@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-07-20
+
+Major release centred on high-performance probabilistic address filters (in-memory and GPU-side),
+a self-tuning benchmark mode, and a rebuilt runtime statistics log.
+
+### Added
+- **Binary Fuse filters as address-lookup backends** — `BINARY_FUSE_8` (~1.13 B/entry, ~0.39 % FPR)
+  and `BINARY_FUSE_16` (~2.25 B/entry, ~0.0016 % FPR) in-memory presence filters in front of LMDB,
+  built by multi-pass peeling with progress logging. LMDB stays open to verify the handful of
+  survivors, so a false positive can never be reported as a hit.
+- **`BLOCKED_BLOOM` address-lookup backend** — a 512-bit-block Bloom filter sized with fastrange
+  (exact, no power-of-two rounding) and configurable geometry (`blockedBloomBitsPerEntry`,
+  `blockedBloomK`).
+- **GPU-side filter cascade** — `producerOpenCL.gpuFilterType` (`FUSE_8` / `FUSE_16`) builds a filter
+  from the database and uploads it to the GPU, so the kernel checks each derived hash160 inline and
+  transfers back only the survivors ("compact mode"), collapsing the PCIe read-back. Independent of
+  the CPU `addressLookupBackend`; works with the `LMDB_ONLY` default.
+- **`TuneConfiguration` command** — measures the net end-to-end throughput of every
+  `batchSizeInBits × keysPerWorkItem` arm on your own hardware and emits the winning config as
+  ready-to-paste JSON, plus a measured database-lookup cost. The sweep runs up to the framework
+  maximum `batchSizeInBits = 24`.
+- **Rebuilt runtime statistics log** — reports `Generated` (candidate keys the producers actually
+  compute) next to `-> LMDB` (survivors reaching the database) and the `pre-filtered` share, over a
+  trailing windowed rate that auto-scales `/s … G/s`. Replaces the old consumer-only rate, which made
+  a filtered GPU run look idle.
+- **Filter build progress logging** — `reading → indexing → peeling → assigning → ready` phases with
+  rate/ETA for every in-memory filter build.
+- **Measurement suite** — storage-free filter comparison (`FilterMeasurementMain`,
+  `bench_filters.sh`), GPU filter-probe and JMH benchmarks, and CSV-backed data under
+  `docs/measurements/` with generated plots and tables (`plot.py`, self-registering `machines.json`).
+- Example configs for the GPU filter cascade and per-tier filter choices; `useNoReadAhead` on the
+  read-only LMDB configuration.
+
+### Changed
+- **`FUSE_16` is the recommended default GPU pre-filter** (best net end-to-end throughput; fits VRAM
+  even at the Full DB tier). Documented in the README, `docs/filter-selection.md`, and
+  `docs/performance.md`.
+- Blocked Bloom `DEFAULT_K` 8 → 6, matching the fastrange density; the in-RAM Bloom filter is now
+  keyed on 8 bytes instead of 20 (~22 % faster lookups).
+- JSON/YAML config serialization uses field-only visibility so round-trips are stable (fixes derived
+  getters such as `getOverallWorkSize` leaking into the emitted configuration).
+- Dependency bumps: `bcprov-jdk15to18` 1.84 → 1.85, plus routine updates to `junit-jupiter`,
+  `jackson`, `logback-classic`, `nullaway`, `pitest-maven`, `spotless`, the Checker Framework, and CI
+  actions.
+
+### Fixed
+- **GPU Fuse-16 upload at the Full DB tier** — the `short[]` fingerprints were flattened into a
+  `byte[]` that overflowed `Integer.MAX_VALUE` (`NegativeArraySizeException`); they are now uploaded
+  directly as `short[]`.
+- **GPU filter upload under host-memory pressure (RDNA3)** — `clCreateBuffer` with
+  `CL_MEM_COPY_HOST_PTR` failed with `CL_MEM_OBJECT_ALLOCATION_FAILURE` while the build's transient
+  heap garbage was still resident; the heap is now reclaimed (`System.gc()`, injectable) immediately
+  before the upload. Verified on an RX 7900 XTX.
+- **`TuneConfiguration` on smaller GPUs** — an arm whose grid is too large for the device is caught
+  and recorded as unusable instead of aborting the whole sweep, so `batchSizeInBits` candidates up to
+  the hard framework cap can be swept on any card.
+- Measurement plots — the GPU filter-probe chart now shows the 1 B blocked-Bloom bars
+  (density-encoded filter names were not matched), and the blocked-Bloom sizing figure plots one
+  coherent series instead of a zigzag across machines and `k`.
+- Documentation corrected for the current statistics-log format, the keys-vs-addresses relationship
+  (each key yields both a compressed and an uncompressed address, so addresses examined are twice the
+  `Generated` rate and `pre-filtered` is measured against that doubled figure), and stale constant
+  references.
+
+[Full changelog](https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.6.1...v1.7.0)
+
 ## [1.6.1] - 2026-06-18
 
 ### Fixed

@@ -25,6 +25,7 @@
       "lmdbConfigurationReadOnly": {
         "lmdbDirectory": "lmdb",
         "useProxyOptimal": true,
+        "useNoReadAhead": false,
         "logStatsOnInit": true,
         "logStatsOnClose": false,
         "addressLookupBackend" : "LMDB_ONLY",
@@ -75,6 +76,7 @@
         "shutdownTimeoutSeconds": 300,
         "enableGpuFilter": true,
         "transferAll": false,
+        "gpuFilterType": "FUSE_16",
         "useSafeGcdInverse": true
       }
     ]

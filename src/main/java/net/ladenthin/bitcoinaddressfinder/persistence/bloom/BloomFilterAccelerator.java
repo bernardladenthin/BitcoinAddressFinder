@@ -11,8 +11,11 @@ import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.persistence.AbstractFilterAccelerator;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressLookup;
+import net.ladenthin.bitcoinaddressfinder.persistence.FilterBuildProgress;
 import org.bitcoinj.base.Coin;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Read-only accelerator that places a {@link BloomFilter} in front of an
@@ -28,9 +31,15 @@ import org.jspecify.annotations.NonNull;
  * database" case during a key-scan.
  *
  * <pre>{@code
- * BloomFilter<byte[]> bloom = ...;                         // built once, e.g. from LMDB cursor
+ * BloomFilter<Long> bloom = ...;                         // built once, e.g. from LMDB cursor
  * AddressLookup chain = new BloomFilterAccelerator(bloom, lmdbPersistence);
  * }</pre>
+ *
+ * <p><b>Superseded by {@code BINARY_FUSE_8} for new configurations.</b> Even after the tuning
+ * described on {@link #mightContain}, this backend measures ~85 ns/op against Fuse-8's ~13 ns and
+ * costs far more memory per entry. Two of the remaining causes are structural in Guava and cannot be
+ * fixed from here: {@code k} probes are scattered across the whole bit array (k cache misses instead
+ * of one), and the bits live in a lock-free atomic array. It is retained for existing configurations.
  *
  * <p>The accelerator is thread-safe as long as the supplied delegate and the underlying
  * {@link BloomFilter} are thread-safe. Guava's {@link BloomFilter#mightContain} is safe for
@@ -39,9 +48,14 @@ import org.jspecify.annotations.NonNull;
 @ToString(callSuper = true)
 public final class BloomFilterAccelerator extends AbstractFilterAccelerator<AddressLookup> implements AddressLookup {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterAccelerator.class);
+
+    /** Human-readable prefix for construction progress log lines. */
+    private static final String PROGRESS_NAME = "Bloom filter";
+
     // BloomFilter.toString dumps the full bit array — potentially millions of bits.
     @ToString.Exclude
-    private final @NonNull BloomFilter<byte[]> bloom;
+    private final @NonNull BloomFilter<Long> bloom;
 
     /**
      * Creates a new accelerator.
@@ -49,7 +63,7 @@ public final class BloomFilterAccelerator extends AbstractFilterAccelerator<Addr
      * @param bloom    the pre-populated Bloom filter
      * @param delegate the underlying lookup consulted on Bloom hits and for {@link #getAmount}
      */
-    public BloomFilterAccelerator(@NonNull BloomFilter<byte[]> bloom, @NonNull AddressLookup delegate) {
+    public BloomFilterAccelerator(@NonNull BloomFilter<Long> bloom, @NonNull AddressLookup delegate) {
         super(delegate);
         this.bloom = bloom;
     }
@@ -58,15 +72,29 @@ public final class BloomFilterAccelerator extends AbstractFilterAccelerator<Addr
      * Probes the Bloom filter. A {@code mightContain == false} answer is definitive (no false
      * negatives); a {@code true} answer is verified against the delegate by the base class.
      *
-     * @param hash160 the address hash to test; its position is restored before return
+     * <p>Keys on the <b>first 8 bytes</b> of the hash160, read absolutely so the caller's position
+     * and limit are untouched. This is the same 64-bit key every other filter in the project derives
+     * (Binary Fuse, blocked Bloom, truncated-long), so the backends stay consistent.
+     *
+     * <p><b>Why 8 bytes and not 20.</b> Guava hashes whatever the funnel emits with Murmur3-128, and
+     * hashing 20 bytes instead of 8 measured <b>~22 % slower</b> per lookup (113 ns vs 85 ns at
+     * 100 K entries). The cost is hashing work, not allocation: switching to a {@code long} key
+     * actually <em>increases</em> allocation slightly (176 to 200 B/op, from boxing) while still
+     * being faster, and eliminating our own {@code byte[20]} entirely changed nothing measurable —
+     * Guava allocates a {@code Hasher} per call regardless, which dominates.
+     *
+     * <p><b>Accuracy cost.</b> Two distinct hash160 values sharing their first 8 bytes are
+     * indistinguishable to this filter. Since hash160 is uniform, that adds a collision probability
+     * of N/2&#x2076;&#x2074; on top of the configured FPP — about 7.5 &times; 10&#x207B;&#x00b9;&#x00b9;
+     * per query at the largest published database size, i.e. negligible next to the 1-10 % FPP the
+     * filter is configured for. A Bloom hit is verified against the delegate regardless.
+     *
+     * @param hash160 the address hash to test; its position and limit are left unchanged
      * @return {@code true} if the Bloom filter reports the address as possibly present
      */
     @Override
     protected boolean mightContain(ByteBuffer hash160) {
-        byte[] bytes = new byte[hash160.remaining()];
-        hash160.get(bytes);
-        hash160.rewind();
-        return bloom.mightContain(bytes);
+        return bloom.mightContain(hash160.getLong(hash160.position()));
     }
 
     @Override
@@ -91,15 +119,19 @@ public final class BloomFilterAccelerator extends AbstractFilterAccelerator<Addr
     public static BloomFilterAccelerator populateFrom(
             @NonNull AddressIterable source, @NonNull AddressLookup delegate, double falsePositiveProbability) {
         long count = source.count();
-        BloomFilter<byte[]> bloom =
-                BloomFilter.create(Funnels.byteArrayFunnel(), Math.max(count, 1L), falsePositiveProbability);
+        LOGGER.info("{}: building over {} addresses (fpp={}) ...", PROGRESS_NAME, count, falsePositiveProbability);
+        BloomFilter<Long> bloom =
+                BloomFilter.create(Funnels.longFunnel(), Math.max(count, 1L), falsePositiveProbability);
+        FilterBuildProgress progress =
+                new FilterBuildProgress(LOGGER::info, PROGRESS_NAME + ": inserting addresses", count);
+        long[] processed = {0L};
         try (Stream<ByteBuffer> stream = source.addresses()) {
             stream.forEach(bb -> {
-                byte[] bytes = new byte[bb.remaining()];
-                bb.duplicate().get(bytes);
-                bloom.put(bytes);
+                bloom.put(bb.getLong(bb.position()));
+                progress.report(++processed[0]);
             });
         }
+        LOGGER.info("{}: ready ({} addresses inserted).", PROGRESS_NAME, processed[0]);
         return new BloomFilterAccelerator(bloom, delegate);
     }
 }

@@ -42,6 +42,7 @@ import java.util.Objects;
 import java.util.Optional;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.configuration.GpuFilterType;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
@@ -384,6 +385,18 @@ public class OpenCLContext implements ReleaseCLObject {
     private @Nullable cl_mem fuse8MetadataMem;
 
     /**
+     * Which fingerprint width was actually uploaded, or {@code null} when only the placeholder is
+     * bound.
+     *
+     * <p>Exists solely to make a width mismatch loud. The device cannot detect one: a Fuse-8 buffer
+     * probed as {@code ushort*} reads two adjacent slots as one 16-bit fingerprint, which almost
+     * never matches, so the filter rejects nearly everything — including funded addresses — while
+     * the scan keeps running and reports nothing. That is indistinguishable from an honest empty
+     * result, so it is checked on the host instead, where it can throw.
+     */
+    private @Nullable GpuFilterType uploadedFilterType;
+
+    /**
      * Whether a real GPU filter has been uploaded via {@link #uploadGpuFilter}. {@code false}
      * means the buffers hold a dummy empty filter (allocated in {@link #init()} so the kernel
      * arguments are always bindable) and the kernel must run in full-transfer mode.
@@ -430,6 +443,34 @@ public class OpenCLContext implements ReleaseCLObject {
     public OpenCLContext(CProducerOpenCL producerOpenCL, BitHelper bitHelper) {
         this.producerOpenCL = producerOpenCL;
         this.bitHelper = bitHelper;
+    }
+
+    /** Reclaims the heap before a filter upload; injectable so the trigger can be verified. */
+    private GcTrigger gcTrigger = GcTrigger.SYSTEM;
+
+    /**
+     * Overrides the garbage-collection trigger. For tests only, so the reclaim-before-upload
+     * behaviour can be asserted against a mock without a real {@code System.gc()}.
+     *
+     * @param gcTrigger the trigger to use
+     */
+    @VisibleForTesting
+    void setGcTrigger(GcTrigger gcTrigger) {
+        this.gcTrigger = gcTrigger;
+    }
+
+    /**
+     * Reclaims the JVM heap right before a fingerprint buffer is created, so the driver can pin the
+     * host staging region {@code CL_MEM_COPY_HOST_PTR} needs. A filter is uploaded once, at startup,
+     * immediately after its build — no size gate is worth its complexity: the collection is a
+     * one-time cost of a few milliseconds, and skipping it risks the
+     * {@code CL_MEM_OBJECT_ALLOCATION_FAILURE} measured on RDNA3 when the build's ~40&nbsp;GB of
+     * transient garbage still occupies the heap. See {@link GcTrigger} for the cause and the JDK
+     * precedent.
+     */
+    @VisibleForTesting
+    void reclaimHeapBeforeUpload() {
+        gcTrigger.requestGc();
     }
 
     /**
@@ -678,10 +719,82 @@ public class OpenCLContext implements ReleaseCLObject {
             byte[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
         allocateFilterBuffers(fingerprints, seedLo, seedHi, segLen, segLenMask, segCountLen);
         gpuFilterUploaded = true;
+        uploadedFilterType = GpuFilterType.FUSE_8;
     }
 
+    /**
+     * Uploads a Binary Fuse <b>16</b> filter to GPU VRAM, using the same two device buffers and the
+     * same five-word metadata block as {@link #uploadGpuFilter(byte[], int, int, int, int, int)}.
+     *
+     * <p>The kernel takes a single {@code uchar*} fingerprint argument for both widths and casts it
+     * to {@code ushort*} when {@code filter_type} says so. The 16-bit slots are uploaded as the
+     * {@code short[]} directly (see {@code allocateFilterBuffersShort}); the device sees the array's
+     * native <b>little-endian</b> bytes — a big-endian device is rejected outright in {@link #init()}
+     * (see {@code assertDeviceByteOrderSupported}) — so it reads back exactly the values the CPU
+     * filter holds, without a byte-array copy that would overflow at the Full DB tier.
+     *
+     * <p>Which width the kernel <em>probes</em> is decided separately, by
+     * {@code producerOpenCL.gpuFilterType}. Uploading through this method and leaving that setting
+     * at {@code FUSE_8} does not throw: it reinterprets 16-bit slots as 8-bit ones and silently
+     * misses stored addresses. The two must be configured together.
+     *
+     * @param fingerprints the 16-bit fingerprint slot array
+     * @param seedLo       low 32 bits of the construction seed
+     * @param seedHi       high 32 bits of the construction seed
+     * @param segLen       per-segment {@code reduce} length
+     * @param segLenMask   {@code segLen - 1}
+     * @param segCountLen  total fingerprint slot count ({@code fingerprints.length})
+     * @throws IllegalStateException if the context has not been initialised
+     */
+    public void uploadGpuFilter16(
+            short[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
+        allocateFilterBuffersShort(fingerprints, seedLo, seedHi, segLen, segLenMask, segCountLen);
+        gpuFilterUploaded = true;
+        uploadedFilterType = GpuFilterType.FUSE_16;
+    }
+
+    /** Fuse-8 buffer upload: the {@code byte[]} slot array goes to the device as-is. */
     private void allocateFilterBuffers(
             byte[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
+        // Avoid Pointer.to on a zero-length array (the empty-filter placeholder); the pointer would
+        // be unused anyway because FromPointer pads a zero-size upload with its own dummy byte.
+        final Pointer host = fingerprints.length == 0 ? Pointer.to(new byte[] {0}) : Pointer.to(fingerprints);
+        allocateFilterBuffersFromPointer(
+                host, (long) fingerprints.length, seedLo, seedHi, segLen, segLenMask, segCountLen);
+    }
+
+    /**
+     * Fuse-16 buffer upload: the {@code short[]} slot array goes to the device <b>directly</b> via
+     * {@code Pointer.to(short[])}, never flattened into a {@code byte[]} first.
+     *
+     * <p>Flattening was wrong twice over at the Full DB tier: {@code slots * 2} overflowed a 32-bit
+     * {@code int} to a negative length, and a Java {@code byte[]} cannot exceed
+     * {@code Integer.MAX_VALUE} elements anyway, so a 3.1&nbsp;GB fuse-16 filter (1.55&nbsp;billion
+     * 16-bit slots) could not be represented as bytes at all. Uploading the {@code short[]} directly
+     * — exactly as the fuse-8 path uploads its {@code byte[]} and blocked bloom its {@code long[]} —
+     * removes the byte-array limit; the device sees the array's native little-endian bytes, and a
+     * big-endian device is rejected in {@link #init()}.
+     */
+    private void allocateFilterBuffersShort(
+            short[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
+        allocateFilterBuffersFromPointer(
+                Pointer.to(fingerprints),
+                (long) fingerprints.length * Short.BYTES,
+                seedLo,
+                seedHi,
+                segLen,
+                segLenMask,
+                segCountLen);
+    }
+
+    private void allocateFilterBuffersFromPointer(
+            Pointer fingerprintHost,
+            long fingerprintByteSize,
+            int seedLo,
+            int seedHi,
+            int segLen,
+            int segLenMask,
+            int segCountLen) {
         final cl_context localContext = context;
         if (localContext == null || closed) {
             throw new IllegalStateException("uploadGpuFilter called before init() or after close()");
@@ -691,14 +804,15 @@ public class OpenCLContext implements ReleaseCLObject {
         releaseGpuFilter();
 
         // Zero-size device buffers are invalid; pad an empty filter to a single zero byte. The
-        // kernel relies on segCountLen == 0 (not the buffer length) to detect the empty filter.
-        final byte[] fingerprintBytes = fingerprints.length == 0 ? new byte[1] : fingerprints;
-        final cl_mem localFpMem = clCreateBuffer(
-                localContext,
-                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                (long) fingerprintBytes.length,
-                Pointer.to(fingerprintBytes),
-                null);
+        // kernel relies on segCountLen == 0 (not the buffer length) to detect the empty filter, so
+        // the padding byte is never read.
+        final Pointer host = fingerprintByteSize <= 0L ? Pointer.to(new byte[] {0}) : fingerprintHost;
+        final long byteSize = fingerprintByteSize <= 0L ? 1L : fingerprintByteSize;
+        // An upload right after a filter build can fail to pin host memory while the build's
+        // transient garbage still occupies the heap (measured on RDNA3); reclaim it first.
+        reclaimHeapBeforeUpload();
+        final cl_mem localFpMem =
+                clCreateBuffer(localContext, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, byteSize, host, null);
 
         final int[] metadata = new int[] {seedLo, seedHi, segLen, segLenMask, segCountLen};
         final cl_mem localMetaMem;
@@ -719,6 +833,7 @@ public class OpenCLContext implements ReleaseCLObject {
     }
 
     private void releaseGpuFilter() {
+        uploadedFilterType = null;
         if (fuse8FingerprintsMem != null) {
             clReleaseMemObject(fuse8FingerprintsMem);
             fuse8FingerprintsMem = null;
@@ -830,6 +945,52 @@ public class OpenCLContext implements ReleaseCLObject {
     }
 
     /**
+     * Test hook: attempts to allocate a device buffer of {@code bytes}, <b>forces the driver to
+     * actually back it</b>, and releases it. Its only purpose is to let a test observe, on a real
+     * device, <b>how an over-large allocation actually fails</b>.
+     *
+     * <p><b>Why the fill/read step is required.</b> {@code clCreateBuffer} alone is not a reliable
+     * probe: some drivers (NVIDIA, measured on an RTX 3070) allocate <em>lazily</em> and return
+     * success from {@code clCreateBuffer} even for an absurd multi-exabyte request, deferring the
+     * backing storage until first use. Only touching the buffer (a blocking 1-byte read here) forces
+     * the driver to materialize it, which is where an impossible size is rejected. This is the same
+     * reason the real RDNA3 failure appeared with {@code CL_MEM_COPY_HOST_PTR} (which must pin host
+     * memory immediately), not with a bare create.
+     *
+     * <p>With JOCL exceptions enabled ({@link #EXCEPTIONS_ENABLED}) the rejection surfaces as a JOCL
+     * {@link org.jocl.CLException} — a {@link RuntimeException} carrying a status such as {@code
+     * CL_MEM_OBJECT_ALLOCATION_FAILURE} / {@code CL_OUT_OF_RESOURCES} / {@code CL_INVALID_BUFFER_SIZE}
+     * — and <b>never</b> an {@link OutOfMemoryError}. That is the evidence behind {@code
+     * TuneConfiguration.runArm}'s per-arm catch: the sweep probes {@code batchSizeInBits} up to {@link
+     * net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
+     * whose output buffer scales as {@code 2^bits} and can exceed what a smaller card allocates.
+     * Because the device failure is a {@code CLException} (a {@code RuntimeException}), catching {@code
+     * Exception} suffices to record that arm as unusable and continue (the catch also keeps {@code
+     * OutOfMemoryError} for the independent case of a host-side readback buffer running out first). It
+     * complements {@link OpenClConfigSuggestion}, which derives a <em>starting</em> batch from {@code
+     * CL_DEVICE_MAX_MEM_ALLOC_SIZE} but is clamped well below the hard cap the tuner reaches.
+     *
+     * @param bytes requested buffer size; pass a value larger than the device's global memory to
+     *     force the rejection path
+     */
+    @VisibleForTesting
+    void allocateDeviceReadWriteBufferForTesting(long bytes) {
+        final cl_context localContext = Objects.requireNonNull(context, "init() must run before allocating a buffer");
+        final cl_command_queue localQueue =
+                Objects.requireNonNull(commandQueue, "init() must run before allocating a buffer");
+        final cl_mem mem = clCreateBuffer(localContext, CL_MEM_READ_WRITE, bytes, null, null);
+        try {
+            // Force the (possibly lazy) driver to materialize the backing storage; this is where an
+            // impossible size is rejected with a CLException.
+            final byte[] probe = new byte[1];
+            clEnqueueReadBuffer(localQueue, mem, CL_TRUE, 0L, 1L, Pointer.to(probe), 0, null, null);
+            clFinish(localQueue);
+        } finally {
+            clReleaseMemObject(mem);
+        }
+    }
+
+    /**
      * Test hook: runs a single-work-item fixed-base precompute kernel from the already-built program
      * (e.g. {@code precompute_ig_table}, {@code precompute_comb_table} in
      * {@code copyfromhashcat/inc_ecc_secp256k1.cl}) into a fresh {@code CL_MEM_READ_WRITE} buffer and
@@ -894,6 +1055,148 @@ public class OpenCLContext implements ReleaseCLObject {
             clReleaseMemObject(out);
             clReleaseKernel(benchKernel);
         }
+    }
+
+    // Filter-probe microbenchmark state. Held across calls on purpose: the filter reaches gigabytes
+    // at production sizes, so uploading it per measured invocation would measure PCIe, not the probe.
+    private @Nullable cl_kernel benchFilterKernel;
+    private @Nullable cl_mem benchFilterMem;
+    private @Nullable cl_mem benchFilterMetaMem;
+    private @Nullable cl_mem benchFilterKeysMem;
+    private @Nullable cl_mem benchFilterHitsMem;
+    private int benchFilterProbeCount;
+
+    /**
+     * Benchmark hook: uploads a Binary Fuse 8 filter and a probe-key array, and binds the
+     * {@code benchmarkFilterFuse8} kernel. Pairs with {@link #runBenchFilterProbe()} and
+     * {@link #releaseBenchFilterProbe()}.
+     *
+     * <p>Split into prepare/run/release so the multi-gigabyte upload happens once, outside the
+     * timed region — measuring it per invocation would report PCIe bandwidth rather than probe cost.
+     *
+     * @param fingerprints the fuse fingerprint array
+     * @param meta         {@code [seedLo, seedHi, segLen, segLenMask, segCountLen]}
+     * @param probeKeys    the 64-bit keys to probe, one per work-item
+     */
+    @VisibleForTesting
+    public void prepareBenchFilterProbeFuse8(byte[] fingerprints, int[] meta, long[] probeKeys) {
+        prepareBenchFilterProbe("benchmarkFilterFuse8", Pointer.to(fingerprints), fingerprints.length, meta, probeKeys);
+    }
+
+    /**
+     * Benchmark hook: uploads a Binary Fuse 16 filter and a probe-key array, and binds the
+     * {@code benchmarkFilterFuse16} kernel. See
+     * {@link #prepareBenchFilterProbeFuse8(byte[], int[], long[])} for the lifecycle.
+     *
+     * <p>The {@code short[]} slot array is uploaded directly (no byte-array flattening), exactly as
+     * the production upload does, so this benchmark exercises the same path — including the Full-DB
+     * case whose byte image would exceed {@code Integer.MAX_VALUE}.
+     *
+     * @param fingerprints the 16-bit fingerprint slot array
+     * @param meta         {@code [seedLo, seedHi, segLen, segLenMask, segCountLen]}
+     * @param probeKeys    the 64-bit keys to probe, one per work-item
+     */
+    public void prepareBenchFilterProbeFuse16(short[] fingerprints, int[] meta, long[] probeKeys) {
+        // Upload the short[] directly (no byte[] flattening) so a Full-DB-sized filter, whose byte
+        // image exceeds Integer.MAX_VALUE, still uploads. See allocateFilterBuffersShort.
+        prepareBenchFilterProbe(
+                "benchmarkFilterFuse16",
+                Pointer.to(fingerprints),
+                (long) fingerprints.length * Short.BYTES,
+                meta,
+                probeKeys);
+    }
+
+    /**
+     * Benchmark hook: uploads a blocked Bloom filter and a probe-key array, and binds the
+     * {@code benchmarkFilterBlockedBloom} kernel. See
+     * {@link #prepareBenchFilterProbeFuse8(byte[], int[], long[])} for the lifecycle.
+     *
+     * @param words     the blocked Bloom bit array
+     * @param meta      {@code [logBlocks, k]}
+     * @param probeKeys the 64-bit keys to probe, one per work-item
+     */
+    @VisibleForTesting
+    public void prepareBenchFilterProbeBlockedBloom(long[] words, int[] meta, long[] probeKeys) {
+        prepareBenchFilterProbe(
+                "benchmarkFilterBlockedBloom",
+                Pointer.to(words),
+                (long) words.length * Sizeof.cl_ulong,
+                meta,
+                probeKeys);
+    }
+
+    private void prepareBenchFilterProbe(
+            String kernelName, Pointer filterHost, long filterBytes, int[] meta, long[] probeKeys) {
+        final cl_context localContext = Objects.requireNonNull(context);
+        final cl_program localProgram = Objects.requireNonNull(program);
+
+        releaseBenchFilterProbe(); // idempotent: a second prepare must not leak the first upload
+        benchFilterProbeCount = probeKeys.length;
+        benchFilterKernel = clCreateKernel(localProgram, kernelName, null);
+        // Same host-memory-pinning trap as the production upload: reclaim the build's transient
+        // garbage so the driver can pin the staging region (see reclaimHeapBeforeUpload).
+        reclaimHeapBeforeUpload();
+        benchFilterMem =
+                clCreateBuffer(localContext, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, filterBytes, filterHost, null);
+        benchFilterMetaMem = clCreateBuffer(
+                localContext,
+                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                (long) meta.length * Sizeof.cl_uint,
+                Pointer.to(meta),
+                null);
+        benchFilterKeysMem = clCreateBuffer(
+                localContext,
+                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                (long) probeKeys.length * Sizeof.cl_ulong,
+                Pointer.to(probeKeys),
+                null);
+        benchFilterHitsMem = clCreateBuffer(localContext, CL_MEM_WRITE_ONLY, benchFilterProbeCount, null, null);
+
+        final cl_kernel k = Objects.requireNonNull(benchFilterKernel);
+        clSetKernelArg(k, 0, Sizeof.cl_mem, Pointer.to(Objects.requireNonNull(benchFilterMem)));
+        clSetKernelArg(k, 1, Sizeof.cl_mem, Pointer.to(Objects.requireNonNull(benchFilterMetaMem)));
+        clSetKernelArg(k, 2, Sizeof.cl_mem, Pointer.to(Objects.requireNonNull(benchFilterKeysMem)));
+        clSetKernelArg(k, 3, Sizeof.cl_mem, Pointer.to(Objects.requireNonNull(benchFilterHitsMem)));
+        clSetKernelArg(k, 4, Sizeof.cl_uint, Pointer.to(new int[] {benchFilterProbeCount}));
+    }
+
+    /**
+     * Benchmark hook: probes every prepared key on the device and blocks until the kernel finishes.
+     * This is the timed region of the filter A/B — no host transfer occurs, so it measures the probe.
+     *
+     * @return the number of work-items launched, so callers can normalise to a per-probe cost
+     * @throws IllegalStateException if no filter probe has been prepared
+     */
+    @VisibleForTesting
+    public int runBenchFilterProbe() {
+        final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
+        final cl_kernel k = benchFilterKernel;
+        if (k == null) {
+            throw new IllegalStateException("prepareBenchFilterProbe* must be called before runBenchFilterProbe()");
+        }
+        clEnqueueNDRangeKernel(localQueue, k, 1, null, new long[] {benchFilterProbeCount}, null, 0, null, null);
+        clFinish(localQueue);
+        return benchFilterProbeCount;
+    }
+
+    /** Releases the filter-probe benchmark buffers and kernel. Safe to call repeatedly. */
+    @VisibleForTesting
+    public void releaseBenchFilterProbe() {
+        for (cl_mem mem : new cl_mem[] {benchFilterMem, benchFilterMetaMem, benchFilterKeysMem, benchFilterHitsMem}) {
+            if (mem != null) {
+                clReleaseMemObject(mem);
+            }
+        }
+        benchFilterMem = null;
+        benchFilterMetaMem = null;
+        benchFilterKeysMem = null;
+        benchFilterHitsMem = null;
+        if (benchFilterKernel != null) {
+            clReleaseKernel(benchFilterKernel);
+            benchFilterKernel = null;
+        }
+        benchFilterProbeCount = 0;
     }
 
     /**
@@ -983,6 +1286,17 @@ public class OpenCLContext implements ReleaseCLObject {
         // Compact (filter) mode only when a real filter is uploaded AND the caller did not force
         // full transfer; otherwise run full transfer (no filter, or vanity forced transferAll).
         final int transferAll = (producerOpenCL.transferAll || !gpuFilterUploaded) ? 1 : 0;
+        // Tells the kernel how wide the uploaded fingerprint slots are. This MUST agree with the
+        // upload method that was actually used; the device cannot detect a mismatch and it surfaces
+        // only as silently missed addresses, so it is asserted here rather than trusted.
+        final GpuFilterType configuredType = producerOpenCL.gpuFilterType;
+        if (transferAll == 0 && uploadedFilterType != configuredType) {
+            throw new IllegalStateException("GPU filter width mismatch: kernel would probe as "
+                    + configuredType + " but the uploaded payload is "
+                    + (uploadedFilterType == null ? "absent" : uploadedFilterType.toString())
+                    + ". This would silently drop funded addresses; refusing to dispatch.");
+        }
+        final int filterType = configuredType.getWireValue();
 
         localOpenClTask.setSrcPrivateKeyChunk(privateKeyBase);
         ByteBuffer dstByteBuffer = localOpenClTask.executeKernel(
@@ -991,6 +1305,7 @@ public class OpenCLContext implements ReleaseCLObject {
                 localFuse8FingerprintsMem,
                 localFuse8MetadataMem,
                 transferAll,
+                filterType,
                 localIgTableMem,
                 localCombTableMem);
 

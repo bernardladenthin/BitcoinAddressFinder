@@ -7,11 +7,140 @@ cross-cutting initiative.
 
 ## Open — BAF-specific
 
+### GPU filter upload fails under host-memory pressure (`CL_MEM_OBJECT_ALLOCATION_FAILURE`) ✅ FIXED & VERIFIED on RDNA3
+
+Uploading the Full-DB Fuse-16 fingerprint buffer (1 549 795 328 slots × 2 B = **3.10 GB**) failed at
+`clCreateBuffer` with `CL_MEM_OBJECT_ALLOCATION_FAILURE` even though the device had ample room —
+measured on an RX 7900 XTX where `CL_DEVICE_MAX_MEM_ALLOC_SIZE` is 20 876 MB, i.e. 6.7× the request.
+
+**It was host memory, not VRAM.** `CL_MEM_COPY_HOST_PTR` makes the driver pin a host-side staging
+region, and after the 1.377 B-entry peel (~29 B/entry ≈ 40 GB peak) too much of the JVM heap was still
+occupied by uncollected garbage. Isolated with a minimal JOCL probe on a 61.6 GB host, requesting the
+same 3.10 GB buffer:
+
+| heap state at `clCreateBuffer` | result |
+|---|---|
+| empty heap, plain alloc *and* `COPY_HOST_PTR` | OK |
+| 23.6 GiB live | OK |
+| 33.9 GiB live | **FAIL (−4)** |
+| 30 GiB of garbage, then `System.gc()` → 2.9 GiB live / 9.8 GiB committed | OK |
+
+**Fix:** `OpenCLContext.reclaimHeapBeforeUpload()` now runs a GC (via the injectable `GcTrigger`,
+default `System.gc()`) immediately before every filter buffer is created — production upload and
+benchmark hook alike. No size gate: a filter is uploaded once, at startup, right after its build, so
+the collection is a one-time cost of milliseconds. This mirrors `java.nio.Bits.reserveMemory`, which
+calls `System.gc()` before a large direct-buffer allocation for the same native-memory-pressure
+reason. Unit-tested with a mocked `GcTrigger` (`OpenCLContextGpuFilterWidthTest`); a hardware retest
+is not possible on the 3070 (it never reproduced the failure — NVIDIA's driver pins differently).
+
+**Verified on the reproducing hardware.** The AMD machine (gfx1100 / RX 7900 XTX, driver 3679.0
+PAL/LC, Win 11, JDK 21.0.7) re-ran the Full-DB Fuse-16 probe at plain `-Xmx48g` — the exact command
+that failed before — and it now completes cleanly: **0** `CL_MEM_OBJECT_ALLOCATION_FAILURE` in the
+whole log, no `MaxHeapFreeRatio` workaround needed, 2.265 ± 0.007 ms/op (≈ 1.852 G probes/s) across
+three iterations. That matches the pre-fix workaround measurement (2.257 ms/op), i.e. the
+`System.gc()` hint costs no measurable throughput — it only fixes the allocation. Same `-Xmx48g`
+command line: yesterday FAIL, today with the fix PASS — the A/B control the no-op-`GcTrigger`
+cross-check would have forced, obtained via the commit instead.
+
+This became visible only *after* the `short[]`-direct upload fix; before that the Java-side `byte[]`
+overflow (`NegativeArraySizeException`) always struck first, so it is a second, independent defect
+rather than a regression of that fix.
+
 ### Persistence backends (genuinely open work)
 
-Implementation of `BLOOM` / `HASHSET` / `TRUNCATED_LONG_64` is DONE
+Implementation of `BLOOM` / `HASHSET` / `TRUNCATED_LONG_64` /
+`BINARY_FUSE_8` / `BINARY_FUSE_16` / `BLOCKED_BLOOM` is DONE
 (see "Done" history below). The remaining open items in the
 pluggable-persistence design plan:
+
+- **Prefetch/readahead the LMDB scan during filter construction (I/O-latency bound, measured).** Every
+  in-RAM backend is populated by a single-threaded cursor walk over the LMDB mmap, and on a database
+  larger than free RAM that walk — not the filter work — is what dominates the build. Measured while
+  building `BLOCKED_BLOOM` over the 1.377 B-entry Full DB (61 GB) with ~27 GB of the file warm in page
+  cache, per 10 % segment:
+
+  | segment | 0→9 % | 9→19 % | 19→29 % | 29→39 % | 39→49 % | 49→59 % | 59→69 % |
+  |---|--:|--:|--:|--:|--:|--:|--:|
+  | time | 48 s | 48 s | 47 s | 55 s | 110 s | 330 s | **325 s** |
+  | rate | 2.85 M/s | 2.87 M/s | 2.96 M/s | 2.49 M/s | 1.25 M/s | 0.42 M/s | **0.42 M/s** |
+
+  Two regimes, not an open-ended decline: ~2.9 M/s while pages are cached, then a ~7× drop that
+  **plateaus at a steady ~0.42 M/s** once the walk is fully in cold territory (the last two segments
+  match to within 2 %). The insert work per key is constant, so the entire curve is the cost of
+  *reaching* the next key.
+
+  **The dominant variable is free RAM, not cache warmth** — an earlier reading of these numbers had
+  that causality backwards. The 1 869 s build above began with RAM already contended (~2 GB free
+  after a 12 GB-heap JMH run), so pages were evicted before reuse and re-read. A later build of the
+  *same* database starting from a deliberately emptied cache but **58 GB free** took **1 043 s** —
+  nearly 2× faster despite being colder, because file pages could accumulate instead of evicting one
+  another. Cache warmth helps only the prefix; headroom helps the whole pass. The process sat
+  **Root cause is read amplification, not an idle disk.** Measured in the cold regime on the NVMe
+  backing the database: **332 MB/s, 8 279 reads/s, 86 % disk-busy, queue depth 1**, with free RAM down
+  to 2.3 GB and the JVM working set at 54 GB. Useful entry throughput at that moment was only
+  0.43 M/s × ~44 B/entry ≈ **19 MB/s** — so roughly **17× more data is read than consumed**. Over the
+  39 %→89 % span the disk moved ~460 GB for ~30 GB of file content, against a 61 GB file: pages are
+  read, evicted before use, and re-read.
+
+  Mechanism: the database is built by inserting *random* hash160 keys, so LMDB B-tree pages in **key
+  order** are scattered in **file order**. A key-ordered cursor walk therefore jumps across the 61 GB
+  file, and the OS's ~40 KB readahead (332 MB ÷ 8 279 reads) drags in neighbours that are evicted
+  before their turn arrives. Once RAM is exhausted this degenerates into thrashing.
+
+  Fix candidates, cheapest first:
+  1. **`EnvFlags.MDB_NORDAHEAD` — implemented, but STILL UNVALIDATED (Windows no-op).** Available as
+     the opt-in `CLMDBConfigurationReadOnly#useNoReadAhead`, default `false`. **LMDB does not
+     implement this flag on Windows** — lmdbjava's javadoc: *"Don't do readahead (no effect on
+     Windows) … The option is not implemented on Windows."* It is a POSIX-only lever.
+
+     A cold-cache A/B was run on Windows before that was checked (each arm preceded by a 46 GiB
+     `PageCacheBuster` pass): baseline 1 042.8 s vs `MDB_NORDAHEAD` 965.8 s. **That 7.4 % gap is
+     run-to-run variance, not an effect** — both arms executed identical code paths, and FPR
+     (0.004847) plus retained size (2052.1 MiB) were bit-identical. Useful byproduct: it calibrates
+     the **noise floor of the full-DB build measurement at ~7-8 % for n = 1**, so smaller effects
+     need repeats to be credible.
+
+     **To settle it:** run the same A/B on Linux, where the flag actually does something, with
+     alternating arm order, matched free RAM, and enough repeats to beat that ~8 % noise floor. Note
+     CI already runs Ubuntu, so a Linux measurement is reachable. Lesson recorded: check a flag's
+     platform support *before* spending measurement time on it.
+  2. Raise the effective queue depth — the disk sat at **QD 1**, so it is latency-serialized even
+     while 86 % busy; overlapping reads could recover throughput.
+  3. Rebuild/compact the database in key order so the logical walk becomes physically sequential
+     (largest win, but a one-off offline cost on a 61 GB store).
+
+  Note this supersedes an earlier reading of these numbers as "the SSD is idle at 4 K IOPS, add
+  readahead" — that sample was taken while the page cache was still warm and the working set growing.
+  The disk is *not* idle, and adding more readahead would make the amplification worse. None of this
+  touches filter logic and it benefits *every* backend (`HASHSET` and `TRUNCATED_LONG_64` walk the
+  same cursor — the latter twice). Re-measure with `FilterMeasurementMain` (see
+  `docs/performance.md` §6); the per-10 % progress lines make the curve directly visible.
+
+- **Size blocked Bloom with a multiply-shift instead of power-of-two block counts.** ✅ **DONE.**
+  `chooseBlocks` now sizes exactly via Lemire's fastrange (`block = unsignedMultiplyHigh(hash,
+  numBlocks)` on the CPU, `mul_hi` on the GPU), so a requested 11 bits/entry is delivered as 11, not
+  rounded up to as much as 21.47. This removed the up-to-2x memory waste and confirmed the predicted
+  RDNA3 improvement: at 100 M the blocked-Bloom filter dropped from 256 MB (2ⁿ) to ~131 MB and its
+  GPU advantage over Fuse-8 grew from 1.13x to 1.61x once it stopped spilling the 96 MB Infinity
+  Cache. The k-sweep, sizing sweep and GPU A/B were all re-run against the new geometry; the shipped
+  default is now `DEFAULT_K = 6` at 11 bits/entry. Pinned by
+  `BlockedBloomAddressPresenceTest#chooseBlocks_sizesExactly_withoutPowerOfTwoRounding`.
+
+- **Selectable GPU pre-filter (`gpuFilterType`) + `BINARY_FUSE_16` kernel.** ✅ **DONE** for the fuse
+  widths; blocked Bloom on the GPU is a **deliberate no**, not an open item. The production kernel
+  now branches on a `filter_type` uniform, `CProducerOpenCL.gpuFilterType` (default `FUSE_8`) selects
+  the width, and `fuse16_contains` is byte-exact against Java (`BinaryFuse16GpuAgreementTest`, plus
+  the end-to-end `OpenCLFilterHitSetIntegrationTest` on both NVIDIA and RDNA3). A width mismatch is
+  refused at dispatch rather than silently dropping addresses.
+
+  Why blocked Bloom is **not** wired in despite winning the isolated probe (1.6–2.3x, confirmed on
+  RDNA3): the pre-filter's job is to hand the single consumer as little as possible, and blocked
+  Bloom passes ~2x more candidates at equal footprint because its false-positive rate is higher. The
+  measured end-to-end cascade (`docs/filter-selection.md` §7) shows the GPU filter choice is decided
+  by FPR-per-VRAM-byte, not probe speed — so `FUSE_16` is the pre-filter to prefer where the device
+  allocation limit allows it, and `FUSE_8` otherwise. The device probe `blockedbloom_contains` and
+  the `benchmarkFilterBlockedBloom` kernel remain for the benchmark only. Re-open this only if a
+  future device makes blocked Bloom win on *total* cost, not probe latency.
 
 - **Add open-addressing primitive hash table backend** (fastutil `Long2LongOpenHashMap` or hand-rolled over `long[]`) — would offer O(1) average vs. the sorted array's O(log n) per lookup with similar cache profile. Deferred because `TRUNCATED_LONG_64` is already the fastest backend in practice and the marginal speedup would not change the recommended default.
 
@@ -254,7 +383,16 @@ This means the Part 2 GPU-side filter and the compact-output-buffer approach app
 
   **After this TODO is done:** the GPU-side filter (see next TODO) reuses the same `murmur64` / `reduce` / fingerprint formula verbatim in OpenCL C. The Java and GPU lookup paths are verifiable against each other with identical test inputs.
 
-- **GPU-side Binary Fuse 8 filter — Part 2 implementation plan (atomic steps).** Uses the CPU-side `BinaryFuse8AddressPresence` (✅ done) uploaded to GPU VRAM so the kernel checks the filter inline and transmits only hits over PCIe. Controlled by two new config flags: `enableGpuFilter` (default `false`) and `transferAll` (default `false`; forced `true` automatically when `ConsumerJava.enableVanity = true`, since vanity scanning requires all results on the CPU). Each of the 9 steps below is independently committable and must compile + pass existing tests before the next step begins.
+- **GPU-side Binary Fuse 8 filter — Part 2 implementation plan (atomic steps).** ✅ **DONE.** Shipped
+  as designed: `enableGpuFilter` and `transferAll` exist on `CProducerOpenCL` with the documented
+  defaults, `generateKeysKernel_grid` runs the inline filter with the compact/full-transfer count-word
+  protocol below, and the whole path is covered end-to-end by `OpenCLCompactOutputIntegrationTest` and
+  `OpenCLFilterHitSetIntegrationTest` (real device, both NVIDIA and RDNA3). The 16-bit width and the
+  `gpuFilterType` selector were added on top later (see the "Selectable GPU pre-filter" entry above).
+  The design record below is kept because it documents the count-word wire protocol the reader still
+  relies on.
+
+  Original plan (uses the CPU-side `BinaryFuse8AddressPresence`, uploaded to GPU VRAM so the kernel checks the filter inline and transmits only hits over PCIe. Controlled by two new config flags: `enableGpuFilter` (default `false`) and `transferAll` (default `false`; forced `true` automatically when `ConsumerJava.enableVanity = true`, since vanity scanning requires all results on the CPU). Each of the 9 steps below is independently committable and must compile + pass existing tests before the next step begins).
 
   **Unified output buffer format (ONE physical layout, two write modes).** There is a *single* physical output layout, used unchanged by every kernel launch — there is **not** a separate full-transfer stride. This is deliberate: two different strides (104 vs 108) would make the destination-buffer sizing bound (`MAXIMUM_CHUNK_ELEMENTS` / `BIT_COUNT_FOR_MAX_CHUNKS_ARRAY`) depend on which format is active. With one stride the bound is computed off a single true entry size and the buffer is always `OUTPUT_HEADER_SIZE_BYTES + N × OUTPUT_ENTRY_SIZE_BYTES`, which is also exactly compact mode's worst case (every candidate is a filter hit), so one allocation safely covers both modes.
 

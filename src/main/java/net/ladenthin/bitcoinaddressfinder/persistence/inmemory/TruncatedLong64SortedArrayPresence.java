@@ -9,7 +9,10 @@ import java.util.stream.Stream;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
+import net.ladenthin.bitcoinaddressfinder.persistence.FilterBuildProgress;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Self-contained presence-only snapshot backed by 256 sorted {@code long[]} arrays,
@@ -48,6 +51,11 @@ import org.jspecify.annotations.NonNull;
 @ToString
 public final class TruncatedLong64SortedArrayPresence implements AddressPresence {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(TruncatedLong64SortedArrayPresence.class);
+
+    /** Human-readable prefix for construction progress log lines. */
+    private static final String PROGRESS_NAME = "Truncated long64 snapshot";
+
     /** Fixed length of a hash160 entry in bytes. */
     static final int BYTES_PER_ADDRESS = 20;
 
@@ -76,11 +84,17 @@ public final class TruncatedLong64SortedArrayPresence implements AddressPresence
      * @return a fully populated, self-contained presence lookup
      */
     public static TruncatedLong64SortedArrayPresence populateFrom(@NonNull AddressIterable source) {
+        long expected = source.count();
+        LOGGER.info("{}: building over {} addresses (two passes + per-bucket sort) ...", PROGRESS_NAME, expected);
         long[] counts = new long[BUCKET_COUNT];
 
         // First pass: count entries per bucket
+        FilterBuildProgress counting =
+                new FilterBuildProgress(LOGGER::info, PROGRESS_NAME + ": counting (pass 1/2)", expected);
+        long[] counted = {0L};
         try (Stream<ByteBuffer> stream = source.addresses()) {
             stream.forEach(bb -> {
+                counting.report(++counted[0]);
                 if (bb.remaining() != BYTES_PER_ADDRESS) {
                     return;
                 }
@@ -99,8 +113,12 @@ public final class TruncatedLong64SortedArrayPresence implements AddressPresence
         }
 
         // Second pass: fill (preserve buffer position by reading absolute indices)
+        FilterBuildProgress filling =
+                new FilterBuildProgress(LOGGER::info, PROGRESS_NAME + ": filling (pass 2/2)", expected);
+        long[] filled = {0L};
         try (Stream<ByteBuffer> stream = source.addresses()) {
             stream.forEach(bb -> {
+                filling.report(++filled[0]);
                 if (bb.remaining() != BYTES_PER_ADDRESS) {
                     return;
                 }
@@ -113,10 +131,12 @@ public final class TruncatedLong64SortedArrayPresence implements AddressPresence
             });
         }
 
+        LOGGER.info("{}: sorting {} buckets ...", PROGRESS_NAME, BUCKET_COUNT);
         for (long[] data : buckets) {
             Arrays.sort(data);
         }
 
+        LOGGER.info("{}: ready ({} addresses in {} buckets).", PROGRESS_NAME, filled[0], BUCKET_COUNT);
         return new TruncatedLong64SortedArrayPresence(buckets);
     }
 
@@ -133,6 +153,21 @@ public final class TruncatedLong64SortedArrayPresence implements AddressPresence
             return false;
         }
         return Arrays.binarySearch(data, key) >= 0;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The 256 sorted {@code long[]} buckets. Per-array object headers are ignored: at 256 arrays
+     * they are a rounding error against the payload.
+     */
+    @Override
+    public long sizeInBytes() {
+        long total = 0L;
+        for (long[] bucket : buckets) {
+            total += (long) bucket.length * Long.BYTES;
+        }
+        return total;
     }
 
     @Override

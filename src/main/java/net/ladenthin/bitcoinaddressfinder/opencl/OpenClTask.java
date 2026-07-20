@@ -360,6 +360,11 @@ public class OpenClTask implements ReleaseCLObject {
      * @param fuse8FpMem    the GPU fingerprint slot buffer (a dummy empty filter when none is uploaded)
      * @param fuse8MetaMem  the GPU 5-int metadata buffer {@code [seedLo, seedHi, segLen, segLenMask, segCountLen]}
      * @param transferAll   {@code 0} for compact (filter) mode, non-zero to force full transfer
+     * @param filterType    the {@code GpuFilterType} wire value telling the kernel how wide the
+     *     fingerprint slots in {@code fuse8FpMem} are ({@code 0} = Binary Fuse 8, {@code 1} =
+     *     Binary Fuse 16). The buffer is uploaded as raw bytes either way and reinterpreted on the
+     *     device, so this value must match the width that was actually uploaded — a mismatch does
+     *     not fail, it silently produces false negatives.
      * @param iGTableMem    the GPU {@code i·G} table buffer for the affine scalar walk (a one-byte
      *     placeholder when {@code keysPerWorkItem == 1})
      * @param combTableMem  the GPU fixed-base comb table buffer used to compute the {@code P0} anchor
@@ -371,6 +376,7 @@ public class OpenClTask implements ReleaseCLObject {
             cl_mem fuse8FpMem,
             cl_mem fuse8MetaMem,
             int transferAll,
+            int filterType,
             cl_mem iGTableMem,
             cl_mem combTableMem) {
         // Host-side readback buffer for this launch. Checked out from the pool (reused, see field
@@ -410,8 +416,11 @@ public class OpenClTask implements ReleaseCLObject {
         clSetKernelArg(kernel, 3, Sizeof.cl_mem, Pointer.to(fuse8FpMem));
         clSetKernelArg(kernel, 4, Sizeof.cl_mem, Pointer.to(fuse8MetaMem));
         clSetKernelArg(kernel, 5, Sizeof.cl_uint, Pointer.to(new int[] {transferAll}));
-        clSetKernelArg(kernel, 6, Sizeof.cl_mem, Pointer.to(iGTableMem));
-        clSetKernelArg(kernel, 7, Sizeof.cl_mem, Pointer.to(combTableMem));
+        // filter_type sits directly behind transfer_all in the kernel signature; the table buffers
+        // that follow it therefore occupy indices 7 and 8, not 6 and 7.
+        clSetKernelArg(kernel, 6, Sizeof.cl_uint, Pointer.to(new int[] {filterType}));
+        clSetKernelArg(kernel, 7, Sizeof.cl_mem, Pointer.to(iGTableMem));
+        clSetKernelArg(kernel, 8, Sizeof.cl_mem, Pointer.to(combTableMem));
 
         {
             // write src buffer

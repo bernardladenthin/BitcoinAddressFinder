@@ -1,0 +1,201 @@
+machine_id,date,backend,entries,ns_per_op,error_ns,jmh_iterations,source,notes
+ryzen75800h-63g-win11,2026-07-18,BLOOM,100000,85.427,1.124,5,prng,after 8-byte longFunnel change
+ryzen75800h-63g-win11,2026-07-18,BLOOM,1000000,98.921,4.896,5,prng,after 8-byte longFunnel change
+ryzen75800h-63g-win11,2026-07-18,BLOOM,10000000,114.118,5.979,5,prng,after 8-byte longFunnel change
+ryzen75800h-63g-win11,2026-07-18,BLOOM,50000000,203.163,58.346,4,prng,
+ryzen75800h-63g-win11,2026-07-18,BLOOM,100000000,203.775,30.732,4,prng,
+ryzen75800h-63g-win11,2026-07-18,HASHSET,100000,52.053,1.007,5,prng,
+ryzen75800h-63g-win11,2026-07-18,HASHSET,1000000,92.944,31.434,5,prng,
+ryzen75800h-63g-win11,2026-07-18,HASHSET,10000000,145.059,11.917,5,prng,omitted above 10M (~80 B/entry)
+ryzen75800h-63g-win11,2026-07-18,TRUNCATED_LONG_64,100000,80.096,1.563,5,prng,
+ryzen75800h-63g-win11,2026-07-18,TRUNCATED_LONG_64,1000000,145.378,1.494,5,prng,
+ryzen75800h-63g-win11,2026-07-18,TRUNCATED_LONG_64,10000000,348.589,21.232,5,prng,
+ryzen75800h-63g-win11,2026-07-18,TRUNCATED_LONG_64,50000000,533.340,48.222,4,prng,
+ryzen75800h-63g-win11,2026-07-18,TRUNCATED_LONG_64,100000000,612.213,19.330,4,prng,
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_8,100000,13.087,0.080,5,prng,
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_8,1000000,18.478,0.236,5,prng,
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_8,10000000,22.400,0.449,5,prng,filter ~11.4 MB still fits 16 MB L3
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_8,50000000,52.057,1.788,4,prng,filter ~57 MB exceeds L3
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_8,100000000,59.554,3.876,4,prng,
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_16,100000,15.051,0.161,5,prng,
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_16,1000000,19.180,0.154,5,prng,
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_16,10000000,34.362,4.004,5,prng,
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_16,50000000,60.858,5.551,4,prng,
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_16,100000000,63.515,4.474,4,prng,
+ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,100000,23.894,0.337,5,prng,
+ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,1000000,31.205,0.386,5,prng,
+ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,10000000,38.015,1.075,5,prng,already exceeds L3 at ~26 MB
+ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,50000000,40.498,9.297,4,prng,
+ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,100000000,45.505,1.284,4,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOOM,100000,50.076,0.817,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOOM,1000000,56.491,2.312,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOOM,10000000,62.919,2.971,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOOM,50000000,64.142,1.743,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOOM,100000000,73.014,3.005,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,HASHSET,100000,30.112,1.309,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,HASHSET,1000000,41.156,1.417,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,HASHSET,10000000,53.108,2.361,5,prng,omitted above 10M (~80 B/entry)
+ryzen79800x3d8core-61g-win11,2026-07-18,TRUNCATED_LONG_64,100000,46.246,1.023,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,TRUNCATED_LONG_64,1000000,87.009,2.090,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,TRUNCATED_LONG_64,10000000,153.869,7.778,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,TRUNCATED_LONG_64,50000000,289.220,20.430,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,TRUNCATED_LONG_64,100000000,394.118,12.467,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_8,100000,11.719,0.091,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_8,1000000,15.223,0.205,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_8,10000000,22.493,1.218,5,prng,filter ~11.4 MB well inside 96 MB L3
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_8,50000000,25.901,0.552,5,prng,filter ~57 MB still fits 96 MB L3 - still ahead of BLOCKED_BLOOM
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_8,100000000,30.950,1.289,5,prng,filter ~114 MB just exceeds L3; still ahead - crossover lies beyond 100M
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_8,132288304,32.837,2.149,5,prng,exact Light DB entry count - measured not extrapolated; still ahead of BLOCKED_BLOOM but only by ~12%
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,100000,11.841,0.338,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,1000000,20.196,0.923,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,10000000,30.193,1.515,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,50000000,30.978,0.922,8,prng,re-measured at -i 8; supersedes a 37.026 +/- 1.108 reading that made 100M look faster than 50M
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,100000000,35.402,0.949,8,prng,re-measured at -i 8; the 50M point was the faulty one - this one barely moved
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,100000,14.865,0.274,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,1000000,22.481,0.650,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,10000000,27.946,1.244,5,prng,filter ~26 MB still inside 96 MB L3
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,50000000,31.030,1.117,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,100000000,34.395,2.609,5,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,132288304,37.137,2.136,5,prng,exact Light DB entry count - still behind BINARY_FUSE_8; error bars nearly touch
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOOM,500000000,85.157,4.963,4,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOOM,1000000000,87.227,4.068,4,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_8,500000000,39.573,2.841,4,prng,JIT-warmed instrument - still ahead of BLOCKED_BLOOM at this scale
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_8,1000000000,39.887,2.855,4,prng,no crossover even at 1B on 96 MB L3; curve is flat 500M->1B (DRAM-bound)
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,500000000,43.090,5.568,4,prng,widest error bar of the run
+ryzen79800x3d8core-61g-win11,2026-07-18,BINARY_FUSE_16,1000000000,40.819,1.353,4,prng,
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,500000000,42.149,1.525,4,prng,nominally behind BINARY_FUSE_8 but the intervals overlap
+ryzen79800x3d8core-61g-win11,2026-07-18,BLOCKED_BLOOM,1000000000,42.705,1.741,4,prng,contradicts the single-shot FilterMeasurementMain reading of BLOCKED_BLOOM +17% on this host
+ryzen75800h-63g-win11,2026-07-18,BLOOM,500000000,243.325,21.847,4,prng,
+ryzen75800h-63g-win11,2026-07-18,BLOOM,1000000000,293.073,18.637,4,prng,
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_8,500000000,89.376,3.739,4,prng,~2.3x slower than the 96 MB-L3 host at the same size - cache alone
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_8,1000000000,91.701,14.226,4,prng,flat 500M->1B; fully DRAM-bound
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_16,500000000,81.986,9.327,4,prng,
+ryzen75800h-63g-win11,2026-07-18,BINARY_FUSE_16,1000000000,88.826,7.239,4,prng,
+ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,500000000,57.241,10.056,4,prng,36% ahead of BINARY_FUSE_8 on 16 MB L3 - opposite of the 96 MB-L3 host
+ryzen75800h-63g-win11,2026-07-18,BLOCKED_BLOOM,1000000000,79.844,9.517,4,prng,still ahead at 1B (13%) but the margin narrows and error bars widen
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,100000,19.639,0.446,4,prng,fastrange sizing - supersedes the 2^n rows above; denser filter short-circuits later so CPU lookups got SLOWER (was 14.865)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,1000000,24.174,0.929,4,prng,fastrange sizing (was 22.481)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,10000000,29.315,0.320,4,prng,fastrange sizing 13 MiB instead of 16 MiB (was 27.946)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,100000000,36.174,2.772,4,prng,fastrange sizing 131 MiB instead of 256 MiB (was 34.395)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,500000000,44.177,2.580,4,prng,fastrange sizing (was 42.149)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,45.032,3.259,4,prng,fastrange sizing (was 42.705); BINARY_FUSE_8 now leads at every measured size on this host
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,50000000,31.329,2.618,4,prng,fastrange sizing (was 31.030) - added so the whole row is one geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,132288304,38.512,1.916,4,prng,fastrange sizing at the exact Light DB size (was 37.137); BINARY_FUSE_8 32.8 now leads more clearly
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,100000,17.895,0.652,4,prng,fastrange + k=6; recovers most of the k=8 regression (19.639) but still short of the old sparse 2^n geometry (14.865)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,1000000,22.315,0.296,4,prng,fastrange + k=6; fully recovered vs 2^n (22.481)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,10000000,27.668,1.533,4,prng,fastrange + k=6; fully recovered vs 2^n (27.946)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,50000000,29.061,0.664,4,prng,fastrange + k=6; now FASTER than the 2^n geometry (31.030) at half the size
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,100000000,34.542,1.301,4,prng,fastrange + k=6; fully recovered vs 2^n (34.395)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,132288304,36.317,2.020,4,prng,fastrange + k=6; now faster than the 2^n geometry (37.137)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,500000000,42.373,4.118,4,prng,fastrange + k=6; fully recovered vs 2^n (42.149)
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,44.317,2.068,4,prng,fastrange + k=6; partially recovered vs 2^n (42.705) - still ~4% short
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000,29.740,0.490,5,prng,fastrange bpe=8 k=4; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,10000000,34.922,1.174,5,prng,fastrange bpe=8 k=4; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,100000000,48.042,2.549,5,prng,fastrange bpe=8 k=4; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,500000000,57.729,2.871,5,prng,fastrange bpe=8 k=4; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,52.266,4.671,5,prng,fastrange bpe=8 k=4; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000,32.058,0.387,5,prng,fastrange bpe=11 k=6; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,10000000,36.881,0.710,5,prng,fastrange bpe=11 k=6; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,100000000,46.704,1.683,5,prng,fastrange bpe=11 k=6; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,500000000,67.483,36.457,5,prng,fastrange bpe=11 k=6; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,58.780,1.884,5,prng,fastrange bpe=11 k=6; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000,33.318,0.221,5,prng,fastrange bpe=14 k=8; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,10000000,38.647,6.467,5,prng,fastrange bpe=14 k=8; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,100000000,53.628,0.720,5,prng,fastrange bpe=14 k=8; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,500000000,64.504,2.633,5,prng,fastrange bpe=14 k=8; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,63.347,3.786,5,prng,fastrange bpe=14 k=8; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000,32.207,0.613,5,prng,fastrange bpe=17 k=9; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,10000000,36.821,1.022,5,prng,fastrange bpe=17 k=9; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,100000000,55.313,5.096,5,prng,fastrange bpe=17 k=9; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,500000000,64.842,4.125,5,prng,fastrange bpe=17 k=9; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,71.933,7.295,5,prng,fastrange bpe=17 k=9; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000,34.085,0.431,5,prng,fastrange bpe=21 k=12; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,10000000,38.324,1.246,5,prng,fastrange bpe=21 k=12; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,100000000,66.815,6.281,5,prng,fastrange bpe=21 k=12; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,500000000,67.735,2.771,5,prng,fastrange bpe=21 k=12; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,64.781,2.950,5,prng,fastrange bpe=21 k=12; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000,33.158,0.486,5,prng,fastrange bpe=26 k=14; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,10000000,39.825,2.366,5,prng,fastrange bpe=26 k=14; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,100000000,50.169,5.534,5,prng,fastrange bpe=26 k=14; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,500000000,61.430,3.161,5,prng,fastrange bpe=26 k=14; block C single session
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM,1000000000,72.662,14.727,5,prng,fastrange bpe=26 k=14; block C single session
+ryzen75800h-63g-win11,2026-07-19,BINARY_FUSE_8,10000000,31.181,5.99,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BINARY_FUSE_8,100000000,61.482,1.373,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BINARY_FUSE_8,1000000000,80.401,2.333,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BINARY_FUSE_16,10000000,36.475,2.841,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BINARY_FUSE_16,100000000,64.493,2.508,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BINARY_FUSE_16,1000000000,80.839,2.273,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,TRUNCATED_LONG_64,10000000,337.294,13.369,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,TRUNCATED_LONG_64,100000000,635.503,30.626,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,TRUNCATED_LONG_64,1000000000,1061.653,15.719,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM:11:6,10000000,35.753,0.797,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM:11:6,100000000,46.805,2.206,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM:11:6,1000000000,59.034,2.815,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM:17:7,10000000,33.305,0.568,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM:17:7,100000000,49.527,1.994,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM:17:7,1000000000,85.18,40.366,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM:26:9,10000000,37.076,3.102,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM:26:9,100000000,48.321,3.412,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM:26:9,1000000000,84.371,4.581,5,prng,single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BINARY_FUSE_8,100000000,59.3,1.396,5,prng,equal-memory budget pair; single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BINARY_FUSE_8,1000000000,76.737,0.839,5,prng,equal-memory budget pair; single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM:9:5,100000000,45.257,3.811,5,prng,equal-memory budget pair; single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM:9:5,1000000000,63.391,2.532,5,prng,equal-memory budget pair; single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BINARY_FUSE_16,100000000,65.759,0.701,5,prng,equal-memory budget pair; single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BINARY_FUSE_16,1000000000,80.436,1.513,5,prng,equal-memory budget pair; single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM:18:7,100000000,40.698,1.939,5,prng,equal-memory budget pair; single-session run; densities encoded as NAME:bpe:k
+ryzen75800h-63g-win11,2026-07-19,BLOCKED_BLOOM:18:7,1000000000,54.41,6.663,5,prng,equal-memory budget pair; single-session run; densities encoded as NAME:bpe:k
+ryzen79800x3d8core-61g-win11,2026-07-19,BINARY_FUSE_8,10000000,21.722,1.184,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BINARY_FUSE_8,100000000,30.956,1.509,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BINARY_FUSE_8,1000000000,38.868,1.327,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BINARY_FUSE_16,10000000,22.093,1.927,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BINARY_FUSE_16,100000000,34.953,0.980,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BINARY_FUSE_16,1000000000,39.161,1.950,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,TRUNCATED_LONG_64,10000000,147.466,3.950,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,TRUNCATED_LONG_64,100000000,390.640,17.648,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,TRUNCATED_LONG_64,1000000000,786.555,23.120,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:11:6,10000000,27.292,0.797,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:11:6,100000000,33.584,1.248,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:11:6,1000000000,43.598,2.034,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:17:7,10000000,25.306,0.652,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:17:7,100000000,34.267,2.192,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:17:7,1000000000,41.782,1.518,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:26:9,10000000,24.766,0.775,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:26:9,100000000,35.292,1.191,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:26:9,1000000000,41.161,1.698,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:9:5,10000000,27.008,1.248,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:9:5,100000000,32.974,0.826,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:9:5,1000000000,43.047,1.535,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:18:7,10000000,25.066,0.855,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:18:7,100000000,34.352,1.493,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-19,BLOCKED_BLOOM:18:7,1000000000,41.258,1.490,5,prng,bench_filters.sh block 2 - single session all backends; fastrange geometry
+ryzen79800x3d8core-61g-win11,2026-07-20,BINARY_FUSE_8,10000000,22.050,1.433,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BINARY_FUSE_8,100000000,31.020,2.225,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BINARY_FUSE_8,1000000000,39.437,1.428,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BINARY_FUSE_16,10000000,22.177,1.677,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BINARY_FUSE_16,100000000,34.958,1.056,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BINARY_FUSE_16,1000000000,39.978,1.739,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,TRUNCATED_LONG_64,10000000,146.431,3.891,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,TRUNCATED_LONG_64,100000000,398.538,23.507,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,TRUNCATED_LONG_64,1000000000,779.269,19.189,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:11:6,10000000,27.188,1.250,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:11:6,100000000,33.708,1.954,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:11:6,1000000000,43.147,1.045,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:17:7,10000000,25.246,1.397,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:17:7,100000000,34.362,2.409,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:17:7,1000000000,41.682,1.617,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:26:9,10000000,24.636,1.008,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:26:9,100000000,36.298,1.209,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:26:9,1000000000,41.606,1.204,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:9:5,10000000,26.961,0.942,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:9:5,100000000,32.641,0.184,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:9:5,1000000000,42.808,2.633,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:18:7,10000000,25.036,1.483,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:18:7,100000000,34.273,0.663,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:18:7,1000000000,41.461,2.110,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen75800h-63g-win11,2026-07-20,BINARY_FUSE_8,1000000000,77.718,1.788,5,prng,48g re-run at 1B (fixes the earlier 8g OOM); single JMH session
+ryzen75800h-63g-win11,2026-07-20,BINARY_FUSE_16,1000000000,82.767,6.955,5,prng,48g re-run at 1B (fixes the earlier 8g OOM); single JMH session
+ryzen75800h-63g-win11,2026-07-20,TRUNCATED_LONG_64,1000000000,1043.618,40.265,5,prng,48g re-run at 1B (fixes the earlier 8g OOM); single JMH session
+ryzen75800h-63g-win11,2026-07-20,BLOCKED_BLOOM:11:6,1000000000,60.27,2.539,5,prng,48g re-run at 1B (fixes the earlier 8g OOM); single JMH session
+ryzen75800h-63g-win11,2026-07-20,BLOCKED_BLOOM:17:7,1000000000,63.104,13.481,5,prng,48g re-run at 1B (fixes the earlier 8g OOM); single JMH session
+ryzen75800h-63g-win11,2026-07-20,BLOCKED_BLOOM:26:9,1000000000,54.834,6.234,5,prng,48g re-run at 1B (fixes the earlier 8g OOM); single JMH session

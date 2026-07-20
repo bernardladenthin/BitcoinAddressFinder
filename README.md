@@ -161,7 +161,7 @@ Copyright (c) 2017-2025 Bernard Ladenthin
     * lmdb
       * data.mdb
       * lock.mdb
-    * bitcoinaddressfinder-1.6.1-jar-with-dependencies.jar
+    * bitcoinaddressfinder-1.7.0-jar-with-dependencies.jar
     * logbackConfiguration.xml
     * config_Find_1OpenCLDevice.js
     * run_Find_1OpenCLDevice.bat  *(Windows)* / run_Find_1OpenCLDevice.sh *(Linux/macOS)*
@@ -170,6 +170,53 @@ Copyright (c) 2017-2025 Bernard Ladenthin
   - **Linux / macOS:** `chmod +x run_Find_1OpenCLDevice.sh && ./run_Find_1OpenCLDevice.sh`
 
 Every `examples/run_*.bat` has a matching `examples/run_*.sh` (same JVM flags); use the `.sh` on Linux/macOS and the `.bat` on Windows.
+
+### What a healthy run looks like
+
+On startup the tool builds the GPU pre-filter from your database and *then* begins scanning. The log walks through four one-time build phases — **reading → indexing → peeling → assigning** — prints a **`ready`** line, and from then on emits a periodic **`Statistics`** line. That ticking `Statistics` line is how you know it is running correctly. Abridged real output (one line per phase):
+
+```text
+… BinaryFuse8AddressPresence - Binary Fuse8 filter: reading 132288304 addresses from the source …
+… BinaryFuse8AddressPresence - Binary Fuse8 filter: reading addresses: 99% (132288300/132288304), 15.4M/s, ETA 0s, elapsed 8s.
+… BinaryFuse8AddressPresence - Binary Fuse8 filter: indexing:  99% (132207500/132207501), 22.2M/s, ETA 0s, elapsed 5s.
+… BinaryFuse8AddressPresence - Binary Fuse8 filter: peeling:   99% (132207500/132207501), 12.6M/s, ETA 0s, elapsed 10s.
+… BinaryFuse8AddressPresence - Binary Fuse8 filter: assigning: 99% (132207500/132207501), 21.1M/s, ETA 0s, elapsed 6s.
+… BinaryFuse8AddressPresence - Binary Fuse8 filter: ready (132207501 addresses, 148766720 fingerprint slots).
+… ConsumerJava - start consumeKeysRunner
+… AbstractProducer - Init producer.
+… ConsumerJava - Statistics: [uptime 0 min] [Generated 129 M/s (859 M total)] [-> LMDB 2 M/s (13 M lookups total), 99.22% pre-filtered] … [Hits: 0]
+```
+
+What to look for:
+
+* **The four build phases run once, at startup** (a few seconds each per 100 M addresses). This is the filter being built from your database — it is normal for the tool to sit here briefly before the first `Statistics` line, with no keys scanned yet.
+* **`ready (… addresses, … fingerprint slots)`** means the filter is built and scanning is about to start.
+* **`Statistics: … [Generated N/s …] [-> LMDB M/s …, NN.NN% pre-filtered] … [Hits: 0]`** is the running heartbeat. `Generated` is the raw key rate; `-> LMDB` is how many candidates survive the GPU pre-filter and reach the database; `pre-filtered` is the share the filter eliminated (so the CPU/LMDB never sees them). `Hits: 0` is expected — a hit means a funded address was actually found.
+* The filter is named after your `gpuFilterType`: the excerpt above is a `FUSE_8` run, whereas the recommended default `FUSE_16` logs `Binary Fuse16 filter: …` and drives the `pre-filtered` share even higher (fewer survivors reach LMDB). See [docs/filter-selection.md](docs/filter-selection.md) for the trade-off.
+
+### Tune the configuration for your own machine
+
+Every grid and filter recommendation in this README and in [`docs/filter-selection.md`](docs/filter-selection.md) was measured on one developer's hardware. The `TuneConfiguration` command measures *yours*:
+
+```bash
+# Use the launcher — it carries the --add-opens the JVM needs for LMDB access:
+examples/run_TuneConfiguration.sh          # Linux/macOS
+examples\run_TuneConfiguration.bat         # Windows
+```
+
+> The bare `java -jar … config_TuneConfiguration.json` works **only** when no real database is
+> configured. The moment `lmdbConfigurationReadOnly.lmdbDirectory` points at an actual LMDB, the
+> lookup path reflects into `java.nio`/`sun.nio.ch` and the JVM throws
+> `InaccessibleObjectException` without the `--add-opens` flags the launcher sets. Use the launcher,
+> or copy its flag list, whenever you point the tuner at a database.
+
+It sweeps `batchSizeInBits` × `keysPerWorkItem`, measures the **net end-to-end throughput** of each combination (candidate keys per second through the whole pipeline, not kernel time), and prints a table of every arm plus the winning configuration as a ready-to-paste JSON file. It also measures what one database lookup costs on your storage in its current state — the term that ranges from 4.1 µs warm to 292.7 µs cold, and the one the `FUSE_8` / `FUSE_16` choice hinges on. Every number in the report is labelled **MEASURED** (here, on this machine) or **DOCUMENTED / ESTIMATED** (a published constant), so it is always clear which is which.
+
+Honest expectations:
+
+* **It takes minutes.** The run time is `arms × (warmupSecondsPerArm + secondsPerArm)`; the defaults give 25 arms × 25 s ≈ 10 minutes, plus a one-time filter build (~44 s per 100 M entries).
+* **It does not read or rebuild your database.** The grid sweep builds its pre-filter from a deterministic PRNG source sized to `targetDatabaseEntries` — set that to the size of the database you *intend* to run against. Only the optional verification-cost stage touches LMDB, and only if `lmdbConfigurationReadOnly.lmdbDirectory` points at a real database. With no database configured the command still runs end to end and falls back to the documented lookup cost.
+* **`sweepFilterTypes` is off by default, and should stay off unless you need it.** Enabling it forces a second full filter build (~150 s at the 132 M Light DB tier, ~26 minutes at the 1.377 B Full DB tier) to measure the `FUSE_8` / `FUSE_16` choice instead of deriving it from `total = probe + fpr × verification`.
 
 ## ✨ Features
 * 📐 Supports blockchain addresses based on [secp256k1](https://en.bitcoin.it/wiki/Secp256k1)
@@ -222,7 +269,7 @@ The OpenCL kernel then evaluates `secretBase + i` for `i &#x2208; [0, 2^batchSiz
 | `18`              | 262,144                 | typical OpenCL device &#x2014; used by `config_Find_1OpenCLDevice.json` |
 | `20`&#x2013;`21`  | 1M&#x2013;2M            | high-end OpenCL device |
 
-**Upper bound**: [`PublicKeyBytes.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY`](src/main/java/net/ladenthin/bitcoinaddressfinder/PublicKeyBytes.java) &#x2014; derived from `Integer.MAX_VALUE / CHUNK_SIZE_NUM_BYTES` so per-batch result arrays cannot exceed Java's 32-bit array-length limit. **Default**: `0` (sequential, no batching).
+**Upper bound**: [`OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY`](src/main/java/net/ladenthin/bitcoinaddressfinder/constants/OpenClKernelConstants.java) (`= 24`) &#x2014; derived from `Integer.MAX_VALUE / CHUNK_SIZE_NUM_BYTES` so per-batch result arrays cannot exceed Java's 32-bit array-length limit. **Default**: `0` (sequential, no batching).
 
 #### Relation to `keysPerWorkItem`
 
@@ -274,6 +321,62 @@ As of version 1.6.0, the address presence check is decoupled from the on-disk LM
 
 **The default is `LMDB_ONLY`: no in-RAM filter, LMDB stays open and answers every lookup exactly.** This is the safest baseline — an exact backend can never report a false positive as a hit — and the in-RAM filters below are opt-in optimisations you add only when you want them. (Note the GPU pre-filter, `producerOpenCL.enableGpuFilter`, is independent of this setting and works with the `LMDB_ONLY` default; see below.)
 
+#### Which filter to pick
+
+**Most users should just run the shipped example
+[`examples/config_Find_GPU_Fuse16Cascade.json`](examples/config_Find_GPU_Fuse16Cascade.json)** — it
+is already set to the recommended combination. There are two independent knobs, and the defaults are:
+
+| Knob | Recommended | Why |
+|---|---|---|
+| **GPU pre-filter** (`gpuFilterType`, needs `enableGpuFilter`) | **`FUSE_16`** | raises end-to-end throughput **1.2×–7.2×**; fits VRAM even at the Full DB tier |
+| **Consumer backend** (`addressLookupBackend`) | **`BINARY_FUSE_8`** | small, cheap independent second stage — or `LMDB_ONLY` for exact, false-positive-free checks |
+
+They form a **cascade**: the GPU pre-filter decides what crosses PCIe, the consumer backend re-checks
+the survivors. Because the two filters hash independently, the second stage rejects what the first
+let through — so they must be *different* filters. Full analysis, with all measurements, in
+[`docs/filter-selection.md`](docs/filter-selection.md) and
+[`docs/performance.md`](docs/performance.md).
+
+**Why `FUSE_16` on the GPU, even though it is not the fastest to probe.** Blocked Bloom probes
+1.6–2.3× faster on the device, but the device is not the bottleneck — the single consumer thread,
+verifying survivors against LMDB, is. A faster probe that passes *more* candidates (a higher
+false-positive rate) just floods that thread. `FUSE_16`'s 0.0016 % FPR hands it **256× less work**
+than `FUSE_8` and removes it as the bottleneck. Measured end-to-end against a real database, only the
+GPU filter varied:
+
+| Consumer threads | `FUSE_8` net throughput | `FUSE_16` net throughput | Speed-up |
+|--:|--:|--:|--:|
+| 8 | 188.6 M/s | 227.8 M/s | 1.21× |
+| 1 | 31.7 M/s | 228.3 M/s | **7.24×** |
+
+The gain grows as the consumer gets tighter — fewer threads, colder storage, or several GPUs feeding
+one consumer — and is never negative. It costs 2× the VRAM (2.25 vs 1.13 B/entry), which fits an 8 GB
+card at every tier.
+
+**Deviate when:**
+
+- **CPU-only runs (no GPU): `BINARY_FUSE_16`** as the consumer backend. Against a cold database its
+  0.0016 % FPR makes verification cost vanish — the largest single effect in the whole comparison.
+- **Rebuild often, or short on build RAM: `BLOCKED_BLOOM`** (low density, `bpe` 9–11). It builds
+  **3–4× faster** in a single streaming pass, where Binary Fuse peels through ~29 B/entry of
+  auxiliary arrays (~40 GB transient at the Full DB tier). At `bpe` ≥ 17 `BINARY_FUSE_16` dominates
+  it on both memory and accuracy. It is not offered as a GPU pre-filter on purpose — its faster probe
+  passes more candidates to the consumer, which loses net throughput.
+- **`LMDB_ONLY`** — whenever a false positive is unacceptable rather than merely costly.
+
+> **On GPU, `CL_DEVICE_MAX_MEM_ALLOC_SIZE` is a reported floor, not a hard cap.** The filter is a
+> single OpenCL allocation. NVIDIA reports a conservative quarter of VRAM (2047 MB on an 8 GB RTX
+> 3070) but the driver actually honours far larger single buffers — a 3.1 GB blocked-bloom filter
+> allocated and ran fine on the 3070 — so `BINARY_FUSE_16` (3.14 GB) fits the Full DB tier there
+> after all. The robust test is whether the allocation succeeds (the upload path fails loudly if it
+> does not), not the reported number. Run `{"command":"OpenCLInfo"}` to read it.
+
+All numbers above come from the storage-free bench in
+[`docs/measurements/bench_filters.sh`](docs/measurements/bench_filters.sh), which measures the
+filters without LMDB behind them so the results reproduce across machines. Run it yourself; the
+false-positive rates are deterministic and must match to the digit.
+
 Supported values:
 
 | Value               | RAM cost                | Lookup latency       | LMDB stays open? | Best for                                                                                |
@@ -281,9 +384,10 @@ Supported values:
 | `LMDB_ONLY`         | minimal (mmap only)     | slowest              | yes              | **default** — exact, no filter, can never produce a false hit; also the simplest base for GPU pre-filtering |
 | `BLOOM`             | ~80 MB – ~1.5 GB (FPP)  | fast for misses      | yes              | when you want to skip LMDB for the common miss case but keep it open to verify hits      |
 | `HASHSET`           | ~80 B / entry           | fast                 | **no**           | small databases where memory is plentiful and exact lookup is required by callers       |
-| `TRUNCATED_LONG_64` | **~8 B / entry**        | **near HASHSET**     | **no**           | best in-RAM trade-off when you *do* want to drop LMDB — near-`HASHSET` latency at ~10× less RAM |
+| `TRUNCATED_LONG_64` | **~8 B / entry**        | fast when small, **degrades with size** | **no**           | best in-RAM trade-off when you *do* want to drop LMDB *and* the database is small; latency scales worse than any other backend (see the size sweep) |
 | `BINARY_FUSE_8`     | **~1.13 B / entry**     | **fast**             | yes              | ultra-low RAM filter in front of LMDB; 0.4% of filter hits are verified against LMDB (also feeds the GPU pre-filter) |
 | `BINARY_FUSE_16`    | **~2.25 B / entry**     | **fast**             | yes              | like Fuse-8 but 0.0015% FPR — fewer LMDB verifications; use when Fuse-8's verification cost is measurable |
+| `BLOCKED_BLOOM`     | **1.375 B / entry** (bpe 11, configurable) | **fastest probe** | yes              | rebuild-heavy workloads — constructs 3× faster and streams in one pass instead of peeling through ~29 B/entry of auxiliary arrays; loses on *total* cost because its FPR is ~4× higher at equal size |
 
 #### Memory footprint per backend across the published database tiers
 
@@ -296,10 +400,23 @@ Supported values:
 | `BLOOM` (FPP 0.01)  | ~120 MB                     | ~150 MB                  | ~1.6 GB                   |
 | `BINARY_FUSE_8`     | **~113 MB**                 | **~149 MB**              | **~1.5 GB**               |
 | `BINARY_FUSE_16`    | ~225 MB                     | ~298 MB                  | ~3.1 GB                   |
+| `BLOCKED_BLOOM`     | **~138 MB**                 | **~182 MB**              | **~1.89 GB**              |
 
-> The Binary Fuse rows are ~1.125 B/entry (Fuse-8) and ~2.25 B/entry (Fuse-16). Only the 132 M
-> (Light DB) tier is directly measured (148,766,720 fingerprint slots); the 100 M and 1.377 B rows
-> are extrapolated from that ratio.
+> Every row is now **exact**, reported by each backend's `sizeInBytes()` rather than estimated from
+> heap deltas. The old estimates ran ~25 % high (1.412 vs the true 1.126 B/entry for Fuse-8), which
+> made them unusable for a comparison in which memory is a decision criterion.
+>
+> Per-entry constants: Fuse-8 **1.126 B**, Fuse-16 **2.252 B**, Blocked Bloom **1.375 B** at the
+> default 11 bits/entry. Blocked Bloom's density is configurable via `blockedBloomBitsPerEntry`
+> and `blockedBloomK`; the measured optimum for `k` is **5/6/7/7/8/9** at 8/11/14/17/21/26 bits per
+> entry. It saturates sub-linearly, so there is no proportional rule — an earlier
+> `k ≈ 0.55 × bitsPerEntry` was inferred from the low end of that sweep and overshoots by 2 at the
+> top.
+>
+> **Blocked Bloom no longer rounds to power-of-two block counts.** It sizes exactly via *fastrange*
+> (`unsignedMultiplyHigh(hash, numBlocks)`, `mul_hi` on the GPU). The old rounding wasted up to 2×:
+> a request for 11 bits/entry at 100 M entries delivered 21.47. Per-entry cost is now a constant, not
+> a step function that fell as the database grew.
 
 #### Self-contained snapshots release the LMDB env
 
@@ -338,6 +455,139 @@ Unlike a plain XOR filter's three *disjoint* segments (~1.23× space), the fused
 
 Choose between the two variants based on how expensive the LMDB verification of filter hits is in your workload. For most use cases with a light or full database, `BINARY_FUSE_8` gives the best RAM-to-latency trade-off: a tiny in-RAM filter that skips LMDB for the ~99.6% of queries that miss, while `BINARY_FUSE_16` drops the FPR ~256× (fewer LMDB verifications) at the cost of 2× the fingerprint array size.
 
+#### `BLOCKED_BLOOM` — the filter that *builds* at the billion-entry tier
+
+The Binary Fuse filters are excellent at **rest** (1.13 B/entry is unbeatable) but expensive to **construct**: peeling holds several auxiliary arrays live at once — the 64-bit keys, per-slot counters, an XOR accumulator, a peeling queue, and the reverse order/alone arrays — roughly **29 bytes per entry at peak**, ≈ 42 GB at the 1.377 B-entry Full DB.
+
+> **Correction.** An earlier edition of this document claimed that made `BINARY_FUSE_8` *unbuildable* at the Full DB tier on commodity hardware. **That was wrong**, and it was the stated reason this backend existed. Independently retested on a 61.6 GB host (cache cleared first, `-Xmx48g`), Fuse-8 builds in 1 564 s to 1 504 MiB with a 0.393 % FPR and no false negatives. The original observation — a build that appeared to hang — was the **I/O-bound ingest** stalling under memory pressure, not the peeling step: peeling itself finished in 76 s at ~19 M keys/s. Two different phenomena were conflated.
+
+`BLOCKED_BLOOM` is still the better choice at that tier, but because it builds roughly twice as fast — not because fuse is impossible, and not on lookup speed, which does not reproduce across machines.
+
+`BLOCKED_BLOOM` exists to close exactly that gap. It is a **blocked Bloom filter**: allocate the bit array once, then stream every address through it setting `k` bits. There is no peeling, no auxiliary array, no second pass — **peak build memory is the filter itself** (~2 GB at the Full DB tier), so it builds anywhere the finished filter fits.
+
+**Blocked layout — all `k` bits in one cache line.** The bit array is split into **512-bit blocks** (64 bytes = one CPU cache line = one coalesced GPU memory transaction). A key's block is chosen from the high bits of one hash; all `k` of its bit positions are then confined to *that* block:
+
+```
+key   = hash160[0..7] as big-endian long        // same extraction as the fuse filters
+a     = murmur64(key)
+b     = murmur64(key + GOLDEN)
+block = a >>> (64 - logBlocks)                   // uniform block index
+bit_i = ((int)b + i * (int)(b >>> 32)) & 511     // i = 0..k-1, all inside that block
+hit  ⟺ every bit_i is set
+```
+
+So a lookup touches **exactly one 64-byte region** instead of the three scattered reads a fuse lookup makes. That is what makes the extra bit-probes nearly free once the filter no longer fits in cache — and it is the property that makes this layout the natural candidate for a future GPU-side filter (one coalesced read per candidate).
+
+**No false negatives** — every inserted key always passes, so a filter **miss** is definitive.
+**False-positive rate** — ~0.76 % at the shipped default (`k = 6`, 11 bits/entry; fastrange sizes it to exactly that density at every tier). Like the fuse filters this is far too high to report unverified, so `BlockedBloomAccelerator` is a **decorator**: `requiresBackend()` returns `true`, a miss short-circuits, a hit falls through to LMDB to confirm or reject.
+
+**Measured against a real database** (`FilterMeasurementMain`, Light DB = 132,288,304 entries; build time, retained heap after GC, and 5 M random-non-member probes; zero false negatives on 20 k sampled real members in every row):
+
+| Backend             | build time | retained RAM | B / entry | lookups/s | measured FPR |
+|---------------------|-----------:|-------------:|----------:|----------:|-------------:|
+| `BLOCKED_BLOOM`     | **34.8 s** |    259.5 MiB |     2.057 |   11.54 M |    0.258 %   |
+| `BINARY_FUSE_8`     |     68.8 s | **143.4 MiB**| **1.137** | **12.93 M**|   0.390 %   |
+| `BINARY_FUSE_16`    |     70.6 s |    287.4 MiB |     2.278 |   12.30 M | **0.002 %**  |
+| `TRUNCATED_LONG_64` |     41.9 s |   1082.2 MiB |     8.578 |    1.52 M |  0.000 %     |
+
+> The `BLOCKED_BLOOM` row here was measured before *fastrange*, at the old power-of-two default
+> (~16 bits/entry). At the current default (11 bits/entry, `k = 6`) it is smaller — **1.375 B/entry**
+> — but has a higher FPR of **~0.76 %**; the build-time and lookup columns are representative either
+> way.
+
+Reading the table: `BLOCKED_BLOOM` builds **~2× faster** than either fuse variant (streaming vs. peeling), costs somewhat more RAM at the same density, and looks up in the same ballpark — the differences are modest. Its decisive advantage shows at the **Full DB** tier, in build cost and heap, not in whether fuse can build at all (it can — see below).
+
+##### Full DB (1.377 B entries) — where blocked Bloom's cheaper build matters
+
+Same harness, same machine (64 GB RAM), against the 61 GB / 1,377,478,516-entry database. Blocked Bloom builds it in a **6 GB heap** (it only needs the finished filter); the fuse filters build here too, but their multi-pass peeling needs ~40 GB of transient heap (`-Xmx48g`), so an under-sized heap OOMs mid-peel — that, not any algorithmic limit, is what an earlier version of this document mistook for "fuse cannot build at the Full DB tier". Blocked-Bloom row:
+
+| metric | measured |
+|---|--:|
+| entries | 1,377,478,516 |
+| retained RAM | **2,051.8 MiB** (2.0 GiB) |
+| bytes / entry | **1.562** |
+| lookups/s | **9.53 M** |
+| false-positive rate | **0.485 %** |
+| false negatives | **0** |
+| build time | 1,869 s (31 min, I/O-bound — see below) |
+
+- **Faster to build than Fuse-8 at this tier — the lookup question is unresolved.** Both backends measured on both hosts, each arm preceded by a cache-clearing pass, at `-Xmx48g`:
+
+  | | 16 MB L3 host | | 96 MB L3 host | |
+  |---|--:|--:|--:|--:|
+  | | `BINARY_FUSE_8` | `BLOCKED_BLOOM` | `BINARY_FUSE_8` | `BLOCKED_BLOOM` |
+  | build | 3 186 s | **1 617 s** | 1 564 s | **859 s** |
+  | lookups/s | **9.37 M** | 7.44 M | 6.13 M | **7.17 M** |
+  | retained | **1 504 MiB** | 2 080 MiB | **1 504 MiB** | 2 080 MiB |
+  | FPR | **0.393 %** | 0.485 % | **0.393 %** | 0.485 % |
+
+  **Blocked Bloom builds faster on both machines.** The 1.8–2.0× seen here is an *LMDB-bound* figure; measured storage-free the true algorithmic factor is **3.0×** (14.6 s vs 43.8 s at 100 M), because these runs spend most of their time on a scattered 61 GB cursor walk that is common to both filters and dilutes the difference. Fuse-8 is 27 % smaller with a ~19 % better FPR, both bit-identical across hosts.
+
+  **The lookup row above is an artefact — do not use it.** It comes from a single-shot probe loop run right after a multi-GB build, and re-measuring with the warmed, storage-free JMH instrument inverts the answer on *both* machines. Measured ns/op at 1 B entries:
+
+  | | `BINARY_FUSE_8` | `BLOCKED_BLOOM` |
+  |---|--:|--:|
+  | 16 MB L3 host | 91.7 | **79.8** |
+  | 96 MB L3 host | **39.9** | 42.7 |
+
+  So the ranking flips with cache size: blocked Bloom leads by 13–36 % where L3 is modest, Fuse-8 by ~6 % (intervals overlapping) where it is large. Note the same Fuse-8 array costs 91.7 vs 39.9 ns on the two hosts — **2.3× from cache alone**. Full analysis in [`docs/performance.md`](docs/performance.md).
+
+  **Recommendation: `BINARY_FUSE_8`** — see [Which filter to pick](#which-filter-to-pick). Blocked Bloom wins every *probe* column on this page, and still loses the *total*: at equal footprint its false-positive rate is ~4× higher, and a false positive costs 4.1 µs warm to 292.7 µs cold against tens of nanoseconds for the probe. The probe is the term that barely counts. Blocked Bloom remains the pick when build time dominates (3× faster, one streaming pass, no ~29 B/entry peeling arrays).
+
+**Build time is dominated by LMDB I/O, not by the filter**, and the lever is **free RAM**. The database is written in random hash160 order, so a key-ordered cursor walk is physically scattered across the 61 GB file; with headroom the pages accumulate, without it they are evicted before reuse and re-read. Measured mid-build under memory pressure: the NVMe ran 86 % busy at 332 MB/s while yielding only ~19 MB/s of useful entry data — roughly **17× read amplification**. The same build took **1,869 s with ~2 GB free** but **1,043 s starting from an emptied cache with 58 GB free** — nearly 2× faster from the *colder* start.
+
+Setting `"useNoReadAhead": true` opens LMDB with `MDB_NORDAHEAD`, asking the OS not to prefetch neighbours that get evicted before use. **This flag has no effect on Windows** — LMDB does not implement it there (see the `MDB_NORDAHEAD` javadoc in lmdbjava: *"The option is not implemented on Windows"*), so it is a POSIX-only lever. On Linux it is the standard remedy for the amplification described above; **it is currently unvalidated in this project**, because the only measurements taken so far were on Windows where it does nothing. It defaults to `false`. See `docs/performance.md` for the measurement history and `TODO.md` for the remaining levers (higher queue depth, key-order compaction).
+
+##### Why `k = 6` — the measured sweep, and how the optimum shifts with density
+
+`k` (bits set per key) is the accuracy knob. Too few and the filter is too permissive; too many and the shared 512-bit block saturates, *raising* the FPR again. The optimum is not guessed — it is measured. Since *fastrange* replaced power-of-two block rounding, the density is exactly what you configure, and the shipped default is **`DEFAULT_K = 6` at `DEFAULT_BITS_PER_ENTRY = 11`**. At that default density (10 M synthetic entries, 2 M random-non-member probes per row):
+
+| `k` | 4 | 5 | **6** | 7 | 8 | 10 |
+|---|--:|--:|--:|--:|--:|--:|
+| FPR @ 11 b/e | 0.997 % | 0.805 % | **0.758 %** | 0.764 % | 0.806 % | 0.996 % |
+
+**More bits is not monotonically better** — the FPR bottoms out at `k = 6` and climbs again, because every additional probe fills the same 512-bit block faster. And the blocked optimum sits **below** the textbook unblocked prediction `(m/n)·ln2 ≈ 7.6` for 11 b/e: confining all probes to one block introduces per-block load variance, which penalises high `k`. So `DEFAULT_K` is an empirical result, not a formula.
+
+The optimum is **density-dependent** and must be raised together with `bitsPerEntry`. Measured across the whole surface (10 M entries, fastrange sizing, so the effective density equals the configured one exactly):
+
+| bits/entry | 8 | 11 *(default)* | 14 | 17 | 21 | 26 |
+|---|--:|--:|--:|--:|--:|--:|
+| **optimum `k`** | **5** | **6** | **7** | **7** | **8** | **9** |
+| FPR at optimum | 2.44 % | 0.758 % | 0.306 % | 0.153 % | 0.086 % | 0.055 % |
+
+The optimum **saturates sub-linearly**: the ratio `k / bits-per-entry` *falls* from 0.63 at 8 b/e to 0.35 at 26 b/e, so there is **no proportional rule**. (An earlier `k ≈ 0.55 × bits/entry` was inferred from the middle of this range — it happens to fit near 11 b/e but overshoots by 2 at the top.) If you raise `blockedBloomBitsPerEntry`, raise `blockedBloomK` to the matching column, or you measure a mismatched geometry rather than a denser filter.
+
+**`k = 1` would be a direct-addressed bitmap** — one bit per hash, no shared block, fastest of all — but its FPR is `1 − e^(−n/m)` ≈ 6 % at these densities, so roughly 1 query in 17 falls through to LMDB. That verification cost dwarfs any lookup-speed saving, which is why the default is a multi-probe `k`, not 1.
+
+##### Size (density) and lookup speed
+
+Because `containsAddress` short-circuits on the first *unset* bit, a sparser (lower-density, lower-`k`) filter answers a miss sooner — **lookup speed tracks sparsity, not size**. That is the opposite of intuition and matters when tuning: a denser blocked-bloom filter buys a lower FPR but each probe is slightly slower, and the two effects trade off through the cost model (§ [`docs/filter-selection.md`](docs/filter-selection.md)).
+
+This is also the clearest statement of why blocked Bloom is an **addition, not a replacement** for the fuse filters: at equal footprint the fuse construction always has the lower FPR (e.g. at ~1.13 B/entry, Fuse-8's 0.39 % against blocked bloom's 1.6 %; at ~2.25 B/entry, Fuse-16's 0.0016 % against 0.13 %). Per byte stored, fuse is simply the better filter — blocked bloom's justification is its ~3–4× faster single-pass build and its faster GPU probe, not accuracy per byte.
+
+##### Probe stride must be odd
+
+The probe sequence is `bit_i = (x + i·y) mod 512`, whose period is `512 / gcd(y, 512)`. With an unconstrained stride `y`, 1 key in 512 draws `y ≡ 0 (mod 512)` and places **all `k` probes on a single bit**; 1 in 256 reaches only 2 distinct bits, 1 in 128 only 4. Those degenerate keys are near-useless filter entries and measurably inflate the aggregate FPR — **0.258 % before the fix versus 0.184 % after**, at identical size and `k`. Forcing `y` odd makes `gcd(y, 512) = 1`, so the probes are always distinct. Cost: one OR instruction. `BlockedBloomAddressPresenceTest#probePositions_areAlwaysDistinct_becauseStrideIsOdd` fails if it is ever dropped.
+
+**Which consumer backend to choose** (`addressLookupBackend`; the GPU pre-filter is a separate knob — see [Which filter to pick](#which-filter-to-pick)):
+
+- **Small/medium databases (below ~15 M entries) → `BINARY_FUSE_8`.** Fastest filter measured at that scale on either machine, and lowest RAM.
+- **Large databases → `BINARY_FUSE_8`**, on either host. Cache size changes which filter *probes* faster, but not which one is cheaper overall: verification cost dominates, and Fuse-8's FPR is ~4× lower at equal footprint. Against genuinely cold storage `BINARY_FUSE_16` pulls ahead (its FPR is two orders of magnitude lower). Budget ~40 GB of transient heap to build Fuse at the 1.377 B tier (the peeling arrays need ~29 B/entry); `BLOCKED_BLOOM` needs only the finished 1.89 GB and builds 3× faster, so prefer it if you rebuild often or cannot spare the heap.
+
+Ready-to-run example covering both tiers, on GPU:
+[`examples/config_Find_GPU_Fuse16Cascade.json`](examples/config_Find_GPU_Fuse16Cascade.json) —
+`FUSE_16` GPU pre-filter + `BINARY_FUSE_8` consumer backend, the recommended cascade (see
+[Which filter to pick](#which-filter-to-pick)).
+
+For the **consumer backend** specifically, `BINARY_FUSE_8` is the safe simple default on both tiers;
+`BINARY_FUSE_16` is the better consumer choice against cold storage, where its far lower FPR makes
+verification cost vanish. Both fuse widths now have a GPU kernel. Building Fuse at the Full DB tier
+needs roughly 40 GB of transient heap for the peeling arrays, so raise `-Xmx` accordingly; if that
+heap is unavailable or you rebuild often, `BLOCKED_BLOOM` builds 3–4× faster in a single streaming
+pass and needs only its finished 1.89 GB.
+
+`BLOCKED_BLOOM` is therefore an **addition, not a replacement** — the two filters have genuinely different optimal domains, so neither was removed.
+
 #### Benchmark numbers
 
 `AddressLookupBenchmark` (JMH, replaces the old JUnit timing test) writes 2048 random hash160 entries into LMDB, then measures average `containsAddress` time per backend across 8192 pre-generated miss queries with JMH-driven JIT warmup and fork isolation. Sample numbers from one workstation run — **relative ordering** is the architecturally interesting part; absolute values vary by machine, JVM, and dataset size:
@@ -348,10 +598,49 @@ Choose between the two variants based on how expensive the LMDB verification of 
 | `BLOOM`             |  155    |
 | `HASHSET`           |   42    |
 | `TRUNCATED_LONG_64` |   40    |
-| `BINARY_FUSE_8`     |   ~20   |
+| `BINARY_FUSE_8`     |   ~19   |
 | `BINARY_FUSE_16`    |   ~23   |
+| `BLOCKED_BLOOM`     |   ~30   |
 
-The default backend is `LMDB_ONLY` (no in-RAM structure, exact, can never produce a false hit). When you *do* want to trade RAM for speed, `TRUNCATED_LONG_64` reaches near-`HASHSET` latency at ~10× lower memory cost and is the best in-RAM choice for most cases. `BINARY_FUSE_8` and `BINARY_FUSE_16` offer even lower memory with O(1) lookup (3 direct array reads + 1 hash) but keep LMDB open to verify hits; cache-cold latency grows with filter size, but for small-to-medium databases the three-read pattern typically stays in L2 or L3 cache.
+> **This table is the cache-*hot* regime and does not generalise — see the scale sweep below.**
+> With only 2048 entries every filter fits in L1, so the measurement reduces to instruction count.
+> The ranking changes substantially at real database sizes.
+
+#### Lookup latency vs database size (`FilterLookupBenchmark`)
+
+The 2048-entry table above measures one point on a curve, and it is the least representative one. `FilterLookupBenchmark` sweeps the entry count instead, and removes LMDB entirely — addresses come from a seeded PRNG (`PrngAddressIterable`), so there is no page-cache behaviour, no read amplification, and no run-to-run variance from what the OS happened to cache. Only the filter is measured. Average ns per `containsAddress` against non-member probes:
+
+| Backend             | 100 K | 1 M | 10 M | 50 M | 100 M |
+|---------------------|------:|----:|-----:|-----:|------:|
+| `BINARY_FUSE_8`     | **13.1** | **18.5** | **22.4** | 52.1 | 59.6 |
+| `BINARY_FUSE_16`    |  15.1 |  19.2 |  34.4 | 60.9 |  63.5 |
+| `BLOCKED_BLOOM`     |  23.9 |  31.2 |  38.0 | **40.5** | **45.5** |
+| `HASHSET`           |  52.1 |  92.9 | 145.1 | — | — |
+| `TRUNCATED_LONG_64` |  80.1 | 145.4 | 348.6 | 533.3 | 612.2 |
+| `BLOOM`             |  85.4 |  98.9 | 114.1 | 203.2 | 203.8 |
+
+`HASHSET` is omitted above 10 M — at ~80 B/entry it needs ~8 GB at 100 M.
+
+**There is a crossover, and it sits between 10 M and 50 M entries.** Below it `BINARY_FUSE_8` wins by ~1.7×; above it `BLOCKED_BLOOM` wins by ~1.3×. The mechanism is visible in the step sizes: from 10 M to 50 M Fuse-8 degrades by 2.3× (22.4 → 52.1 ns) while blocked Bloom barely moves (38.0 → 40.5 ns, 1.07×). That is exactly where the Fuse-8 array outgrows L3 cache (~11 MB at 10 M, ~57 MB at 50 M). Once neither filter is cache-resident, a fuse lookup pays **three** scattered cache misses while a blocked-Bloom lookup pays **one** — all `k` probes share a single 512-bit block. Blocked Bloom is the flattest structure in the table (1.9× from 100 K to 100 M, against Fuse-8's 4.5×).
+
+Practical reading: the crossover lands *below* both published database tiers, so at the Light DB (132 M) and Full DB (1.377 B) the blocked layout is on the winning side of it.
+
+- **`TRUNCATED_LONG_64` degrades worst of all** (7.6× from 100 K to 100 M, ending at 612 ns — 13× slower than blocked Bloom). Its binary search costs ~log₂(n/256) dependent cache misses. The "near-`HASHSET` latency" characterisation holds only for small databases.
+- **`BLOOM` is the slowest filter** despite scaling flatly (2.4×). See the tuning history below; what remains is structural in Guava.
+
+Run it yourself:
+
+```bash
+# all backends at one size
+java ... org.openjdk.jmh.Main FilterLookupBenchmark -p entries=1000000 -f 1 -wi 3 -i 5
+
+# scale sweep, filters only (HASHSET needs ~80 B/entry, so give it heap or omit it)
+java ... org.openjdk.jmh.Main FilterLookupBenchmark \
+    -p backend=BLOOM,BINARY_FUSE_8,BINARY_FUSE_16,BLOCKED_BLOOM \
+    -p entries=1000000,10000000,50000000 -f 1 -wi 3 -i 5
+```
+
+The default backend is `LMDB_ONLY` (no in-RAM structure, exact, can never produce a false hit). When you *do* want to trade RAM for speed, `TRUNCATED_LONG_64` reaches near-`HASHSET` latency at ~10× lower memory cost **on small databases** — but see the size sweep above: its binary search degrades faster than any other backend, and by 10 M entries it is the slowest option measured. `BINARY_FUSE_8` and `BINARY_FUSE_16` offer even lower memory with O(1) lookup (3 direct array reads + 1 hash) but keep LMDB open to verify hits; cache-cold latency grows with filter size, but for small-to-medium databases the three-read pattern typically stays in L2 or L3 cache.
 
 Run the backend comparison benchmark yourself with:
 
@@ -1311,7 +1600,11 @@ For technical details, see:
 
 #### Performance Benchmarks
 
-> **Note:** OpenCL generates uncompressed keys. Compressed keys can be derived from uncompressed ones with minimal overhead.
+> **Note:** the kernel computes each public-key point once (the uncompressed form); the compressed
+> form is derived from the same point with negligible overhead, and **both** the compressed and
+> uncompressed address are checked. `Effective Keys/s` counts **keys (EC points)**, so the number of
+> addresses examined is twice this rate — see
+> [Keys versus addresses](#keys-versus-addresses).
 
 | GPU Model                   | CPU                 | Key Range (Bits) | Grid Size (Bits) | Effective Keys/s (~)   |
 |-----------------------------|---------------------|------------------|------------------|------------------------|
@@ -1385,7 +1678,7 @@ CPU at negligible GPU cost, which is exactly the design intent. (Profiling adds 
 
 In `Find` mode the consumer logs a periodic, single-line statistics snapshot at `INFO`
 level. The print interval is controlled by `consumerJava.printStatisticsEveryNSeconds`
-(default `60`); the keys/second and keys/minute figures are a **current** throughput averaged
+(default `60`); the `Generated` and `-> LMDB` rates are a **current** throughput averaged
 over a trailing `consumerJava.statisticsRateWindowSeconds` window (default `60`), independent of
 the print interval. All logging goes through **SLF4J / Logback**, so format and destinations
 are fully configurable (see [Customizing Log Output](#customizing-log-output)).
@@ -1395,13 +1688,15 @@ are fully configurable (see [Customizing Log Output](#customizing-log-output)).
 A statistics line looks like this:
 
 ```
-Statistics: [Checked 1234 M keys in 5 minutes] [4100 k keys/second over 60s] [246 M keys/minute over 60s] [Batches per producer: exampleOpenCL (Random, GPU)=5012, exampleRandom (Random, CPU)=480] [Producers running: 2] [Consumers running: 4] [Consumer ready for work (queue empty): 5012] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
+Statistics: [uptime 43 min] [Generated 128 M/s (333258 M total)] [-> LMDB 2 M/s (5196 M lookups total), 99.22% pre-filtered] [rate window 60s] [Batches per producer: exampleKeyProducerSecureRandomId (Random, GPU)=79455] [Producers running: 1] [Consumers running: 8] [Consumer ready for work (queue empty): 167939] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
 ```
 
 | Field | Meaning |
 |---|---|
-| `Checked N M keys in M minutes` | **Lifetime** total candidate keys checked so far (millions) and elapsed minutes. |
-| `k keys/second over Ns` / `M keys/minute over Ns` | **Current** throughput, averaged over the trailing `statisticsRateWindowSeconds` window (the `over Ns` suffix shows the window). Unlike a lifetime average it tracks warm-up and thermal throttling and drops toward zero when producers stall. **The headline performance number.** |
+| `uptime N min` | **Lifetime** elapsed minutes since the scan started. |
+| `Generated <rate> (<N> M total)` | **The headline performance number: the rate of candidate private keys the producers fully compute** (windowed rate + lifetime total in millions). On a GPU run this is the real key-generation output. It counts **keys (EC points)**, not addresses — see *Keys vs. addresses* below. Auto-scales across `/s`, `k/s`, `M/s`, `G/s`. |
+| `-> LMDB <rate> (<N> M lookups total), NN.NN% pre-filtered` | The rate of hash160 **address** lookups that survive the GPU pre-filter and actually reach the consumer/LMDB (windowed rate + lifetime total). `pre-filtered` is the share of the potential address lookups the filter eliminated before LMDB (see below); it is omitted when no pre-filter is active (full transfer). |
+| `rate window Ns` | The trailing window (`statisticsRateWindowSeconds`) the two rates are averaged over. |
 | `Batches per producer: <label>=N, …` | Dispatched-batch count per running producer, keyed by `<keyProducerId> (<Strategy>, <CPU\|GPU>)` so concurrently running producers are told apart. The **strategy** (`Random`, `Bip39`, `Incremental`, `Socket`, `WebSocket`, `Zmq`) is derived from the key producer; the **backend** (`CPU` for `producerJava`/`producerJavaSecretsFiles`, `GPU` for `producerOpenCL`) from the producer. `none` until the first batch. |
 | `Producers running: N` | Number of producers currently in the `RUNNING` state. |
 | `Consumers running: N` | Number of consumer worker threads currently running (≤ `consumerJava.threads`). |
@@ -1411,10 +1706,30 @@ Statistics: [Checked 1234 M keys in 5 minutes] [4100 k keys/second over 60s] [24
 | `keys queue size: N` | Instantaneous depth of the producer→consumer queue (bounded by `consumerJava.queueSize`). |
 | `Hits: N` | Number of address matches found so far (see [Hit Logging](#hit-logging)). |
 
-> The **count** fields (`Checked … keys`, `Consumer ready`, `Producer blocked`, `Hits`) are
-> **cumulative since startup** — for those, what matters is how fast they *rise between two
-> lines*, not the absolute value. The `keys/second` / `keys/minute` fields are already a
-> **current windowed rate**, so they read directly with no need to difference successive lines.
+#### Keys versus addresses
+
+Why `Generated` and `-> LMDB` count different things: `Generated` counts **candidate private keys** — secp256k1 points, one full scalar multiplication each.
+From every such key the tool derives **two** hash160 addresses: the **compressed** and the
+**uncompressed** form, and both are checked. So the number of *addresses* examined is **twice** the
+`Generated` rate:
+
+- `Generated 128 M/s` ⇒ 128 M keys/s ⇒ **~256 M addresses/s** (compressed + uncompressed) hashed and
+  probed against the filter.
+- `-> LMDB` counts those address lookups (post-filter), **not** keys. With a strong GPU pre-filter
+  almost none survive, so `-> LMDB` is a tiny fraction of `Generated`.
+- `pre-filtered` is measured against that doubled figure: it is the share of the `2 × Generated`
+  potential address lookups the pre-filter removed before LMDB. In the line above, `2 M/s` reach LMDB
+  out of `~256 M/s` potential ⇒ `99.22 % pre-filtered`.
+
+This split is deliberate. An earlier version reported only the surviving (`-> LMDB`) rate, which
+**collapses** when a GPU pre-filter is on — making a hard-working GPU look idle. `Generated` now shows
+the real output rate next to it, so a **healthy GPU run reads as high `Generated`, low `-> LMDB`, high
+`pre-filtered`**.
+
+> The **total** fields (`Generated … total`, `-> LMDB … total`, `Consumer ready`, `Producer blocked`,
+> `Hits`) are **cumulative since startup** — for those, what matters is how fast they *rise between two
+> lines*, not the absolute value. The `Generated` / `-> LMDB` **rates** are already a **current
+> windowed rate**, so they read directly with no need to difference successive lines.
 
 ### Diagnosing Bottlenecks
 
@@ -1438,8 +1753,8 @@ problem signal:
 |---|---|---|---|
 | ~0 | rising | ~0 | **Healthy** (the normal GPU-scanning state) — the CPU keeps up easily. If throughput is below expectations, the limit is the producer/GPU side, not the consumer. |
 | rising | ~0 | near `queueSize` | **CPU-bound — the warning state.** The consumer can't keep up. Use a faster [lookup backend](#-pluggable-address-lookup-backends-addresslookupbackend), raise `consumerJava.threads`, or reduce the producer rate. |
-| ~0 | ~0 | mid-range | **Balanced** — neither side waits; watch `keys/second`. |
-| ~0 | rising | ~0 | with `keys/second` ≈ 0 → **nothing is producing** — check the producer/key-producer configuration. |
+| ~0 | ~0 | mid-range | **Balanced** — neither side waits; watch `Generated`. |
+| ~0 | rising | ~0 | with `Generated` ≈ 0 → **nothing is producing** — check the producer/key-producer configuration. |
 
 Rule of thumb: **`Producer blocked` climbing = act (CPU too slow); `Consumer ready` climbing = fine.**
 
@@ -1474,7 +1789,7 @@ Typical customizations:
   (or filter on the `hit:` prefix) to it, so matches are never lost in console scrollback.
 - **Adjust the statistics cadence / rate window** — `consumerJava.printStatisticsEveryNSeconds`
   controls *when* the line is emitted; `consumerJava.statisticsRateWindowSeconds` controls the
-  trailing window the keys/second rate is averaged over (Logback controls *how/where*).
+  trailing window the `Generated` / `-> LMDB` rates are averaged over (Logback controls *how/where*).
 - **Machine-readable output** — the single-line, fixed-field statistics format is intentionally
   stable so an external supervisor or GUI can parse it (e.g. via an inter-process pipe) to plot
   throughput and the ready/blocked health counters over time.

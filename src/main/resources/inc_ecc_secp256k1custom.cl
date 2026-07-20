@@ -638,6 +638,10 @@ inline void ripemd160_hash_prebuilt_block_swap(const u32 *block, u32 *out_h)
 // divergence produces silent false negatives (a stored address never flagged), so they are
 // pinned against the Java implementation by Fuse8GpuHashParityTest.
 
+// Filter selector values shared with the Java GpuFilterType enum; keep the two in sync.
+#define GPU_FILTER_TYPE_FUSE8  0u
+#define GPU_FILTER_TYPE_FUSE16 1u
+
 inline ulong fuse8_murmur64(ulong h) {
     h ^= h >> 33;
     h *= 0xff51afd7ed558ccdUL;
@@ -693,6 +697,138 @@ inline bool fuse8_contains(
     uint h2 = fuse8_position(2, hash, seg_count_len, seg, seg_mask);
     uchar f8 = fuse8_fingerprint(hash);
     return (uchar)(fp[h0] ^ fp[h1] ^ fp[h2]) == f8;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Binary Fuse 16 probe. Identical geometry to fuse8 - same mix, same three positions, same segment
+// layout - so it deliberately REUSES fuse8_mix and fuse8_position rather than duplicating them.
+// Only the fingerprint width differs: 16 bits instead of 8, which lowers the false-positive rate
+// from ~0.39 % to ~0.0016 % (measured, 242x) for exactly 2x the memory.
+//
+// Java pins the formula as (short)(hash ^ (hash >>> 32)); the cast to 16 bits is what makes this a
+// different filter from fuse8 and must not be widened. Divergence here produces silent FALSE
+// NEGATIVES - a funded address that is never reported. BinaryFuse16GpuAgreementTest checks this
+// probe against the Java implementation over the full probe set.
+inline ushort fuse16_fingerprint(ulong h) {
+    return (ushort)(h ^ (h >> 32));
+}
+
+// Returns true when the key is POSSIBLY present (no false negatives; ~0.0016% false positives).
+inline bool fuse16_contains(
+    __global const ushort *fp, ulong seed, uint seg, uint seg_mask, uint seg_count_len, ulong key) {
+    if (seg_count_len == 0) {
+        return false; // empty filter never matches
+    }
+    ulong hash = fuse8_mix(key, seed);
+    uint h0 = fuse8_position(0, hash, seg_count_len, seg, seg_mask);
+    uint h1 = fuse8_position(1, hash, seg_count_len, seg, seg_mask);
+    uint h2 = fuse8_position(2, hash, seg_count_len, seg, seg_mask);
+    ushort f16 = fuse16_fingerprint(hash);
+    return (ushort)(fp[h0] ^ fp[h1] ^ fp[h2]) == f16;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Blocked Bloom filter probe (byte-exact port of BlockedBloomAddressPresence).
+//
+// Why it exists next to the fuse8 probe: a fuse lookup reads three *scattered* fingerprints, i.e.
+// three uncoalesced global transactions per candidate. This layout confines all k probes of a key
+// to one 512-bit block = 64 bytes = a single coalesced transaction. On the CPU that is worth
+// 13-36% at the billion-entry tier on a 16 MB-L3 host; whether it pays off on a GPU is what the
+// benchmark kernels below exist to answer.
+//
+// Any divergence from the Java implementation produces silent FALSE NEGATIVES (a stored address
+// never flagged), which is the one failure mode this project cannot tolerate. The formula is
+// pinned against Java by BlockedBloomAddressPresenceTest#gpuStyleLookup_agreesWithContainsAddress.
+//
+//   key   = hash160[0..7] big-endian            (same extraction as the fuse filter)
+//   a     = murmur64(key)
+//   b     = murmur64(key + GOLDEN)
+//   block = mul_hi(a, num_blocks)               // Lemire fastrange: any block count, not just 2^n
+//   x     = (uint)b
+//   y     = (uint)(b >> 32) | 1                  <-- stride MUST be odd, see below
+//   bit_i = (x + i*y) & 511                      for i in 0..k-1
+//
+// The "| 1" is load-bearing, not cosmetic: the probe walk has period 512/gcd(y,512), so an even
+// stride collapses it. 1 key in 512 would otherwise place every probe on a single bit. Measured
+// on the CPU this cost a factor ~5 in false-positive rate.
+#define BLOCKEDBLOOM_GOLDEN 0x9E3779B97F4A7C15UL
+#define BLOCKEDBLOOM_BLOCK_MASK 511u
+#define BLOCKEDBLOOM_LONGS_PER_BLOCK 8u
+
+// Returns true when the key is POSSIBLY present (no false negatives).
+inline bool blockedbloom_contains(
+    __global const ulong *words, uint num_blocks, uint k, ulong key) {
+    if (num_blocks == 0u || k == 0u) {
+        return false; // empty/degenerate filter never matches
+    }
+    ulong a = fuse8_murmur64(key);
+    ulong b = fuse8_murmur64(key + BLOCKEDBLOOM_GOLDEN);
+    // mul_hi is the unsigned 64x64->high64 multiply (== Java Math.unsignedMultiplyHigh), mapping the
+    // hash uniformly onto [0, num_blocks) without requiring a power-of-two count -- the same
+    // primitive fuse8_position uses for its base. Requiring 2^n wasted up to 2x the memory.
+    // One coalesced 64-byte region per key: every probe below indexes inside [base, base+8).
+    uint base = ((uint)mul_hi(a, (ulong)num_blocks)) * BLOCKEDBLOOM_LONGS_PER_BLOCK;
+    uint x = (uint)b;
+    uint y = ((uint)(b >> 32)) | 1u;
+    for (uint i = 0u; i < k; i++) {
+        uint bit = (x + i * y) & BLOCKEDBLOOM_BLOCK_MASK;
+        if ((words[base + (bit >> 6)] & (1UL << (bit & 63u))) == 0UL) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Filter micro-benchmark kernels.
+//
+// Deliberately separate from generateKeysKernel_grid: in the production kernel the filter probe is
+// a small tail behind EC point generation and two hash160 chains (~57%/43% of kernel time per
+// docs/performance.md), so an A/B there would be swamped by work both arms share. These kernels do
+// nothing but probe, over a caller-supplied key array, so the measured difference *is* the filter.
+//
+// Both write a per-work-item 0/1 hit flag rather than using an atomic counter: atomics would
+// serialise on contention and confound the very thing being measured.
+
+__kernel void benchmarkFilterFuse8(
+    __global const uchar *fp,
+    __global const uint *meta,      // [seedLo, seedHi, segLen, segLenMask, segCountLen]
+    __global const ulong *keys,
+    __global uchar *hits,
+    const uint key_count) {
+    uint gid = get_global_id(0);
+    if (gid >= key_count) {
+        return;
+    }
+    ulong seed = ((ulong)meta[1] << 32) | (ulong)meta[0];
+    hits[gid] = fuse8_contains(fp, seed, meta[2], meta[3], meta[4], keys[gid]) ? (uchar)1 : (uchar)0;
+}
+
+__kernel void benchmarkFilterFuse16(
+    __global const ushort *fp,
+    __global const uint *meta,      // [seedLo, seedHi, segLen, segLenMask, segCountLen]
+    __global const ulong *keys,
+    __global uchar *hits,
+    const uint key_count) {
+    uint gid = get_global_id(0);
+    if (gid >= key_count) {
+        return;
+    }
+    ulong seed = ((ulong)meta[1] << 32) | (ulong)meta[0];
+    hits[gid] = fuse16_contains(fp, seed, meta[2], meta[3], meta[4], keys[gid]) ? (uchar)1 : (uchar)0;
+}
+
+__kernel void benchmarkFilterBlockedBloom(
+    __global const ulong *words,
+    __global const uint *meta,      // [numBlocks, k]
+    __global const ulong *keys,
+    __global uchar *hits,
+    const uint key_count) {
+    uint gid = get_global_id(0);
+    if (gid >= key_count) {
+        return;
+    }
+    hits[gid] = blockedbloom_contains(words, meta[0], meta[1], keys[gid]) ? (uchar)1 : (uchar)0;
 }
 
 /**
@@ -831,6 +967,7 @@ __kernel void generateKeysKernel_grid(
     __global const uchar *fuse8_fp,    // Binary Fuse 8 fingerprint slot array
     __global const uint *fuse8_meta,   // [seedLo, seedHi, segLen, segLenMask, segCountLen]
     const u32 transfer_all,            // 0 = compact (filter) mode, non-zero = full transfer
+    const u32 filter_type,             // 0 = Binary Fuse 8, 1 = Binary Fuse 16 (see GpuFilterType)
     __global const u32 *iG_table,      // (keysPerWorkItem-1) points: entry m-1 = [x_{mG}(8 words)][y_{mG}(8 words)], device word order
     __global const u32 *comb_table)    // fixed-base signed-digit comb table: 65 positions * 8 magnitudes, each [x(8)][y(8)], device word order
 {
@@ -1152,10 +1289,23 @@ __kernel void generateKeysKernel_grid(
             } else {
                 ulong key_uncompressed = fuse8_key_from_ripemd(ripemd_uncompressed_h);
                 ulong key_compressed   = fuse8_key_from_ripemd(ripemd_compressed_h);
-                bool hit = fuse8_contains(
-                                fuse8_fp, fuse8_seed, fuse8_seg, fuse8_seg_mask, fuse8_seg_count_len, key_uncompressed)
-                        || fuse8_contains(
-                                fuse8_fp, fuse8_seed, fuse8_seg, fuse8_seg_mask, fuse8_seg_count_len, key_compressed);
+                // filter_type is a kernel uniform: identical for every work-item, so this branch
+                // is perfectly predicted and costs nothing. The fingerprint buffer is uploaded as
+                // bytes either way and reinterpreted here - fuse16 slots are 16-bit, and the meta
+                // block is the same five words for both widths.
+                bool hit;
+                if (filter_type == GPU_FILTER_TYPE_FUSE16) {
+                    __global const ushort *fp16 = (__global const ushort *)fuse8_fp;
+                    hit = fuse16_contains(
+                                    fp16, fuse8_seed, fuse8_seg, fuse8_seg_mask, fuse8_seg_count_len, key_uncompressed)
+                            || fuse16_contains(
+                                    fp16, fuse8_seed, fuse8_seg, fuse8_seg_mask, fuse8_seg_count_len, key_compressed);
+                } else {
+                    hit = fuse8_contains(
+                                    fuse8_fp, fuse8_seed, fuse8_seg, fuse8_seg_mask, fuse8_seg_count_len, key_uncompressed)
+                            || fuse8_contains(
+                                    fuse8_fp, fuse8_seed, fuse8_seg, fuse8_seg_mask, fuse8_seg_count_len, key_compressed);
+                }
                 should_write = hit;
                 slot = 0;
                 if (hit) {

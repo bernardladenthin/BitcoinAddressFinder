@@ -5,10 +5,10 @@ package net.ladenthin.bitcoinaddressfinder.persistence.inmemory;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.stream.Stream;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
+import net.ladenthin.bitcoinaddressfinder.persistence.FilterBuildProgress;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -159,6 +159,16 @@ public final class BinaryFuse16AddressPresence implements AddressPresence {
         return (short) (fingerprints[h0] ^ fingerprints[h1] ^ fingerprints[h2]) == fp;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Exactly the fingerprint array — two bytes per slot, ~1.125 slots per entry.
+     */
+    @Override
+    public long sizeInBytes() {
+        return (long) fingerprints.length * Short.BYTES;
+    }
+
     @Override
     public boolean requiresBackend() {
         return false;
@@ -173,6 +183,80 @@ public final class BinaryFuse16AddressPresence implements AddressPresence {
     @ToString.Include
     public int slotCount() {
         return fingerprints.length;
+    }
+
+    /**
+     * Returns an immutable payload describing this filter for GPU VRAM upload.
+     * <p>
+     * Public bridge accessor: the engine layer reads this single object (instead of the
+     * package-private getters, which are not visible across packages) and decomposes it into
+     * the primitive arguments accepted by the OpenCL upload path. This keeps the OpenCL layer
+     * free of any dependency on this persistence type.
+     * <p>
+     * The payload type is deliberately distinct from {@link BinaryFuse8GpuFilterData} rather than
+     * a shared supertype: the fingerprint width <em>is</em> the filter, so uploading a 16-bit
+     * payload and probing it as 8-bit (or the reverse) would not fail loudly — it would silently
+     * produce false negatives, i.e. a funded address that is never reported. Keeping the two types
+     * unrelated makes that mix-up a compile error.
+     *
+     * @return the GPU-upload payload (fingerprints reference plus seed and segment metadata)
+     */
+    public BinaryFuse16GpuFilterData toGpuFilterData() {
+        return new BinaryFuse16GpuFilterData(
+                getFingerprints(), getSeed(), getSegmentLength(), getSegmentLengthMask(), getSegmentCountLength());
+    }
+
+    /**
+     * Returns the fingerprint slot array, exposed for GPU VRAM upload and tests.
+     * <p>
+     * The reference (not a defensive copy) is returned deliberately: the array can be large
+     * (two bytes per slot, ~2.25 B per indexed address) and is treated as read-only by every
+     * caller (the GPU upload path copies it into device memory; tests only read it). Callers
+     * must not mutate it.
+     *
+     * @return the fingerprint short array; its length equals {@link #slotCount()}
+     */
+    @SuppressWarnings("EI_EXPOSE_REP")
+    short[] getFingerprints() {
+        return fingerprints;
+    }
+
+    /**
+     * Returns the construction seed of the successful build.
+     *
+     * @return the seed value used by {@link #containsAddress(ByteBuffer)} for hashing
+     */
+    long getSeed() {
+        return seed;
+    }
+
+    /**
+     * Returns the per-segment length (a power of two) used by the fused position mapping.
+     *
+     * @return the segment length
+     */
+    int getSegmentLength() {
+        return segmentLength;
+    }
+
+    /**
+     * Returns {@code segmentLength - 1}, the mask applied to each within-segment bit-window.
+     *
+     * @return the segment-length mask
+     */
+    int getSegmentLengthMask() {
+        return segmentLengthMask;
+    }
+
+    /**
+     * Returns {@code segmentCount * segmentLength}, the exclusive upper bound of the base
+     * position produced by the high-bits reduction. This is <em>not</em> the fingerprint array
+     * length (which is {@code (segmentCount + 2) * segmentLength}).
+     *
+     * @return the segment-count length used by the position mapping
+     */
+    int getSegmentCountLength() {
+        return segmentCountLength;
     }
 
     /**
@@ -234,6 +318,24 @@ public final class BinaryFuse16AddressPresence implements AddressPresence {
         return (int) h;
     }
 
+    /**
+     * Exact capacity of the peeling queue for a build with {@code arrayLength} fingerprint slots
+     * and {@code size} keys. During peeling, position counts only decrease, so every position
+     * reaches {@code count == 1} at most once and is therefore enqueued at most once — the total
+     * number of enqueues can never exceed the number of positions ({@code arrayLength}), regardless
+     * of {@code size}. Sizing the queue as {@code arrayLength} is therefore both sufficient and free
+     * of the {@code int} overflow that the earlier {@code arrayLength + 3 * size} sizing incurred
+     * above ~716&nbsp;M keys (where {@code 3 * size} wraps past {@link Integer#MAX_VALUE}).
+     *
+     * @param arrayLength the number of fingerprint slots (positions); the exact capacity
+     * @param size        the number of keys being inserted; does not affect the capacity
+     * @return {@code arrayLength} — always {@code >= arrayLength} and never overflowed
+     */
+    static int peelingQueueLength(int arrayLength, int size) {
+        // Intentionally independent of size: max enqueues == arrayLength (each position at most once).
+        return arrayLength;
+    }
+
     /** Reference segment-length heuristic for arity 3, capped at {@link #MAX_SEGMENT_LENGTH}. */
     static int calculateSegmentLength(int size) {
         if (size == 0) {
@@ -261,14 +363,12 @@ public final class BinaryFuse16AddressPresence implements AddressPresence {
         int[] idx = {0};
         FilterBuildProgress progress =
                 new FilterBuildProgress(LOGGER::info, PROGRESS_NAME + ": reading addresses", count);
-        try (Stream<ByteBuffer> stream = source.addresses()) {
-            stream.forEach(bb -> {
-                if (idx[0] < keys.length && bb.remaining() == BYTES_PER_ADDRESS) {
-                    keys[idx[0]++] = bb.getLong(bb.position());
-                    progress.report(idx[0]);
-                }
-            });
-        }
+        source.forEachAddress(bb -> {
+            if (idx[0] < keys.length && bb.remaining() == BYTES_PER_ADDRESS) {
+                keys[idx[0]++] = bb.getLong(bb.position());
+                progress.report(idx[0]);
+            }
+        });
         return idx[0] == keys.length ? keys : Arrays.copyOf(keys, idx[0]);
     }
 
@@ -332,9 +432,9 @@ public final class BinaryFuse16AddressPresence implements AddressPresence {
             indexing.report(i + 1);
         }
 
-        // Build initial queue of singleton positions.
-        // Maximum enqueues: arrayLength initial + 3*size from peeling (up to 3 positions per key peeled).
-        int[] queue = new int[arrayLength + 3 * size];
+        // Peeling queue of singleton positions; see peelingQueueLength for the exact-capacity /
+        // no-overflow rationale (each position is enqueued at most once).
+        int[] queue = new int[peelingQueueLength(arrayLength, size)];
         int qHead = 0;
         int qTail = 0;
         for (int pos = 0; pos < arrayLength; pos++) {

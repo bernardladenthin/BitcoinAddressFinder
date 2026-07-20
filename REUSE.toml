@@ -19,6 +19,7 @@ path = [
     "examples/config_Find_GPUFilterCompact.json",
     "examples/config_LMDBToAddressFile.json",
     "examples/config_OpenCLInfo.json",
+    "examples/config_TuneConfiguration.json",
     "src/test/resources/testOpenCLInfo/config_OpenCLInfo.json",
     "src/test/resources/testRoundtrip/config_AddressFilesToLMDB.json",
     "src/test/resources/testRoundtrip/config_Find_1OpenCLDevice.json",

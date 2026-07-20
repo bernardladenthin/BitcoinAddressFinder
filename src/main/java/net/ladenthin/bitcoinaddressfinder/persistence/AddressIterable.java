@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.persistence;
 
 import java.nio.ByteBuffer;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 /**
@@ -46,4 +47,21 @@ public interface AddressIterable {
      * @return the entry count
      */
     long count();
+
+    /**
+     * Applies {@code action} to every hash160 entry. The default implementation streams via
+     * {@link #addresses()}; backends with a lower-overhead bulk iteration (e.g. a raw LMDB cursor,
+     * avoiding the {@code Stream}/{@code Spliterator}/{@code Iterator} per-entry dispatch) should
+     * override this for large-database throughput.
+     *
+     * <p>Each supplied {@link ByteBuffer} may be a cursor-owned view valid only until {@code action}
+     * returns — read what you need immediately, do not retain the buffer.
+     *
+     * @param action the per-entry action
+     */
+    default void forEachAddress(Consumer<ByteBuffer> action) {
+        try (Stream<ByteBuffer> stream = addresses()) {
+            stream.forEach(action);
+        }
+    }
 }
