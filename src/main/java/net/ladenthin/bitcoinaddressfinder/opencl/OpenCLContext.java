@@ -797,7 +797,13 @@ public class OpenCLContext implements ReleaseCLObject {
             int segCountLen) {
         final cl_context localContext = context;
         if (localContext == null || closed) {
-            throw new IllegalStateException("uploadGpuFilter called before init() or after close()");
+            throw new IllegalStateException("uploadGpuFilter called before init() or after close() (context="
+                    + (localContext == null ? "null" : "set")
+                    + ", closed="
+                    + closed
+                    + ", fingerprintByteSize="
+                    + fingerprintByteSize
+                    + ")");
         }
 
         // Release any previously uploaded filter so a re-upload does not leak device memory.
@@ -1173,7 +1179,10 @@ public class OpenCLContext implements ReleaseCLObject {
         final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
         final cl_kernel k = benchFilterKernel;
         if (k == null) {
-            throw new IllegalStateException("prepareBenchFilterProbe* must be called before runBenchFilterProbe()");
+            throw new IllegalStateException(
+                    "prepareBenchFilterProbe* must be called before runBenchFilterProbe() (benchFilterKernel=null, benchFilterProbeCount="
+                            + benchFilterProbeCount
+                            + ")");
         }
         clEnqueueNDRangeKernel(localQueue, k, 1, null, new long[] {benchFilterProbeCount}, null, 0, null, null);
         clFinish(localQueue);

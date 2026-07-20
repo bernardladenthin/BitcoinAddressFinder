@@ -343,10 +343,9 @@ public final class BinaryFuse8AddressPresence implements AddressPresence {
      * above ~716&nbsp;M keys (where {@code 3 * size} wraps past {@link Integer#MAX_VALUE}).
      *
      * @param arrayLength the number of fingerprint slots (positions); the exact capacity
-     * @param size        the number of keys being inserted; does not affect the capacity
      * @return {@code arrayLength} — always {@code >= arrayLength} and never overflowed
      */
-    static int peelingQueueLength(int arrayLength, int size) {
+    static int peelingQueueLength(int arrayLength) {
         // Intentionally independent of size: max enqueues == arrayLength (each position at most once).
         return arrayLength;
     }
@@ -450,7 +449,7 @@ public final class BinaryFuse8AddressPresence implements AddressPresence {
 
         // Peeling queue of singleton positions; see peelingQueueLength for the exact-capacity /
         // no-overflow rationale (each position is enqueued at most once).
-        int[] queue = new int[peelingQueueLength(arrayLength, size)];
+        int[] queue = new int[peelingQueueLength(arrayLength)];
         int qHead = 0;
         int qTail = 0;
         for (int pos = 0; pos < arrayLength; pos++) {

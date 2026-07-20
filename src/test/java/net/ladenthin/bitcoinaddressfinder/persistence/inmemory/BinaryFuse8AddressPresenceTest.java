@@ -189,8 +189,7 @@ class BinaryFuse8AddressPresenceTest {
     void peelingQueueLength_billionScale_isSufficientAndDoesNotOverflow() {
         // Full-DB scale (~1.377 B keys): arrayLength ~1.55 B (< Integer.MAX_VALUE), size ~1.38 B.
         int arrayLength = 1_549_000_000;
-        int size = 1_377_000_000;
-        int capacity = BinaryFuse8AddressPresence.peelingQueueLength(arrayLength, size);
+        int capacity = BinaryFuse8AddressPresence.peelingQueueLength(arrayLength);
         assertThat("capacity must not overflow to a non-positive value", capacity, is(greaterThan(0)));
         assertThat(
                 "capacity must cover every position (>= arrayLength)", capacity, is(greaterThanOrEqualTo(arrayLength)));

@@ -128,15 +128,14 @@ public class Statistics {
      */
     private static String describeFilterEffect(double generatedPerSecond, double lookupsPerSecond) {
         double potentialLookups = generatedPerSecond * 2.0; // compressed + uncompressed per candidate
-        if (potentialLookups <= 0.0 || lookupsPerSecond <= 0.0) {
+        // Report only once candidates are generated and some (but not all) survive to LMDB. The
+        // second test also covers the no-generation case (potentialLookups == 0, so any lookup rate
+        // is >= it) and the full-transfer case (lookups reach the full potential, nothing filtered),
+        // and it keeps the division safe: it runs only when 0 < lookupsPerSecond < potentialLookups.
+        if (lookupsPerSecond <= 0.0 || lookupsPerSecond >= potentialLookups) {
             return "";
         }
-        double reaching = lookupsPerSecond / potentialLookups;
-        double prunedPercent = (1.0 - reaching) * 100.0;
-        if (prunedPercent <= 0.0) {
-            // No pre-filter (full transfer): every candidate reaches LMDB, nothing to report here.
-            return "";
-        }
+        double prunedPercent = (1.0 - lookupsPerSecond / potentialLookups) * 100.0;
         return String.format(java.util.Locale.ROOT, ", %.2f%% pre-filtered", prunedPercent);
     }
 }

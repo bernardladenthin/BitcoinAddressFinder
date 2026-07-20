@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.statistics;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
@@ -105,6 +106,41 @@ public class StatisticsTest {
         assertThat(Statistics.formatRate(130_000_000.0), is(equalTo("130 M/s")));
         assertThat(Statistics.formatRate(1_500_000_000.0), is(equalTo("2 G/s")));
         assertThat(Statistics.formatRate(3_000.0), is(equalTo("3 k/s")));
+        // Exact scale boundaries: pin the >= comparisons in formatRate (a > mutant would drop each
+        // value into the next-smaller unit, e.g. 1_000_000_000 -> "1000 M/s" instead of "1 G/s").
+        assertThat(Statistics.formatRate(1_000_000_000.0), is(equalTo("1 G/s")));
+        assertThat(Statistics.formatRate(1_000_000.0), is(equalTo("1 M/s")));
+        assertThat(Statistics.formatRate(1_000.0), is(equalTo("1 k/s")));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="describeFilterEffect boundary">
+    /**
+     * Boundary guard for the pre-filter clause: when the LMDB-lookup rate is exactly zero (nothing
+     * has reached the consumer yet) the clause must be omitted, not printed as {@code 100.00%
+     * pre-filtered}. This pins the {@code lookupsPerSecond <= 0.0} boundary in describeFilterEffect.
+     */
+    @Test
+    public void createStatisticsMessage_zeroLookupRate_omitsPreFilterClause() {
+        Statistics statistics = new Statistics();
+
+        String result = statistics.createStatisticsMessage(
+                180_000L,
+                0L, // lookups lifetime
+                0.0, // lookup rate/s -> exactly the boundary
+                200_000_000L, // generated lifetime
+                100_000_000.0, // generation rate/s (> 0, so potentialLookups > 0)
+                60L,
+                0L,
+                new TreeMap<>(),
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L);
+
+        assertThat(result, containsString("[-> LMDB 0/s (0 M lookups total)] [rate window 60s]"));
     }
     // </editor-fold>
 }

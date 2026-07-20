@@ -132,4 +132,9 @@ public final class PrngAddressIterable implements AddressIterable {
     public long count() {
         return count;
     }
+
+    @Override
+    public String toString() {
+        return "PrngAddressIterable{seed=" + seed + ", count=" + count + '}';
+    }
 }

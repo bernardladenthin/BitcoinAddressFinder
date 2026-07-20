@@ -1137,4 +1137,136 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="SEO_SUBOPTIMAL_EXPRESSION_ORDER"/>
     </Match>
 
+    <!--
+        The 1.7.0 filter / tuner / GPU code adds the following findings that are by design or false
+        positives (SpotBugs runs at effort=Max, threshold=Low). Genuine issues were fixed in code;
+        only the by-design ones are suppressed here.
+    -->
+
+    <!-- Before/after baseline captures around a timed window: totalBatches(...) and getCheckedKeys()
+         are each invoked twice on purpose (baseline, then after the measurement window) to compute a
+         delta; caching either would corrupt the measurement. -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration"/>
+        <Method name="runArm"/>
+        <Bug pattern="PRMC_POSSIBLY_REDUNDANT_METHOD_CALLS"/>
+    </Match>
+
+    <!-- By design: the tuner creates a short-lived local ExecutorService and shuts it down
+         (shutdownNow) in a finally block within run(). -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration"/>
+        <Method name="run"/>
+        <Bug pattern="HES_LOCAL_EXECUTOR_SERVICE"/>
+    </Match>
+
+    <!-- The LMDB directory comes from the operator's own tuner configuration
+         (lmdbConfigurationReadOnly.lmdbDirectory), not from untrusted external input. -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration"/>
+        <Method name="measureVerificationCostMicros"/>
+        <Bug pattern="PATH_TRAVERSAL_IN"/>
+    </Match>
+
+    <!-- Pure style nag (instance fields declared before static fields). The field and Javadoc
+         ordering is intentional and documented; reordering carries no functional benefit. -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration"/>
+        <Bug pattern="IMC_IMMATURE_CLASS_WRONG_FIELD_ORDER"/>
+    </Match>
+
+    <!-- deduplicate(long[]) is a private in-class helper that dedups one array in place; varargs
+         would be semantically wrong and would invite accidental external callers. -->
+    <Match>
+        <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8AddressPresence"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence"/>
+        </Or>
+        <Method name="deduplicate"/>
+        <Bug pattern="UVA_USE_VAR_ARGS"/>
+    </Match>
+
+    <!-- tryBuild returns null as a meaningful sentinel: peeling failed for this seed, so the build()
+         retry loop re-attempts with a freshly mixed seed. That is distinct from a successfully built
+         (possibly empty) table, so a zero-length array cannot substitute for it. -->
+    <Match>
+        <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8AddressPresence"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence"/>
+        </Or>
+        <Method name="tryBuild"/>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+
+    <!-- Internal VRAM-upload DTOs: the primitive array (fingerprints / words) is deliberately shared
+         zero-copy with the OpenCL upload path. A defensive copy would double multi-GB memory and
+         defeat the design; these records are not a security or mutability boundary. -->
+    <Match>
+        <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16GpuFilterData"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BlockedBloomGpuFilterData"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- Filter backend has identity semantics; value equality over a multi-GB bit array is
+         meaningless, so no equals()/hashCode() is provided by design. -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BlockedBloomAddressPresence"/>
+        <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
+    </Match>
+
+    <!-- The constant indices access a fixed-layout long[] sample tuple
+         {timestampMillis, checkedKeys, generatedKeys}; those are semantic positional fields, not
+         List first/last, so getFirst()/getLast() do not apply. Scoped class-wide because the finding
+         lives in a synthetic lambda whose number churns; ConsumerJava has no other occurrence. -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava"/>
+        <Bug pattern="CLI_CONSTANT_LIST_INDEX"/>
+    </Match>
+
+    <!-- resolved == null is the intentional "no compact-mode producer resolved yet" sentinel; the
+         GpuFilterType enum has no dedicated none or unset constant. -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.engine.Finder"/>
+        <Method name="resolveGpuFilterType"/>
+        <Bug pattern="ENMI_NULL_ENUM_VALUE"/>
+    </Match>
+
+    <!-- uploadedFilterType = null intentionally records "no GPU filter currently uploaded". -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext"/>
+        <Method name="releaseGpuFilter"/>
+        <Bug pattern="ENMI_NULL_ENUM_VALUE"/>
+    </Match>
+
+    <!-- Intentional leak-safe fail-fast: rethrows the caught RuntimeException after freeing the
+         first allocated buffer so no VRAM leaks on a partial allocation failure. -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext"/>
+        <Method name="allocateFilterBuffersFromPointer"/>
+        <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
+    </Match>
+
+    <!-- Serialising the recommended configuration (a local in-memory POJO) to JSON can only fail on
+         a programming error, never on runtime input, so the checked JsonProcessingException is
+         deliberately wrapped in an IllegalStateException that carries the full winner context and the
+         cause. Declaring the checked type is not an option: the caller is Runnable.run(). -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration"/>
+        <Method name="buildRecommendedConfigurationJson"/>
+        <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
+    </Match>
+
+    <!-- PrngAddressIterable is a stateful, seed-driven address generator (an AddressIterable), not a
+         value object; equality over its running PRNG state is meaningless, so no equals()/hashCode()
+         is provided by design. -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.persistence.PrngAddressIterable"/>
+        <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
+    </Match>
+
 </FindBugsFilter>
