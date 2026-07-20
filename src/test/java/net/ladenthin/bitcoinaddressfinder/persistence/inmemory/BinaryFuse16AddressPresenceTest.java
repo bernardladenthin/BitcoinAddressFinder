@@ -172,8 +172,7 @@ class BinaryFuse16AddressPresenceTest {
     @Test
     void peelingQueueLength_billionScale_isSufficientAndDoesNotOverflow() {
         int arrayLength = 1_549_000_000;
-        int size = 1_377_000_000;
-        int capacity = BinaryFuse16AddressPresence.peelingQueueLength(arrayLength, size);
+        int capacity = BinaryFuse16AddressPresence.peelingQueueLength(arrayLength);
         assertThat("capacity must not overflow to a non-positive value", capacity, is(greaterThan(0)));
         assertThat(
                 "capacity must cover every position (>= arrayLength)", capacity, is(greaterThanOrEqualTo(arrayLength)));

@@ -76,6 +76,9 @@ public final class FilterBuildProgress {
     /** Inputs smaller than this (in units) emit no interim percentage lines. */
     public static final long MIN_ENTRIES = 1_000_000L;
 
+    /** Nanoseconds in one second. */
+    private static final long NANOS_PER_SECOND = 1_000_000_000L;
+
     private final LogSink sink;
     private final String phase;
     private final long total;
@@ -172,8 +175,22 @@ public final class FilterBuildProgress {
         } while (nextThreshold <= done);
     }
 
-    /** Nanoseconds in one second. */
-    private static final long NANOS_PER_SECOND = 1_000_000_000L;
+    @Override
+    public String toString() {
+        return "FilterBuildProgress{phase="
+                + phase
+                + ", total="
+                + total
+                + ", lastDone="
+                + lastDone
+                + ", nextThreshold="
+                + nextThreshold
+                + ", step="
+                + step
+                + ", interimEnabled="
+                + interimEnabled
+                + '}';
+    }
 
     /**
      * Renders a throughput with a compact magnitude suffix, e.g. {@code "2.9M/s"}.

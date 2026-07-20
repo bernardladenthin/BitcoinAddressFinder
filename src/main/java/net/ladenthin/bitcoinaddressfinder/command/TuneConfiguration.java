@@ -5,12 +5,14 @@ package net.ladenthin.bitcoinaddressfinder.command;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -31,6 +33,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.configuration.CTuneConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.GpuFilterType;
+import net.ladenthin.bitcoinaddressfinder.consumer.Consumer;
 import net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.core.FireAndForget;
 import net.ladenthin.bitcoinaddressfinder.core.Interruptable;
@@ -377,7 +380,9 @@ public class TuneConfiguration implements Runnable, Interruptable {
                 probe.put(PrngAddressIterable.addressAt(PROBE_SEED, i));
                 probe.flip();
                 long before = System.nanoTime();
-                boolean unused = lmdb.containsAddress(probe);
+                // The return value is intentionally discarded: the probe seed guarantees a non-member,
+                // so what is being timed is the cost of the lookup itself, not its boolean answer.
+                lmdb.containsAddress(probe);
                 totalNanos += System.nanoTime() - before;
             }
             double micros = totalNanos / (samples * 1_000.0d);
@@ -443,7 +448,6 @@ public class TuneConfiguration implements Runnable, Interruptable {
      *
      * @return the arm's result, carrying a failure description instead of a rate when it did not run
      */
-    @SuppressWarnings("FutureReturnValueIgnored")
     @FireAndForget("the arm's producer is stopped explicitly below via interrupt/waitTillProducerNotRunning")
     private ArmResult runArm(
             int batchSizeInBits,
@@ -471,7 +475,10 @@ public class TuneConfiguration implements Runnable, Interruptable {
             producer =
                     createProducer(template, consumer, keyUtility, keyProducer, bitHelper, runtimeStatistics, payload);
             producer.initProducer();
-            Object unused = producerExecutor.submit(producer);
+            // Fire-and-forget: the producer is a Runnable stopped explicitly in the finally block
+            // (interrupt + waitTillProducerNotRunning), so execute() (void) is used rather than
+            // submit() — there is no Future to observe.
+            producerExecutor.execute(producer);
 
             awaitSeconds(cTuneConfiguration.warmupSecondsPerArm);
 
@@ -533,7 +540,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
 
     private static Producer createProducer(
             CProducer template,
-            ConsumerJava consumer,
+            Consumer consumer,
             KeyUtility keyUtility,
             KeyProducer keyProducer,
             BitHelper bitHelper,
@@ -545,8 +552,11 @@ public class TuneConfiguration implements Runnable, Interruptable {
             payload.stageOn(producerOpenCL);
             return producerOpenCL;
         }
-        return new ProducerJava(
-                (CProducerJava) template, consumer, keyUtility, keyProducer, bitHelper, runtimeStatistics);
+        if (template instanceof CProducerJava cProducerJava) {
+            return new ProducerJava(cProducerJava, consumer, keyUtility, keyProducer, bitHelper, runtimeStatistics);
+        }
+        throw new IllegalArgumentException("Unsupported producer template type for the sweep: "
+                + template.getClass().getName() + "; expected a CProducerOpenCL or CProducerJava.");
     }
 
     private static long totalBatches(RuntimeStatistics runtimeStatistics) {
@@ -555,7 +565,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
                 .sum();
     }
 
-    private static @Nullable ArmResult pickWinner(List<ArmResult> results) {
+    private static @Nullable ArmResult pickWinner(Collection<ArmResult> results) {
         return results.stream()
                 .filter(ArmResult::succeeded)
                 .max((left, right) -> Double.compare(left.candidatesPerSecond(), right.candidatesPerSecond()))
@@ -778,8 +788,12 @@ public class TuneConfiguration implements Runnable, Interruptable {
             mapper.setVisibility(PropertyAccessor.IS_GETTER, JsonAutoDetect.Visibility.NONE);
             mapper.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.PUBLIC_ONLY);
             return mapper.writeValueAsString(recommended);
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to serialise the recommended configuration to JSON", e);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException(
+                    "Failed to serialise the recommended configuration to JSON (winner batchSizeInBits="
+                            + best.batchSizeInBits() + ", keysPerWorkItem=" + best.keysPerWorkItem()
+                            + ", recommendedFilterType=" + recommendedFilterType + "): " + e.getMessage(),
+                    e);
         }
     }
 
@@ -941,7 +955,9 @@ public class TuneConfiguration implements Runnable, Interruptable {
         }
         throw new IllegalArgumentException(
                 "tuneConfiguration.finder needs at least one producerOpenCL or producerJava entry to use as the "
-                        + "sweep template; the sweep varies its batchSizeInBits / keysPerWorkItem and carries every "
+                        + "sweep template, but both lists are empty (producerOpenCL=" + cFinder.producerOpenCL.size()
+                        + ", producerJava=" + cFinder.producerJava.size()
+                        + "); the sweep varies its batchSizeInBits / keysPerWorkItem and carries every "
                         + "other field through unchanged.");
     }
 

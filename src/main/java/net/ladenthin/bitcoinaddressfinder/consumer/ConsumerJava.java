@@ -83,6 +83,9 @@ public class ConsumerJava implements Consumer {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ConsumerJava.class);
 
+    /** Cadence, in seconds, at which the throughput sampler records an odometer sample. */
+    private static final long RATE_SAMPLE_INTERVAL_SECONDS = 1L;
+
     private final KeyUtility keyUtility;
     /** Total number of address lookups performed. */
     protected final AtomicLong checkedKeys = new AtomicLong();
@@ -129,9 +132,6 @@ public class ConsumerJava implements Consumer {
      * scheduled-executor task that reads it on every tick (fb-contrib AT_NONATOMIC_64BIT_PRIMITIVE).
      */
     protected volatile long startTime = 0;
-
-    /** Cadence, in seconds, at which the throughput sampler records an odometer sample. */
-    private static final long RATE_SAMPLE_INTERVAL_SECONDS = 1L;
 
     /**
      * Trailing ring buffer of {@code [timestampMillis, checkedKeysSnapshot]} samples used to
@@ -598,7 +598,15 @@ public class ConsumerJava implements Consumer {
                     // come from the same trailing window.
                     rateSamples.addLast(new long[] {now, keysNow, runtimeStatistics.getGeneratedKeys()});
                     long cutoff = now - rateWindowMillis;
-                    while (rateSamples.size() > 1 && Objects.requireNonNull(rateSamples.peekFirst())[0] < cutoff) {
+                    // Split the compound guard into a nested test: keep at least one sample, and only
+                    // evict while the oldest is older than the cutoff. Written as an explicit break so
+                    // there is no boolean short-circuit ordering to reason about, and the null-guarded
+                    // peekFirst() (size > 1 guarantees non-null) is evaluated exactly once per turn.
+                    while (rateSamples.size() > 1) {
+                        long[] first = Objects.requireNonNull(rateSamples.peekFirst());
+                        if (first[0] >= cutoff) {
+                            break;
+                        }
                         rateSamples.removeFirst();
                     }
                 },
