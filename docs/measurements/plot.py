@@ -164,14 +164,34 @@ def plot_k_sweep(k_sweep: pd.DataFrame) -> pathlib.Path:
 
 
 def plot_sizing(sizing: pd.DataFrame) -> pathlib.Path:
-    """FPR and lookup speed vs filter size — the size/accuracy trade-off on one axis pair."""
+    """FPR and lookup speed vs filter size — the size/accuracy trade-off on one axis pair.
+
+    This figure needs BOTH axes populated (FPR *and* a measured lookup speed) and must stay one
+    monotonic sweep. The ``filter_sizing.csv`` has since grown to hold rows this figure must not mix:
+    exact-size-only rows with no ``lookups_per_sec`` (they feed the memory/latency figures), and
+    sizing sweeps from other machines and at other ``k`` values. Sorting all of them by x and joining
+    them with a line produced a zigzag that crossed machines, densities and k. So restrict to the
+    single largest self-consistent series — one machine at one ``k``, with a real lookup speed — and
+    let the title report that ``k``.
+    """
     fig, ax = plt.subplots(figsize=(9, 5.0), dpi=150)
-    rows = sizing.sort_values("bits_per_entry_effective")
+    speed = sizing.dropna(subset=["lookups_per_sec"])
+    if speed.empty:
+        ax.text(0.5, 0.5, "no sizing rows with a measured lookup speed", ha="center", va="center")
+        _style(ax, "Blocked Bloom: accuracy and speed vs filter size", "effective bits per entry", "measured FPR [%]")
+        fig.tight_layout()
+        out = PLOTS / "blocked_bloom_sizing.png"
+        fig.savefig(out)
+        plt.close(fig)
+        return out
+
+    machine_id, k = speed.groupby(["machine_id", "k"]).size().idxmax()
+    rows = speed[(speed["machine_id"] == machine_id) & (speed["k"] == k)].sort_values("bits_per_entry_effective")
     ax.plot(rows["bits_per_entry_effective"], rows["fpr"] * 100.0, marker="o", color="#d62728", linewidth=1.8)
     ax.set_yscale("log")
     _style(
         ax,
-        "Blocked Bloom: accuracy and speed vs filter size (k = 8)",
+        f"Blocked Bloom: accuracy and speed vs filter size (k = {int(k)})",
         "effective bits per entry",
         "measured FPR [%]",
     )
