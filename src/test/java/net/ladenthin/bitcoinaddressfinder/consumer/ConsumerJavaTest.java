@@ -395,7 +395,7 @@ public class ConsumerJavaTest {
                     arguments,
                     hasItem(
                             equalTo(
-                                    "Statistics: [Checked 0 M keys in 0 minutes] [0 k keys/second over 60s] [0 M keys/minute over 60s] [Batches per producer: none] [Producers running: 0] [Consumers running: 0] [Consumer ready for work (queue empty): 0] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
+                                    "Statistics: [uptime 0 min] [Generated 0/s (0 M total)] [-> LMDB 0/s (0 M lookups total)] [rate window 60s] [Batches per producer: none] [Producers running: 0] [Consumers running: 0] [Consumer ready for work (queue empty): 0] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
         }
     }
 

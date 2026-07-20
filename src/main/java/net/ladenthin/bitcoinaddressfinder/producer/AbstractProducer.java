@@ -227,10 +227,17 @@ public abstract class AbstractProducer implements Producer {
     void consumeSecrets(BigInteger... secrets) {
         runtimeStatistics.incrementBatches(producerLabel());
         if (cProducer.batchUsePrivateKeyIncrement) {
+            // Increment mode expands secrets[0] into a full grid of getOverallWorkSize() candidates,
+            // so the candidate count is the grid size, not secrets.length.
+            runtimeStatistics.addGeneratedKeys(cProducer.getOverallWorkSize());
             BigInteger secret = secrets[0];
             BigInteger secretBase = createSecretBase(secret, cProducer.logSecretBase);
             processSecretBase(secretBase);
         } else {
+            // Non-increment: each supplied secret is one candidate. Counting the candidates that
+            // enter the pipeline at the top (before any GPU pre-filter) is what lets the statistics
+            // line show total throughput distinctly from the consumer's post-filter lookup rate.
+            runtimeStatistics.addGeneratedKeys(secrets.length);
             processSecrets(secrets);
         }
     }

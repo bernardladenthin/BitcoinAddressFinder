@@ -593,7 +593,10 @@ public class ConsumerJava implements Consumer {
                         return;
                     }
                     long now = System.currentTimeMillis();
-                    rateSamples.addLast(new long[] {now, keysNow});
+                    // Sample both odometers together: checked (post-filter, reaching LMDB) and
+                    // generated (pre-filter, the producers' total output), so both windowed rates
+                    // come from the same trailing window.
+                    rateSamples.addLast(new long[] {now, keysNow, runtimeStatistics.getGeneratedKeys()});
                     long cutoff = now - rateWindowMillis;
                     while (rateSamples.size() > 1 && Objects.requireNonNull(rateSamples.peekFirst())[0] < cutoff) {
                         rateSamples.removeFirst();
@@ -608,10 +611,13 @@ public class ConsumerJava implements Consumer {
                 () -> {
                     long now = System.currentTimeMillis();
                     long keysNow = checkedKeys.get();
+                    long generatedNow = runtimeStatistics.getGeneratedKeys();
                     double rate = 0.0;
+                    double generatedRate = 0.0;
                     long[] oldest = rateSamples.peekFirst();
                     if (oldest != null) {
                         rate = windowKeysPerSecond(oldest[0], oldest[1], now, keysNow);
+                        generatedRate = windowKeysPerSecond(oldest[0], oldest[2], now, generatedNow);
                     }
                     long uptime = Math.max(now - startTime, 1);
 
@@ -620,6 +626,8 @@ public class ConsumerJava implements Consumer {
                                     uptime,
                                     keysNow,
                                     rate,
+                                    generatedNow,
+                                    generatedRate,
                                     rateWindowSeconds,
                                     checkedKeysSumOfTimeToCheckContains.get(),
                                     runtimeStatistics.batchesByProducerSnapshot(),

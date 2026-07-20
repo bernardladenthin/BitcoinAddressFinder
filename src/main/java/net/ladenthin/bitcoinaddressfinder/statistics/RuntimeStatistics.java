@@ -37,6 +37,33 @@ public class RuntimeStatistics {
     private final ConcurrentMap<String, AtomicLong> batchesByProducer = new ConcurrentHashMap<>();
 
     /**
+     * Total candidate keys generated across all producers (lifetime). This is what enters the
+     * pipeline at the top — the producers' real output rate — as opposed to {@code checkedKeys} on
+     * the consumer, which counts only the hash160 lookups that survive the GPU pre-filter and reach
+     * LMDB. Kept here rather than derived from the batch count so it stays correct when producers
+     * with different {@code batchSizeInBits} run concurrently.
+     */
+    private final AtomicLong generatedKeys = new AtomicLong();
+
+    /**
+     * Records {@code count} freshly generated candidate keys (one producer batch).
+     *
+     * @param count the number of candidates in the batch (its {@code getOverallWorkSize()})
+     */
+    public void addGeneratedKeys(long count) {
+        generatedKeys.addAndGet(count);
+    }
+
+    /**
+     * Returns the lifetime total of generated candidate keys.
+     *
+     * @return candidates generated across all producers so far
+     */
+    public long getGeneratedKeys() {
+        return generatedKeys.get();
+    }
+
+    /**
      * Late-bound gauge returning the number of producers currently in the {@code RUNNING}
      * state. Defaults to {@code 0} until the orchestrator wires the real supplier, because
      * the consumer's statistics timer starts before the producers are constructed.
