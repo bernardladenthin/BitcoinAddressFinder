@@ -91,17 +91,21 @@ i.e. one coalesced transaction, where a fuse lookup makes three scattered reads.
 
 ---
 
-## 4. GPU probe (one session, RTX 3070 Laptop, 4 194 304 probes per op)
+## 4. GPU probe (one session, RTX 3070 Laptop, 4 194 304 probes per op, ms/op)
 
-| Filter | 1e7 | 1e8 | per probe @1e8 |
+| Filter | 1e7 | 1e8 | 1e9 |
 |---|--:|--:|--:|
-| `FUSE8` | 1.784 ± 0.008 | 3.011 ± 0.002 | 0.718 ns |
-| `FUSE16` | 2.437 ± 0.001 | 3.088 ± 0.018 | 0.736 ns |
-| `BLOCKED_BLOOM` 11/6 | **0.902 ± 0.029** | **1.459 ± 0.017** | **0.348 ns** |
+| `FUSE8` | 1.784 ± 0.008 | 3.011 ± 0.002 | 3.144 ± 0.037 |
+| `FUSE16` | 2.437 ± 0.001 | 3.088 ± 0.018 | — (no GPU arm run) |
+| `BLOCKED_BLOOM` 11/6 | **0.902 ± 0.029** | **1.459 ± 0.017** | 1.520 ± 0.051 |
+| `BLOCKED_BLOOM` 17/7 | — | — | 1.396 ± 0.022 |
+| `BLOCKED_BLOOM` 26/9 | — | — | **1.350 ± 0.029** |
 
-The coalescing advantage is confirmed cross-vendor — 1.6–2.3× on NVIDIA, and on RDNA3 it *grows*
-with size, reaching 2.53× at 1e9. The CPU's short-circuit advantage does **not** carry over: a warp
-runs in lockstep and waits for its slowest lane, so an early exit saves nothing.
+The coalescing advantage is confirmed cross-vendor and **grows with size**: blocked bloom's lead over
+Fuse-8 reaches **2.33×** at 1e9 on NVIDIA (1.7× at 1e7, 2.2× at 1e8), and 2.53× on RDNA3. The CPU's
+short-circuit advantage does **not** carry over: a warp runs in lockstep and waits for its slowest
+lane, so an early exit saves nothing — which is also why on the GPU the *denser* blocked bloom is
+*faster* (26/9 at 1.350 ms beats 11/6 at 1.520 ms), the opposite of the CPU ordering.
 
 `FUSE16` costs only **+2.6 %** over `FUSE8` at 1e8, against 37 % at 1e7. The gap closes with size
 because once both filters read from VRAM the access *count* is unchanged — only the payload per
@@ -111,17 +115,20 @@ access doubles.
 
 ## 5. Build cost (storage-free, first JIT-carrying shot discarded)
 
-| Backend | 1e7 | 1e8 |
-|---|--:|--:|
-| `BINARY_FUSE_8` | 3 793 ± 762 ms | 43 752 ± 8 796 ms |
-| `BINARY_FUSE_16` | 3 798 ± 646 ms | 43 628 ± 7 930 ms |
-| `BLOCKED_BLOOM` 11/6 | **669 ± 170 ms** | **14 560 ± 599 ms** |
-| `BLOCKED_BLOOM` 17/7 | 980 ± 48 ms | 14 959 ± 107 ms |
-| `BLOCKED_BLOOM` 26/9 | 1 215 ± 132 ms | 15 335 ± 384 ms |
+| Backend | 1e7 | 1e8 | 1e9 |
+|---|--:|--:|--:|
+| `BINARY_FUSE_8` | 3 793 ± 762 ms | 43 752 ± 8 796 ms | 610 948 ± 93 998 ms |
+| `BINARY_FUSE_16` | 3 798 ± 646 ms | 43 628 ± 7 930 ms | 621 422 ± 109 399 ms |
+| `BLOCKED_BLOOM` 11/6 | **669 ± 170 ms** | **14 560 ± 599 ms** | **159 398 ± 9 193 ms** |
+| `BLOCKED_BLOOM` 17/7 | 980 ± 48 ms | 14 959 ± 107 ms | 168 215 ± 30 410 ms |
+| `BLOCKED_BLOOM` 26/9 | 1 215 ± 132 ms | 15 335 ± 384 ms | 192 482 ± 14 483 ms |
 
-**Blocked bloom builds 3.0× faster at 1e8** and streams the bit array in one pass. Binary Fuse peels
-through auxiliary arrays at ~29 B/entry — roughly 40 GB of transient heap at the 1.377 B tier,
-against 1.89 GB for the finished blocked-bloom filter.
+**Blocked bloom builds 3.0× faster at 1e8 and 3.8× at 1e9** — the advantage grows with scale, because
+the multi-pass fuse peeling degrades faster than the single streaming pass. Binary Fuse peels through
+auxiliary arrays at ~29 B/entry — roughly 40 GB of transient heap at the 1.377 B tier, against 1.89 GB
+for the finished blocked-bloom filter. (The 1e9 fuse builds need ~48 GB of heap; an 8 GB run OOMs
+mid-peel, which is how the earlier "fuse cannot build at Full DB" claim arose — the machine, not the
+algorithm.)
 
 Two secondary readings: Fuse-8 and Fuse-16 build in the **same** time, so the cost is the peeling
 rather than the fingerprint width — Fuse-16 is free to build relative to Fuse-8 and costs only
@@ -142,18 +149,23 @@ total = probe + false-positive-rate × verification
 ```
 
 Verification is the LMDB read a false positive forces. It spans **4.1 µs warm to 292.7 µs cold** on
-the early microbenchmark, and the `TuneConfiguration` command has since measured it against two real
+the early microbenchmark, and the `TuneConfiguration` command has since measured it against real
 databases in their actual page-cache state:
 
-| Machine | Database | Measured verification cost |
+| Machine | Database state | Measured verification cost |
 |---|---|--:|
-| Ryzen 9800X3D / RX 7900 XTX | (operator's LMDB) | **195.56 µs** |
-| Ryzen 5800H / RTX 3070 | 5.5 GB LMDB, cold | **385.65 µs** |
+| Ryzen 9800X3D / RX 7900 XTX | operator's LMDB | **195.56 µs** |
+| Ryzen 5800H / RTX 3070 | 5.5 GB LMDB, **cold** (first touch) | **385.65 µs** |
+| Ryzen 5800H / RTX 3070 | same 5.5 GB LMDB, **warm** (after a sustained scan) | **~11 µs** |
 
-Both land near the **cold** end, i.e. 50–95× my original warm estimate of 4.1 µs — a real scan
-against real storage pays far more per false positive than the warm figure suggests, which is
-exactly why the tuner reports this term as ESTIMATED unless it measures your database directly. At
-385.65 µs a false positive costs ~5 000× a probe. At 1e9 entries, filters at equal footprint:
+The last two rows are the **same database** — a cold first-touch lookup costs 385 µs; once a sustained
+scan has pulled the working set into the page cache, the same lookup costs ~11 µs. A **35× spread on
+one database**, driven entirely by cache state. This is why the tuner reports the term as ESTIMATED
+unless it measures *your* database in *its* current state, and why the filter recommendation flips
+with it: expensive verification (cold, or a large database that never fully warms) rewards the filter
+with the lowest false-positive rate, while cheap verification (warm, small database) makes the choice
+nearly throughput-neutral. At the cold 385.65 µs a false positive costs ~5 000× a probe. At 1e9
+entries, filters at equal footprint:
 
 | Filter | Memory | Probe | FPR | Total warm | Total cold |
 |---|--:|--:|--:|--:|--:|
@@ -194,52 +206,71 @@ passes the CPU stage as well and the second filter is a no-op. This is pinned by
 `FilterCascadeTest#sameFilterTwice_rejectsNothing`, and it is why the recommended pairing
 deliberately uses two *different* filters.
 
-### Measured end-to-end, and what it corrects
+### Measured end-to-end, against a real database, at varying consumer capacity
 
-Running the full pipeline against the 5.5 GB LMDB on the RTX 3070, winner grid, only the GPU filter
-type varied (`TuneConfiguration` with `sweepFilterTypes`):
+This is the measurement the whole recommendation rested on and, until it was run, was only derived.
+Real `Find` runs against the 5.5 GB LMDB (`LMDB_ONLY`, `batchSizeInBits=22`, `keysPerWorkItem=256`),
+candidate rate read from the producer's batch counter, sweeping the consumer thread count. Two
+independent passes (A and D), reproducing to within 2 % — raw data in
+[`cascade_under_load.csv`](measurements/cascade_under_load.csv):
 
-| GPU filter | Net throughput | Survivors reaching the consumer |
-|---|--:|--:|
-| `FUSE_8` | 231.4 M/s | **3 615 569 /s** |
-| `FUSE_16` | 233.4 M/s | **14 141 /s** |
+| Consumer threads | `FUSE_8` (A / D) | `FUSE_16` (A / D) | Fuse-16 speed-up |
+|--:|--:|--:|--:|
+| 8 | 188.6 / 187.2 M/s | 227.8 / 228.1 M/s | **1.21×** |
+| 4 | 105.7 / 105.5 M/s | 228.2 / 228.5 M/s | **2.16×** |
+| 2 | 55.1 / 54.2 M/s | 228.3 / 228.2 M/s | **4.14×** |
+| 1 | 31.7 / 31.1 M/s | 228.3 / 228.6 M/s | **7.24×** |
 
-Two separate facts, and the second corrects an earlier overclaim of mine:
+Two facts, and the second **corrects an earlier claim in this very document**:
 
-- **Consumer load: 256× lower** — matching the 242× false-positive-rate ratio almost exactly. The
-  cascade does what the arithmetic said. This is the measured payoff.
-- **Net throughput: unchanged** (231 ≈ 233 M/s, within noise). On this rig the **GPU is the
-  bottleneck**, not the consumer: even Fuse-8's 3.6 M survivors/s did not saturate the (default
-  8-thread) consumer against a warm-cached database, so the better filter did not raise the ceiling.
-  An earlier version of this document claimed a flat "20× throughput" for the cascade; that was the
-  cost-per-candidate model mistaken for pipeline throughput, and the measurement refutes it.
+- **`FUSE_16` is flat at ~228 M/s regardless of thread count**, because it hands the consumer only
+  ~14 k survivors/s — the consumer never becomes the limiting stage, and the pipeline runs at the
+  GPU's rate. `FUSE_8` instead scales *linearly* with consumer threads, because its ~3.6 M
+  survivors/s make the single-verify path the bottleneck. The `Producer blocked (queue full)` counter
+  confirms it: thousands of stalls per window with `FUSE_8`, **zero** with `FUSE_16`.
 
-So `FUSE_16` on the device is best understood as **free insurance**: identical throughput, 256× less
-pressure on the serial verification path. It converts to an actual throughput *win* only when the
-consumer saturates — slower or genuinely cold storage (where the 385.65 µs cold cost bites), several
-GPUs feeding one consumer, or a heavier lookup backend. The cost model quantifies that regime: at the
-measured 385.65 µs, FUSE_8 totals 1 571 ns per candidate against FUSE_16's 87 ns, an 18× gap that
-appears the moment verification, not key generation, is the limiting stage.
+- **`FUSE_16` raises net throughput — by 1.21× at 8 threads up to 7.24× at 1 thread.** An earlier
+  version of this section reported the cascade as throughput-*neutral*, from a `TuneConfiguration`
+  `sweepFilterTypes` run that measured 231 vs 233 M/s. That run was misleading: the tuner's consumer
+  uses a trivial always-absent lookup (`NEVER_PRESENT`), never touching LMDB, so its consumer can
+  never saturate and the filter choice looks free. A **real** consumer doing real LMDB verification
+  saturates readily, and then the pre-filter's false-positive rate sets the ceiling. The lesson: do
+  not measure the cascade with a stubbed consumer.
 
-The lesson is the general one from this whole investigation: net throughput is `min(stage rates)`,
-not the sum of per-candidate costs. A stage improvement only moves the ceiling if that stage is the
-one holding it down.
+So the benefit is not fixed — it is `min(GPU rate, consumer rate)`, and `FUSE_16` raises the consumer
+rate 256× (matching the FPR ratio), removing it as the bottleneck. How much that helps depends on how
+close the consumer already was: abundant threads + warm cache → ~1.2×; a single thread, or cold
+storage (the 385 µs cold cost), or several GPUs feeding one consumer → several-fold to an order of
+magnitude. On this rig even 8 warm threads left 21 % on the table with `FUSE_8`.
+
+The general lesson from the whole investigation: net throughput is `min(stage rates)`, not the sum of
+per-candidate costs. A stage improvement only moves the ceiling if that stage is the one holding it
+down — and the GPU pre-filter's job is precisely to keep the single consumer from being that stage.
 
 ---
 
-## 8. Device allocation limit — check it before choosing
+## 8. Device allocation limit — a reported floor, not a hard cap
 
-The filter is a **single** OpenCL allocation, bounded by `CL_DEVICE_MAX_MEM_ALLOC_SIZE` rather than
-by total VRAM. That bound is vendor policy, not hardware:
+The filter is a **single** OpenCL allocation. `CL_DEVICE_MAX_MEM_ALLOC_SIZE` is often quoted as its
+ceiling, and the two vendors report very different values:
 
-| Device | Total VRAM | Max single allocation | Share |
+| Device | Total VRAM | Reported max single allocation | Share |
 |---|--:|--:|--:|
-| RTX 3070 Laptop | 8 191 MB | 2 047 MB | 25 % — the OpenCL spec minimum |
+| RTX 3070 Laptop | 8 191 MB | 2 047 MB | 25 % — the OpenCL spec *minimum* |
 | RX 7900 XTX | 24 560 MB | 20 876 MB | 85 % |
 
-At 2.25 B/entry the NVIDIA limit admits ~909 M entries. So the 1.377 B-entry Full DB needs `FUSE_8`
-on that card and fits `FUSE_16` comfortably on the AMD one. Run the `OpenCLInfo` command to read
-your device's limit before choosing.
+**The reported value is the spec's guaranteed minimum, not a hard limit — at least on NVIDIA.**
+An earlier version of this document treated the 2 047 MB as a ceiling and concluded the Full DB tier
+"needs `FUSE_8`" on the 3070. That was **wrong**: the RTX 3070 (driver 581.83) allocated and probed a
+**single 3 099 MiB buffer** — blocked bloom at 26 bits/entry over 1 e9 entries — with no error (§4).
+So NVIDIA under-reports the cap by ~4× and honours allocations up to roughly available VRAM; `FUSE_16`
+at the 1.377 B tier (3.14 GB) fits comfortably on the 3070's 8 GB, contrary to the old claim.
+
+The honest caveat: the OpenCL spec only *guarantees* allocations up to the reported value; anything
+larger is implementation-defined, and a different driver or device may enforce it strictly. So the
+robust test is whether the allocation actually succeeds, not the reported number — the upload path
+fails loudly rather than silently if it does not. Run `OpenCLInfo` to see the reported value, but
+treat it as a conservative floor.
 
 ---
 
@@ -248,16 +279,17 @@ your device's limit before choosing.
 **GPU runs — `gpuFilterType = FUSE_16` with `addressLookupBackend = BINARY_FUSE_8`**
 → [`examples/config_Find_GPU_Fuse16Cascade.json`](../examples/config_Find_GPU_Fuse16Cascade.json)
 
-Measured net throughput is **unchanged** versus Fuse-8 on the device (231 vs 233 M/s, within noise —
-the isolated probe benchmark's +2.6 % disappears once key generation, not the probe, sets the rate),
-while the work reaching the consumer drops **256×** (14 141/s against 3 615 569/s). It is free
-insurance: same speed, a serial verification path that stays far from saturation, and a real
-throughput win the moment storage is the bottleneck. The two stages are different filters, so they
-compound (§7).
+Measured against a real database, `FUSE_16` raises net throughput by **1.21× (8 warm consumer
+threads) up to 7.24× (1 thread)** while handing the consumer **256× less work** (§7). The gain grows
+as the consumer gets tighter — fewer threads, colder storage, or several GPUs per consumer — and is
+never negative, so it is the right default whenever a GPU filter is used and the filter fits in VRAM.
+The two stages are different filters, so they compound.
 
-Where the device allocation limit cannot hold Fuse-16, swap them
-→ [`examples/config_Find_GPU_LowVram.json`](../examples/config_Find_GPU_LowVram.json). Fuse-8 fits
-every limit measured so far, including the Full DB tier on an 8 GB NVIDIA card.
+`FUSE_16` fits the Full DB tier (3.14 GB) even on an 8 GB NVIDIA card — the reported 2 047 MB
+allocation cap is a spec floor, not a real limit (§8). Keep
+[`examples/config_Find_GPU_LowVram.json`](../examples/config_Find_GPU_LowVram.json) (`FUSE_8` on the
+device) only as a fallback for genuinely small cards or drivers that enforce the cap strictly; on the
+hardware measured here it is not needed.
 
 **CPU-only runs — `BINARY_FUSE_16`.** 14× lower total cost than Fuse-8 against a cold database
 (85 ns vs 1 211 ns), and no GPU filter is built, so the second filter costs nothing.

@@ -30,12 +30,14 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
  * <p>{@link #FUSE_16} costs twice the VRAM and roughly a 6 % longer probe, and cuts the load on
  * the bottleneck by ~240&times;. Prefer it whenever it fits.
  *
- * <p><b>It may not fit.</b> The filter is a single OpenCL allocation, bounded by
- * {@code CL_DEVICE_MAX_MEM_ALLOC_SIZE} rather than by total VRAM, and that bound is
- * vendor-dependent — 2047 MB of 8191 on an RTX 3070 (the spec minimum, a quarter of VRAM) against
- * 20876 MB of 24560 on an RX 7900 XTX. At 2.25 B/entry the NVIDIA limit admits ~909 M entries, so
- * the 1.377 B-entry Full DB needs {@link #FUSE_8} there and fits {@link #FUSE_16} comfortably on
- * the AMD card. Run {@code {"command":"OpenCLInfo"}} to read your device's limit.
+ * <p><b>VRAM.</b> The filter is a single OpenCL allocation. {@code CL_DEVICE_MAX_MEM_ALLOC_SIZE} is
+ * often read as its ceiling — 2047 MB of 8191 on an RTX 3070, 20876 MB of 24560 on an RX 7900 XTX —
+ * but that value is the OpenCL spec's guaranteed <em>minimum</em>, not a hard cap. NVIDIA
+ * under-reports it: driver 581.83 allocated and probed a single 3099&nbsp;MiB buffer on the 3070
+ * with no error, so {@link #FUSE_16} at the 1.377&nbsp;B Full DB tier (3.14&nbsp;GB) fits its 8&nbsp;GB
+ * fine. The robust test is whether the allocation actually succeeds (the upload path fails loudly if
+ * not), not the reported number; treat it as a conservative floor. Run
+ * {@code {"command":"OpenCLInfo"}} to read it.
  *
  * <h2>Why blocked Bloom is not offered here</h2>
  * It probes 1.6–2.3&times; faster on the device — all {@code k} bits sit in one coalesced 64-byte

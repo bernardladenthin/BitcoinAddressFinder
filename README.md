@@ -345,11 +345,12 @@ Blocked Bloom is twice as fast at the one thing that stopped mattering.
   outright, being both smaller and 37× more accurate.
 - **`LMDB_ONLY`** — whenever a false positive is unacceptable rather than merely costly.
 
-> **On GPU, check the buffer limit, not the VRAM total.** The filter is a single OpenCL allocation
-> and cannot exceed `CL_DEVICE_MAX_MEM_ALLOC_SIZE`, which is commonly a *quarter* of VRAM — 2047 MB
-> on an 8 GB RTX 3070 despite 8191 MB total. At the Full DB tier that admits `BINARY_FUSE_8`
-> (1.58 GB) and low-density `BLOCKED_BLOOM` (1.89 GB), and rules out `BINARY_FUSE_16` (3.14 GB) and
-> dense `BLOCKED_BLOOM`. Run `{"command":"OpenCLInfo"}` to read your device's limit.
+> **On GPU, `CL_DEVICE_MAX_MEM_ALLOC_SIZE` is a reported floor, not a hard cap.** The filter is a
+> single OpenCL allocation. NVIDIA reports a conservative quarter of VRAM (2047 MB on an 8 GB RTX
+> 3070) but the driver actually honours far larger single buffers — a 3.1 GB blocked-bloom filter
+> allocated and ran fine on the 3070 — so `BINARY_FUSE_16` (3.14 GB) fits the Full DB tier there
+> after all. The robust test is whether the allocation succeeds (the upload path fails loudly if it
+> does not), not the reported number. Run `{"command":"OpenCLInfo"}` to read it.
 
 All numbers above come from the storage-free bench in
 [`docs/measurements/bench_filters.sh`](docs/measurements/bench_filters.sh), which measures the
@@ -574,14 +575,14 @@ The probe sequence is `bit_i = (x + i·y) mod 512`, whose period is `512 / gcd(y
 
 Ready-to-run example covering both tiers: [`examples/config_Find_AnyDB_Fuse8.json`](examples/config_Find_AnyDB_Fuse8.json).
 
-`BINARY_FUSE_8` is the recommended backend for both the Light and the Full database, on CPU and on
-GPU — see [Which filter to pick](#which-filter-to-pick). It is the smallest filter measured
-(1.126 B/entry), has the lowest total cost per lookup once verification is counted, is the only
-in-RAM filter with a GPU kernel, and at 1.58 GB stays under the single-allocation limit that
-typically caps an OpenCL buffer at a quarter of VRAM. Building it at the Full DB tier needs roughly
-40 GB of transient heap for the peeling arrays, so raise `-Xmx` accordingly; if that heap is
-unavailable or you rebuild often, `BLOCKED_BLOOM` builds 3x faster in a single streaming pass and
-needs only its finished 1.89 GB.
+`BINARY_FUSE_8` is a safe simple default for the consumer backend (`addressLookupBackend`) on both
+tiers — see [Which filter to pick](#which-filter-to-pick) for the full picture, including when
+`BINARY_FUSE_16` is the better consumer choice (cold storage) and why the GPU **pre-filter**
+(`gpuFilterType`) should usually be `FUSE_16`. Fuse-8 is the smallest filter measured (1.126 B/entry),
+has a low total cost per lookup once verification is counted, and is the only in-RAM filter with a
+GPU kernel. Building it at the Full DB tier needs roughly 40 GB of transient heap for the peeling
+arrays, so raise `-Xmx` accordingly; if that heap is unavailable or you rebuild often, `BLOCKED_BLOOM`
+builds 3–4× faster in a single streaming pass and needs only its finished 1.89 GB.
 
 `BLOCKED_BLOOM` is therefore an **addition, not a replacement** — the two filters have genuinely different optimal domains, so neither was removed.
 

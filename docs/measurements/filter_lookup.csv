@@ -193,3 +193,9 @@ ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:9:5,1000000000,42.808,2.63
 ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:18:7,10000000,25.036,1.483,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
 ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:18:7,100000000,34.273,0.663,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
 ryzen79800x3d8core-61g-win11,2026-07-20,BLOCKED_BLOOM:18:7,1000000000,41.461,2.110,5,prng,bench_filters.sh block 2 second run - single session; reproduces the 2026-07-19 run within noise
+ryzen75800h-63g-win11,2026-07-20,BINARY_FUSE_8,1000000000,77.718,1.788,5,prng,48g re-run at 1B (fixes the earlier 8g OOM); single JMH session
+ryzen75800h-63g-win11,2026-07-20,BINARY_FUSE_16,1000000000,82.767,6.955,5,prng,48g re-run at 1B (fixes the earlier 8g OOM); single JMH session
+ryzen75800h-63g-win11,2026-07-20,TRUNCATED_LONG_64,1000000000,1043.618,40.265,5,prng,48g re-run at 1B (fixes the earlier 8g OOM); single JMH session
+ryzen75800h-63g-win11,2026-07-20,BLOCKED_BLOOM:11:6,1000000000,60.27,2.539,5,prng,48g re-run at 1B (fixes the earlier 8g OOM); single JMH session
+ryzen75800h-63g-win11,2026-07-20,BLOCKED_BLOOM:17:7,1000000000,63.104,13.481,5,prng,48g re-run at 1B (fixes the earlier 8g OOM); single JMH session
+ryzen75800h-63g-win11,2026-07-20,BLOCKED_BLOOM:26:9,1000000000,54.834,6.234,5,prng,48g re-run at 1B (fixes the earlier 8g OOM); single JMH session
