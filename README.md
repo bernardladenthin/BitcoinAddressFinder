@@ -1871,28 +1871,41 @@ This resembles the historic Android `SecureRandom` vulnerability: the elliptic-c
 BitcoinAddressFinder can simulate this type of scenario by generating keys using intentionally weak or deterministic RNGs and scanning the resulting restricted key ranges. This makes it possible to study how insecure RNGs can compromise wallets.
 
 ## Similar projects
-* The [LBC](https://lbc.cryptoguru.org/) is optimized to find keys for the [Bitcoin Puzzle Transaction](https://privatekeys.pw/puzzles/bitcoin-puzzle-tx). It require communication to a server, doesn't support altcoin and pattern matching.
-* https://privatekeys.pw/scanner/bitcoin
-* https://allprivatekeys.com/get-lucky
-* https://allprivatekeys.com/vanity-address
-* https://github.com/treyyoder/bitcoin-wallet-finder
-* https://github.com/albertobsd/keyhunt
-* https://github.com/brichard19/BitCrack — CUDA/OpenCL secp256k1 brute-forcer
-* https://github.com/kanhavishva/KeyHunt-Cuda — CUDA key/puzzle hunter (a modified version of [VanitySearch](https://github.com/JeanLucPons/VanitySearch))
-* https://github.com/mvrc42/bitp0wn
-* https://github.com/JeanLucPons/BTCCollider
-* https://github.com/JeanLucPons/VanitySearch
-* https://github.com/JamieAcharya/Bitcoin-Private-Key-Finder
-* https://github.com/mingfunwong/all-bitcoin-private-key
-* https://github.com/Frankenmint/PKGenerator_Checker
-* https://github.com/Henshall/BitcoinPrivateKeyHunter
-* https://github.com/Xefrok/BitBruteForce-Wallet
-* https://github.com/Isaacdelly/Plutus
-* https://github.com/Noname400/Hunt-to-Mnemonic
-* https://github.com/Py-Project/Bitcoin-wallet-cracker
-* https://github.com/johncantrell97/bip39-solver-gpu
-* https://github.com/ilkerccom/bitcrackrandomiser
-* https://btcpuzzle.info/
+
+A non-exhaustive list of related tools and services. **Type** is a rough category for orientation, not an endorsement or a feature guarantee.
+
+| Project | Type |
+|---|---|
+| [LBC](https://lbc.cryptoguru.org/) | Puzzle solver — server-based, no altcoin/vanity |
+| [privatekeys.pw — scanner](https://privatekeys.pw/scanner/bitcoin) | Online key scanner |
+| [privatekeys.pw — cloud search](https://privatekeys.pw/cloud-search/) | Online cloud key search |
+| [allprivatekeys.com — get lucky](https://allprivatekeys.com/get-lucky) | Online random key try |
+| [allprivatekeys.com — vanity address](https://allprivatekeys.com/vanity-address) | Online vanity generator |
+| [treyyoder/bitcoin-wallet-finder](https://github.com/treyyoder/bitcoin-wallet-finder) | Wallet / balance finder |
+| [albertobsd/keyhunt](https://github.com/albertobsd/keyhunt) | CPU key / puzzle hunter |
+| [brichard19/BitCrack](https://github.com/brichard19/BitCrack) | GPU brute-forcer (CUDA/OpenCL secp256k1) |
+| [kanhavishva/KeyHunt-Cuda](https://github.com/kanhavishva/KeyHunt-Cuda) | GPU key / puzzle hunter (CUDA; [VanitySearch](https://github.com/JeanLucPons/VanitySearch)-based) |
+| [mvrc42/bitp0wn](https://github.com/mvrc42/bitp0wn) | Key-recovery experiments |
+| [JeanLucPons/BTCCollider](https://github.com/JeanLucPons/BTCCollider) | Address collider (RIPEMD-160) |
+| [JeanLucPons/VanitySearch](https://github.com/JeanLucPons/VanitySearch) | GPU vanity generator |
+| [JamieAcharya/Bitcoin-Private-Key-Finder](https://github.com/JamieAcharya/Bitcoin-Private-Key-Finder) | Key finder |
+| [mingfunwong/all-bitcoin-private-key](https://github.com/mingfunwong/all-bitcoin-private-key) | Key enumeration |
+| [Frankenmint/PKGenerator_Checker](https://github.com/Frankenmint/PKGenerator_Checker) | Key generator + balance checker |
+| [Henshall/BitcoinPrivateKeyHunter](https://github.com/Henshall/BitcoinPrivateKeyHunter) | Key hunter |
+| [Xefrok/BitBruteForce-Wallet](https://github.com/Xefrok/BitBruteForce-Wallet) | Brute-forcer |
+| [Isaacdelly/Plutus](https://github.com/Isaacdelly/Plutus) | Balance checker |
+| [Noname400/Hunt-to-Mnemonic](https://github.com/Noname400/Hunt-to-Mnemonic) | Mnemonic hunter |
+| [Py-Project/Bitcoin-wallet-cracker](https://github.com/Py-Project/Bitcoin-wallet-cracker) | Wallet cracker |
+| [johncantrell97/bip39-solver-gpu](https://github.com/johncantrell97/bip39-solver-gpu) | BIP39 seed solver (GPU) |
+| [ilkerccom/bitcrackrandomiser](https://github.com/ilkerccom/bitcrackrandomiser) | BitCrack randomiser (puzzle) |
+| [btcpuzzle.info](https://btcpuzzle.info/) | Puzzle site |
+| [oritwoen/vgen](https://github.com/oritwoen/vgen) | Vanity generator |
+| [vlnahp/KeyZero](https://github.com/vlnahp/KeyZero) | Key finder |
+| [samr7/vanitygen](https://github.com/samr7/vanitygen) | CPU vanity generator (the classic) |
+| [10gic/vanitygen-plusplus](https://github.com/10gic/vanitygen-plusplus) | Vanity generator (multi-coin fork) |
+| [gurnec/btcrecover](https://github.com/gurnec/btcrecover) | Wallet password / seed recovery |
+| [Coding-Enthusiast/FinderOuter](https://github.com/Coding-Enthusiast/FinderOuter) | Wallet recovery (.NET) |
+| [prof7bit/wallet-key-tool](https://github.com/prof7bit/wallet-key-tool) | Wallet key import/export (GUI) |
 
 ### Deep learning private key prediction
 An export of the full database can be used to predict private keys with deep learning. A funny idea: https://github.com/DRSZL/BitcoinTensorFlowPrivateKeyPrediction
