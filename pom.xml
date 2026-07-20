@@ -665,10 +665,13 @@ SPDX-License-Identifier: Apache-2.0
                         <!-- Whole-fork budget: with reuseForks=false this must cover JVM
                              startup + EVERY method of one test class + JVM shutdown.
                              60s was sporadically exceeded by socket-heavy classes
-                             (e.g. KeyProducerJavaZmqTest) on loaded Windows runners,
-                             killing the fork with "There was a timeout in the fork"
-                             even though all tests passed. -->
-                        <forkedProcessTimeoutInSeconds>180</forkedProcessTimeoutInSeconds>
+                             (e.g. KeyProducerJavaZmqTest) on loaded Windows runners, so it
+                             was raised to 180s; 180s was in turn occasionally exceeded on
+                             slow/overloaded CI runners (a ~2x-slow run plus the
+                             Lincheck/jcstress concurrency forks), killing the fork with
+                             "There was a timeout in the fork" even though all tests passed
+                             — hence 240s. -->
+                        <forkedProcessTimeoutInSeconds>240</forkedProcessTimeoutInSeconds>
                 </configuration>
             </plugin>
             <plugin>

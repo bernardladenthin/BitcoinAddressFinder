@@ -1772,7 +1772,7 @@ cost balance shifts):
 
 **Symptom.** On AMD GPUs (measured: Radeon RX 7900 XTX, `gfx1100`, RDNA3, Adrenalin 25.12.1,
 OpenCL 2.0 AMD-APP) the **first** `clBuildProgram` of the full kernel took **8–16+ minutes** —
-single-threaded, one core pinned, multi-GB RAM — and routinely blew past the 180 s Surefire fork
+single-threaded, one core pinned, multi-GB RAM — and routinely blew past the 240 s Surefire fork
 budget, so the OpenCL parity tests could not even run. A trivial `add` kernel compiles in **0.2 s** on
 the same device, so the OpenCL stack itself is healthy; the cost is specific to this one large kernel.
 NVIDIA (RTX 3070) builds the identical source in seconds.
@@ -1913,7 +1913,7 @@ follow-ups below.)
   (comb `point_mul_xy_comb`, `point_add`, `point_add_xy`, `inv_mod_safegcd`, `sha256_transform`,
   `ripemd160_transform`) via a `NOINLINE_HEAVY` marker — while keeping the field multiply
   (`mul_mod`/`fe10x26_mul`) inline — compiled in **~5.3 min** (vs ~16 min fully inlined, ~3 s blanket).
-  Still far over the 180 s test-fork budget, so it cannot serve as the AMD default. Root cause: the
+  Still far over the 240 s test-fork budget, so it cannot serve as the AMD default. Root cause: the
   **field multiply is both the compile bottleneck** (inlined into `point_add`/`point_add_xy`/conversions
   everywhere) **and the runtime-hottest function** — keep it inline and compile stays minutes;
   out-of-line it and runtime collapses toward the blanket's 3.3×. No split wins both, so the blanket
