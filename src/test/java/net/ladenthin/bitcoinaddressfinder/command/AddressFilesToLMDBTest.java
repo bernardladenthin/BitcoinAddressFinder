@@ -348,13 +348,14 @@ public class AddressFilesToLMDBTest extends LMDBBase {
     /** Duration formatting is locale-independent (no decimals), so exact strings can be asserted. */
     @Test
     public void formatDuration_rendersCompactHoursMinutesSeconds() {
-        assertThat(AddressFilesToLMDB.formatDuration(0L), is(equalTo("0s")));
-        assertThat(AddressFilesToLMDB.formatDuration(45L), is(equalTo("45s")));
-        assertThat(AddressFilesToLMDB.formatDuration(60L), is(equalTo("1m 0s")));
-        assertThat(AddressFilesToLMDB.formatDuration(125L), is(equalTo("2m 5s")));
-        assertThat(AddressFilesToLMDB.formatDuration(3_600L), is(equalTo("1h 0m")));
-        assertThat(AddressFilesToLMDB.formatDuration(8_100L), is(equalTo("2h 15m")));
-        assertThat(AddressFilesToLMDB.formatDuration(-1L), is(equalTo("?")));
+        AddressFilesToLMDB importer = new AddressFilesToLMDB(new CAddressFilesToLMDB());
+        assertThat(importer.formatDuration(0L), is(equalTo("0s")));
+        assertThat(importer.formatDuration(45L), is(equalTo("45s")));
+        assertThat(importer.formatDuration(60L), is(equalTo("1m 0s")));
+        assertThat(importer.formatDuration(125L), is(equalTo("2m 5s")));
+        assertThat(importer.formatDuration(3_600L), is(equalTo("1h 0m")));
+        assertThat(importer.formatDuration(8_100L), is(equalTo("2h 15m")));
+        assertThat(importer.formatDuration(-1L), is(equalTo("?")));
     }
 
     /**
@@ -363,12 +364,13 @@ public class AddressFilesToLMDBTest extends LMDBBase {
      */
     @Test
     public void humanBytes_picksTheRightUnit() {
-        assertThat(AddressFilesToLMDB.humanBytes(0L), is(equalTo("0 B")));
-        assertThat(AddressFilesToLMDB.humanBytes(512L), is(equalTo("512 B")));
-        assertThat(AddressFilesToLMDB.humanBytes(1L << 10), containsString("KiB"));
-        assertThat(AddressFilesToLMDB.humanBytes(1L << 20), containsString("MiB"));
-        assertThat(AddressFilesToLMDB.humanBytes(1L << 30), containsString("GiB"));
-        assertThat(AddressFilesToLMDB.humanBytes(58L << 30), containsString("GiB"));
+        AddressFilesToLMDB importer = new AddressFilesToLMDB(new CAddressFilesToLMDB());
+        assertThat(importer.humanBytes(0L), is(equalTo("0 B")));
+        assertThat(importer.humanBytes(512L), is(equalTo("512 B")));
+        assertThat(importer.humanBytes(1L << 10), containsString("KiB"));
+        assertThat(importer.humanBytes(1L << 20), containsString("MiB"));
+        assertThat(importer.humanBytes(1L << 30), containsString("GiB"));
+        assertThat(importer.humanBytes(58L << 30), containsString("GiB"));
     }
 
     // </editor-fold>

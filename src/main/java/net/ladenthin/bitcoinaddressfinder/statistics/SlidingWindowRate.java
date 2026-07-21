@@ -20,7 +20,7 @@ import lombok.ToString;
  * running on one scheduler in {@code ConsumerJava}, and a single reader elsewhere.
  */
 @ToString
-public final class SlidingWindowRate {
+public class SlidingWindowRate {
 
     /** One immutable {@code (timestamp, value)} odometer sample. */
     private record Sample(long timestampMillis, long value) {}

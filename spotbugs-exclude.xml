@@ -1185,6 +1185,15 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
     </Match>
 
+    <!-- The constructor fail-fast validates windowMillis and the class is intentionally non-final (so it
+         can be subclassed / mocked in tests). SpotBugs then warns about a finalizer attack on the
+         partially-constructed object, but that vector is obsolete: finalize() is deprecated since Java 9,
+         this class declares none, and it holds no security-sensitive state. -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.statistics.SlidingWindowRate"/>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+
     <!-- By design: drainEntries() runs only after the writer has already failed; it repeatedly polls the
          parser→writer queue purely to discard entries so parser threads blocked on a full queue can
          finish. The polled value is intentionally dropped (RV_RETURN_VALUE_IGNORED). -->

@@ -289,7 +289,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
      * synchronization. Samples the running byte count (~1/s) into a trailing-rate window and, on the
      * throttled interval, logs overall percent plus an ETA derived from that rate.
      */
-    private final class ReaderProgress {
+    private class ReaderProgress {
 
         private final long totalBytes;
         private final SlidingWindowRate byteRate = new SlidingWindowRate(RATE_WINDOW_MILLIS);
@@ -338,7 +338,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     /** Formats a byte count as a human-readable KiB/MiB/GiB string. */
     @VisibleForTesting
-    static String humanBytes(long bytes) {
+    String humanBytes(long bytes) {
         if (bytes >= 1L << 30) {
             return String.format("%.1f GiB", bytes / (double) (1L << 30));
         }
@@ -353,7 +353,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     /** Formats a duration in seconds as a compact {@code Hh Mm} / {@code Mm Ss} / {@code Ss} string. */
     @VisibleForTesting
-    static String formatDuration(long totalSeconds) {
+    String formatDuration(long totalSeconds) {
         if (totalSeconds < 0L) {
             return "?";
         }
