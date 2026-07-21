@@ -219,6 +219,13 @@ public class LMDBPersistence implements Persistence, AddressIterable {
         }
 
         logStatsIfConfigured(false);
+        // The writable env runs with MDB_NOSYNC/MDB_NOMETASYNC/MDB_MAPASYNC: commits are NOT flushed to
+        // disk during the run (fast, but a crash may lose or corrupt data — acceptable for a rebuildable
+        // import DB). Force one full, durable flush here so a normal shutdown leaves everything on disk.
+        // Read-only envs have nothing to sync, so this only applies to the writable env.
+        if (lmdbConfigurationWrite != null) {
+            localEnv.sync(true);
+        }
         localLmdb_h160ToAmount.close();
         localEnv.close();
     }
