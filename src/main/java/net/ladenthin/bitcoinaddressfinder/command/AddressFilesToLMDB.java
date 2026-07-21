@@ -51,8 +51,9 @@ import org.slf4j.LoggerFactory;
  * thread) reads the current file line by line into a bounded {@link BlockingQueue}; {@code threads}
  * parser workers take lines and decode them into {@link AddressToCoin} entries on a second bounded
  * queue; and a <b>single writer</b> drains that queue and writes to LMDB in <b>batches</b> (one write
- * transaction per {@value #WRITE_BATCH_SIZE} entries). LMDB is a single-writer store and a commit per
- * address is the dominant cost of a bulk import, so batching the writes — not the reading — is the main
+ * transaction per {@code writeBatchSize} entries, default 10000). LMDB is a single-writer store and a
+ * commit per address is the dominant cost of a bulk import, so batching the writes — not the reading —
+ * is the main
  * speedup. Reading files one at a time keeps all workers busy on the current file and never has several
  * threads reading different whole files at once.
  *
@@ -69,14 +70,6 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     /** Log a write-progress line every this many written addresses. */
     private static final long PROGRESS_LOG = 100_000;
-
-    /** Number of entries written per LMDB transaction. One commit per batch is the import speedup. */
-    private static final int WRITE_BATCH_SIZE = 10_000;
-
-    /** Capacity of the reader→parser line queue and the parser→writer entry queue (back-pressure). */
-    private static final int LINE_QUEUE_CAPACITY = 200_000;
-
-    private static final int ENTRY_QUEUE_CAPACITY = 200_000;
 
     /** Poll timeout used when draining the queues so the "upstream done and queue empty" exit is re-checked. */
     private static final long QUEUE_POLL_MILLIS = 50;
@@ -132,6 +125,8 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
         CLMDBConfigurationWrite lmdbConfigurationWrite =
                 Objects.requireNonNull(addressFilesToLMDB.lmdbConfigurationWrite);
         final int threads = Math.max(1, addressFilesToLMDB.threads);
+        final int writeBatchSize = Math.max(1, addressFilesToLMDB.writeBatchSize);
+        final int queueCapacity = Math.max(1, addressFilesToLMDB.queueCapacity);
 
         if (threads > 1 && !lmdbConfigurationWrite.useStaticAmount) {
             LOGGER.warn(
@@ -155,8 +150,8 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
                 fileHelper.assertFilesExists(files);
 
                 LOGGER.info("Import " + files.size() + " address file(s) with " + threads + " parser thread(s), "
-                        + "batched writes of " + WRITE_BATCH_SIZE + " ...");
-                importFiles(network, persistence, files, threads);
+                        + "batched writes of " + writeBatchSize + ", queue capacity " + queueCapacity + " ...");
+                importFiles(network, persistence, files, threads, writeBatchSize, queueCapacity);
                 logSummary();
                 LOGGER.info("... import done.");
             } catch (IOException e) {
@@ -171,17 +166,22 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
      * pipeline and blocks until every file is imported.
      */
     private void importFiles(
-            @NonNull Network network, @NonNull LMDBPersistence persistence, @NonNull List<File> files, int threads)
+            @NonNull Network network,
+            @NonNull LMDBPersistence persistence,
+            @NonNull List<File> files,
+            int threads,
+            int writeBatchSize,
+            int queueCapacity)
             throws IOException {
-        final BlockingQueue<String> lineQueue = new LinkedBlockingQueue<>(LINE_QUEUE_CAPACITY);
-        final BlockingQueue<AddressToCoin> entryQueue = new LinkedBlockingQueue<>(ENTRY_QUEUE_CAPACITY);
+        final BlockingQueue<String> lineQueue = new LinkedBlockingQueue<>(queueCapacity);
+        final BlockingQueue<AddressToCoin> entryQueue = new LinkedBlockingQueue<>(queueCapacity);
         final AtomicBoolean readingDone = new AtomicBoolean(false);
         final AtomicBoolean parsingDone = new AtomicBoolean(false);
         final AtomicReference<Throwable> failure = new AtomicReference<>();
 
         final ExecutorService writerExecutor = Executors.newSingleThreadExecutor();
         final Future<?> writerFuture =
-                writerExecutor.submit(() -> runWriter(persistence, entryQueue, parsingDone, failure));
+                writerExecutor.submit(() -> runWriter(persistence, entryQueue, parsingDone, failure, writeBatchSize));
 
         final ExecutorService parserPool = Executors.newFixedThreadPool(threads);
         final List<Future<?>> parserFutures = new ArrayList<>(threads);
@@ -298,10 +298,11 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
             @NonNull LMDBPersistence persistence,
             @NonNull BlockingQueue<AddressToCoin> entryQueue,
             @NonNull AtomicBoolean parsingDone,
-            @NonNull AtomicReference<Throwable> failure)
+            @NonNull AtomicReference<Throwable> failure,
+            int writeBatchSize)
             throws InterruptedException {
-        List<ByteBuffer> hash160Batch = new ArrayList<>(WRITE_BATCH_SIZE);
-        List<Coin> amountBatch = new ArrayList<>(WRITE_BATCH_SIZE);
+        List<ByteBuffer> hash160Batch = new ArrayList<>(writeBatchSize);
+        List<Coin> amountBatch = new ArrayList<>(writeBatchSize);
         try {
             while (failure.get() == null && !(parsingDone.get() && entryQueue.isEmpty())) {
                 AddressToCoin entry = entryQueue.poll(QUEUE_POLL_MILLIS, TimeUnit.MILLISECONDS);
@@ -310,7 +311,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
                 }
                 hash160Batch.add(entry.hash160());
                 amountBatch.add(entry.coin());
-                if (hash160Batch.size() >= WRITE_BATCH_SIZE) {
+                if (hash160Batch.size() >= writeBatchSize) {
                     flushBatch(persistence, hash160Batch, amountBatch);
                 }
             }

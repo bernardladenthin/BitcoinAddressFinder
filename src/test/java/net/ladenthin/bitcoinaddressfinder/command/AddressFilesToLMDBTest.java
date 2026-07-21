@@ -259,6 +259,27 @@ public class AddressFilesToLMDBTest extends LMDBBase {
         }
     }
 
+    /**
+     * A tiny {@code writeBatchSize} forces the writer through many flushes and a tiny
+     * {@code queueCapacity} exercises the queue back-pressure; the imported set must still be complete.
+     */
+    @Test
+    public void addressFilesToLMDB_smallBatchAndQueue_importsAllAddresses() throws Exception {
+        List<String> files = writeAddressFilesRoundRobin(base58P2PKHAddresses(), 4, "batch");
+
+        File lmdbDir = runImport(2, true, files, "batch", 3, 8);
+
+        LMDBPersistence lmdb = openReadOnly(lmdbDir);
+        try {
+            assertThat(lmdb.count(), is(equalTo((long) P2PKH.values().length)));
+            for (P2PKH staticTestAddress : P2PKH.values()) {
+                assertThat(lmdb.containsAddress(staticTestAddress.getPublicKeyHashAsByteBuffer()), is(true));
+            }
+        } finally {
+            lmdb.close();
+        }
+    }
+
     private List<String> base58P2PKHAddresses() {
         List<String> addresses = new ArrayList<>();
         for (P2PKH staticTestAddress : P2PKH.values()) {
@@ -286,9 +307,22 @@ public class AddressFilesToLMDBTest extends LMDBBase {
     }
 
     private File runImport(int threads, boolean useStaticAmount, List<String> files, String name) throws IOException {
+        return runImport(threads, useStaticAmount, files, name, 10_000, 200_000);
+    }
+
+    private File runImport(
+            int threads,
+            boolean useStaticAmount,
+            List<String> files,
+            String name,
+            int writeBatchSize,
+            int queueCapacity)
+            throws IOException {
         CAddressFilesToLMDB config = new CAddressFilesToLMDB();
         config.addressesFiles.addAll(files);
         config.threads = threads;
+        config.writeBatchSize = writeBatchSize;
+        config.queueCapacity = queueCapacity;
         config.lmdbConfigurationWrite = new CLMDBConfigurationWrite();
         config.lmdbConfigurationWrite.useStaticAmount = useStaticAmount;
         config.lmdbConfigurationWrite.staticAmount = 0L;
