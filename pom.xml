@@ -660,18 +660,7 @@ SPDX-License-Identifier: Apache-2.0
                         <!-- Fork just one JVM for test isolation -->
                         <forkCount>1</forkCount>
                         <reuseForks>false</reuseForks>
-                        <!-- @{argLine} injects the JaCoCo agent + the project argLine property.
-                             -XX:+EnableDynamicAgentLoading silences the JVM's "A Java agent has been
-                             loaded dynamically" warning that Mockito's inline mock maker triggers when
-                             it self-attaches byte-buddy at runtime. That warning is written to the
-                             *native* stderr (outside Surefire's wrapped System.err) and intermittently
-                             corrupted the encoded fork channel — surfacing as "Corrupted channel by
-                             directly writing to native stream" and then a bogus "There was a timeout in
-                             the fork", even though every test passed (flaky, seen on ubuntu). Enabling
-                             the flag removes the native write, so the channel stays clean. It is a
-                             -XX flag (test-fork only) and is deliberately NOT part of the module-flag
-                             list synchronised across pom/jvm.config/launchers by
-                             JvmModuleFlagConsistencyTest. -->
+                        <!-- -XX:+EnableDynamicAgentLoading: silences the JDK 21 byte-buddy self-attach agent warning that intermittently corrupts Surefire's fork channel ("Corrupted channel ..." / bogus "timeout in the fork"). See workspace policy ci-test-diagnostics.md section 2.1: https://github.com/bernardladenthin/workspace/blob/main/policies/ci-test-diagnostics.md - root cause: https://github.com/raphw/byte-buddy/issues/1639 -->
                         <argLine>@{argLine} -XX:+EnableDynamicAgentLoading</argLine>
                         <!-- Whole-fork budget: with reuseForks=false this must cover JVM
                              startup + EVERY method of one test class + JVM shutdown.
