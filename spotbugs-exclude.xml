@@ -1160,6 +1160,34 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="HES_LOCAL_EXECUTOR_SERVICE"/>
     </Match>
 
+    <!-- By design: the importer builds a short-lived reader pool and a single-writer executor for the
+         one import run and shuts both down (shutdownNow) in the finally block of importFiles(). They are
+         local because their lifetime is exactly one import, not the object's lifetime. -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.command.AddressFilesToLMDB"/>
+        <Method name="importFiles"/>
+        <Bug pattern="HES_LOCAL_EXECUTOR_SERVICE"/>
+    </Match>
+
+    <!-- By design: drainRemaining() runs only after the writer has already failed; it repeatedly polls
+         the hand-off queue purely to discard entries so reader threads blocked on a full queue can
+         finish. The polled value is intentionally dropped (RV_RETURN_VALUE_IGNORED). -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.command.AddressFilesToLMDB"/>
+        <Method name="drainRemaining"/>
+        <Bug pattern="RV_RETURN_VALUE_IGNORED"/>
+    </Match>
+
+    <!-- By design: a reader thread hands each parsed address to the single LMDB writer through a
+         Consumer<AddressToCoin> supplied to AddressFile, and that functional interface cannot throw a
+         checked exception. An interrupt while the bounded queue is full is therefore surfaced as an
+         unchecked IllegalStateException (the interrupt flag is restored first). -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.command.AddressFilesToLMDB"/>
+        <Method name="putOrFail"/>
+        <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
+    </Match>
+
     <!-- The LMDB directory comes from the operator's own tuner configuration
          (lmdbConfigurationReadOnly.lmdbDirectory), not from untrusted external input. -->
     <Match>
