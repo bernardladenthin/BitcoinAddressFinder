@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.command;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -36,6 +37,7 @@ import net.ladenthin.bitcoinaddressfinder.io.FileHelper;
 import net.ladenthin.bitcoinaddressfinder.model.AddressToCoin;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
+import net.ladenthin.bitcoinaddressfinder.statistics.SlidingWindowRate;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
@@ -77,7 +79,13 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
     private static final long QUEUE_POLL_MILLIS = 50;
 
     /** Minimum interval between per-file read-progress log lines. */
-    private static final long PROGRESS_REPORT_NANOS = TimeUnit.SECONDS.toNanos(30);
+    private static final long PROGRESS_REPORT_MILLIS = 30_000L;
+
+    /** Interval at which the reader feeds a byte sample into the trailing-rate window for the ETA. */
+    private static final long SAMPLE_INTERVAL_MILLIS = 1_000L;
+
+    /** Trailing window over which the read throughput (for the ETA) is averaged. */
+    private static final long RATE_WINDOW_MILLIS = 60_000L;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AddressFilesToLMDB.class);
 
@@ -97,10 +105,6 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     /** Lines that threw an unexpected error while parsing; logged in the final summary. */
     private final Queue<String> errors = new ConcurrentLinkedQueue<>();
-
-    /** Wall-clock of the last per-file read-progress log; touched only by the reader (this) thread. */
-    @ToString.Exclude
-    private long lastProgressLogNanos;
 
     /**
      * Flag controlling the import; cleared via {@link #interrupt()}.
@@ -175,6 +179,11 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
             int writeBatchSize,
             int queueCapacity)
             throws IOException {
+        // All files are already verified to exist, so summing their sizes is a cheap up-front stat and
+        // gives the denominator for overall progress + ETA. Owned by the reader (this) thread only.
+        final ReaderProgress progress =
+                new ReaderProgress(files.stream().mapToLong(File::length).sum(), System.currentTimeMillis());
+
         final BlockingQueue<String> lineQueue = new LinkedBlockingQueue<>(queueCapacity);
         final BlockingQueue<AddressToCoin> entryQueue = new LinkedBlockingQueue<>(queueCapacity);
         final AtomicBoolean readingDone = new AtomicBoolean(false);
@@ -194,7 +203,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
         try {
             // The reader is this thread: read every file, in order, into the line queue.
-            readAllFiles(files, lineQueue, failure);
+            readAllFiles(files, lineQueue, failure, progress);
             readingDone.set(true);
             // Parsers drain the remaining lines, then the writer drains the remaining entries.
             awaitTermination(parserPool);
@@ -226,7 +235,8 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
     private void readAllFiles(
             @NonNull List<File> files,
             @NonNull BlockingQueue<String> lineQueue,
-            @NonNull AtomicReference<Throwable> failure)
+            @NonNull AtomicReference<Throwable> failure,
+            @NonNull ReaderProgress progress)
             throws IOException {
         int totalFiles = files.size();
         for (File file : files) {
@@ -235,7 +245,8 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
             }
             String path = file.getAbsolutePath();
             LOGGER.info("process " + path);
-            readFileLines(file, lineQueue, failure);
+            readFileLines(file, lineQueue, failure, progress);
+            progress.fileFinished(file.length());
             LOGGER.info("finished (" + filesProcessed.incrementAndGet() + "/" + totalFiles + " files): " + path);
         }
     }
@@ -247,10 +258,15 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
      * which reads one byte at a time and made this single reader the import bottleneck. The
      * {@link InputStreamReader} decodes UTF-8 leniently (malformed bytes are replaced, not thrown),
      * matching the previous behaviour. Progress percent is by decoded characters over file bytes —
-     * exact for the ASCII address files, approximate otherwise.
+     * exact for the ASCII address files, approximate otherwise. Each line also feeds {@code progress},
+     * which samples the running byte count (~1/s) and, on the throttled interval, prints overall
+     * progress and an ETA. All reader-side, so nothing here is shared across threads.
      */
     private void readFileLines(
-            @NonNull File file, @NonNull BlockingQueue<String> lineQueue, @NonNull AtomicReference<Throwable> failure)
+            @NonNull File file,
+            @NonNull BlockingQueue<String> lineQueue,
+            @NonNull AtomicReference<Throwable> failure,
+            @NonNull ReaderProgress progress)
             throws IOException {
         long length = Math.max(file.length(), 1L);
         try (BufferedReader reader = new BufferedReader(
@@ -262,15 +278,95 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
                 if (!enqueue(lineQueue, line, failure)) {
                     return;
                 }
-                long now = System.nanoTime();
-                if (now - lastProgressLogNanos >= PROGRESS_REPORT_NANOS) {
-                    lastProgressLogNanos = now;
-                    double percent = (double) charsRead / (double) length * 100.0d;
-                    LOGGER.info(String.format(
-                            "reading %s: %.2f%% (%d written)", file.getName(), percent, addressCounter.get()));
-                }
+                progress.onLineRead(file, charsRead, length, System.currentTimeMillis());
             }
         }
+    }
+
+    /**
+     * Reader-thread-only overall-progress and ETA tracker. All state lives here and only the single
+     * reader thread ever calls into it, so no field is shared across threads and none needs
+     * synchronization. Samples the running byte count (~1/s) into a trailing-rate window and, on the
+     * throttled interval, logs overall percent plus an ETA derived from that rate.
+     */
+    private final class ReaderProgress {
+
+        private final long totalBytes;
+        private final SlidingWindowRate byteRate = new SlidingWindowRate(RATE_WINDOW_MILLIS);
+        private long bytesReadInFinishedFiles;
+        private long lastSampleMillis;
+        private long lastProgressLogMillis;
+
+        ReaderProgress(long totalBytes, long nowMillis) {
+            this.totalBytes = Math.max(totalBytes, 1L);
+            this.lastSampleMillis = nowMillis;
+            this.lastProgressLogMillis = nowMillis;
+        }
+
+        /** Adds a fully-read file's exact size to the running total. */
+        void fileFinished(long fileBytes) {
+            bytesReadInFinishedFiles += fileBytes;
+        }
+
+        /** Per line: samples the byte rate (throttled) and emits the progress+ETA line (throttled). */
+        void onLineRead(File file, long charsRead, long fileLength, long nowMillis) {
+            long overallBytes = bytesReadInFinishedFiles + charsRead;
+            if (nowMillis - lastSampleMillis >= SAMPLE_INTERVAL_MILLIS) {
+                lastSampleMillis = nowMillis;
+                byteRate.sample(nowMillis, overallBytes);
+            }
+            if (nowMillis - lastProgressLogMillis >= PROGRESS_REPORT_MILLIS) {
+                lastProgressLogMillis = nowMillis;
+                double filePercent = (double) charsRead / (double) fileLength * 100.0d;
+                double overallPercent = (double) overallBytes / (double) totalBytes * 100.0d;
+                double bytesPerSecond = byteRate.ratePerSecond(nowMillis, overallBytes);
+                String eta = bytesPerSecond > 0.0
+                        ? formatDuration((long) ((totalBytes - overallBytes) / bytesPerSecond))
+                        : "?";
+                LOGGER.info(String.format(
+                        "reading %s: %.2f%% (%d written) | overall %.2f%% of %s, %s/s, ETA %s",
+                        file.getName(),
+                        filePercent,
+                        addressCounter.get(),
+                        overallPercent,
+                        humanBytes(totalBytes),
+                        humanBytes((long) bytesPerSecond),
+                        eta));
+            }
+        }
+    }
+
+    /** Formats a byte count as a human-readable KiB/MiB/GiB string. */
+    @VisibleForTesting
+    static String humanBytes(long bytes) {
+        if (bytes >= 1L << 30) {
+            return String.format("%.1f GiB", bytes / (double) (1L << 30));
+        }
+        if (bytes >= 1L << 20) {
+            return String.format("%.1f MiB", bytes / (double) (1L << 20));
+        }
+        if (bytes >= 1L << 10) {
+            return String.format("%.1f KiB", bytes / (double) (1L << 10));
+        }
+        return bytes + " B";
+    }
+
+    /** Formats a duration in seconds as a compact {@code Hh Mm} / {@code Mm Ss} / {@code Ss} string. */
+    @VisibleForTesting
+    static String formatDuration(long totalSeconds) {
+        if (totalSeconds < 0L) {
+            return "?";
+        }
+        long hours = totalSeconds / 3600L;
+        long minutes = (totalSeconds % 3600L) / 60L;
+        long seconds = totalSeconds % 60L;
+        if (hours > 0L) {
+            return hours + "h " + minutes + "m";
+        }
+        if (minutes > 0L) {
+            return minutes + "m " + seconds + "s";
+        }
+        return seconds + "s";
     }
 
     /** One parser worker: take lines, decode them, and hand the parsed entries to the writer queue. */
