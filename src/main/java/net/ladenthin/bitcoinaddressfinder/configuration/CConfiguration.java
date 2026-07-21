@@ -26,4 +26,6 @@ public class CConfiguration {
     public @Nullable CFinder finder;
     /** Configuration for the {@code TuneConfiguration} command. */
     public @Nullable CTuneConfiguration tuneConfiguration;
+    /** Configuration for the {@code CompactLMDB} command. */
+    public @Nullable CCompactLMDB compactLMDB;
 }

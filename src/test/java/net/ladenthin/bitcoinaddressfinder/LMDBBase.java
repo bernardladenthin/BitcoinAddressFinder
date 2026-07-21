@@ -57,10 +57,25 @@ public class LMDBBase {
             boolean addInvalidAddresses,
             AddressLookupBackend backend)
             throws IOException {
+        return createAndFillAndOpenLMDB(useStaticAmount, addressesFiles, addInvalidAddresses, backend, 1);
+    }
+
+    /**
+     * Overload that imports with {@code threads} parallel reader threads (see
+     * {@code CAddressFilesToLMDB.threads}). {@code threads == 1} reproduces the deterministic
+     * single-threaded import; higher values read files in parallel through a single LMDB writer.
+     */
+    protected LMDBHandle createAndFillAndOpenLMDB(
+            boolean useStaticAmount,
+            AddressesFiles addressesFiles,
+            boolean addInvalidAddresses,
+            AddressLookupBackend backend,
+            int threads)
+            throws IOException {
         TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
 
         File lmdbFolderPath =
-                testAddressesLMDB.createTestLMDB(folder, addressesFiles, useStaticAmount, addInvalidAddresses);
+                testAddressesLMDB.createTestLMDB(folder, addressesFiles, useStaticAmount, addInvalidAddresses, threads);
 
         CLMDBConfigurationReadOnly lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();

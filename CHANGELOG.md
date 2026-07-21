@@ -7,10 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.7.0] - 2026-07-20
+## [1.7.0] - 2026-07-21
 
 Major release centred on high-performance probabilistic address filters (in-memory and GPU-side),
-a self-tuning benchmark mode, and a rebuilt runtime statistics log.
+a self-tuning benchmark mode, a rebuilt runtime statistics log, and a reworked bulk-import pipeline.
 
 ### Added
 - **Binary Fuse filters as address-lookup backends** — `BINARY_FUSE_8` (~1.13 B/entry, ~0.39 % FPR)
@@ -39,6 +39,21 @@ a self-tuning benchmark mode, and a rebuilt runtime statistics log.
   `docs/measurements/` with generated plots and tables (`plot.py`, self-registering `machines.json`).
 - Example configs for the GPU filter cascade and per-tier filter choices; `useNoReadAhead` on the
   read-only LMDB configuration.
+- **Decoupled, multi-threaded `AddressFilesToLMDB` import** — a single buffered reader streams file
+  lines into a bounded queue, `threads` parser workers decode them, and one writer stores them in
+  LMDB in batches (one transaction per `writeBatchSize` entries). New `CAddressFilesToLMDB` fields
+  `threads` (default 1), `writeBatchSize` (default 32768) and `queueCapacity` (default 200000). Adds
+  per-file byte-offset read progress and an "X/Y files" counter. `threads = 1` preserves the exact
+  deterministic import order; higher values parse in parallel — order-independent when
+  `useStaticAmount = true`, otherwise a non-determinism warning is logged.
+- **`CompactLMDB` command** — writes a compacted copy of an existing LMDB database via LMDB's
+  `MDB_CP_COMPACT` (free/dead pages omitted, pages laid out sequentially → a smaller, read-denser
+  `data.mdb` in a separate target directory). The source is opened read-only and left unchanged; the
+  compacted copy is re-opened and its entry count verified against the source. Ships an example
+  `config_CompactLMDB.json` and run scripts.
+- **Durable LMDB flush on close** — the writable env keeps its fast sync-free write flags
+  (`MDB_NOSYNC` / `MDB_MAPASYNC`) during the import for speed and now forces one full `env.sync(true)`
+  when closing, so a normal shutdown leaves the whole database on disk.
 
 ### Changed
 - **`FUSE_16` is the recommended default GPU pre-filter** (best net end-to-end throughput; fits VRAM
@@ -70,6 +85,21 @@ a self-tuning benchmark mode, and a rebuilt runtime statistics log.
   (each key yields both a compressed and an uncompressed address, so addresses examined are twice the
   `Generated` rate and `pre-filtered` is measured against that doubled figure), and stale constant
   references.
+- **Corrected the light/full prepared-database backend recommendation** in the README from
+  `TRUNCATED_LONG_64` to `BINARY_FUSE_8` — `TRUNCATED_LONG_64` has the worst lookup latency of any
+  backend at 100 M+ entries (it was already flagged as "never" for this in `docs/filter-selection.md`),
+  while `BINARY_FUSE_8` costs ~7× less RAM and is far faster; documented the `FUSE_16` GPU +
+  `BINARY_FUSE_8` CPU cascade at both tiers.
+- **Reconciled the Full-DB backend recommendation across all docs.** An earlier recommendation flip
+  (blocked Bloom → `BINARY_FUSE_8`, on total cost once Fuse-8's Full-DB build was shown feasible)
+  updated `docs/filter-selection.md` and most of the README but missed several spots, leaving them
+  contradictory. `docs/performance.md`, the remaining README conclusions, and the `BLOCKED_BLOOM`
+  enum Javadoc now consistently recommend `BINARY_FUSE_8` on total cost, with `BLOCKED_BLOOM` framed
+  as the rebuild-heavy / heap-constrained niche. The stale `BLOCKED_BLOOM` enum Javadoc (pre-fastrange
+  power-of-two sizing, 1.56/2.06 B/entry, 0.49/0.18 % FPR) was corrected to the current fastrange
+  numbers (1.375 B/entry at the default 11 bits/entry, ~0.76 % FPR); a stale README lookup-latency
+  table was re-synced to the CSV-authoritative one; and the Full-DB RAM figures for the fuse filters
+  were corrected (~1.8/3.6 GB → ~1.5/3.1 GB).
 
 [Full changelog](https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.6.1...v1.7.0)
 

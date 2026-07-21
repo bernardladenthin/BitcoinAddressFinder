@@ -389,6 +389,7 @@ SPDX-License-Identifier: Apache-2.0
         <Or>
             <Class name="net.ladenthin.bitcoinaddressfinder.io.FileHelper"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.command.AddressFilesToLMDB"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.command.LMDBCompact"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.producer.ProducerJavaSecretsFiles"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.command.LMDBToAddressFile"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
@@ -1158,6 +1159,48 @@ SPDX-License-Identifier: Apache-2.0
         <Class name="net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration"/>
         <Method name="run"/>
         <Bug pattern="HES_LOCAL_EXECUTOR_SERVICE"/>
+    </Match>
+
+    <!-- By design: the importer builds two short-lived local executors for the one import run — a parser
+         pool and a single-writer executor — and shuts both down (shutdownNow) in the finally block of
+         importFiles(). They are local because their lifetime is exactly one import, not the object's
+         lifetime. -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.command.AddressFilesToLMDB"/>
+        <Method name="importFiles"/>
+        <Bug pattern="HES_LOCAL_EXECUTOR_SERVICE"/>
+    </Match>
+
+    <!-- Style nag: AddressFilesToLMDB is a Runnable command (behaviour, not a value object), so it has
+         no meaningful equals/hashCode — identity equality is correct. -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.command.AddressFilesToLMDB"/>
+        <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
+    </Match>
+
+    <!-- Style nag: SlidingWindowRate is a mutable stateful rate estimator (a sample buffer), not a
+         value object — equals/hashCode would be meaningless; identity equality is correct. -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.statistics.SlidingWindowRate"/>
+        <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
+    </Match>
+
+    <!-- The constructor fail-fast validates windowMillis and the class is intentionally non-final (so it
+         can be subclassed / mocked in tests). SpotBugs then warns about a finalizer attack on the
+         partially-constructed object, but that vector is obsolete: finalize() is deprecated since Java 9,
+         this class declares none, and it holds no security-sensitive state. -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.statistics.SlidingWindowRate"/>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+
+    <!-- By design: drainEntries() runs only after the writer has already failed; it repeatedly polls the
+         parser→writer queue purely to discard entries so parser threads blocked on a full queue can
+         finish. The polled value is intentionally dropped (RV_RETURN_VALUE_IGNORED). -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.command.AddressFilesToLMDB"/>
+        <Method name="drainEntries"/>
+        <Bug pattern="RV_RETURN_VALUE_IGNORED"/>
     </Match>
 
     <!-- The LMDB directory comes from the operator's own tuner configuration

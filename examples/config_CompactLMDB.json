@@ -1,0 +1,9 @@
+{
+  "command": "CompactLMDB",
+  "compactLMDB": {
+    "lmdbConfigurationReadOnly": {
+      "lmdbDirectory": "lmdb"
+    },
+    "targetDirectory": "lmdb_compact"
+  }
+}

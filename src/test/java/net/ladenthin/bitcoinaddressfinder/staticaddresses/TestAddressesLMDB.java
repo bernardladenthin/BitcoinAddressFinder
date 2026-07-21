@@ -17,10 +17,21 @@ public class TestAddressesLMDB {
     public File createTestLMDB(
             Path folder, AddressesFiles addressesFiles, boolean useStaticAmount, boolean addInvalidAddresses)
             throws IOException {
+        return createTestLMDB(folder, addressesFiles, useStaticAmount, addInvalidAddresses, 1);
+    }
+
+    public File createTestLMDB(
+            Path folder,
+            AddressesFiles addressesFiles,
+            boolean useStaticAmount,
+            boolean addInvalidAddresses,
+            int threads)
+            throws IOException {
         CAddressFilesToLMDB addressFilesToLMDBConfigurationWrite = new CAddressFilesToLMDB();
 
         List<String> files = addressesFiles.createAddressesFiles(folder, addInvalidAddresses);
         addressFilesToLMDBConfigurationWrite.addressesFiles.addAll(files);
+        addressFilesToLMDBConfigurationWrite.threads = threads;
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite = new CLMDBConfigurationWrite();
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.useStaticAmount = useStaticAmount;
         addressFilesToLMDBConfigurationWrite.lmdbConfigurationWrite.staticAmount = 0L;

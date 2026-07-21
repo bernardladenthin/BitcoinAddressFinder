@@ -461,7 +461,7 @@ The Binary Fuse filters are excellent at **rest** (1.13 B/entry is unbeatable) b
 
 > **Correction.** An earlier edition of this document claimed that made `BINARY_FUSE_8` *unbuildable* at the Full DB tier on commodity hardware. **That was wrong**, and it was the stated reason this backend existed. Independently retested on a 61.6 GB host (cache cleared first, `-Xmx48g`), Fuse-8 builds in 1 564 s to 1 504 MiB with a 0.393 % FPR and no false negatives. The original observation — a build that appeared to hang — was the **I/O-bound ingest** stalling under memory pressure, not the peeling step: peeling itself finished in 76 s at ~19 M keys/s. Two different phenomena were conflated.
 
-`BLOCKED_BLOOM` is still the better choice at that tier, but because it builds roughly twice as fast — not because fuse is impossible, and not on lookup speed, which does not reproduce across machines.
+`BLOCKED_BLOOM`'s remaining edge at that tier is purely **build cost** — it builds roughly twice as fast — not lookup speed (which does not reproduce across machines) and not because fuse is impossible. On **total** cost `BINARY_FUSE_8` wins (smaller, lower FPR, verified over the database's whole life against a one-time build), so it is the recommended full-tier backend; reach for `BLOCKED_BLOOM` when builds are frequent or heap during the build is tight.
 
 `BLOCKED_BLOOM` exists to close exactly that gap. It is a **blocked Bloom filter**: allocate the bit array once, then stream every address through it setting `k` bits. There is no peeling, no auxiliary array, no second pass — **peak build memory is the filter itself** (~2 GB at the Full DB tier), so it builds anywhere the finished filter fits.
 
@@ -495,7 +495,7 @@ So a lookup touches **exactly one 64-byte region** instead of the three scattere
 > — but has a higher FPR of **~0.76 %**; the build-time and lookup columns are representative either
 > way.
 
-Reading the table: `BLOCKED_BLOOM` builds **~2× faster** than either fuse variant (streaming vs. peeling), costs somewhat more RAM at the same density, and looks up in the same ballpark — the differences are modest. Its decisive advantage shows at the **Full DB** tier, in build cost and heap, not in whether fuse can build at all (it can — see below).
+Reading the table: `BLOCKED_BLOOM` builds **~2× faster** than either fuse variant (streaming vs. peeling), costs somewhat more RAM at the same density, and looks up in the same ballpark — the differences are modest. Its advantage is confined to **build cost and heap** at the **Full DB** tier (a rebuild-heavy or heap-constrained niche), not the overall recommendation — which is `BINARY_FUSE_8` on total cost — and not whether fuse can build at all (it can — see below).
 
 ##### Full DB (1.377 B entries) — where blocked Bloom's cheaper build matters
 
@@ -612,18 +612,18 @@ The 2048-entry table above measures one point on a curve, and it is the least re
 
 | Backend             | 100 K | 1 M | 10 M | 50 M | 100 M |
 |---------------------|------:|----:|-----:|-----:|------:|
-| `BINARY_FUSE_8`     | **13.1** | **18.5** | **22.4** | 52.1 | 59.6 |
-| `BINARY_FUSE_16`    |  15.1 |  19.2 |  34.4 | 60.9 |  63.5 |
-| `BLOCKED_BLOOM`     |  23.9 |  31.2 |  38.0 | **40.5** | **45.5** |
+| `BINARY_FUSE_8`     | **13.1** | **18.5** | **31.2** | 52.1 | 59.3 |
+| `BINARY_FUSE_16`    |  15.1 |  19.2 |  36.5 | 60.9 |  65.8 |
+| `BLOCKED_BLOOM`     |  23.9 |  33.2 |  39.8 | **40.5** | **50.2** |
 | `HASHSET`           |  52.1 |  92.9 | 145.1 | — | — |
-| `TRUNCATED_LONG_64` |  80.1 | 145.4 | 348.6 | 533.3 | 612.2 |
+| `TRUNCATED_LONG_64` |  80.1 | 145.4 | 337.3 | 533.3 | 635.5 |
 | `BLOOM`             |  85.4 |  98.9 | 114.1 | 203.2 | 203.8 |
 
 `HASHSET` is omitted above 10 M — at ~80 B/entry it needs ~8 GB at 100 M.
 
-**There is a crossover, and it sits between 10 M and 50 M entries.** Below it `BINARY_FUSE_8` wins by ~1.7×; above it `BLOCKED_BLOOM` wins by ~1.3×. The mechanism is visible in the step sizes: from 10 M to 50 M Fuse-8 degrades by 2.3× (22.4 → 52.1 ns) while blocked Bloom barely moves (38.0 → 40.5 ns, 1.07×). That is exactly where the Fuse-8 array outgrows L3 cache (~11 MB at 10 M, ~57 MB at 50 M). Once neither filter is cache-resident, a fuse lookup pays **three** scattered cache misses while a blocked-Bloom lookup pays **one** — all `k` probes share a single 512-bit block. Blocked Bloom is the flattest structure in the table (1.9× from 100 K to 100 M, against Fuse-8's 4.5×).
+**There is a crossover — but it is set by L3 cache size, not by the filters.** On this reference machine (16 MB L3) it sits between 10 M and 50 M entries: below it `BINARY_FUSE_8` wins by ~1.7×; above it `BLOCKED_BLOOM` wins by ~1.3×. The mechanism is visible in the step sizes: from 10 M to 50 M Fuse-8 degrades by ~1.7× (31.2 → 52.1 ns) while blocked Bloom barely moves (39.8 → 40.5 ns, 1.02×). That is exactly where the Fuse-8 array outgrows L3 cache (~11 MB at 10 M, ~57 MB at 50 M). Once neither filter is cache-resident, a fuse lookup pays **three** scattered cache misses while a blocked-Bloom lookup pays **one** — all `k` probes share a single 512-bit block. Blocked Bloom is the flattest structure in the table (1.9× from 100 K to 100 M, against Fuse-8's 4.5×).
 
-Practical reading: the crossover lands *below* both published database tiers, so at the Light DB (132 M) and Full DB (1.377 B) the blocked layout is on the winning side of it.
+Practical reading: **this crossover moves with the cache, so "blocked Bloom wins at production scale" is machine-specific, not universal.** On a large-cache host (96 MB L3) Fuse-8 stays ahead through 100 M+, and even at the Light DB tier (132 M) it measures faster (32.8 vs 37.1 ns). The lookup ranking is close and cache-dependent, which is why the recommendation does not rest on it but on **total** cost (size + FPR + a one-time build, amortised over the database's life) → **`BINARY_FUSE_8`**. See [`docs/performance.md`](docs/performance.md) for the second-machine confirmation and the full 500 M / 1 B columns.
 
 - **`TRUNCATED_LONG_64` degrades worst of all** (7.6× from 100 K to 100 M, ending at 612 ns — 13× slower than blocked Bloom). Its binary search costs ~log₂(n/256) dependent cache misses. The "near-`HASHSET` latency" characterisation holds only for small databases.
 - **`BLOOM` is the slowest filter** despite scaling flatly (2.4×). See the tuning history below; what remains is structural in Guava.
@@ -942,6 +942,28 @@ Useful txt/text file provider:
 * http://blockdata.loyce.club/alladdresses/
 * https://blockchair.com/dumps
 
+Import one or more plaintext address files into an LMDB database with the `AddressFilesToLMDB` command
+(see [`examples/config_AddressFilesToLMDB.json`](examples/config_AddressFilesToLMDB.json) and the
+`run_AddressFilesToLMDB` launchers). Files are read one at a time; a single buffered reader streams
+their lines to `threads` parser workers, and one writer stores the parsed addresses in LMDB in
+batches. The performance-relevant settings on `addressFilesToLMDB`:
+
+| Setting          | Default  | Purpose |
+|------------------|----------|---------|
+| `threads`        | `1`      | Parser threads. `1` keeps the exact deterministic import order; `≥2` parses in parallel — order-independent when `useStaticAmount = true`, otherwise a warning is logged. |
+| `writeBatchSize` | `32768`  | Addresses written per LMDB transaction. |
+| `queueCapacity`  | `200000` | Capacity of each internal hand-off queue (back-pressure vs. memory). |
+
+The single LMDB writer is the throughput ceiling (LMDB permits one writer at a time), so a handful of
+parser threads is enough to keep it fed.
+
+**Optional — compact the finished database.** After the import you can write a smaller, read-denser
+copy with the `CompactLMDB` command (LMDB `MDB_CP_COMPACT`; see
+[`examples/config_CompactLMDB.json`](examples/config_CompactLMDB.json)). It opens the source
+read-only, writes `data.mdb` into a separate target directory, and verifies the copy's entry count
+against the source. The read benefit is largest when the database exceeds RAM (a smaller file raises
+the OS page-cache hit rate); for a database that fits in RAM the gain is marginal.
+
 
 ### Export
 The exporter provides various output formats for Bitcoin and altcoin address data:
@@ -968,35 +990,34 @@ You are also welcome to **extend this database** by importing your own address d
 If you're missing any information or have questions about usage or content, feel free to ask or open an issue.
 
 #### Light database
-* Light (5.4 GiB), Last update: July 1, 2025
+* Light (5.4 GiB), Last update: July 20, 2026
   * Contains Bitcoin addresses whith amount and many altcoin addresses with amount.
   * Static amount of 0 is used to allow best compression.
-  * Unique entries: 132288304
-  * Mapsize: 5576 MiB
-  * Time to create the database: ~9 hours
-  * Link (3.66 GiB zip archive): http://ladenthin.net/lmdb_light.zip
-  * Link extracted addresses as txt (5.17 GiB) (2.29 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Light_HexHash.zip
+  * Unique entries: 141045995
+  * Mapsize: 5942 MiB
+  * Link (3.90 GiB zip archive): http://ladenthin.net/lmdb_light.zip
+  * Link extracted addresses as txt (5.51 GiB) (2.44 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Light_HexHash.zip
 
-> 💡 **Hint:** When using the light database it is **strongly recommended** to switch the lookup backend to a self-contained in-memory snapshot:
+> 💡 **Hint:** For the light database the recommended lookup backend is `BINARY_FUSE_8`:
 > ```json
-> "addressLookupBackend" : "TRUNCATED_LONG_64"
+> "addressLookupBackend" : "BINARY_FUSE_8"
 > ```
-> See [Pluggable Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend) above for the full trade-off matrix and benchmark numbers. `TRUNCATED_LONG_64` loads every hash160 into RAM once at startup as 256 sorted `long[]` buckets (~1.1 GB for the Light DB), then closes the LMDB env and releases its mmap pages — near-`HASHSET` lookup latency at ~10× lower memory cost. If you have memory to spare and prefer exact-bit storage with no probabilistic fallthrough, `HASHSET` (~10 GB for the Light DB) is the next step up. If RAM is tight, `BINARY_FUSE_8` (~149 MB for the Light DB) is the lowest-footprint filter: like `BLOOM` it keeps LMDB open and verifies the ~0.4% of filter hits against it (rejecting false positives), but at a fraction of `BLOOM`'s memory. `BLOOM` (~150 MB) covers a similar niche.
+> See [Pluggable Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend) above for the full trade-off matrix and benchmark numbers. `BINARY_FUSE_8` is a tiny in-RAM filter (~149 MB for the Light DB, ~0.4% false-positive rate, no false negatives) in front of LMDB: it answers almost every miss straight from RAM and keeps LMDB open only to verify the ~0.4% of filter hits, so a false positive is never reported as a hit. If you run on a GPU, pair it with the `FUSE_16` GPU pre-filter (`producerOpenCL.gpuFilterType`) — the two form an independent cascade (see below). Want lower fallthrough for a CPU-only run? `BINARY_FUSE_16` (~298 MB, ~0.0015% FPR) verifies against LMDB far less often. If you need LMDB fully closed (a self-contained in-RAM snapshot) and can spare the memory, `HASHSET` (~10 GB) is exact. **Avoid `TRUNCATED_LONG_64` here:** at the Light DB's 141 M entries its lookup latency is the worst of all backends while still costing ~7× the RAM of `BINARY_FUSE_8`.
 
 <details>
 <summary>Checksums lmdb_light.zip</summary>
 
 ```txt
-lmdb_light.zip	CRC32	DF77E5CF
-lmdb_light.zip	MD5	4B733EAFF200C8044F80BE68538BB164
-lmdb_light.zip	RipeMD160	A82C31F511C9BF3CDCA705E63860B5B597227EB3
-lmdb_light.zip	SHA-1	C2E9FA56578C9F73942943C7861B226C6B44AC18
-lmdb_light.zip	SHA-256	3B8AB59232D9CBB67118A79143E788E0B08A957E9C3D877F8B41303005170DC0
-lmdb_light.zip	SHA-512	108D88E7EE1E90BEE975ADB711438C41971B23A65751EFB33EA6287A9697DC563ECCE40452DFA2DD1E0F66637F5AA14CC02D9A621AED953E0DA6FCEDD9D9C440
-lmdb_light.zip	SHA3-224	BDF86A26D072BF521AE4A909AC912AC1C0F4EEAB33D12AE4D554327F
-lmdb_light.zip	SHA3-256	55206B88314AD7F2907740FBD49C462BC0B1C2F075C23807E71E095EE9712345
-lmdb_light.zip	SHA3-384	D23681FC1722253F2B51BBCF9CDA22FDD2B79C33657D38C938B64392E8CD4957AAD1FD4E6D54E7B9FF1A98C3D110C52F
-lmdb_light.zip	SHA3-512	096B12FE4CB1A095287F678C10B30418091FCBF1FABB77003969C6D9846F1344A0C8918B3D2D047E94363B6E9BC5324801EA0E14331A012E8123FDE44672B394
+lmdb_light.zip	CRC32	D29A7AB0
+lmdb_light.zip	MD5	DD7B561A1814E7061B071ADCC1BE9CF5
+lmdb_light.zip	RipeMD160	153476EBD621DF60A8223C26A531349AECB804D3
+lmdb_light.zip	SHA-1	EA1C0F87050E5B37EC147A4AAAD1404E267AC631
+lmdb_light.zip	SHA-256	DC3DF4F6B2C4AE1F7ADA8234CC6AA6B6ECF53CFDC25671F65D2C4F66B41B11FC
+lmdb_light.zip	SHA-512	144532C32F9BEAF86BACA9495DDE1AAAD4BBC29554DEFA4014F26D7D89413607DB3DB46178590B3FCC99B155F7E247E55CCBBC04A7B836BEA2946FF78026E015
+lmdb_light.zip	SHA3-224	75C09C525A04FD8098DAFDE51A652A867AB29DFC6ED0ADC717C59A4D
+lmdb_light.zip	SHA3-256	87051F9B5AB2B88FF864A85AA26BE515692F09BC1EB91E4824BD7D78EDE5BA5E
+lmdb_light.zip	SHA3-384	513580D208C2D9BC882F13D87A4B93757B882F290AE348A6B42AA7577D8DB15C4084235550BD0564CD74E8B0540B1807
+lmdb_light.zip	SHA3-512	32AC436F5505B34F7EA36E4A7F92F374351DC7991A0DA1630204D77EBF6F02939E614E4590B052867834F570944DB973505964E5DF8B62B5B45F0224E5DF3191
 ```
 
 </details>
@@ -1005,16 +1026,16 @@ lmdb_light.zip	SHA3-512	096B12FE4CB1A095287F678C10B30418091FCBF1FABB77003969C6D9
 <summary>Checksums LMDBToAddressFile_Light_HexHash.zip</summary>
 
 ```txt
-LMDBToAddressFile_Light_HexHash.zip	CRC32	AA42A096
-LMDBToAddressFile_Light_HexHash.zip	MD5	EB2E19F7AFE545A1A98FAE134D5394D4
-LMDBToAddressFile_Light_HexHash.zip	RipeMD160	A011232D5069884ACFBE76C8DF4069DF684768DB
-LMDBToAddressFile_Light_HexHash.zip	SHA-1	C8899544133C605EAB9FE2C83227854737B8D3FC
-LMDBToAddressFile_Light_HexHash.zip	SHA-256	A8B67B606C574A4F895FA7E9B5E0AA9830C5DDD7E615EB59D77C2324E388DB78
-LMDBToAddressFile_Light_HexHash.zip	SHA-512	4FD1B0905016292169A23E166C0D1C4D448DADFE4EC8FE410C1991D37B6AB5FE34596FD6EDFC62C0DE8EC8AD7142212F105ACD137B9A71F5F71E1BB1FB3B9278
-LMDBToAddressFile_Light_HexHash.zip	SHA3-224	858550C2805FF1A20F3728392E70CAB9E4952792F31FA0881B0031D2
-LMDBToAddressFile_Light_HexHash.zip	SHA3-256	4B522E2F4225D6FB238228033CC8AAE843DC24BA00B32BCBCA0D23B9A4C1AC46
-LMDBToAddressFile_Light_HexHash.zip	SHA3-384	C29158FCB83F2D4F25BC610CE4D143964AC984ACA9D2064C9B8D40F33679830B3704A99BF408DAC75702658E55F58A7D
-LMDBToAddressFile_Light_HexHash.zip	SHA3-512	29CA44CD666D7B8CF9EAD4B340620FBB7EDC30F47DBC2582A57E3DFF5E537A2A2F2CE7A7CEC2C6EF21775F7B839E0D1F23BE720CE0FC64F304B142AFAFA1437E
+LMDBToAddressFile_Light_HexHash.zip	CRC32	2F79BEB6
+LMDBToAddressFile_Light_HexHash.zip	MD5	42760355C2EFBCD964152F333D49083D
+LMDBToAddressFile_Light_HexHash.zip	RipeMD160	6E089BC89F87F6FE9D928CA7A82CB8276E76196D
+LMDBToAddressFile_Light_HexHash.zip	SHA-1	872D5EF8A90EB7B0EEC44A4D7A0284D886CAE3D5
+LMDBToAddressFile_Light_HexHash.zip	SHA-256	9079152EB750D640E469A1C050FA27D982CFC2C08F519922468061834776759E
+LMDBToAddressFile_Light_HexHash.zip	SHA-512	9A5298A8391F317B4593E36EB5111CAC6FF3BC23582C8A15A1052D2EE95EFA2A9F590C1BD6F28234AD1B6163BB98CD62939928F9DC20C3AF4D320D18B332987C
+LMDBToAddressFile_Light_HexHash.zip	SHA3-224	45B3DED0DEFCEB7A828FDB8D7A67FA86456C8369A191B0E2E4C5A18C
+LMDBToAddressFile_Light_HexHash.zip	SHA3-256	7CCCD74E911B030DBD84691E6C5253EC460B10ECC1F9327CB985276FFC36AC30
+LMDBToAddressFile_Light_HexHash.zip	SHA3-384	CDEE253DF906C04FC03C4B725A123FF01AF3AAF251C4633008D3D67F5D7D567703E82F093FA085014D4A36C48EEA604F
+LMDBToAddressFile_Light_HexHash.zip	SHA3-512	1C66472C3605FCB6833163B9FBDF81A6581F012A1FE0D6236C4804909AFD6E0CF15DB11FD53EFD507C8AF7CEDFA0F06EDD03FE2F84C7ACD38058604FF304EF66
 ```
 
 </details>
@@ -1026,23 +1047,22 @@ LMDBToAddressFile_Light_HexHash.zip	SHA3-512	29CA44CD666D7B8CF9EAD4B340620FBB7ED
   * Static amount of 0 is used to allow best compression.
   * Unique entries: 1377481459
   * Mapsize: 58368 MiB
-  * Time to create the database: ~54 hours
   * Link (34.3 GiB zip archive): http://ladenthin.net/lmdb_full.zip
   * Link extracted addresses as txt (23.4 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Full_HexHash.zip
 
 > ⚠️ **Backend choice for the full database.** At 1.377 B entries, `HASHSET` requires roughly **~110 GB of RAM** — impractical on almost any consumer hardware. Pick one of the realistic options instead:
 >
 > ```json
-> "addressLookupBackend" : "TRUNCATED_LONG_64"
+> "addressLookupBackend" : "BINARY_FUSE_8"
 > ```
 >
 > | Choice              | RAM needed at Full DB | LMDB stays open? | When to pick |
 > |---------------------|-----------------------|------------------|--------------|
-> | `TRUNCATED_LONG_64` | ~11 GB                | **no**           | recommended if you can spare ~12 GB; closes LMDB and releases its mmap pages |
-> | `BINARY_FUSE_8`     | **~1.8 GB**           | yes              | tiny filter in front of LMDB; keeps LMDB open to verify the 0.4% of filter hits; also feeds the GPU pre-filter |
-> | `BINARY_FUSE_16`    | ~3.6 GB               | yes              | same as Fuse-8 but with 0.0015% FPR — fewer LMDB verifications |
+> | `BINARY_FUSE_8`     | **~1.5 GB**           | yes              | **recommended** — tiny filter in front of LMDB; keeps LMDB open to verify the 0.4% of filter hits; also pairs with the `FUSE_16` GPU pre-filter |
+> | `BINARY_FUSE_16`    | ~3.1 GB               | yes              | recommended for **CPU-only** cold-storage runs — 0.0015% FPR means far fewer LMDB verifications |
 > | `BLOOM` (FPP 0.01)  | ~1.6 GB               | yes              | keeps LMDB open as the verifier; skips it for the overwhelming majority of misses |
 > | `LMDB_ONLY`         | minimal (mmap only)   | yes              | fallback when there is essentially no spare RAM and disk-backed mmap is acceptable |
+> | `TRUNCATED_LONG_64` | ~11 GB                | **no**           | not recommended — worst lookup latency at this size (see backend section); use only if you specifically need LMDB fully closed and can spare the RAM |
 >
 > Do **not** select `HASHSET` for the full database. See [Pluggable Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend) above for the full trade-off matrix and per-tier memory footprint.
 

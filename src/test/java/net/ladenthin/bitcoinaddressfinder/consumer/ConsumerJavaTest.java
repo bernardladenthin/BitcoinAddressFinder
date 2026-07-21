@@ -418,23 +418,7 @@ public class ConsumerJavaTest {
         assertThrows(IllegalArgumentException.class, () -> consumerJava.startStatisticsTimer());
     }
 
-    @Test
-    public void windowKeysPerSecond_computesRateOverTheWindow() {
-        // 5000 keys advanced over 1000 ms -> 5000 keys/s
-        assertThat(ConsumerJava.windowKeysPerSecond(1_000L, 0L, 2_000L, 5_000L), is(equalTo(5_000.0)));
-        // 3,000,000 keys over 2000 ms -> 1,500,000 keys/s
-        assertThat(ConsumerJava.windowKeysPerSecond(0L, 0L, 2_000L, 3_000_000L), is(equalTo(1_500_000.0)));
-    }
-
-    @Test
-    public void windowKeysPerSecond_nonPositiveIntervalOrNoAdvance_returnsZero() {
-        // zero elapsed time
-        assertThat(ConsumerJava.windowKeysPerSecond(1_000L, 0L, 1_000L, 5_000L), is(equalTo(0.0)));
-        // negative elapsed time
-        assertThat(ConsumerJava.windowKeysPerSecond(2_000L, 0L, 1_000L, 5_000L), is(equalTo(0.0)));
-        // odometer did not advance
-        assertThat(ConsumerJava.windowKeysPerSecond(1_000L, 5_000L, 2_000L, 5_000L), is(equalTo(0.0)));
-    }
+    // windowed-rate math moved to SlidingWindowRate; see SlidingWindowRateTest.
 
     @AwaitTimeTest
     @Test

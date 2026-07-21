@@ -6,6 +6,9 @@
       "addresses/fileContainingAddresses1.tsv",
       "addresses/fileContainingAddresses2.csv"
     ],
+    "threads": 1,
+    "writeBatchSize": 32768,
+    "queueCapacity": 200000,
     "lmdbConfigurationWrite": {
       "initialMapSizeInMiB": 16,
       "deleteEmptyAddresses": false,

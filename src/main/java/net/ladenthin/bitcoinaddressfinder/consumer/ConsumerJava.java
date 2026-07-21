@@ -5,9 +5,7 @@ package net.ladenthin.bitcoinaddressfinder.consumer;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -46,6 +44,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.HashSetAddressPre
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.TruncatedLong64SortedArrayPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
+import net.ladenthin.bitcoinaddressfinder.statistics.SlidingWindowRate;
 import net.ladenthin.bitcoinaddressfinder.statistics.Statistics;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import org.apache.commons.codec.binary.Hex;
@@ -132,15 +131,6 @@ public class ConsumerJava implements Consumer {
      * scheduled-executor task that reads it on every tick (fb-contrib AT_NONATOMIC_64BIT_PRIMITIVE).
      */
     protected volatile long startTime = 0;
-
-    /**
-     * Trailing ring buffer of {@code [timestampMillis, checkedKeysSnapshot]} samples used to
-     * compute the current windowed keys/second. Only ever touched by the single-thread
-     * {@link #scheduledExecutorService} (both the sampler and the printer run on it), so it needs
-     * no synchronization.
-     */
-    @ToString.Exclude
-    private final Deque<long[]> rateSamples = new ArrayDeque<>();
 
     /** Consumer configuration. */
     protected final CConsumerJava consumerJava;
@@ -540,29 +530,6 @@ public class ConsumerJava implements Consumer {
     }
 
     /**
-     * Computes the windowed throughput in keys/second from the oldest retained sample to now.
-     * Pure and clock-free so the rate logic can be unit-tested without scheduling or a real clock.
-     *
-     * @param oldestSampleMillis timestamp (epoch ms) of the oldest sample still inside the window
-     * @param oldestSampleKeys   odometer value at {@code oldestSampleMillis}
-     * @param nowMillis          the current timestamp (epoch ms)
-     * @param nowKeys            the current odometer value
-     * @return keys/second averaged over {@code [oldestSampleMillis, nowMillis]}, or {@code 0} if
-     *     the interval is non-positive or the odometer did not advance
-     */
-    static double windowKeysPerSecond(long oldestSampleMillis, long oldestSampleKeys, long nowMillis, long nowKeys) {
-        long deltaMillis = nowMillis - oldestSampleMillis;
-        if (deltaMillis <= 0L) {
-            return 0.0;
-        }
-        long deltaKeys = nowKeys - oldestSampleKeys;
-        if (deltaKeys <= 0L) {
-            return 0.0;
-        }
-        return deltaKeys * 1_000.0 / deltaMillis;
-    }
-
-    /**
      * Starts the periodic statistics-printing scheduler plus the throughput sampler that feeds the
      * trailing windowed keys/second rate. Both tasks run on the same single-thread scheduler.
      */
@@ -581,6 +548,11 @@ public class ConsumerJava implements Consumer {
         }
         long rateWindowMillis = rateWindowSeconds * 1_000L;
 
+        // Two trailing-window rate estimators sharing the same window and sampled at the same instant,
+        // so the checked (post-filter) and generated (pre-filter) rates come from the same window.
+        final SlidingWindowRate keysRateWindow = new SlidingWindowRate(rateWindowMillis);
+        final SlidingWindowRate generatedRateWindow = new SlidingWindowRate(rateWindowMillis);
+
         startTime = System.currentTimeMillis();
 
         // Sampler: record an odometer sample once per second and evict samples older than the
@@ -593,22 +565,11 @@ public class ConsumerJava implements Consumer {
                         return;
                     }
                     long now = System.currentTimeMillis();
-                    // Sample both odometers together: checked (post-filter, reaching LMDB) and
-                    // generated (pre-filter, the producers' total output), so both windowed rates
+                    // Sample both odometers at the same instant: checked (post-filter, reaching LMDB)
+                    // and generated (pre-filter, the producers' total output), so both windowed rates
                     // come from the same trailing window.
-                    rateSamples.addLast(new long[] {now, keysNow, runtimeStatistics.getGeneratedKeys()});
-                    long cutoff = now - rateWindowMillis;
-                    // Split the compound guard into a nested test: keep at least one sample, and only
-                    // evict while the oldest is older than the cutoff. Written as an explicit break so
-                    // there is no boolean short-circuit ordering to reason about, and the null-guarded
-                    // peekFirst() (size > 1 guarantees non-null) is evaluated exactly once per turn.
-                    while (rateSamples.size() > 1) {
-                        long[] first = Objects.requireNonNull(rateSamples.peekFirst());
-                        if (first[0] >= cutoff) {
-                            break;
-                        }
-                        rateSamples.removeFirst();
-                    }
+                    keysRateWindow.sample(now, keysNow);
+                    generatedRateWindow.sample(now, runtimeStatistics.getGeneratedKeys());
                 },
                 RATE_SAMPLE_INTERVAL_SECONDS,
                 RATE_SAMPLE_INTERVAL_SECONDS,
@@ -620,13 +581,8 @@ public class ConsumerJava implements Consumer {
                     long now = System.currentTimeMillis();
                     long keysNow = checkedKeys.get();
                     long generatedNow = runtimeStatistics.getGeneratedKeys();
-                    double rate = 0.0;
-                    double generatedRate = 0.0;
-                    long[] oldest = rateSamples.peekFirst();
-                    if (oldest != null) {
-                        rate = windowKeysPerSecond(oldest[0], oldest[1], now, keysNow);
-                        generatedRate = windowKeysPerSecond(oldest[0], oldest[2], now, generatedNow);
-                    }
+                    double rate = keysRateWindow.ratePerSecond(now, keysNow);
+                    double generatedRate = generatedRateWindow.ratePerSecond(now, generatedNow);
                     long uptime = Math.max(now - startTime, 1);
 
                     String message = new Statistics()
