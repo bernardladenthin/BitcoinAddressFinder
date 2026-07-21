@@ -3,12 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.command;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -238,22 +240,32 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
         }
     }
 
-    /** Reads one file line by line onto the line queue, logging a throttled byte-offset progress line. */
+    /**
+     * Reads one file line by line onto the line queue, logging a throttled progress line.
+     *
+     * <p>Uses a {@link BufferedReader} (block reads) rather than {@code RandomAccessFile.readLine()},
+     * which reads one byte at a time and made this single reader the import bottleneck. The
+     * {@link InputStreamReader} decodes UTF-8 leniently (malformed bytes are replaced, not thrown),
+     * matching the previous behaviour. Progress percent is by decoded characters over file bytes —
+     * exact for the ASCII address files, approximate otherwise.
+     */
     private void readFileLines(
             @NonNull File file, @NonNull BlockingQueue<String> lineQueue, @NonNull AtomicReference<Throwable> failure)
             throws IOException {
-        try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
-            long length = Math.max(raf.length(), 1L);
-            String rawLine;
-            while (shouldRun.get() && failure.get() == null && (rawLine = raf.readLine()) != null) {
-                String line = new String(rawLine.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
+        long length = Math.max(file.length(), 1L);
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(Files.newInputStream(file.toPath()), StandardCharsets.UTF_8))) {
+            long charsRead = 0;
+            String line;
+            while (shouldRun.get() && failure.get() == null && (line = reader.readLine()) != null) {
+                charsRead += line.length() + 1L;
                 if (!enqueue(lineQueue, line, failure)) {
                     return;
                 }
                 long now = System.nanoTime();
                 if (now - lastProgressLogNanos >= PROGRESS_REPORT_NANOS) {
                     lastProgressLogNanos = now;
-                    double percent = (double) raf.getFilePointer() / (double) length * 100.0d;
+                    double percent = (double) charsRead / (double) length * 100.0d;
                     LOGGER.info(String.format(
                             "reading %s: %.2f%% (%d written)", file.getName(), percent, addressCounter.get()));
                 }
