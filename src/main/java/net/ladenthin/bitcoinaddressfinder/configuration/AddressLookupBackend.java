@@ -42,14 +42,14 @@ package net.ladenthin.bitcoinaddressfinder.configuration;
  *       ~2.28 B/entry, FPR &#x2248; 0.0015&nbsp;%. No false negatives. Same decorator behaviour
  *       as {@link #BINARY_FUSE_8}; LMDB stays open. Use when the 0.4&nbsp;% false-positive rate
  *       of {@link #BINARY_FUSE_8} sends too many hits to LMDB for verification.</li>
- *   <li>{@link #BLOCKED_BLOOM} - Blocked Bloom filter in front of LMDB. Measured 1.56&nbsp;B/entry
- *       (2.0&nbsp;GiB) on the Full DB and 2.06&nbsp;B/entry (256&nbsp;MiB) on the Light DB, with a
- *       measured FPR of 0.49&nbsp;% and 0.18&nbsp;% respectively. No false negatives.
- *       Same decorator behaviour as {@link #BINARY_FUSE_8}; LMDB stays open. Unlike the fuse filters
- *       it builds in a single streaming pass with peak build memory ≈ the filter itself (~2&nbsp;GB
- *       against the fuse construction's ~42&nbsp;GB peak), so it is the backend that builds fastest on the
- *       full billion-entry tier on a commodity-RAM machine, and its cache-line-aligned blocks feed
- *       the GPU pre-filter with a single coalesced read per lookup.</li>
+ *   <li>{@link #BLOCKED_BLOOM} - Blocked Bloom filter in front of LMDB. Sized exactly via fastrange
+ *       (no power-of-two rounding) to the configured density; the default 11 bits/entry
+ *       ({@code k = 6}) gives ~1.375&nbsp;B/entry (~182&nbsp;MiB Light DB, ~1.89&nbsp;GiB Full DB) at
+ *       ~0.76&nbsp;% FPR. No false negatives. Same decorator behaviour as {@link #BINARY_FUSE_8}; LMDB
+ *       stays open. Builds in a single streaming pass (peak build memory ≈ the filter itself), roughly
+ *       2× faster than the fuse construction's multi-pass peeling — the pick for rebuild-heavy or
+ *       heap-constrained builds; on <b>total</b> cost {@link #BINARY_FUSE_8} is the recommended
+ *       full-tier backend (smaller, lower FPR).</li>
  * </ul>
  */
 public enum AddressLookupBackend {
@@ -82,20 +82,21 @@ public enum AddressLookupBackend {
     BINARY_FUSE_16,
 
     /**
-     * Blocked Bloom filter in front of LMDB. Auto-sized in power-of-two block counts: 2.0 GiB
-     * (1.56 B/entry, measured FPR 0.49 %) at the 1.377 B-entry Full DB tier, 256 MiB (2.06 B/entry,
-     * measured FPR 0.18 %) at the 132 M-entry Light DB tier. No false negatives.
+     * Blocked Bloom filter in front of LMDB. Sized exactly via <i>fastrange</i> (no power-of-two
+     * rounding) to the configured density: the shipped default of 11 bits/entry with {@code k = 6}
+     * gives ~1.375 B/entry (~182 MiB at the 132 M-entry Light DB, ~1.89 GiB at the 1.377 B-entry Full
+     * DB) at a false-positive rate of ~0.76 %. Configurable via {@code blockedBloomBitsPerEntry} /
+     * {@code blockedBloomK}. No false negatives. Decorator like {@link #BINARY_FUSE_8}; LMDB stays open.
      *
-     * <p><b>Faster than {@link #BINARY_FUSE_8} above ~10-50 M entries</b>, slower below it: all
-     * {@code k} probes share one 512-bit block, so a cache-cold lookup costs one cache miss against
-     * a fuse lookup's three. Measured 40.5 vs 52.1 ns at 50 M and 45.5 vs 59.6 ns at 100 M, against
-     * 22.4 vs 38.0 ns at 10 M where the fuse array still fits in L3. Both published database tiers
-     * sit above that crossover. Decorator like BINARY_FUSE_8; LMDB stays open. Builds in a single streaming
-     * pass (peak build memory ≈ the filter itself), so it is the backend that scales to the full
-     * billion-entry database roughly 1.8x faster than the fuse construction, and queries it ~17 %
-     * faster (measured 859 s / 7.17 M lookups per s against 1 564 s / 6.13 M on one 61.6 GB host).
-     * Fuse-8 does build at that tier -- an earlier claim that it could not was refuted -- but costs
-     * more time for less throughput, while remaining 27 % smaller with a slightly better FPR.
+     * <p>All {@code k} probes share one cache-line-aligned 512-bit block, so a cache-cold lookup costs
+     * one cache miss against a fuse lookup's three. Its distinguishing advantage is <b>build cost</b>:
+     * it allocates the bit array once and streams every address through it in a single pass — no
+     * peeling, no auxiliary arrays — so peak build memory is ≈ the filter itself (~2 GB at the Full DB
+     * tier) and it builds roughly 2× faster than the fuse construction's multi-pass peeling (~29 B/entry,
+     * ~42 GB transient at the Full DB). That makes it the pick for <b>rebuild-heavy or heap-constrained</b>
+     * builds. On <b>total</b> cost, however, {@link #BINARY_FUSE_8} is the recommended full-tier backend:
+     * it is ~27 % smaller with a lower FPR, and the one-time build cost amortises over the database's
+     * life. (An earlier claim that Fuse-8 could not build at the Full DB tier was refuted.)
      */
     BLOCKED_BLOOM
 }

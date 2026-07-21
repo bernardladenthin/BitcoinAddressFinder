@@ -300,9 +300,10 @@ itself, the one presumed impossible, finished in 76 s at ~19 M/s. The blocked Bl
 allocates the bit array once and streams — **peak build memory ≈ the filter itself** (2 GiB at the
 Full DB tier) — which is why it builds in roughly half the wall-clock and without the memory cliff.
 
-**`BLOCKED_BLOOM` remains the Full DB recommendation, but on *build* speed — the lookup comparison
-at this tier does not survive a second machine.** Both backends have now been measured on both hosts
-at the 1.377 B-entry tier, each arm preceded by a `PageCacheBuster` pass and run at `-Xmx48g`:
+**`BLOCKED_BLOOM`'s only Full-DB edge is *build* speed — the lookup comparison at this tier does not
+survive a second machine, so the recommendation is `BINARY_FUSE_8` on total cost.** Both backends have
+now been measured on both hosts at the 1.377 B-entry tier, each arm preceded by a `PageCacheBuster`
+pass and run at `-Xmx48g`:
 
 ![Full DB backends](measurements/plots/full_db_backends.png)
 
@@ -368,13 +369,14 @@ systematic artefact rather than noise, so **`filter_build.csv`'s `lookups_per_se
 used to compare backends** — only its build-time, size and FPR columns are trustworthy. The column is
 retained for provenance, not for conclusions.
 
-**Consequence: at the ≈ 1 B+ tier on a large-cache host, the `BLOCKED_BLOOM` recommendation rests on
+**Consequence: at the ≈ 1 B+ tier on a large-cache host, any case for `BLOCKED_BLOOM` rests on
 build time alone** — 1.8–2.0× faster to construct, reproduced on both machines — and not on lookup
 speed, which is a wash or slightly against it. On the 16 MB host the cache argument still applies and
-blocked Bloom wins on both counts — now measured at 500 M and 1 B, not extrapolated. Pick `BINARY_FUSE_8` for light/medium databases (lower RAM,
-marginally faster, and it feeds the GPU pre-filter); pick `BLOCKED_BLOOM` at the ≈ 1 B+ tier for the
-build, or when the smaller L3 makes it faster too. If footprint or FPR outweighs build time, Fuse-8
-is a legitimate Full DB choice given enough heap.
+blocked Bloom wins on both counts — now measured at 500 M and 1 B, not extrapolated. The recommendation
+is **`BINARY_FUSE_8` at every tier** (lower RAM, lower FPR, and it feeds the GPU pre-filter): its
+one-time build cost amortises over the database's life. Reach for `BLOCKED_BLOOM` only when its build
+advantage dominates — **rebuild-heavy or heap-constrained** builds — or on a small-L3 host where it is
+also the faster lookup.
 
 ###### Build time is I/O, and free RAM is the lever (`MDB_NORDAHEAD`)
 
@@ -493,9 +495,10 @@ non-member probes:
   Fuse-8 cannot be constructed at all. **That was wrong, and an independent run disproved it** — see
   the build comparison above. Both filters build; blocked Bloom wins on build time there (~1.8-2.0x
   faster lookups, ~1.8× faster build), because at ~1.5 GB the fuse array is far past any L3. So
-  **`BLOCKED_BLOOM` remains the Full DB recommendation on every machine measured**, but as a
-  throughput result rather than a feasibility one — and Fuse-8 stays a defensible choice there if
-  footprint (1.145 vs 1.583 B/entry) or FPR (0.393 % vs 0.485 %) outweighs query speed.
+  **`BINARY_FUSE_8` is the Full DB recommendation on total cost** — smaller (1.145 vs 1.583 B/entry),
+  lower FPR (0.393 % vs 0.485 %), and its one-time slower build amortises over the database's life.
+  `BLOCKED_BLOOM` wins build time there (and lookup on a small-L3 host), so it is the pick for
+  rebuild-heavy or heap-constrained builds — a throughput/build result, not a feasibility one.
 
   Pick against *both* properties of the machine that will run the scan: cache decides which is
   faster, RAM decides how much the fuse build will hurt — not a single published table.
@@ -1160,8 +1163,9 @@ under test: the streaming backends need little more than the finished structure,
 `BINARY_FUSE_8/16` need ≈ 29 B/entry at peak. Pointing a fuse backend at a billion-entry database on
 a commodity-RAM machine is the build that thrashes (§3) — it does *complete* (measured: 1 564 s at
 1.377 B entries with `-Xmx48g` on 61.6 GB, having run `PageCacheBuster` first), but the ingest phase
-crawls once free RAM is exhausted. Budget the wall-clock, and prefer `BLOCKED_BLOOM` there unless you
-specifically want the smaller, more accurate structure.
+crawls once free RAM is exhausted. Budget the wall-clock; `BINARY_FUSE_8` is the recommendation there
+(smaller, more accurate), accepting the slower build — reach for `BLOCKED_BLOOM` only when that
+build's transient RAM is the binding constraint.
 
 ### Stage attribution — where kernel time goes (permanent, re-runnable)
 
