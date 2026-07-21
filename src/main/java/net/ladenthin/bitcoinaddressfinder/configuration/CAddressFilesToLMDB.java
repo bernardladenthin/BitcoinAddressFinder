@@ -48,10 +48,10 @@ public class CAddressFilesToLMDB {
      * Number of parsed addresses written to LMDB per transaction. Committing once per batch — instead
      * of once per address — is the dominant import speedup, because the LMDB commit is the expensive
      * part. Larger batches mean fewer commits (faster) but a bigger transaction and more entries held
-     * in memory before each flush. The default of {@code 10000} is a good starting point. Values below
+     * in memory before each flush. The default of {@code 32768} is a good starting point. Values below
      * {@code 1} are treated as {@code 1}.
      */
-    public int writeBatchSize = 10_000;
+    public int writeBatchSize = 32_768;
 
     /**
      * Capacity of each internal hand-off queue (reader→parser lines and parser→writer entries). This is

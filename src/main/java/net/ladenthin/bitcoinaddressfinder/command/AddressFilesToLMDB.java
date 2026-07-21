@@ -53,7 +53,7 @@ import org.slf4j.LoggerFactory;
  * thread) reads the current file line by line into a bounded {@link BlockingQueue}; {@code threads}
  * parser workers take lines and decode them into {@link AddressToCoin} entries on a second bounded
  * queue; and a <b>single writer</b> drains that queue and writes to LMDB in <b>batches</b> (one write
- * transaction per {@code writeBatchSize} entries, default 10000). LMDB is a single-writer store and a
+ * transaction per {@code writeBatchSize} entries, default 32768). LMDB is a single-writer store and a
  * commit per address is the dominant cost of a bulk import, so batching the writes — not the reading —
  * is the main
  * speedup. Reading files one at a time keeps all workers busy on the current file and never has several
