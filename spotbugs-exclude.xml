@@ -1178,6 +1178,13 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
     </Match>
 
+    <!-- Style nag: SlidingWindowRate is a mutable stateful rate estimator (a sample buffer), not a
+         value object — equals/hashCode would be meaningless; identity equality is correct. -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.statistics.SlidingWindowRate"/>
+        <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
+    </Match>
+
     <!-- By design: drainEntries() runs only after the writer has already failed; it repeatedly polls the
          parser→writer queue purely to discard entries so parser threads blocked on a full queue can
          finish. The polled value is intentionally dropped (RV_RETURN_VALUE_IGNORED). -->
