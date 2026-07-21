@@ -35,6 +35,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.lmdbjava.BufferProxy;
 import org.lmdbjava.ByteBufferProxy;
+import org.lmdbjava.CopyFlags;
 import org.lmdbjava.Cursor;
 import org.lmdbjava.CursorIterable;
 import org.lmdbjava.Dbi;
@@ -228,6 +229,18 @@ public class LMDBPersistence implements Persistence, AddressIterable {
         }
         localLmdb_h160ToAmount.close();
         localEnv.close();
+    }
+
+    /**
+     * Writes a compacted copy of this (open) database into {@code targetDirectory} using LMDB's
+     * {@code MDB_CP_COMPACT}: free/dead pages are omitted and pages are renumbered sequentially,
+     * producing a smaller, read-denser {@code targetDirectory/data.mdb}. The source is not modified.
+     *
+     * @param targetDirectory an existing, writable directory to receive {@code data.mdb}
+     */
+    public void compactTo(File targetDirectory) {
+        Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
+        localEnv.copy(targetDirectory, CopyFlags.MDB_CP_COMPACT);
     }
 
     @Override

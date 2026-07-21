@@ -389,6 +389,7 @@ SPDX-License-Identifier: Apache-2.0
         <Or>
             <Class name="net.ladenthin.bitcoinaddressfinder.io.FileHelper"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.command.AddressFilesToLMDB"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.command.LMDBCompact"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.producer.ProducerJavaSecretsFiles"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.command.LMDBToAddressFile"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>

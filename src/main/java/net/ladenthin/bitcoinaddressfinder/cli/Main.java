@@ -18,9 +18,11 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.command.AddressFilesToLMDB;
+import net.ladenthin.bitcoinaddressfinder.command.LMDBCompact;
 import net.ladenthin.bitcoinaddressfinder.command.LMDBToAddressFile;
 import net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
+import net.ladenthin.bitcoinaddressfinder.configuration.CCompactLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBToAddressFile;
@@ -288,6 +290,12 @@ public class Main implements Runnable, Interruptable {
                     TuneConfiguration tuneConfiguration = new TuneConfiguration(cTuneConfiguration);
                     interruptables.add(tuneConfiguration);
                     tuneConfiguration.run();
+                }
+                case CompactLMDB -> {
+                    CCompactLMDB cCompactLMDB = Objects.requireNonNull(configuration.compactLMDB);
+                    LMDBCompact lmdbCompact = new LMDBCompact(cCompactLMDB);
+                    interruptables.add(lmdbCompact);
+                    lmdbCompact.run();
                 }
                 case OpenCLInfo -> {
                     OpenCLBuilder openCLBuilder = new OpenCLBuilder();

@@ -24,5 +24,11 @@ public enum CCommand {
      * arithmetically. This command measures the composed pipeline itself, on the operator's own
      * hardware, so the recommendation does not rest on numbers taken from somebody else's GPU.
      */
-    TuneConfiguration
+    TuneConfiguration,
+    /**
+     * Write a compacted copy of an existing LMDB database (LMDB {@code MDB_CP_COMPACT}): free/dead pages
+     * are omitted and pages are laid out sequentially, producing a smaller, read-denser database. Useful
+     * as a post-import optimize step, especially when the database exceeds RAM.
+     */
+    CompactLMDB
 }
