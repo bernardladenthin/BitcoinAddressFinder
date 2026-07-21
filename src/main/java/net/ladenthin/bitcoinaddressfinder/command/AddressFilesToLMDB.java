@@ -80,6 +80,9 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
     /** Count of addresses actually written to LMDB (incremented by the single sink). */
     private final AtomicLong addressCounter = new AtomicLong();
 
+    /** Number of address files fully read so far, across all reader threads (for "X/Y files" progress). */
+    private final AtomicLong filesProcessed = new AtomicLong();
+
     /**
      * Aggregate read statistic. Each reader thread keeps its own {@link ReadStatistic} (which is not
      * thread-safe) and they are merged into this one after every reader has finished — so the final
@@ -171,10 +174,11 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
         final ExecutorService sinkExecutor = Executors.newSingleThreadExecutor();
         final Future<?> sinkFuture = sinkExecutor.submit(() -> runSink(persistence, queue, readersDone, sinkError));
 
+        final int totalFiles = files.size();
         final ExecutorService readerPool = Executors.newFixedThreadPool(threads);
         final List<Future<ReadStatistic>> readerFutures = new ArrayList<>(threads);
         for (int i = 0; i < threads; i++) {
-            readerFutures.add(readerPool.submit(reader(network, queue, fileQueue, sinkError)));
+            readerFutures.add(readerPool.submit(reader(network, queue, fileQueue, sinkError, totalFiles)));
         }
         readerPool.shutdown();
 
@@ -209,7 +213,8 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
             @NonNull Network network,
             @NonNull BlockingQueue<AddressToCoin> queue,
             @NonNull ConcurrentLinkedQueue<File> fileQueue,
-            @NonNull AtomicReference<Throwable> sinkError) {
+            @NonNull AtomicReference<Throwable> sinkError,
+            int totalFiles) {
         return () -> {
             ReadStatistic localStatistic = new ReadStatistic();
             Consumer<AddressToCoin> toQueue = addressToCoin -> putOrFail(queue, addressToCoin);
@@ -226,7 +231,8 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
                 } finally {
                     activeFiles.remove(addressFile);
                 }
-                LOGGER.info("finished: " + filePath);
+                LOGGER.info(
+                        "finished (" + filesProcessed.incrementAndGet() + "/" + totalFiles + " files): " + filePath);
             }
             return localStatistic;
         };

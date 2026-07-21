@@ -215,6 +215,17 @@ public class AddressFilesToLMDBTest extends LMDBBase {
         }
     }
 
+    /** Each finished file logs an "X/Y files" progress marker so a long parallel import stays observable. */
+    @Test
+    public void addressFilesToLMDB_logsPerFileProgress() throws Exception {
+        List<String> files = writeAddressFilesRoundRobin(base58P2PKHAddresses(), 8, "progress");
+        try (LogCaptor logCaptor = LogCaptor.forClass(AddressFilesToLMDB.class)) {
+            runImport(4, true, files, "progress");
+            assertThat(logCaptor.getInfoLogs(), hasItem(containsString("/8 files): ")));
+            assertThat(logCaptor.getInfoLogs(), hasItem(containsString("finished (8/8 files): ")));
+        }
+    }
+
     /**
      * Order-sensitivity warning: it fires only when reading in parallel ({@code threads > 1}) can change
      * the write order <b>and</b> the stored amount depends on that order ({@code useStaticAmount == false}).
