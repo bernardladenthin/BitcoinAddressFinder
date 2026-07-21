@@ -4,7 +4,9 @@
 package net.ladenthin.bitcoinaddressfinder.command;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -17,6 +19,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2PKH;
+import nl.altindag.log.LogCaptor;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -36,8 +39,17 @@ public class LMDBCompactTest extends LMDBBase {
         config.lmdbConfigurationReadOnly.lmdbDirectory = sourceDirectory.getAbsolutePath();
         config.targetDirectory = targetDirectory.getAbsolutePath();
 
-        // act
-        new LMDBCompact(config).run();
+        // act — capture logs to confirm the command re-opens and verifies the compacted copy
+        try (LogCaptor logCaptor = LogCaptor.forClass(LMDBCompact.class)) {
+            new LMDBCompact(config).run();
+
+            // assert: the verification line reports the compacted DB's own entry count
+            assertThat(logCaptor.getInfoLogs(), hasItem(containsString("Compaction verified")));
+            assertThat(
+                    logCaptor.getInfoLogs(),
+                    hasItem(containsString(
+                            staticAddressesFiles.getSupportedAddresses().size() + " unique entries")));
+        }
 
         // assert: the compacted data.mdb exists
         assertThat(new File(targetDirectory, "data.mdb").exists(), is(true));

@@ -7,6 +7,7 @@ import java.io.File;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CCompactLMDB;
+import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.core.Interruptable;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
@@ -68,19 +69,37 @@ public class LMDBCompact implements Runnable, Interruptable {
         }
 
         PersistenceUtils persistenceUtils = new PersistenceUtils(network);
-        try (LMDBPersistence persistence =
-                new LMDBPersistence(compactLMDB.lmdbConfigurationReadOnly, persistenceUtils)) {
-            persistence.init();
+        File sourceDataFile = new File(sourceDirectory, LMDB_DATA_FILE);
 
-            File sourceDataFile = new File(sourceDirectory, LMDB_DATA_FILE);
+        long sourceEntries;
+        try (LMDBPersistence source = new LMDBPersistence(compactLMDB.lmdbConfigurationReadOnly, persistenceUtils)) {
+            source.init();
+            sourceEntries = source.count();
+
             LOGGER.info("Compacting LMDB " + sourceDataFile + " -> " + targetDataFile + " (MDB_CP_COMPACT) ...");
-            persistence.compactTo(targetDirectory);
+            source.compactTo(targetDirectory);
 
             long sourceBytes = sourceDataFile.length();
             long targetBytes = targetDataFile.length();
             LOGGER.info("... compaction done. Source: " + mib(sourceBytes) + " MiB, compacted: " + mib(targetBytes)
-                    + " MiB (" + reductionPercent(sourceBytes, targetBytes) + "% smaller). Point the finder's "
-                    + "lmdbDirectory at " + targetDirectory + " to use it.");
+                    + " MiB (" + reductionPercent(sourceBytes, targetBytes) + "% smaller).");
+        }
+
+        // Re-open the compacted database on its own and confirm it is a valid, complete copy — otherwise
+        // the log would only ever show the source's stats and never prove the compacted copy is correct.
+        CLMDBConfigurationReadOnly compactedConfig = new CLMDBConfigurationReadOnly();
+        compactedConfig.lmdbDirectory = targetDirectory.getAbsolutePath();
+        try (LMDBPersistence compacted = new LMDBPersistence(compactedConfig, persistenceUtils)) {
+            compacted.init();
+            long compactedEntries = compacted.count();
+            if (compactedEntries == sourceEntries) {
+                LOGGER.info("Compaction verified: " + targetDataFile + " contains " + compactedEntries
+                        + " unique entries, matching the source. Point the finder's lmdbDirectory at "
+                        + targetDirectory + " to use it.");
+            } else {
+                LOGGER.warn("Compaction entry-count MISMATCH for " + targetDataFile + ": source " + sourceEntries
+                        + " vs compacted " + compactedEntries + " — do NOT use this copy.");
+            }
         }
     }
 

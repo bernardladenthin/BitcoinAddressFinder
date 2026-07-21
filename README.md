@@ -972,8 +972,7 @@ If you're missing any information or have questions about usage or content, feel
   * Contains Bitcoin addresses whith amount and many altcoin addresses with amount.
   * Static amount of 0 is used to allow best compression.
   * Unique entries: 132288304
-  * Mapsize: 5576 MiB
-  * Time to create the database: ~9 hours
+  * Mapsize: 6352 MiB
   * Link (3.66 GiB zip archive): http://ladenthin.net/lmdb_light.zip
   * Link extracted addresses as txt (5.17 GiB) (2.29 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Light_HexHash.zip
 
@@ -1026,7 +1025,6 @@ LMDBToAddressFile_Light_HexHash.zip	SHA3-512	29CA44CD666D7B8CF9EAD4B340620FBB7ED
   * Static amount of 0 is used to allow best compression.
   * Unique entries: 1377481459
   * Mapsize: 58368 MiB
-  * Time to create the database: ~54 hours
   * Link (34.3 GiB zip archive): http://ladenthin.net/lmdb_full.zip
   * Link extracted addresses as txt (23.4 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Full_HexHash.zip
 
