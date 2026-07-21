@@ -14,7 +14,9 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -85,6 +87,65 @@ public class LMDBPersistenceTest {
             // assert
             Coin amountInLmdb = lmdbPersistence.getAmount(hash160ByteBuffer);
             assertThat(amountInLmdb.getValue(), is(equalTo(expectedAmount)));
+        }
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="putNewAmounts (batch)">
+    /** The batch write (one transaction for many entries) must store every entry with its own amount. */
+    @Test
+    public void putNewAmounts_batchOfEntries_allStoredWithCorrectAmounts() throws IOException {
+        // arrange
+        File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
+
+        CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
+        cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
+        cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
+        cLMDBConfigurationWrite.useStaticAmount = false;
+
+        try (LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils)) {
+            lmdbPersistence.init();
+
+            int count = 1_000;
+            List<ByteBuffer> hash160s = new ArrayList<>(count);
+            List<Coin> amounts = new ArrayList<>(count);
+            for (int i = 0; i < count; i++) {
+                BigInteger secret = keyUtility.createSecret(Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS, random);
+                ECKey ecKey = keyUtility.createECKey(secret, true);
+                hash160s.add(byteBufferUtility.byteArrayToByteBuffer(ecKey.getPubKeyHash()));
+                amounts.add(Coin.valueOf(i + 1L));
+            }
+
+            // act — a single transaction for the whole batch
+            lmdbPersistence.putNewAmounts(hash160s, amounts);
+
+            // assert
+            assertThat(lmdbPersistence.count(), is(equalTo((long) count)));
+            for (int i = 0; i < count; i++) {
+                assertThat(lmdbPersistence.getAmount(hash160s.get(i)).getValue(), is(equalTo(i + 1L)));
+            }
+        }
+    }
+
+    /** The two parallel lists must be the same length; otherwise the pairing is undefined. */
+    @Test
+    public void putNewAmounts_mismatchedListSizes_throwsIllegalArgumentException() throws IOException {
+        // arrange
+        File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
+
+        CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
+        cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
+        cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
+
+        try (LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils)) {
+            lmdbPersistence.init();
+
+            List<ByteBuffer> hash160s = new ArrayList<>();
+            hash160s.add(byteBufferUtility.byteArrayToByteBuffer(new byte[20]));
+            List<Coin> amounts = new ArrayList<>();
+
+            // act, assert
+            assertThrows(IllegalArgumentException.class, () -> lmdbPersistence.putNewAmounts(hash160s, amounts));
         }
     }
     // </editor-fold>

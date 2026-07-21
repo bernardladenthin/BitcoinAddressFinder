@@ -425,16 +425,64 @@ public class LMDBPersistence implements Persistence, AddressIterable {
         Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
 
         try (Txn<ByteBuffer> txn = localEnv.txnWrite()) {
-            if (localLmdbConfigurationWrite.deleteEmptyAddresses && amount.isZero()) {
-                localLmdb_h160ToAmount.delete(txn, hash160);
+            applyEntry(localLmdbConfigurationWrite, localLmdb_h160ToAmount, txn, hash160, amount);
+            txn.commit();
+        }
+    }
+
+    /**
+     * Writes many entries in a <b>single</b> write transaction (one commit for the whole batch) instead
+     * of one transaction per entry. Since LMDB commits are the dominant cost of a bulk import, this is
+     * the primary import speedup. The two lists are parallel: entry {@code i} is
+     * {@code (hash160s.get(i), amounts.get(i))}. Order is preserved. On a full map the whole batch is
+     * retried after growing the map, matching {@link #putNewAmount(ByteBuffer, Coin)}.
+     *
+     * <p>Not thread-safe: LMDB permits only one write transaction at a time, so a single writer thread
+     * must own all calls.
+     *
+     * @param hash160s the 20-byte hashes to write, in order
+     * @param amounts  the amounts, aligned one-to-one with {@code hash160s}
+     */
+    public void putNewAmounts(List<ByteBuffer> hash160s, List<Coin> amounts) {
+        if (hash160s.size() != amounts.size()) {
+            throw new IllegalArgumentException(
+                    "hash160s and amounts must have the same size: " + hash160s.size() + " != " + amounts.size());
+        }
+        CLMDBConfigurationWrite localLmdbConfigurationWrite = Objects.requireNonNull(lmdbConfigurationWrite);
+
+        try {
+            putNewAmountsUnsafe(hash160s, amounts);
+        } catch (org.lmdbjava.Env.MapFullException e) {
+            if (localLmdbConfigurationWrite.increaseMapAutomatically) {
+                increaseDatabaseSize(new ByteConversion().mibToBytes(lmdbConfigurationWrite.increaseSizeInMiB));
+                putNewAmountsUnsafe(hash160s, amounts);
             } else {
-                long amountAsLong = amount.longValue();
-                if (localLmdbConfigurationWrite.useStaticAmount) {
-                    amountAsLong = lmdbConfigurationWrite.staticAmount;
-                }
-                localLmdb_h160ToAmount.put(txn, hash160, persistenceUtils.longToByteBufferDirect(amountAsLong));
+                throw e;
+            }
+        }
+    }
+
+    private void putNewAmountsUnsafe(List<ByteBuffer> hash160s, List<Coin> amounts) {
+        CLMDBConfigurationWrite localLmdbConfigurationWrite = Objects.requireNonNull(lmdbConfigurationWrite);
+        Dbi<ByteBuffer> localLmdb_h160ToAmount = Objects.requireNonNull(lmdb_h160ToAmount);
+        Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
+
+        try (Txn<ByteBuffer> txn = localEnv.txnWrite()) {
+            for (int i = 0; i < hash160s.size(); i++) {
+                applyEntry(localLmdbConfigurationWrite, localLmdb_h160ToAmount, txn, hash160s.get(i), amounts.get(i));
             }
             txn.commit();
+        }
+    }
+
+    /** Applies one hash160/amount to the open transaction (respecting deleteEmptyAddresses/useStaticAmount). */
+    private void applyEntry(
+            CLMDBConfigurationWrite config, Dbi<ByteBuffer> dbi, Txn<ByteBuffer> txn, ByteBuffer hash160, Coin amount) {
+        if (config.deleteEmptyAddresses && amount.isZero()) {
+            dbi.delete(txn, hash160);
+        } else {
+            long amountAsLong = config.useStaticAmount ? config.staticAmount : amount.longValue();
+            dbi.put(txn, hash160, persistenceUtils.longToByteBufferDirect(amountAsLong));
         }
     }
 

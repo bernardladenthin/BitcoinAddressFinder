@@ -5,39 +5,39 @@ package net.ladenthin.bitcoinaddressfinder.command;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 import net.ladenthin.bitcoinaddressfinder.core.Interruptable;
-import net.ladenthin.bitcoinaddressfinder.io.AddressFile;
+import net.ladenthin.bitcoinaddressfinder.io.AddressFormatNotAcceptedException;
+import net.ladenthin.bitcoinaddressfinder.io.AddressTxtLine;
 import net.ladenthin.bitcoinaddressfinder.io.FileHelper;
 import net.ladenthin.bitcoinaddressfinder.model.AddressToCoin;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
-import net.ladenthin.bitcoinaddressfinder.statistics.ReadStatistic;
+import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
+import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
+import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -46,62 +46,66 @@ import org.slf4j.LoggerFactory;
 /**
  * Imports one or more plaintext address files into an LMDB database.
  *
- * <h2>Reading is decoupled from writing</h2>
- * File reading and address parsing (CPU/IO-bound) run on {@code threads} reader threads; each parsed
- * {@link AddressToCoin} is handed over a bounded {@link BlockingQueue} to a <b>single writer</b> (the
- * sink), because LMDB is a single-writer store. This parallelises only the slow, single-threaded read
- * side without touching the write path.
+ * <h2>Pipeline</h2>
+ * Files are processed <b>sequentially, in list order</b>. For the whole import a single reader (this
+ * thread) reads the current file line by line into a bounded {@link BlockingQueue}; {@code threads}
+ * parser workers take lines and decode them into {@link AddressToCoin} entries on a second bounded
+ * queue; and a <b>single writer</b> drains that queue and writes to LMDB in <b>batches</b> (one write
+ * transaction per {@value #WRITE_BATCH_SIZE} entries). LMDB is a single-writer store and a commit per
+ * address is the dominant cost of a bulk import, so batching the writes — not the reading — is the main
+ * speedup. Reading files one at a time keeps all workers busy on the current file and never has several
+ * threads reading different whole files at once.
  *
  * <h2>Ordering</h2>
- * With {@code threads == 1} there is one reader and one writer draining a FIFO queue, so writes happen
- * in exactly the original file/line order — identical to the previous single-threaded importer. This
- * matters when {@code useStaticAmount} is {@code false}: for an address present in several files the
- * last write wins. With {@code threads >= 2} files are read in parallel, so that order (and thus the
- * winning amount for duplicates) is non-deterministic; a warning is logged unless
- * {@code useStaticAmount} is {@code true}, which stores the same amount regardless of order. The set
- * of imported addresses is the same either way.
+ * With {@code threads == 1} there is one parser draining a FIFO queue and one writer, so entries are
+ * written in the original file/line order — deterministic. This matters when {@code useStaticAmount} is
+ * {@code false}: for an address present more than once the last write wins. With {@code threads >= 2}
+ * lines are parsed in parallel, so the write order — and thus the winning amount for duplicates —
+ * becomes non-deterministic; a warning is logged unless {@code useStaticAmount} is {@code true}, which
+ * stores the same amount regardless of order. The set of imported addresses is the same either way.
  */
 @ToString
 public class AddressFilesToLMDB implements Runnable, Interruptable {
 
+    /** Log a write-progress line every this many written addresses. */
     private static final long PROGRESS_LOG = 100_000;
 
-    /**
-     * Bound on the reader-to-writer hand-off queue. Provides back-pressure so fast readers cannot
-     * outrun the single LMDB writer and exhaust the heap on a huge import.
-     */
-    private static final int QUEUE_CAPACITY = 200_000;
+    /** Number of entries written per LMDB transaction. One commit per batch is the import speedup. */
+    private static final int WRITE_BATCH_SIZE = 10_000;
 
-    /** Sink poll timeout: how often the writer re-checks the "readers done and queue drained" exit. */
-    private static final long SINK_POLL_MILLIS = 50;
+    /** Capacity of the reader→parser line queue and the parser→writer entry queue (back-pressure). */
+    private static final int LINE_QUEUE_CAPACITY = 200_000;
 
-    /** Interval, in seconds, at which the read progress of every in-flight file is logged. */
-    private static final long PROGRESS_REPORT_SECONDS = 30;
+    private static final int ENTRY_QUEUE_CAPACITY = 200_000;
+
+    /** Poll timeout used when draining the queues so the "upstream done and queue empty" exit is re-checked. */
+    private static final long QUEUE_POLL_MILLIS = 50;
+
+    /** Minimum interval between per-file read-progress log lines. */
+    private static final long PROGRESS_REPORT_NANOS = TimeUnit.SECONDS.toNanos(30);
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AddressFilesToLMDB.class);
 
     private final @NonNull CAddressFilesToLMDB addressFilesToLMDB;
 
-    /** Count of addresses actually written to LMDB (incremented by the single sink). */
+    /** Count of addresses actually written to LMDB (incremented by the single writer). */
     private final AtomicLong addressCounter = new AtomicLong();
 
-    /** Number of address files fully read so far, across all reader threads (for "X/Y files" progress). */
+    /** Count of lines successfully decoded into an address (incremented by the parser workers). */
+    private final AtomicLong parsedCounter = new AtomicLong();
+
+    /** Count of lines rejected as unsupported/unparseable (incremented by the parser workers). */
+    private final AtomicLong unsupportedCounter = new AtomicLong();
+
+    /** Number of address files fully read so far (for "X/Y files" progress). */
     private final AtomicLong filesProcessed = new AtomicLong();
 
-    /**
-     * Aggregate read statistic. Each reader thread keeps its own {@link ReadStatistic} (which is not
-     * thread-safe) and they are merged into this one after every reader has finished — so the final
-     * summary is race-free.
-     */
-    private final ReadStatistic readStatistic = new ReadStatistic();
+    /** Lines that threw an unexpected error while parsing; logged in the final summary. */
+    private final Queue<String> errors = new ConcurrentLinkedQueue<>();
 
-    /**
-     * Address files currently being read, so {@link #interrupt()} can stop every in-flight reader.
-     *
-     * <p>Excluded from {@link ToString} — a transient, per-run set of readers, not configuration.
-     */
+    /** Wall-clock of the last per-file read-progress log; touched only by the reader (this) thread. */
     @ToString.Exclude
-    private final Set<AddressFile> activeFiles = ConcurrentHashMap.newKeySet();
+    private long lastProgressLogNanos;
 
     /**
      * Flag controlling the import; cleared via {@link #interrupt()}.
@@ -131,11 +135,11 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
         if (threads > 1 && !lmdbConfigurationWrite.useStaticAmount) {
             LOGGER.warn(
-                    "threads={} with useStaticAmount=false: address files are read in parallel, so the LMDB write "
-                            + "order is non-deterministic. For an address that appears in more than one file the "
-                            + "last write wins, so the stored amount for such duplicates is not deterministic across "
-                            + "runs. Use threads=1 for a deterministic amount, or useStaticAmount=true (order-safe "
-                            + "with any thread count). The set of imported addresses is unaffected either way.",
+                    "threads={} with useStaticAmount=false: address files are parsed in parallel, so the LMDB write "
+                            + "order is non-deterministic. For an address that appears more than once the last write "
+                            + "wins, so the stored amount for such duplicates is not deterministic across runs. Use "
+                            + "threads=1 for a deterministic amount, or useStaticAmount=true (order-safe with any "
+                            + "thread count). The set of imported addresses is unaffected either way.",
                     threads);
         }
 
@@ -150,14 +154,11 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
                 List<File> files = fileHelper.stringsToFiles(addressesFiles);
                 fileHelper.assertFilesExists(files);
 
-                LOGGER.info("Iterate address files with " + threads + " reader thread(s) ...");
+                LOGGER.info("Import " + files.size() + " address file(s) with " + threads + " parser thread(s), "
+                        + "batched writes of " + WRITE_BATCH_SIZE + " ...");
                 importFiles(network, persistence, files, threads);
-                logProgress();
-                LOGGER.info("... iterate address files done.");
-
-                for (String error : readStatistic.errors) {
-                    LOGGER.info("Error in line: " + error);
-                }
+                logSummary();
+                LOGGER.info("... import done.");
             } catch (IOException e) {
                 throw new UncheckedIOException(
                         "Failed to import " + addressFilesToLMDB.addressesFiles.size() + " address file(s)", e);
@@ -166,196 +167,227 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
     }
 
     /**
-     * Runs the reader pool → queue → single writer pipeline and blocks until every file is imported.
+     * Runs the reader (this thread) → line queue → parser pool → entry queue → single batched writer
+     * pipeline and blocks until every file is imported.
      */
     private void importFiles(
             @NonNull Network network, @NonNull LMDBPersistence persistence, @NonNull List<File> files, int threads)
             throws IOException {
-        final BlockingQueue<AddressToCoin> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
-        final ConcurrentLinkedQueue<File> fileQueue = new ConcurrentLinkedQueue<>(files);
-        final AtomicBoolean readersDone = new AtomicBoolean(false);
-        final AtomicReference<Throwable> sinkError = new AtomicReference<>();
+        final BlockingQueue<String> lineQueue = new LinkedBlockingQueue<>(LINE_QUEUE_CAPACITY);
+        final BlockingQueue<AddressToCoin> entryQueue = new LinkedBlockingQueue<>(ENTRY_QUEUE_CAPACITY);
+        final AtomicBoolean readingDone = new AtomicBoolean(false);
+        final AtomicBoolean parsingDone = new AtomicBoolean(false);
+        final AtomicReference<Throwable> failure = new AtomicReference<>();
 
-        final ExecutorService sinkExecutor = Executors.newSingleThreadExecutor();
-        final Future<?> sinkFuture = sinkExecutor.submit(() -> runSink(persistence, queue, readersDone, sinkError));
+        final ExecutorService writerExecutor = Executors.newSingleThreadExecutor();
+        final Future<?> writerFuture =
+                writerExecutor.submit(() -> runWriter(persistence, entryQueue, parsingDone, failure));
 
-        final int totalFiles = files.size();
-        final ExecutorService readerPool = Executors.newFixedThreadPool(threads);
-        final List<Future<ReadStatistic>> readerFutures = new ArrayList<>(threads);
+        final ExecutorService parserPool = Executors.newFixedThreadPool(threads);
+        final List<Future<?>> parserFutures = new ArrayList<>(threads);
         for (int i = 0; i < threads; i++) {
-            readerFutures.add(readerPool.submit(reader(network, queue, fileQueue, sinkError, totalFiles)));
+            parserFutures.add(parserPool.submit(() -> runParser(network, lineQueue, entryQueue, readingDone, failure)));
         }
-        readerPool.shutdown();
-
-        // Periodically report the read progress (byte offset / size) of every file currently being read,
-        // so a long parallel import shows how far each busy reader has got, not just when a file finishes.
-        final ScheduledExecutorService progressReporter = Executors.newSingleThreadScheduledExecutor();
-        final ScheduledFuture<?> progressTask = progressReporter.scheduleWithFixedDelay(
-                this::logReaderProgress, PROGRESS_REPORT_SECONDS, PROGRESS_REPORT_SECONDS, TimeUnit.SECONDS);
+        parserPool.shutdown();
 
         try {
-            awaitTermination(readerPool);
-            // Readers are done; let the sink drain the remainder and stop.
-            readersDone.set(true);
-            sinkFuture.get();
-            for (Future<ReadStatistic> future : readerFutures) {
-                merge(readStatistic, future.get());
+            // The reader is this thread: read every file, in order, into the line queue.
+            readAllFiles(files, lineQueue, failure);
+            readingDone.set(true);
+            // Parsers drain the remaining lines, then the writer drains the remaining entries.
+            awaitTermination(parserPool);
+            parsingDone.set(true);
+            writerFuture.get();
+            for (Future<?> parserFuture : parserFutures) {
+                parserFuture.get();
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("Interrupted while importing " + files.size() + " address file(s)", e);
         } catch (ExecutionException e) {
-            // Chain the full ExecutionException so the reader's original failure keeps its stack trace.
+            // Chain the full ExecutionException so the worker's original failure keeps its stack trace.
             throw new IOException("Failed while importing " + files.size() + " address file(s)", e);
         } finally {
-            progressTask.cancel(true);
-            progressReporter.shutdownNow();
-            readersDone.set(true);
-            sinkExecutor.shutdownNow();
-            readerPool.shutdownNow();
+            readingDone.set(true);
+            parsingDone.set(true);
+            parserPool.shutdownNow();
+            writerExecutor.shutdownNow();
         }
 
-        Throwable failed = sinkError.get();
+        Throwable failed = failure.get();
         if (failed != null) {
             throw new IOException("LMDB writer failed after " + addressCounter.get() + " address(es) written", failed);
         }
     }
 
-    /** Builds one reader task: pull files from the shared queue, parse them, enqueue parsed entries. */
-    private Callable<ReadStatistic> reader(
-            @NonNull Network network,
-            @NonNull BlockingQueue<AddressToCoin> queue,
-            @NonNull ConcurrentLinkedQueue<File> fileQueue,
-            @NonNull AtomicReference<Throwable> sinkError,
-            int totalFiles) {
-        return () -> {
-            ReadStatistic localStatistic = new ReadStatistic();
-            Consumer<AddressToCoin> toQueue = addressToCoin -> putOrFail(queue, addressToCoin);
-            Consumer<String> unsupported = line -> {};
-
-            File file;
-            while (shouldRun.get() && sinkError.get() == null && (file = fileQueue.poll()) != null) {
-                AddressFile addressFile = new AddressFile(file, localStatistic, network, toQueue, unsupported);
-                activeFiles.add(addressFile);
-                String filePath = file.getAbsolutePath();
-                LOGGER.info("process " + filePath);
-                try {
-                    addressFile.readFile();
-                } finally {
-                    activeFiles.remove(addressFile);
-                }
-                LOGGER.info(
-                        "finished (" + filesProcessed.incrementAndGet() + "/" + totalFiles + " files): " + filePath);
+    /** Reads every file, in list order, pushing each line onto the shared line queue. */
+    private void readAllFiles(
+            @NonNull List<File> files,
+            @NonNull BlockingQueue<String> lineQueue,
+            @NonNull AtomicReference<Throwable> failure)
+            throws IOException {
+        int totalFiles = files.size();
+        for (File file : files) {
+            if (!shouldRun.get() || failure.get() != null) {
+                break;
             }
-            return localStatistic;
-        };
+            String path = file.getAbsolutePath();
+            LOGGER.info("process " + path);
+            readFileLines(file, lineQueue, failure);
+            LOGGER.info("finished (" + filesProcessed.incrementAndGet() + "/" + totalFiles + " files): " + path);
+        }
     }
 
-    /** The single LMDB writer: drains the queue and writes until readers are done and the queue is empty. */
-    private Void runSink(
-            @NonNull LMDBPersistence persistence,
-            @NonNull BlockingQueue<AddressToCoin> queue,
-            @NonNull AtomicBoolean readersDone,
-            @NonNull AtomicReference<Throwable> sinkError)
-            throws InterruptedException {
-        try {
-            while (!(readersDone.get() && queue.isEmpty())) {
-                AddressToCoin entry = queue.poll(SINK_POLL_MILLIS, TimeUnit.MILLISECONDS);
-                if (entry != null) {
-                    ByteBuffer hash160 = entry.hash160();
-                    persistence.putNewAmount(hash160, entry.coin());
-                    long written = addressCounter.incrementAndGet();
-                    if (written % PROGRESS_LOG == 0) {
-                        LOGGER.info("Progress: " + written + " addresses written.");
-                    }
+    /** Reads one file line by line onto the line queue, logging a throttled byte-offset progress line. */
+    private void readFileLines(
+            @NonNull File file, @NonNull BlockingQueue<String> lineQueue, @NonNull AtomicReference<Throwable> failure)
+            throws IOException {
+        try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+            long length = Math.max(raf.length(), 1L);
+            String rawLine;
+            while (shouldRun.get() && failure.get() == null && (rawLine = raf.readLine()) != null) {
+                String line = new String(rawLine.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
+                if (!enqueue(lineQueue, line, failure)) {
+                    return;
+                }
+                long now = System.nanoTime();
+                if (now - lastProgressLogNanos >= PROGRESS_REPORT_NANOS) {
+                    lastProgressLogNanos = now;
+                    double percent = (double) raf.getFilePointer() / (double) length * 100.0d;
+                    LOGGER.info(String.format(
+                            "reading %s: %.2f%% (%d written)", file.getName(), percent, addressCounter.get()));
                 }
             }
-        } catch (RuntimeException e) {
-            // Record the failure and keep draining so readers blocked on a full queue can finish; the
-            // recorded error is rethrown by importFiles once everything has stopped.
-            sinkError.set(e);
-            drainRemaining(queue, readersDone);
+        }
+    }
+
+    /** One parser worker: take lines, decode them, and hand the parsed entries to the writer queue. */
+    private Void runParser(
+            @NonNull Network network,
+            @NonNull BlockingQueue<String> lineQueue,
+            @NonNull BlockingQueue<AddressToCoin> entryQueue,
+            @NonNull AtomicBoolean readingDone,
+            @NonNull AtomicReference<Throwable> failure)
+            throws InterruptedException {
+        // Both are stateless/immutable and reused for every line this worker parses.
+        KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(true));
+        AddressTxtLine addressTxtLine = new AddressTxtLine();
+        while (failure.get() == null && shouldRun.get() && !(readingDone.get() && lineQueue.isEmpty())) {
+            String line = lineQueue.poll(QUEUE_POLL_MILLIS, TimeUnit.MILLISECONDS);
+            if (line == null) {
+                continue;
+            }
+            try {
+                AddressToCoin entry = addressTxtLine.fromLine(line, keyUtility);
+                parsedCounter.incrementAndGet();
+                if (!enqueue(entryQueue, entry, failure)) {
+                    return null;
+                }
+            } catch (AddressFormatNotAcceptedException e) {
+                unsupportedCounter.incrementAndGet();
+            } catch (RuntimeException e) {
+                errors.add(line);
+                LOGGER.error("Error in line: {}", line, e);
+            }
         }
         return null;
     }
 
-    private static void drainRemaining(@NonNull BlockingQueue<AddressToCoin> queue, @NonNull AtomicBoolean readersDone)
+    /** The single LMDB writer: drains parsed entries and writes them in batches (one transaction each). */
+    private Void runWriter(
+            @NonNull LMDBPersistence persistence,
+            @NonNull BlockingQueue<AddressToCoin> entryQueue,
+            @NonNull AtomicBoolean parsingDone,
+            @NonNull AtomicReference<Throwable> failure)
             throws InterruptedException {
-        while (!(readersDone.get() && queue.isEmpty())) {
-            // Discard the drained entries: the writer has already failed, this only unblocks readers.
-            queue.poll(SINK_POLL_MILLIS, TimeUnit.MILLISECONDS);
+        List<ByteBuffer> hash160Batch = new ArrayList<>(WRITE_BATCH_SIZE);
+        List<Coin> amountBatch = new ArrayList<>(WRITE_BATCH_SIZE);
+        try {
+            while (failure.get() == null && !(parsingDone.get() && entryQueue.isEmpty())) {
+                AddressToCoin entry = entryQueue.poll(QUEUE_POLL_MILLIS, TimeUnit.MILLISECONDS);
+                if (entry == null) {
+                    continue;
+                }
+                hash160Batch.add(entry.hash160());
+                amountBatch.add(entry.coin());
+                if (hash160Batch.size() >= WRITE_BATCH_SIZE) {
+                    flushBatch(persistence, hash160Batch, amountBatch);
+                }
+            }
+            if (!hash160Batch.isEmpty()) {
+                flushBatch(persistence, hash160Batch, amountBatch);
+            }
+        } catch (RuntimeException e) {
+            // Record the failure and keep draining so parsers/reader blocked on a full queue can finish.
+            // Only this single writer thread ever sets failure, so an unconditional set is correct.
+            failure.set(e);
+            drainEntries(entryQueue, parsingDone);
+        }
+        return null;
+    }
+
+    /** Writes one batch in a single transaction and logs write progress when a 100k boundary is crossed. */
+    private void flushBatch(
+            @NonNull LMDBPersistence persistence,
+            @NonNull List<ByteBuffer> hash160Batch,
+            @NonNull List<Coin> amountBatch) {
+        int count = hash160Batch.size();
+        persistence.putNewAmounts(hash160Batch, amountBatch);
+        long before = addressCounter.getAndAdd(count);
+        long after = before + count;
+        if (before / PROGRESS_LOG != after / PROGRESS_LOG) {
+            LOGGER.info("Progress: " + after + " addresses written.");
+        }
+        hash160Batch.clear();
+        amountBatch.clear();
+    }
+
+    private static void drainEntries(
+            @NonNull BlockingQueue<AddressToCoin> entryQueue, @NonNull AtomicBoolean parsingDone)
+            throws InterruptedException {
+        while (!(parsingDone.get() && entryQueue.isEmpty())) {
+            // Discard the drained entries: the writer has already failed, this only unblocks upstream.
+            entryQueue.poll(QUEUE_POLL_MILLIS, TimeUnit.MILLISECONDS);
         }
     }
 
-    private static void putOrFail(@NonNull BlockingQueue<AddressToCoin> queue, @NonNull AddressToCoin entry) {
+    /**
+     * Offers an item to a bounded queue, retrying until it fits or the import is aborting (interrupt,
+     * {@link #shouldRun} cleared, or a recorded {@code failure}).
+     *
+     * @return {@code true} if the item was enqueued, {@code false} if the import is aborting
+     */
+    private <T extends @NonNull Object> boolean enqueue(
+            @NonNull BlockingQueue<T> queue, @NonNull T item, @NonNull AtomicReference<Throwable> failure) {
         try {
-            queue.put(entry);
+            while (shouldRun.get() && failure.get() == null) {
+                if (queue.offer(item, QUEUE_POLL_MILLIS, TimeUnit.MILLISECONDS)) {
+                    return true;
+                }
+            }
+            return false;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            // A reader lambda hands entries to the writer through a Consumer that cannot throw checked
-            // exceptions, so an interrupt while queueing is surfaced as an unchecked exception.
-            throw new IllegalStateException(
-                    "Interrupted while queueing a parsed address for the LMDB writer on thread "
-                            + Thread.currentThread().getName(),
-                    e);
+            return false;
         }
     }
 
     private static void awaitTermination(@NonNull ExecutorService executor) throws InterruptedException {
         while (!executor.awaitTermination(1, TimeUnit.DAYS)) {
-            // wait for all readers to finish
+            // wait for all workers to finish
         }
     }
 
-    /** Merges a reader's per-thread statistic into the aggregate; {@code target} is only touched here. */
-    private static void merge(@NonNull ReadStatistic target, @NonNull ReadStatistic source) {
-        target.successful += source.successful;
-        source.unsupportedReasons.forEach((reason, count) -> target.unsupportedReasons.merge(reason, count, Long::sum));
-        target.errors.addAll(source.errors);
-        target.currentFileProgress = source.currentFileProgress;
-    }
-
-    /**
-     * Logs the read progress of every file currently being read. Runs on the scheduled reporter thread;
-     * each active file is read by exactly one reader, so the list is effectively per-reader progress.
-     */
-    private void logReaderProgress() {
-        try {
-            List<AddressFile> active = new ArrayList<>(activeFiles);
-            if (active.isEmpty()) {
-                return;
-            }
-            StringBuilder report = new StringBuilder();
-            report.append("Reader progress (")
-                    .append(active.size())
-                    .append(" file(s) active, ")
-                    .append(addressCounter.get())
-                    .append(" written):");
-            for (AddressFile addressFile : active) {
-                report.append(System.lineSeparator())
-                        .append("  ")
-                        .append(addressFile.getFile().getName())
-                        .append(": ")
-                        .append(String.format("%.2f%%", addressFile.getReadProgressInPercent()));
-            }
-            LOGGER.info(report.toString());
-        } catch (RuntimeException e) {
-            // Never let a reporting hiccup cancel the scheduled task or affect the import.
-            LOGGER.debug("Failed to log reader progress", e);
+    private void logSummary() {
+        LOGGER.info("Import summary: " + addressCounter.get() + " written, " + parsedCounter.get() + " parsed, "
+                + unsupportedCounter.get() + " unsupported, " + errors.size() + " error(s).");
+        for (String error : errors) {
+            LOGGER.info("Error in line: " + error);
         }
-    }
-
-    private void logProgress() {
-        LOGGER.info("Progress: " + addressCounter.get() + " addresses. Unsupported: "
-                + readStatistic.getUnsupportedTotal() + ". Errors: " + readStatistic.errors.size()
-                + ". Current File progress: " + String.format("%.2f", readStatistic.currentFileProgress) + "%.");
     }
 
     @Override
     public void interrupt() {
         shouldRun.set(false);
-        for (AddressFile addressFile : activeFiles) {
-            addressFile.interrupt();
-        }
     }
 }
