@@ -35,6 +35,32 @@ public class AddressFileTest {
     @TempDir
     public Path folder;
 
+    // <editor-fold defaultstate="collapsed" desc="progress reporting accessors">
+    @Test
+    public void getFile_returnsTheFileBeingRead() throws IOException {
+        File file = Files.createFile(folder.resolve("addresses.txt")).toFile();
+        AddressFile addressFile = new AddressFile(file, new ReadStatistic(), network, addressToCoin -> {}, line -> {});
+
+        assertThat(addressFile.getFile(), is(equalTo(file)));
+    }
+
+    @Test
+    public void getReadProgressInPercent_afterFullyReadingFile_reportsComplete() throws IOException {
+        // arrange — a non-empty file so the byte-offset progress reaches 100%
+        File file = folder.resolve("addresses.txt").toFile();
+        FileUtils.writeStringToFile(
+                file, P2PKH.Bitcoin.getPublicAddress() + System.lineSeparator(), StandardCharsets.UTF_8);
+        ReadStatistic readStatistic = new ReadStatistic();
+        AddressFile addressFile = new AddressFile(file, readStatistic, network, addressToCoin -> {}, line -> {});
+
+        // act
+        addressFile.readFile();
+
+        // assert
+        assertThat(addressFile.getReadProgressInPercent(), is(equalTo(100.0d)));
+    }
+    // </editor-fold>
+
     // <editor-fold defaultstate="collapsed" desc="processLine">
     @Test
     public void processLine_validBitcoinAddress_addressConsumerCalledOnce() throws IOException {

@@ -20,6 +20,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -72,6 +74,9 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     /** Sink poll timeout: how often the writer re-checks the "readers done and queue drained" exit. */
     private static final long SINK_POLL_MILLIS = 50;
+
+    /** Interval, in seconds, at which the read progress of every in-flight file is logged. */
+    private static final long PROGRESS_REPORT_SECONDS = 30;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AddressFilesToLMDB.class);
 
@@ -182,6 +187,12 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
         }
         readerPool.shutdown();
 
+        // Periodically report the read progress (byte offset / size) of every file currently being read,
+        // so a long parallel import shows how far each busy reader has got, not just when a file finishes.
+        final ScheduledExecutorService progressReporter = Executors.newSingleThreadScheduledExecutor();
+        final ScheduledFuture<?> progressTask = progressReporter.scheduleWithFixedDelay(
+                this::logReaderProgress, PROGRESS_REPORT_SECONDS, PROGRESS_REPORT_SECONDS, TimeUnit.SECONDS);
+
         try {
             awaitTermination(readerPool);
             // Readers are done; let the sink drain the remainder and stop.
@@ -197,6 +208,8 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
             // Chain the full ExecutionException so the reader's original failure keeps its stack trace.
             throw new IOException("Failed while importing " + files.size() + " address file(s)", e);
         } finally {
+            progressTask.cancel(true);
+            progressReporter.shutdownNow();
             readersDone.set(true);
             sinkExecutor.shutdownNow();
             readerPool.shutdownNow();
@@ -300,6 +313,36 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
         source.unsupportedReasons.forEach((reason, count) -> target.unsupportedReasons.merge(reason, count, Long::sum));
         target.errors.addAll(source.errors);
         target.currentFileProgress = source.currentFileProgress;
+    }
+
+    /**
+     * Logs the read progress of every file currently being read. Runs on the scheduled reporter thread;
+     * each active file is read by exactly one reader, so the list is effectively per-reader progress.
+     */
+    private void logReaderProgress() {
+        try {
+            List<AddressFile> active = new ArrayList<>(activeFiles);
+            if (active.isEmpty()) {
+                return;
+            }
+            StringBuilder report = new StringBuilder();
+            report.append("Reader progress (")
+                    .append(active.size())
+                    .append(" file(s) active, ")
+                    .append(addressCounter.get())
+                    .append(" written):");
+            for (AddressFile addressFile : active) {
+                report.append(System.lineSeparator())
+                        .append("  ")
+                        .append(addressFile.getFile().getName())
+                        .append(": ")
+                        .append(String.format("%.2f%%", addressFile.getReadProgressInPercent()));
+            }
+            LOGGER.info(report.toString());
+        } catch (RuntimeException e) {
+            // Never let a reporting hiccup cancel the scheduled task or affect the import.
+            LOGGER.debug("Failed to log reader progress", e);
+        }
     }
 
     private void logProgress() {

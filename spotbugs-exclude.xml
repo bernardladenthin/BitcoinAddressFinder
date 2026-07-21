@@ -1160,9 +1160,10 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="HES_LOCAL_EXECUTOR_SERVICE"/>
     </Match>
 
-    <!-- By design: the importer builds a short-lived reader pool and a single-writer executor for the
-         one import run and shuts both down (shutdownNow) in the finally block of importFiles(). They are
-         local because their lifetime is exactly one import, not the object's lifetime. -->
+    <!-- By design: the importer builds short-lived local executors for the one import run — a reader
+         pool, a single-writer sink executor, and a scheduled progress reporter — and shuts them all down
+         (shutdownNow) in the finally block of importFiles(). They are local because their lifetime is
+         exactly one import, not the object's lifetime. -->
     <Match>
         <Class name="net.ladenthin.bitcoinaddressfinder.command.AddressFilesToLMDB"/>
         <Method name="importFiles"/>

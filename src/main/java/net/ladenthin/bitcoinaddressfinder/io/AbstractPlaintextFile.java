@@ -57,6 +57,25 @@ public abstract class AbstractPlaintextFile implements Interruptable {
     }
 
     /**
+     * Returns the file being read.
+     *
+     * @return the file being read
+     */
+    public @NonNull File getFile() {
+        return file;
+    }
+
+    /**
+     * Returns the current read progress of this file in percent (byte offset over file size), as last
+     * updated by {@link #readFile()}. Safe to call from another thread for progress reporting.
+     *
+     * @return the current read progress in percent (0 to 100)
+     */
+    public double getReadProgressInPercent() {
+        return readStatistic.currentFileProgress;
+    }
+
+    /**
      * Processes a single line read from the file.
      *
      * @param line the line content (UTF-8 decoded)

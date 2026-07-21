@@ -42,8 +42,11 @@ public class ReadStatistic {
     public final Map<String, Long> unsupportedReasons = new LinkedHashMap<>();
     /**
      * Progress of the currently processed file, in percent.
+     *
+     * <p>{@code volatile} so a separate progress-reporter thread can read a fresh value while the
+     * reading thread updates it per line (see {@code AddressFilesToLMDB}).
      */
-    public double currentFileProgress;
+    public volatile double currentFileProgress;
 
     /** Lines that failed to parse with a logged error. */
     public final List<String> errors = new ArrayList<>();
