@@ -28,4 +28,6 @@ public class CConfiguration {
     public @Nullable CTuneConfiguration tuneConfiguration;
     /** Configuration for the {@code CompactLMDB} command. */
     public @Nullable CCompactLMDB compactLMDB;
+    /** Configuration for the {@code LMDBDelta} command. */
+    public @Nullable CLMDBDelta lmdbDelta;
 }
