@@ -229,12 +229,11 @@ public class LMDBDeltaTest extends LMDBBase {
     }
 
     /**
-     * A delta address may live in several "other" databases at once. The provenance sink must list every
-     * source that held it (comma-separated, in source order), and the per-source counts must tally each
-     * source's delta hits.
+     * A delta address may live in several "other" databases at once. The per-source counts must tally
+     * each source's delta hits, counting a shared delta address against every source that held it.
      */
     @Test
-    public void writeDelta_recordsPerAddressProvenanceAndPerSourceCounts() throws Exception {
+    public void writeDelta_countsPerSourceContained() throws Exception {
         LMDBDelta delta = new LMDBDelta(new CLMDBDelta());
         byte[] h1 = hash160(1);
         byte[] h2 = hash160(2);
@@ -242,19 +241,14 @@ public class LMDBDeltaTest extends LMDBBase {
 
         AddressIterable reference = iterableOf(h3); // h3 is in the reference, so excluded from the delta
         List<AddressIterable> others = List.of(iterableOf(h1, h2, h3), iterableOf(h2));
-        List<String> labels = List.of("dbA", "dbB");
 
         StringBuilder out = new StringBuilder();
-        StringBuilder provenance = new StringBuilder();
-        LMDBDelta.DeltaResult result = delta.writeDelta(reference, others, labels, out, provenance);
+        LMDBDelta.DeltaResult result = delta.writeDelta(reference, others, out);
 
         assertThat(result.written(), is(equalTo(2L)));
         assertThat(lines(out), contains(keyUtility.toBase58(h1), keyUtility.toBase58(h2)));
-        // h1 was only in dbA; h2 was in both dbA and dbB (listed in source order).
-        assertThat(
-                lines(provenance), contains(keyUtility.toBase58(h1) + "\tdbA", keyUtility.toBase58(h2) + "\tdbA,dbB"));
         long[] perSource = result.perSourceContained();
-        assertThat(perSource[0], is(equalTo(2L))); // dbA contained h1 and h2
+        assertThat(perSource[0], is(equalTo(2L))); // dbA contained h1 and h2 (h2 shared)
         assertThat(perSource[1], is(equalTo(1L))); // dbB contained h2
     }
 
@@ -282,26 +276,17 @@ public class LMDBDeltaTest extends LMDBBase {
 
         // Only hC is in the other database but not the reference.
         assertThat(Files.readAllLines(deltaFile.toPath()), contains(keyUtility.toBase58(hC)));
-        // The command also writes the per-address provenance sidecar next to the delta file.
-        File provenanceFile = folder.resolve("delta.txt.provenance.tsv").toFile();
-        assertThat(
-                Files.readAllLines(provenanceFile.toPath()),
-                contains(keyUtility.toBase58(hC) + "\t" + otherDir.getAbsolutePath()));
     }
 
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="helpers">
 
-    /** Calls the full {@code writeDelta} with generated source labels and no provenance sink. */
+    /** Calls {@code writeDelta} and returns just the written count (most tests only assert on that). */
     private static long writeDelta(
             LMDBDelta delta, AddressIterable reference, List<? extends AddressIterable> others, Appendable out)
             throws IOException {
-        List<String> labels = new ArrayList<>(others.size());
-        for (int i = 0; i < others.size(); i++) {
-            labels.add("db" + i);
-        }
-        return delta.writeDelta(reference, others, labels, out, null).written();
+        return delta.writeDelta(reference, others, out).written();
     }
 
     private static byte[] hash160(int firstByte) {

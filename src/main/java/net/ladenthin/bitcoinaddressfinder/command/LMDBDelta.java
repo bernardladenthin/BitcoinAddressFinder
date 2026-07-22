@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 import lombok.ToString;
@@ -50,22 +49,15 @@ import org.slf4j.LoggerFactory;
  * decodes back to the same hash160 (the tool keys on hash160), even though a hash160 that originally came
  * from a P2SH/altcoin/bech32 address is written as {@code 1...}.
  *
- * <h2>Provenance and progress</h2>
- * Because a delta address may live in several of the "other" databases at once, the main delta file stays
- * a pure re-importable address list, and the origin is written separately:
- * <ul>
- *   <li>a sidecar TSV ({@code <deltaFile>.provenance.tsv}) with one {@code address\tsource1,source2,...}
- *       line per delta address — if a hash160 was in more than one source database, all are listed;</li>
- *   <li>a per-source summary logged at the end (how many delta addresses each source database contained);</li>
- *   <li>periodic progress lines (delta written so far, position in the reference key space, rate, ETA).</li>
- * </ul>
+ * <h2>Diagnostics</h2>
+ * Progress is logged periodically (delta written so far, position in the reference key space, rate, ETA).
+ * At the end a per-source summary is logged: how many delta addresses each source database contained
+ * (a delta address may be present in several sources at once, so the counts can overlap).
  */
 @ToString
 public class LMDBDelta implements Runnable, Interruptable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LMDBDelta.class);
-
-    private static final String PROVENANCE_FILE_SUFFIX = ".provenance.tsv";
 
     private static final long PROGRESS_REPORT_MILLIS = 30_000L;
     private static final long RATE_WINDOW_MILLIS = 60_000L;
@@ -113,15 +105,12 @@ public class LMDBDelta implements Runnable, Interruptable {
             }
 
             Path deltaFile = Path.of(lmdbDelta.deltaAddressesFile);
-            Path deltaFileName = Objects.requireNonNull(deltaFile.getFileName(), "deltaAddressesFile has no file name");
-            Path provenanceFile = deltaFile.resolveSibling(deltaFileName + PROVENANCE_FILE_SUFFIX);
             LOGGER.info("Writing delta of " + others.size() + " database(s) against the reference to " + deltaFile
-                    + " (provenance: " + provenanceFile + ") ...");
+                    + " ...");
 
             DeltaResult result;
-            try (Writer writer = Files.newBufferedWriter(deltaFile, StandardCharsets.UTF_8);
-                    Writer provenanceWriter = Files.newBufferedWriter(provenanceFile, StandardCharsets.UTF_8)) {
-                result = writeDelta(reference, others, otherLabels, writer, provenanceWriter);
+            try (Writer writer = Files.newBufferedWriter(deltaFile, StandardCharsets.UTF_8)) {
+                result = writeDelta(reference, others, writer);
             }
             LOGGER.info("... delta done: " + result.written() + " address(es) written to " + deltaFile + ".");
             logSourceSummary(result.perSourceContained(), otherLabels);
@@ -136,25 +125,17 @@ public class LMDBDelta implements Runnable, Interruptable {
 
     /**
      * Streams every hash160 present in one of {@code others} but not in {@code reference} to {@code out}
-     * as a Base58 P2PKH address line, using a k-way sorted merge over the (key-ordered) cursors. Takes
-     * plain {@link Appendable}s rather than files so it is trivially unit-testable in memory.
+     * as a Base58 P2PKH address line, using a k-way sorted merge over the (key-ordered) cursors. Takes a
+     * plain {@link Appendable} rather than a file so it is trivially unit-testable in memory.
      *
-     * @param reference     the reference address set (excluded from the delta)
-     * @param others        the other address sets to diff against the reference
-     * @param otherLabels   a display label per {@code others} entry (same size/order), used for provenance
-     * @param out           the sink for one {@code 1...} address per delta hash160, newline-separated
-     * @param provenanceOut optional sink for one {@code address\tsource1,source2,...} line per delta
-     *                      address; {@code null} disables provenance output
+     * @param reference the reference address set (excluded from the delta)
+     * @param others    the other address sets to diff against the reference
+     * @param out       the sink for one {@code 1...} address per delta hash160, newline-separated
      * @return the delta result: the number of addresses written and the per-source contained counts
-     * @throws IOException if appending to a sink fails
+     * @throws IOException if appending to {@code out} fails
      */
     @VisibleForTesting
-    DeltaResult writeDelta(
-            AddressIterable reference,
-            List<? extends AddressIterable> others,
-            List<String> otherLabels,
-            Appendable out,
-            @Nullable Appendable provenanceOut)
+    DeltaResult writeDelta(AddressIterable reference, List<? extends AddressIterable> others, Appendable out)
             throws IOException {
         long[] perSourceContained = new long[others.size()];
         long referenceTotal = reference.count();
@@ -195,35 +176,20 @@ public class LMDBDelta implements Runnable, Interruptable {
                 boolean inReference = referenceHead != null && Arrays.equals(referenceHead, smallest);
 
                 // Consume `smallest` from every other database (deduplicates across them); for a delta key,
-                // record which sources held it and count them.
-                StringBuilder sources = new StringBuilder();
+                // tally which sources held it.
                 for (int i = 0; i < otherPeekers.size(); i++) {
                     Peeker peeker = otherPeekers.get(i);
                     byte @Nullable [] head = peeker.peek();
                     if (head != null && Arrays.equals(head, smallest)) {
                         if (!inReference) {
                             perSourceContained[i]++;
-                            if (provenanceOut != null) {
-                                if (sources.length() > 0) {
-                                    sources.append(',');
-                                }
-                                sources.append(otherLabels.get(i));
-                            }
                         }
                         peeker.advance();
                     }
                 }
 
                 if (!inReference) {
-                    String address = keyUtility.toBase58(smallest);
-                    out.append(address).append('\n');
-                    if (provenanceOut != null) {
-                        provenanceOut
-                                .append(address)
-                                .append('\t')
-                                .append(sources)
-                                .append('\n');
-                    }
+                    out.append(keyUtility.toBase58(smallest)).append('\n');
                     written++;
                 }
 
