@@ -10,6 +10,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -47,7 +48,7 @@ public class LMDBDeltaTest extends LMDBBase {
         List<AddressIterable> others = List.of(iterableOf(h1, h2), iterableOf(h2, h4));
 
         StringBuilder out = new StringBuilder();
-        long written = delta.writeDelta(reference, others, out);
+        long written = writeDelta(delta, reference, others, out);
 
         assertThat(written, is(equalTo(2L)));
         assertThat(lines(out), contains(keyUtility.toBase58(h2), keyUtility.toBase58(h4)));
@@ -61,7 +62,7 @@ public class LMDBDeltaTest extends LMDBBase {
         byte[] h3 = hash160(3);
 
         StringBuilder out = new StringBuilder();
-        long written = delta.writeDelta(iterableOf(h1, h2, h3), List.of(iterableOf(h1, h2), iterableOf(h3)), out);
+        long written = writeDelta(delta, iterableOf(h1, h2, h3), List.of(iterableOf(h1, h2), iterableOf(h3)), out);
 
         assertThat(written, is(equalTo(0L)));
         assertThat(lines(out), is(empty()));
@@ -74,7 +75,7 @@ public class LMDBDeltaTest extends LMDBBase {
         byte[] h2 = hash160(2);
 
         StringBuilder out = new StringBuilder();
-        long written = delta.writeDelta(iterableOf(), List.of(iterableOf(h1, h2), iterableOf(h1)), out);
+        long written = writeDelta(delta, iterableOf(), List.of(iterableOf(h1, h2), iterableOf(h1)), out);
 
         assertThat(written, is(equalTo(2L)));
         assertThat(lines(out), contains(keyUtility.toBase58(h1), keyUtility.toBase58(h2)));
@@ -85,7 +86,7 @@ public class LMDBDeltaTest extends LMDBBase {
         LMDBDelta delta = new LMDBDelta(new CLMDBDelta());
 
         StringBuilder out = new StringBuilder();
-        long written = delta.writeDelta(iterableOf(hash160(1)), List.of(), out);
+        long written = writeDelta(delta, iterableOf(hash160(1)), List.of(), out);
 
         assertThat(written, is(equalTo(0L)));
         assertThat(lines(out), is(empty()));
@@ -104,7 +105,7 @@ public class LMDBDeltaTest extends LMDBBase {
 
         StringBuilder out = new StringBuilder();
         // reference holds the high-byte key; the other holds both, ascending unsigned.
-        long written = delta.writeDelta(iterableOf(high), List.of(iterableOf(low, high)), out);
+        long written = writeDelta(delta, iterableOf(high), List.of(iterableOf(low, high)), out);
 
         // Only `low` is new; `high` is in the reference. Signed ordering would also emit `high`.
         assertThat(written, is(equalTo(1L)));
@@ -124,7 +125,7 @@ public class LMDBDeltaTest extends LMDBBase {
 
         StringBuilder out = new StringBuilder();
         // reference holds only the high key; the other holds a strictly smaller one.
-        long written = delta.writeDelta(iterableOf(high), List.of(iterableOf(low)), out);
+        long written = writeDelta(delta, iterableOf(high), List.of(iterableOf(low)), out);
 
         assertThat(written, is(equalTo(1L)));
         assertThat(lines(out), contains(keyUtility.toBase58(low)));
@@ -145,7 +146,7 @@ public class LMDBDeltaTest extends LMDBBase {
 
         StringBuilder out = new StringBuilder();
         // reference = {h2, h3, h5}; other = {h2, h4}. Only h4 is new; h3 and the trailing h5 are ignored.
-        long written = delta.writeDelta(iterableOf(h2, h3, h5), List.of(iterableOf(h2, h4)), out);
+        long written = writeDelta(delta, iterableOf(h2, h3, h5), List.of(iterableOf(h2, h4)), out);
 
         assertThat(written, is(equalTo(1L)));
         assertThat(lines(out), contains(keyUtility.toBase58(h4)));
@@ -166,7 +167,7 @@ public class LMDBDeltaTest extends LMDBBase {
 
         StringBuilder out = new StringBuilder();
         // reference (B) = {shared}; other (A) = {h1, h2, shared, h4, h5} → delta = {h1, h2, h4, h5}.
-        long written = delta.writeDelta(iterableOf(shared), List.of(iterableOf(h1, h2, shared, h4, h5)), out);
+        long written = writeDelta(delta, iterableOf(shared), List.of(iterableOf(h1, h2, shared, h4, h5)), out);
 
         assertThat(written, is(equalTo(4L)));
         assertThat(
@@ -195,7 +196,7 @@ public class LMDBDeltaTest extends LMDBBase {
 
         StringBuilder out = new StringBuilder();
         // reference (B) = {h1, h2, shared, h4, h5}; other (A) = {shared, extra} → delta = {extra}.
-        long written = delta.writeDelta(iterableOf(h1, h2, shared, h4, h5), List.of(iterableOf(shared, extra)), out);
+        long written = writeDelta(delta, iterableOf(h1, h2, shared, h4, h5), List.of(iterableOf(shared, extra)), out);
 
         assertThat(written, is(equalTo(1L)));
         assertThat(lines(out), contains(keyUtility.toBase58(extra)));
@@ -215,7 +216,7 @@ public class LMDBDeltaTest extends LMDBBase {
 
         StringBuilder out = new StringBuilder();
         // empty reference; other_1 = {h1, h4}, other_2 = {h2, h3} → delta = {h1, h2, h3, h4}.
-        long written = delta.writeDelta(iterableOf(), List.of(iterableOf(h1, h4), iterableOf(h2, h3)), out);
+        long written = writeDelta(delta, iterableOf(), List.of(iterableOf(h1, h4), iterableOf(h2, h3)), out);
 
         assertThat(written, is(equalTo(4L)));
         assertThat(
@@ -225,6 +226,36 @@ public class LMDBDeltaTest extends LMDBBase {
                         keyUtility.toBase58(h2),
                         keyUtility.toBase58(h3),
                         keyUtility.toBase58(h4)));
+    }
+
+    /**
+     * A delta address may live in several "other" databases at once. The provenance sink must list every
+     * source that held it (comma-separated, in source order), and the per-source counts must tally each
+     * source's delta hits.
+     */
+    @Test
+    public void writeDelta_recordsPerAddressProvenanceAndPerSourceCounts() throws Exception {
+        LMDBDelta delta = new LMDBDelta(new CLMDBDelta());
+        byte[] h1 = hash160(1);
+        byte[] h2 = hash160(2);
+        byte[] h3 = hash160(3);
+
+        AddressIterable reference = iterableOf(h3); // h3 is in the reference, so excluded from the delta
+        List<AddressIterable> others = List.of(iterableOf(h1, h2, h3), iterableOf(h2));
+        List<String> labels = List.of("dbA", "dbB");
+
+        StringBuilder out = new StringBuilder();
+        StringBuilder provenance = new StringBuilder();
+        LMDBDelta.DeltaResult result = delta.writeDelta(reference, others, labels, out, provenance);
+
+        assertThat(result.written(), is(equalTo(2L)));
+        assertThat(lines(out), contains(keyUtility.toBase58(h1), keyUtility.toBase58(h2)));
+        // h1 was only in dbA; h2 was in both dbA and dbB (listed in source order).
+        assertThat(
+                lines(provenance), contains(keyUtility.toBase58(h1) + "\tdbA", keyUtility.toBase58(h2) + "\tdbA,dbB"));
+        long[] perSource = result.perSourceContained();
+        assertThat(perSource[0], is(equalTo(2L))); // dbA contained h1 and h2
+        assertThat(perSource[1], is(equalTo(1L))); // dbB contained h2
     }
 
     // </editor-fold>
@@ -251,11 +282,27 @@ public class LMDBDeltaTest extends LMDBBase {
 
         // Only hC is in the other database but not the reference.
         assertThat(Files.readAllLines(deltaFile.toPath()), contains(keyUtility.toBase58(hC)));
+        // The command also writes the per-address provenance sidecar next to the delta file.
+        File provenanceFile = folder.resolve("delta.txt.provenance.tsv").toFile();
+        assertThat(
+                Files.readAllLines(provenanceFile.toPath()),
+                contains(keyUtility.toBase58(hC) + "\t" + otherDir.getAbsolutePath()));
     }
 
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="helpers">
+
+    /** Calls the full {@code writeDelta} with generated source labels and no provenance sink. */
+    private static long writeDelta(
+            LMDBDelta delta, AddressIterable reference, List<? extends AddressIterable> others, Appendable out)
+            throws IOException {
+        List<String> labels = new ArrayList<>(others.size());
+        for (int i = 0; i < others.size(); i++) {
+            labels.add("db" + i);
+        }
+        return delta.writeDelta(reference, others, labels, out, null).written();
+    }
 
     private static byte[] hash160(int firstByte) {
         byte[] hash160 = new byte[20];
