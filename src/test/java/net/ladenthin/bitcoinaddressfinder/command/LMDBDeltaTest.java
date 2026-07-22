@@ -111,6 +111,122 @@ public class LMDBDeltaTest extends LMDBBase {
         assertThat(lines(out), contains(keyUtility.toBase58(low)));
     }
 
+    /**
+     * An "other" key that sorts <em>below</em> every reference key must be emitted without advancing the
+     * reference at all — the reference head is already greater than {@code smallest}, so the skip-over
+     * loop never runs. Guards the "emit without touching the reference cursor" path.
+     */
+    @Test
+    public void writeDelta_otherKeyBelowSmallestReferenceKey_emitted() throws Exception {
+        LMDBDelta delta = new LMDBDelta(new CLMDBDelta());
+        byte[] low = hash160(1);
+        byte[] high = hash160(9);
+
+        StringBuilder out = new StringBuilder();
+        // reference holds only the high key; the other holds a strictly smaller one.
+        long written = delta.writeDelta(iterableOf(high), List.of(iterableOf(low)), out);
+
+        assertThat(written, is(equalTo(1L)));
+        assertThat(lines(out), contains(keyUtility.toBase58(low)));
+    }
+
+    /**
+     * The reference may hold keys beyond the largest "other" key (it is the bigger database). Those
+     * trailing keys must be skipped over and then simply ignored once the others are exhausted, while a
+     * genuine delta between them is still emitted. Guards the "reference cursor outlives the others" path.
+     */
+    @Test
+    public void writeDelta_referenceKeysBeyondOthersIgnored_deltaStillEmitted() throws Exception {
+        LMDBDelta delta = new LMDBDelta(new CLMDBDelta());
+        byte[] h2 = hash160(2);
+        byte[] h3 = hash160(3);
+        byte[] h4 = hash160(4);
+        byte[] h5 = hash160(5);
+
+        StringBuilder out = new StringBuilder();
+        // reference = {h2, h3, h5}; other = {h2, h4}. Only h4 is new; h3 and the trailing h5 are ignored.
+        long written = delta.writeDelta(iterableOf(h2, h3, h5), List.of(iterableOf(h2, h4)), out);
+
+        assertThat(written, is(equalTo(1L)));
+        assertThat(lines(out), contains(keyUtility.toBase58(h4)));
+    }
+
+    /**
+     * Asymmetric case A: the "other" database (A) has many entries that are absent from the smaller
+     * reference (B). Every A-only key is emitted, in order, and the single shared key is withheld.
+     */
+    @Test
+    public void writeDelta_otherHasManyEntriesAbsentFromReference_allEmitted() throws Exception {
+        LMDBDelta delta = new LMDBDelta(new CLMDBDelta());
+        byte[] h1 = hash160(1);
+        byte[] h2 = hash160(2);
+        byte[] shared = hash160(3);
+        byte[] h4 = hash160(4);
+        byte[] h5 = hash160(5);
+
+        StringBuilder out = new StringBuilder();
+        // reference (B) = {shared}; other (A) = {h1, h2, shared, h4, h5} → delta = {h1, h2, h4, h5}.
+        long written = delta.writeDelta(iterableOf(shared), List.of(iterableOf(h1, h2, shared, h4, h5)), out);
+
+        assertThat(written, is(equalTo(4L)));
+        assertThat(
+                lines(out),
+                contains(
+                        keyUtility.toBase58(h1),
+                        keyUtility.toBase58(h2),
+                        keyUtility.toBase58(h4),
+                        keyUtility.toBase58(h5)));
+    }
+
+    /**
+     * Asymmetric case B (the mirror image): the reference (B) is the larger database and the "other" (A)
+     * is almost a subset — only its one extra key is emitted, even though many reference keys sort both
+     * before and after it.
+     */
+    @Test
+    public void writeDelta_referenceLargerThanOther_onlyExtraEmitted() throws Exception {
+        LMDBDelta delta = new LMDBDelta(new CLMDBDelta());
+        byte[] h1 = hash160(1);
+        byte[] h2 = hash160(2);
+        byte[] shared = hash160(3);
+        byte[] h4 = hash160(4);
+        byte[] h5 = hash160(5);
+        byte[] extra = hash160(6);
+
+        StringBuilder out = new StringBuilder();
+        // reference (B) = {h1, h2, shared, h4, h5}; other (A) = {shared, extra} → delta = {extra}.
+        long written = delta.writeDelta(iterableOf(h1, h2, shared, h4, h5), List.of(iterableOf(shared, extra)), out);
+
+        assertThat(written, is(equalTo(1L)));
+        assertThat(lines(out), contains(keyUtility.toBase58(extra)));
+    }
+
+    /**
+     * Two "other" databases with fully disjoint key sets must interleave correctly in the k-way merge —
+     * every key from both is emitted exactly once, in global ascending order.
+     */
+    @Test
+    public void writeDelta_disjointOtherDatabases_bothContributeInterleaved() throws Exception {
+        LMDBDelta delta = new LMDBDelta(new CLMDBDelta());
+        byte[] h1 = hash160(1);
+        byte[] h2 = hash160(2);
+        byte[] h3 = hash160(3);
+        byte[] h4 = hash160(4);
+
+        StringBuilder out = new StringBuilder();
+        // empty reference; other_1 = {h1, h4}, other_2 = {h2, h3} → delta = {h1, h2, h3, h4}.
+        long written = delta.writeDelta(iterableOf(), List.of(iterableOf(h1, h4), iterableOf(h2, h3)), out);
+
+        assertThat(written, is(equalTo(4L)));
+        assertThat(
+                lines(out),
+                contains(
+                        keyUtility.toBase58(h1),
+                        keyUtility.toBase58(h2),
+                        keyUtility.toBase58(h3),
+                        keyUtility.toBase58(h4)));
+    }
+
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="run() integration — writes to a real file">
