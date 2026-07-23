@@ -511,26 +511,26 @@ Same harness, same machine (64 GB RAM), against the 61 GB / 1,377,478,516-entry 
 | false negatives | **0** |
 | build time | 1,869 s (31 min, I/O-bound — see below) |
 
-- **Faster to build than Fuse-8 at this tier — the lookup question is unresolved.** Both backends measured on both hosts, each arm preceded by a cache-clearing pass, at `-Xmx48g`:
+**Faster to build than Fuse-8 at this tier — the lookup question is unresolved.** Both backends measured on both hosts, each arm preceded by a cache-clearing pass, at `-Xmx48g`:
 
-  | | 16 MB L3 host | | 96 MB L3 host | |
-  |---|--:|--:|--:|--:|
-  | | `BINARY_FUSE_8` | `BLOCKED_BLOOM` | `BINARY_FUSE_8` | `BLOCKED_BLOOM` |
-  | build | 3 186 s | **1 617 s** | 1 564 s | **859 s** |
-  | lookups/s | **9.37 M** | 7.44 M | 6.13 M | **7.17 M** |
-  | retained | **1 504 MiB** | 2 080 MiB | **1 504 MiB** | 2 080 MiB |
-  | FPR | **0.393 %** | 0.485 % | **0.393 %** | 0.485 % |
+| | 16 MB L3 host | | 96 MB L3 host | |
+|---|--:|--:|--:|--:|
+| | `BINARY_FUSE_8` | `BLOCKED_BLOOM` | `BINARY_FUSE_8` | `BLOCKED_BLOOM` |
+| build | 3 186 s | **1 617 s** | 1 564 s | **859 s** |
+| lookups/s | **9.37 M** | 7.44 M | 6.13 M | **7.17 M** |
+| retained | **1 504 MiB** | 2 080 MiB | **1 504 MiB** | 2 080 MiB |
+| FPR | **0.393 %** | 0.485 % | **0.393 %** | 0.485 % |
 
-  **Blocked Bloom builds faster on both machines.** The 1.8–2.0× seen here is an *LMDB-bound* figure; measured storage-free the true algorithmic factor is **3.0×** (14.6 s vs 43.8 s at 100 M), because these runs spend most of their time on a scattered 61 GB cursor walk that is common to both filters and dilutes the difference. Fuse-8 is 27 % smaller with a ~19 % better FPR, both bit-identical across hosts.
+**Blocked Bloom builds faster on both machines.** The 1.8–2.0× seen here is an *LMDB-bound* figure; measured storage-free the true algorithmic factor is **3.0×** (14.6 s vs 43.8 s at 100 M), because these runs spend most of their time on a scattered 61 GB cursor walk that is common to both filters and dilutes the difference. Fuse-8 is 27 % smaller with a ~19 % better FPR, both bit-identical across hosts.
 
-  **The lookup row above is an artefact — do not use it.** It comes from a single-shot probe loop run right after a multi-GB build, and re-measuring with the warmed, storage-free JMH instrument inverts the answer on *both* machines. Measured ns/op at 1 B entries:
+**The lookup row above is an artefact — do not use it.** It comes from a single-shot probe loop run right after a multi-GB build, and re-measuring with the warmed, storage-free JMH instrument inverts the answer on *both* machines. Measured ns/op at 1 B entries:
 
-  | | `BINARY_FUSE_8` | `BLOCKED_BLOOM` |
-  |---|--:|--:|
-  | 16 MB L3 host | 91.7 | **79.8** |
-  | 96 MB L3 host | **39.9** | 42.7 |
+| | `BINARY_FUSE_8` | `BLOCKED_BLOOM` |
+|---|--:|--:|
+| 16 MB L3 host | 91.7 | **79.8** |
+| 96 MB L3 host | **39.9** | 42.7 |
 
-  So the ranking flips with cache size: blocked Bloom leads by 13–36 % where L3 is modest, Fuse-8 by ~6 % (intervals overlapping) where it is large. Note the same Fuse-8 array costs 91.7 vs 39.9 ns on the two hosts — **2.3× from cache alone**. Full analysis in [`docs/performance.md`](docs/performance.md).
+So the ranking flips with cache size: blocked Bloom leads by 13–36 % where L3 is modest, Fuse-8 by ~6 % (intervals overlapping) where it is large. Note the same Fuse-8 array costs 91.7 vs 39.9 ns on the two hosts — **2.3× from cache alone**. Full analysis in [`docs/performance.md`](docs/performance.md).
 
   **Recommendation: `BINARY_FUSE_8`** — see [Which filter to pick](#which-filter-to-pick). Blocked Bloom wins every *probe* column on this page, and still loses the *total*: at equal footprint its false-positive rate is ~4× higher, and a false positive costs 4.1 µs warm to 292.7 µs cold against tens of nanoseconds for the probe. The probe is the term that barely counts. Blocked Bloom remains the pick when build time dominates (3× faster, one streaming pass, no ~29 B/entry peeling arrays).
 
@@ -964,6 +964,17 @@ read-only, writes `data.mdb` into a separate target directory, and verifies the 
 against the source. The read benefit is largest when the database exceeds RAM (a smaller file raises
 the OS page-cache hit rate); for a database that fits in RAM the gain is marginal.
 
+**Optional — extract what a newer database adds over a reference.** The `LMDBDelta` command
+(see [`examples/config_LMDBDelta.json`](examples/config_LMDBDelta.json) and the `run_LMDBDelta`
+launchers) diffs one or more `lmdbConfigurationReadOnlyList` databases against a single
+`referenceLmdbConfigurationReadOnly` and writes every address present in the others but **not** in the
+reference to `deltaAddressesFile` — one mainnet Base58 `1…` address per line, ready to be re-imported
+with `AddressFilesToLMDB`. Because LMDB stores keys sorted, all databases are streamed together as a
+k-way cursor merge: memory stays flat regardless of the delta size (only one 20-byte key per cursor is
+held), cross-database duplicates are removed, and the whole pass is sequential I/O rather than random
+lookups. The re-encoding keys on the 20-byte `hash160`, so the round trip is lossless for lookups even
+though a hash that originally came from a P2SH/bech32/altcoin address is written in `1…` form.
+
 
 ### Export
 The exporter provides various output formats for Bitcoin and altcoin address data:
@@ -1008,16 +1019,16 @@ If you're missing any information or have questions about usage or content, feel
 <summary>Checksums lmdb_light.zip</summary>
 
 ```txt
-lmdb_light.zip	CRC32	D29A7AB0
-lmdb_light.zip	MD5	DD7B561A1814E7061B071ADCC1BE9CF5
-lmdb_light.zip	RipeMD160	153476EBD621DF60A8223C26A531349AECB804D3
-lmdb_light.zip	SHA-1	EA1C0F87050E5B37EC147A4AAAD1404E267AC631
-lmdb_light.zip	SHA-256	DC3DF4F6B2C4AE1F7ADA8234CC6AA6B6ECF53CFDC25671F65D2C4F66B41B11FC
-lmdb_light.zip	SHA-512	144532C32F9BEAF86BACA9495DDE1AAAD4BBC29554DEFA4014F26D7D89413607DB3DB46178590B3FCC99B155F7E247E55CCBBC04A7B836BEA2946FF78026E015
-lmdb_light.zip	SHA3-224	75C09C525A04FD8098DAFDE51A652A867AB29DFC6ED0ADC717C59A4D
-lmdb_light.zip	SHA3-256	87051F9B5AB2B88FF864A85AA26BE515692F09BC1EB91E4824BD7D78EDE5BA5E
-lmdb_light.zip	SHA3-384	513580D208C2D9BC882F13D87A4B93757B882F290AE348A6B42AA7577D8DB15C4084235550BD0564CD74E8B0540B1807
-lmdb_light.zip	SHA3-512	32AC436F5505B34F7EA36E4A7F92F374351DC7991A0DA1630204D77EBF6F02939E614E4590B052867834F570944DB973505964E5DF8B62B5B45F0224E5DF3191
+lmdb_light.zip	CRC32	85D5B66B
+lmdb_light.zip	MD5	85D99D42307FAE3D2DE9842E1BC2E05C
+lmdb_light.zip	RipeMD160	63F9A232B474FBDBE0BF44424848204F96D815F9
+lmdb_light.zip	SHA-1	6C70EB6C9DA6E856F6AA37DE8005CDE63C73C40E
+lmdb_light.zip	SHA-256	8CF75775992A3CF6DF7E92BE8BF11512865B64355AE8B9B4AC4AA17EA0D23099
+lmdb_light.zip	SHA-512	7F5DC94BECA62F75ECDC3B2982F2E049B65BA1999A565184EC037F86455EE3A84A7CFF2CB5417EB897D98784BF5928376CD328E4428AEB53B546B73737DA707B
+lmdb_light.zip	SHA3-224	7828FF892A2C3A132A31097B3E474960B9724F11D89E417CC41C262F
+lmdb_light.zip	SHA3-256	7EAF32276D0E04199D10694DD204FBC2FD35594E537A2CFA5C5BCA6DEF3B19FB
+lmdb_light.zip	SHA3-384	7DEE61D19C04734AEBD808AFF2D9B3AD14A0659D3CDB00E4E6E4324CA7317F1C48A6B32E7D02DBE0E68A67F843F2018D
+lmdb_light.zip	SHA3-512	FD9F17E3ECAD1896A984BE5FA2B884184608DF2CDAA35E7465EE4DD5735FDD2E77F361EDFA563AC8754965375C68B140208C8FEFCDE18932897B929CC707BC2E
 ```
 
 </details>
@@ -1042,13 +1053,13 @@ LMDBToAddressFile_Light_HexHash.zip	SHA3-512	1C66472C3605FCB6833163B9FBDF81A6581
 
 
 #### Full database
-* Full (57.0 GiB), Last update: June 4, 2025
+* Full (64.0 GiB), Last update: July 20, 2026
   * Contains all Bitcoin addresses which are ever used and many altcoin addresses with and without amount.
   * Static amount of 0 is used to allow best compression.
-  * Unique entries: 1377481459
+  * Unique entries: 1472947953
   * Mapsize: 58368 MiB
-  * Link (34.3 GiB zip archive): http://ladenthin.net/lmdb_full.zip
-  * Link extracted addresses as txt (23.4 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Full_HexHash.zip
+  * Link (41.6 GiB zip archive): http://ladenthin.net/lmdb_full.zip
+  * Link extracted addresses as txt (25 GiB zip archive); open with HxD, set 42 bytes each line: http://ladenthin.net/LMDBToAddressFile_Full_HexHash.zip
 
 > ⚠️ **Backend choice for the full database.** At 1.377 B entries, `HASHSET` requires roughly **~110 GB of RAM** — impractical on almost any consumer hardware. Pick one of the realistic options instead:
 >
@@ -1070,16 +1081,16 @@ LMDBToAddressFile_Light_HexHash.zip	SHA3-512	1C66472C3605FCB6833163B9FBDF81A6581
 <summary>Checksums lmdb_full.zip</summary>
 
 ```txt
-lmdb_full.zip	CRC32	815A7A2D
-lmdb_full.zip	MD5	AF29E5E75C62DC9591DFE0C101726296
-lmdb_full.zip	RipeMD160	6137C2A7BDA337C274141ED866C7C9B5F011A47E
-lmdb_full.zip	SHA-1	82554DD5C17BBDCD071015382AF4E1A8F3A85B33
-lmdb_full.zip	SHA-256	DD9F6ACE080D24D80C1C032361226348D62CAF8BD0C0C09E0473A76F1ED95D57
-lmdb_full.zip	SHA-512	0DF89EDB8243A4E12F56BC1AB9DF2C558A32FE14919B8A648CD3EB6869611DE035B044DEFAE6A5D5835886CBA405975E534BE4A624CD17A39CF69CF45A46381A
-lmdb_full.zip	SHA3-224	43FF7478841483F022866569B73D89C7A4D154564CBE343873C29C61
-lmdb_full.zip	SHA3-256	EB02EA6321F346406011F8195A57AA43BDAFAD2BBD34944ED27A87EF04FC509D
-lmdb_full.zip	SHA3-384	F1A91448D85A84E6059EDED27E23FE5939B5F2A9BCE5DC260C8CAEF7B2E5AAFF75F6FE58AFB05F13094441F91DF3B031
-lmdb_full.zip	SHA3-512	EF669BAD483E373CE4AFBA37AAE800A030F78E3D81972D8385E659DC5BEF2973E279D8666F53F727F1891F2C242896A957944E2E8E24BF138BC61C5A58394A7A
+lmdb_full.zip	CRC32	731194D3
+lmdb_full.zip	MD5	C7A144E1474E537B58DE91D8FE9BA762
+lmdb_full.zip	RipeMD160	ED6964A1722BB453D1CA97380BEEE3CA9DC495E5
+lmdb_full.zip	SHA-1	8EFCE18E7173AD2ABE8D0046D5E703A337939E1E
+lmdb_full.zip	SHA-256	0CDF5F126BD090A18423B3AE47B34DC84506E88A5F882DF364BEFC3F68025EB0
+lmdb_full.zip	SHA-512	402BBD2BD8ADAF7837851DB8C9E9C2B9D7C8F54FCB29F4C9E7F9A021D12988D36069549CE586D015B53011E5E00DFD9EAAB9506A0659C21F8DB4C1F66A0F000D
+lmdb_full.zip	SHA3-224	BF2B576F66109EBD4F0C1A67E68EAC567E106186949F9E4E5B10DCBB
+lmdb_full.zip	SHA3-256	F2A64AD5F5241B30FE4C6C4DDE5DC8F4151F0BEA00AB9A015F2B5A2E90717BAD
+lmdb_full.zip	SHA3-384	4D0F0E86610FBF6720AA47E3E0A55C0276AE8A7C44CAFB9B67117314518FB17248951F855DDA324CB40232CE9832B335
+lmdb_full.zip	SHA3-512	EA14474708CDEF4A2422961077F066FB853247734CF1D782C5AC66F5CFCBADAB6AC32B047575501ED22490912AE6E4DA1C77BE79EF1965B0D77982F5ABE54B7E
 ```
 
 </details>
@@ -1088,16 +1099,16 @@ lmdb_full.zip	SHA3-512	EF669BAD483E373CE4AFBA37AAE800A030F78E3D81972D8385E659DC5
 <summary>Checksums LMDBToAddressFile_Full_HexHash.zip</summary>
 
 ```txt
-LMDBToAddressFile_Full_HexHash.zip	CRC32	41E4AF53
-LMDBToAddressFile_Full_HexHash.zip	MD5	920B9656E21A0B68737255FC240F48D2
-LMDBToAddressFile_Full_HexHash.zip	RipeMD160	73689B50945034554DADA23E5C25B49FCD1BF57C
-LMDBToAddressFile_Full_HexHash.zip	SHA-1	2C59FCBF6FB53EDEB9E3B9069E67A547F114AEC6
-LMDBToAddressFile_Full_HexHash.zip	SHA-256	CC45F6E8F383344D918B9C9F2AEDA5846211D878B7E05E222DB066106230BFBE
-LMDBToAddressFile_Full_HexHash.zip	SHA-512	18E1739A6380D421F232C669DBD685B418B6F2D462C92E711539D2A2EEC606CEEDF58E19014B23A8936093ED07D55F51CFDC374B59B3299332E0DED223A53A96
-LMDBToAddressFile_Full_HexHash.zip	SHA3-224	24B2D4AD34E73B59FB7BA5F8E064288176733A2634B5470B25B1C0DE
-LMDBToAddressFile_Full_HexHash.zip	SHA3-256	1CC79E2F24031A37BFB5FFEA27C07CC654CDD91224A334F52095AF16FBE81F55
-LMDBToAddressFile_Full_HexHash.zip	SHA3-384	CA115D352C2609B0B2E85010CC13175E7DC3C8F6295B3B6B4BD858D60D81D6E3EA706E4979F764A4C6BF7D351153A429
-LMDBToAddressFile_Full_HexHash.zip	SHA3-512	A1419AFFE869B18973D499439E7EA90A94C4C7C6818F719741E59DD619985C6867F6C51F31BC7EDEBF27356D11B013E4D36FB83D89E5FFB1F77566FF5582FBD5
+LMDBToAddressFile_Full_HexHash.zip	CRC32	B2FB544F
+LMDBToAddressFile_Full_HexHash.zip	MD5	439B5202737C1B5D8766E3096191411B
+LMDBToAddressFile_Full_HexHash.zip	RipeMD160	77DED76F7C9CFFB103CD94B129FE9DEF0A5445F0
+LMDBToAddressFile_Full_HexHash.zip	SHA-1	581067DB3C986691CEE90A315BB3668FB2643F0A
+LMDBToAddressFile_Full_HexHash.zip	SHA-256	A4AAE52539F457B8551AF8E29324297029D7A3F760F185C028DB1D741E458585
+LMDBToAddressFile_Full_HexHash.zip	SHA-512	090E3289BBFBAEB8F68C6EBBCE0C03843BAE389D4D4EBD178881EF11AB39C8035A726974003A01B83F15A839F0C48131353E92266F24E625F534288D2AE2682A
+LMDBToAddressFile_Full_HexHash.zip	SHA3-224	C4775299678F61E000F7AE11EDB0BBF1FF142797BBA31BC95E1290D2
+LMDBToAddressFile_Full_HexHash.zip	SHA3-256	5C563C323850638905FC1DBBB186FABF47F6EBF473ED50C5C5852A63EB9B9B3B
+LMDBToAddressFile_Full_HexHash.zip	SHA3-384	B7561CAF76447F75813DDDE9D07D85CE5FDA8E7207C36066F79B5D105340A63AC42A22BEAF1AF9D01146202B404310CD
+LMDBToAddressFile_Full_HexHash.zip	SHA3-512	6ED622047AF04BBECF46BC2E50E9169ADC2DD0B7D35E58F6A4F7B33D64AB4C1C8F91CACF89F12A87C7AD5BAC2974BFA41100550E8A8D4A2298C3A5FFB012B8AB
 ```
 
 </details>
@@ -1626,25 +1637,40 @@ For technical details, see:
 > addresses examined is twice this rate — see
 > [Keys versus addresses](#keys-versus-addresses).
 
-| GPU Model                   | CPU                 | Key Range (Bits) | Grid Size (Bits) | Effective Keys/s (~)   |
-|-----------------------------|---------------------|------------------|------------------|------------------------|
-| AMD Radeon RX 7900 XTX      | AMD Ryzen 7 9800X3D | 160              | 19               | 15,000,000 keys/s      |
-| AMD Radeon RX 7900 XTX      | AMD Ryzen 7 9800X3D | 256              | 19               | 11,000,000 keys/s      |
-| NVIDIA RTX 3070 Laptop      | AMD Ryzen 7 5800H   | 160              | 19               |  6,000,000 keys/s      |
-| NVIDIA RTX 3070 Laptop      | AMD Ryzen 7 5800H   | 256              | 19               |  4,000,000 keys/s      |
-| NVIDIA RTX 3090             | AMD Ryzen 9 3950X   | 160              | 19               | 11,000,000 keys/s      |
-| NVIDIA RTX 3090             | AMD Ryzen 9 3950X   | 256              | 19               |  8,000,000 keys/s      |
-| NVIDIA RTX A3000            | Intel i7-11850H     | 256              | 19               |  3,000,000 keys/s      |
-| NVIDIA RTX A3000            | Intel i7-11850H     | 160              | 19               |  5,000,000 keys/s      |
-| AMD Radeon 8060S            | AMD AI MAX+ 395     | 256              | 16               |  9,200,000 keys/s      |
-| AMD Radeon 8060S            | AMD AI MAX+ 395     | 160              | 16               | 11,000,000 keys/s      |
+| GPU Model              | CPU                 | Key Range (Bits) | Grid Size (Bits) | keysPerWorkItem | Effective Keys/s (~)   |
+|------------------------|---------------------|------------------|------------------|-----------------|------------------------|
+| NVIDIA RTX 3070 Laptop | AMD Ryzen 7 5800H   | 256              | 22               | 256             | ~229,000,000 keys/s    |
+| NVIDIA RTX 3070 Laptop | AMD Ryzen 7 5800H   | 256              | 24               | 2048            | ~266,000,000 keys/s    |
+| AMD Radeon RX 7900 XTX | AMD Ryzen 7 9800X3D | 256              | 24               | 512             | ~670,000,000 keys/s    |
+
+> **Methodology.** Compact GPU-filter fast path, candidates/s = JMH ops/s × `2^batchSizeInBits`, all on
+> the **inlined** kernel (the example configs now default to `noInlineHelpers: false`). Each device is
+> shown at its own tuned optimum — the grid optimum is device-specific: the RTX 3070 peaks at `kpwi=2048`,
+> the RX 7900 XTX at `kpwi=512` (`kpwi=2048` collapses to ~71 M/s on RDNA3 through under-occupancy). The
+> 3070's `batch=22` row is kept as a lower-grid reference. Live end-to-end `Find` runs (tuned FUSE_16 +
+> BINARY_FUSE_8 cascade against the ~141 M-entry light DB, warm) sustained **~280 M/s** on the 3070 and
+> **~616 M/s** on the 7900 XTX. Raw data: [`tune_arms.csv`](docs/measurements/tune_arms.csv) (RTX 3070)
+> and [`tuner_ryzen9800x3d_gfx1100.csv`](docs/measurements/tuner_ryzen9800x3d_gfx1100.csv) (RX 7900 XTX).
+>
+> **The inlined kernel is the dominant lever on AMD.** At the same `24/512` arm the 7900 XTX runs
+> 187.8 M/s out-of-lined vs **669.8 M/s inlined — a ~3.6× gap** that had hidden the card's real speed (an
+> out-of-lined sweep capped at `batch=22` reported only ~130 M/s). With the inlined kernel the 7900 XTX now
+> sits ~2.3–2.5× above the 3070, as its raw compute would suggest. Trade-off: on AMD the inlined kernel's
+> first compile is slow (~8–16 min, then `comgr`-cached); NVIDIA compiles it instantly.
+>
+> `Grid Size (Bits)` (= `batchSizeInBits`) and `keysPerWorkItem` are **device-specific** — sweep your own
+> hardware with `GridSizeSweepBenchmark` / `TuneConfiguration`. `Key Range = 256` is the full-width
+> private-key path; a 160-bit [MSB-Zero](#-msb-zero-optimization) scan runs faster but is not separately
+> benchmarked here. Earlier third-party rows (RTX 3090, A3000, Radeon 8060S) and their pre-optimization
+> figures were removed as obsolete.
 
 ##### GPU Binary Fuse 8 filter — compact output vs. full transfer
 
-The table above measures raw key generation. The table below isolates the effect of the
+The table above shows the tuned peak throughput on the compact GPU-filter fast path. The table
+below isolates the effect of the
 [GPU-side Binary Fuse 8 filter](#gpu-side-binary-fuse-8-filtering-enablegpufilter)
-(`enableGpuFilter`): with it **on**, the kernel checks each derived hash160 against the
-on-GPU filter and transfers only the hits; with it **off**, every work-item result is read
+(`enableGpuFilter`) at a fixed grid: with it **on**, the kernel checks each derived hash160 against
+the on-GPU filter and transfers only the hits; with it **off**, every work-item result is read
 back over PCIe.
 
 > **Note:** These numbers come from the `GpuFuse8FilterBenchmark` JMH microbenchmark

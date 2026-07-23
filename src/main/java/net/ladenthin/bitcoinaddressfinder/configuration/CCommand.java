@@ -30,5 +30,10 @@ public enum CCommand {
      * are omitted and pages are laid out sequentially, producing a smaller, read-denser database. Useful
      * as a post-import optimize step, especially when the database exceeds RAM.
      */
-    CompactLMDB
+    CompactLMDB,
+    /**
+     * Write every address present in one of the "other" databases but not in a reference database to a
+     * plaintext file (one Base58 P2PKH address per line), computed by a cursor-based sorted merge.
+     */
+    LMDBDelta
 }

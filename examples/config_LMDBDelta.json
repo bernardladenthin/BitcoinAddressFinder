@@ -1,0 +1,13 @@
+{
+  "command": "LMDBDelta",
+  "lmdbDelta": {
+    "referenceLmdbConfigurationReadOnly": {
+      "lmdbDirectory": "lmdb_reference"
+    },
+    "lmdbConfigurationReadOnlyList": [
+      { "lmdbDirectory": "lmdb_other_1" },
+      { "lmdbDirectory": "lmdb_other_2" }
+    ],
+    "deltaAddressesFile": "delta_addresses.txt"
+  }
+}

@@ -390,6 +390,7 @@ SPDX-License-Identifier: Apache-2.0
             <Class name="net.ladenthin.bitcoinaddressfinder.io.FileHelper"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.command.AddressFilesToLMDB"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.command.LMDBCompact"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.command.LMDBDelta"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.producer.ProducerJavaSecretsFiles"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.command.LMDBToAddressFile"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
@@ -1238,6 +1239,15 @@ SPDX-License-Identifier: Apache-2.0
             <Class name="net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence"/>
         </Or>
         <Method name="tryBuild"/>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+
+    <!-- Peeker.nextOrNull returns null as a meaningful end-of-stream sentinel for the one-element
+         look-ahead: null means the cursor is exhausted, which is distinct from a (never-occurring)
+         zero-length hash160 key. A zero-length array cannot substitute for the "no more keys" signal. -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.command.LMDBDelta$Peeker"/>
+        <Method name="nextOrNull"/>
         <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
     </Match>
 

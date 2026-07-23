@@ -47,7 +47,8 @@
         "enableGpuFilter": true,
         "transferAll": false,
         "useSafeGcdInverse": true,
-        "gpuFilterType": "FUSE_16"
+        "gpuFilterType": "FUSE_16",
+        "noInlineHelpers": false
       }
     ]
   }

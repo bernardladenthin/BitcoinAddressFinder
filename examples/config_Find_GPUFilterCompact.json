@@ -46,7 +46,8 @@
         "shutdownTimeoutSeconds": 300,
         "enableGpuFilter": true,
         "transferAll": false,
-        "useSafeGcdInverse": true
+        "useSafeGcdInverse": true,
+        "noInlineHelpers": false
       }
     ]
   }

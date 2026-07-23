@@ -18,8 +18,9 @@ and understanding *why* — it goes well beyond the defaults.
    scalar multiplication per key). The optimum is **device-dependent and jointly tuned with
    `batchSizeInBits`** (see point 3). On an NVIDIA RTX 3070 Laptop the joint optimum is
    `keysPerWorkItem=2048` at `batchSizeInBits=24` (≈ **266 M keys/s** compact, reduced-radix on); on an
-   AMD RX 7900 XTX it is `keysPerWorkItem=128` at `batch=24` (≈ 177 M keys/s, `noinline`). Never leave it
-   at `1`. Sweep both axes on your hardware (§4 "Joint (batch, kpwi) optimum").
+   AMD RX 7900 XTX it is `keysPerWorkItem=512` at `batch=24` on the **inlined** kernel
+   (≈ **670 M keys/s**; the out-of-line/`noinline` kernel reaches only ≈ 188 M keys/s at that same arm —
+   §9). Never leave it at `1`. Sweep both axes on your hardware (§4 "Joint (batch, kpwi) optimum").
 3. **Maximize `batchSizeInBits` too** — a larger batch amortizes the per-launch overhead and lets a
    larger `keysPerWorkItem` amortize the one-time comb anchor. Push it up to **`24`** (the
    `MAXIMUM_CHUNK_ELEMENTS` cap) on an 8 GB+ GPU, scaling down for lower VRAM, while keeping ≳ 8 192
@@ -643,7 +644,8 @@ the RTX 3070 peaks at **128** (8 192 work-items for its 40 SMs). This is the sam
 count to the device" rule from §4 — the optimum is genuinely per-device, so **sweep on your own
 hardware**. The RX 7900 XTX wants ~4× more work-items (smaller `keysPerWorkItem`) than the RTX 3070.
 (As on NVIDIA, `kpwi=32` is the peak *only at this fixed `batchSizeInBits = 20`*; with the batch size
-also free it rises to `kpwi=128` at `batch=24` and is ~2× faster — see (3) below.)
+also free it rises to `kpwi=512` at `batch=24`, and on the inlined kernel that arm reaches ≈ 670 M keys/s
+— ~2.3–2.5× the RTX 3070 — see (3) below.)
 
 **(2) Reduced-radix 2²⁶ (Stage 5) is also a win on AMD — but smaller (≈ +8% vs +22%).** Matched A/B at
 each device's own context (compact, `batchSizeInBits = 20`; RX 7900 XTX at its `keysPerWorkItem = 32`
@@ -660,10 +662,12 @@ ordering. It is smaller than on the RTX 3070 — plausibly because RDNA3's field
 carry-bound, or because the per-key boundary conversions (§5 Stage 5) weigh more here — but it is a
 **positive cross-device confirmation**, which is what open point #4 was gated on (see §8 Stage 5).
 
-**(3) With `batchSizeInBits` also free, AMD's joint optimum is `batch=24, kpwi=128` — ≈ 2× the
-fixed-`batch=20` config.** Exactly as on the RTX 3070, pinning `batchSizeInBits = 20` under-occupies the
-device. A full 2-D sweep (compact, reduced-radix on, `noinline`, `gpuFilter`; M keys/s = JMH ops/s × `2^batch`;
-`-f 1 -wi 1 -w 25 -i 4 -r 30`):
+**(3) With `batchSizeInBits` also free, AMD's joint optimum is `batch=24, kpwi=512` — and on the
+inlined kernel it reaches ≈ 670 M keys/s.** Exactly as on the RTX 3070, pinning `batchSizeInBits = 20`
+under-occupies the device. The first 2-D sweep below (compact, reduced-radix on, `noinline`,
+`gpuFilter`; M keys/s = JMH ops/s × `2^batch`; `-f 1 -wi 1 -w 25 -i 4 -r 30`) read the *out-of-line*
+peak as `batch=24, kpwi=128`; the extended 2026-07-23 sweep corrects both the peak location and — far
+more importantly — the absolute (see the correction after the table):
 
 | batch | kpwi | ops/s | ±err | M keys/s | work-items (2^batch/kpwi) |
 |--:|--:|--:|--:|--:|--:|
@@ -691,10 +695,11 @@ device. A full 2-D sweep (compact, reduced-radix on, `noinline`, `gpuFilter`; M 
 
 (kpwi=16/32/64 probed at batch=23/24 to confirm the kpwi=128 peak is interior, not an edge.)
 
-Peak ≈ **177 M keys/s at `batch=24, keysPerWorkItem=128`** — **≈ +97% (~2×) over the documented
-`batch=20, kpwi=32` sweet spot (90.0 M keys/s, same code/device/session)**. kpwi=128 is a genuine
-*interior* peak (16/32/64 all fall off below it; 256/512 plateau just under it, then collapse). Two
-architectural notes vs the RTX 3070's joint optimum (`batch=24, kpwi=2048`, §4):
+In *this* (out-of-line) sweep the peak is ≈ **177 M keys/s at `batch=24, keysPerWorkItem=128`** —
+**≈ +97% (~2×) over the documented `batch=20, kpwi=32` sweet spot (90.0 M keys/s, same
+code/device/session)**. kpwi=128 is a genuine *interior* peak (16/32/64 all fall off below it; 256/512
+plateau just under it, then collapse). Two architectural notes vs the RTX 3070's joint optimum
+(`batch=24, kpwi=2048`, §4):
 - **AMD's kpwi optimum rises 32 → 128** once the larger batch supplies occupancy — AMD too benefits from
   amortizing the comb anchor over more keys — **but it stays 16× smaller than NVIDIA's 2048**. High kpwi
   *collapses* on AMD (`kpwi=2048` → 73 M keys/s, only 8 192 work-items for 48 CUs), the mirror image of
@@ -703,8 +708,31 @@ architectural notes vs the RTX 3070's joint optimum (`batch=24, kpwi=2048`, §4)
 - Both devices agree on **max `batchSizeInBits` (24, the `MAXIMUM_CHUNK_ELEMENTS` cap)** and on
   **reduced-radix 2²⁶ being a net win**.
 
-**Reduced-radix 2²⁶ at the AMD optimum: +10.7%.** Matched A/B at `batch=24, kpwi=128` (`noinline` both
-arms, `-f 1 -wi 1 -w 25 -i 5 -r 30`), with the `batch=20, kpwi=32` documented sweet spot measured the
+**Correction (2026-07-23) — the out-of-line sweep understated the card by ~3.6×.** Two follow-ups
+supersede the sweep above. (a) An **extended out-of-line sweep** (18 arms,
+`batch ∈ {22,23,24} × kpwi ∈ {64,128,256,512,1024,2048}`, full data in
+[`measurements/tuner_ryzen9800x3d_gfx1100.csv`](measurements/tuner_ryzen9800x3d_gfx1100.csv)) moved the
+out-of-line peak to **`batch=24, kpwi=512` ≈ 186 M keys/s** (with `kpwi=2048` collapsing to **~71 M/s** —
+only 8 192 work-items for 48 CUs, under-occupancy on RDNA3). So AMD's out-of-line optimum is `kpwi=512`,
+not the `kpwi=128` the first sweep read — **4× smaller than NVIDIA's 2048, not 16×** — but the "small
+kpwi + max batch" direction stands. (b) The whole out-of-line sweep understates the device: an
+**inline-vs-out-of-line A/B at the same `24/512` arm** measured out-of-line **187.8 M** vs inline
+**669.8 M keys/s — ~3.6× faster inlined** (the `noinline` runtime penalty of §9, not the architecture,
+is what made the 7900 XTX look slow). On the inlined kernel the 7900 XTX therefore sits **~2.3–2.5×
+above the RTX 3070** (`batch=24, kpwi=2048` ≈ 266 M, §4) — as its raw compute implies. A **live tuned
+cascade** (FUSE_16 GPU pre-filter + BINARY_FUSE_8 CPU consumer, inline) sustains **~616–620 M keys/s**.
+The five GPU `Find` example configs now set `noInlineHelpers=false` (inline) by default, so this is the
+out-of-the-box path (§9).
+> **Inline `kpwi` sweep (2026-07-23) — confirmed.** The A/B above measured inline only at the
+> out-of-line winner `24/512`, so a dedicated inline sweep at `batch=24, kpwi ∈ {128,256,512,1024}`
+> checked whether the inline peak sits elsewhere. It does not: `kpwi` 128/256/512 form a **flat plateau
+> within ~1.4 %** (683.2 / 675.6 / 673.9 M keys/s), `1024` drops to 535 M. `kpwi=128` is marginally
+> highest but well inside run-to-run noise, so **`kpwi=512` stands as the inline optimum** and the
+> ≈ 670 M figure is unchanged. Rows in the CSV carry a new `kernel` column (`inline` vs `out-of-line`).
+
+**Reduced-radix 2²⁶ at the out-of-line sweep's `batch=24, kpwi=128` peak: +10.7%.** Matched A/B at
+`batch=24, kpwi=128` (`noinline` both arms, `-f 1 -wi 1 -w 25 -i 5 -r 30`), with the `batch=20, kpwi=32`
+documented sweet spot measured the
 same session as a reference (`-i 4`):
 
 | batch | kpwi | radix | ops/s | ±err | M keys/s |
@@ -722,19 +750,20 @@ with the arithmetic-heavy affine walk" trend seen on NVIDIA, though it stays wel
 `kpwi=2048` (AMD never operates at that high kpwi). Device: `gfx1100`, driver 3661.0 (PAL,LC), 48 CU,
 OpenCL 2.0 AMD-APP, wave32.
 
-> **Methodology caveat — the AMD numbers are measured with `noinline` (§9).** The RX 7900 XTX build
-> uses `-D AMD_NOINLINE_HELPERS` because the inlined kernel takes 8–16+ min to compile on AMD (§9).
-> Out-of-line calls can cost runtime throughput, so the **absolute** AMD M keys/s above are
-> *understated* relative to the **warm-cache *inlined* AMD build, which is actually faster** — §10
-> "Track B" measured the `noinline` cost at **~3.3×** at a matched config (`batch=20, kpwi=32`:
-> 279 → 83 M keys/s), and the inlined build's own peak reaches ≈ **288 M keys/s** (`batch=20, kpwi=64`).
-> (Note 288-vs-177 is a best-config-vs-best-config gap, ~1.63×, not the same-config 3.3×; the noinline
-> build's 177 sits at a better-occupancy config, `batch=24, kpwi=128`.) So `noinline`'s ~177 M keys/s is
-> the **out-of-the-box (auto-default) AMD ceiling**, not the device ceiling; a sustained scan that warms
-> the `comgr` cache and sets
-> `noInlineHelpers=false` is substantially faster (§9/§10). The AMD absolutes are also **not** directly
-> comparable to the inlined RTX 3070 absolutes. What *is* comparable: the **sweet-spot location**
-> (architectural) and the **reduced-radix relative delta** (`noinline` is in both A/B arms, so it cancels).
+> **Methodology caveat — the sweep tables above are measured with `noinline` (§9).** The RX 7900 XTX
+> sweep uses `-D AMD_NOINLINE_HELPERS` because the inlined kernel takes 8–16+ min to compile on AMD (§9),
+> so those out-of-line absolutes are *understated* relative to the **inlined AMD build, which is much
+> faster.** An earlier edition could only *speculate* the inlined ceiling (≈ 288 M keys/s, extrapolated
+> from a `batch=20, kpwi=64` re-sweep, §10 "Track B"); the **2026-07-23 inline A/B supersedes it**: at the
+> joint optimum `batch=24, kpwi=512` the inlined kernel measured **669.8 M keys/s** against **187.8 M**
+> out-of-line at the same arm — **~3.6×** (same order as §10 Track B's `batch=20` ~3.3×). So the device
+> ceiling is ~670 M, not ~177/288 M; `noinline`'s ~186 M is only the **out-of-the-box (auto-default) AMD
+> path** — a sustained scan that warms the `comgr` cache and sets `noInlineHelpers=false` runs ~3.6×
+> faster (§9/§10), and the five GPU example configs now default to it. On the **inlined** kernel the AMD
+> and RTX 3070 absolutes *are* comparable, and the 7900 XTX wins ~2.3–2.5× (≈ 670 vs ≈ 266 M) as its raw
+> compute predicts. What was already cross-comparable in the out-of-line tables: the **sweet-spot
+> location** (architectural) and the **reduced-radix relative delta** (`noinline` is in both A/B arms, so
+> it cancels).
 
 ---
 
@@ -1774,6 +1803,16 @@ cost balance shifts):
 
 ## 9. AMD GPUs — fixing the multi-minute kernel compile (`noinline`)
 
+> **Framing (updated 2026-07-23).** `noinline` (out-of-line helpers) is the **compile-fast, run-slow**
+> path: it drops AMD's first-build time from 8–16+ min to ~3 s but costs **~3.6× runtime throughput** on
+> RDNA3 (§4, §10). The code default (`noInlineHelpers=null`=auto → out-of-line on AMD, inline elsewhere)
+> is unchanged and keeps CI/tests fast, but for a **real scan** the recommended path is the **inlined**
+> kernel: set `noInlineHelpers=false`, pay AMD's one-time slow compile once (then `comgr`-cached at
+> ~0.7 s), and get full speed — ≈ 670 vs ≈ 186 M keys/s at the `batch=24, kpwi=512` optimum. The five GPU
+> `Find` example configs now set `noInlineHelpers=false` explicitly for this reason;
+> `config_TuneConfiguration.json` stays on auto so its first arm doesn't pay the inline compile before any
+> tuning output appears.
+
 **Symptom.** On AMD GPUs (measured: Radeon RX 7900 XTX, `gfx1100`, RDNA3, Adrenalin 25.12.1,
 OpenCL 2.0 AMD-APP) the **first** `clBuildProgram` of the full kernel took **8–16+ minutes** —
 single-threaded, one core pinned, multi-GB RAM — and routinely blew past the 240 s Surefire fork
@@ -1807,7 +1846,7 @@ many small functions**, each compiling in roughly linear time, instead of one qu
 Note removing the `inline` *keyword* alone does nothing — LLVM still inlines at `-O3`; only the hard
 `noinline` attribute stops it.
 
-| Cold compile (fresh `comgr` cache), RX 7900 XTX | inlined (`noInlineHelpers=false`) | `-D AMD_NOINLINE_HELPERS` (AMD auto-default) |
+| Cold compile (fresh `comgr` cache), RX 7900 XTX | inlined (`noInlineHelpers=false`) | out-of-line (`-D AMD_NOINLINE_HELPERS`, AMD auto-default) |
 |---|--:|--:|
 | Stripped (no hash160, legacy inverse) | 8m 02s | **2.99 s** |
 | **Full (both hash160 chains + safegcd)** | **>16 min (never finished)** | **3.09 s** |
@@ -1853,7 +1892,7 @@ Devices the kernel has been built and run on (byte-identical to the bitcoinj ref
 | Device | Architecture | OpenCL | Role | Notes |
 |---|---|---|---|---|
 | NVIDIA RTX 3070 Laptop | Ampere (40 SM) | 3.0 CUDA | primary perf / tuning | fast compile (ptxas); joint optimum **`batch=24, kpwi=2048`** (≈266 M keys/s; `kpwi=128` only at the fixed `batch=20` — see §4) |
-| AMD RX 7900 XTX | RDNA3 (`gfx1100`, 48 CU) | 2.0 AMD-APP | cross-device confirmation | `noInlineHelpers` **auto-enabled** (vendor-detect) for a practical compile (§9); joint optimum **`batch=24, kpwi=128`** (≈177 M keys/s; `kpwi=32` only at the fixed `batch=20` — see §4) |
+| AMD RX 7900 XTX | RDNA3 (`gfx1100`, 48 CU) | 2.0 AMD-APP | cross-device confirmation | example configs default to `noInlineHelpers=false` (inline = full speed); auto/`null` → out-of-line for fast CI compile (§9); joint optimum **`batch=24, kpwi=512`** (inline ≈**670 M keys/s**; out-of-line ≈186 M; `kpwi=32` only at the fixed `batch=20` — see §4) |
 | pocl (CPU) | CPU | 3.0 platform / CL C 1.2 | CI `test-opencl` job | conformant; small grids only (per-fork timeout) |
 
 **Feature compatibility / requirements:**
@@ -1927,6 +1966,9 @@ follow-ups below.)
   (≈ 288 M keys/s at the peak). The inline build prefers slightly fatter work-items than the `noinline`
   build (sweet spot 32, §4), so for a sustained production scan on AMD use `noInlineHelpers=false` at
   `keysPerWorkItem ≈ 64` (a broad 32–64 plateau).
+  **Update (2026-07-23):** that ≈ 288 M is only the *fixed-`batch=20`* inline peak; with `batchSizeInBits`
+  also free the inline joint optimum is `batch=24, kpwi=512` ≈ **669.8 M keys/s** (out-of-line ≈ 188 M at
+  the same arm), so ≈ 670 M — not 288 M — is the device ceiling (§4).
 
 **Inputs:** AMD compile/throughput numbers + sweet-spot sweep in §4 "Cross-device"; the `noinline`
 mechanism + `comgr` cache controls in §9.

@@ -309,17 +309,22 @@ The filter choice above is portable: false-positive rates are deterministic and 
 across hardware. The **grid** parameters (`batchSizeInBits`, `keysPerWorkItem`) are not — they are a
 property of the specific GPU, and copying another machine's values leaves throughput on the table.
 `TuneConfiguration` measures them on yours. Arm tables: [`tune_arms.csv`](measurements/tune_arms.csv)
-(RTX 3070 grid + the cascade run) and the full 25-arm RDNA3 sweep in
+(RTX 3070 grid + the cascade run) and the full RDNA3 sweep (25 original arms + the 18-arm 2026-07-23
+extension to `bits=24`) in
 [`tuner_ryzen9800x3d_gfx1100.csv`](measurements/tuner_ryzen9800x3d_gfx1100.csv). The two machines
 disagree on the optimum:
 
 | Machine | Winner | Peak throughput | Note |
 |---|---|--:|---|
 | RTX 3070 Laptop | `bits=22`, `kpwi=256` | 229–234 M/s | `kpwi=256` is optimal at `bits=22` and the **worst** of all at `bits=18` (5.8× spread) |
-| RX 7900 XTX | `bits=22`, `kpwi=64` | 130.2 M/s | `kpwi=256` is past-peak (110.1 M); spread widens to 24.9× (worst arm `19/1` at 5.24 M/s) |
+| RX 7900 XTX | `bits=24`, `kpwi=512` | ≈**670 M/s** inline (out-of-line ≈186 M) | the batch-22-capped sweep peaked at `22/64` = 130.2 M/s out-of-line (spread 24.9×, worst arm `19/1` at 5.24 M/s); the extended 2026-07-23 sweep to `bits=24` moved the optimum to `24/512`, and the inlined kernel reaches ≈670 M/s — ≈2.3–2.5× the 3070 |
 
-(Absolute rates are not vendor-comparable here — `noInlineHelpers=auto` gave the AMD run its
-out-of-lined kernel — but the *location* of the optimum is what transfers, and that is what differs.)
+(The 130.2 M/s figure was the *out-of-lined* kernel — `noInlineHelpers=auto` gave the AMD run
+out-of-line helpers, ~3.6× slower on RDNA3 (see the GPU performance guide, §9). On the **inlined**
+kernel (`noInlineHelpers=false`, now the example-config default) the rates *are* vendor-comparable, and
+the 7900 XTX reaches ≈670 M/s — ≈2.3–2.5× the 3070, as its raw compute predicts. What still transfers
+regardless is the *location* of the optimum: the 3070 wants `kpwi=2048`, the 7900 XTX `kpwi=512` — grid
+optima are machine-specific.)
 
 The `batchSizeInBits` agrees but `keysPerWorkItem` does not, and the two parameters interact — the
 right `keysPerWorkItem` depends on `batchSizeInBits`, so sweeping one axis alone finds a false
