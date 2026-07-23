@@ -210,9 +210,14 @@ public class OpenCLContext implements ReleaseCLObject {
      *   <li>{@code null} (auto) → {@code true} only when {@link #isAmdVendor(String)} matches the
      *       device vendor (the AMD multi-minute-compile fix), {@code false} on every other vendor.</li>
      *   <li>explicit {@link Boolean#TRUE}/{@link Boolean#FALSE} → used verbatim (vendor-detection
-     *       skipped); an explicit {@code false} on an AMD device additionally logs a slow-compile
-     *       warning.</li>
+     *       skipped).</li>
      * </ul>
+     *
+     * <p>The <em>return value</em> is unchanged by this method; only the log level differs so the
+     * tradeoff is never silent. Every effective path that is not both fast-to-compile <em>and</em>
+     * full-speed logs a {@code WARN}: an <b>out-of-line</b> kernel warns it runs <b>~4× slower</b> (any
+     * vendor); an <b>inlined</b> kernel on <b>AMD</b> warns its <b>first compile takes 8-16+ min</b>
+     * (then comgr-cached). Only the already-optimal case (inline on non-AMD) logs at {@code INFO}.
      *
      * <p>Logged because the choice materially changes both compile time (minutes vs seconds on AMD) and
      * runtime throughput (≈4.5× on NVIDIA) — operators need an unambiguous record of which path ran and
@@ -225,44 +230,46 @@ public class OpenCLContext implements ReleaseCLObject {
     @VisibleForTesting
     boolean resolveEffectiveNoInlineHelpers(String deviceName, @Nullable String deviceVendor) {
         final Boolean configured = producerOpenCL.noInlineHelpers;
-        if (configured != null) {
-            if (!configured && isAmdVendor(deviceVendor)) {
-                LOGGER.warn(
-                        "noInlineHelpers is explicitly FALSE on AMD device '{}' (vendor '{}'): building the "
-                                + "fully-inlined kernel, which can take 8-16+ minutes to compile on AMD's LLVM/comgr "
-                                + "back-end (see docs/performance.md, AMD compile section). Set noInlineHelpers=null "
-                                + "(auto) to let the AMD-only out-of-line compile fix engage automatically.",
-                        deviceName,
-                        deviceVendor);
-            } else {
-                LOGGER.info(
-                        "noInlineHelpers={} (explicit configuration) for device '{}' (vendor '{}'); "
-                                + "vendor auto-detection skipped, {} the kernel.",
-                        configured,
-                        deviceName,
-                        deviceVendor,
-                        configured ? "out-of-lining (-D AMD_NOINLINE_HELPERS)" : "inlining");
-            }
-            return configured;
-        }
-        // null = auto: enable the out-of-line compile fix for AMD only.
-        if (isAmdVendor(deviceVendor)) {
-            LOGGER.info(
-                    "noInlineHelpers=auto: AMD device detected ('{}', vendor '{}') -> ENABLING "
-                            + "-D AMD_NOINLINE_HELPERS. Out-of-lining the DECLSPEC helpers cuts the AMD cold compile "
-                            + "from 8-16+ min to ~3 s (see docs/performance.md, AMD compile section). This costs "
-                            + "runtime throughput on other vendors (~4.5x slower on NVIDIA), so it is applied to AMD "
-                            + "only.",
+        final boolean amd = isAmdVendor(deviceVendor);
+        // Effective decision (semantics unchanged): explicit true/false verbatim; null (auto) = out-of-line
+        // on AMD only, inline elsewhere. Only the LOGGING differs — every path that is not already both
+        // fast to compile AND fast at runtime now warns, so the tradeoff is never silent.
+        final boolean effective = (configured != null) ? configured : amd;
+        final String source = (configured == null) ? "auto" : "explicit configuration";
+
+        if (effective) {
+            // OUT-OF-LINE (-D AMD_NOINLINE_HELPERS): compiles fast (~3 s) but is ~4x slower at runtime.
+            LOGGER.warn(
+                    "noInlineHelpers -> OUT-OF-LINE kernel (-D AMD_NOINLINE_HELPERS) on device '{}' (vendor '{}', "
+                            + "source: {}): the DECLSPEC helpers are out-of-lined, so the kernel compiles fast (~3 s) "
+                            + "but runs ~4x SLOWER (measured ~3.6x on AMD RDNA3, ~4.5x on NVIDIA; see "
+                            + "docs/performance.md sections 9-10). Set noInlineHelpers=false for the full-speed inlined "
+                            + "kernel "
+                            + "(one-time 8-16+ min compile on AMD, then comgr-cached).",
                     deviceName,
-                    deviceVendor);
-            return true;
+                    deviceVendor,
+                    source);
+        } else if (amd) {
+            // INLINE on AMD: full runtime speed, but the first compile is slow (then comgr-cached).
+            LOGGER.warn(
+                    "noInlineHelpers -> INLINED kernel on AMD device '{}' (vendor '{}', source: {}): building for "
+                            + "maximum throughput (~3.6x faster than out-of-line on RDNA3). The FIRST compile can take "
+                            + "8-16+ minutes on AMD's LLVM/comgr back-end; it is then cached (comgr) so later starts "
+                            + "are fast. Set noInlineHelpers=true for a fast ~3 s compile at ~4x lower runtime "
+                            + "throughput.",
+                    deviceName,
+                    deviceVendor,
+                    source);
+        } else {
+            // INLINE on non-AMD: fast to compile AND full runtime speed — nothing to warn about.
+            LOGGER.info(
+                    "noInlineHelpers -> INLINED kernel on non-AMD device '{}' (vendor '{}', source: {}) for full "
+                            + "throughput; compiles quickly on this vendor.",
+                    deviceName,
+                    deviceVendor,
+                    source);
         }
-        LOGGER.info(
-                "noInlineHelpers=auto: non-AMD device ('{}', vendor '{}') -> keeping helpers INLINED for full "
-                        + "throughput (the AMD-only out-of-line compile fix is not needed here).",
-                deviceName,
-                deviceVendor);
-        return false;
+        return effective;
     }
 
     /**

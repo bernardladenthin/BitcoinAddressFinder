@@ -298,8 +298,8 @@ public class OpenCLContextTest {
     }
 
     @Test
-    public void resolveEffectiveNoInlineHelpers_autoOnAmd_enablesAndLogsReason() {
-        // arrange: null = auto.
+    public void resolveEffectiveNoInlineHelpers_autoOnAmd_outOfLineWithSlowRuntimeWarning() {
+        // arrange: null = auto -> out-of-line on AMD (unchanged), now WARNs about the ~4x runtime cost.
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         cProducerOpenCL.noInlineHelpers = null;
         OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
@@ -309,20 +309,20 @@ public class OpenCLContextTest {
             boolean effective = openCLContext.resolveEffectiveNoInlineHelpers(
                     "AMD Radeon RX 7900 XTX", "Advanced Micro Devices, Inc.");
 
-            // assert
+            // assert: still out-of-line (true), but a ~4x-slower warning is logged.
             assertThat(effective, is(true));
             assertThat(
-                    logCaptor.getInfoLogs().stream()
-                            .anyMatch(m -> m.contains("noInlineHelpers=auto")
-                                    && m.contains("AMD device detected")
-                                    && m.contains("ENABLING")),
+                    logCaptor.getWarnLogs().stream()
+                            .anyMatch(m -> m.contains("OUT-OF-LINE")
+                                    && m.contains("~4x SLOWER")
+                                    && m.contains("source: auto")),
                     is(true));
         }
     }
 
     @Test
-    public void resolveEffectiveNoInlineHelpers_autoOnNonAmd_disablesAndLogsReason() {
-        // arrange: null = auto.
+    public void resolveEffectiveNoInlineHelpers_autoOnNonAmd_inlinesAndLogsReason() {
+        // arrange: null = auto -> inline on non-AMD (already optimal: fast compile + full speed), INFO.
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         cProducerOpenCL.noInlineHelpers = null;
         OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
@@ -336,52 +336,56 @@ public class OpenCLContextTest {
             assertThat(effective, is(false));
             assertThat(
                     logCaptor.getInfoLogs().stream()
-                            .anyMatch(m -> m.contains("noInlineHelpers=auto")
+                            .anyMatch(m -> m.contains("INLINED")
                                     && m.contains("non-AMD device")
-                                    && m.contains("INLINED")),
+                                    && m.contains("source: auto")),
                     is(true));
+            // and no warning on the already-optimal path
+            assertThat(logCaptor.getWarnLogs().isEmpty(), is(true));
         }
     }
 
     @Test
-    public void resolveEffectiveNoInlineHelpers_explicitTrue_honouredRegardlessOfVendor() {
+    public void resolveEffectiveNoInlineHelpers_explicitTrue_outOfLineWithSlowRuntimeWarning() {
         // arrange
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         cProducerOpenCL.noInlineHelpers = Boolean.TRUE;
         OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
 
         try (LogCaptor logCaptor = LogCaptor.forClass(OpenCLContext.class)) {
-            // act: forced on even on a non-AMD device.
+            // act: forced out-of-line even on a non-AMD device.
             boolean effective =
                     openCLContext.resolveEffectiveNoInlineHelpers("NVIDIA GeForce RTX 3070", "NVIDIA Corporation");
 
-            // assert
+            // assert: honoured, and a ~4x-slower runtime warning is logged.
             assertThat(effective, is(true));
             assertThat(
-                    logCaptor.getInfoLogs().stream()
-                            .anyMatch(m -> m.contains("explicit configuration")
-                                    && m.contains("vendor auto-detection skipped")),
+                    logCaptor.getWarnLogs().stream()
+                            .anyMatch(m -> m.contains("OUT-OF-LINE")
+                                    && m.contains("~4x SLOWER")
+                                    && m.contains("source: explicit configuration")),
                     is(true));
         }
     }
 
     @Test
-    public void resolveEffectiveNoInlineHelpers_explicitFalseOnAmd_honouredWithSlowCompileWarning() {
+    public void resolveEffectiveNoInlineHelpers_explicitFalseOnAmd_inlinesWithSlowCompileWarning() {
         // arrange
         CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
         cProducerOpenCL.noInlineHelpers = Boolean.FALSE;
         OpenCLContext openCLContext = new OpenCLContext(cProducerOpenCL, bitHelper);
 
         try (LogCaptor logCaptor = LogCaptor.forClass(OpenCLContext.class)) {
-            // act: forced off on AMD (needed to A/B inlined vs out-of-line on AMD).
+            // act: forced inline on AMD (the full-speed path).
             boolean effective = openCLContext.resolveEffectiveNoInlineHelpers(
                     "AMD Radeon RX 7900 XTX", "Advanced Micro Devices, Inc.");
 
-            // assert: honoured, but a slow-compile warning is logged.
+            // assert: honoured (inline), with a slow-first-compile warning.
             assertThat(effective, is(false));
             assertThat(
                     logCaptor.getWarnLogs().stream()
-                            .anyMatch(m -> m.contains("explicitly FALSE on AMD device") && m.contains("8-16+ minutes")),
+                            .anyMatch(m ->
+                                    m.contains("INLINED") && m.contains("AMD device") && m.contains("8-16+ minutes")),
                     is(true));
         }
     }
