@@ -1641,28 +1641,28 @@ For technical details, see:
 |------------------------|---------------------|------------------|------------------|-----------------|------------------------|
 | NVIDIA RTX 3070 Laptop | AMD Ryzen 7 5800H   | 256              | 22               | 256             | ~229,000,000 keys/s    |
 | NVIDIA RTX 3070 Laptop | AMD Ryzen 7 5800H   | 256              | 24               | 2048            | ~266,000,000 keys/s    |
-| AMD Radeon RX 7900 XTX | AMD Ryzen 7 9800X3D | 256              | 22               | 64              | ~130,000,000 keys/s    |
+| AMD Radeon RX 7900 XTX | AMD Ryzen 7 9800X3D | 256              | 24               | 512             | ~670,000,000 keys/s    |
 
-> **Methodology.** Compact GPU-filter fast path, candidates/s = JMH ops/s × `2^batchSizeInBits`. The
-> RTX 3070 is shown at two grids: `batch=22` is its winner within the same `batch≤22` grid-sweep the
-> RX 7900 XTX was run in (a like-for-like cross-device row), and `batch=24, kpwi=2048` is its true joint
-> `(batch, kpwi)` optimum from a separate 2-D sweep. A live end-to-end `Find` run on this 3070 (the tuned
-> cascade against the ~141 M-entry light DB, warm) sustained **~280 M/s** at `24/2048`, consistent with the
-> ~266 M/s benchmark within the ~5 % cross-session spread. Raw data:
-> [`tune_arms.csv`](docs/measurements/tune_arms.csv) (RTX 3070) and
-> [`tuner_ryzen9800x3d_gfx1100.csv`](docs/measurements/tuner_ryzen9800x3d_gfx1100.csv) (RX 7900 XTX).
+> **Methodology.** Compact GPU-filter fast path, candidates/s = JMH ops/s × `2^batchSizeInBits`, all on
+> the **inlined** kernel (the example configs now default to `noInlineHelpers: false`). Each device is
+> shown at its own tuned optimum — the grid optimum is device-specific: the RTX 3070 peaks at `kpwi=2048`,
+> the RX 7900 XTX at `kpwi=512` (`kpwi=2048` collapses to ~71 M/s on RDNA3 through under-occupancy). The
+> 3070's `batch=22` row is kept as a lower-grid reference. Live end-to-end `Find` runs (tuned FUSE_16 +
+> BINARY_FUSE_8 cascade against the ~141 M-entry light DB, warm) sustained **~280 M/s** on the 3070 and
+> **~616 M/s** on the 7900 XTX. Raw data: [`tune_arms.csv`](docs/measurements/tune_arms.csv) (RTX 3070)
+> and [`tuner_ryzen9800x3d_gfx1100.csv`](docs/measurements/tuner_ryzen9800x3d_gfx1100.csv) (RX 7900 XTX).
 >
-> ⚠️ **Absolute rates are not a strict cross-vendor hardware ranking.** The AMD run used the out-of-lined
-> (`noInlineHelpers`) kernel and its sweep stopped at `batch=22` (no `batch=24` arm), whereas the NVIDIA
-> run used the inlined kernel. What transfers across machines is the *location* of the optimum, not the
-> absolute number — see [`docs/performance.md` §4](docs/performance.md).
+> **The inlined kernel is the dominant lever on AMD.** At the same `24/512` arm the 7900 XTX runs
+> 187.8 M/s out-of-lined vs **669.8 M/s inlined — a ~3.6× gap** that had hidden the card's real speed (an
+> out-of-lined sweep capped at `batch=22` reported only ~130 M/s). With the inlined kernel the 7900 XTX now
+> sits ~2.3–2.5× above the 3070, as its raw compute would suggest. Trade-off: on AMD the inlined kernel's
+> first compile is slow (~8–16 min, then `comgr`-cached); NVIDIA compiles it instantly.
 >
 > `Grid Size (Bits)` (= `batchSizeInBits`) and `keysPerWorkItem` are **device-specific** — sweep your own
-> hardware with `GridSizeSweepBenchmark` / `TuneConfiguration`. Tuning matters a lot: on the 7900 XTX the
-> generic `18/16` default yields only ~36 M/s versus ~130 M/s tuned (a **3.6×** gap). `Key Range = 256` is
-> the full-width private-key path; a 160-bit [MSB-Zero](#-msb-zero-optimization) scan runs faster but is
-> not separately benchmarked here. Earlier third-party rows (RTX 3090, A3000, Radeon 8060S) and their
-> pre-optimization figures were removed as obsolete.
+> hardware with `GridSizeSweepBenchmark` / `TuneConfiguration`. `Key Range = 256` is the full-width
+> private-key path; a 160-bit [MSB-Zero](#-msb-zero-optimization) scan runs faster but is not separately
+> benchmarked here. Earlier third-party rows (RTX 3090, A3000, Radeon 8060S) and their pre-optimization
+> figures were removed as obsolete.
 
 ##### GPU Binary Fuse 8 filter — compact output vs. full transfer
 
