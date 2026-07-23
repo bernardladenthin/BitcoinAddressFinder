@@ -723,6 +723,12 @@ above the RTX 3070** (`batch=24, kpwi=2048` ≈ 266 M, §4) — as its raw compu
 cascade** (FUSE_16 GPU pre-filter + BINARY_FUSE_8 CPU consumer, inline) sustains **~616–620 M keys/s**.
 The five GPU `Find` example configs now set `noInlineHelpers=false` (inline) by default, so this is the
 out-of-the-box path (§9).
+> **Inline `kpwi` sweep (2026-07-23) — confirmed.** The A/B above measured inline only at the
+> out-of-line winner `24/512`, so a dedicated inline sweep at `batch=24, kpwi ∈ {128,256,512,1024}`
+> checked whether the inline peak sits elsewhere. It does not: `kpwi` 128/256/512 form a **flat plateau
+> within ~1.4 %** (683.2 / 675.6 / 673.9 M keys/s), `1024` drops to 535 M. `kpwi=128` is marginally
+> highest but well inside run-to-run noise, so **`kpwi=512` stands as the inline optimum** and the
+> ≈ 670 M figure is unchanged. Rows in the CSV carry a new `kernel` column (`inline` vs `out-of-line`).
 
 **Reduced-radix 2²⁶ at the out-of-line sweep's `batch=24, kpwi=128` peak: +10.7%.** Matched A/B at
 `batch=24, kpwi=128` (`noinline` both arms, `-f 1 -wi 1 -w 25 -i 5 -r 30`), with the `batch=20, kpwi=32`
