@@ -1637,25 +1637,40 @@ For technical details, see:
 > addresses examined is twice this rate — see
 > [Keys versus addresses](#keys-versus-addresses).
 
-| GPU Model                   | CPU                 | Key Range (Bits) | Grid Size (Bits) | Effective Keys/s (~)   |
-|-----------------------------|---------------------|------------------|------------------|------------------------|
-| AMD Radeon RX 7900 XTX      | AMD Ryzen 7 9800X3D | 160              | 19               | 15,000,000 keys/s      |
-| AMD Radeon RX 7900 XTX      | AMD Ryzen 7 9800X3D | 256              | 19               | 11,000,000 keys/s      |
-| NVIDIA RTX 3070 Laptop      | AMD Ryzen 7 5800H   | 160              | 19               |  6,000,000 keys/s      |
-| NVIDIA RTX 3070 Laptop      | AMD Ryzen 7 5800H   | 256              | 19               |  4,000,000 keys/s      |
-| NVIDIA RTX 3090             | AMD Ryzen 9 3950X   | 160              | 19               | 11,000,000 keys/s      |
-| NVIDIA RTX 3090             | AMD Ryzen 9 3950X   | 256              | 19               |  8,000,000 keys/s      |
-| NVIDIA RTX A3000            | Intel i7-11850H     | 256              | 19               |  3,000,000 keys/s      |
-| NVIDIA RTX A3000            | Intel i7-11850H     | 160              | 19               |  5,000,000 keys/s      |
-| AMD Radeon 8060S            | AMD AI MAX+ 395     | 256              | 16               |  9,200,000 keys/s      |
-| AMD Radeon 8060S            | AMD AI MAX+ 395     | 160              | 16               | 11,000,000 keys/s      |
+| GPU Model              | CPU                 | Key Range (Bits) | Grid Size (Bits) | keysPerWorkItem | Effective Keys/s (~)   |
+|------------------------|---------------------|------------------|------------------|-----------------|------------------------|
+| NVIDIA RTX 3070 Laptop | AMD Ryzen 7 5800H   | 256              | 22               | 256             | ~229,000,000 keys/s    |
+| NVIDIA RTX 3070 Laptop | AMD Ryzen 7 5800H   | 256              | 24               | 2048            | ~266,000,000 keys/s    |
+| AMD Radeon RX 7900 XTX | AMD Ryzen 7 9800X3D | 256              | 22               | 64              | ~130,000,000 keys/s    |
+
+> **Methodology.** Compact GPU-filter fast path, candidates/s = JMH ops/s × `2^batchSizeInBits`. The
+> RTX 3070 is shown at two grids: `batch=22` is its winner within the same `batch≤22` grid-sweep the
+> RX 7900 XTX was run in (a like-for-like cross-device row), and `batch=24, kpwi=2048` is its true joint
+> `(batch, kpwi)` optimum from a separate 2-D sweep. A live end-to-end `Find` run on this 3070 (the tuned
+> cascade against the ~141 M-entry light DB, warm) sustained **~280 M/s** at `24/2048`, consistent with the
+> ~266 M/s benchmark within the ~5 % cross-session spread. Raw data:
+> [`tune_arms.csv`](docs/measurements/tune_arms.csv) (RTX 3070) and
+> [`tuner_ryzen9800x3d_gfx1100.csv`](docs/measurements/tuner_ryzen9800x3d_gfx1100.csv) (RX 7900 XTX).
+>
+> ⚠️ **Absolute rates are not a strict cross-vendor hardware ranking.** The AMD run used the out-of-lined
+> (`noInlineHelpers`) kernel and its sweep stopped at `batch=22` (no `batch=24` arm), whereas the NVIDIA
+> run used the inlined kernel. What transfers across machines is the *location* of the optimum, not the
+> absolute number — see [`docs/performance.md` §4](docs/performance.md).
+>
+> `Grid Size (Bits)` (= `batchSizeInBits`) and `keysPerWorkItem` are **device-specific** — sweep your own
+> hardware with `GridSizeSweepBenchmark` / `TuneConfiguration`. Tuning matters a lot: on the 7900 XTX the
+> generic `18/16` default yields only ~36 M/s versus ~130 M/s tuned (a **3.6×** gap). `Key Range = 256` is
+> the full-width private-key path; a 160-bit [MSB-Zero](#-msb-zero-optimization) scan runs faster but is
+> not separately benchmarked here. Earlier third-party rows (RTX 3090, A3000, Radeon 8060S) and their
+> pre-optimization figures were removed as obsolete.
 
 ##### GPU Binary Fuse 8 filter — compact output vs. full transfer
 
-The table above measures raw key generation. The table below isolates the effect of the
+The table above shows the tuned peak throughput on the compact GPU-filter fast path. The table
+below isolates the effect of the
 [GPU-side Binary Fuse 8 filter](#gpu-side-binary-fuse-8-filtering-enablegpufilter)
-(`enableGpuFilter`): with it **on**, the kernel checks each derived hash160 against the
-on-GPU filter and transfers only the hits; with it **off**, every work-item result is read
+(`enableGpuFilter`) at a fixed grid: with it **on**, the kernel checks each derived hash160 against
+the on-GPU filter and transfers only the hits; with it **off**, every work-item result is read
 back over PCIe.
 
 > **Note:** These numbers come from the `GpuFuse8FilterBenchmark` JMH microbenchmark
