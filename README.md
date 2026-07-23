@@ -511,26 +511,26 @@ Same harness, same machine (64 GB RAM), against the 61 GB / 1,377,478,516-entry 
 | false negatives | **0** |
 | build time | 1,869 s (31 min, I/O-bound — see below) |
 
-- **Faster to build than Fuse-8 at this tier — the lookup question is unresolved.** Both backends measured on both hosts, each arm preceded by a cache-clearing pass, at `-Xmx48g`:
+**Faster to build than Fuse-8 at this tier — the lookup question is unresolved.** Both backends measured on both hosts, each arm preceded by a cache-clearing pass, at `-Xmx48g`:
 
-  | | 16 MB L3 host | | 96 MB L3 host | |
-  |---|--:|--:|--:|--:|
-  | | `BINARY_FUSE_8` | `BLOCKED_BLOOM` | `BINARY_FUSE_8` | `BLOCKED_BLOOM` |
-  | build | 3 186 s | **1 617 s** | 1 564 s | **859 s** |
-  | lookups/s | **9.37 M** | 7.44 M | 6.13 M | **7.17 M** |
-  | retained | **1 504 MiB** | 2 080 MiB | **1 504 MiB** | 2 080 MiB |
-  | FPR | **0.393 %** | 0.485 % | **0.393 %** | 0.485 % |
+| | 16 MB L3 host | | 96 MB L3 host | |
+|---|--:|--:|--:|--:|
+| | `BINARY_FUSE_8` | `BLOCKED_BLOOM` | `BINARY_FUSE_8` | `BLOCKED_BLOOM` |
+| build | 3 186 s | **1 617 s** | 1 564 s | **859 s** |
+| lookups/s | **9.37 M** | 7.44 M | 6.13 M | **7.17 M** |
+| retained | **1 504 MiB** | 2 080 MiB | **1 504 MiB** | 2 080 MiB |
+| FPR | **0.393 %** | 0.485 % | **0.393 %** | 0.485 % |
 
-  **Blocked Bloom builds faster on both machines.** The 1.8–2.0× seen here is an *LMDB-bound* figure; measured storage-free the true algorithmic factor is **3.0×** (14.6 s vs 43.8 s at 100 M), because these runs spend most of their time on a scattered 61 GB cursor walk that is common to both filters and dilutes the difference. Fuse-8 is 27 % smaller with a ~19 % better FPR, both bit-identical across hosts.
+**Blocked Bloom builds faster on both machines.** The 1.8–2.0× seen here is an *LMDB-bound* figure; measured storage-free the true algorithmic factor is **3.0×** (14.6 s vs 43.8 s at 100 M), because these runs spend most of their time on a scattered 61 GB cursor walk that is common to both filters and dilutes the difference. Fuse-8 is 27 % smaller with a ~19 % better FPR, both bit-identical across hosts.
 
-  **The lookup row above is an artefact — do not use it.** It comes from a single-shot probe loop run right after a multi-GB build, and re-measuring with the warmed, storage-free JMH instrument inverts the answer on *both* machines. Measured ns/op at 1 B entries:
+**The lookup row above is an artefact — do not use it.** It comes from a single-shot probe loop run right after a multi-GB build, and re-measuring with the warmed, storage-free JMH instrument inverts the answer on *both* machines. Measured ns/op at 1 B entries:
 
-  | | `BINARY_FUSE_8` | `BLOCKED_BLOOM` |
-  |---|--:|--:|
-  | 16 MB L3 host | 91.7 | **79.8** |
-  | 96 MB L3 host | **39.9** | 42.7 |
+| | `BINARY_FUSE_8` | `BLOCKED_BLOOM` |
+|---|--:|--:|
+| 16 MB L3 host | 91.7 | **79.8** |
+| 96 MB L3 host | **39.9** | 42.7 |
 
-  So the ranking flips with cache size: blocked Bloom leads by 13–36 % where L3 is modest, Fuse-8 by ~6 % (intervals overlapping) where it is large. Note the same Fuse-8 array costs 91.7 vs 39.9 ns on the two hosts — **2.3× from cache alone**. Full analysis in [`docs/performance.md`](docs/performance.md).
+So the ranking flips with cache size: blocked Bloom leads by 13–36 % where L3 is modest, Fuse-8 by ~6 % (intervals overlapping) where it is large. Note the same Fuse-8 array costs 91.7 vs 39.9 ns on the two hosts — **2.3× from cache alone**. Full analysis in [`docs/performance.md`](docs/performance.md).
 
   **Recommendation: `BINARY_FUSE_8`** — see [Which filter to pick](#which-filter-to-pick). Blocked Bloom wins every *probe* column on this page, and still loses the *total*: at equal footprint its false-positive rate is ~4× higher, and a false positive costs 4.1 µs warm to 292.7 µs cold against tens of nanoseconds for the probe. The probe is the term that barely counts. Blocked Bloom remains the pick when build time dominates (3× faster, one streaming pass, no ~29 B/entry peeling arrays).
 
