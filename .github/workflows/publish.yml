@@ -256,8 +256,10 @@ jobs:
         #
         # -P assembly additionally builds the runnable fat jar-with-dependencies
         # (bitcoinaddressfinder-<version>-jar-with-dependencies.jar). It lands in target/ and
-        # rides along in the `jars` upload-artifact below - a CI run artifact only, not a Maven
-        # Central / GitHub-Release asset.
+        # rides along in the `jars` upload-artifact below as a CI run artifact. It is NOT a Maven
+        # Central asset (never deployed there). It IS attached to the GitHub Release, but that copy
+        # is produced+signed independently by the publish-release / publish-snapshot jobs (their
+        # "Build & sign fat jar" step), not taken from this build job's upload-artifact.
         run: mvn --batch-mode --no-transfer-progress -P assembly -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -DskipTests -Dmaven.javadoc.skip=true package
       - uses: actions/upload-artifact@v7
         with: { name: jars, path: target/*.jar }
@@ -550,6 +552,19 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      # Build + GPG-sign the runnable fat jar (bitcoinaddressfinder-<version>-jar-with-dependencies.jar)
+      # as a GitHub-Release asset ONLY — it is deliberately NOT deployed to Maven Central. The Deploy
+      # step above (`-P release deploy`, no `assembly`) already pushed the main/sources/javadoc jars to
+      # Central; this second invocation adds the `assembly` profile and stops at `verify` (never
+      # reaching `deploy`), so the central-publishing plugin's publish goal — bound to the deploy phase —
+      # does nothing here. `verify` runs: package (assembly `single` attaches the fat jar) → verify
+      # (maven-gpg-plugin signs every attached artifact, incl. the fat jar → .jar.asc). It rebuilds and
+      # re-signs the main/sources/javadoc jars in target/ too (harmless), so the Collect step below now
+      # also finds the fat jar + its .asc. Runs only if the deploy succeeded.
+      - name: Build & sign fat jar (GitHub asset only — not deployed to Central)
+        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release,assembly verify -DskipTests
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       # Runs even when the deploy step failed: a Central publish-poll timeout reds the
       # job *after* the bundle was uploaded (and typically published server-side), while
       # the signed jars + .asc files already exist in target/ (signing happens at
@@ -625,6 +640,19 @@ jobs:
         env:
           MAVEN_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      # Build + GPG-sign the runnable fat jar (bitcoinaddressfinder-<version>-jar-with-dependencies.jar)
+      # as a GitHub-Release asset ONLY — it is deliberately NOT deployed to Maven Central. The Deploy
+      # step above (`-P release deploy`, no `assembly`) already pushed the main/sources/javadoc jars to
+      # Central; this second invocation adds the `assembly` profile and stops at `verify` (never
+      # reaching `deploy`), so the central-publishing plugin's publish goal — bound to the deploy phase —
+      # does nothing here. `verify` runs: package (assembly `single` attaches the fat jar) → verify
+      # (maven-gpg-plugin signs every attached artifact, incl. the fat jar → .jar.asc). It rebuilds and
+      # re-signs the main/sources/javadoc jars in target/ too (harmless), so the Collect step below now
+      # also finds the fat jar + its .asc. Runs only if the deploy succeeded.
+      - name: Build & sign fat jar (GitHub asset only — not deployed to Central)
+        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release,assembly verify -DskipTests
+        env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       # Runs even when the deploy step failed: a Central publish-poll timeout reds the
       # job *after* the bundle was uploaded (and typically published server-side), while
