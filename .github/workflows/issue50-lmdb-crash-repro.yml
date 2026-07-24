@@ -4,13 +4,23 @@
 
 # ---------------------------------------------------------------------------
 # Manual reproduction harness for issue #50 — the sporadic native SIGSEGV in
-# LMDB's mdb_txn_renew0 under concurrent read transactions.
+# LMDB's mdb_txn_renew0.
 #
 # This is a DIAGNOSTIC workflow, not part of the build pipeline: it runs only on
-# manual dispatch. It drives LmdbCrashReproDriverTest, which forks child JVMs
-# that hammer the read-only LMDB path with short-lived (reader-slot-churning)
-# threads and reports a "k crashes / N runs" rate. The Linux runner is the point:
-# the crash is a pthread-TLS reader-slot race that does not reproduce on Windows.
+# manual dispatch. It drives LmdbCrashReproDriverTest, which forks child JVMs and
+# reports a "k crashes / N runs" rate. Two scenarios (see `scenario` input):
+#
+#   * closerace (DEFAULT, the ROOT CAUSE) — close the LMDB env while reads are
+#     still in flight, exactly the ConsumerJava.interrupt() path where
+#     awaitTermination times out and persistence.close() unmaps the mmap out from
+#     under a live reader. This is a genuine use-after-unmap and reproduces
+#     ON DEMAND and CROSS-PLATFORM (verified 5/5 on Windows). It is the scenario
+#     the LMDBPersistence read/write-lock fix closes; after the fix it reports 0/N.
+#   * churn — steady-state reader-slot churn (many short-lived reader threads,
+#     env kept open the whole run). This was the ORIGINAL hypothesis; it does NOT
+#     reproduce the crash (0/48 on Linux even with JaCoCo) because it never
+#     overlaps a close with a live read. Kept as the informative negative control.
+#
 # JaCoCo instrumentation (issue #50 comment 1's documented aggravator) is
 # forwarded into every child by default.
 #
@@ -31,18 +41,33 @@ name: Issue #50 LMDB crash repro (manual)
 on:
   workflow_dispatch:
     inputs:
+      scenario:
+        description: 'closerace = root-cause use-after-unmap (reproduces on demand); churn = negative control'
+        type: choice
+        options:
+          - closerace
+          - churn
+        default: closerace
       runs_per_shard:
         description: 'Forked child JVMs per shard (keep runs*(seconds+5) < ~200s per shard)'
         type: string
         default: '8'
       concurrency:
-        description: 'Live short-lived reader threads per child'
+        description: 'churn only: live short-lived reader threads per child'
         type: string
         default: '256'
       seconds:
-        description: 'Churn duration per child (seconds)'
+        description: 'churn only: churn duration per child (seconds)'
         type: string
         default: '15'
+      reader_threads:
+        description: 'closerace only: reader threads hammering containsAddress per child'
+        type: string
+        default: '128'
+      warmup_millis:
+        description: 'closerace only: warm-up before the env is closed (ms)'
+        type: string
+        default: '1000'
       forward_jacoco:
         description: 'Run children under the JaCoCo agent (issue #50 aggravator)'
         type: boolean
@@ -81,10 +106,13 @@ jobs:
           mvn -e --batch-mode --no-transfer-progress test \
             -Dtest=LmdbCrashReproDriverTest \
             -Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver=true \
+            -Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver.scenario=${{ inputs.scenario }} \
             -Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver.runs=${{ inputs.runs_per_shard }} \
             -Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver.concurrency=${{ inputs.concurrency }} \
             -Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver.seconds=${{ inputs.seconds }} \
             -Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver.lookupsPerThread=1 \
+            -Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver.readerThreads=${{ inputs.reader_threads }} \
+            -Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver.warmupMillis=${{ inputs.warmup_millis }} \
             -Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver.forwardJacoco=${{ inputs.forward_jacoco }} \
             -Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver.logDir="${GITHUB_WORKSPACE}/child-logs"
       - uses: actions/upload-artifact@v7

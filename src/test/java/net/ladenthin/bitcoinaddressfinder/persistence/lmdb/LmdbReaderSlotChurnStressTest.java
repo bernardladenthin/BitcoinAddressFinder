@@ -107,13 +107,27 @@ public class LmdbReaderSlotChurnStressTest {
     public static final String PROP_NOLOCK = PROP_ENABLE + ".nolock";
     /** Raw mode only: {@code Env.Builder.setMaxReaders} (default 0 → leave lmdbjava default). */
     public static final String PROP_MAX_READERS = PROP_ENABLE + ".maxReaders";
+    /**
+     * Scenario selector: {@code churn} (steady-state reader-slot churn, the default) or
+     * {@code closerace} (close the env while reads are in flight — the actual issue #50 crash,
+     * a use-after-unmap: a consumer thread's {@code containsAddress} → {@code mdb_txn_begin}
+     * dereferences the LMDB mmap after {@code Env.close()} has unmapped it during shutdown).
+     */
+    public static final String PROP_SCENARIO = PROP_ENABLE + ".scenario";
+    /** {@code closerace} only: number of reader threads hammering {@code containsAddress}. */
+    public static final String PROP_READER_THREADS = PROP_ENABLE + ".readerThreads";
+    /** {@code closerace} only: warm-up before the env is closed, in ms (default 1000). */
+    public static final String PROP_WARMUP_MILLIS = PROP_ENABLE + ".warmupMillis";
 
     private static final int DEFAULT_CONCURRENCY = 128;
     private static final int DEFAULT_SECONDS = 20;
     private static final int DEFAULT_LOOKUPS_PER_THREAD = 1;
+    private static final int DEFAULT_READER_THREADS = 128;
+    private static final int DEFAULT_WARMUP_MILLIS = 1000;
     private static final int CORPUS_SIZE = 256;
     private static final int HASH160_BYTES = OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES;
     private static final int DRAIN_AWAIT_SECONDS = 60;
+    private static final int READER_JOIN_MILLIS = 2000;
 
     /**
      * Physical LMDB sub-database name, mirroring the private
@@ -140,6 +154,9 @@ public class LmdbReaderSlotChurnStressTest {
         Assumptions.assumeTrue(
                 Boolean.getBoolean(PROP_ENABLE),
                 "opt-in LMDB reader-slot churn test; enable with -D" + PROP_ENABLE + "=true");
+        Assumptions.assumeFalse(
+                "closerace".equalsIgnoreCase(System.getProperty(PROP_SCENARIO, "churn")),
+                "scenario=closerace selects the close-during-read test instead");
         new LMDBPlatformAssume().assumeLMDBExecution();
 
         final int concurrency = Integer.getInteger(PROP_CONCURRENCY, DEFAULT_CONCURRENCY);
@@ -187,6 +204,46 @@ public class LmdbReaderSlotChurnStressTest {
         assertThat("expected the churn loop to perform reads", result.reads > 0L, is(equalTo(true)));
     }
 
+    /**
+     * The actual issue #50 crash: close the LMDB env while reader threads are mid-{@code
+     * containsAddress}. A reader inside the native {@code mdb_txn_begin} when {@code Env.close()}
+     * unmaps the mmap dereferences freed memory → {@code SIGSEGV (SEGV_MAPERR)} in {@code
+     * mdb_txn_renew0}. <b>A reproduction crashes this JVM</b>; run it under {@code
+     * LmdbCrashReproDriverTest} (scenario=closerace) for a crash rate instead of a killed fork.
+     */
+    @Test
+    public void closeDuringRead_race_reproducesUseAfterUnmap() throws Exception {
+        Assumptions.assumeTrue(
+                Boolean.getBoolean(PROP_ENABLE),
+                "opt-in LMDB close-during-read test; enable with -D" + PROP_ENABLE + "=true");
+        Assumptions.assumeTrue(
+                "closerace".equalsIgnoreCase(System.getProperty(PROP_SCENARIO, "churn")),
+                "enable with -D" + PROP_SCENARIO + "=closerace");
+        new LMDBPlatformAssume().assumeLMDBExecution();
+
+        final int readerThreads = Integer.getInteger(PROP_READER_THREADS, DEFAULT_READER_THREADS);
+        final int warmupMillis = Integer.getInteger(PROP_WARMUP_MILLIS, DEFAULT_WARMUP_MILLIS);
+
+        File lmdbDirectory = buildTestLmdb(folder, persistenceUtils);
+        byte[][] corpus = buildHash160Corpus(CORPUS_SIZE);
+        LOGGER.info("closerace readerThreads={} warmupMillis={}", readerThreads, warmupMillis);
+
+        ChurnResult result =
+                runCloseDuringReadRace(lmdbDirectory, persistenceUtils, corpus, readerThreads, warmupMillis);
+
+        // If this JVM survived, no native crash occurred this run (the race did not land). Only
+        // UNEXPECTED Java throwables (not the benign post-close AlreadyClosedException) are failures.
+        LOGGER.info(
+                "closerace survived: {} reads across {} readers, {} unexpected Java-level errors",
+                result.reads,
+                result.threadsSpawned,
+                result.errors.size());
+        assertThat(
+                "close-during-read raised unexpected Java-level throwables: " + result.errors,
+                result.errors.isEmpty(),
+                is(equalTo(true)));
+    }
+
     // ------------------------------------------------------------------------------------------
     // Child-JVM entry point (forked by LmdbCrashReproDriverTest to get a crash rate).
     // ------------------------------------------------------------------------------------------
@@ -198,7 +255,10 @@ public class LmdbReaderSlotChurnStressTest {
      * {@code mdb_txn_renew0} crash kills this JVM with a non-zero / signal exit that the parent
      * driver counts.
      *
-     * <p>Args: {@code <lmdbDir> [concurrency] [seconds] [lookupsPerThread]}.
+     * <p>Args: {@code <lmdbDir> [concurrency] [seconds] [lookupsPerThread]}. The scenario and its
+     * close-race parameters come from system properties ({@link #PROP_SCENARIO},
+     * {@link #PROP_READER_THREADS}, {@link #PROP_WARMUP_MILLIS}) so the driver can forward them
+     * as {@code -D} flags.
      *
      * @param args the child parameters
      * @throws Exception if the LMDB cannot be opened
@@ -210,19 +270,106 @@ public class LmdbReaderSlotChurnStressTest {
             return;
         }
         File lmdbDirectory = new File(args[0]);
-        int concurrency = args.length > 1 ? Integer.parseInt(args[1]) : DEFAULT_CONCURRENCY;
-        int seconds = args.length > 2 ? Integer.parseInt(args[2]) : DEFAULT_SECONDS;
-        int lookupsPerThread = args.length > 3 ? Integer.parseInt(args[3]) : DEFAULT_LOOKUPS_PER_THREAD;
-
         Network net = new NetworkParameterFactory().getNetwork();
         PersistenceUtils utils = new PersistenceUtils(net);
         byte[][] corpus = buildHash160Corpus(CORPUS_SIZE);
 
-        ChurnResult result = runProdChurn(lmdbDirectory, utils, corpus, concurrency, seconds, lookupsPerThread);
-        System.out.println("child churn done: reads=" + result.reads
-                + " threadsSpawned=" + result.threadsSpawned
-                + " javaErrors=" + result.errors.size());
+        String scenario = System.getProperty(PROP_SCENARIO, "churn");
+        ChurnResult result;
+        if ("closerace".equalsIgnoreCase(scenario)) {
+            int readerThreads = Integer.getInteger(PROP_READER_THREADS, DEFAULT_READER_THREADS);
+            int warmupMillis = Integer.getInteger(PROP_WARMUP_MILLIS, DEFAULT_WARMUP_MILLIS);
+            result = runCloseDuringReadRace(lmdbDirectory, utils, corpus, readerThreads, warmupMillis);
+            System.out.println("child closerace done: reads=" + result.reads
+                    + " readers=" + result.threadsSpawned
+                    + " unexpectedJavaErrors=" + result.errors.size());
+        } else {
+            int concurrency = args.length > 1 ? Integer.parseInt(args[1]) : DEFAULT_CONCURRENCY;
+            int seconds = args.length > 2 ? Integer.parseInt(args[2]) : DEFAULT_SECONDS;
+            int lookupsPerThread = args.length > 3 ? Integer.parseInt(args[3]) : DEFAULT_LOOKUPS_PER_THREAD;
+            result = runProdChurn(lmdbDirectory, utils, corpus, concurrency, seconds, lookupsPerThread);
+            System.out.println("child churn done: reads=" + result.reads
+                    + " threadsSpawned=" + result.threadsSpawned
+                    + " javaErrors=" + result.errors.size());
+        }
         System.exit(result.errors.isEmpty() ? 0 : 3);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Close-during-read race (the actual issue #50 crash).
+    // ------------------------------------------------------------------------------------------
+
+    /**
+     * Reproduces issue #50: start {@code readerThreads} threads hammering the real
+     * {@code containsAddress} in tight loops, let them reach steady state, then close the env
+     * <b>while reads are still in flight</b> — exactly the {@code ConsumerJava.interrupt()}
+     * path where {@code awaitTermination} times out and {@code persistence.close()} runs with
+     * live readers. A reader inside the native {@code mdb_txn_begin} when {@code Env.close()}
+     * unmaps the mmap crashes this JVM with {@code SIGSEGV (SEGV_MAPERR)} in
+     * {@code mdb_txn_renew0}. If no reader is mid-native-call at the instant of close, the JVM
+     * survives and readers see the benign {@code AlreadyClosedException} (ignored here).
+     *
+     * <p>Deliberately uses raw {@link Thread}: readers must be genuinely concurrent with the
+     * close call, and {@link LMDBPersistence#close()} performs no reader coordination — that
+     * missing coordination is the bug.
+     */
+    @SuppressWarnings("CatchAndPrintStackTrace")
+    private static ChurnResult runCloseDuringReadRace(
+            File lmdbDirectory, PersistenceUtils persistenceUtils, byte[][] corpus, int readerThreads, int warmupMillis)
+            throws InterruptedException {
+        CLMDBConfigurationReadOnly config = new CLMDBConfigurationReadOnly();
+        config.lmdbDirectory = lmdbDirectory.getAbsolutePath();
+        LMDBPersistence persistence = new LMDBPersistence(config, persistenceUtils);
+        persistence.init();
+
+        final AtomicBoolean stop = new AtomicBoolean(false);
+        final AtomicBoolean closing = new AtomicBoolean(false);
+        final AtomicLong reads = new AtomicLong();
+        final List<Throwable> errors = new CopyOnWriteArrayList<>();
+        final List<Thread> readers = new ArrayList<>(readerThreads);
+
+        for (int i = 0; i < readerThreads; i++) {
+            final long seed = i;
+            Thread reader = new Thread(
+                    () -> {
+                        final ByteBuffer key = ByteBuffer.allocateDirect(HASH160_BYTES);
+                        final Random random = new Random(seed);
+                        while (!stop.get()) {
+                            try {
+                                key.rewind();
+                                key.put(corpus[random.nextInt(corpus.length)]);
+                                key.flip();
+                                persistence.containsAddress(key);
+                                reads.incrementAndGet();
+                            } catch (Throwable t) {
+                                // After close() the env is gone: AlreadyClosedException (and friends)
+                                // are the EXPECTED Java-level outcome, not a defect. Only throwables
+                                // seen while the env is still open count as unexpected.
+                                if (!closing.get()) {
+                                    errors.add(t);
+                                }
+                                return;
+                            }
+                        }
+                    },
+                    "lmdb-reader-" + seed);
+            reader.setDaemon(true);
+            reader.start();
+            readers.add(reader);
+        }
+
+        // Let readers saturate the native mdb_txn_begin path before the race.
+        Thread.sleep(warmupMillis);
+
+        // THE RACE: close the env out from under live readers (no drain first — that is the bug).
+        closing.set(true);
+        persistence.close();
+
+        stop.set(true);
+        for (Thread reader : readers) {
+            reader.join(READER_JOIN_MILLIS);
+        }
+        return new ChurnResult(reads.get(), readerThreads, errors);
     }
 
     // ------------------------------------------------------------------------------------------

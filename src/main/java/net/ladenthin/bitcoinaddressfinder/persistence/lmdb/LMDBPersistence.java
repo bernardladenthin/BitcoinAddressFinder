@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Spliterators;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -72,6 +73,34 @@ public class LMDBPersistence implements Persistence, AddressIterable {
 
     @ToString.Exclude
     private @Nullable Dbi<ByteBuffer> lmdb_h160ToAmount;
+
+    /**
+     * Guards the native env/mmap lifecycle against the close-during-read race (issue #50). The
+     * short, bounded point-lookup reads ({@link #containsAddress} / {@link #getAmount}) take the
+     * READ lock for the whole duration of their native transaction; {@link #close()} takes the
+     * WRITE lock. Because a writer waits for every read lock to be released, {@code Env.close()}
+     * can never unmap the mmap while a reader is inside {@code mdb_txn_begin} /
+     * {@code mdb_txn_renew0} — the exact use-after-unmap that crashed a straggler
+     * {@code ConsumerJava} thread with {@code SIGSEGV (SEGV_MAPERR)} when
+     * {@code ConsumerJava.interrupt()} closed the env after {@code awaitTermination} timed out.
+     *
+     * <p>Deliberately scoped to the two point-lookup queries only. Those are the operations that
+     * run concurrently with {@code close()} on the scan path; the long full-database iterations
+     * ({@link #addresses()}, {@link #forEachAddress}, {@link #writeAllAmountsToAddressFile},
+     * {@link #count()}) execute during population/export, are never concurrent with a close from
+     * another thread, and must not hold the read lock for a whole-database scan (that would block
+     * shutdown for the entire scan). The write side (import) is single-threaded per instance.
+     */
+    @ToString.Exclude
+    private final ReentrantReadWriteLock envLifecycleLock = new ReentrantReadWriteLock();
+
+    /**
+     * Set to {@code true} under {@link #envLifecycleLock}'s write lock in {@link #close()} and
+     * read under its read lock by the point-lookup queries. A query that observes it already set
+     * returns "absent" instead of dereferencing the torn-down mmap — the benign side of the
+     * issue #50 race after the env has been closed during shutdown.
+     */
+    private volatile boolean closed = false;
 
     private final java.util.concurrent.atomic.AtomicLong increasedCounter =
             new java.util.concurrent.atomic.AtomicLong(0);
@@ -219,16 +248,35 @@ public class LMDBPersistence implements Persistence, AddressIterable {
             return;
         }
 
-        logStatsIfConfigured(false);
-        // The writable env runs with MDB_NOSYNC/MDB_NOMETASYNC/MDB_MAPASYNC: commits are NOT flushed to
-        // disk during the run (fast, but a crash may lose or corrupt data — acceptable for a rebuildable
-        // import DB). Force one full, durable flush here so a normal shutdown leaves everything on disk.
-        // Read-only envs have nothing to sync, so this only applies to the writable env.
-        if (lmdbConfigurationWrite != null) {
-            localEnv.sync(true);
+        // Take the WRITE lock so the mmap is unmapped only after every in-flight point-lookup read
+        // (each of which holds the READ lock across its whole native transaction) has finished, and
+        // so no new read can start against a half-closed env. Without this, a consumer thread still
+        // inside containsAddress -> mdb_txn_begin when Env.close() unmaps the mmap dereferences freed
+        // memory -> SIGSEGV (SEGV_MAPERR) in mdb_txn_renew0 (issue #50).
+        envLifecycleLock.writeLock().lock();
+        try {
+            if (closed) {
+                // Idempotent: a second close() (e.g. finally-block + explicit) is a no-op.
+                return;
+            }
+            // Publish "closed" before unmapping so any query that acquires the read lock after this
+            // point returns "absent" instead of touching the mmap we are about to tear down.
+            closed = true;
+
+            logStatsIfConfigured(false);
+            // The writable env runs with MDB_NOSYNC/MDB_NOMETASYNC/MDB_MAPASYNC: commits are NOT flushed
+            // to disk during the run (fast, but a crash may lose or corrupt data — acceptable for a
+            // rebuildable import DB). Force one full, durable flush here so a normal shutdown leaves
+            // everything on disk. Read-only envs have nothing to sync, so this only applies to the
+            // writable env.
+            if (lmdbConfigurationWrite != null) {
+                localEnv.sync(true);
+            }
+            localLmdb_h160ToAmount.close();
+            localEnv.close();
+        } finally {
+            envLifecycleLock.writeLock().unlock();
         }
-        localLmdb_h160ToAmount.close();
-        localEnv.close();
     }
 
     /**
@@ -251,12 +299,21 @@ public class LMDBPersistence implements Persistence, AddressIterable {
 
     @Override
     public Coin getAmount(ByteBuffer hash160) {
-        Dbi<ByteBuffer> localLmdb_h160ToAmount = Objects.requireNonNull(lmdb_h160ToAmount);
-        Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
+        // READ lock spans the whole native transaction so close() cannot unmap the mmap mid-read.
+        envLifecycleLock.readLock().lock();
+        try {
+            if (closed) {
+                return Coin.ZERO;
+            }
+            Dbi<ByteBuffer> localLmdb_h160ToAmount = Objects.requireNonNull(lmdb_h160ToAmount);
+            Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
 
-        try (Txn<ByteBuffer> txn = localEnv.txnRead()) {
-            ByteBuffer byteBuffer = localLmdb_h160ToAmount.get(txn, hash160);
-            return getCoinFromByteBuffer(byteBuffer);
+            try (Txn<ByteBuffer> txn = localEnv.txnRead()) {
+                ByteBuffer byteBuffer = localLmdb_h160ToAmount.get(txn, hash160);
+                return getCoinFromByteBuffer(byteBuffer);
+            }
+        } finally {
+            envLifecycleLock.readLock().unlock();
         }
     }
 
@@ -270,16 +327,29 @@ public class LMDBPersistence implements Persistence, AddressIterable {
     @Override
     public boolean containsAddress(ByteBuffer hash160) {
         CLMDBConfigurationReadOnly localLmdbConfigurationReadOnly = Objects.requireNonNull(lmdbConfigurationReadOnly);
-        Dbi<ByteBuffer> localLmdb_h160ToAmount = Objects.requireNonNull(lmdb_h160ToAmount);
-        Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
 
         if (localLmdbConfigurationReadOnly.disableAddressLookup) {
             return false;
         }
 
-        try (Txn<ByteBuffer> txn = localEnv.txnRead()) {
-            ByteBuffer byteBuffer = localLmdb_h160ToAmount.get(txn, hash160);
-            return byteBuffer != null;
+        // READ lock spans the whole native transaction so close() cannot unmap the mmap mid-read.
+        envLifecycleLock.readLock().lock();
+        try {
+            if (closed) {
+                // The env was closed during shutdown. Treat as "absent" rather than dereferencing the
+                // unmapped mmap — the benign side of the issue #50 close-during-read race: a straggler
+                // consumer lookup after close() no longer crashes the JVM.
+                return false;
+            }
+            Dbi<ByteBuffer> localLmdb_h160ToAmount = Objects.requireNonNull(lmdb_h160ToAmount);
+            Env<ByteBuffer> localEnv = Objects.requireNonNull(env);
+
+            try (Txn<ByteBuffer> txn = localEnv.txnRead()) {
+                ByteBuffer byteBuffer = localLmdb_h160ToAmount.get(txn, hash160);
+                return byteBuffer != null;
+            }
+        } finally {
+            envLifecycleLock.readLock().unlock();
         }
     }
 

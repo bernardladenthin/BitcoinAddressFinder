@@ -83,11 +83,19 @@ public class LmdbCrashReproDriverTest {
      * own {@code destfile} so the coverage writes never collide.
      */
     public static final String PROP_FORWARD_JACOCO = PROP_ENABLE + ".forwardJacoco";
+    /** Per-child scenario: {@code churn} (default) or {@code closerace} (the actual #50 crash). */
+    public static final String PROP_SCENARIO = PROP_ENABLE + ".scenario";
+    /** {@code closerace} only: reader threads per child (forwarded to the child). */
+    public static final String PROP_READER_THREADS = PROP_ENABLE + ".readerThreads";
+    /** {@code closerace} only: warm-up before close, in ms (forwarded to the child). */
+    public static final String PROP_WARMUP_MILLIS = PROP_ENABLE + ".warmupMillis";
 
     private static final int DEFAULT_RUNS = 30;
     private static final int DEFAULT_CONCURRENCY = 128;
     private static final int DEFAULT_SECONDS = 8;
     private static final int DEFAULT_LOOKUPS_PER_THREAD = 1;
+    private static final int DEFAULT_READER_THREADS = 128;
+    private static final int DEFAULT_WARMUP_MILLIS = 1000;
 
     /**
      * Runtime module flags the child JVM needs so lmdbjava's off-heap {@code ByteBufferProxy} can
@@ -123,6 +131,17 @@ public class LmdbCrashReproDriverTest {
         final int concurrency = Integer.getInteger(PROP_CONCURRENCY, DEFAULT_CONCURRENCY);
         final int seconds = Integer.getInteger(PROP_SECONDS, DEFAULT_SECONDS);
         final int lookupsPerThread = Integer.getInteger(PROP_LOOKUPS_PER_THREAD, DEFAULT_LOOKUPS_PER_THREAD);
+        final String scenario = System.getProperty(PROP_SCENARIO, "churn");
+        final int readerThreads = Integer.getInteger(PROP_READER_THREADS, DEFAULT_READER_THREADS);
+        final int warmupMillis = Integer.getInteger(PROP_WARMUP_MILLIS, DEFAULT_WARMUP_MILLIS);
+        LOGGER.info(
+                "driver scenario={} runs={} concurrency={} seconds={} readerThreads={} warmupMillis={}",
+                scenario,
+                runs,
+                concurrency,
+                seconds,
+                readerThreads,
+                warmupMillis);
 
         // Build the shared read-only test LMDB once; every child opens it read-only.
         File lmdbDirectory = LmdbReaderSlotChurnStressTest.buildTestLmdb(folder, persistenceUtils);
@@ -139,7 +158,15 @@ public class LmdbCrashReproDriverTest {
 
         for (int run = 0; run < runs; run++) {
             Path childLog = logDir.resolve("child-" + run + ".log");
-            RunOutcome outcome = runChild(lmdbDirectory, childLog, concurrency, seconds, lookupsPerThread);
+            RunOutcome outcome = runChild(
+                    lmdbDirectory,
+                    childLog,
+                    scenario,
+                    concurrency,
+                    seconds,
+                    lookupsPerThread,
+                    readerThreads,
+                    warmupMillis);
             switch (outcome.classification) {
                 case CLEAN -> clean++;
                 case JAVA_ERROR -> javaError++;
@@ -175,8 +202,17 @@ public class LmdbCrashReproDriverTest {
                 is(equalTo(0)));
     }
 
-    private RunOutcome runChild(File lmdbDirectory, Path childLog, int concurrency, int seconds, int lookupsPerThread)
+    private RunOutcome runChild(
+            File lmdbDirectory,
+            Path childLog,
+            String scenario,
+            int concurrency,
+            int seconds,
+            int lookupsPerThread,
+            int readerThreads,
+            int warmupMillis)
             throws IOException, InterruptedException {
+        boolean closeRace = "closerace".equalsIgnoreCase(scenario);
         List<String> command = new ArrayList<>();
         command.add(javaBinary());
         command.add("-Xmx512m");
@@ -193,6 +229,12 @@ public class LmdbCrashReproDriverTest {
                         PROP_FORWARD_JACOCO);
             }
         }
+        // Forward the scenario (and its close-race parameters) to the child via -D.
+        command.add("-D" + LmdbReaderSlotChurnStressTest.PROP_SCENARIO + "=" + scenario);
+        if (closeRace) {
+            command.add("-D" + LmdbReaderSlotChurnStressTest.PROP_READER_THREADS + "=" + readerThreads);
+            command.add("-D" + LmdbReaderSlotChurnStressTest.PROP_WARMUP_MILLIS + "=" + warmupMillis);
+        }
         command.add("-cp");
         command.add(buildChildClasspath());
         command.add(LmdbReaderSlotChurnStressTest.class.getName());
@@ -206,8 +248,10 @@ public class LmdbCrashReproDriverTest {
         pb.redirectOutput(childLog.toFile());
 
         Process process = pb.start();
-        // Generous ceiling: child churn duration + JVM start/stop + fixture open.
-        long timeoutSeconds = (long) seconds + 90L;
+        // Generous ceiling: churn runs for `seconds`; closerace is bounded by warm-up + close +
+        // reader join. Cover both plus JVM start/stop and fixture open.
+        long childWorkSeconds = closeRace ? (warmupMillis / 1000L) + 10L : seconds;
+        long timeoutSeconds = childWorkSeconds + 90L;
         if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
             process.destroyForcibly();
             process.waitFor(15, TimeUnit.SECONDS);
