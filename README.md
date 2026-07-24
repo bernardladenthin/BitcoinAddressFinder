@@ -161,7 +161,7 @@ Copyright (c) 2017-2025 Bernard Ladenthin
     * lmdb
       * data.mdb
       * lock.mdb
-    * bitcoinaddressfinder-1.7.0-jar-with-dependencies.jar
+    * bitcoinaddressfinder-1.8.0-SNAPSHOT-jar-with-dependencies.jar
     * logbackConfiguration.xml
     * config_Find_1OpenCLDevice.js
     * run_Find_1OpenCLDevice.bat  *(Windows)* / run_Find_1OpenCLDevice.sh *(Linux/macOS)*
