@@ -597,6 +597,15 @@ See [`../workspace/policies/ci-test-diagnostics.md`](../workspace/policies/ci-te
 See [`../workspace/policies/pit-mutation-testing.md`](../workspace/policies/pit-mutation-testing.md).
 Run PIT with the lifecycle prefix — `mvn test-compile org.pitest:pitest-maven:mutationCoverage`.
 
+## Fat-jar release assets
+
+The runnable fat jar (`bitcoinaddressfinder-<version>-jar-with-dependencies.jar`) is a
+**GitHub-Release asset only — never Maven Central** (a jocl-bundled single jar, so no classifier
+split), attached with a detached GPG `.asc`. The publish jobs build + sign it off-Central via a
+second `mvn -P release,assembly verify` (which stops before `deploy`, so `central-publishing` never
+uploads it). The cross-repo convention + per-repo shapes are documented in
+[`../workspace/policies/fat-jar-release-assets.md`](../workspace/policies/fat-jar-release-assets.md).
+
 ## Open TODOs
 
 Open TODOs for this repo live in [`TODO.md`](TODO.md). Cross-repo status

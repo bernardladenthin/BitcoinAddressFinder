@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
 //
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT OR Apache-2.0
 
 // Throwaway signing project used ONLY by the `verify-signing-key-gradle`
 // preflight job in .github/workflows/publish.yml. It signs a tiny throwaway Zip
