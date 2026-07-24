@@ -7,22 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- **`LMDBDelta` command** — streams every address present in one or more source LMDB databases but
-  **not** in a reference database to a plaintext file (one mainnet Base58 `1…` address per line,
-  re-importable with `AddressFilesToLMDB`). It walks the key-ordered databases as a near-zero-memory
-  k-way cursor merge (memory is just one 20-byte key per cursor, independent of the delta size), logs a
-  per-source summary of how many delta addresses each source contained, and reports periodic progress
-  with rate/ETA. See `examples/config_LMDBDelta.json` and the `run_LMDBDelta` launchers.
-
-### Changed
-- **GPU example configs default to the inlined kernel** (`producerOpenCL.noInlineHelpers: false`) for
-  full runtime throughput — measured ~3.6× faster than the out-of-lined kernel on an AMD RX 7900 XTX
-  (RDNA3) and ~4.5× on NVIDIA; the trade-off is a one-time slow first compile on AMD (then
-  `comgr`-cached). The runtime auto-default is unchanged (out-of-line on AMD to keep CI compiles fast)
-  and now logs symmetric warnings so the compile-vs-speed trade-off is never silent.
-
-## [1.7.0] - 2026-07-21
+## [1.7.0] - 2026-07-23
 
 Major release centred on high-performance probabilistic address filters (in-memory and GPU-side),
 a self-tuning benchmark mode, a rebuilt runtime statistics log, and a reworked bulk-import pipeline.
@@ -69,6 +54,12 @@ a self-tuning benchmark mode, a rebuilt runtime statistics log, and a reworked b
 - **Durable LMDB flush on close** — the writable env keeps its fast sync-free write flags
   (`MDB_NOSYNC` / `MDB_MAPASYNC`) during the import for speed and now forces one full `env.sync(true)`
   when closing, so a normal shutdown leaves the whole database on disk.
+- **`LMDBDelta` command** — streams every address present in one or more source LMDB databases but
+  **not** in a reference database to a plaintext file (one mainnet Base58 `1…` address per line,
+  re-importable with `AddressFilesToLMDB`). It walks the key-ordered databases as a near-zero-memory
+  k-way cursor merge (memory is just one 20-byte key per cursor, independent of the delta size), logs a
+  per-source summary of how many delta addresses each source contained, and reports periodic progress
+  with rate/ETA. See `examples/config_LMDBDelta.json` and the `run_LMDBDelta` launchers.
 
 ### Changed
 - **`FUSE_16` is the recommended default GPU pre-filter** (best net end-to-end throughput; fits VRAM
@@ -81,6 +72,11 @@ a self-tuning benchmark mode, a rebuilt runtime statistics log, and a reworked b
 - Dependency bumps: `bcprov-jdk15to18` 1.84 → 1.85, plus routine updates to `junit-jupiter`,
   `jackson`, `logback-classic`, `nullaway`, `pitest-maven`, `spotless`, the Checker Framework, and CI
   actions.
+- **GPU example configs default to the inlined kernel** (`producerOpenCL.noInlineHelpers: false`) for
+  full runtime throughput — measured ~3.6× faster than the out-of-lined kernel on an AMD RX 7900 XTX
+  (RDNA3) and ~4.5× on NVIDIA; the trade-off is a one-time slow first compile on AMD (then
+  `comgr`-cached). The runtime auto-default is unchanged (out-of-line on AMD to keep CI compiles fast)
+  and now logs symmetric warnings so the compile-vs-speed trade-off is never silent.
 
 ### Fixed
 - **GPU Fuse-16 upload at the Full DB tier** — the `short[]` fingerprints were flattened into a
