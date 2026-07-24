@@ -9,6 +9,7 @@ import static org.hamcrest.Matchers.is;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -75,6 +76,13 @@ public class LmdbCrashReproDriverTest {
     public static final String PROP_LOOKUPS_PER_THREAD = PROP_ENABLE + ".lookupsPerThread";
     /** Optional directory for child JVM logs; defaults to a temp subdir that is auto-cleaned. */
     public static final String PROP_LOG_DIR = PROP_ENABLE + ".logDir";
+    /**
+     * When {@code true}, forward this (parent) JVM's JaCoCo {@code -javaagent} into every child so
+     * the churn runs under offline instrumentation — issue #50 comment 1's documented aggravator.
+     * The parent surefire fork already carries the agent via {@code argLine}; each child gets its
+     * own {@code destfile} so the coverage writes never collide.
+     */
+    public static final String PROP_FORWARD_JACOCO = PROP_ENABLE + ".forwardJacoco";
 
     private static final int DEFAULT_RUNS = 30;
     private static final int DEFAULT_CONCURRENCY = 128;
@@ -172,7 +180,19 @@ public class LmdbCrashReproDriverTest {
         List<String> command = new ArrayList<>();
         command.add(javaBinary());
         command.add("-Xmx512m");
+        // Write any fatal-error report next to this child's log so it is captured as an artifact.
+        command.add("-XX:ErrorFile=" + childLog + ".hs_err_%p.log");
         command.addAll(List.of(CHILD_MODULE_FLAGS));
+        if (Boolean.getBoolean(PROP_FORWARD_JACOCO)) {
+            String jacocoAgent = jacocoAgentArgForChild(childLog);
+            if (jacocoAgent != null) {
+                command.add(jacocoAgent);
+            } else {
+                LOGGER.warn(
+                        "{}=true but this JVM has no JaCoCo -javaagent to forward; child runs uninstrumented",
+                        PROP_FORWARD_JACOCO);
+            }
+        }
         command.add("-cp");
         command.add(buildChildClasspath());
         command.add(LmdbReaderSlotChurnStressTest.class.getName());
@@ -266,6 +286,24 @@ public class LmdbCrashReproDriverTest {
         } catch (URISyntaxException | RuntimeException e) {
             LOGGER.warn("could not resolve classpath root for {}", anchor.getName(), e);
         }
+    }
+
+    /**
+     * Finds this JVM's JaCoCo {@code -javaagent} (put there by surefire's {@code argLine}) and
+     * rewrites it for a child: same agent jar, but a per-child {@code destfile} with
+     * {@code append=false} so sequential children never clobber or grow a shared exec file.
+     * Returns {@code null} if no JaCoCo agent is present on this JVM.
+     */
+    @Nullable
+    private static String jacocoAgentArgForChild(Path childLog) {
+        for (String arg : ManagementFactory.getRuntimeMXBean().getInputArguments()) {
+            if (arg.startsWith("-javaagent:") && arg.contains("jacoco")) {
+                int optionsAt = arg.indexOf('=');
+                String agentPath = optionsAt < 0 ? arg : arg.substring(0, optionsAt);
+                return agentPath + "=destfile=" + childLog + ".jacoco.exec,append=false";
+            }
+        }
+        return null;
     }
 
     private static String javaBinary() {

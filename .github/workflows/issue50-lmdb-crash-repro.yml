@@ -1,0 +1,98 @@
+# SPDX-FileCopyrightText: 2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# ---------------------------------------------------------------------------
+# Manual reproduction harness for issue #50 — the sporadic native SIGSEGV in
+# LMDB's mdb_txn_renew0 under concurrent read transactions.
+#
+# This is a DIAGNOSTIC workflow, not part of the build pipeline: it runs only on
+# manual dispatch. It drives LmdbCrashReproDriverTest, which forks child JVMs
+# that hammer the read-only LMDB path with short-lived (reader-slot-churning)
+# threads and reports a "k crashes / N runs" rate. The Linux runner is the point:
+# the crash is a pthread-TLS reader-slot race that does not reproduce on Windows.
+# JaCoCo instrumentation (issue #50 comment 1's documented aggravator) is
+# forwarded into every child by default.
+#
+# The job NEVER fails on a reproduced crash — that is the goal. It goes red only
+# if the harness itself misbehaves. Inspect the "issue #50 repro rate: k/N ..."
+# line in the log and download the child-logs artifact (child .log, per-child
+# hs_err_*.log, and .jacoco.exec) to confirm the mdb_txn_renew0 stack.
+#
+# IMPORTANT sizing note: the driver test runs inside a single Surefire fork whose
+# whole-fork timeout is 240s (pom.xml forkedProcessTimeoutInSeconds, per class
+# with reuseForks=false). Keep runs_per_shard * (seconds + ~5s JVM start) well
+# under ~200s or the fork is killed ("timeout in the fork"). Multiply total
+# attempts through the parallel `shard` matrix, not by inflating one shard.
+# ---------------------------------------------------------------------------
+
+name: Issue #50 LMDB crash repro (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs_per_shard:
+        description: 'Forked child JVMs per shard (keep runs*(seconds+5) < ~200s per shard)'
+        type: string
+        default: '8'
+      concurrency:
+        description: 'Live short-lived reader threads per child'
+        type: string
+        default: '256'
+      seconds:
+        description: 'Churn duration per child (seconds)'
+        type: string
+        default: '15'
+      forward_jacoco:
+        description: 'Run children under the JaCoCo agent (issue #50 aggravator)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  JAVA_VERSION: '21'
+
+jobs:
+  repro:
+    name: Repro shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Six parallel shards multiply total attempts (6 * runs_per_shard) while
+        # each shard's single Surefire fork stays under the 240s fork timeout.
+        shard: [1, 2, 3, 4, 5, 6]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+      - name: Reproduce (LMDB enabled — do NOT disable LMDB here)
+        shell: bash
+        # No -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true: the whole
+        # point is to exercise the LMDB read path. The normal `mvn test` argLine
+        # puts the JaCoCo agent on the Surefire fork, which forwardJacoco forwards
+        # into each child.
+        run: |
+          mvn -e --batch-mode --no-transfer-progress test \
+            -Dtest=LmdbCrashReproDriverTest \
+            -Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver=true \
+            -Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver.runs=${{ inputs.runs_per_shard }} \
+            -Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver.concurrency=${{ inputs.concurrency }} \
+            -Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver.seconds=${{ inputs.seconds }} \
+            -Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver.lookupsPerThread=1 \
+            -Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver.forwardJacoco=${{ inputs.forward_jacoco }} \
+            -Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver.logDir="${GITHUB_WORKSPACE}/child-logs"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: issue50-child-logs-shard-${{ matrix.shard }}
+          path: |
+            child-logs/**
+            hs_err_pid*.log
+            target/surefire-reports/**
+          if-no-files-found: ignore
