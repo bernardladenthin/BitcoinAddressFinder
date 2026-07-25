@@ -1734,7 +1734,7 @@ are fully configurable (see [Customizing Log Output](#customizing-log-output)).
 A statistics line looks like this:
 
 ```
-Statistics: [uptime 43 min] [Generated 128 M/s (333258 M total)] [-> LMDB 2 M/s (5196 M lookups total), 99.22% pre-filtered] [rate window 60s] [Batches per producer: exampleKeyProducerSecureRandomId (Random, GPU)=79455] [Producers running: 1] [Consumers running: 8] [Consumer ready for work (queue empty): 167939] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
+Statistics: [uptime 43 min] [Generated 128 M/s (333258 M total)] [-> LMDB 2 M/s (5196 M lookups total), 99.22% pre-filtered] [rate window 60s] [Keys per producer: exampleKeyProducerSecureRandomId (Random, GPU)=333 G (100.0%)] [Producers running: 1] [Consumers running: 8] [Consumer ready for work (queue empty): 167939] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
 ```
 
 | Field | Meaning |
@@ -1743,7 +1743,7 @@ Statistics: [uptime 43 min] [Generated 128 M/s (333258 M total)] [-> LMDB 2 M/s 
 | `Generated <rate> (<N> M total)` | **The headline performance number: the rate of candidate private keys the producers fully compute** (windowed rate + lifetime total in millions). On a GPU run this is the real key-generation output. It counts **keys (EC points)**, not addresses — see *Keys vs. addresses* below. Auto-scales across `/s`, `k/s`, `M/s`, `G/s`. |
 | `-> LMDB <rate> (<N> M lookups total), NN.NN% pre-filtered` | The rate of hash160 **address** lookups that survive the GPU pre-filter and actually reach the consumer/LMDB (windowed rate + lifetime total). `pre-filtered` is the share of the potential address lookups the filter eliminated before LMDB (see below); it is omitted when no pre-filter is active (full transfer). |
 | `rate window Ns` | The trailing window (`statisticsRateWindowSeconds`) the two rates are averaged over. |
-| `Batches per producer: <label>=N, …` | Dispatched-batch count per running producer, keyed by `<keyProducerId> (<Strategy>, <CPU\|GPU>)` so concurrently running producers are told apart. The **strategy** (`Random`, `Bip39`, `Incremental`, `Socket`, `WebSocket`, `Zmq`) is derived from the key producer; the **backend** (`CPU` for `producerJava`/`producerJavaSecretsFiles`, `GPU` for `producerOpenCL`) from the producer. `none` until the first batch. |
+| `Keys per producer: <label>=N (NN.N%), …` | Candidates generated per running producer plus its **share of the total**, keyed by `<keyProducerId> (<Strategy>, <CPU\|GPU>)` so concurrently running producers are told apart. The **strategy** (`Random`, `Bip39`, `Incremental`, `Socket`, `WebSocket`, `Zmq`) is derived from the key producer; the **backend** (`CPU` for `producerJava`/`producerJavaSecretsFiles`, `GPU` for `producerOpenCL`) from the producer. `none` until the first batch. **This is the field to read when running more than one device** — see *Comparing producers* below. |
 | `Producers running: N` | Number of producers currently in the `RUNNING` state. |
 | `Consumers running: N` | Number of consumer worker threads currently running (≤ `consumerJava.threads`). |
 | `Consumer ready for work (queue empty): N` | **Runtime health counter — rising is normal/healthy.** Consume cycles that found the queue empty and waited. An empty queue is the *desired* state: it means the CPU drains everything the producers generate and has headroom. See below. |
@@ -1751,6 +1751,26 @@ Statistics: [uptime 43 min] [Generated 128 M/s (333258 M total)] [-> LMDB 2 M/s 
 | `Average contains time: N ms` | Mean time spent per address-presence lookup. Large values point at a slow lookup backend (see [Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend)). |
 | `keys queue size: N` | Instantaneous depth of the producer→consumer queue (bounded by `consumerJava.queueSize`). |
 | `Hits: N` | Number of address matches found so far (see [Hit Logging](#hit-logging)). |
+
+#### Comparing producers on a multi-device run
+
+With more than one `producerOpenCL` entry, `Keys per producer` is what tells you whether the second
+device is actually pulling its weight. It counts **candidates**, not dispatched batches, because a
+batch is not a fixed amount of work: one batch yields `2^batchSizeInBits` candidates, so producers
+configured at different batch sizes are not comparable by batch count.
+
+A real example — an RTX 500 at `batchSizeInBits: 24` alongside an integrated Arc at
+`batchSizeInBits: 21`, both after three minutes:
+
+| | batches dispatched | candidates generated |
+|---|---|---|
+| `gpu0 (Incremental, GPU)` | 1156 | 19 G — **94.0 %** |
+| `gpu1 (Random, GPU)` | 595 | 1 G — **6.0 %** |
+
+The batch counts read as a roughly 2:1 split; the actual work split is 20:1. If one device's share
+is far below what you expect, tune it separately with
+[`TuneConfiguration`](#tune-the-configuration-for-your-own-machine) — the optimal
+`batchSizeInBits` / `keysPerWorkItem` is device-specific.
 
 #### Keys versus addresses
 

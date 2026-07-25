@@ -594,7 +594,7 @@ public class ConsumerJava implements Consumer {
                                     generatedRate,
                                     rateWindowSeconds,
                                     checkedKeysSumOfTimeToCheckContains.get(),
-                                    runtimeStatistics.batchesByProducerSnapshot(),
+                                    runtimeStatistics.generatedKeysByProducerSnapshot(),
                                     runtimeStatistics.getRunningProducers(),
                                     runningConsumerCount(),
                                     consumerReadyCount.get(),

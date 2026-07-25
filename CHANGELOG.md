@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Statistics line reports candidates per producer instead of dispatched batches** — the
+  `Batches per producer` group is replaced by `Keys per producer`, which prints each producer's
+  generated-candidate count and its **share of the total**
+  (`gpu0 (Incremental, GPU)=19 G (94.0%), gpu1 (Random, GPU)=1 G (6.0%)`). Batch counts are not
+  comparable between producers: one batch yields `2^batchSizeInBits` candidates, so on a multi-GPU
+  run with different batch sizes the old field read as a near-even split where the real work split
+  was an order of magnitude apart. `RuntimeStatistics` still tracks batch counts (used by
+  `TuneConfiguration`); only the rendered field changed.
+
 ## [1.7.0] - 2026-07-23
 
 Major release centred on high-performance probabilistic address filters (in-memory and GPU-side),
