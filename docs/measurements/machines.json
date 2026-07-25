@@ -7,7 +7,9 @@
         "l3_mb": 16,
         "model": "AMD Ryzen 7 5800H with Radeon Graphics"
       },
-      "gpu": "NVIDIA GeForce RTX 3070 Laptop GPU",
+      "gpu": [
+        "NVIDIA GeForce RTX 3070 Laptop GPU"
+      ],
       "jdk": "21.0.9",
       "notes": "Reference machine for the 2026-07 filter measurements",
       "os": {
@@ -26,7 +28,10 @@
         "l3_mb": 96,
         "model": "AMD Ryzen 7 9800X3D 8-Core Processor"
       },
-      "gpu": "AMD Radeon(TM) Graphics, AMD Radeon RX 7900 XTX",
+      "gpu": [
+        "AMD Radeon(TM) Graphics",
+        "AMD Radeon RX 7900 XTX"
+      ],
       "jdk": "21.0.7",
       "notes": "",
       "os": {

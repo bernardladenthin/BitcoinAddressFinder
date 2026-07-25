@@ -369,8 +369,18 @@ python docs/measurements/register_machine.py --id my-laptop   # choose the id yo
 python docs/measurements/register_machine.py --set cpu.l3_mb=32   # fill in a field it missed
 ```
 
-Anything it cannot detect is left `null`. **Check `cpu.l3_mb` in particular** — the filter-selection
-plots annotate the L3 boundary from it, and detection fails on some platforms.
+Anything it cannot detect is left `null`. Two fields are worth checking by eye:
+
+- **`cpu.l3_mb`** — the filter-selection plots annotate the L3 boundary from it, and detection fails
+  on some platforms.
+- **`gpu`** — a list, because a laptop with a discrete card also has an integrated one and this tool
+  runs on both. Compare it against what `OpenCLInfo` reported in [step 1](#3-step-1--find-your-devices):
+  the script reads the *operating system's* device list, which need not agree. Correct it with a
+  comma-separated value if a device is missing:
+
+  ```bash
+  python docs/measurements/register_machine.py --set gpu="RTX 500 Ada,Arc Pro Graphics"
+  ```
 
 ### 9.2 Send the numbers
 

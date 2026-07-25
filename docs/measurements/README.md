@@ -56,6 +56,18 @@ measurements are keyed by machine rather than averaged.
    detect stays `null` and can be filled in with `--set`, including nested fields
    (`--set cpu.l3_mb=32`).
 
+   **`gpu` is a list.** Machines with a discrete card *and* an integrated one are the normal case
+   here, and this project runs on both, so every GPU is recorded rather than only the one the first
+   detector happened to name. `--set` takes a comma-separated value for it:
+
+   ```bash
+   python docs/measurements/register_machine.py --set gpu="RTX 500 Ada,Arc Pro Graphics"
+   ```
+
+   Detection reports what the *operating system* enumerates, which need not match what an OpenCL
+   runtime exposes. For which devices this tool can actually drive, `OpenCLInfo` is authoritative —
+   check it against the list and correct with `--set` if they disagree.
+
    **Check `l3_mb`.** If detection failed there, set it manually: the lookup-latency plot annotates
    the L3 boundary from this value, and the whole crossover story is expressed in terms of it.
 

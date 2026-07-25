@@ -17,7 +17,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the reason and the remedy, instead of a bare `0.00 candidates/s` that reads like a driver
   rejection. Happens at large `batchSizeInBits` with tiny `keysPerWorkItem`.
 
+### Changed
+- **`machines.json` records `gpu` as a list** — multi-GPU machines are the normal case (any laptop
+  with a discrete card also has an integrated one, and this project runs on both), so the field
+  holds every device instead of a comma-joined string that readers had to split. Existing entries
+  migrated; `register_machine.py --set gpu="A,B"` accepts a comma-separated value. `plot.py` reads
+  only `cpu.l3_mb` from the registry and is unaffected.
+
 ### Fixed
+- **`register_machine.py` no longer hides every non-NVIDIA GPU** — `detect_gpu()` returned as soon
+  as `nvidia-smi` named anything, which made the platform-wide enumeration unreachable on exactly
+  the machines that need it: a laptop with an NVIDIA card *and* an integrated GPU recorded only the
+  NVIDIA. All sources are now consulted and merged, with duplicates dropped. Detection reports what
+  the OS enumerates, which need not match the OpenCL device list — `OpenCLInfo` stays authoritative
+  for which devices this tool can drive.
 - **Rate and count formatting no longer collapses precision at a unit boundary** — `formatRate` and
   `formatCount` rounded the scaled value to a whole number, so everything from 1.000 to 1.499 G/s
   printed as `1 G/s` and tuned runs became impossible to compare once they crossed 1 G/s (reported

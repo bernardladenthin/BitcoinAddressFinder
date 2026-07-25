@@ -14,7 +14,7 @@ Run this once per machine before benchmarking::
     python docs/measurements/register_machine.py                 # detect and write
     python docs/measurements/register_machine.py --dry-run       # show what would be written
     python docs/measurements/register_machine.py --id my-box     # override the generated id
-    python docs/measurements/register_machine.py --set gpu="RTX 4090" --set storage="WD SN850X"
+    python docs/measurements/register_machine.py --set gpu="RTX 4090,Arc Pro" --set storage="WD SN850X"
 
 Re-running is idempotent: the same machine updates its own entry rather than creating a duplicate.
 Fields that cannot be detected are left as ``null`` and can be filled with ``--set``.
@@ -38,6 +38,10 @@ from datetime import date, timezone, datetime
 
 HERE = pathlib.Path(__file__).resolve().parent
 REGISTRY = HERE / "machines.json"
+
+#: Entry fields stored as a JSON list. ``--set`` splits their value on commas instead of storing
+#: the raw string, so one flag can supply every value.
+LIST_FIELDS = frozenset({"gpu"})
 
 
 def _run(cmd: list[str]) -> str:
@@ -123,23 +127,52 @@ def detect_ram_gb() -> float | None:
     return None
 
 
-def detect_gpu() -> str | None:
-    system = platform.system()
+def detect_gpu() -> list[str]:
+    """Return every GPU in this machine as a list, empty if none could be detected.
+
+    **A list, not a joined string.** Multi-GPU machines are the norm rather than the exception here
+    — any laptop with a discrete card also has an integrated one, and this project runs on both —
+    so the field that names them has to hold more than one value without the reader having to split
+    a string on commas and hope no device name contains one.
+
+    **All sources are consulted and merged.** An earlier version returned as soon as ``nvidia-smi``
+    named anything, which made the platform-wide enumeration below unreachable on exactly the
+    machines that need it most: a laptop with an NVIDIA card *and* an integrated GPU reported only
+    the NVIDIA, silently dropping a device that BitcoinAddressFinder can and does run on. That is
+    not a cosmetic loss — measurements are keyed by machine, and a machine whose second GPU is not
+    recorded cannot have that GPU's rows interpreted later.
+
+    ``nvidia-smi`` is still queried first because it gives the marketing name a reader recognises;
+    the platform enumeration then contributes whatever it did not cover. Duplicates are dropped,
+    including the common case where one source's name is contained in the other's.
+
+    Note that this reports what the *operating system* enumerates, which is not guaranteed to match
+    what an OpenCL runtime exposes. For deciding which devices this tool can actually drive, the
+    ``OpenCLInfo`` command is authoritative.
+
+    :return: the detected GPU names, in the order nvidia-smi then platform enumeration
+    """
+    names: list[str] = []
+
     nvidia = _run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"])
-    names = [line.strip() for line in nvidia.splitlines() if line.strip() and "not found" not in line.lower()]
-    if names:
-        return ", ".join(dict.fromkeys(names))
+    names.extend(line.strip() for line in nvidia.splitlines() if line.strip() and "not found" not in line.lower())
+
+    system = platform.system()
     if system == "Windows":
         raw = _powershell(
             "(Get-CimInstance Win32_VideoController | Where-Object { $_.Name -notmatch 'Basic|Remote' }"
             " | Select-Object -ExpandProperty Name) -join ', '"
         )
-        return raw.strip() or None
-    if system == "Linux":
+        names.extend(part.strip() for part in raw.split(",") if part.strip())
+    elif system == "Linux":
         lspci = _run(["lspci"])
-        gpus = [ln.split(":", 2)[-1].strip() for ln in lspci.splitlines() if re.search(r"VGA|3D controller", ln)]
-        return ", ".join(gpus) or None
-    return None
+        names.extend(ln.split(":", 2)[-1].strip() for ln in lspci.splitlines() if re.search(r"VGA|3D controller", ln))
+
+    unique: list[str] = []
+    for name in names:
+        if not any(name == kept or name in kept for kept in unique):
+            unique.append(name)
+    return unique
 
 
 def detect_os() -> dict:
@@ -198,7 +231,8 @@ def main() -> int:
         action="append",
         default=[],
         metavar="KEY=VALUE",
-        help="override a detected field, e.g. --set storage='Samsung 990 PRO' or --set cpu.l3_mb=32",
+        help="override a detected field, e.g. --set storage='Samsung 990 PRO' or --set cpu.l3_mb=32."
+        " List fields (gpu) take a comma-separated value: --set gpu='RTX 500 Ada,Arc Pro Graphics'",
     )
     parser.add_argument("--dry-run", action="store_true", help="print the entry without writing")
     args = parser.parse_args()
@@ -227,7 +261,12 @@ def main() -> int:
         if not isinstance(holder, dict):
             print(f"ignoring --set {key}: {target!r} is not a section", file=sys.stderr)
             continue
-        holder[leaf] = int(value) if value.isdigit() else value
+        if key in LIST_FIELDS:
+            # A list field takes a comma-separated value, so a machine with two GPUs can be
+            # corrected in one flag: --set gpu="RTX 500 Ada,Arc Pro Graphics"
+            holder[leaf] = [part.strip() for part in value.split(",") if part.strip()]
+        else:
+            holder[leaf] = int(value) if value.isdigit() else value
 
     machine_id = args.id or make_machine_id(cpu, ram_gb, os_info)
 
@@ -240,9 +279,11 @@ def main() -> int:
     if existing:
         entry["registered"] = existing.get("registered", entry["registered"])
         entry["notes"] = args.notes or existing.get("notes", "")
-        # Keep manually supplied values that detection cannot recover.
+        # Keep manually supplied values that detection cannot recover. An empty list counts as
+        # "nothing detected" here, so a hand-curated gpu list survives a re-run on a machine where
+        # detection comes up empty — the same way a hand-set storage string does.
         for field in ("storage", "gpu"):
-            if entry.get(field) is None:
+            if not entry.get(field):
                 entry[field] = existing.get(field)
     entry["updated"] = datetime.now(timezone.utc).date().isoformat()
 
