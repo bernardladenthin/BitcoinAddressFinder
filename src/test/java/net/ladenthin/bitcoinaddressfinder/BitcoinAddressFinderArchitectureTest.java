@@ -283,9 +283,22 @@ public class BitcoinAddressFinderArchitectureTest {
             .mayOnlyBeAccessedByLayers("Command", "Persistence", "Producer")
             .whereLayer("Model")
             .mayOnlyBeAccessedByLayers("Command", "Consumer", "Io", "Opencl", "Producer")
+            // "Cli" is on this list because Main logs the transformed configuration through
+            // util.MultilineLogger. Cli is the topmost layer, so a dependency on a Foundation
+            // package is downward and introduces no cycle; its earlier absence was incidental
+            // (Main had simply never needed a util helper) rather than a deliberate restriction.
             .whereLayer("Util")
             .mayOnlyBeAccessedByLayers(
-                    "Command", "Consumer", "Engine", "Io", "Keyproducer", "Model", "Opencl", "Persistence", "Producer")
+                    "Cli",
+                    "Command",
+                    "Consumer",
+                    "Engine",
+                    "Io",
+                    "Keyproducer",
+                    "Model",
+                    "Opencl",
+                    "Persistence",
+                    "Producer")
             .whereLayer("Core")
             .mayOnlyBeAccessedByLayers("Cli", "Command", "Consumer", "Engine", "Io", "Keyproducer", "Producer")
             .whereLayer("Statistics")

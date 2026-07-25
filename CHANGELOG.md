@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Step-by-step tuning guide** — [`docs/tuning-your-gpu.md`](docs/tuning-your-gpu.md) walks through
+  finding device indices, writing a tuning config, capturing the log, reading the report, tuning a
+  second GPU and contributing the numbers back, with every command explained. Linked from the
+  README's `TuneConfiguration` section.
+- **`TuneConfiguration` distinguishes "too slow to measure" from a failure** — an arm that ran
+  without error but completed no batch inside its measurement window now reports `NOT MEASURED:` with
+  the reason and the remedy, instead of a bare `0.00 candidates/s` that reads like a driver
+  rejection. Happens at large `batchSizeInBits` with tiny `keysPerWorkItem`.
+
+### Fixed
+- **Rate and count formatting no longer collapses precision at a unit boundary** — `formatRate` and
+  `formatCount` rounded the scaled value to a whole number, so everything from 1.000 to 1.499 G/s
+  printed as `1 G/s` and tuned runs became impossible to compare once they crossed 1 G/s (reported
+  in #250). The same collapse happened at the `k/s` and `M/s` boundaries. Both now keep four
+  significant digits: `1.400 G/s`, `130.0 M/s`, `2.013 k/s`, `412/s`.
+- **Multi-line reports are readable again** — the `TuneConfiguration` report, the OpenCL device dump
+  and the transformed-configuration echo were folded onto a single line separated by ` | ` by the
+  log pattern's CRLF guard, forcing users to reformat them by hand to read them (reported in #250).
+  They are now emitted one log record per line via `util.MultilineLogger`. The guard is unchanged
+  and undiminished: every emitted line still carries a prefix the appender wrote, and the split
+  consumes every line-break form so no line can carry another past it.
+
 ### Changed
 - **Statistics line reports candidates per producer instead of dispatched batches** — the
   `Batches per producer` group is replaced by `Keys per producer`, which prints each producer's

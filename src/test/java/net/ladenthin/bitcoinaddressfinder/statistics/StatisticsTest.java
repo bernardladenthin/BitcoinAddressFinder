@@ -7,6 +7,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 
 import java.util.Map;
 import java.util.TreeMap;
@@ -51,10 +52,10 @@ public class StatisticsTest {
         // assert
         assertThat(
                 result,
-                is(equalTo("Statistics: [uptime 3 min] [Generated 130 M/s (3900 M total)]"
-                        + " [-> LMDB 2 M/s (53 M lookups total), 99.23% pre-filtered] [rate window 60s]"
-                        + " [Keys per producer: exampleOpenCL (Random, GPU)=3 G (76.9%),"
-                        + " exampleRandom (Random, CPU)=900 M (23.1%)]"
+                is(equalTo("Statistics: [uptime 3 min] [Generated 130.0 M/s (3900 M total)]"
+                        + " [-> LMDB 2.000 M/s (53 M lookups total), 99.23% pre-filtered] [rate window 60s]"
+                        + " [Keys per producer: exampleOpenCL (Random, GPU)=3.000 G (76.9%),"
+                        + " exampleRandom (Random, CPU)=900.0 M (23.1%)]"
                         + " [Producers running: 2] [Consumers running: 4]"
                         + " [Consumer ready for work (queue empty): 4567]"
                         + " [Producer blocked (queue full): 1234] [Average contains time: 3 ms]"
@@ -91,8 +92,8 @@ public class StatisticsTest {
         // assert
         assertThat(
                 result,
-                is(equalTo("Statistics: [uptime 3 min] [Generated 100 M/s (200 M total)]"
-                        + " [-> LMDB 200 M/s (400 M lookups total)] [rate window 60s]"
+                is(equalTo("Statistics: [uptime 3 min] [Generated 100.0 M/s (200 M total)]"
+                        + " [-> LMDB 200.0 M/s (400 M lookups total)] [rate window 60s]"
                         + " [Keys per producer: none] [Producers running: 0] [Consumers running: 0]"
                         + " [Consumer ready for work (queue empty): 0] [Producer blocked (queue full): 0]"
                         + " [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
@@ -103,15 +104,41 @@ public class StatisticsTest {
     @Test
     public void formatRate_autoScalesAcrossTheWholeRange() {
         assertThat(Statistics.formatRate(412.0), is(equalTo("412/s")));
-        assertThat(Statistics.formatRate(2_013_000.0), is(equalTo("2 M/s")));
-        assertThat(Statistics.formatRate(130_000_000.0), is(equalTo("130 M/s")));
-        assertThat(Statistics.formatRate(1_500_000_000.0), is(equalTo("2 G/s")));
-        assertThat(Statistics.formatRate(3_000.0), is(equalTo("3 k/s")));
+        assertThat(Statistics.formatRate(2_013_000.0), is(equalTo("2.013 M/s")));
+        assertThat(Statistics.formatRate(130_000_000.0), is(equalTo("130.0 M/s")));
+        assertThat(Statistics.formatRate(1_500_000_000.0), is(equalTo("1.500 G/s")));
+        assertThat(Statistics.formatRate(3_000.0), is(equalTo("3.000 k/s")));
         // Exact scale boundaries: pin the >= comparisons in formatRate (a > mutant would drop each
-        // value into the next-smaller unit, e.g. 1_000_000_000 -> "1000 M/s" instead of "1 G/s").
-        assertThat(Statistics.formatRate(1_000_000_000.0), is(equalTo("1 G/s")));
-        assertThat(Statistics.formatRate(1_000_000.0), is(equalTo("1 M/s")));
-        assertThat(Statistics.formatRate(1_000.0), is(equalTo("1 k/s")));
+        // value into the next-smaller unit, e.g. 1_000_000_000 -> "1000.0 M/s" instead of "1.000 G/s").
+        assertThat(Statistics.formatRate(1_000_000_000.0), is(equalTo("1.000 G/s")));
+        assertThat(Statistics.formatRate(1_000_000.0), is(equalTo("1.000 M/s")));
+        assertThat(Statistics.formatRate(1_000.0), is(equalTo("1.000 k/s")));
+    }
+
+    /**
+     * The regression this scale exists to prevent: rounding the scaled value to a whole number made
+     * every rate in the first half of a decade collapse into one bucket, so a GPU at 1.0 G/s and one
+     * at 1.4 G/s both printed {@code "1 G/s"} — reported from the field as making tuned runs
+     * impossible to compare once they crossed 1 G/s. Distinct rates must stay distinguishable, and
+     * that has to hold at every unit boundary, not only at G/s.
+     */
+    @Test
+    public void formatRate_ratesWithinTheSameDecade_stayDistinguishable() {
+        assertThat(Statistics.formatRate(1_000_000_000.0), is(not(equalTo(Statistics.formatRate(1_400_000_000.0)))));
+        assertThat(Statistics.formatRate(1_000_000.0), is(not(equalTo(Statistics.formatRate(1_400_000.0)))));
+        assertThat(Statistics.formatRate(1_000.0), is(not(equalTo(Statistics.formatRate(1_400.0)))));
+        // and the specific pair from the report
+        assertThat(Statistics.formatRate(1_400_000_000.0), is(equalTo("1.400 G/s")));
+    }
+
+    /**
+     * A value within rounding distance of the next unit is rendered in the unit its magnitude
+     * selected rather than being promoted. Pinned because it looks like a bug on first sight and a
+     * future reader should find the decision recorded rather than "fix" it.
+     */
+    @Test
+    public void formatRate_justBelowTheNextUnit_rendersAsAThousandOfTheSmallerUnit() {
+        assertThat(Statistics.formatRate(999_999_999.0), is(equalTo("1000.0 M/s")));
     }
     // </editor-fold>
 
@@ -130,7 +157,7 @@ public class StatisticsTest {
 
         String result = Statistics.describeProducerShares(generatedKeysByProducer);
 
-        assertThat(result, is(equalTo("gpu0 (Incremental, GPU)=19 G (94.0%), gpu1 (Random, GPU)=1 G (6.0%)")));
+        assertThat(result, is(equalTo("gpu0 (Incremental, GPU)=19.39 G (94.0%), gpu1 (Random, GPU)=1.248 G (6.0%)")));
     }
 
     @Test
@@ -159,7 +186,7 @@ public class StatisticsTest {
 
         String result = Statistics.describeProducerShares(generatedKeysByProducer);
 
-        assertThat(result, is(equalTo("gpu0 (Random, GPU)=333 G (100.0%)")));
+        assertThat(result, is(equalTo("gpu0 (Random, GPU)=333.3 G (100.0%)")));
     }
     // </editor-fold>
 
@@ -167,14 +194,14 @@ public class StatisticsTest {
     @Test
     public void formatCount_autoScalesAcrossTheWholeRange() {
         assertThat(Statistics.formatCount(412L), is(equalTo("412")));
-        assertThat(Statistics.formatCount(3_000L), is(equalTo("3 k")));
-        assertThat(Statistics.formatCount(130_000_000L), is(equalTo("130 M")));
-        assertThat(Statistics.formatCount(19_398_263_296L), is(equalTo("19 G")));
+        assertThat(Statistics.formatCount(3_000L), is(equalTo("3.000 k")));
+        assertThat(Statistics.formatCount(130_000_000L), is(equalTo("130.0 M")));
+        assertThat(Statistics.formatCount(19_398_263_296L), is(equalTo("19.40 G")));
         // Exact scale boundaries: pin the >= comparisons (a > mutant would drop each value into the
         // next-smaller unit, e.g. 1_000_000_000 -> "1000 M" instead of "1 G").
-        assertThat(Statistics.formatCount(1_000_000_000L), is(equalTo("1 G")));
-        assertThat(Statistics.formatCount(1_000_000L), is(equalTo("1 M")));
-        assertThat(Statistics.formatCount(1_000L), is(equalTo("1 k")));
+        assertThat(Statistics.formatCount(1_000_000_000L), is(equalTo("1.000 G")));
+        assertThat(Statistics.formatCount(1_000_000L), is(equalTo("1.000 M")));
+        assertThat(Statistics.formatCount(1_000L), is(equalTo("1.000 k")));
         assertThat(Statistics.formatCount(0L), is(equalTo("0")));
     }
     // </editor-fold>

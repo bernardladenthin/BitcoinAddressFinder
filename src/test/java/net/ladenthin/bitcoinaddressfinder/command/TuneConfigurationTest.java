@@ -243,6 +243,41 @@ public class TuneConfigurationTest extends LMDBBase {
      * <p>{@code warmupSecondsPerArm = 0} on purpose: warmup exists to absorb kernel compilation and
      * GPU clock ramp, neither of which a CPU producer has, so here it would only spend fork time.
      */
+    // <editor-fold desc="ArmResult classification">
+    /**
+     * An arm that produced no throughput without failing must be classified as "too slow to
+     * measure", not lumped in with driver rejections. Field reports showed a bare {@code 0.00} row
+     * being read as a hardware failure when in fact one launch simply outlasted the measurement
+     * window (an integrated GPU at {@code batchSizeInBits=22, keysPerWorkItem=1} needs ~40 s against
+     * a 20 s window). The two call for different responses, so they must not render alike.
+     */
+    @Test
+    public void tooSlowToMeasure_zeroThroughputWithoutFailure_isDistinguishedFromAFailure() {
+        TuneConfiguration.ArmResult tooSlow = new TuneConfiguration.ArmResult(22, 1, 0.0d, 0.0d, 20.0d, null);
+
+        assertThat(tooSlow.tooSlowToMeasure(), is(true));
+        assertThat(tooSlow.succeeded(), is(false));
+    }
+
+    @Test
+    public void tooSlowToMeasure_driverRejectedArm_isNotClassifiedAsTooSlow() {
+        TuneConfiguration.ArmResult failed =
+                new TuneConfiguration.ArmResult(24, 1, 0.0d, 0.0d, 0.0d, "CL_OUT_OF_RESOURCES");
+
+        assertThat(failed.tooSlowToMeasure(), is(false));
+        assertThat(failed.succeeded(), is(false));
+    }
+
+    @Test
+    public void tooSlowToMeasure_armThatProducedThroughput_isNotClassifiedAsTooSlow() {
+        TuneConfiguration.ArmResult measured =
+                new TuneConfiguration.ArmResult(20, 256, 17_877_410.33d, 278_229.79d, 20.0d, null);
+
+        assertThat(measured.tooSlowToMeasure(), is(false));
+        assertThat(measured.succeeded(), is(true));
+    }
+    // </editor-fold>
+
     private CTuneConfiguration cpuTuneConfiguration() {
         CKeyProducerJavaRandom cKeyProducerJavaRandom = new CKeyProducerJavaRandom();
         cKeyProducerJavaRandom.keyProducerId = "tuneKeyProducer";

@@ -54,6 +54,7 @@ import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.util.MultilineLogger;
 import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.Nullable;
@@ -225,6 +226,24 @@ public class TuneConfiguration implements Runnable, Interruptable {
         public boolean succeeded() {
             return failure == null && candidatesPerSecond > 0.0d;
         }
+
+        /**
+         * Returns whether this arm ran without error but never completed a batch inside its
+         * measurement window.
+         *
+         * <p>Distinct from a {@link #failure()}: nothing was rejected, the grid is simply so large
+         * relative to this device's speed that one launch outlasts {@code secondsPerArm}. Seen at
+         * large {@code batchSizeInBits} combined with tiny {@code keysPerWorkItem} — on an
+         * integrated GPU, {@code batchSizeInBits=22, keysPerWorkItem=1} is ~4.2 M candidates at
+         * ~105 k/s, about 40 s against a 20 s window. Reported separately because a bare
+         * {@code 0.00} is indistinguishable from a driver rejection at a glance, and the two call
+         * for different responses.
+         *
+         * @return {@code true} if the arm produced no throughput yet did not fail
+         */
+        public boolean tooSlowToMeasure() {
+            return failure == null && candidatesPerSecond <= 0.0d;
+        }
     }
 
     /**
@@ -318,7 +337,9 @@ public class TuneConfiguration implements Runnable, Interruptable {
             recommendedFilterType = resolveFilterType(
                     template, finder, consumer, runtimeStatistics, producerExecutor, keyUtility, bitHelper);
             recommendedConfigurationJson = buildRecommendedConfigurationJson(cFinder, template);
-            LOGGER.info(buildReport(template));
+            // One record per line: the report is a formatted table, and the log pattern's CRLF guard
+            // would otherwise fold all 40-odd rows onto one line separated by " | ".
+            new MultilineLogger().info(LOGGER, buildReport(template));
         } finally {
             finder.interrupt();
             consumer.interrupt();
@@ -825,6 +846,8 @@ public class TuneConfiguration implements Runnable, Interruptable {
                     format(result.addressesCheckedPerSecond())));
             if (result.failure() != null) {
                 report.append("   FAILED: ").append(result.failure());
+            } else if (result.tooSlowToMeasure()) {
+                report.append("   NOT MEASURED: ").append(tooSlowExplanation(result));
             }
             report.append('\n');
         }
@@ -894,9 +917,27 @@ public class TuneConfiguration implements Runnable, Interruptable {
             return "batchSizeInBits=" + result.batchSizeInBits() + " keysPerWorkItem=" + result.keysPerWorkItem()
                     + " FAILED: " + result.failure();
         }
+        if (result.tooSlowToMeasure()) {
+            return "batchSizeInBits=" + result.batchSizeInBits() + " keysPerWorkItem=" + result.keysPerWorkItem()
+                    + " NOT MEASURED: " + tooSlowExplanation(result);
+        }
         return "batchSizeInBits=" + result.batchSizeInBits() + " keysPerWorkItem=" + result.keysPerWorkItem() + " -> "
                 + format(result.candidatesPerSecond()) + " candidates/s (" + format(result.addressesCheckedPerSecond())
                 + " addresses checked/s over " + format(result.elapsedSeconds()) + " s)";
+    }
+
+    /**
+     * Explains an arm that produced no throughput without failing, so it is not mistaken for a
+     * driver rejection.
+     *
+     * @param result the arm, which must satisfy {@link ArmResult#tooSlowToMeasure()}
+     * @return the explanation appended after {@code NOT MEASURED:}
+     */
+    private static String tooSlowExplanation(ArmResult result) {
+        return "no batch completed within the " + format(result.elapsedSeconds())
+                + " s window; one launch of 2^" + result.batchSizeInBits()
+                + " candidates outlasts it at this keysPerWorkItem. Raise secondsPerArm or lower"
+                + " batchSizeInBits if this combination matters to you. Not a device or driver error.";
     }
 
     private static String format(double value) {

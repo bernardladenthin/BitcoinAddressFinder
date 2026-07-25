@@ -439,14 +439,16 @@ public class OpenCLContextTest {
             // act
             openCLContext.init();
 
-            // assert
-            assertThat(
-                    logCaptor.getLogEvents().stream()
-                            .filter(e -> "INFO".equals(e.getLevel()))
-                            .map(LogEvent::getFormattedMessage)
-                            .anyMatch(m -> m.startsWith("Selected OpenCL device:")
-                                    && m.contains("--- Info for OpenCL device:")),
-                    is(true));
+            // assert — the device dump is emitted one record per line (see MultilineLogger), so the
+            // header and the property block are separate events rather than one multi-line message
+            List<String> infoMessages = logCaptor.getLogEvents().stream()
+                    .filter(e -> "INFO".equals(e.getLevel()))
+                    .map(LogEvent::getFormattedMessage)
+                    .toList();
+            assertThat(infoMessages, hasItem(equalTo("Selected OpenCL device:")));
+            assertThat(infoMessages, hasItem(containsString("--- Info for OpenCL device:")));
+            // no record may carry a line break of its own: that is the property the split preserves
+            assertThat(infoMessages.stream().anyMatch(m -> m.indexOf('\n') >= 0 || m.indexOf('\r') >= 0), is(false));
         } finally {
             openCLContext.close();
         }

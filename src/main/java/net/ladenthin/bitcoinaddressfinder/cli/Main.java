@@ -35,6 +35,7 @@ import net.ladenthin.bitcoinaddressfinder.engine.Finder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
+import net.ladenthin.bitcoinaddressfinder.util.MultilineLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -240,15 +241,23 @@ public class Main implements Runnable, Interruptable {
     public void logConfigurationTransformation() throws IOException {
         String json = configurationToJson(configuration);
         String yaml = configurationToYAML(configuration);
-        LOGGER.info(
-                "Please review the transformed configuration to ensure it aligns with your expectations and requirements before proceeding.:\n"
-                        + "########## BEGIN transformed JSON configuration ##########\n"
-                        + json
-                        + "\n" + "########## END   transformed JSON configuration ##########\n"
-                        + "\n"
-                        + "########## BEGIN transformed YAML configuration ##########\n"
-                        + yaml
-                        + "\n" + "########## END   transformed YAML configuration ##########\n");
+        // One record per line: both renderings are formatted blocks, and the log pattern's CRLF
+        // guard would otherwise fold the entire configuration onto one line separated by " | ".
+        // Splitting is safe for the same reason it is elsewhere — every emitted line still carries
+        // the appender's own prefix (see MultilineLogger). It matters here in particular because the
+        // YAML rendering, unlike the JSON one, can carry a genuine line break out of a user-supplied
+        // string value such as vanityPattern.
+        new MultilineLogger()
+                .info(
+                        LOGGER,
+                        "Please review the transformed configuration to ensure it aligns with your expectations and requirements before proceeding.:\n"
+                                + "########## BEGIN transformed JSON configuration ##########\n"
+                                + json
+                                + "\n" + "########## END   transformed JSON configuration ##########\n"
+                                + "\n"
+                                + "########## BEGIN transformed YAML configuration ##########\n"
+                                + yaml
+                                + "\n" + "########## END   transformed YAML configuration ##########\n");
     }
 
     @Override

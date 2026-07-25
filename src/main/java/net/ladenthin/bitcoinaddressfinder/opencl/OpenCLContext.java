@@ -46,6 +46,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.GpuFilterType;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
+import net.ladenthin.bitcoinaddressfinder.util.MultilineLogger;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.jocl.CL;
 import org.jocl.Pointer;
@@ -499,7 +500,9 @@ public class OpenCLContext implements ReleaseCLObject {
                 platforms, producerOpenCL.platformIndex, producerOpenCL.deviceType, producerOpenCL.deviceIndex);
 
         OpenCLDevice device = selection.device();
-        LOGGER.info("Selected OpenCL device:\n{}", device.toStringPretty());
+        // One record per line: the pretty device dump is a formatted block, and the log pattern's
+        // CRLF guard would otherwise fold the whole property list onto one line separated by " | ".
+        new MultilineLogger().info(LOGGER, "Selected OpenCL device:\n" + device.toStringPretty());
         // Fail fast on a big-endian device: the kernel canonicalises its output assuming a
         // little-endian device (see OpenClKernelConstants.GPU_NATIVE_WORD_ORDER), so running on
         // a big-endian device would produce silently corrupt results. Reject it cleanly instead.
