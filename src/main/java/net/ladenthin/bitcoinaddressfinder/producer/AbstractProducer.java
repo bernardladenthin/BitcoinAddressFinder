@@ -17,6 +17,7 @@ import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.util.PrivateKeyValidator;
 import org.apache.commons.codec.binary.Hex;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,6 +77,19 @@ public abstract class AbstractProducer implements Producer {
 
     /** Current life-cycle state. */
     protected volatile ProducerState state = ProducerState.UNINITIALIZED;
+
+    /**
+     * The throwable that ended {@link #run()}, or {@code null} if it has not ended in failure.
+     *
+     * <p>Volatile because it is written on the producer's executor thread and read by whoever
+     * started it — the orchestrator that needs to know whether a measurement window contained a
+     * working producer or a corpse.
+     *
+     * <p>Excluded from {@link ToString} — a stack trace does not belong in a one-line producer
+     * description.
+     */
+    @ToString.Exclude
+    private volatile @Nullable Throwable terminalFailure;
 
     /**
      * Flag controlling the main {@link #run()} loop; cleared via {@link #interrupt()}.
@@ -169,6 +183,10 @@ public abstract class AbstractProducer implements Producer {
                 produceKeys();
             } catch (Exception e) {
                 LOGGER.error("Error in produceKeys", e);
+                // Recorded as well as logged: the exception dies on this thread, and the thread that
+                // started this producer has no other way to learn the run ended badly rather than
+                // simply ending. See ProducerStateProvider#getTerminalFailure().
+                terminalFailure = e;
                 break;
             }
             if (cProducer.runOnce) {
@@ -323,5 +341,10 @@ public abstract class AbstractProducer implements Producer {
     @Override
     public ProducerState getState() {
         return state;
+    }
+
+    @Override
+    public @Nullable Throwable getTerminalFailure() {
+        return terminalFailure;
     }
 }

@@ -10,6 +10,8 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThan;
+import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
@@ -286,6 +288,68 @@ public class AbstractProducerTest {
 
             assertThat(logCaptor.getErrorLogs(), hasItem(equalTo("Error in produceKeys")));
         }
+    }
+
+    /**
+     * A producer that dies mid-run must say so, not just log it.
+     *
+     * <p>Logging alone leaves every caller blind: {@code run()} swallows the exception on the
+     * executor thread, so an orchestrator waiting out a measurement window on another thread sees a
+     * producer that simply stopped producing. {@code TuneConfiguration} then reported the partial
+     * throughput of a crashed arm as if it were a valid measurement — a real sweep recorded
+     * "1,022,288 candidates/s" for an arm whose producer had died of {@code CL_OUT_OF_RESOURCES}
+     * seconds in, and printed it next to healthy arms with nothing to distinguish it.
+     */
+    @Test
+    public void getTerminalFailure_exceptionInProduceKeys_returnsTheExceptionThatStoppedTheLoop() throws Exception {
+        // arrange
+        CProducer cProducer = new CProducer();
+        MockConsumer mockConsumer = new MockConsumer();
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, new Random(1));
+        RuntimeException thrown = new RuntimeException("CL_OUT_OF_RESOURCES");
+
+        AbstractProducerTestImpl producer =
+                new AbstractProducerTestImpl(
+                        cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics()) {
+                    @Override
+                    public void produceKeys() {
+                        throw thrown;
+                    }
+                };
+        producer.initProducer();
+
+        // pre-assert: nothing has gone wrong yet
+        assertThat(producer.getTerminalFailure(), is(nullValue()));
+
+        // act
+        producer.run();
+
+        // assert
+        assertThat(producer.getTerminalFailure(), is(sameInstance(thrown)));
+    }
+
+    /**
+     * The counterpart: a producer that stopped because it was asked to must not look like one that
+     * crashed, or every clean shutdown would be reported as a failure.
+     */
+    @Test
+    public void getTerminalFailure_producerRanWithoutError_returnsNull() throws Exception {
+        // arrange
+        CProducer cProducer = new CProducer();
+        cProducer.runOnce = true;
+        MockConsumer mockConsumer = new MockConsumer();
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, new Random(1));
+
+        AbstractProducerTestImpl producer = new AbstractProducerTestImpl(
+                cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
+        producer.initProducer();
+
+        // act
+        producer.run();
+
+        // assert
+        assertThat(producer.getState(), is(equalTo(ProducerState.NOT_RUNNING)));
+        assertThat(producer.getTerminalFailure(), is(nullValue()));
     }
     // </editor-fold>
 

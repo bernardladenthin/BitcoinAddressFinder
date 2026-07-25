@@ -515,13 +515,16 @@ public class TuneConfiguration implements Runnable, Interruptable {
             double candidatesPerSecond =
                     elapsedSeconds > 0.0d ? batchesDelta * (double) (1L << batchSizeInBits) / elapsedSeconds : 0.0d;
             double addressesCheckedPerSecond = elapsedSeconds > 0.0d ? checkedDelta / elapsedSeconds : 0.0d;
-            return new ArmResult(
+            // The producer runs on another thread and swallows its own exceptions, so a crash
+            // part-way through the window looks from here like a producer that merely slowed down.
+            // Ask it directly rather than trusting the rate.
+            return armResultFor(
                     batchSizeInBits,
                     keysPerWorkItem,
                     candidatesPerSecond,
                     addressesCheckedPerSecond,
                     elapsedSeconds,
-                    null);
+                    producer.getTerminalFailure());
         } catch (Exception | OutOfMemoryError e) {
             // A grid that is too large for the device is an expected outcome, not a fatal one: the
             // sweep deliberately probes high batchSizeInBits values up to the framework cap
@@ -557,6 +560,49 @@ public class TuneConfiguration implements Runnable, Interruptable {
                 producer.releaseProducer();
             }
         }
+    }
+
+    /**
+     * Builds an arm's result, downgrading it to a failure when the producer did not survive the
+     * measurement window.
+     *
+     * <p>A rate produced by a producer that spent most of the window dead is not a measurement of
+     * anything, and printing it beside healthy arms actively misleads: a real sweep on an Intel Arc
+     * recorded {@code 1,022,288 candidates/s} for an arm whose producer had died of
+     * {@code CL_OUT_OF_RESOURCES} seconds in. Nothing in that row said so — and it was the arm
+     * immediately before every larger grid began failing, so the one number that would have
+     * explained the cascade was the one presented as normal.
+     *
+     * <p>The partial rate is deliberately discarded rather than reported alongside the failure.
+     * Keeping it would invite exactly the comparison it cannot support, since how much of the window
+     * the producer survived is unknown.
+     *
+     * @param batchSizeInBits            the arm's grid size exponent
+     * @param keysPerWorkItem            the arm's keys per work item
+     * @param candidatesPerSecond        the measured candidate rate, used only if the producer survived
+     * @param addressesCheckedPerSecond  the measured lookup rate, used only if the producer survived
+     * @param elapsedSeconds             the measured window length
+     * @param producerFailure            what killed the producer, or {@code null} if it survived
+     * @return a measured result, or a failed one carrying the producer's cause
+     */
+    static ArmResult armResultFor(
+            int batchSizeInBits,
+            int keysPerWorkItem,
+            double candidatesPerSecond,
+            double addressesCheckedPerSecond,
+            double elapsedSeconds,
+            @Nullable Throwable producerFailure) {
+        if (producerFailure != null) {
+            return new ArmResult(
+                    batchSizeInBits,
+                    keysPerWorkItem,
+                    0.0d,
+                    0.0d,
+                    elapsedSeconds,
+                    producerFailure.getClass().getSimpleName() + ": " + producerFailure.getMessage());
+        }
+        return new ArmResult(
+                batchSizeInBits, keysPerWorkItem, candidatesPerSecond, addressesCheckedPerSecond, elapsedSeconds, null);
     }
 
     private static Producer createProducer(

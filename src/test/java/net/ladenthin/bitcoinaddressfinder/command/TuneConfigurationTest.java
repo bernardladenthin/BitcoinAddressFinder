@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder.command;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasSize;
@@ -243,6 +244,48 @@ public class TuneConfigurationTest extends LMDBBase {
      * <p>{@code warmupSecondsPerArm = 0} on purpose: warmup exists to absorb kernel compilation and
      * GPU clock ramp, neither of which a CPU producer has, so here it would only spend fork time.
      */
+    // <editor-fold desc="crashed producer">
+    /**
+     * An arm whose producer died part-way through the window must be recorded as a failure, not as
+     * the throughput it managed before dying.
+     *
+     * <p>This is the defect a real sweep exposed: on an Intel Arc, the {@code batchSizeInBits=19,
+     * keysPerWorkItem=8192} arm's producer hit {@code CL_OUT_OF_RESOURCES} seconds into its window
+     * and stopped, yet the report presented "1,022,288 candidates/s" for it, indistinguishable from
+     * a healthy measurement — the only tell was an {@code addresses checked} of 0.00, which is easy
+     * to read past. A number produced by a producer that was dead for most of the window is not a
+     * measurement of anything, and worse, it was the arm that preceded a cascade of failures whose
+     * cause it would have identified.
+     */
+    @Test
+    public void armResultFor_producerDiedDuringTheWindow_isRecordedAsFailedNotAsAMeasurement() {
+        RuntimeException producerFailure = new RuntimeException("CL_OUT_OF_RESOURCES");
+
+        TuneConfiguration.ArmResult result =
+                TuneConfiguration.armResultFor(19, 8192, 1_022_288.82d, 0.0d, 20.0d, producerFailure);
+
+        assertThat(result.succeeded(), is(false));
+        assertThat(result.failure(), containsString("CL_OUT_OF_RESOURCES"));
+        // the partial rate must not survive into the report as if it meant something
+        assertThat(result.candidatesPerSecond(), is(0.0d));
+    }
+
+    /**
+     * The counterpart: a producer that survived its window keeps the rate it measured. Without this,
+     * the fix above would turn every arm into a failure.
+     */
+    @Test
+    public void armResultFor_producerSurvivedTheWindow_keepsTheMeasuredRate() {
+        TuneConfiguration.ArmResult result =
+                TuneConfiguration.armResultFor(23, 2048, 36_481_091.96d, 565_148.11d, 20.0d, null);
+
+        assertThat(result.succeeded(), is(true));
+        assertThat(result.failure(), is(nullValue()));
+        assertThat(result.candidatesPerSecond(), is(36_481_091.96d));
+        assertThat(result.addressesCheckedPerSecond(), is(565_148.11d));
+    }
+    // </editor-fold>
+
     // <editor-fold desc="ArmResult classification">
     /**
      * An arm that produced no throughput without failing must be classified as "too slow to

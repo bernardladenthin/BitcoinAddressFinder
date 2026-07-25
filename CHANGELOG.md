@@ -26,6 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   single GPU.
 
 ### Fixed
+- **`TuneConfiguration` no longer reports a crashed arm as a measurement** — a producer that died
+  part-way through its measurement window (e.g. a `CLException` from the run loop) was reported with
+  whatever throughput it managed before dying, indistinguishable from a healthy arm. A real sweep on
+  an Intel Arc recorded `1,022,288 candidates/s` for an arm whose producer had hit
+  `CL_OUT_OF_RESOURCES` seconds in — and it was the arm immediately before every larger grid started
+  failing, so the row that would have explained the cascade was presented as normal. Producers now
+  record what terminated their run loop (`ProducerStateProvider#getTerminalFailure()`, which
+  previously had no way of reaching the thread that started them), and the sweep records such an arm
+  as `FAILED` with the cause, discarding the partial rate.
 - **REUSE compliance restored** — the licensing check had been failing on `main`. All measurement
   data and generated plots are now covered by globs in `REUSE.toml` (so new machines and benchmark
   runs stay compliant without an edit), and four example configs that were never added to the
