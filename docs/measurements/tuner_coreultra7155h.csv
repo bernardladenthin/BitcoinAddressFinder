@@ -1,0 +1,85 @@
+machine_id,gpu,date,batch_size_in_bits,keys_per_work_item,candidates_per_second,addresses_checked_per_second,seconds_per_arm,warmup_seconds,verification_micros_measured,winner,kernel
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,18,16,27142398.34,422950.28,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,18,64,55123551.10,859371.87,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,18,256,27286901.03,425310.12,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,18,512,15479285.18,241671.73,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,18,1024,8231048.58,128644.43,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,18,2048,6369639.12,99343.82,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,19,16,31533253.12,492171.83,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,19,64,58745968.42,916616.57,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,19,256,54289551.71,846517.96,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,19,512,30984779.26,482938.40,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,19,1024,16644930.50,259298.00,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,19,2048,8597957.87,134243.90,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,20,16,32817893.45,511670.07,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,20,64,60076715.26,936207.85,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,20,256,87185483.61,1359327.90,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,20,512,60500320.50,942618.62,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,20,1024,33133312.63,516840.95,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,20,2048,17300861.10,269692.08,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,21,16,33972224.77,529915.16,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,21,64,61652112.52,961307.29,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,21,256,90910741.46,1418129.96,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,21,512,97828095.12,1524704.05,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,21,1024,65009086.61,1014039.35,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,21,2048,34288256.73,534547.82,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,22,16,35216589.10,549401.28,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,22,64,63117902.50,984339.72,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,22,256,93052409.64,1449343.42,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,22,512,101869461.62,1588747.75,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,22,1024,102948601.13,1601967.98,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,22,2048,67055783.31,1045586.32,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,23,16,36061740.58,562157.53,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,23,64,64576607.89,1007246.43,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,23,256,94323092.88,1474695.31,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,23,512,103550241.52,1614765.14,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,23,1024,107733935.74,1685115.16,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,23,2048,104842974.41,1636516.71,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,24,16,36909497.80,575372.82,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,24,64,64548071.33,1006943.92,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,24,256,92229744.45,1438435.65,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,24,512,102328141.14,1595440.14,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,24,1024,109019715.38,1686160.95,20,5,10.69,,inline
+coreultra7155h-95g-win11,NVIDIA RTX 500 Ada Generation Laptop GPU,2026-07-25,24,2048,110725506.61,1727398.44,20,5,10.69,yes,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,18,16,1690762.00,26439.16,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,18,64,6002819.46,93589.66,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,18,256,9450225.43,147409.07,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,18,512,6461460.81,100610.65,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,18,1024,3997466.89,62142.69,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,18,2048,2424781.43,37786.61,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,19,16,1677707.14,26124.57,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,19,64,5871866.00,91443.61,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,19,256,17248277.21,268898.06,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,19,512,12818193.77,199989.39,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,19,1024,7916089.11,123460.31,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,19,2048,4482376.85,69864.05,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,20,16,1625226.58,25267.07,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,20,64,5871719.48,91550.63,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,20,256,18087034.00,281780.65,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,20,512,23801077.91,371235.24,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,20,1024,15622584.38,243597.82,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,20,2048,8807589.12,137290.80,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,21,16,1677653.41,26222.03,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,21,64,5767097.27,90055.40,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,21,256,16042550.16,250325.66,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,21,512,24639043.14,384475.50,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,21,1024,29358577.87,457790.43,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,21,2048,17506887.82,273330.38,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,22,16,1677482.44,26174.37,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,22,64,5658527.31,88131.78,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,22,256,15306449.23,238655.26,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,22,512,20746451.49,323856.23,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,22,1024,31229382.90,487126.69,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,22,2048,32070933.41,499982.58,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,23,16,1677367.57,26134.08,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,23,64,5450210.92,85065.29,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,23,256,15088007.45,235287.07,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,23,512,20119526.08,313966.76,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,23,1024,25155871.71,392397.06,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,23,2048,36481091.96,565148.11,20,5,10.11,yes,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,24,16,1676721.75,26174.09,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,24,64,5871719.83,91518.23,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,24,256,15926850.76,248215.71,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,24,512,20132087.45,314144.88,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,24,1024,25163894.56,392562.20,20,5,10.11,,inline
+coreultra7155h-95g-win11,Intel(R) Arc(TM) Pro Graphics,2026-07-25,24,2048,26843233.01,418642.22,20,5,10.11,,inline

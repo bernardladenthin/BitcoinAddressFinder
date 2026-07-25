@@ -17,6 +17,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the reason and the remedy, instead of a bare `0.00 candidates/s` that reads like a driver
   rejection. Happens at large `batchSizeInBits` with tiny `keysPerWorkItem`.
 
+### Added
+- **First contributed multi-GPU machine in the measurement registry** —
+  `coreultra7155h-95g-win11` (Lenovo ThinkPad P14s Gen 5: Core Ultra 7 155H, RTX 500 Ada + integrated
+  Arc Pro), with `tuner_coreultra7155h.csv` carrying all 84 measured arms for both devices. Peaks:
+  **110.7 M keys/s** on the RTX at `batchSizeInBits=24, keysPerWorkItem=2048` and **36.5 M keys/s**
+  on the Arc at `23, 2048`. Until now every registered machine was high-end desktop hardware with a
+  single GPU.
+
+### Fixed
+- **REUSE compliance restored** — the licensing check had been failing on `main`. All measurement
+  data and generated plots are now covered by globs in `REUSE.toml` (so new machines and benchmark
+  runs stay compliant without an edit), and four example configs that were never added to the
+  existing list are included. 486/486 files compliant, was 462/486.
+
 ### Changed
 - **`machines.json` records `gpu` as a list** — multi-GPU machines are the normal case (any laptop
   with a discrete card also has an integrated one, and this project runs on both), so the field

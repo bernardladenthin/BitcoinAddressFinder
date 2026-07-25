@@ -28,7 +28,8 @@ That regenerates `plots/*.png` and the generated tables in one step.
 | `filter_build.csv` | Build time, retained memory, FPR against **real** LMDB databases — `FilterMeasurementMain`. |
 | `k_sweep.csv` | Blocked Bloom false-positive rate vs `k`, per bit density. |
 | `filter_sizing.csv` | Blocked Bloom FPR and speed vs filter size at fixed `k`. |
-| `plot.py` | Reads all of the above; writes `plots/*.png` and the generated tables. |
+| `tune_arms.csv`, `tuner_*.csv` | `TuneConfiguration` grid sweeps: one row per arm (`batchSizeInBits` × `keysPerWorkItem`), with the winner flagged. Raw data — not consumed by `plot.py`. |
+| `plot.py` | Reads all of the above **except the tuner sweeps**; writes `plots/*.png` and the generated tables. |
 
 > **`retained_mib` is a GC-delta estimate, not the structure size.** It includes harness heap, so it
 > is only trustworthy once the filter dominates — at ~10 M entries it has reported ~26 MiB for a
