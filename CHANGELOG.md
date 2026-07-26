@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **The same GPU behind two OpenCL platforms is swept once** — a duplicate ICD registration (common
+  on Windows AMD systems, where driver and runtime both register) makes one card enumerate twice, so
+  a two-card machine appeared as four devices and would have been measured, and then driven, twice
+  over. Devices are now de-duplicated by a fingerprint of the *physical* card, taken from
+  `cl_khr_device_uuid`, else `cl_khr_pci_bus_info`, else AMD's `cl_amd_device_attribute_query`. The
+  first two are Khronos standards that NVIDIA and Intel report as well, so this is not AMD-specific.
+  An unavailable fingerprint never merges: a rig of identical cards keeps every device, because the
+  device name is deliberately not used as a signal.
+- **The fat jar runs with a bare `java -jar`** — the assembly manifest now carries the `Add-Opens`
+  that lmdbjava needs to reflect into `java.nio`/`sun.nio.ch`, so the launcher scripts are no longer
+  required for LMDB access (they remain useful for the heap and Logback settings). Guarded by
+  `JvmModuleFlagConsistencyTest`, which asserts the manifest entry equals the `java.base` opens in
+  `.mvn/jvm.config` — the pom comment asked for that sync, nothing enforced it.
 - **`TuneConfiguration` measures every GPU, and by default every one it detects** — it used to take
   `producerOpenCL.get(0)` silently. A dual-GPU configuration produced a full-looking report for one
   device and a paste-ready configuration whose second entry still held the operator's guesses,
@@ -64,6 +77,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TuneConfiguration`); only the rendered field changed.
 
 ### Fixed
+- **`disableAddressLookup: true` no longer opens LMDB** — it opened the environment unconditionally
+  and failed with `ESRCH` / `InaccessibleObjectException` when no database existed, which is exactly
+  the situation disabling the lookup is meant to permit. A pure key-generation run, or the tuner's
+  paste-ready config before a database has been imported, now works with no database on disk.
+- **Example launchers and the tuning guide referenced a stale jar version** — 22 `run_*` scripts and
+  `docs/tuning-your-gpu.md` still named `1.7.0`. Bumped to the project version and guarded by
+  `ExampleRunScriptJarVersionTest`, which reads the version from `pom.xml` so it cannot drift again.
 - **`TuneConfiguration` no longer reports a failing arm as a measurement** — an arm measured while
   the device was throwing errors was reported with whatever throughput it managed, indistinguishable
   from a healthy arm. A real sweep on an Intel Arc recorded `1,022,288 candidates/s` for an arm

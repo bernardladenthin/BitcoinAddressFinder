@@ -60,10 +60,11 @@ You need:
 - **The launcher scripts** from [`examples/`](../examples/) — `run_TuneConfiguration.bat` (Windows)
   or `run_TuneConfiguration.sh` (Linux/macOS).
 
-> **Use the launcher, not a bare `java -jar`.** The launchers pass a set of `--add-opens` flags that
-> the JVM needs before it will let the LMDB layer reach into `java.nio` internals. Without them the
-> tuner throws `InaccessibleObjectException` the moment you point it at a real database. A bare
-> `java -jar` only works if no database is configured at all.
+> **A bare `java -jar` works.** The fat jar's manifest carries the `Add-Opens` the JVM needs before
+> it will let the LMDB layer reach into `java.nio` internals, so it is self-sufficient. The launcher
+> scripts remain useful for what they *also* set — the heap (`-Xmx8g`) and the Logback configuration —
+> so prefer them if you have not tuned those yourself. Older releases did require the launcher: if
+> you see `InaccessibleObjectException`, you are on a jar built before this became automatic.
 
 Put the jar, the launcher and your config file in the same directory. The launcher refers to the jar
 by name, so if your version differs, open it in a text editor and fix the filename on the
@@ -92,7 +93,7 @@ or directly:
 java -jar bitcoinaddressfinder-1.8.0-SNAPSHOT-jar-with-dependencies.jar config_OpenCLInfo.json
 ```
 
-This is the one command where a bare `java -jar` is fine — no database is involved.
+No database is involved here, so nothing beyond the plain command is needed.
 
 You get one block per device. The two numbers you need are printed with it, along with a heuristic
 starting point:
@@ -444,8 +445,9 @@ the arm as failed and continues, so this is not fatal during tuning. If it happe
 start from the `SUGGESTED START CONFIG` values that `OpenCLInfo` printed.
 
 **`InaccessibleObjectException` at startup.**
-You ran a bare `java -jar` with a database configured. Use the launcher script, which passes the
-required `--add-opens` flags.
+Your jar predates the manifest that carries the required `Add-Opens` (added in 1.8.0-SNAPSHOT). Use
+the launcher script, which passes the same flags on the command line, or rebuild from a current
+checkout.
 
 **Numbers differ noticeably between two runs of the same config.**
 Something else was using the machine. Close other GPU workloads, then re-run. Laptops additionally

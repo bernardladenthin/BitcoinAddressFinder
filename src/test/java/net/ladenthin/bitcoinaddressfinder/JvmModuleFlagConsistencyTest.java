@@ -4,9 +4,12 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 
+import com.google.common.base.Splitter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -49,6 +52,9 @@ public class JvmModuleFlagConsistencyTest {
 
     /** Number of flags in the canonical set (9 {@code --add-opens} + 15 {@code --add-exports}). */
     private static final int EXPECTED_FLAG_COUNT = 24;
+
+    /** Captures the space-separated body of the fat jar's {@code <Add-Opens>} manifest entry. */
+    private static final Pattern ADD_OPENS_MANIFEST_ENTRY = Pattern.compile("<Add-Opens>([^<]+)</Add-Opens>");
 
     /** Creates a new {@link JvmModuleFlagConsistencyTest}. */
     public JvmModuleFlagConsistencyTest() {}
@@ -133,5 +139,39 @@ public class JvmModuleFlagConsistencyTest {
                     flags.subList(i, i + EXPECTED_FLAG_COUNT),
                     is(equalTo(master)));
         }
+    }
+    /**
+     * The fat jar's {@code Add-Opens} manifest entry must name exactly the {@code java.base} opens
+     * from the master set — no more, no fewer.
+     *
+     * <p>That entry is what lets {@code java -jar bitcoinaddressfinder-*-jar-with-dependencies.jar}
+     * run without the launcher flags, so a package dropped from it fails only at runtime, on a user's
+     * machine, as an {@code InaccessibleObjectException} the moment LMDB is opened. The pom comment
+     * asks the next editor to keep the two in sync; this is what makes that request enforceable
+     * rather than hopeful.
+     *
+     * <p>Only {@code java.base} is compared. The master set also carries {@code jdk.compiler} and
+     * {@code jdk.management} opens for Error Prone and JMH, which the runtime jar never needs, and
+     * {@code --add-exports}, which a manifest cannot express.
+     */
+    @Test
+    public void fatJarManifest_declaresExactlyTheJavaBaseOpensFromTheMasterSet() {
+        // extract() renders a flag as "<opens|exports> <module>/<package>", so the java.base opens
+        // are selected by that prefix and the verb is dropped to leave the manifest's own form.
+        List<String> expected = master().stream()
+                .filter(flag -> flag.startsWith("opens java.base/"))
+                .map(flag -> flag.substring("opens ".length()))
+                .toList();
+        assertThat("the master set must contain java.base opens", expected, is(not(empty())));
+
+        Matcher matcher = ADD_OPENS_MANIFEST_ENTRY.matcher(read(Path.of("pom.xml")));
+        assertThat("pom.xml must declare an <Add-Opens> manifest entry for the fat jar", matcher.find(), is(true));
+        List<String> declared =
+                Splitter.on(' ').omitEmptyStrings().splitToList(matcher.group(1).trim());
+
+        assertThat(
+                "the fat jar's Add-Opens manifest entry must equal the java.base opens in .mvn/jvm.config",
+                declared,
+                is(equalTo(expected)));
     }
 }

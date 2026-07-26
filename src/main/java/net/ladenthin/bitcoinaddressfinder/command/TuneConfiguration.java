@@ -1226,7 +1226,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
      * @param deviceIndex    the device's position <em>within that platform</em>
      * @param deviceName     the device's reported name, used to label its section of the report
      * @param deviceType     the raw {@code CL_DEVICE_TYPE} bit field
-     * @param pciFingerprint a PCIe-topology fingerprint identifying the physical GPU, or {@code null}
+     * @param physicalDeviceFingerprint a fingerprint identifying the physical GPU, or {@code null}
      *     when it could not be determined; two entries with the same non-null fingerprint are the same
      *     physical card seen through two OpenCL platforms
      */
@@ -1235,7 +1235,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
             int deviceIndex,
             String deviceName,
             long deviceType,
-            @Nullable String pciFingerprint) {
+            @Nullable String physicalDeviceFingerprint) {
 
         /**
          * Convenience constructor for callers and tests that have no PCIe topology to supply.
@@ -1285,7 +1285,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
                             deviceIndex,
                             device.deviceName(),
                             device.deviceType(),
-                            OpenCLDeviceTopology.pciFingerprintOf(device)));
+                            OpenCLDeviceTopology.physicalDeviceFingerprintOf(device)));
                 }
             }
         }
@@ -1297,8 +1297,8 @@ public class TuneConfiguration implements Runnable, Interruptable {
      * platform, so a duplicate ICD registration does not make the sweep measure — and the emitted
      * configuration then drive — one card several times over.
      *
-     * <p>Two entries are the same physical GPU only when they share a non-null PCIe-topology
-     * {@link DetectedDevice#pciFingerprint() fingerprint}. A {@code null} fingerprint means the
+     * <p>Two entries are the same physical GPU only when they share a non-null
+     * {@link DetectedDevice#physicalDeviceFingerprint() fingerprint}. A {@code null} fingerprint means the
      * topology is unknown, so such a device is always kept: merging on anything weaker (the device
      * name) would wrongly collapse a rig of identical cards, which reports identical names but occupies
      * distinct PCIe slots. When a name recurs with unknown topology the ambiguity is only logged, not
@@ -1314,7 +1314,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
         Set<String> namesKept = new HashSet<>();
         Set<String> namesWarned = new HashSet<>();
         for (DetectedDevice device : devices) {
-            String fingerprint = device.pciFingerprint();
+            String fingerprint = device.physicalDeviceFingerprint();
             if (fingerprint != null) {
                 DetectedDevice first = firstByFingerprint.get(fingerprint);
                 if (first != null) {
