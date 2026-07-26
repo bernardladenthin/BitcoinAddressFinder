@@ -89,7 +89,7 @@ Run it with the supplied launcher (`run_OpenCLInfo.bat` on Windows, `run_OpenCLI
 or directly:
 
 ```bash
-java -jar bitcoinaddressfinder-1.7.0-jar-with-dependencies.jar config_OpenCLInfo.json
+java -jar bitcoinaddressfinder-1.8.0-SNAPSHOT-jar-with-dependencies.jar config_OpenCLInfo.json
 ```
 
 This is the one command where a bare `java -jar` is fine — no database is involved.
