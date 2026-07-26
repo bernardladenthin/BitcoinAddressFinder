@@ -205,6 +205,49 @@ public class TuneConfigurationTest extends LMDBBase {
         assertThat(TuneConfiguration.dedupePhysicalDevices(detected), hasSize(2));
     }
 
+    /**
+     * A shared fingerprint across <em>differently named</em> devices is a driver defect, not a
+     * duplicate, and must not merge them.
+     *
+     * <p>The dangerous direction of this feature is asymmetric. A missing fingerprint costs nothing —
+     * both entries are kept, which is what happened before de-duplication existed. A fingerprint that
+     * is wrongly identical silently halves a multi-GPU machine, and nothing in the run reports it. The
+     * only source verified on hardware so far is AMD's topology extension; the two Khronos paths
+     * ({@code cl_khr_device_uuid}, {@code cl_khr_pci_bus_info}) have never executed on a real device,
+     * because the one dual-ICD machine available reports neither. A driver handing every device the
+     * same UUID is exactly the failure that would not be noticed.
+     *
+     * <p>The device name is therefore a <b>veto</b>, never a merge signal — merging on names would
+     * still be wrong, since a rig of identical cards shares one. Requiring both to agree keeps the
+     * legitimate case working (one card through two ICDs reports the same name; verified as
+     * {@code gfx1100} on both platforms of an AMD box) and makes the pathological case impossible.
+     * Should two ICDs ever name one card differently, the merge is skipped and the behaviour falls
+     * back to sweeping both — a missed optimisation, not a loss.
+     */
+    @Test
+    public void dedupePhysicalDevices_sameFingerprintButDifferentNames_keepsBothRatherThanTrustingIt() {
+        List<TuneConfiguration.DetectedDevice> detected = List.of(
+                new TuneConfiguration.DetectedDevice(0, 0, "Radeon RX 7900 XTX", CL.CL_DEVICE_TYPE_GPU, "uuid:dead"),
+                new TuneConfiguration.DetectedDevice(0, 1, "Radeon Graphics", CL.CL_DEVICE_TYPE_GPU, "uuid:dead"));
+
+        List<TuneConfiguration.DetectedDevice> unique = TuneConfiguration.dedupePhysicalDevices(detected);
+
+        assertThat(unique, hasSize(2));
+    }
+
+    /** The legitimate case must keep working: one card, two ICDs, same fingerprint and same name. */
+    @Test
+    public void dedupePhysicalDevices_sameFingerprintAndSameName_stillCollapses() {
+        List<TuneConfiguration.DetectedDevice> detected = List.of(
+                new TuneConfiguration.DetectedDevice(0, 0, "gfx1100", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:3:0:0"),
+                new TuneConfiguration.DetectedDevice(1, 0, "gfx1100", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:3:0:0"));
+
+        List<TuneConfiguration.DetectedDevice> unique = TuneConfiguration.dedupePhysicalDevices(detected);
+
+        assertThat(unique, hasSize(1));
+        assertThat(unique.get(0).platformIndex(), is(equalTo(0)));
+    }
+
     @Test
     public void renderPerDeviceWinners_multipleDevices_listsEachDevicesOwnWinner() {
         TuneConfiguration.ArmResult fastWin =

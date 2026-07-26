@@ -77,6 +77,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TuneConfiguration`); only the rendered field changed.
 
 ### Fixed
+- **Device de-duplication requires the name to agree, not just the identity** — a fingerprint shared
+  by *differently named* devices is a driver defect rather than one card seen twice, and acting on it
+  would silently halve a multi-GPU machine with nothing in the run reporting it. The name remains a
+  veto and never a merge signal (merging on names would collapse a rig of identical cards). The
+  asymmetry decides it: a missed merge costs one redundant sweep, a wrong merge costs half the
+  hardware. Cheap insurance, since two of the three fingerprint sources have not yet run on real
+  hardware — the only dual-ICD machine available reports neither Khronos extension.
 - **`disableAddressLookup: true` no longer opens LMDB** — it opened the environment unconditionally
   and failed with `ESRCH` / `InaccessibleObjectException` when no database existed, which is exactly
   the situation disabling the lookup is meant to permit. A pure key-generation run, or the tuner's

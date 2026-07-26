@@ -20,28 +20,30 @@ This document provides guidance for AI assistants working on the BitcoinAddressF
 
 ## Build System
 
-The project uses **Maven** (minimum 3.6.3) with a Maven Wrapper.
+The project uses **Maven** (minimum 3.6.3). **There is no Maven Wrapper in this repository** —
+`mvnw` / `mvnw.cmd` do not exist, so use an installed `mvn`. Commands below are written that way;
+a wrapper could be added later, but until it is, `./mvnw ...` fails outright.
 
 ### Common Commands
 
 ```bash
 # Compile only
-./mvnw compile
+mvn compile
 
 # Run all tests
-./mvnw test
+mvn test
 
 # Build fat JAR with all dependencies
-./mvnw package -P assembly
+mvn package -P assembly
 
 # Build without tests
-./mvnw package -DskipTests
+mvn package -DskipTests
 
 # Generate coverage report
-./mvnw test jacoco:report
+mvn test jacoco:report
 
 # Skip LMDB-specific tests (useful when LMDB native libs unavailable)
-./mvnw test -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true
+mvn test -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true
 ```
 
 ### JVM / Compiler Flags
@@ -510,7 +512,7 @@ Test-only:
 
 ```bash
 # Build fat JAR
-./mvnw package -P assembly -DskipTests
+mvn package -P assembly -DskipTests
 
 # Run (replace config path as needed)
 java -jar target/bitcoinaddressfinder-1.8.0-SNAPSHOT-jar-with-dependencies.jar \

@@ -1298,7 +1298,10 @@ public class TuneConfiguration implements Runnable, Interruptable {
      * configuration then drive — one card several times over.
      *
      * <p>Two entries are the same physical GPU only when they share a non-null
-     * {@link DetectedDevice#physicalDeviceFingerprint() fingerprint}. A {@code null} fingerprint means the
+     * {@link DetectedDevice#physicalDeviceFingerprint() fingerprint} <b>and</b> the same device name.
+     * The name is a veto, never a merge signal: merging on it would collapse a rig of identical
+     * cards, but requiring it to agree blocks the one dangerous failure — a driver reporting one
+     * identity for several devices, which would otherwise halve the machine without a word. A {@code null} fingerprint means the
      * topology is unknown, so such a device is always kept: merging on anything weaker (the device
      * name) would wrongly collapse a rig of identical cards, which reports identical names but occupies
      * distinct PCIe slots. When a name recurs with unknown topology the ambiguity is only logged, not
@@ -1317,6 +1320,25 @@ public class TuneConfiguration implements Runnable, Interruptable {
             String fingerprint = device.physicalDeviceFingerprint();
             if (fingerprint != null) {
                 DetectedDevice first = firstByFingerprint.get(fingerprint);
+                if (first != null && !first.deviceName().equals(device.deviceName())) {
+                    // Same identity, different name: a driver defect, not a duplicate. Keep both.
+                    // The asymmetry decides this — a missed merge costs one redundant sweep, a wrong
+                    // merge silently halves a multi-GPU machine and reports nothing. Two of the three
+                    // fingerprint sources have never run on real hardware, so the guard is cheap
+                    // insurance against precisely the failure that would go unnoticed.
+                    LOGGER.warn(
+                            "{} (platformIndex={}, deviceIndex={}) reports the same identity {} as {}, but a"
+                                    + " different name. Treating them as distinct devices: an identity shared by"
+                                    + " differently named devices indicates a driver defect rather than one card"
+                                    + " seen twice.",
+                            device.deviceName(),
+                            device.platformIndex(),
+                            device.deviceIndex(),
+                            fingerprint,
+                            first.deviceName());
+                    unique.add(device);
+                    continue;
+                }
                 if (first != null) {
                     LOGGER.info(
                             "Skipping {} (platformIndex={}, deviceIndex={}): it is the same physical GPU as {}"
