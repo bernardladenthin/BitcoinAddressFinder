@@ -62,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   single GPU.
 
 ### Changed
+- **The documented iGPU interference figure is qualified, not a single number** — `docs/tuning-your-gpu.md`
+  cited "~3×" from one laptop pair (Intel Arc next to an RTX 500 Ada). A desktop pair (AMD gfx1036 next
+  to an RX 7900 XTX) measured ~1.5×. Both are now shown side by side with the advice to measure your
+  own, since platform, bandwidth headroom and thermal coupling all move it.
 - **`machines.json` records `gpu` as a list** — multi-GPU machines are the normal case (any laptop
   with a discrete card also has an integrated one, and this project runs on both), so the field
   holds every device instead of a comma-joined string that readers had to split. Existing entries
@@ -77,6 +81,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TuneConfiguration`); only the rendered field changed.
 
 ### Fixed
+- **The sweep extension judged a slow device by a fast one's winner** — on a multi-device run the
+  decision consulted the global best arm instead of the device being swept, so an integrated GPU that
+  won at the largest `keysPerWorkItem` tried got no extension: the discrete card's winner sat inside
+  its own range and reported "nothing to extend". The slower device's reported optimum was therefore
+  a silent lower bound — exactly what the extension exists to prevent. Invisible on a single-GPU
+  machine, where the global and the device winner are the same arm; found on a dual-GPU one.
 - **Device de-duplication requires the name to agree, not just the identity** — a fingerprint shared
   by *differently named* devices is a driver defect rather than one card seen twice, and acting on it
   would silently halve a multi-GPU machine with nothing in the run reporting it. The name remains a

@@ -352,10 +352,19 @@ notice.
 Two things worth knowing:
 
 - **Devices are measured one at a time, on purpose.** Two GPUs running at once contend for host
-  memory bandwidth. On a laptop with a discrete NVIDIA card and an integrated Intel GPU, the
-  integrated one measured 16.3 M keys/s alone and 5.5 M keys/s alongside the discrete card — a 3×
-  loss. An integrated GPU has no memory of its own; it shares system RAM with the host. Tuning them
-  simultaneously would measure that interference instead of the devices.
+  memory bandwidth, and an integrated GPU — which has no memory of its own and shares system RAM
+  with the host — loses the most. Tuning them simultaneously would measure that interference instead
+  of the devices.
+
+  **How much it costs varies by a lot, so do not plan around a single figure.** Two measured pairs:
+
+  | integrated GPU | alone | alongside the discrete card | loss |
+  |---|---|---|---|
+  | Intel Arc Pro (laptop, next to an RTX 500 Ada) | 16.3 M keys/s | 5.5 M keys/s | ~3× |
+  | AMD gfx1036 (desktop, next to an RX 7900 XTX) | 3.12 M keys/s | 2.07 M keys/s | ~1.5× |
+
+  Same phenomenon, twice the severity on the laptop. Platform, memory bandwidth headroom and
+  thermal coupling all move it, so measure your own pair rather than assuming either number.
 - **Expect roughly N × the run time.** The tuner states it up front. Only the sweep repeats — the
   filter is built once and reused across devices.
 

@@ -562,6 +562,53 @@ public class TuneConfigurationTest extends LMDBBase {
         assertThat(next.batchSizeInBits(), is(equalTo(23)));
     }
 
+    /**
+     * On a multi-device sweep the extension decision must be made against <b>the device being
+     * swept</b>, never against the best arm across all devices.
+     *
+     * <p>Found on a dual-GPU machine: the slower integrated GPU won at the largest
+     * {@code keysPerWorkItem} tried and should have been extended, but was not, because the decision
+     * consulted the global winner — the discrete card's arm, which sat comfortably inside its range
+     * and therefore reported "nothing to extend". The slower device's winner is then a silent lower
+     * bound, which is the exact defect the extension exists to prevent.
+     *
+     * <p>Invisible on a single-GPU box, where the global winner and the device winner are the same
+     * arm. Passing the device's own arms in makes the confusion structurally impossible rather than
+     * merely fixed.
+     */
+    @Test
+    public void nextExtensionArmForDevice_deviceWinnerAtTheEdgeWhileAFasterDeviceIsNot_stillExtends() {
+        // This device peaked at the largest keysPerWorkItem it was given.
+        List<TuneConfiguration.ArmResult> slowDeviceArms = List.of(
+                new TuneConfiguration.ArmResult(21, 16, 400_000.0d, 1.0d, 20.0d, null),
+                new TuneConfiguration.ArmResult(21, 64, 1_152_911.61d, 1.0d, 20.0d, null));
+
+        TuneConfiguration.SweepExtension next =
+                TuneConfiguration.nextExtensionArmForDevice(slowDeviceArms, 64, 21, true);
+
+        assertThat(next, is(notNullValue()));
+        assertThat(next.keysPerWorkItem(), is(equalTo(128)));
+        assertThat(next.batchSizeInBits(), is(equalTo(21)));
+    }
+
+    /** A device whose own winner sits inside its range still must not be extended. */
+    @Test
+    public void nextExtensionArmForDevice_deviceWinnerInsideItsRange_doesNotExtend() {
+        List<TuneConfiguration.ArmResult> fastDeviceArms = List.of(
+                new TuneConfiguration.ArmResult(19, 4, 11_107_682.60d, 1.0d, 20.0d, null),
+                new TuneConfiguration.ArmResult(19, 64, 5_000_000.0d, 1.0d, 20.0d, null));
+
+        assertThat(TuneConfiguration.nextExtensionArmForDevice(fastDeviceArms, 64, 21, true), is(nullValue()));
+    }
+
+    @Test
+    public void nextExtensionArmForDevice_deviceProducedNoUsableArm_doesNotExtend() {
+        List<TuneConfiguration.ArmResult> failedOnly =
+                List.of(new TuneConfiguration.ArmResult(21, 64, 0.0d, 0.0d, 0.0d, "CLException: CL_OUT_OF_RESOURCES"));
+
+        assertThat(TuneConfiguration.nextExtensionArmForDevice(failedOnly, 64, 21, true), is(nullValue()));
+    }
+
     @Test
     public void nextExtensionArm_winnerInsideTheSweptRange_doesNotContinue() {
         TuneConfiguration.ArmResult winner =

@@ -505,6 +505,8 @@ public class TuneConfiguration implements Runnable, Interruptable {
             FilterPayload payload,
             KeyUtility keyUtility,
             BitHelper bitHelper) {
+        // Remember where this device's arms start so the extension judges it by its own results.
+        int deviceArmsFromIndex = results.size();
         List<Integer> batchCandidates = cTuneConfiguration.batchSizeInBitsCandidates;
         List<Integer> keysPerWorkItemCandidates = cTuneConfiguration.keysPerWorkItemCandidates;
         int armCount = batchCandidates.size() * keysPerWorkItemCandidates.size();
@@ -550,7 +552,8 @@ public class TuneConfiguration implements Runnable, Interruptable {
                 keyUtility,
                 bitHelper,
                 Collections.max(batchCandidates),
-                Collections.max(keysPerWorkItemCandidates));
+                Collections.max(keysPerWorkItemCandidates),
+                deviceArmsFromIndex);
     }
 
     /**
@@ -572,7 +575,8 @@ public class TuneConfiguration implements Runnable, Interruptable {
             KeyUtility keyUtility,
             BitHelper bitHelper,
             int largestSweptBatchSizeInBits,
-            int largestSweptKeysPerWorkItem) {
+            int largestSweptKeysPerWorkItem,
+            int deviceArmsFromIndex) {
         if (!cTuneConfiguration.extendSweepWhenWinnerIsAtTheEdge) {
             return;
         }
@@ -584,12 +588,15 @@ public class TuneConfiguration implements Runnable, Interruptable {
             if (!shouldRun.get()) {
                 return;
             }
-            ArmResult currentWinner = pickWinner(results);
+            // This device's own arms only. Consulting the global list would judge a slow device by
+            // a fast one's winner -- see nextExtensionArmForDevice.
+            List<ArmResult> deviceArms = new ArrayList<>(results.subList(deviceArmsFromIndex, results.size()));
+            ArmResult currentWinner = pickWinner(deviceArms);
             if (currentWinner == null) {
                 return;
             }
             SweepExtension next =
-                    nextExtensionArm(currentWinner, largestKeysPerWorkItem, largestBatchSizeInBits, openCl);
+                    nextExtensionArmForDevice(deviceArms, largestKeysPerWorkItem, largestBatchSizeInBits, openCl);
             if (next == null) {
                 return;
             }
@@ -1494,6 +1501,35 @@ public class TuneConfiguration implements Runnable, Interruptable {
             return new SweepExtension(winner.batchSizeInBits() + 1, winner.keysPerWorkItem(), "batchSizeInBits");
         }
         return null;
+    }
+
+    /**
+     * Decides the next arm for <b>one device</b>, from that device's own results.
+     *
+     * <p>Exists so the extension can never again be judged against another device's arm. A dual-GPU
+     * run found that defect: the slower integrated GPU won at the largest {@code keysPerWorkItem}
+     * swept and was not extended, because the decision consulted the global winner — the discrete
+     * card, which sat inside its range. The slower device's reported optimum was therefore a silent
+     * lower bound, which is precisely what the extension exists to prevent. A single-GPU machine
+     * cannot show this, because there the global winner and the device winner are the same arm.
+     *
+     * @param deviceArms                  the arms measured on this device, in measurement order
+     * @param largestSweptKeysPerWorkItem the largest {@code keysPerWorkItem} measured on it
+     * @param largestSweptBatchSizeInBits the largest {@code batchSizeInBits} measured on it
+     * @param openCl                      whether the swept producer is GPU-backed
+     * @return the next arm to measure on this device, or {@code null} when it should stop
+     */
+    @VisibleForTesting
+    static @Nullable SweepExtension nextExtensionArmForDevice(
+            List<ArmResult> deviceArms,
+            int largestSweptKeysPerWorkItem,
+            int largestSweptBatchSizeInBits,
+            boolean openCl) {
+        ArmResult deviceWinner = pickWinner(deviceArms);
+        if (deviceWinner == null) {
+            return null;
+        }
+        return nextExtensionArm(deviceWinner, largestSweptKeysPerWorkItem, largestSweptBatchSizeInBits, openCl);
     }
 
     /**
