@@ -57,3 +57,6 @@ nbactions.xml
 # Python bytecode from running docs/measurements/test_register_machine.py
 __pycache__/
 *.py[cod]
+
+# JVM heap dumps (pom.xml sets -XX:+HeapDumpOnOutOfMemoryError)
+*.hprof

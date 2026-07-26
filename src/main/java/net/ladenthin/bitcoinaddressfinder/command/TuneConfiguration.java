@@ -128,6 +128,13 @@ public class TuneConfiguration implements Runnable, Interruptable {
     private static final Logger LOGGER = LoggerFactory.getLogger(TuneConfiguration.class);
 
     /**
+     * Rough host-heap cost of one candidate held on the host: an uncompressed and a compressed key
+     * encoding plus object headers. Deliberately approximate — it decides whether to warn, it does
+     * not predict.
+     */
+    private static final long ESTIMATED_HEAP_BYTES_PER_CANDIDATE = 200L;
+
+    /**
      * Documented false-positive rate of a Binary Fuse 8 filter (0.3874 %).
      *
      * <p>A property of the construction — 8-bit fingerprints, 3-wise peeling — not of the host, so
@@ -517,6 +524,22 @@ public class TuneConfiguration implements Runnable, Interruptable {
                 keysPerWorkItemCandidates.size(),
                 cTuneConfiguration.warmupSecondsPerArm,
                 cTuneConfiguration.secondsPerArm);
+
+        if (template instanceof CProducerOpenCL cProducerOpenCL) {
+            // Warn once per device, at the largest grid this sweep will attempt, before spending
+            // twenty minutes discovering it the hard way.
+            String heapWarning = hostHeapWarning(
+                    Collections.max(batchCandidates),
+                    cProducerOpenCL.enableGpuFilter,
+                    (cTuneConfiguration.finder == null || cTuneConfiguration.finder.consumerJava == null
+                                    ? 1
+                                    : cTuneConfiguration.finder.consumerJava.queueSize)
+                            + cProducerOpenCL.maxResultReaderThreads,
+                    Runtime.getRuntime().maxMemory());
+            if (!heapWarning.isEmpty()) {
+                LOGGER.warn(heapWarning);
+            }
+        }
 
         int armIndex = 0;
         for (int batchSizeInBits : batchCandidates) {
@@ -1719,8 +1742,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
         if (devices.isEmpty()) {
             return Collections.emptyList();
         }
-        CProducerOpenCL prototype = new CProducerOpenCL();
-        prototype.keyProducerId = firstKeyProducerId(cFinder);
+        CProducerOpenCL prototype = autoDiscoveryPrototype(firstKeyProducerId(cFinder));
         LOGGER.info(
                 "No producer configured; sweeping every detected GPU instead. {} found: {}.",
                 devices.size(),
@@ -1734,6 +1756,67 @@ public class TuneConfiguration implements Runnable, Interruptable {
                                 + ")")
                         .collect(Collectors.joining("; ")));
         return templatesForDevices(devices, prototype);
+    }
+
+    /**
+     * Builds the producer settings an auto-discovered device is swept with.
+     *
+     * <p><b>The GPU pre-filter is switched on</b>, unlike {@code CProducerOpenCL}'s own default. The
+     * tuner builds a filter payload for {@link CTuneConfiguration#targetDatabaseEntries} in any case
+     * — a minute of work at 141 M entries — so sweeping without it throws that away, measures
+     * full-transfer throughput while claiming to describe the pipeline the operator will run, and
+     * transfers every candidate back to the host. The last of those is not merely wasteful: the
+     * result reader then materialises {@code 2^batchSizeInBits} {@code PublicKeyBytes} per grid, and
+     * a real sweep died with {@code OutOfMemoryError: Java heap space} at {@code batchSizeInBits=22}
+     * on a 15.4 GiB heap — below the shipped candidate list's maximum of 24.
+     *
+     * @param keyProducerId the key producer every discovered device draws from
+     * @return the prototype every discovered device's template is copied from
+     */
+    @VisibleForTesting
+    static CProducerOpenCL autoDiscoveryPrototype(String keyProducerId) {
+        CProducerOpenCL prototype = new CProducerOpenCL();
+        prototype.keyProducerId = keyProducerId;
+        prototype.enableGpuFilter = true;
+        prototype.transferAll = false;
+        return prototype;
+    }
+
+    /**
+     * Warns when a swept arm would move its whole grid across to the host heap.
+     *
+     * <p>Without a GPU pre-filter every candidate is read back and enqueued, so a whole grid of
+     * {@code PublicKeyBytes} is materialised per reader and per queued batch. That is a <em>host
+     * heap</em> limit, not a device one, and the resulting {@code OutOfMemoryError} names neither the
+     * setting nor the grid size that caused it — which is why it was first diagnosed as a
+     * device-memory problem.
+     *
+     * <p>The estimate is coarse on purpose and errs toward warning: it triggers at a quarter of the
+     * heap, because a sweep that dies twenty minutes in has already cost more than a warning nobody
+     * needed. A measured failure at {@code batchSizeInBits=22} on a 15.4 GiB heap sits comfortably
+     * inside that boundary.
+     *
+     * @param batchSizeInBits the arm's grid size exponent
+     * @param enableGpuFilter whether the producer filters on the GPU
+     * @param gridsInFlight   how many grids can be live at once — queue depth plus result readers
+     * @param maxHeapBytes    the JVM's maximum heap
+     * @return the warning, or an empty string when the arm is not at risk
+     */
+    @VisibleForTesting
+    static String hostHeapWarning(int batchSizeInBits, boolean enableGpuFilter, int gridsInFlight, long maxHeapBytes) {
+        if (enableGpuFilter) {
+            return "";
+        }
+        long candidatesInFlight = (long) Math.max(gridsInFlight, 1) * (1L << batchSizeInBits);
+        long estimatedBytes = candidatesInFlight * ESTIMATED_HEAP_BYTES_PER_CANDIDATE;
+        if (estimatedBytes < maxHeapBytes / 4L) {
+            return "";
+        }
+        return "enableGpuFilter is false, so every one of the 2^" + batchSizeInBits
+                + " candidates per grid is read back and enqueued: roughly "
+                + (estimatedBytes / (1024L * 1024L)) + " MiB of host heap against a maximum of "
+                + (maxHeapBytes / (1024L * 1024L)) + " MiB. This runs out of Java heap, not device"
+                + " memory. Enable the GPU filter, lower batchSizeInBits, or raise -Xmx.";
     }
 
     /**

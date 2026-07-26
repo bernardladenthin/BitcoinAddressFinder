@@ -81,6 +81,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TuneConfiguration`); only the rendered field changed.
 
 ### Fixed
+- **Auto-discovered devices are swept with the GPU pre-filter on** — they inherited
+  `CProducerOpenCL`'s default of `false`, which caused three faults at once: the filter payload the
+  tuner builds for `targetDatabaseEntries` was thrown away unused, the sweep measured full-transfer
+  throughput while claiming to describe the pipeline the operator will run, and every candidate
+  crossed back to the host. The last one killed real runs: the result reader materialises
+  `2^batchSizeInBits` `PublicKeyBytes` per grid, so a sweep died with `OutOfMemoryError: Java heap
+  space` at `batchSizeInBits=22` on a 15.4 GiB heap — below the shipped candidate list's maximum
+  of 24. Emptying the example's `producerOpenCL` list to demonstrate auto-discovery had silently
+  moved it onto that default and taken its `enableGpuFilter: true` away. A sweep that still runs
+  without a filter now warns up front with the estimated host-heap cost, because the JVM's own error
+  names neither the setting nor the grid size responsible.
 - **The sweep extension judged a slow device by a fast one's winner** — on a multi-device run the
   decision consulted the global best arm instead of the device being swept, so an integrated GPU that
   won at the largest `keysPerWorkItem` tried got no extension: the discrete card's winner sat inside

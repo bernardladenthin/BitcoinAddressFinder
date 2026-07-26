@@ -463,6 +463,62 @@ public class TuneConfigurationTest extends LMDBBase {
      * <p>{@code warmupSecondsPerArm = 0} on purpose: warmup exists to absorb kernel compilation and
      * GPU clock ramp, neither of which a CPU producer has, so here it would only spend fork time.
      */
+    // <editor-fold desc="auto-discovery defaults">
+    /**
+     * An auto-discovered device must sweep <b>with the GPU pre-filter on</b>.
+     *
+     * <p>{@code CProducerOpenCL} defaults it off, and building the discovery prototype from bare
+     * defaults produced three faults at once on a real machine:
+     *
+     * <ul>
+     *   <li>The tuner builds a filter payload for {@code targetDatabaseEntries} regardless — a minute
+     *       of work at 141 M entries — and then never used it.
+     *   <li>It measured full-transfer throughput while claiming to measure the pipeline the operator
+     *       will run, which the guide and the emitted recommendation both put behind a filter.
+     *   <li>Every candidate crossed back to the host, so the result reader materialised
+     *       {@code 2^batchSizeInBits} {@code PublicKeyBytes} per grid and the sweep died with
+     *       {@code OutOfMemoryError: Java heap space} at {@code batchSizeInBits=22} on a 15.4 GiB
+     *       heap — long before the shipped candidate list reaches 24.
+     * </ul>
+     *
+     * <p>The shipped example carried {@code enableGpuFilter: true} until its {@code producerOpenCL}
+     * list was emptied to demonstrate auto-discovery; emptying it silently moved the example onto the
+     * defaults and took the setting away with it.
+     */
+    @Test
+    public void autoDiscoveryPrototype_enablesTheGpuFilterRatherThanInheritingTheOffDefault() {
+        CProducerOpenCL prototype = TuneConfiguration.autoDiscoveryPrototype("tuneKeyProducer");
+
+        assertThat(prototype.enableGpuFilter, is(true));
+        assertThat(prototype.transferAll, is(false));
+        assertThat(prototype.keyProducerId, is(equalTo("tuneKeyProducer")));
+    }
+
+    /**
+     * An operator who turns the filter off explicitly keeps that choice, but must be told what it
+     * costs before a 20-minute sweep dies on the heap rather than on the device.
+     */
+    @Test
+    public void hostHeapWarning_filterOffAtALargeGrid_warnsAboutTheHostHeapNotTheDevice() {
+        String warning = TuneConfiguration.hostHeapWarning(22, false, 8, 16L * 1024 * 1024 * 1024);
+
+        assertThat(warning, not(equalTo("")));
+        assertThat(warning, containsString("enableGpuFilter"));
+        assertThat(warning, containsString("heap"));
+    }
+
+    @Test
+    public void hostHeapWarning_filterOn_saysNothing() {
+        assertThat(TuneConfiguration.hostHeapWarning(24, true, 8, 16L * 1024 * 1024 * 1024), is(equalTo("")));
+    }
+
+    /** A small grid transfers little, so the warning must not fire on every filterless run. */
+    @Test
+    public void hostHeapWarning_filterOffButSmallGrid_saysNothing() {
+        assertThat(TuneConfiguration.hostHeapWarning(16, false, 8, 16L * 1024 * 1024 * 1024), is(equalTo("")));
+    }
+    // </editor-fold>
+
     // <editor-fold desc="multi device">
     /**
      * Every GPU the machine has must end up swept, because that is what someone with two cards
@@ -865,6 +921,11 @@ public class TuneConfigurationTest extends LMDBBase {
 
         CTuneConfiguration cTuneConfiguration = new CTuneConfiguration();
         cTuneConfiguration.finder = cFinder;
+        // The default is the real Light DB tier (141 M entries). Auto-discovered devices now sweep
+        // with the GPU pre-filter on, so that default would have every OpenCL test build a genuine
+        // 141 M-entry Binary Fuse filter — several GB of peeling inside a 2 GB Surefire fork. The
+        // filter's size is irrelevant to what these tests assert; only that one exists.
+        cTuneConfiguration.targetDatabaseEntries = 1_000L;
         cTuneConfiguration.warmupSecondsPerArm = 0;
         cTuneConfiguration.secondsPerArm = SECONDS_PER_ARM;
         cTuneConfiguration.batchSizeInBitsCandidates = BATCH_SIZE_CANDIDATES;
