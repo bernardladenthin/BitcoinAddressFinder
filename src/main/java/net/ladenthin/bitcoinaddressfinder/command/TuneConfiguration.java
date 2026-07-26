@@ -14,9 +14,13 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -44,6 +48,7 @@ import net.ladenthin.bitcoinaddressfinder.engine.Finder;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDeviceTopology;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
@@ -1072,6 +1077,44 @@ public class TuneConfiguration implements Runnable, Interruptable {
         }
     }
 
+    /**
+     * Renders the per-device winner section: one line per swept device naming its own optimum, so a
+     * multi-GPU report shows that a slower card wanted different settings than the single global
+     * winner. The flat arms table above does not attribute rows to devices, and the emitted JSON is
+     * the only other place the per-device optimum appears — a reader of the report alone would
+     * otherwise never learn it.
+     *
+     * <p>Returns an empty string when fewer than two devices were swept: with one device the global
+     * {@code Winner} line already states it, and repeating it here would only add noise.
+     *
+     * @param deviceSweeps the per-device breakdown, in sweep order
+     * @return the rendered section (terminated by a newline), or an empty string for a single device
+     */
+    @VisibleForTesting
+    static String renderPerDeviceWinners(List<DeviceSweep> deviceSweeps) {
+        if (deviceSweeps.size() < 2) {
+            return "";
+        }
+        StringBuilder section = new StringBuilder(256);
+        section.append("Winner per device (MEASURED):\n");
+        for (DeviceSweep sweep : deviceSweeps) {
+            ArmResult best = sweep.winner();
+            if (best == null) {
+                section.append(String.format(
+                        Locale.ROOT, "  %s: no arm produced a usable measurement%n", sweep.deviceLabel()));
+            } else {
+                section.append(String.format(
+                        Locale.ROOT,
+                        "  %s: batchSizeInBits=%d keysPerWorkItem=%d at %s candidates/s%n",
+                        sweep.deviceLabel(),
+                        best.batchSizeInBits(),
+                        best.keysPerWorkItem(),
+                        format(best.candidatesPerSecond())));
+            }
+        }
+        return section.toString();
+    }
+
     private String buildReport(CProducer template) {
         StringBuilder report = new StringBuilder(2_048);
         report.append("\n########## BEGIN TuneConfiguration report ##########\n");
@@ -1121,6 +1164,11 @@ public class TuneConfiguration implements Runnable, Interruptable {
             if (!boundaryNote.isEmpty()) {
                 report.append(boundaryNote).append('\n');
             }
+        }
+
+        String perDeviceWinners = renderPerDeviceWinners(deviceSweeps);
+        if (!perDeviceWinners.isEmpty()) {
+            report.append('\n').append(perDeviceWinners);
         }
 
         report.append('\n').append("Filter choice - total = probe + fpr x verification:\n");
@@ -1174,12 +1222,32 @@ public class TuneConfiguration implements Runnable, Interruptable {
      * An OpenCL device the sweep can target, reduced to what the tuner needs to address and describe
      * it.
      *
-     * @param platformIndex the platform's position in the enumeration, as {@code producerOpenCL} means it
-     * @param deviceIndex   the device's position <em>within that platform</em>
-     * @param deviceName    the device's reported name, used to label its section of the report
-     * @param deviceType    the raw {@code CL_DEVICE_TYPE} bit field
+     * @param platformIndex  the platform's position in the enumeration, as {@code producerOpenCL} means it
+     * @param deviceIndex    the device's position <em>within that platform</em>
+     * @param deviceName     the device's reported name, used to label its section of the report
+     * @param deviceType     the raw {@code CL_DEVICE_TYPE} bit field
+     * @param pciFingerprint a PCIe-topology fingerprint identifying the physical GPU, or {@code null}
+     *     when it could not be determined; two entries with the same non-null fingerprint are the same
+     *     physical card seen through two OpenCL platforms
      */
-    public record DetectedDevice(int platformIndex, int deviceIndex, String deviceName, long deviceType) {
+    public record DetectedDevice(
+            int platformIndex,
+            int deviceIndex,
+            String deviceName,
+            long deviceType,
+            @Nullable String pciFingerprint) {
+
+        /**
+         * Convenience constructor for callers and tests that have no PCIe topology to supply.
+         *
+         * @param platformIndex the platform's position in the enumeration
+         * @param deviceIndex   the device's position within that platform
+         * @param deviceName    the device's reported name
+         * @param deviceType    the raw {@code CL_DEVICE_TYPE} bit field
+         */
+        public DetectedDevice(int platformIndex, int deviceIndex, String deviceName, long deviceType) {
+            this(platformIndex, deviceIndex, deviceName, deviceType, null);
+        }
 
         /**
          * Returns whether this is a GPU.
@@ -1212,11 +1280,75 @@ public class TuneConfiguration implements Runnable, Interruptable {
                 DetectedDevice detected =
                         new DetectedDevice(platformIndex, deviceIndex, device.deviceName(), device.deviceType());
                 if (detected.isGpu()) {
-                    devices.add(detected);
+                    devices.add(new DetectedDevice(
+                            platformIndex,
+                            deviceIndex,
+                            device.deviceName(),
+                            device.deviceType(),
+                            OpenCLDeviceTopology.pciFingerprintOf(device)));
                 }
             }
         }
-        return devices;
+        return dedupePhysicalDevices(devices);
+    }
+
+    /**
+     * Collapses device entries that are the same physical GPU seen through more than one OpenCL
+     * platform, so a duplicate ICD registration does not make the sweep measure — and the emitted
+     * configuration then drive — one card several times over.
+     *
+     * <p>Two entries are the same physical GPU only when they share a non-null PCIe-topology
+     * {@link DetectedDevice#pciFingerprint() fingerprint}. A {@code null} fingerprint means the
+     * topology is unknown, so such a device is always kept: merging on anything weaker (the device
+     * name) would wrongly collapse a rig of identical cards, which reports identical names but occupies
+     * distinct PCIe slots. When a name recurs with unknown topology the ambiguity is only logged, not
+     * acted on.
+     *
+     * @param devices the detected GPUs, in enumeration order
+     * @return the physically distinct GPUs, first occurrence kept, in enumeration order
+     */
+    @VisibleForTesting
+    static List<DetectedDevice> dedupePhysicalDevices(List<DetectedDevice> devices) {
+        List<DetectedDevice> unique = new ArrayList<>();
+        Map<String, DetectedDevice> firstByFingerprint = new HashMap<>();
+        Set<String> namesKept = new HashSet<>();
+        Set<String> namesWarned = new HashSet<>();
+        for (DetectedDevice device : devices) {
+            String fingerprint = device.pciFingerprint();
+            if (fingerprint != null) {
+                DetectedDevice first = firstByFingerprint.get(fingerprint);
+                if (first != null) {
+                    LOGGER.info(
+                            "Skipping {} (platformIndex={}, deviceIndex={}): it is the same physical GPU as {}"
+                                    + " (platformIndex={}, deviceIndex={}, PCIe {}) exposed by a second OpenCL"
+                                    + " platform. Sweeping it once.",
+                            device.deviceName(),
+                            device.platformIndex(),
+                            device.deviceIndex(),
+                            first.deviceName(),
+                            first.platformIndex(),
+                            first.deviceIndex(),
+                            fingerprint);
+                    continue;
+                }
+                firstByFingerprint.put(fingerprint, device);
+                namesKept.add(device.deviceName());
+                unique.add(device);
+                continue;
+            }
+            // Topology unknown: keep the device (never merge on the weaker name signal), but warn once
+            // per name when it recurs — it may be the same card seen through a second ICD and would
+            // then be swept, and later driven, more than once.
+            if (!namesKept.add(device.deviceName()) && namesWarned.add(device.deviceName())) {
+                LOGGER.warn(
+                        "{} appears under more than one OpenCL platform but its PCIe topology is unavailable,"
+                                + " so it cannot be confirmed as one physical GPU. It may be swept and later"
+                                + " driven more than once; configure producerOpenCL explicitly to pick one.",
+                        device.deviceName());
+            }
+            unique.add(device);
+        }
+        return unique;
     }
 
     /**

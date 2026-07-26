@@ -162,6 +162,95 @@ public class TuneConfigurationTest extends LMDBBase {
         assertThat(cTuneConfiguration.finder.producerOpenCL, is(not(empty())));
     }
 
+    @Test
+    public void dedupePhysicalDevices_sameCardUnderTwoPlatforms_collapsesToOnePerPhysicalGpu() {
+        // The real topology of a Windows AMD box with a duplicate ICD: two platforms, each exposing
+        // both physical GPUs, so four entries for two cards. Same PCIe fingerprint => same card.
+        List<TuneConfiguration.DetectedDevice> detected = List.of(
+                new TuneConfiguration.DetectedDevice(0, 0, "gfx1100", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:3:0:0"),
+                new TuneConfiguration.DetectedDevice(0, 1, "gfx1036", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:16:0:0"),
+                new TuneConfiguration.DetectedDevice(1, 0, "gfx1100", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:3:0:0"),
+                new TuneConfiguration.DetectedDevice(1, 1, "gfx1036", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:16:0:0"));
+
+        List<TuneConfiguration.DetectedDevice> deduped = TuneConfiguration.dedupePhysicalDevices(detected);
+
+        // Two physical GPUs, first occurrence of each kept (platform 0).
+        assertThat(deduped, hasSize(2));
+        assertThat(deduped.get(0).platformIndex(), is(equalTo(0)));
+        assertThat(deduped.get(0).deviceName(), is(equalTo("gfx1100")));
+        assertThat(deduped.get(1).platformIndex(), is(equalTo(0)));
+        assertThat(deduped.get(1).deviceName(), is(equalTo("gfx1036")));
+    }
+
+    @Test
+    public void dedupePhysicalDevices_identicalCardsInOnePlatform_areKept() {
+        // A mining rig: several identical cards in one platform share a name but sit in distinct PCIe
+        // slots. They must NOT be collapsed — distinct fingerprints keep them all.
+        List<TuneConfiguration.DetectedDevice> detected = List.of(
+                new TuneConfiguration.DetectedDevice(0, 0, "gfx1030", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:1:0:0"),
+                new TuneConfiguration.DetectedDevice(0, 1, "gfx1030", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:2:0:0"),
+                new TuneConfiguration.DetectedDevice(0, 2, "gfx1030", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:3:0:0"));
+
+        assertThat(TuneConfiguration.dedupePhysicalDevices(detected), hasSize(3));
+    }
+
+    @Test
+    public void dedupePhysicalDevices_unknownTopology_keepsEveryDeviceUnmerged() {
+        // No topology available (null fingerprint): the tuner must never merge on the weaker name
+        // signal, so every entry is kept — falling back to today's behaviour, not regressing it.
+        List<TuneConfiguration.DetectedDevice> detected = List.of(
+                new TuneConfiguration.DetectedDevice(0, 0, "GPU", CL.CL_DEVICE_TYPE_GPU, null),
+                new TuneConfiguration.DetectedDevice(1, 0, "GPU", CL.CL_DEVICE_TYPE_GPU, null));
+
+        assertThat(TuneConfiguration.dedupePhysicalDevices(detected), hasSize(2));
+    }
+
+    @Test
+    public void renderPerDeviceWinners_multipleDevices_listsEachDevicesOwnWinner() {
+        TuneConfiguration.ArmResult fastWin =
+                new TuneConfiguration.ArmResult(18, 16, 22_000_000.0d, 44_000_000.0d, 3.0d, null);
+        TuneConfiguration.ArmResult slowWin =
+                new TuneConfiguration.ArmResult(19, 64, 2_900_000.0d, 5_800_000.0d, 3.0d, null);
+        List<TuneConfiguration.DeviceSweep> sweeps = List.of(
+                new TuneConfiguration.DeviceSweep(
+                        "gfx1100 (platformIndex=0, deviceIndex=0)", List.of(fastWin), fastWin),
+                new TuneConfiguration.DeviceSweep(
+                        "gfx1036 (platformIndex=0, deviceIndex=1)", List.of(slowWin), slowWin));
+
+        String rendered = TuneConfiguration.renderPerDeviceWinners(sweeps);
+
+        assertThat(rendered, containsString("Winner per device (MEASURED):"));
+        assertThat(
+                rendered,
+                containsString("gfx1100 (platformIndex=0, deviceIndex=0): batchSizeInBits=18 keysPerWorkItem=16"));
+        assertThat(
+                rendered,
+                containsString("gfx1036 (platformIndex=0, deviceIndex=1): batchSizeInBits=19 keysPerWorkItem=64"));
+    }
+
+    @Test
+    public void renderPerDeviceWinners_singleDevice_isEmptySoItDoesNotRepeatTheGlobalWinner() {
+        TuneConfiguration.ArmResult win =
+                new TuneConfiguration.ArmResult(18, 16, 22_000_000.0d, 44_000_000.0d, 3.0d, null);
+        List<TuneConfiguration.DeviceSweep> sweeps = List.of(
+                new TuneConfiguration.DeviceSweep("gfx1100 (platformIndex=0, deviceIndex=0)", List.of(win), win));
+
+        assertThat(TuneConfiguration.renderPerDeviceWinners(sweeps), is(equalTo("")));
+    }
+
+    @Test
+    public void renderPerDeviceWinners_deviceWithoutAWinner_reportsNoMeasurement() {
+        TuneConfiguration.ArmResult win =
+                new TuneConfiguration.ArmResult(18, 16, 22_000_000.0d, 44_000_000.0d, 3.0d, null);
+        List<TuneConfiguration.DeviceSweep> sweeps = List.of(
+                new TuneConfiguration.DeviceSweep("gfx1100 (platformIndex=0, deviceIndex=0)", List.of(win), win),
+                new TuneConfiguration.DeviceSweep("dead (platformIndex=1, deviceIndex=0)", List.of(), null));
+
+        assertThat(
+                TuneConfiguration.renderPerDeviceWinners(sweeps),
+                containsString("dead (platformIndex=1, deviceIndex=0): no arm produced a usable measurement"));
+    }
+
     /**
      * Each device keeps its own optimum. A single winner applied across devices would hand the
      * slower card the faster card's settings — on a contributor's laptop the integrated GPU would
