@@ -3,7 +3,7 @@
   "tuneConfiguration": {
     "secondsPerArm": 20,
     "warmupSecondsPerArm": 5,
-    "targetDatabaseEntries": 132288304,
+    "targetDatabaseEntries": 141045995,
     "batchSizeInBitsCandidates": [18, 19, 20, 21, 22, 23, 24],
     "keysPerWorkItemCandidates": [1, 4, 16, 64, 256],
     "sweepFilterTypes": false,
@@ -39,25 +39,7 @@
       "awaitTerminateSeconds": 31536000000,
       "producerJava": [],
       "producerJavaSecretsFiles": [],
-      "producerOpenCL": [
-        {
-          "platformIndex": 0,
-          "deviceType": -1,
-          "deviceIndex": 0,
-          "maxResultReaderThreads": 4,
-          "keyProducerId": "exampleKeyProducerSecureRandomId",
-          "batchSizeInBits": 18,
-          "keysPerWorkItem": 16,
-          "batchUsePrivateKeyIncrement": true,
-          "logSecretBase": false,
-          "runOnce": false,
-          "shutdownTimeoutSeconds": 300,
-          "enableGpuFilter": true,
-          "transferAll": false,
-          "gpuFilterType": "FUSE_8",
-          "useSafeGcdInverse": true
-        }
-      ]
+      "producerOpenCL": []
     }
   }
 }

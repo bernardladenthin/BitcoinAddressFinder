@@ -275,8 +275,12 @@ public class BitcoinAddressFinderArchitectureTest {
             .mayOnlyBeAccessedByLayers("Command", "Engine", "Producer")
             .whereLayer("Keyproducer")
             .mayOnlyBeAccessedByLayers("Command", "Engine", "Producer")
+            // "Command" is on this list because TuneConfiguration enumerates the machine's OpenCL
+            // devices so it can sweep every GPU rather than only the first one configured. That is
+            // the same discovery Cli already performs for OpenCLInfo; doing it anywhere else would
+            // mean passing a device list into a command constructed from configuration alone.
             .whereLayer("Opencl")
-            .mayOnlyBeAccessedByLayers("Cli", "Producer")
+            .mayOnlyBeAccessedByLayers("Cli", "Command", "Producer")
             .whereLayer("Persistence")
             .mayOnlyBeAccessedByLayers("Command", "Consumer", "Engine")
             .whereLayer("Io")

@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder.command;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasItem;
@@ -35,6 +36,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.GpuFilterType;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import nl.altindag.log.LogCaptor;
+import org.jocl.CL;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -123,20 +125,67 @@ public class TuneConfigurationTest extends LMDBBase {
         assertThat(parsed.finder.producerJava.get(0).batchSizeInBits, is(equalTo(winner.batchSizeInBits())));
     }
 
+    /**
+     * An empty producer list used to be an error. It is instead the state most first runs are in —
+     * the operator does not yet know what to write — so the tuner enumerates the machine's GPUs and
+     * measures each. Being told "configure a producer first" is of no use to someone who ran the
+     * tuner precisely to find out what to configure.
+     *
+     * <p>Only the GPU case is asserted here. The remaining error path (nothing configured and no
+     * OpenCL device present) still throws, but reaching it would require a machine without a GPU or
+     * mocking the device enumeration, and it is the branch that changed least.
+     */
     @Test
-    public void run_noProducerConfigured_throwsBecauseThereIsNoSweepTemplate() {
+    @OpenCLTest
+    public void run_noProducerConfiguredButGpuPresent_sweepsTheDetectedDevices() {
         // arrange
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
         CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();
         cTuneConfiguration.finder.producerJava.clear();
+        cTuneConfiguration.batchSizeInBitsCandidates =
+                List.of(Math.min(4, new OpenCLPlatformAssume().maxGridBitsForAvailableDevice()));
+        cTuneConfiguration.extendSweepWhenWinnerIsAtTheEdge = false;
 
-        // act + assert
+        // act
         TuneConfiguration tuneConfiguration = new TuneConfiguration(cTuneConfiguration);
-        try {
-            tuneConfiguration.run();
-            throw new AssertionError("expected IllegalArgumentException for a configuration without any producer");
-        } catch (IllegalArgumentException e) {
-            assertThat(e.getMessage(), is(notNullValue()));
+        tuneConfiguration.run();
+
+        // assert: a device was found, swept, and reported under its own label with its own winner
+        assertThat(tuneConfiguration.getDeviceSweeps(), is(not(empty())));
+        assertThat(tuneConfiguration.getResults(), is(not(empty())));
+        for (TuneConfiguration.DeviceSweep sweep : tuneConfiguration.getDeviceSweeps()) {
+            assertThat(sweep.deviceLabel(), containsString("platformIndex="));
+            assertThat(sweep.arms(), is(not(empty())));
         }
+        // the discovered devices become the configuration's producers, so the recommendation
+        // describes the run that was measured rather than the empty list it started from
+        assertThat(cTuneConfiguration.finder.producerOpenCL, is(not(empty())));
+    }
+
+    /**
+     * Each device keeps its own optimum. A single winner applied across devices would hand the
+     * slower card the faster card's settings — on a contributor's laptop the integrated GPU would
+     * have received {@code 24/2048} when its own optimum was {@code 23/2048}.
+     */
+    @Test
+    public void applyWinnerTo_openClProducer_writesThatDevicesOwnValues() {
+        CProducerOpenCL producer = new CProducerOpenCL();
+
+        TuneConfiguration.applyWinnerTo(
+                producer, new TuneConfiguration.ArmResult(23, 2048, 36_481_091.96d, 1.0d, 20.0d, null));
+
+        assertThat(producer.batchSizeInBits, is(equalTo(23)));
+        assertThat(producer.keysPerWorkItem, is(equalTo(2048)));
+    }
+
+    @Test
+    public void applyWinnerTo_deviceWithoutAUsableArm_leavesTheProducerUntouched() {
+        CProducerOpenCL producer = new CProducerOpenCL();
+        int originalBatchSizeInBits = producer.batchSizeInBits;
+
+        TuneConfiguration.applyWinnerTo(producer, null);
+
+        assertThat(producer.batchSizeInBits, is(equalTo(originalBatchSizeInBits)));
     }
 
     // </editor-fold>
@@ -282,6 +331,85 @@ public class TuneConfigurationTest extends LMDBBase {
      * <p>{@code warmupSecondsPerArm = 0} on purpose: warmup exists to absorb kernel compilation and
      * GPU clock ramp, neither of which a CPU producer has, so here it would only spend fork time.
      */
+    // <editor-fold desc="multi device">
+    /**
+     * Every GPU the machine has must end up swept, because that is what someone with two cards
+     * expects when they run a tuner once.
+     *
+     * <p>The old behaviour took {@code producerOpenCL.get(0)} silently: a dual-GPU configuration
+     * produced a full-looking report for one device and a paste-ready configuration in which the
+     * second entry still carried the user's guesses, visually indistinguishable from the measured
+     * one. On a real contributor's machine that guess was 2.3× off its device's optimum.
+     */
+    @Test
+    public void templatesForDevices_twoDevices_producesOneTemplateEachCarryingItsIndices() {
+        CProducerOpenCL prototype = new CProducerOpenCL();
+        prototype.keyProducerId = "tuneKeyProducer";
+        List<TuneConfiguration.DetectedDevice> devices = List.of(
+                new TuneConfiguration.DetectedDevice(0, 0, "NVIDIA RTX 500 Ada", CL.CL_DEVICE_TYPE_GPU),
+                new TuneConfiguration.DetectedDevice(1, 0, "Intel(R) Arc(TM) Pro Graphics", CL.CL_DEVICE_TYPE_GPU));
+
+        List<CProducerOpenCL> templates = TuneConfiguration.templatesForDevices(devices, prototype);
+
+        assertThat(templates, hasSize(2));
+        assertThat(templates.get(0).platformIndex, is(equalTo(0)));
+        assertThat(templates.get(0).deviceIndex, is(equalTo(0)));
+        assertThat(templates.get(1).platformIndex, is(equalTo(1)));
+        assertThat(templates.get(1).deviceIndex, is(equalTo(0)));
+    }
+
+    /**
+     * Everything the sweep does not vary has to survive the copy, or the measured configuration
+     * would not be the configuration the operator then runs — the property the whole command rests
+     * on.
+     */
+    @Test
+    public void templatesForDevices_prototypeSettings_areCarriedIntoEveryTemplate() {
+        CProducerOpenCL prototype = new CProducerOpenCL();
+        prototype.keyProducerId = "tuneKeyProducer";
+        prototype.maxResultReaderThreads = 7;
+        prototype.useSafeGcdInverse = false;
+        prototype.gpuFilterType = GpuFilterType.FUSE_16;
+
+        List<CProducerOpenCL> templates = TuneConfiguration.templatesForDevices(
+                List.of(new TuneConfiguration.DetectedDevice(2, 1, "GPU", CL.CL_DEVICE_TYPE_GPU)), prototype);
+
+        assertThat(templates, hasSize(1));
+        assertThat(templates.get(0).maxResultReaderThreads, is(equalTo(7)));
+        assertThat(templates.get(0).useSafeGcdInverse, is(equalTo(false)));
+        assertThat(templates.get(0).gpuFilterType, is(equalTo(GpuFilterType.FUSE_16)));
+        assertThat(templates.get(0).keyProducerId, is(equalTo("tuneKeyProducer")));
+    }
+
+    /** A template must be an independent object, or tuning device 2 would overwrite device 1. */
+    @Test
+    public void templatesForDevices_templates_areIndependentOfTheProtoypeAndEachOther() {
+        CProducerOpenCL prototype = new CProducerOpenCL();
+        prototype.keyProducerId = "tuneKeyProducer";
+        List<CProducerOpenCL> templates = TuneConfiguration.templatesForDevices(
+                List.of(
+                        new TuneConfiguration.DetectedDevice(0, 0, "A", CL.CL_DEVICE_TYPE_GPU),
+                        new TuneConfiguration.DetectedDevice(1, 0, "B", CL.CL_DEVICE_TYPE_GPU)),
+                prototype);
+
+        templates.get(0).batchSizeInBits = 22;
+
+        assertThat(templates.get(1).batchSizeInBits, is(not(equalTo(22))));
+        assertThat(prototype.batchSizeInBits, is(not(equalTo(22))));
+    }
+
+    /**
+     * Only GPUs. A CPU OpenCL runtime (pocl, Intel's CPU ICD) enumerates as a device but duplicates
+     * what {@code producerJava} already does, so sweeping it spends real minutes measuring the wrong
+     * thing — and our own OpenCL CI job runs on pocl.
+     */
+    @Test
+    public void detectedDevice_cpuRuntime_isNotTreatedAsAGpu() {
+        assertThat(new TuneConfiguration.DetectedDevice(0, 0, "pocl CPU", CL.CL_DEVICE_TYPE_CPU).isGpu(), is(false));
+        assertThat(new TuneConfiguration.DetectedDevice(0, 0, "Radeon", CL.CL_DEVICE_TYPE_GPU).isGpu(), is(true));
+    }
+    // </editor-fold>
+
     // <editor-fold desc="sweep extension">
     /**
      * A sweep whose winner sits at the largest value it tried has measured a lower bound, not a

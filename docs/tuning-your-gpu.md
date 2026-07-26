@@ -172,16 +172,18 @@ nothing more, or raise `maxExtensionArms` (default `4`) to let it look further.
 ### 4.3 Set `targetDatabaseEntries` to your real database size
 
 ```json
-"targetDatabaseEntries": 132288304,
+"targetDatabaseEntries": 141045995,
 ```
 
 State the size of the database you **intend to scan against**, not one you happen to have. The tuner
 builds a synthetic filter of exactly that size — the filter's contents do not affect timing, but its
 size does (GPU memory occupancy and how many candidates cross the PCIe bus).
 
-The value is a count of addresses. Two reference points: the Light DB tier is `132288304`, the Full
-DB tier is `1377000000`. If your database is already imported, the address count is printed at
-startup by any `Find` run (`Binary Fuse16 filter: ready (140964881 addresses, …)`).
+The value is a count of addresses. Two reference points, both from the README's database section:
+the Light DB is `141045995` and the Full DB `1472947953` as of the 2026-07-20 publication. They grow
+each time the databases are republished, so check there rather than trusting a number copied from a
+guide. If your database is already imported, the address count is printed at
+startup by any `Find` run (`Binary Fuse16 filter: ready (141045995 addresses, …)`).
 
 ### 4.4 Point the consumer at your database (optional but recommended)
 
@@ -331,27 +333,33 @@ If you prefer to edit your existing config by hand, copy exactly three values in
 
 ---
 
-## 8. Tuning a second GPU
+## 8. More than one GPU
 
-**The sweep tunes one device: the first entry in `producerOpenCL`.** It ignores any further entries.
-So with two GPUs, tune them separately:
+**Nothing to do — every GPU is measured by default.** Leave `producerOpenCL` empty and the tuner
+enumerates the machine's GPUs, sweeps each one in turn, and reports a winner per device. The
+paste-ready configuration then contains one entry per device, each carrying **its own** measured
+values.
 
-1. Make a second config, e.g. `config_TuneConfiguration_gpu1.json`, whose **single** `producerOpenCL`
-   entry carries the second device's `platformIndex` / `deviceIndex`.
-2. Run it, capturing to `log_TuneConfiguration_gpu1.txt`.
-3. Put each winner into the corresponding entry of your dual-GPU `Find` config.
+```json
+"producerOpenCL": []
+```
 
-Two things to know about running two GPUs together:
+Listing entries explicitly remains the override: name one device and exactly that device is swept.
+If you do, and the machine has more GPUs than you listed, the log says so rather than leaving you to
+notice.
 
-- **Each producer needs its own `keyProducerId`.** Key producers cannot be shared between producers.
-- **A tuned-alone result may not hold when both run at once.** On a laptop with a discrete NVIDIA
-  card and an integrated Intel GPU, the integrated GPU measured 16.3 M keys/s alone but delivered
-  5.5 M keys/s with the discrete card running — a 3× loss. An integrated GPU has no memory of its
-  own; it shares system RAM with the host, so a discrete GPU saturating memory bandwidth takes
-  directly from it. A discrete card with its own VRAM does not suffer this. Tune alone, then check
-  the real split in the `Keys per producer` field of the statistics line.
+Two things worth knowing:
 
----
+- **Devices are measured one at a time, on purpose.** Two GPUs running at once contend for host
+  memory bandwidth. On a laptop with a discrete NVIDIA card and an integrated Intel GPU, the
+  integrated one measured 16.3 M keys/s alone and 5.5 M keys/s alongside the discrete card — a 3×
+  loss. An integrated GPU has no memory of its own; it shares system RAM with the host. Tuning them
+  simultaneously would measure that interference instead of the devices.
+- **Expect roughly N × the run time.** The tuner states it up front. Only the sweep repeats — the
+  filter is built once and reused across devices.
+
+After a multi-device run, check the `Keys per producer` field of the statistics line during a real
+`Find` run to see the actual split between your devices.
 
 ## 9. Contributing your numbers
 

@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`TuneConfiguration` measures every GPU, and by default every one it detects** — it used to take
+  `producerOpenCL.get(0)` silently. A dual-GPU configuration produced a full-looking report for one
+  device and a paste-ready configuration whose second entry still held the operator's guesses,
+  visually identical to the measured one; on a contributor's laptop that guess was 2.3× off that
+  device's optimum. All configured entries are now swept in turn, each keeping its own winner, and an
+  empty `producerOpenCL` list — previously an error — means "sweep every detected GPU", which is the
+  state most first runs are in. CPU OpenCL runtimes (pocl, Intel's CPU ICD) are excluded, devices are
+  measured one at a time so they do not contend, and the emitted configuration gives each producer
+  its own key producer per the shipped examples' convention.
+- **Light and Full DB entry counts refreshed** — `targetDatabaseEntries` defaults to `141045995`
+  (Light, 2026-07-20 publication) instead of the stale `132288304`; the Full tier reference is
+  `1472947953`. Historical measurement tables keep the counts they were measured at.
 - **The tuning sweep extends itself instead of advising a re-run** — when the winner lands on the
   largest `keysPerWorkItem` or `batchSizeInBits` tried, `TuneConfiguration` keeps measuring past the
   configured candidates (doubling, or one bit at a time) until an extra arm stops improving. A winner

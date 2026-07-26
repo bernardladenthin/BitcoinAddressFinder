@@ -22,11 +22,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CCommand;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
@@ -40,6 +42,9 @@ import net.ladenthin.bitcoinaddressfinder.core.FireAndForget;
 import net.ladenthin.bitcoinaddressfinder.core.Interruptable;
 import net.ladenthin.bitcoinaddressfinder.engine.Finder;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.PrngAddressIterable;
@@ -58,6 +63,7 @@ import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.util.MultilineLogger;
 import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
 import org.bitcoinj.base.Network;
+import org.jocl.CL;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -175,6 +181,15 @@ public class TuneConfiguration implements Runnable, Interruptable {
     @ToString.Exclude
     private final List<ArmResult> results = new ArrayList<>();
 
+    /**
+     * Per-device breakdown of {@link #results}, one entry per swept device in measurement order.
+     *
+     * <p>{@link #results} stays the flat list of every arm and {@link #winner} the best arm overall;
+     * this is what a multi-device run needs on top, because the settings a device should run with
+     * are its own optimum, not the fastest device's.
+     */
+    private final List<DeviceSweep> deviceSweeps = new ArrayList<>();
+
     private @Nullable ArmResult winner;
 
     /** Measured mean verification cost in microseconds, or {@code null} when no database was configured. */
@@ -248,12 +263,33 @@ public class TuneConfiguration implements Runnable, Interruptable {
     }
 
     /**
+     * One device's slice of the sweep: every arm measured on it, and its own winner.
+     *
+     * @param deviceLabel how the device is identified in the report
+     * @param arms        the arms measured on this device, in measurement order
+     * @param winner      the best arm on this device, or {@code null} if none succeeded
+     */
+    public record DeviceSweep(
+            String deviceLabel,
+            List<ArmResult> arms,
+            @Nullable ArmResult winner) {}
+
+    /**
      * Returns the per-arm results, one entry per swept candidate pair, in sweep order.
      *
      * @return an unmodifiable snapshot of the arm results
      */
     public List<ArmResult> getResults() {
         return Collections.unmodifiableList(new ArrayList<>(results));
+    }
+
+    /**
+     * Returns the per-device breakdown, one entry per swept device in measurement order.
+     *
+     * @return each device's arms and its own winner
+     */
+    public List<DeviceSweep> getDeviceSweeps() {
+        return Collections.unmodifiableList(deviceSweeps);
     }
 
     /**
@@ -308,7 +344,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
         // 100 M-entry filter beforehand would evict exactly the pages being measured.
         measuredVerificationCostMicros = measureVerificationCostMicros(cConsumerJava);
 
-        CProducer template = resolveTemplate(cFinder);
+        List<CProducer> templates = resolveTemplates(cFinder);
         RuntimeStatistics runtimeStatistics = new RuntimeStatistics();
         KeyUtility keyUtility = keyUtility();
         BitHelper bitHelper = new BitHelper();
@@ -332,15 +368,53 @@ public class TuneConfiguration implements Runnable, Interruptable {
 
         ExecutorService producerExecutor = Executors.newCachedThreadPool();
         try {
-            FilterPayload payload = buildFilterPayload(template);
-            sweepGrid(template, finder, consumer, runtimeStatistics, producerExecutor, payload, keyUtility, bitHelper);
+            // Built once and reused across every device: the filter is the expensive part (~44 s per
+            // 100 M entries), the sweep is the part that has to be repeated per device.
+            FilterPayload payload = buildFilterPayload(templates.get(0));
+            if (templates.size() > 1) {
+                LOGGER.info(
+                        "Sweeping {} devices in turn, {} arms each — roughly {} minutes in total. Devices are"
+                                + " measured one at a time on purpose: two running at once contend for host memory"
+                                + " bandwidth, and an integrated GPU can lose several times its solo throughput"
+                                + " that way.",
+                        templates.size(),
+                        cTuneConfiguration.batchSizeInBitsCandidates.size()
+                                * cTuneConfiguration.keysPerWorkItemCandidates.size(),
+                        Math.round(templates.size()
+                                * cTuneConfiguration.batchSizeInBitsCandidates.size()
+                                * cTuneConfiguration.keysPerWorkItemCandidates.size()
+                                * (cTuneConfiguration.warmupSecondsPerArm + cTuneConfiguration.secondsPerArm)
+                                / 60.0d));
+            }
+            for (CProducer template : templates) {
+                if (!shouldRun.get()) {
+                    break;
+                }
+                int armsBefore = results.size();
+                sweepGrid(
+                        template,
+                        finder,
+                        consumer,
+                        runtimeStatistics,
+                        producerExecutor,
+                        payload,
+                        keyUtility,
+                        bitHelper);
+                List<ArmResult> deviceArms = new ArrayList<>(results.subList(armsBefore, results.size()));
+                ArmResult deviceWinner = pickWinner(deviceArms);
+                deviceSweeps.add(new DeviceSweep(describeTemplateDevice(template), deviceArms, deviceWinner));
+                // Each device keeps its own optimum. Picking one winner across devices would hand the
+                // slower card the faster card's settings — on a contributor's laptop that would have
+                // been 24/2048 for a device whose own optimum was 23/2048.
+                applyWinnerTo(template, deviceWinner);
+            }
             winner = pickWinner(results);
             recommendedFilterType = resolveFilterType(
-                    template, finder, consumer, runtimeStatistics, producerExecutor, keyUtility, bitHelper);
-            recommendedConfigurationJson = buildRecommendedConfigurationJson(cFinder, template);
+                    templates.get(0), finder, consumer, runtimeStatistics, producerExecutor, keyUtility, bitHelper);
+            recommendedConfigurationJson = buildRecommendedConfigurationJson(cFinder, templates);
             // One record per line: the report is a formatted table, and the log pattern's CRLF guard
             // would otherwise fold all 40-odd rows onto one line separated by " | ".
-            new MultilineLogger().info(LOGGER, buildReport(template));
+            new MultilineLogger().info(LOGGER, buildReport(templates.get(0)));
         } finally {
             finder.interrupt();
             consumer.interrupt();
@@ -920,40 +994,81 @@ public class TuneConfiguration implements Runnable, Interruptable {
     // Stage 4 — output
     // -----------------------------------------------------------------------------------------
 
-    private String buildRecommendedConfigurationJson(CFinder cFinder, CProducer template) {
-        ArmResult best = winner;
-        if (best == null) {
+    /**
+     * Emits the configuration the operator should now run: every swept device carrying its own
+     * measured values.
+     *
+     * <p>Each template was updated with its device's winner during the sweep, so this only has to
+     * settle the filter type and serialise. That matters for a multi-device machine — the entries
+     * differ from one another, which is the whole point, and a reader must not have to wonder which
+     * of them was actually measured.
+     *
+     * @param cFinder   the configuration being tuned, whose producers now carry the winning values
+     * @param templates the swept producers, in measurement order
+     * @return the ready-to-run configuration as JSON, or an empty string when nothing was measured
+     */
+    private String buildRecommendedConfigurationJson(CFinder cFinder, List<CProducer> templates) {
+        if (winner == null) {
             return "";
         }
-        template.batchSizeInBits = best.batchSizeInBits();
-        if (template instanceof CProducerOpenCL cProducerOpenCL) {
-            cProducerOpenCL.keysPerWorkItem = best.keysPerWorkItem();
-            GpuFilterType type = recommendedFilterType;
-            if (type != null && cProducerOpenCL.enableGpuFilter && !cProducerOpenCL.transferAll) {
-                cProducerOpenCL.gpuFilterType = type;
+        for (CProducer template : templates) {
+            if (template instanceof CProducerOpenCL cProducerOpenCL) {
+                GpuFilterType type = recommendedFilterType;
+                if (type != null && cProducerOpenCL.enableGpuFilter && !cProducerOpenCL.transferAll) {
+                    cProducerOpenCL.gpuFilterType = type;
+                }
             }
         }
+        giveEveryProducerItsOwnKeyProducer(cFinder);
         CConfiguration recommended = new CConfiguration();
         recommended.command = CCommand.Find;
         recommended.finder = cFinder;
         try {
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.enable(SerializationFeature.INDENT_OUTPUT);
-            // Serialise the public fields only, never the getters. The configuration POJOs are
-            // plain field carriers, but CProducer also exposes the derived getOverallWorkSize();
-            // with default visibility Jackson writes it as "overallWorkSize", and reading that file
-            // back fails with UnrecognizedPropertyException because no such field exists. The whole
-            // point of this output is that the user can paste and run it, so it must round-trip.
-            mapper.setVisibility(PropertyAccessor.GETTER, JsonAutoDetect.Visibility.NONE);
-            mapper.setVisibility(PropertyAccessor.IS_GETTER, JsonAutoDetect.Visibility.NONE);
-            mapper.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.PUBLIC_ONLY);
-            return mapper.writeValueAsString(recommended);
+            return configurationMapper().writeValueAsString(recommended);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException(
-                    "Failed to serialise the recommended configuration to JSON (winner batchSizeInBits="
-                            + best.batchSizeInBits() + ", keysPerWorkItem=" + best.keysPerWorkItem()
+                    "Failed to serialise the recommended configuration to JSON (devices=" + templates.size()
                             + ", recommendedFilterType=" + recommendedFilterType + "): " + e.getMessage(),
                     e);
+        }
+    }
+
+    /**
+     * Ensures no two producers in the emitted configuration reference the same key producer.
+     *
+     * <p>Sharing one is accepted at runtime — the lookup is by id and nothing forbids it — but every
+     * shipped multi-producer example gives each its own, so that each device draws from an
+     * independent stream rather than contending on one. Automatically detected devices all start out
+     * pointing at the same key producer, so without this a two-GPU recommendation would ship a
+     * convention violation the operator never chose.
+     *
+     * @param cFinder the configuration to normalise in place
+     */
+    private static void giveEveryProducerItsOwnKeyProducer(CFinder cFinder) {
+        if (cFinder.producerOpenCL.size() < 2 || cFinder.keyProducerJavaRandom.isEmpty()) {
+            return;
+        }
+        CKeyProducerJavaRandom prototype = cFinder.keyProducerJavaRandom.get(0);
+        String baseId = prototype.keyProducerId;
+        if (baseId == null) {
+            return;
+        }
+        ObjectMapper mapper = configurationMapper();
+        for (int index = 1; index < cFinder.producerOpenCL.size(); index++) {
+            CProducerOpenCL producer = cFinder.producerOpenCL.get(index);
+            if (!baseId.equals(producer.keyProducerId)) {
+                continue;
+            }
+            String ownId = baseId + "_" + (index + 1);
+            try {
+                CKeyProducerJavaRandom copy =
+                        mapper.readValue(mapper.writeValueAsString(prototype), CKeyProducerJavaRandom.class);
+                copy.keyProducerId = ownId;
+                cFinder.keyProducerJavaRandom.add(copy);
+                producer.keyProducerId = ownId;
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException("Failed to derive a key producer for device " + index, e);
+            }
         }
     }
 
@@ -1056,6 +1171,112 @@ public class TuneConfiguration implements Runnable, Interruptable {
     }
 
     /**
+     * An OpenCL device the sweep can target, reduced to what the tuner needs to address and describe
+     * it.
+     *
+     * @param platformIndex the platform's position in the enumeration, as {@code producerOpenCL} means it
+     * @param deviceIndex   the device's position <em>within that platform</em>
+     * @param deviceName    the device's reported name, used to label its section of the report
+     * @param deviceType    the raw {@code CL_DEVICE_TYPE} bit field
+     */
+    public record DetectedDevice(int platformIndex, int deviceIndex, String deviceName, long deviceType) {
+
+        /**
+         * Returns whether this is a GPU.
+         *
+         * <p>A CPU OpenCL runtime — pocl, Intel's CPU ICD — enumerates as an ordinary device, but
+         * measuring it duplicates what {@code producerJava} already does while costing a full sweep
+         * of wall-clock. The project's own OpenCL CI job runs on pocl, so this is not hypothetical.
+         *
+         * @return {@code true} if the device reports the GPU type bit
+         */
+        public boolean isGpu() {
+            return (deviceType & CL.CL_DEVICE_TYPE_GPU) != 0L;
+        }
+    }
+
+    /**
+     * Flattens the platform/device hierarchy into the GPUs the sweep should measure, in enumeration
+     * order.
+     *
+     * @param platforms the platforms as reported by {@code OpenCLBuilder}
+     * @return every GPU, carrying the indices {@code producerOpenCL} addresses it by
+     */
+    @VisibleForTesting
+    static List<DetectedDevice> gpuDevicesOf(List<OpenCLPlatform> platforms) {
+        List<DetectedDevice> devices = new ArrayList<>();
+        for (int platformIndex = 0; platformIndex < platforms.size(); platformIndex++) {
+            List<OpenCLDevice> platformDevices = platforms.get(platformIndex).openCLDevices();
+            for (int deviceIndex = 0; deviceIndex < platformDevices.size(); deviceIndex++) {
+                OpenCLDevice device = platformDevices.get(deviceIndex);
+                DetectedDevice detected =
+                        new DetectedDevice(platformIndex, deviceIndex, device.deviceName(), device.deviceType());
+                if (detected.isGpu()) {
+                    devices.add(detected);
+                }
+            }
+        }
+        return devices;
+    }
+
+    /**
+     * Builds one independent producer template per device, each addressing its own device and
+     * carrying every other setting from the prototype.
+     *
+     * <p>The copy is a JSON round-trip rather than field-by-field assignment. {@code CProducerOpenCL}
+     * has upwards of fifteen settings and gains more over time; a hand-written copy silently drops
+     * whichever one was added last, and the failure would be a device measured under settings the
+     * operator never asked for — the exact class of quietly-wrong result this command exists to
+     * remove.
+     *
+     * @param devices   the devices to target
+     * @param prototype the settings every template inherits
+     * @return one template per device, independent of the prototype and of each other
+     */
+    @VisibleForTesting
+    static List<CProducerOpenCL> templatesForDevices(List<DetectedDevice> devices, CProducerOpenCL prototype) {
+        ObjectMapper mapper = configurationMapper();
+        String serialisedPrototype;
+        try {
+            serialisedPrototype = mapper.writeValueAsString(prototype);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to copy the producer template for multi-device tuning", e);
+        }
+        List<CProducerOpenCL> templates = new ArrayList<>();
+        for (DetectedDevice device : devices) {
+            try {
+                CProducerOpenCL copy = mapper.readValue(serialisedPrototype, CProducerOpenCL.class);
+                copy.platformIndex = device.platformIndex();
+                copy.deviceIndex = device.deviceIndex();
+                templates.add(copy);
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException(
+                        "Failed to copy the producer template for device " + device.deviceName(), e);
+            }
+        }
+        return templates;
+    }
+
+    /**
+     * The mapper used for both copying templates and emitting the recommendation.
+     *
+     * <p>Serialises the public fields only, never the getters: the configuration POJOs are plain
+     * field carriers, but {@code CProducer} also exposes the derived {@code getOverallWorkSize()},
+     * which Jackson would write as {@code "overallWorkSize"} — a property no field matches, so
+     * reading the result back fails with {@code UnrecognizedPropertyException}.
+     *
+     * @return a mapper that round-trips the configuration POJOs
+     */
+    private static ObjectMapper configurationMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.enable(SerializationFeature.INDENT_OUTPUT);
+        mapper.setVisibility(PropertyAccessor.GETTER, JsonAutoDetect.Visibility.NONE);
+        mapper.setVisibility(PropertyAccessor.IS_GETTER, JsonAutoDetect.Visibility.NONE);
+        mapper.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.PUBLIC_ONLY);
+        return mapper;
+    }
+
+    /**
      * One further arm the sweep should measure because the grid's winner landed on the edge of what
      * was swept.
      *
@@ -1143,6 +1364,38 @@ public class TuneConfiguration implements Runnable, Interruptable {
         return "";
     }
 
+    /**
+     * Names a template's device for the report.
+     *
+     * @param template the producer being swept
+     * @return a human-readable device label
+     */
+    @VisibleForTesting
+    static String describeTemplateDevice(CProducer template) {
+        if (template instanceof CProducerOpenCL cProducerOpenCL) {
+            return "GPU platformIndex=" + cProducerOpenCL.platformIndex + " deviceIndex=" + cProducerOpenCL.deviceIndex;
+        }
+        return "CPU (producerJava)";
+    }
+
+    /**
+     * Writes a device's own winning values back into its producer, so the emitted configuration
+     * describes what was measured on that device rather than on another one.
+     *
+     * @param template the producer to update
+     * @param winner   that device's winning arm, or {@code null} if it produced none
+     */
+    @VisibleForTesting
+    static void applyWinnerTo(CProducer template, @Nullable ArmResult winner) {
+        if (winner == null) {
+            return;
+        }
+        template.batchSizeInBits = winner.batchSizeInBits();
+        if (template instanceof CProducerOpenCL cProducerOpenCL) {
+            cProducerOpenCL.keysPerWorkItem = winner.keysPerWorkItem();
+        }
+    }
+
     @VisibleForTesting
     static String describeArm(ArmResult result) {
         if (result.failure() != null) {
@@ -1220,19 +1473,115 @@ public class TuneConfiguration implements Runnable, Interruptable {
         return new KeyUtility(network, new ByteBufferUtility(false));
     }
 
-    private static CProducer resolveTemplate(CFinder cFinder) {
+    /**
+     * Determines which producers the sweep measures — every one of them, in order.
+     *
+     * <h2>Every configured device, not just the first</h2>
+     * This used to return {@code producerOpenCL.get(0)} and ignore the rest without a word. Someone
+     * with two GPUs naturally lists both, waited twenty minutes, and received a full-looking report
+     * for one device plus a paste-ready configuration whose second entry still held their guesses —
+     * indistinguishable from the measured one. On a contributor's laptop that guess was 2.3× off
+     * that device's optimum, and nothing in the output could have revealed it.
+     *
+     * <h2>Nothing configured means "measure what I have"</h2>
+     * An empty producer list used to be an error. It is instead the case where the operator does not
+     * know what to write, which is the majority of first runs, so the tuner enumerates the machine's
+     * GPUs and sweeps each. Listing entries explicitly remains the override: an operator who names
+     * one device gets exactly that device.
+     *
+     * @param cFinder the configuration being tuned
+     * @return the producers to sweep, in the order they will be measured
+     */
+    private List<CProducer> resolveTemplates(CFinder cFinder) {
         if (!cFinder.producerOpenCL.isEmpty()) {
-            return cFinder.producerOpenCL.get(0);
+            hintAtUndetectedDevices(cFinder.producerOpenCL.size());
+            return new ArrayList<>(cFinder.producerOpenCL);
         }
         if (!cFinder.producerJava.isEmpty()) {
-            return cFinder.producerJava.get(0);
+            return new ArrayList<>(cFinder.producerJava);
+        }
+        List<CProducerOpenCL> discovered = discoverTemplates(cFinder);
+        if (!discovered.isEmpty()) {
+            // The discovered templates become the configuration's own producers, so the emitted
+            // recommendation describes the run that was actually measured rather than the empty
+            // list it started from.
+            cFinder.producerOpenCL.addAll(discovered);
+            return new ArrayList<>(discovered);
         }
         throw new IllegalArgumentException(
-                "tuneConfiguration.finder needs at least one producerOpenCL or producerJava entry to use as the "
-                        + "sweep template, but both lists are empty (producerOpenCL=" + cFinder.producerOpenCL.size()
-                        + ", producerJava=" + cFinder.producerJava.size()
-                        + "); the sweep varies its batchSizeInBits / keysPerWorkItem and carries every "
-                        + "other field through unchanged.");
+                "tuneConfiguration.finder has no producerOpenCL or producerJava entry and no OpenCL GPU could be"
+                        + " detected to sweep automatically. Configure a producer, or install an OpenCL runtime"
+                        + " and verify it with the OpenCLInfo command.");
+    }
+
+    /**
+     * Builds one template per detected GPU, inheriting the settings of a configured OpenCL producer
+     * when there is one and the defaults otherwise.
+     *
+     * @param cFinder the configuration being tuned
+     * @return a template per detected GPU, empty when none could be detected
+     */
+    private List<CProducerOpenCL> discoverTemplates(CFinder cFinder) {
+        if (!OpenCLBuilder.isOpenClNativeLibraryLoaded()) {
+            return Collections.emptyList();
+        }
+        List<DetectedDevice> devices = gpuDevicesOf(new OpenCLBuilder().build());
+        if (devices.isEmpty()) {
+            return Collections.emptyList();
+        }
+        CProducerOpenCL prototype = new CProducerOpenCL();
+        prototype.keyProducerId = firstKeyProducerId(cFinder);
+        LOGGER.info(
+                "No producer configured; sweeping every detected GPU instead. {} found: {}.",
+                devices.size(),
+                devices.stream()
+                        .map(d -> d.deviceName() + " (platformIndex=" + d.platformIndex() + ", deviceIndex="
+                                + d.deviceIndex() + ")")
+                        .collect(Collectors.joining("; ")));
+        return templatesForDevices(devices, prototype);
+    }
+
+    /**
+     * Points out devices the operator's explicit configuration leaves unmeasured.
+     *
+     * <p>Explicit configuration wins — but someone who wrote one entry on a two-GPU machine most
+     * likely did not know the tuner could do both, and would otherwise never find out.
+     *
+     * @param configuredCount how many OpenCL producers the configuration names
+     */
+    private void hintAtUndetectedDevices(int configuredCount) {
+        if (!OpenCLBuilder.isOpenClNativeLibraryLoaded()) {
+            return;
+        }
+        int detected = gpuDevicesOf(new OpenCLBuilder().build()).size();
+        if (detected > configuredCount) {
+            LOGGER.info(
+                    "{} producerOpenCL entries configured, but {} GPUs are present. Only the configured ones are"
+                            + " swept. Remove the producerOpenCL entries entirely to have every GPU measured.",
+                    configuredCount,
+                    detected);
+        }
+    }
+
+    /**
+     * Returns an id of a configured key producer, for templates that have none of their own.
+     *
+     * @param cFinder the configuration being tuned
+     * @return the first configured key producer id
+     */
+    private static String firstKeyProducerId(CFinder cFinder) {
+        List<@Nullable String> ids = new ArrayList<>();
+        cFinder.keyProducerJavaRandom.forEach(c -> ids.add(c.keyProducerId));
+        cFinder.keyProducerJavaIncremental.forEach(c -> ids.add(c.keyProducerId));
+        cFinder.keyProducerJavaBip39.forEach(c -> ids.add(c.keyProducerId));
+        for (String id : ids) {
+            if (id != null) {
+                return id;
+            }
+        }
+        throw new IllegalArgumentException(
+                "tuneConfiguration.finder needs at least one key producer (for example keyProducerJavaRandom) so the"
+                        + " automatically detected devices have a source of secrets to measure with.");
     }
 
     /**
