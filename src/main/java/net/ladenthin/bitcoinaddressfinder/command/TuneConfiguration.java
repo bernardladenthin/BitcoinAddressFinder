@@ -1320,7 +1320,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
                 if (first != null) {
                     LOGGER.info(
                             "Skipping {} (platformIndex={}, deviceIndex={}): it is the same physical GPU as {}"
-                                    + " (platformIndex={}, deviceIndex={}, PCIe {}) exposed by a second OpenCL"
+                                    + " (platformIndex={}, deviceIndex={}, identity {}) exposed by a second OpenCL"
                                     + " platform. Sweeping it once.",
                             device.deviceName(),
                             device.platformIndex(),
@@ -1667,8 +1667,13 @@ public class TuneConfiguration implements Runnable, Interruptable {
                 "No producer configured; sweeping every detected GPU instead. {} found: {}.",
                 devices.size(),
                 devices.stream()
+                        // The identity is logged for every device, not only for merged ones: without it
+                        // there is no way to tell "no duplicate present" from "no fingerprint could be
+                        // read", and those call for very different follow-up.
                         .map(d -> d.deviceName() + " (platformIndex=" + d.platformIndex() + ", deviceIndex="
-                                + d.deviceIndex() + ")")
+                                + d.deviceIndex() + ", identity "
+                                + (d.physicalDeviceFingerprint() == null ? "unknown" : d.physicalDeviceFingerprint())
+                                + ")")
                         .collect(Collectors.joining("; ")));
         return templatesForDevices(devices, prototype);
     }
