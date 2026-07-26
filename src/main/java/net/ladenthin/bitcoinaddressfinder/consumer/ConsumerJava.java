@@ -326,6 +326,18 @@ public class ConsumerJava implements Consumer {
      */
     public void initLMDB() throws Exception {
         var cfg = consumerJava.lmdbConfigurationReadOnly;
+        if (cfg.disableAddressLookup && !gpuFilterRequested) {
+            // Nothing reads from LMDB: address lookup is disabled and no GPU pre-filter has to be
+            // built from the database. Skip opening the env entirely so the scan can run with no
+            // database on disk (a pure key-generation benchmark, or the tuner's paste-ready config
+            // before a database exists). Opening it here would fail when lmdbDirectory is absent,
+            // which is exactly what disabling the lookup is meant to allow.
+            LOGGER.info("Address lookup is disabled and no GPU pre-filter is requested; skipping LMDB open."
+                    + " Every address is reported as absent.");
+            lookup = AbsentAddressPresence.INSTANCE;
+            persistence = null;
+            return;
+        }
         LMDBPersistence lmdb = new LMDBPersistence(cfg, persistenceUtils);
         lmdb.init();
         persistence = lmdb;
@@ -375,6 +387,25 @@ public class ConsumerJava implements Consumer {
      */
     public void initWithLookup(AddressPresence lookup) {
         this.lookup = lookup;
+    }
+
+    /**
+     * An {@link AddressPresence} that reports every address as absent, used when address lookup is
+     * disabled and no database is opened. Self-contained, so it never needs a backend and nothing has
+     * to be closed after a scan.
+     */
+    private enum AbsentAddressPresence implements AddressPresence {
+        INSTANCE;
+
+        @Override
+        public boolean containsAddress(ByteBuffer hash160) {
+            return false;
+        }
+
+        @Override
+        public boolean requiresBackend() {
+            return false;
+        }
     }
 
     /**
