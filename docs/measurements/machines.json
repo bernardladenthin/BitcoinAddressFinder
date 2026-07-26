@@ -1,5 +1,27 @@
 {
   "machines": {
+    "coreultra7155h-95g-win11": {
+      "cpu": {
+        "cores_logical": 22,
+        "cores_physical": 16,
+        "l3_mb": 24,
+        "model": "Intel(R) Core(TM) Ultra 7 155H"
+      },
+      "gpu": [
+        "NVIDIA RTX 500 Ada Generation Laptop GPU",
+        "Intel(R) Arc(TM) Pro Graphics"
+      ],
+      "jdk": "26.0.1",
+      "notes": "Lenovo ThinkPad P14s Gen 5. Contributed via discussion 281. First entry with both a discrete and an integrated GPU: the Arc Pro is integrated and shares system RAM, and measurably loses throughput when the RTX runs alongside it. The gpu list was completed by hand from the contributor's report because detection at the time returned only the NVIDIA.",
+      "os": {
+        "name": "Microsoft Windows 11 Pro",
+        "version": "10.0.26200"
+      },
+      "ram_gb": 95.5,
+      "registered": "2026-07-25",
+      "storage": "Crucial P3 Plus 4TB NVMe (M.2)",
+      "updated": "2026-07-25"
+    },
     "ryzen75800h-63g-win11": {
       "cpu": {
         "cores_logical": 16,
@@ -7,7 +29,9 @@
         "l3_mb": 16,
         "model": "AMD Ryzen 7 5800H with Radeon Graphics"
       },
-      "gpu": "NVIDIA GeForce RTX 3070 Laptop GPU",
+      "gpu": [
+        "NVIDIA GeForce RTX 3070 Laptop GPU"
+      ],
       "jdk": "21.0.9",
       "notes": "Reference machine for the 2026-07 filter measurements",
       "os": {
@@ -26,7 +50,10 @@
         "l3_mb": 96,
         "model": "AMD Ryzen 7 9800X3D 8-Core Processor"
       },
-      "gpu": "AMD Radeon(TM) Graphics, AMD Radeon RX 7900 XTX",
+      "gpu": [
+        "AMD Radeon(TM) Graphics",
+        "AMD Radeon RX 7900 XTX"
+      ],
       "jdk": "21.0.7",
       "notes": "",
       "os": {

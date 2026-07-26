@@ -198,23 +198,27 @@ What to look for:
 
 Every grid and filter recommendation in this README and in [`docs/filter-selection.md`](docs/filter-selection.md) was measured on one developer's hardware. The `TuneConfiguration` command measures *yours*:
 
+> 📘 **New to this? Follow the step-by-step guide: [docs/tuning-your-gpu.md](docs/tuning-your-gpu.md).**
+> It walks through finding your device indices, writing the config, capturing the log, reading the
+> report, tuning a second GPU, and contributing your numbers back — every command explained.
+
 ```bash
-# Use the launcher — it carries the --add-opens the JVM needs for LMDB access:
 examples/run_TuneConfiguration.sh          # Linux/macOS
 examples\run_TuneConfiguration.bat         # Windows
 ```
 
-> The bare `java -jar … config_TuneConfiguration.json` works **only** when no real database is
-> configured. The moment `lmdbConfigurationReadOnly.lmdbDirectory` points at an actual LMDB, the
-> lookup path reflects into `java.nio`/`sun.nio.ch` and the JVM throws
-> `InaccessibleObjectException` without the `--add-opens` flags the launcher sets. Use the launcher,
-> or copy its flag list, whenever you point the tuner at a database.
+> A bare `java -jar … config_TuneConfiguration.json` works too: the fat jar's manifest carries the
+> `Add-Opens` that the LMDB lookup path needs to reflect into `java.nio`/`sun.nio.ch`. The launchers
+> remain the easier route because they also set the heap and the Logback configuration. Only jars
+> built before that manifest entry require the flags on the command line — the symptom is
+> `InaccessibleObjectException` when the tuner opens a database.
 
 It sweeps `batchSizeInBits` × `keysPerWorkItem`, measures the **net end-to-end throughput** of each combination (candidate keys per second through the whole pipeline, not kernel time), and prints a table of every arm plus the winning configuration as a ready-to-paste JSON file. It also measures what one database lookup costs on your storage in its current state — the term that ranges from 4.1 µs warm to 292.7 µs cold, and the one the `FUSE_8` / `FUSE_16` choice hinges on. Every number in the report is labelled **MEASURED** (here, on this machine) or **DOCUMENTED / ESTIMATED** (a published constant), so it is always clear which is which.
 
 Honest expectations:
 
-* **It takes minutes.** The run time is `arms × (warmupSecondsPerArm + secondsPerArm)`; the defaults give 25 arms × 25 s ≈ 10 minutes, plus a one-time filter build (~44 s per 100 M entries).
+* **It takes minutes.** The run time is `arms × (warmupSecondsPerArm + secondsPerArm)`; the defaults give 35 arms × 25 s ≈ 15 minutes, plus a one-time filter build (~44 s per 100 M entries).
+* **Widen `keysPerWorkItemCandidates` before trusting the winner.** The default list stops at `256`, and on modern GPUs the optimum is frequently above it — a sweep that stops at 256 reports 256 as the winner because it never tried more. If the winner sits at the largest value you swept, the real optimum is higher. `[16, 64, 256, 512, 1024, 2048]` is a better starting list.
 * **It does not read or rebuild your database.** The grid sweep builds its pre-filter from a deterministic PRNG source sized to `targetDatabaseEntries` — set that to the size of the database you *intend* to run against. Only the optional verification-cost stage touches LMDB, and only if `lmdbConfigurationReadOnly.lmdbDirectory` points at a real database. With no database configured the command still runs end to end and falls back to the documented lookup cost.
 * **`sweepFilterTypes` is off by default, and should stay off unless you need it.** Enabling it forces a second full filter build (~150 s at the 132 M Light DB tier, ~26 minutes at the 1.377 B Full DB tier) to measure the `FUSE_8` / `FUSE_16` choice instead of deriving it from `total = probe + fpr × verification`.
 
@@ -1734,16 +1738,16 @@ are fully configurable (see [Customizing Log Output](#customizing-log-output)).
 A statistics line looks like this:
 
 ```
-Statistics: [uptime 43 min] [Generated 128 M/s (333258 M total)] [-> LMDB 2 M/s (5196 M lookups total), 99.22% pre-filtered] [rate window 60s] [Batches per producer: exampleKeyProducerSecureRandomId (Random, GPU)=79455] [Producers running: 1] [Consumers running: 8] [Consumer ready for work (queue empty): 167939] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
+Statistics: [uptime 43 min] [Generated 128.0 M/s (333258 M total)] [-> LMDB 2.000 M/s (5196 M lookups total), 99.22% pre-filtered] [rate window 60s] [Keys per producer: exampleKeyProducerSecureRandomId (Random, GPU)=333.3 G (100.0%)] [Producers running: 1] [Consumers running: 8] [Consumer ready for work (queue empty): 167939] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
 ```
 
 | Field | Meaning |
 |---|---|
 | `uptime N min` | **Lifetime** elapsed minutes since the scan started. |
-| `Generated <rate> (<N> M total)` | **The headline performance number: the rate of candidate private keys the producers fully compute** (windowed rate + lifetime total in millions). On a GPU run this is the real key-generation output. It counts **keys (EC points)**, not addresses — see *Keys vs. addresses* below. Auto-scales across `/s`, `k/s`, `M/s`, `G/s`. |
+| `Generated <rate> (<N> M total)` | **The headline performance number: the rate of candidate private keys the producers fully compute** (windowed rate + lifetime total in millions). On a GPU run this is the real key-generation output. It counts **keys (EC points)**, not addresses — see *Keys vs. addresses* below. Auto-scales across `/s`, `k/s`, `M/s`, `G/s`, always with four significant digits (`1.400 G/s`, `130.0 M/s`) so two tuning runs stay comparable across a unit boundary. |
 | `-> LMDB <rate> (<N> M lookups total), NN.NN% pre-filtered` | The rate of hash160 **address** lookups that survive the GPU pre-filter and actually reach the consumer/LMDB (windowed rate + lifetime total). `pre-filtered` is the share of the potential address lookups the filter eliminated before LMDB (see below); it is omitted when no pre-filter is active (full transfer). |
 | `rate window Ns` | The trailing window (`statisticsRateWindowSeconds`) the two rates are averaged over. |
-| `Batches per producer: <label>=N, …` | Dispatched-batch count per running producer, keyed by `<keyProducerId> (<Strategy>, <CPU\|GPU>)` so concurrently running producers are told apart. The **strategy** (`Random`, `Bip39`, `Incremental`, `Socket`, `WebSocket`, `Zmq`) is derived from the key producer; the **backend** (`CPU` for `producerJava`/`producerJavaSecretsFiles`, `GPU` for `producerOpenCL`) from the producer. `none` until the first batch. |
+| `Keys per producer: <label>=N (NN.N%), …` | Candidates generated per running producer plus its **share of the total**, keyed by `<keyProducerId> (<Strategy>, <CPU\|GPU>)` so concurrently running producers are told apart. The **strategy** (`Random`, `Bip39`, `Incremental`, `Socket`, `WebSocket`, `Zmq`) is derived from the key producer; the **backend** (`CPU` for `producerJava`/`producerJavaSecretsFiles`, `GPU` for `producerOpenCL`) from the producer. `none` until the first batch. **This is the field to read when running more than one device** — see *Comparing producers* below. Read it alongside `Producer blocked (queue full)`: while that counter is rising the consumer is the bottleneck, so the shares describe what the queue allowed each producer to deliver rather than what the devices are capable of. |
 | `Producers running: N` | Number of producers currently in the `RUNNING` state. |
 | `Consumers running: N` | Number of consumer worker threads currently running (≤ `consumerJava.threads`). |
 | `Consumer ready for work (queue empty): N` | **Runtime health counter — rising is normal/healthy.** Consume cycles that found the queue empty and waited. An empty queue is the *desired* state: it means the CPU drains everything the producers generate and has headroom. See below. |
@@ -1752,6 +1756,26 @@ Statistics: [uptime 43 min] [Generated 128 M/s (333258 M total)] [-> LMDB 2 M/s 
 | `keys queue size: N` | Instantaneous depth of the producer→consumer queue (bounded by `consumerJava.queueSize`). |
 | `Hits: N` | Number of address matches found so far (see [Hit Logging](#hit-logging)). |
 
+#### Comparing producers on a multi-device run
+
+With more than one `producerOpenCL` entry, `Keys per producer` is what tells you whether the second
+device is actually pulling its weight. It counts **candidates**, not dispatched batches, because a
+batch is not a fixed amount of work: one batch yields `2^batchSizeInBits` candidates, so producers
+configured at different batch sizes are not comparable by batch count.
+
+A real example — an RTX 500 at `batchSizeInBits: 24` alongside an integrated Arc at
+`batchSizeInBits: 21`, both after three minutes:
+
+| | batches dispatched | candidates generated |
+|---|---|---|
+| `gpu0 (Incremental, GPU)` | 1156 | 19.39 G — **94.0 %** |
+| `gpu1 (Random, GPU)` | 595 | 1.248 G — **6.0 %** |
+
+The batch counts read as a roughly 2:1 split; the actual work split is 20:1. If one device's share
+is far below what you expect, tune it separately with
+[`TuneConfiguration`](#tune-the-configuration-for-your-own-machine) — the optimal
+`batchSizeInBits` / `keysPerWorkItem` is device-specific.
+
 #### Keys versus addresses
 
 Why `Generated` and `-> LMDB` count different things: `Generated` counts **candidate private keys** — secp256k1 points, one full scalar multiplication each.
@@ -1759,7 +1783,7 @@ From every such key the tool derives **two** hash160 addresses: the **compressed
 **uncompressed** form, and both are checked. So the number of *addresses* examined is **twice** the
 `Generated` rate:
 
-- `Generated 128 M/s` ⇒ 128 M keys/s ⇒ **~256 M addresses/s** (compressed + uncompressed) hashed and
+- `Generated 128.0 M/s` ⇒ 128 M keys/s ⇒ **~256 M addresses/s** (compressed + uncompressed) hashed and
   probed against the filter.
 - `-> LMDB` counts those address lookups (post-filter), **not** keys. With a strong GPU pre-filter
   almost none survive, so `-> LMDB` is a tiny fraction of `Generated`.
@@ -1844,6 +1868,22 @@ Typical customizations:
 > `%replace(%msg){'[\r\n]+', ' | '}`, which neutralizes carriage returns / line feeds in
 > rendered messages so untrusted input cannot forge extra log lines. Preserve this wrap in any
 > derived pattern.
+
+#### Why the big reports are not one long ` | ` line
+
+The guard above folds *any* line break in a message into a ` | ` separator — including the ones
+this tool puts there on purpose. The formatted blocks (the `TuneConfiguration` report, the OpenCL
+device dump, the transformed-configuration echo) are therefore emitted **one log record per line**
+rather than as a single multi-line message, so they arrive readable under the bundled pattern and
+under any pattern derived from it, with no configuration change on your side.
+
+That is not a hole in the guard. The property it defends is that every physical line carries a
+prefix the *appender* wrote, never one the message chose; splitting a block into N records preserves
+exactly that, because the appender stamps each record itself. Splitting consumes every line-break
+form (`\r\n`, `\r`, `\n`), so no emitted line can smuggle another one past it.
+
+If you previously post-processed these blocks by replacing ` | ` with newlines, you no longer need
+to. The `Statistics` line is unaffected — it is a single line by design and stays parseable as one.
 
 ## Collision Probability and Security Considerations
 

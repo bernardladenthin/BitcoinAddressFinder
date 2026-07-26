@@ -71,12 +71,15 @@ public class CTuneConfiguration {
      * PCIe) affect timing. Decoupling from storage removes a multi-minute LMDB walk and lets the
      * command run with no database present at all.
      *
-     * <p>Default is the Light DB tier (132 288 304 entries). The Full DB tier is 1 377 000 000.
+     * <p>Default is the Light DB tier (141 045 995 entries as of the 2026-07-20 publication). The
+     * Full DB tier is 1 472 947 953. Both grow with every republication, so the current figures are
+     * the ones in the README's database section rather than anything hard-coded here — state your
+     * own database's count when it differs.
      * Building the filter costs one multi-pass fuse peel at roughly 29 B/entry regardless of where
      * the addresses come from (~44 s per 100 M entries measured storage-free), which is why the
      * filter is built once and only the producer is restarted per arm.
      */
-    public long targetDatabaseEntries = 132_288_304L;
+    public long targetDatabaseEntries = 141_045_995L;
 
     /**
      * Candidate {@code batchSizeInBits} values to sweep.
@@ -103,13 +106,40 @@ public class CTuneConfiguration {
     public List<Integer> keysPerWorkItemCandidates = new ArrayList<>(List.of(1, 4, 16, 64, 256));
 
     /**
+     * Whether the sweep keeps measuring past {@link #keysPerWorkItemCandidates} /
+     * {@link #batchSizeInBitsCandidates} when the winner lands on the largest value tried.
+     *
+     * <p><b>On by default because a winner at the edge is a lower bound, not a peak</b>, and telling
+     * the operator to widen the list and start over does not help someone who runs a 20-minute
+     * measurement once. Two field sweeps both won at the shipped list's last {@code keysPerWorkItem}
+     * of 256; widening by hand afterwards gained 17 % on one GPU and 104 % on another, which is the
+     * difference between a usable result and a misleading one.
+     *
+     * <p>Costs one arm per step, and stops at the first step that fails to beat the winner — so the
+     * usual price of being wrong is a single wasted arm rather than a second sweep. Set {@code false}
+     * to measure exactly the candidates given and nothing else.
+     */
+    public boolean extendSweepWhenWinnerIsAtTheEdge = true;
+
+    /**
+     * Upper bound on how many extra arms {@link #extendSweepWhenWinnerIsAtTheEdge} may add.
+     *
+     * <p>The extension already stops as soon as an extra arm fails to improve, so this only bounds
+     * the case where every step keeps winning — a device whose optimum lies far outside the
+     * configured list. Four doublings reach 16× the largest candidate, past which the list itself
+     * was the wrong starting point.
+     */
+    public int maxExtensionArms = 4;
+
+    /**
      * Whether to measure the {@code FUSE_8} / {@code FUSE_16} choice empirically instead of
      * deriving it.
      *
      * <p><b>Opt-in because it forces a second full filter build.</b> Switching {@code gpuFilterType}
      * changes the fingerprint width, so the filter cannot be reinterpreted and must be rebuilt from
-     * scratch: roughly 150 s at the 132 M Light DB tier and 1 564 s (~26 min) at the 1.377 B Full DB
-     * tier, on top of the sweep itself.
+     * scratch: roughly 150 s and 1 564 s (~26 min) respectively, as measured at the 132 M and
+     * 1.377 B tiers of the time, on top of the sweep itself. Both tiers have grown since, so scale
+     * accordingly — the build is linear at roughly 44 s per 100 M entries.
      *
      * <p>Left {@code false}, the recommendation is instead derived from the measured verification
      * cost and the two filters' documented, machine-independent false-positive rates

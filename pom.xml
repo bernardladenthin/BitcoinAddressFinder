@@ -697,6 +697,22 @@ SPDX-License-Identifier: Apache-2.0
                         <manifest>
                             <mainClass>net.ladenthin.bitcoinaddressfinder.cli.Main</mainClass>
                         </manifest>
+                        <!--
+                            Add-Opens for `java -jar bitcoinaddressfinder-*-jar-with-dependencies.jar`.
+                            lmdbjava reflects into JDK-internal off-heap classes (java.nio.Buffer.address,
+                            sun.nio.ch.DirectBuffer, jdk.internal.ref.Cleaner) to map the database; on
+                            Java 21 those packages are not open by default, so opening the env throws
+                            InaccessibleObjectException. The examples/run_*.sh|bat launchers pass the same
+                            add-opens flags on the command line, but a bare `java -jar` does not; baking
+                            them into the launcher manifest makes the fat jar self-sufficient. Runtime only
+                            (Find/AddressFilesToLMDB/etc.); the wider jdk.compiler/jdk.management opens the
+                            run scripts also carry are for Error Prone and JMH, which the fat jar never runs.
+                            Keep this java.base set in sync with .mvn/jvm.config (see
+                            JvmModuleFlagConsistencyTest for the canonical list).
+                        -->
+                        <manifestEntries>
+                            <Add-Opens>java.base/java.lang java.base/java.io java.base/java.nio java.base/jdk.internal.ref java.base/jdk.internal.misc java.base/sun.nio.ch</Add-Opens>
+                        </manifestEntries>
                     </archive>
                 </configuration>
             </plugin>

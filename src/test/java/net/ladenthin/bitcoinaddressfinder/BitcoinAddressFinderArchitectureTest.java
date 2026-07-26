@@ -275,17 +275,34 @@ public class BitcoinAddressFinderArchitectureTest {
             .mayOnlyBeAccessedByLayers("Command", "Engine", "Producer")
             .whereLayer("Keyproducer")
             .mayOnlyBeAccessedByLayers("Command", "Engine", "Producer")
+            // "Command" is on this list because TuneConfiguration enumerates the machine's OpenCL
+            // devices so it can sweep every GPU rather than only the first one configured. That is
+            // the same discovery Cli already performs for OpenCLInfo; doing it anywhere else would
+            // mean passing a device list into a command constructed from configuration alone.
             .whereLayer("Opencl")
-            .mayOnlyBeAccessedByLayers("Cli", "Producer")
+            .mayOnlyBeAccessedByLayers("Cli", "Command", "Producer")
             .whereLayer("Persistence")
             .mayOnlyBeAccessedByLayers("Command", "Consumer", "Engine")
             .whereLayer("Io")
             .mayOnlyBeAccessedByLayers("Command", "Persistence", "Producer")
             .whereLayer("Model")
             .mayOnlyBeAccessedByLayers("Command", "Consumer", "Io", "Opencl", "Producer")
+            // "Cli" is on this list because Main logs the transformed configuration through
+            // util.MultilineLogger. Cli is the topmost layer, so a dependency on a Foundation
+            // package is downward and introduces no cycle; its earlier absence was incidental
+            // (Main had simply never needed a util helper) rather than a deliberate restriction.
             .whereLayer("Util")
             .mayOnlyBeAccessedByLayers(
-                    "Command", "Consumer", "Engine", "Io", "Keyproducer", "Model", "Opencl", "Persistence", "Producer")
+                    "Cli",
+                    "Command",
+                    "Consumer",
+                    "Engine",
+                    "Io",
+                    "Keyproducer",
+                    "Model",
+                    "Opencl",
+                    "Persistence",
+                    "Producer")
             .whereLayer("Core")
             .mayOnlyBeAccessedByLayers("Cli", "Command", "Consumer", "Engine", "Io", "Keyproducer", "Producer")
             .whereLayer("Statistics")
@@ -295,8 +312,14 @@ public class BitcoinAddressFinderArchitectureTest {
             .whereLayer("Configuration")
             .mayOnlyBeAccessedByLayers(
                     "Cli", "Command", "Consumer", "Engine", "Io", "Keyproducer", "Opencl", "Persistence", "Producer")
+            // "Command" is on this list because TuneConfiguration decides how far it may extend a
+            // sweep from BIT_COUNT_FOR_MAX_CHUNKS_ARRAY — the framework's own grid ceiling. Reading
+            // the constant is the point: hard-coding 24 in the command would be a second source of
+            // truth for a limit the kernel layout defines. Constants is the architectural leaf, so
+            // the dependency is downward and introduces no cycle.
             .whereLayer("Constants")
-            .mayOnlyBeAccessedByLayers("Configuration", "Consumer", "Io", "Keyproducer", "Model", "Opencl", "Util");
+            .mayOnlyBeAccessedByLayers(
+                    "Command", "Configuration", "Consumer", "Io", "Keyproducer", "Model", "Opencl", "Util");
 
     /**
      * The {@code constants} sub-package is a true architectural leaf. Pure

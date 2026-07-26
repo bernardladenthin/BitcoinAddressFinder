@@ -86,6 +86,32 @@ public class ConsumerJavaTest {
     }
 
     @Test
+    public void initLMDB_disableAddressLookupAndNoGpuFilter_skipsLmdbOpenAndReportsAbsent() throws Exception {
+        // With address lookup disabled and no GPU pre-filter requested, there is nothing to read
+        // from LMDB, so initLMDB must not open (or require) a database at all: the scan can run with
+        // no lmdbDirectory on disk. Regression guard for the documented "disableAddressLookup=true"
+        // fallback, which previously still opened the env and failed when the directory was absent.
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        // A directory that does not exist: opening an LMDB env here would throw.
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory =
+                new File(folder.toFile(), "does-not-exist").getAbsolutePath();
+        cConsumerJava.lmdbConfigurationReadOnly.disableAddressLookup = true;
+
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        // Must not throw despite the missing directory.
+        consumerJava.initLMDB();
+
+        // Nothing was opened, so there is nothing to close.
+        assertThat(consumerJava.persistence, is(nullValue()));
+        // Every address reports absent.
+        ByteBuffer reuseable = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
+        boolean present =
+                consumerJava.containsAddress(reuseable, new byte[OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES]);
+        assertThat(present, is(false));
+    }
+
+    @Test
     public void initLMDB_lmdbOnlyBackend_keepsEnvOpenForDirectLookups() throws Exception {
         // Regression: LMDB_ONLY uses the LMDBPersistence itself as the lookup. initLMDB must
         // NOT close its env (it would if LMDBPersistence.requiresBackend() returned false),
@@ -395,7 +421,7 @@ public class ConsumerJavaTest {
                     arguments,
                     hasItem(
                             equalTo(
-                                    "Statistics: [uptime 0 min] [Generated 0/s (0 M total)] [-> LMDB 0/s (0 M lookups total)] [rate window 60s] [Batches per producer: none] [Producers running: 0] [Consumers running: 0] [Consumer ready for work (queue empty): 0] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
+                                    "Statistics: [uptime 0 min] [Generated 0/s (0 M total)] [-> LMDB 0/s (0 M lookups total)] [rate window 60s] [Keys per producer: none] [Producers running: 0] [Consumers running: 0] [Consumer ready for work (queue empty): 0] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
         }
     }
 

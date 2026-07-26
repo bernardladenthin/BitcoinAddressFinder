@@ -20,6 +20,10 @@ path = [
     "examples/config_LMDBToAddressFile.json",
     "examples/config_OpenCLInfo.json",
     "examples/config_TuneConfiguration.json",
+    "examples/config_CompactLMDB.json",
+    "examples/config_Find_GPU_Fuse16Cascade.json",
+    "examples/config_Find_GPU_LowVram.json",
+    "examples/config_LMDBDelta.json",
     "src/test/resources/testOpenCLInfo/config_OpenCLInfo.json",
     "src/test/resources/testRoundtrip/config_AddressFilesToLMDB.json",
     "src/test/resources/testRoundtrip/config_Find_1OpenCLDevice.json",
@@ -59,6 +63,12 @@ path = [
     "src/test/resources/testOpenCLInfo/config_OpenCLInfo.yml",
     # JS test resource (no inline SPDX appropriate)
     "src/test/resources/testOpenCLInfo/config_OpenCLInfo.js",
+    # Measurement data and generated plots. CSV has no comment syntax, JSON none either, and PNG
+    # is binary — a glob keeps new machines and new benchmark runs compliant without an edit here
+    # every time, which is what let these drift out of coverage in the first place.
+    "docs/measurements/**.csv",
+    "docs/measurements/**.json",
+    "docs/measurements/plots/**.png",
     # JVM config (plain flags file, no comment syntax)
     ".mvn/jvm.config",
     # simplelogger.properties uses Java properties syntax (# comments supported but tool may not recognize)

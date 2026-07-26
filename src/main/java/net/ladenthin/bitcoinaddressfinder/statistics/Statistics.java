@@ -39,9 +39,11 @@ public class Statistics {
      *                                     averaged over the same trailing window
      * @param rateWindowSeconds            the trailing window (seconds) the rate is averaged over
      * @param keysSumOfTimeToCheckContains cumulative time (ms) spent in presence lookups
-     * @param batchesByProducer            dispatched-batch counts keyed by producer label
+     * @param generatedKeysByProducer      generated-candidate counts keyed by producer label
      *                                     ({@code "<keyProducerId> (<Strategy>, <CPU|GPU>)"}); lets
-     *                                     concurrently running producers be told apart
+     *                                     concurrently running producers be told apart, and be
+     *                                     compared against each other — see
+     *                                     {@link #describeProducerShares(Map)}
      * @param producersRunning             number of producers currently in the RUNNING state
      * @param consumersRunning             number of consumer worker threads currently running
      * @param consumerReady               number of consume cycles the consumer was ready for work
@@ -61,7 +63,7 @@ public class Statistics {
             double windowGeneratedPerSecond,
             long rateWindowSeconds,
             long keysSumOfTimeToCheckContains,
-            Map<String, Long> batchesByProducer,
+            Map<String, Long> generatedKeysByProducer,
             long producersRunning,
             long consumersRunning,
             long consumerReady,
@@ -73,12 +75,7 @@ public class Statistics {
         long uptimeInMinutes = uptimeInSeconds / 60;
         // calculate average contains time
         long averageContainsTime = keysSumOfTimeToCheckContains / Math.max(keys, 1);
-        // per-producer batch breakdown, rendered as "label=count, label=count" (or "none")
-        String batches = batchesByProducer.isEmpty()
-                ? "none"
-                : batchesByProducer.entrySet().stream()
-                        .map(entry -> entry.getKey() + "=" + entry.getValue())
-                        .collect(Collectors.joining(", "));
+        String producerShares = describeProducerShares(generatedKeysByProducer);
 
         // The two ends of the pipeline, side by side:
         //   Generated  = candidates the producers create (the GPU's real output rate).
@@ -91,7 +88,7 @@ public class Statistics {
         return "Statistics: [uptime " + uptimeInMinutes + " min] [Generated "
                 + formatRate(windowGeneratedPerSecond) + " (" + (generatedKeys / 1_000_000L) + " M total)] [-> LMDB "
                 + formatRate(windowKeysPerSecond) + " (" + (keys / 1_000_000L) + " M lookups total)" + pruned
-                + "] [rate window " + rateWindowSeconds + "s] [Batches per producer: " + batches
+                + "] [rate window " + rateWindowSeconds + "s] [Keys per producer: " + producerShares
                 + "] [Producers running: " + producersRunning + "] [Consumers running: " + consumersRunning
                 + "] [Consumer ready for work (queue empty): " + consumerReady
                 + "] [Producer blocked (queue full): " + producerBlocked + "] [Average contains time: "
@@ -99,23 +96,118 @@ public class Statistics {
     }
 
     /**
+     * Significant digits kept by {@link #formatRate(double)} and {@link #formatCount(long)}.
+     *
+     * <p>Both used to round the scaled value to a whole number, which made the printed precision
+     * depend on where in a decade the value happened to fall: {@code 1_400_000_000} and
+     * {@code 1_000_000_000} both rendered as {@code "1 G/s"}, a 40 % spread collapsed into one
+     * bucket, while a value just below the next threshold kept three digits. Tuning runs compare
+     * throughput numbers against each other, so a scale whose resolution drops to ~50 % exactly at a
+     * unit boundary hides the difference the comparison is trying to measure. Reported from the
+     * field for the {@code G/s} boundary, but the same collapse happened at {@code k/s} and
+     * {@code M/s}.
+     */
+    private static final int SIGNIFICANT_DIGITS = 4;
+
+    /**
      * Formats a per-second rate, auto-scaling to k/s, M/s or G/s so the number stays readable across
-     * the whole range (a starved consumer at a few thousand/s up to a GPU at hundreds of millions/s).
+     * the whole range (a starved consumer at a few thousand/s up to a GPU in the G/s).
      *
      * @param perSecond the rate in units per second
-     * @return e.g. {@code "130 M/s"}, {@code "2013 k/s"} or {@code "412/s"}
+     * @return e.g. {@code "1.400 G/s"}, {@code "130.0 M/s"}, {@code "2.013 k/s"} or {@code "412/s"}
      */
     static String formatRate(double perSecond) {
         if (perSecond >= 1_000_000_000.0) {
-            return Math.round(perSecond / 1_000_000_000.0) + " G/s";
+            return withSignificantDigits(perSecond / 1_000_000_000.0) + " G/s";
         }
         if (perSecond >= 1_000_000.0) {
-            return Math.round(perSecond / 1_000_000.0) + " M/s";
+            return withSignificantDigits(perSecond / 1_000_000.0) + " M/s";
         }
         if (perSecond >= 1_000.0) {
-            return Math.round(perSecond / 1_000.0) + " k/s";
+            return withSignificantDigits(perSecond / 1_000.0) + " k/s";
         }
         return Math.round(perSecond) + "/s";
+    }
+
+    /**
+     * Renders a value that has already been divided into its unit — so it lies in {@code [1, 1000)} —
+     * with as many decimals as it takes to reach {@link #SIGNIFICANT_DIGITS}.
+     *
+     * <p>A value within rounding distance of the next unit renders as {@code "1000.0"} rather than
+     * being promoted (e.g. {@code 999_999_999} → {@code "1000.0 M/s"}). Promoting it would mean
+     * formatting twice to discover the carry, for a cosmetic gain in a band a live rate crosses in
+     * one sample.
+     *
+     * @param scaled the value in its unit, in {@code [1, 1000)}
+     * @return the value rendered with a constant number of significant digits
+     */
+    private static String withSignificantDigits(double scaled) {
+        int integerDigits = (int) Math.floor(Math.log10(scaled)) + 1;
+        int decimals = Math.max(0, SIGNIFICANT_DIGITS - integerDigits);
+        return String.format(java.util.Locale.ROOT, "%." + decimals + "f", scaled);
+    }
+
+    /**
+     * Renders the per-producer breakdown as {@code "label=<count> (<share>%), label=<count>
+     * (<share>%)"}, or {@code "none"} while no producer has generated anything yet.
+     *
+     * <p>Counts candidates rather than dispatched batches, and states each producer's share of the
+     * total, because the batch count this group used to print is not comparable between producers:
+     * a batch yields {@code 2^batchSizeInBits} candidates, so two GPUs configured at 24 and 21 bits
+     * differ 8× per batch. A run whose batch counts read {@code 1156} vs {@code 595} — an apparent
+     * 2:1 split — can in fact be a 20:1 split of the actual work, which is precisely the question
+     * the group exists to answer when more than one device is configured.
+     *
+     * @param generatedKeysByProducer generated-candidate counts keyed by producer label; iteration
+     *                                order is the caller's (sorted, for a stable line)
+     * @return the rendered breakdown, or {@code "none"} when the map is empty
+     */
+    static String describeProducerShares(Map<String, Long> generatedKeysByProducer) {
+        if (generatedKeysByProducer.isEmpty()) {
+            return "none";
+        }
+        long total = generatedKeysByProducer.values().stream()
+                .mapToLong(Long::longValue)
+                .sum();
+        return generatedKeysByProducer.entrySet().stream()
+                .map(entry ->
+                        entry.getKey() + "=" + formatCount(entry.getValue()) + describeShare(entry.getValue(), total))
+                .collect(Collectors.joining(", "));
+    }
+
+    /**
+     * Formats one producer's share of the generated total.
+     *
+     * @param generated this producer's candidate count
+     * @param total     the candidate count across all producers
+     * @return {@code " (NN.N%)"}, or an empty string when the total is zero (every producer is
+     *         registered but none has generated anything yet, so no share is meaningful)
+     */
+    private static String describeShare(long generated, long total) {
+        if (total <= 0L) {
+            return "";
+        }
+        return String.format(java.util.Locale.ROOT, " (%.1f%%)", generated * 100.0d / total);
+    }
+
+    /**
+     * Formats an absolute count, auto-scaling to k, M or G on the same thresholds as
+     * {@link #formatRate(double)} so the two read consistently within one line.
+     *
+     * @param count the count to format
+     * @return e.g. {@code "19.39 G"}, {@code "130.0 M"}, {@code "3.000 k"} or {@code "412"}
+     */
+    static String formatCount(long count) {
+        if (count >= 1_000_000_000L) {
+            return withSignificantDigits(count / 1_000_000_000.0d) + " G";
+        }
+        if (count >= 1_000_000L) {
+            return withSignificantDigits(count / 1_000_000.0d) + " M";
+        }
+        if (count >= 1_000L) {
+            return withSignificantDigits(count / 1_000.0d) + " k";
+        }
+        return String.valueOf(count);
     }
 
     /**

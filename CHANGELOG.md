@@ -7,6 +7,151 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Second contributed multi-GPU machine in the measurement registry** —
+  `tuner_ryzen9800x3d_dualgpu.csv` carries all 73 arms of an RX 7900 XTX plus an integrated gfx1036,
+  measured through the GPU-filtered pipeline with the shipped default candidates: **190.4 M keys/s**
+  on the discrete card at `batchSizeInBits=24, keysPerWorkItem=512` and **4.61 M keys/s** on the
+  iGPU at `23, 256`. Both winners came from the automatic sweep extension, which had to walk past
+  the shipped candidate list on each device independently. The machine's older single-device file
+  measured the full-transfer path and is not comparable — `docs/measurements/README.md` now says so
+  rather than leaving two numbers for the same card side by side.
+- **The same GPU behind two OpenCL platforms is swept once** — a duplicate ICD registration (common
+  on Windows AMD systems, where driver and runtime both register) makes one card enumerate twice, so
+  a two-card machine appeared as four devices and would have been measured, and then driven, twice
+  over. Devices are now de-duplicated by a fingerprint of the *physical* card, taken from
+  `cl_khr_device_uuid`, else `cl_khr_pci_bus_info`, else AMD's `cl_amd_device_attribute_query`. The
+  first two are Khronos standards that NVIDIA and Intel report as well, so this is not AMD-specific.
+  An unavailable fingerprint never merges: a rig of identical cards keeps every device, because the
+  device name is deliberately not used as a signal.
+- **The fat jar runs with a bare `java -jar`** — the assembly manifest now carries the `Add-Opens`
+  that lmdbjava needs to reflect into `java.nio`/`sun.nio.ch`, so the launcher scripts are no longer
+  required for LMDB access (they remain useful for the heap and Logback settings). Guarded by
+  `JvmModuleFlagConsistencyTest`, which asserts the manifest entry equals the `java.base` opens in
+  `.mvn/jvm.config` — the pom comment asked for that sync, nothing enforced it.
+- **`TuneConfiguration` measures every GPU, and by default every one it detects** — it used to take
+  `producerOpenCL.get(0)` silently. A dual-GPU configuration produced a full-looking report for one
+  device and a paste-ready configuration whose second entry still held the operator's guesses,
+  visually identical to the measured one; on a contributor's laptop that guess was 2.3× off that
+  device's optimum. All configured entries are now swept in turn, each keeping its own winner, and an
+  empty `producerOpenCL` list — previously an error — means "sweep every detected GPU", which is the
+  state most first runs are in. CPU OpenCL runtimes (pocl, Intel's CPU ICD) are excluded, devices are
+  measured one at a time so they do not contend, and the emitted configuration gives each producer
+  its own key producer per the shipped examples' convention.
+- **Light and Full DB entry counts refreshed** — `targetDatabaseEntries` defaults to `141045995`
+  (Light, 2026-07-20 publication) instead of the stale `132288304`; the Full tier reference is
+  `1472947953`. Historical measurement tables keep the counts they were measured at.
+- **The tuning sweep extends itself instead of advising a re-run** — when the winner lands on the
+  largest `keysPerWorkItem` or `batchSizeInBits` tried, `TuneConfiguration` keeps measuring past the
+  configured candidates (doubling, or one bit at a time) until an extra arm stops improving. A winner
+  at the edge is a lower bound, not a peak, and "widen the list and run it again" only reaches
+  someone who reads the guide first — a 20-minute measurement is run once. Two field sweeps both won
+  at the shipped list's last value of 256; widening by hand afterwards gained 17 % and 104 %. Costs
+  one arm per step, bounded by `maxExtensionArms` (default 4), disabled with
+  `extendSweepWhenWinnerIsAtTheEdge: false`. `batchSizeInBits=24` is treated as the framework
+  maximum rather than a truncation, so it extends no further and the report says why.
+- **Separate CI pipeline for the measurement tooling** — `.github/workflows/measurement-tools.yml`
+  runs the `register_machine.py` tests on Python 3.9 and 3.13, path-filtered to
+  `docs/measurements/**`. Kept out of the Java build, which shares none of its setup and takes
+  minutes rather than a second.
+- **Step-by-step tuning guide** — [`docs/tuning-your-gpu.md`](docs/tuning-your-gpu.md) walks through
+  finding device indices, writing a tuning config, capturing the log, reading the report, tuning a
+  second GPU and contributing the numbers back, with every command explained. Linked from the
+  README's `TuneConfiguration` section.
+- **`TuneConfiguration` distinguishes "too slow to measure" from a failure** — an arm that ran
+  without error but completed no batch inside its measurement window now reports `NOT MEASURED:` with
+  the reason and the remedy, instead of a bare `0.00 candidates/s` that reads like a driver
+  rejection. Happens at large `batchSizeInBits` with tiny `keysPerWorkItem`.
+- **First contributed multi-GPU machine in the measurement registry** —
+  `coreultra7155h-95g-win11` (Lenovo ThinkPad P14s Gen 5: Core Ultra 7 155H, RTX 500 Ada + integrated
+  Arc Pro), with `tuner_coreultra7155h.csv` carrying all 84 measured arms for both devices. Peaks:
+  **110.7 M keys/s** on the RTX at `batchSizeInBits=24, keysPerWorkItem=2048` and **36.5 M keys/s**
+  on the Arc at `23, 2048`. Until now every registered machine was high-end desktop hardware with a
+  single GPU.
+
+### Changed
+- **The documented iGPU interference figure is qualified, not a single number** — `docs/tuning-your-gpu.md`
+  cited "~3×" from one laptop pair (Intel Arc next to an RTX 500 Ada). A desktop pair (AMD gfx1036 next
+  to an RX 7900 XTX) measured ~1.5×. Both are now shown side by side with the advice to measure your
+  own, since platform, bandwidth headroom and thermal coupling all move it.
+- **`machines.json` records `gpu` as a list** — multi-GPU machines are the normal case (any laptop
+  with a discrete card also has an integrated one, and this project runs on both), so the field
+  holds every device instead of a comma-joined string that readers had to split. Existing entries
+  migrated; `register_machine.py --set gpu="A,B"` accepts a comma-separated value. `plot.py` reads
+  only `cpu.l3_mb` from the registry and is unaffected.
+- **Statistics line reports candidates per producer instead of dispatched batches** — the
+  `Batches per producer` group is replaced by `Keys per producer`, which prints each producer's
+  generated-candidate count and its **share of the total**
+  (`gpu0 (Incremental, GPU)=19 G (94.0%), gpu1 (Random, GPU)=1 G (6.0%)`). Batch counts are not
+  comparable between producers: one batch yields `2^batchSizeInBits` candidates, so on a multi-GPU
+  run with different batch sizes the old field read as a near-even split where the real work split
+  was an order of magnitude apart. `RuntimeStatistics` still tracks batch counts (used by
+  `TuneConfiguration`); only the rendered field changed.
+
+### Fixed
+- **Auto-discovered devices are swept with the GPU pre-filter on** — they inherited
+  `CProducerOpenCL`'s default of `false`, which caused three faults at once: the filter payload the
+  tuner builds for `targetDatabaseEntries` was thrown away unused, the sweep measured full-transfer
+  throughput while claiming to describe the pipeline the operator will run, and every candidate
+  crossed back to the host. The last one killed real runs: the result reader materialises
+  `2^batchSizeInBits` `PublicKeyBytes` per grid, so a sweep died with `OutOfMemoryError: Java heap
+  space` at `batchSizeInBits=22` on a 15.4 GiB heap — below the shipped candidate list's maximum
+  of 24. Emptying the example's `producerOpenCL` list to demonstrate auto-discovery had silently
+  moved it onto that default and taken its `enableGpuFilter: true` away. A sweep that still runs
+  without a filter now warns up front with the estimated host-heap cost, because the JVM's own error
+  names neither the setting nor the grid size responsible.
+- **The sweep extension judged a slow device by a fast one's winner** — on a multi-device run the
+  decision consulted the global best arm instead of the device being swept, so an integrated GPU that
+  won at the largest `keysPerWorkItem` tried got no extension: the discrete card's winner sat inside
+  its own range and reported "nothing to extend". The slower device's reported optimum was therefore
+  a silent lower bound — exactly what the extension exists to prevent. Invisible on a single-GPU
+  machine, where the global and the device winner are the same arm; found on a dual-GPU one.
+- **Device de-duplication requires the name to agree, not just the identity** — a fingerprint shared
+  by *differently named* devices is a driver defect rather than one card seen twice, and acting on it
+  would silently halve a multi-GPU machine with nothing in the run reporting it. The name remains a
+  veto and never a merge signal (merging on names would collapse a rig of identical cards). The
+  asymmetry decides it: a missed merge costs one redundant sweep, a wrong merge costs half the
+  hardware. Cheap insurance, since two of the three fingerprint sources have not yet run on real
+  hardware — the only dual-ICD machine available reports neither Khronos extension.
+- **`disableAddressLookup: true` no longer opens LMDB** — it opened the environment unconditionally
+  and failed with `ESRCH` / `InaccessibleObjectException` when no database existed, which is exactly
+  the situation disabling the lookup is meant to permit. A pure key-generation run, or the tuner's
+  paste-ready config before a database has been imported, now works with no database on disk.
+- **Example launchers and the tuning guide referenced a stale jar version** — 22 `run_*` scripts and
+  `docs/tuning-your-gpu.md` still named `1.7.0`. Bumped to the project version and guarded by
+  `ExampleRunScriptJarVersionTest`, which reads the version from `pom.xml` so it cannot drift again.
+- **`TuneConfiguration` no longer reports a failing arm as a measurement** — an arm measured while
+  the device was throwing errors was reported with whatever throughput it managed, indistinguishable
+  from a healthy arm. A real sweep on an Intel Arc recorded `1,022,288 candidates/s` for an arm
+  during which the producer hit `CL_OUT_OF_RESOURCES` **40 times**, and it was the arm immediately
+  before every larger grid began failing — so the row that would have explained the cascade was
+  presented as normal. Neither failure mode could reach the thread that started the producer: a
+  fatal exception ends the run loop quietly, and a per-secret failure is caught, logged and skipped
+  while the producer stays alive and looks healthy. Producers now record both
+  (`ProducerStateProvider#getLastFailure()`), and the sweep marks such an arm `FAILED` with the
+  cause, discarding the rate.
+- **REUSE compliance restored** — the licensing check had been failing on `main`. All measurement
+  data and generated plots are now covered by globs in `REUSE.toml` (so new machines and benchmark
+  runs stay compliant without an edit), and four example configs that were never added to the
+  existing list are included. 486/486 files compliant, was 462/486.
+- **`register_machine.py` no longer hides every non-NVIDIA GPU** — `detect_gpu()` returned as soon
+  as `nvidia-smi` named anything, which made the platform-wide enumeration unreachable on exactly
+  the machines that need it: a laptop with an NVIDIA card *and* an integrated GPU recorded only the
+  NVIDIA. All sources are now consulted and merged, with duplicates dropped. Detection reports what
+  the OS enumerates, which need not match the OpenCL device list — `OpenCLInfo` stays authoritative
+  for which devices this tool can drive.
+- **Rate and count formatting no longer collapses precision at a unit boundary** — `formatRate` and
+  `formatCount` rounded the scaled value to a whole number, so everything from 1.000 to 1.499 G/s
+  printed as `1 G/s` and tuned runs became impossible to compare once they crossed 1 G/s (reported
+  in #250). The same collapse happened at the `k/s` and `M/s` boundaries. Both now keep four
+  significant digits: `1.400 G/s`, `130.0 M/s`, `2.013 k/s`, `412/s`.
+- **Multi-line reports are readable again** — the `TuneConfiguration` report, the OpenCL device dump
+  and the transformed-configuration echo were folded onto a single line separated by ` | ` by the
+  log pattern's CRLF guard, forcing users to reformat them by hand to read them (reported in #250).
+  They are now emitted one log record per line via `util.MultilineLogger`. The guard is unchanged
+  and undiminished: every emitted line still carries a prefix the appender wrote, and the split
+  consumes every line-break form so no line can carry another past it.
+
 ## [1.7.0] - 2026-07-23
 
 Major release centred on high-performance probabilistic address filters (in-memory and GPU-side),

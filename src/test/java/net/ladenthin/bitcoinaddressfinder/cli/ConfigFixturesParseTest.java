@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.cli;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
@@ -93,7 +94,11 @@ public class ConfigFixturesParseTest {
                 "tuneConfiguration.finder.consumerJava",
                 parsed.tuneConfiguration.finder.consumerJava,
                 is(notNullValue()));
-        assertThat("producerOpenCL", parsed.tuneConfiguration.finder.producerOpenCL.size(), is(equalTo(1)));
+        // Deliberately empty: an empty producerOpenCL list is what makes the tuner enumerate the
+        // machine's GPUs and sweep every one of them. Shipping the example with a single hard-coded
+        // platformIndex/deviceIndex would hand the copy-paste path the one behaviour that measures
+        // only the first device — the behaviour this example most needs to demonstrate away from.
+        assertThat("producerOpenCL", parsed.tuneConfiguration.finder.producerOpenCL, is(empty()));
     }
 
     /**

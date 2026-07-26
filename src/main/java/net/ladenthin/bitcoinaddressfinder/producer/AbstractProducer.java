@@ -17,6 +17,7 @@ import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.util.PrivateKeyValidator;
 import org.apache.commons.codec.binary.Hex;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,6 +77,19 @@ public abstract class AbstractProducer implements Producer {
 
     /** Current life-cycle state. */
     protected volatile ProducerState state = ProducerState.UNINITIALIZED;
+
+    /**
+     * The most recent failure this producer hit, fatal or swallowed, or {@code null} if none.
+     *
+     * <p>Volatile because it is written on the producer's executor thread and read by whoever
+     * started it — the orchestrator that needs to know whether a measurement window contained a
+     * healthy producer or one that was failing throughout.
+     *
+     * <p>Excluded from {@link ToString} — a stack trace does not belong in a one-line producer
+     * description.
+     */
+    @ToString.Exclude
+    private volatile @Nullable Throwable lastFailure;
 
     /**
      * Flag controlling the main {@link #run()} loop; cleared via {@link #interrupt()}.
@@ -169,6 +183,10 @@ public abstract class AbstractProducer implements Producer {
                 produceKeys();
             } catch (Exception e) {
                 LOGGER.error("Error in produceKeys", e);
+                // Recorded as well as logged: the exception dies on this thread, and the thread that
+                // started this producer has no other way to learn the run ended badly rather than
+                // simply ending. See ProducerStateProvider#getLastFailure().
+                recordFailure(e);
                 break;
             }
             if (cProducer.runOnce) {
@@ -225,11 +243,12 @@ public abstract class AbstractProducer implements Producer {
     }
 
     void consumeSecrets(BigInteger... secrets) {
-        runtimeStatistics.incrementBatches(producerLabel());
+        String producerLabel = producerLabel();
+        runtimeStatistics.incrementBatches(producerLabel);
         if (cProducer.batchUsePrivateKeyIncrement) {
             // Increment mode expands secrets[0] into a full grid of getOverallWorkSize() candidates,
             // so the candidate count is the grid size, not secrets.length.
-            runtimeStatistics.addGeneratedKeys(cProducer.getOverallWorkSize());
+            runtimeStatistics.addGeneratedKeys(producerLabel, cProducer.getOverallWorkSize());
             BigInteger secret = secrets[0];
             BigInteger secretBase = createSecretBase(secret, cProducer.logSecretBase);
             processSecretBase(secretBase);
@@ -237,7 +256,7 @@ public abstract class AbstractProducer implements Producer {
             // Non-increment: each supplied secret is one candidate. Counting the candidates that
             // enter the pipeline at the top (before any GPU pre-filter) is what lets the statistics
             // line show total throughput distinctly from the consumer's post-filter lookup rate.
-            runtimeStatistics.addGeneratedKeys(secrets.length);
+            runtimeStatistics.addGeneratedKeys(producerLabel, secrets.length);
             processSecrets(secrets);
         }
     }
@@ -250,6 +269,10 @@ public abstract class AbstractProducer implements Producer {
      */
     protected void logErrorInProduceKeys(Throwable e, BigInteger secret) {
         LOGGER.error("Error in produceKey for secret " + secret + ".", e);
+        // This is the swallowed path: the caller carries on with the next secret, so logging is the
+        // only trace a failure ever leaves. Recording it as well is what lets an orchestrator tell a
+        // window of real work from a window of repeated failure -- see getLastFailure().
+        recordFailure(e);
     }
 
     /**
@@ -259,6 +282,20 @@ public abstract class AbstractProducer implements Producer {
      */
     protected void logErrorInProduceKeys(Exception e) {
         LOGGER.error("Error in produceKey", e);
+        recordFailure(e);
+    }
+
+    /**
+     * Records a failure so callers can observe it after the fact.
+     *
+     * <p>Only the most recent one is kept: a producer failing repeatedly reports the same cause over
+     * and over, and holding every throwable of a 20-second failure storm would retain stack traces
+     * nobody reads. What callers act on is whether a failure happened at all.
+     *
+     * @param e the failure to record
+     */
+    protected void recordFailure(Throwable e) {
+        lastFailure = e;
     }
 
     /**
@@ -322,5 +359,10 @@ public abstract class AbstractProducer implements Producer {
     @Override
     public ProducerState getState() {
         return state;
+    }
+
+    @Override
+    public @Nullable Throwable getLastFailure() {
+        return lastFailure;
     }
 }

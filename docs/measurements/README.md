@@ -28,7 +28,15 @@ That regenerates `plots/*.png` and the generated tables in one step.
 | `filter_build.csv` | Build time, retained memory, FPR against **real** LMDB databases — `FilterMeasurementMain`. |
 | `k_sweep.csv` | Blocked Bloom false-positive rate vs `k`, per bit density. |
 | `filter_sizing.csv` | Blocked Bloom FPR and speed vs filter size at fixed `k`. |
-| `plot.py` | Reads all of the above; writes `plots/*.png` and the generated tables. |
+| `tune_arms.csv`, `tuner_*.csv` | `TuneConfiguration` grid sweeps: one row per arm (`batchSizeInBits` × `keysPerWorkItem`), with the winner flagged — **per device**, so a multi-device file carries one `yes` per GPU. Raw data — not consumed by `plot.py`. |
+| `plot.py` | Reads all of the above **except the tuner sweeps**; writes `plots/*.png` and the generated tables. |
+
+> **Two sweeps of the same machine are not automatically comparable.** `tuner_ryzen9800x3d_gfx1100.csv`
+> measured a single device through the **full-transfer** path; `tuner_ryzen9800x3d_dualgpu.csv` measured
+> both of that machine's GPUs through the **GPU-filtered** path, where only filter survivors cross back
+> to the host. The second reports far higher throughput for the same card, and that is a different
+> pipeline rather than a better result. The older file is kept for provenance, per the rule below —
+> read the pipeline it used before putting two numbers side by side.
 
 > **`retained_mib` is a GC-delta estimate, not the structure size.** It includes harness heap, so it
 > is only trustworthy once the filter dominates — at ~10 M entries it has reported ~26 MiB for a
@@ -55,6 +63,18 @@ measurements are keyed by machine rather than averaged.
    idempotent — re-running updates the same entry instead of duplicating it. Anything it cannot
    detect stays `null` and can be filled in with `--set`, including nested fields
    (`--set cpu.l3_mb=32`).
+
+   **`gpu` is a list.** Machines with a discrete card *and* an integrated one are the normal case
+   here, and this project runs on both, so every GPU is recorded rather than only the one the first
+   detector happened to name. `--set` takes a comma-separated value for it:
+
+   ```bash
+   python docs/measurements/register_machine.py --set gpu="RTX 500 Ada,Arc Pro Graphics"
+   ```
+
+   Detection reports what the *operating system* enumerates, which need not match what an OpenCL
+   runtime exposes. For which devices this tool can actually drive, `OpenCLInfo` is authoritative —
+   check it against the list and correct with `--set` if they disagree.
 
    **Check `l3_mb`.** If detection failed there, set it manually: the lookup-latency plot annotates
    the L3 boundary from this value, and the whole crossover story is expressed in terms of it.

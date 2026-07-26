@@ -92,4 +92,33 @@ public class ProducerStatisticsLabelTest {
 
         assertThat(runtimeStatistics.batchesByProducerSnapshot().get("exampleRandom (Random, CPU)"), is(equalTo(1L)));
     }
+
+    /**
+     * Both per-producer counters must be filed under the <em>same</em> label. If the two calls in
+     * {@code consumeSecrets} ever derived the label independently and disagreed, the statistics line
+     * would attribute a producer's candidates to a name that has no batch count, and the rendered
+     * shares would point at the wrong device.
+     */
+    @Test
+    public void consumeSecrets_attributesGeneratedKeysToTheSameLabelAsTheBatchCount() {
+        CProducerJava cProducerJava = new CProducerJava();
+        cProducerJava.keyProducerId = "exampleRandom";
+        RuntimeStatistics runtimeStatistics = new RuntimeStatistics();
+        ProducerJava producer = new ProducerJava(
+                cProducerJava,
+                new MockConsumer(),
+                keyUtility,
+                randomKeyProducer("exampleRandom"),
+                bitHelper,
+                runtimeStatistics);
+
+        producer.consumeSecrets(BigInteger.ONE);
+
+        assertThat(
+                runtimeStatistics.generatedKeysByProducerSnapshot().keySet(),
+                is(equalTo(runtimeStatistics.batchesByProducerSnapshot().keySet())));
+        assertThat(
+                runtimeStatistics.generatedKeysByProducerSnapshot().get("exampleRandom (Random, CPU)"),
+                is(equalTo(runtimeStatistics.getGeneratedKeys())));
+    }
 }
