@@ -168,9 +168,23 @@ def detect_gpu() -> list[str]:
         lspci = _run(["lspci"])
         names.extend(ln.split(":", 2)[-1].strip() for ln in lspci.splitlines() if re.search(r"VGA|3D controller", ln))
 
+    # Deduplication is deliberately two-directional. The sources disagree on how verbose a name is --
+    # nvidia-smi may say "NVIDIA RTX 500 Ada" where the OS says "NVIDIA RTX 500 Ada Generation Laptop
+    # GPU" -- and which of the two arrives first is not fixed. Checking only whether the new name is
+    # contained in an existing one records the same card twice whenever the longer name comes last.
+    # The more specific name wins, because that is the one a reader can identify.
     unique: list[str] = []
     for name in names:
-        if not any(name == kept or name in kept for kept in unique):
+        covered = False
+        for index, kept in enumerate(unique):
+            if name == kept or name in kept:
+                covered = True
+                break
+            if kept in name:
+                unique[index] = name
+                covered = True
+                break
+        if not covered:
             unique.append(name)
     return unique
 
@@ -303,7 +317,13 @@ def main() -> int:
     registry["machines"][machine_id] = entry
     REGISTRY.write_text(json.dumps(registry, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     action = "updated" if existing else "added"
-    print(f"\n{action} {machine_id} in {REGISTRY.relative_to(HERE.parent.parent)}")
+    try:
+        location = REGISTRY.relative_to(HERE.parent.parent)
+    except ValueError:
+        # Registry outside the repository (a relocated file, or a test): show the full path rather
+        # than raising after the write has already succeeded.
+        location = REGISTRY
+    print(f"\n{action} {machine_id} in {location}")
     print(f"Use machine_id={machine_id} in every measurement row you append.")
     return 0
 

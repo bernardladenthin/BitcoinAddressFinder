@@ -960,7 +960,8 @@ public class TuneConfiguration implements Runnable, Interruptable {
         return report.toString();
     }
 
-    private static String describeArm(ArmResult result) {
+    @VisibleForTesting
+    static String describeArm(ArmResult result) {
         if (result.failure() != null) {
             return "batchSizeInBits=" + result.batchSizeInBits() + " keysPerWorkItem=" + result.keysPerWorkItem()
                     + " FAILED: " + result.failure();
@@ -981,7 +982,8 @@ public class TuneConfiguration implements Runnable, Interruptable {
      * @param result the arm, which must satisfy {@link ArmResult#tooSlowToMeasure()}
      * @return the explanation appended after {@code NOT MEASURED:}
      */
-    private static String tooSlowExplanation(ArmResult result) {
+    @VisibleForTesting
+    static String tooSlowExplanation(ArmResult result) {
         return "no batch completed within the " + format(result.elapsedSeconds())
                 + " s window; one launch of 2^" + result.batchSizeInBits()
                 + " candidates outlasts it at this keysPerWorkItem. Raise secondsPerArm or lower"

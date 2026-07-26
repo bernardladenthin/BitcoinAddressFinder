@@ -8,9 +8,11 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.isIn;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 
@@ -32,6 +34,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CTuneConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.GpuFilterType;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
+import nl.altindag.log.LogCaptor;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -244,6 +247,78 @@ public class TuneConfigurationTest extends LMDBBase {
      * <p>{@code warmupSecondsPerArm = 0} on purpose: warmup exists to absorb kernel compilation and
      * GPU clock ramp, neither of which a CPU producer has, so here it would only spend fork time.
      */
+    // <editor-fold desc="report rendering">
+    /**
+     * The three arm outcomes must be distinguishable <b>in the rendered output</b>, not merely in
+     * the model. Classification was already covered; what a user actually reads was not, and the
+     * whole reason the Intel Arc investigation took as long as it did is that two different
+     * situations printed the same way.
+     */
+    @Test
+    public void describeArm_measuredArm_rendersTheRateAndNoFailureMarker() {
+        String rendered = TuneConfiguration.describeArm(
+                new TuneConfiguration.ArmResult(23, 2048, 36_481_091.96d, 565_148.11d, 20.0d, null));
+
+        assertThat(rendered, containsString("batchSizeInBits=23"));
+        assertThat(rendered, containsString("keysPerWorkItem=2048"));
+        assertThat(rendered, containsString("36,481,091.96 candidates/s"));
+        assertThat(rendered, not(containsString("FAILED")));
+        assertThat(rendered, not(containsString("NOT MEASURED")));
+    }
+
+    @Test
+    public void describeArm_driverRejectedArm_saysFailedAndCarriesTheCause() {
+        String rendered = TuneConfiguration.describeArm(
+                new TuneConfiguration.ArmResult(24, 1, 0.0d, 0.0d, 0.0d, "CLException: CL_OUT_OF_HOST_MEMORY"));
+
+        assertThat(rendered, containsString("FAILED"));
+        assertThat(rendered, containsString("CL_OUT_OF_HOST_MEMORY"));
+        assertThat(rendered, not(containsString("NOT MEASURED")));
+    }
+
+    /**
+     * A bare {@code 0.00} was read as a hardware failure by a user in the field. The rendered line
+     * must say it is not one, and must say what to do about it.
+     */
+    @Test
+    public void describeArm_armTooSlowForTheWindow_saysNotMeasuredAndExplainsTheRemedy() {
+        String rendered =
+                TuneConfiguration.describeArm(new TuneConfiguration.ArmResult(22, 1, 0.0d, 0.0d, 20.0d, null));
+
+        assertThat(rendered, containsString("NOT MEASURED"));
+        assertThat(rendered, not(containsString("FAILED")));
+        // the two things a reader needs: that it is not an error, and the lever to pull
+        assertThat(rendered, containsString("Not a device or driver error"));
+        assertThat(rendered, containsString("secondsPerArm"));
+    }
+
+    /**
+     * The report is emitted one log record per line rather than as one multi-line message, so it
+     * stays readable under the log pattern's CRLF guard. Asserted end to end on a real sweep: a
+     * reverted call site in {@code TuneConfiguration} would otherwise leave every unit test green
+     * while users got a single ` | `-separated line back.
+     */
+    @Test
+    public void run_cpuProducerWithoutDatabase_reportIsLoggedOneRecordPerLine() {
+        // arrange
+        CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(TuneConfiguration.class)) {
+            // act
+            new TuneConfiguration(cTuneConfiguration).run();
+
+            // assert
+            List<String> infoLogs = logCaptor.getInfoLogs();
+            assertThat(infoLogs, hasItem(equalTo("########## BEGIN TuneConfiguration report ##########")));
+            assertThat(infoLogs, hasItem(equalTo("########## END TuneConfiguration report ##########")));
+            assertThat(infoLogs, hasItem(containsString("Winner (MEASURED)")));
+            assertThat(infoLogs, hasItem(containsString("batchSizeInBits  keysPerWorkItem")));
+            // the property the split exists to preserve
+            assertThat(infoLogs.stream().anyMatch(m -> m.indexOf('\n') >= 0 || m.indexOf('\r') >= 0), is(false));
+        }
+    }
+    // </editor-fold>
+
     // <editor-fold desc="crashed producer">
     /**
      * An arm whose producer died part-way through the window must be recorded as a failure, not as

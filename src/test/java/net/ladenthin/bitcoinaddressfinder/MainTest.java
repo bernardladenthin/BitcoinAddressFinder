@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -283,6 +284,47 @@ public class MainTest {
         CConfiguration reloaded = Main.fromYaml(yaml);
         assertThat(reloaded.command, is(equalTo(CCommand.Find)));
         assertThat(reloaded.finder.producerOpenCL.size(), is(equalTo(1)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="logConfigurationTransformation">
+    /**
+     * The configuration echo is emitted one log record per line rather than as one multi-line
+     * message, so it stays readable under the log pattern's CRLF guard
+     * ({@code %replace(%msg){'[\r\n]+', ' | '}}), which would otherwise fold the whole configuration
+     * onto a single line separated by {@code " | "}.
+     *
+     * <p>Asserted here and not only in {@code MultilineLoggerTest} because the helper being correct
+     * says nothing about this call site using it: reverting {@code logConfigurationTransformation}
+     * to a single {@code LOGGER.info} would leave every helper test green while users got the
+     * unreadable form back.
+     *
+     * <p>The stricter of the two assertions is that <b>no emitted record contains a line break</b>.
+     * That is the property the CRLF guard exists to enforce, and splitting only preserves it as long
+     * as every break is consumed — including one arriving inside a user-supplied value, which the
+     * YAML rendering (unlike the JSON one) can reproduce verbatim.
+     */
+    @Test
+    public void logConfigurationTransformation_configurationGiven_isLoggedOneRecordPerLine() throws IOException {
+        // arrange
+        CConfiguration configuration = new CConfiguration();
+        configuration.command = CCommand.Find;
+        configuration.finder = new CFinder();
+        configuration.finder.producerOpenCL.add(new CProducerOpenCL());
+        Main main = new Main(configuration);
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(Main.class)) {
+            // act
+            main.logConfigurationTransformation();
+
+            // assert
+            List<String> infoLogs = logCaptor.getInfoLogs();
+            assertThat(infoLogs, hasItem(equalTo("########## BEGIN transformed JSON configuration ##########")));
+            assertThat(infoLogs, hasItem(equalTo("########## END   transformed JSON configuration ##########")));
+            assertThat(infoLogs, hasItem(equalTo("########## BEGIN transformed YAML configuration ##########")));
+            assertThat(infoLogs, hasItem(equalTo("########## END   transformed YAML configuration ##########")));
+            assertThat(infoLogs.stream().anyMatch(m -> m.indexOf('\n') >= 0 || m.indexOf('\r') >= 0), is(false));
+        }
     }
     // </editor-fold>
 }
