@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Second contributed multi-GPU machine in the measurement registry** —
+  `tuner_ryzen9800x3d_dualgpu.csv` carries all 73 arms of an RX 7900 XTX plus an integrated gfx1036,
+  measured through the GPU-filtered pipeline with the shipped default candidates: **190.4 M keys/s**
+  on the discrete card at `batchSizeInBits=24, keysPerWorkItem=512` and **4.61 M keys/s** on the
+  iGPU at `23, 256`. Both winners came from the automatic sweep extension, which had to walk past
+  the shipped candidate list on each device independently. The machine's older single-device file
+  measured the full-transfer path and is not comparable — `docs/measurements/README.md` now says so
+  rather than leaving two numbers for the same card side by side.
 - **The same GPU behind two OpenCL platforms is swept once** — a duplicate ICD registration (common
   on Windows AMD systems, where driver and runtime both register) makes one card enumerate twice, so
   a two-card machine appeared as four devices and would have been measured, and then driven, twice

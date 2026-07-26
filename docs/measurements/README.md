@@ -28,8 +28,15 @@ That regenerates `plots/*.png` and the generated tables in one step.
 | `filter_build.csv` | Build time, retained memory, FPR against **real** LMDB databases — `FilterMeasurementMain`. |
 | `k_sweep.csv` | Blocked Bloom false-positive rate vs `k`, per bit density. |
 | `filter_sizing.csv` | Blocked Bloom FPR and speed vs filter size at fixed `k`. |
-| `tune_arms.csv`, `tuner_*.csv` | `TuneConfiguration` grid sweeps: one row per arm (`batchSizeInBits` × `keysPerWorkItem`), with the winner flagged. Raw data — not consumed by `plot.py`. |
+| `tune_arms.csv`, `tuner_*.csv` | `TuneConfiguration` grid sweeps: one row per arm (`batchSizeInBits` × `keysPerWorkItem`), with the winner flagged — **per device**, so a multi-device file carries one `yes` per GPU. Raw data — not consumed by `plot.py`. |
 | `plot.py` | Reads all of the above **except the tuner sweeps**; writes `plots/*.png` and the generated tables. |
+
+> **Two sweeps of the same machine are not automatically comparable.** `tuner_ryzen9800x3d_gfx1100.csv`
+> measured a single device through the **full-transfer** path; `tuner_ryzen9800x3d_dualgpu.csv` measured
+> both of that machine's GPUs through the **GPU-filtered** path, where only filter survivors cross back
+> to the host. The second reports far higher throughput for the same card, and that is a different
+> pipeline rather than a better result. The older file is kept for provenance, per the rule below —
+> read the pipeline it used before putting two numbers side by side.
 
 > **`retained_mib` is a GC-delta estimate, not the structure size.** It includes harness heap, so it
 > is only trustworthy once the filter dominates — at ~10 M entries it has reported ~26 MiB for a
