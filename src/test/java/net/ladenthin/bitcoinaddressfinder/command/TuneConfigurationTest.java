@@ -258,7 +258,7 @@ public class TuneConfigurationTest extends LMDBBase {
      * cause it would have identified.
      */
     @Test
-    public void armResultFor_producerDiedDuringTheWindow_isRecordedAsFailedNotAsAMeasurement() {
+    public void armResultFor_producerFailedDuringTheWindow_isRecordedAsFailedNotAsAMeasurement() {
         RuntimeException producerFailure = new RuntimeException("CL_OUT_OF_RESOURCES");
 
         TuneConfiguration.ArmResult result =
@@ -275,7 +275,7 @@ public class TuneConfigurationTest extends LMDBBase {
      * the fix above would turn every arm into a failure.
      */
     @Test
-    public void armResultFor_producerSurvivedTheWindow_keepsTheMeasuredRate() {
+    public void armResultFor_producerReportedNoFailure_keepsTheMeasuredRate() {
         TuneConfiguration.ArmResult result =
                 TuneConfiguration.armResultFor(23, 2048, 36_481_091.96d, 565_148.11d, 20.0d, null);
 

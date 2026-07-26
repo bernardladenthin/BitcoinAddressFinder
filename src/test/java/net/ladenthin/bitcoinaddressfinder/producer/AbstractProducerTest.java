@@ -10,6 +10,7 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThan;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -300,8 +301,40 @@ public class AbstractProducerTest {
      * "1,022,288 candidates/s" for an arm whose producer had died of {@code CL_OUT_OF_RESOURCES}
      * seconds in, and printed it next to healthy arms with nothing to distinguish it.
      */
+    /**
+     * The failure mode that actually occurs on a GPU: {@code ProducerOpenCL.processSecretBase}
+     * catches a {@link RuntimeException} per secret, logs it and carries on, so the producer never
+     * dies and nothing propagates anywhere. A real Intel Arc sweep threw {@code CL_OUT_OF_RESOURCES}
+     * <b>40 times inside a single 20 s arm</b> while the producer stayed alive the whole window —
+     * and the arm was reported as "1,022,288 candidates/s", a number describing a device that was
+     * failing continuously.
+     *
+     * <p>Terminal-failure tracking alone cannot see this: the loop never ends. A swallowed failure
+     * has to be recorded at the point it is swallowed.
+     */
     @Test
-    public void getTerminalFailure_exceptionInProduceKeys_returnsTheExceptionThatStoppedTheLoop() throws Exception {
+    public void getLastFailure_secretFailureSwallowed_isRecordedAlthoughTheProducerKeepsRunning() throws Exception {
+        // arrange
+        CProducer cProducer = new CProducer();
+        MockConsumer mockConsumer = new MockConsumer();
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, new Random(1));
+        AbstractProducerTestImpl producer = new AbstractProducerTestImpl(
+                cProducer, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
+        RuntimeException swallowed = new RuntimeException("CL_OUT_OF_RESOURCES");
+
+        // pre-assert
+        assertThat(producer.getLastFailure(), is(nullValue()));
+
+        // act — exactly what ProducerOpenCL.processSecretBase does with a CLException
+        producer.logErrorInProduceKeys(swallowed, BigInteger.ONE);
+
+        // assert: recorded, and the producer is still perfectly alive
+        assertThat(producer.getLastFailure(), is(sameInstance(swallowed)));
+        assertThat(producer.getState(), is(not(equalTo(ProducerState.NOT_RUNNING))));
+    }
+
+    @Test
+    public void getLastFailure_exceptionInProduceKeys_returnsTheExceptionThatStoppedTheLoop() throws Exception {
         // arrange
         CProducer cProducer = new CProducer();
         MockConsumer mockConsumer = new MockConsumer();
@@ -319,13 +352,13 @@ public class AbstractProducerTest {
         producer.initProducer();
 
         // pre-assert: nothing has gone wrong yet
-        assertThat(producer.getTerminalFailure(), is(nullValue()));
+        assertThat(producer.getLastFailure(), is(nullValue()));
 
         // act
         producer.run();
 
         // assert
-        assertThat(producer.getTerminalFailure(), is(sameInstance(thrown)));
+        assertThat(producer.getLastFailure(), is(sameInstance(thrown)));
     }
 
     /**
@@ -333,7 +366,7 @@ public class AbstractProducerTest {
      * crashed, or every clean shutdown would be reported as a failure.
      */
     @Test
-    public void getTerminalFailure_producerRanWithoutError_returnsNull() throws Exception {
+    public void getLastFailure_producerRanWithoutError_returnsNull() throws Exception {
         // arrange
         CProducer cProducer = new CProducer();
         cProducer.runOnce = true;
@@ -349,7 +382,7 @@ public class AbstractProducerTest {
 
         // assert
         assertThat(producer.getState(), is(equalTo(ProducerState.NOT_RUNNING)));
-        assertThat(producer.getTerminalFailure(), is(nullValue()));
+        assertThat(producer.getLastFailure(), is(nullValue()));
     }
     // </editor-fold>
 

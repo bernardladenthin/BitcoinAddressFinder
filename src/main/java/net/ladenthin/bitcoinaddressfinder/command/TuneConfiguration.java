@@ -515,16 +515,17 @@ public class TuneConfiguration implements Runnable, Interruptable {
             double candidatesPerSecond =
                     elapsedSeconds > 0.0d ? batchesDelta * (double) (1L << batchSizeInBits) / elapsedSeconds : 0.0d;
             double addressesCheckedPerSecond = elapsedSeconds > 0.0d ? checkedDelta / elapsedSeconds : 0.0d;
-            // The producer runs on another thread and swallows its own exceptions, so a crash
-            // part-way through the window looks from here like a producer that merely slowed down.
-            // Ask it directly rather than trusting the rate.
+            // The producer runs on another thread and never propagates its failures: a fatal one
+            // ends its loop quietly, and a per-secret one is logged and skipped while the producer
+            // stays alive. Either way this thread sees only a rate. Ask the producer instead of
+            // trusting the number.
             return armResultFor(
                     batchSizeInBits,
                     keysPerWorkItem,
                     candidatesPerSecond,
                     addressesCheckedPerSecond,
                     elapsedSeconds,
-                    producer.getTerminalFailure());
+                    producer.getLastFailure());
         } catch (Exception | OutOfMemoryError e) {
             // A grid that is too large for the device is an expected outcome, not a fatal one: the
             // sweep deliberately probes high batchSizeInBits values up to the framework cap
@@ -563,26 +564,27 @@ public class TuneConfiguration implements Runnable, Interruptable {
     }
 
     /**
-     * Builds an arm's result, downgrading it to a failure when the producer did not survive the
-     * measurement window.
+     * Builds an arm's result, downgrading it to a failure when the producer reported any failure
+     * during the measurement window.
      *
-     * <p>A rate produced by a producer that spent most of the window dead is not a measurement of
-     * anything, and printing it beside healthy arms actively misleads: a real sweep on an Intel Arc
-     * recorded {@code 1,022,288 candidates/s} for an arm whose producer had died of
-     * {@code CL_OUT_OF_RESOURCES} seconds in. Nothing in that row said so — and it was the arm
-     * immediately before every larger grid began failing, so the one number that would have
-     * explained the cascade was the one presented as normal.
+     * <p>A rate measured while the device was throwing errors is not a measurement of anything, and
+     * printing it beside healthy arms actively misleads: a real sweep on an Intel Arc recorded
+     * {@code 1,022,288 candidates/s} for an arm during which the producer hit
+     * {@code CL_OUT_OF_RESOURCES} 40 times. It never died — each failure was caught per secret and
+     * skipped — so nothing in that row said so, and it was the arm immediately before every larger
+     * grid began failing. The one number that would have explained the cascade was the one presented
+     * as normal.
      *
      * <p>The partial rate is deliberately discarded rather than reported alongside the failure.
      * Keeping it would invite exactly the comparison it cannot support, since how much of the window
-     * the producer survived is unknown.
+     * was productive is unknown.
      *
      * @param batchSizeInBits            the arm's grid size exponent
      * @param keysPerWorkItem            the arm's keys per work item
      * @param candidatesPerSecond        the measured candidate rate, used only if the producer survived
      * @param addressesCheckedPerSecond  the measured lookup rate, used only if the producer survived
      * @param elapsedSeconds             the measured window length
-     * @param producerFailure            what killed the producer, or {@code null} if it survived
+     * @param producerFailure            the producer's last failure, or {@code null} if it hit none
      * @return a measured result, or a failed one carrying the producer's cause
      */
     static ArmResult armResultFor(

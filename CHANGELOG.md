@@ -16,8 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without error but completed no batch inside its measurement window now reports `NOT MEASURED:` with
   the reason and the remedy, instead of a bare `0.00 candidates/s` that reads like a driver
   rejection. Happens at large `batchSizeInBits` with tiny `keysPerWorkItem`.
-
-### Added
 - **First contributed multi-GPU machine in the measurement registry** —
   `coreultra7155h-95g-win11` (Lenovo ThinkPad P14s Gen 5: Core Ultra 7 155H, RTX 500 Ada + integrated
   Arc Pro), with `tuner_coreultra7155h.csv` carrying all 84 measured arms for both devices. Peaks:
@@ -25,29 +23,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on the Arc at `23, 2048`. Until now every registered machine was high-end desktop hardware with a
   single GPU.
 
-### Fixed
-- **`TuneConfiguration` no longer reports a crashed arm as a measurement** — a producer that died
-  part-way through its measurement window (e.g. a `CLException` from the run loop) was reported with
-  whatever throughput it managed before dying, indistinguishable from a healthy arm. A real sweep on
-  an Intel Arc recorded `1,022,288 candidates/s` for an arm whose producer had hit
-  `CL_OUT_OF_RESOURCES` seconds in — and it was the arm immediately before every larger grid started
-  failing, so the row that would have explained the cascade was presented as normal. Producers now
-  record what terminated their run loop (`ProducerStateProvider#getTerminalFailure()`, which
-  previously had no way of reaching the thread that started them), and the sweep records such an arm
-  as `FAILED` with the cause, discarding the partial rate.
-- **REUSE compliance restored** — the licensing check had been failing on `main`. All measurement
-  data and generated plots are now covered by globs in `REUSE.toml` (so new machines and benchmark
-  runs stay compliant without an edit), and four example configs that were never added to the
-  existing list are included. 486/486 files compliant, was 462/486.
-
 ### Changed
 - **`machines.json` records `gpu` as a list** — multi-GPU machines are the normal case (any laptop
   with a discrete card also has an integrated one, and this project runs on both), so the field
   holds every device instead of a comma-joined string that readers had to split. Existing entries
   migrated; `register_machine.py --set gpu="A,B"` accepts a comma-separated value. `plot.py` reads
   only `cpu.l3_mb` from the registry and is unaffected.
+- **Statistics line reports candidates per producer instead of dispatched batches** — the
+  `Batches per producer` group is replaced by `Keys per producer`, which prints each producer's
+  generated-candidate count and its **share of the total**
+  (`gpu0 (Incremental, GPU)=19 G (94.0%), gpu1 (Random, GPU)=1 G (6.0%)`). Batch counts are not
+  comparable between producers: one batch yields `2^batchSizeInBits` candidates, so on a multi-GPU
+  run with different batch sizes the old field read as a near-even split where the real work split
+  was an order of magnitude apart. `RuntimeStatistics` still tracks batch counts (used by
+  `TuneConfiguration`); only the rendered field changed.
 
 ### Fixed
+- **`TuneConfiguration` no longer reports a failing arm as a measurement** — an arm measured while
+  the device was throwing errors was reported with whatever throughput it managed, indistinguishable
+  from a healthy arm. A real sweep on an Intel Arc recorded `1,022,288 candidates/s` for an arm
+  during which the producer hit `CL_OUT_OF_RESOURCES` **40 times**, and it was the arm immediately
+  before every larger grid began failing — so the row that would have explained the cascade was
+  presented as normal. Neither failure mode could reach the thread that started the producer: a
+  fatal exception ends the run loop quietly, and a per-secret failure is caught, logged and skipped
+  while the producer stays alive and looks healthy. Producers now record both
+  (`ProducerStateProvider#getLastFailure()`), and the sweep marks such an arm `FAILED` with the
+  cause, discarding the rate.
+- **REUSE compliance restored** — the licensing check had been failing on `main`. All measurement
+  data and generated plots are now covered by globs in `REUSE.toml` (so new machines and benchmark
+  runs stay compliant without an edit), and four example configs that were never added to the
+  existing list are included. 486/486 files compliant, was 462/486.
 - **`register_machine.py` no longer hides every non-NVIDIA GPU** — `detect_gpu()` returned as soon
   as `nvidia-smi` named anything, which made the platform-wide enumeration unreachable on exactly
   the machines that need it: a laptop with an NVIDIA card *and* an integrated GPU recorded only the
@@ -65,16 +70,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   They are now emitted one log record per line via `util.MultilineLogger`. The guard is unchanged
   and undiminished: every emitted line still carries a prefix the appender wrote, and the split
   consumes every line-break form so no line can carry another past it.
-
-### Changed
-- **Statistics line reports candidates per producer instead of dispatched batches** — the
-  `Batches per producer` group is replaced by `Keys per producer`, which prints each producer's
-  generated-candidate count and its **share of the total**
-  (`gpu0 (Incremental, GPU)=19 G (94.0%), gpu1 (Random, GPU)=1 G (6.0%)`). Batch counts are not
-  comparable between producers: one batch yields `2^batchSizeInBits` candidates, so on a multi-GPU
-  run with different batch sizes the old field read as a near-even split where the real work split
-  was an order of magnitude apart. `RuntimeStatistics` still tracks batch counts (used by
-  `TuneConfiguration`); only the rendered field changed.
 
 ## [1.7.0] - 2026-07-23
 
