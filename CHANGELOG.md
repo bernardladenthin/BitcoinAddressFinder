@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **The tuning sweep extends itself instead of advising a re-run** — when the winner lands on the
+  largest `keysPerWorkItem` or `batchSizeInBits` tried, `TuneConfiguration` keeps measuring past the
+  configured candidates (doubling, or one bit at a time) until an extra arm stops improving. A winner
+  at the edge is a lower bound, not a peak, and "widen the list and run it again" only reaches
+  someone who reads the guide first — a 20-minute measurement is run once. Two field sweeps both won
+  at the shipped list's last value of 256; widening by hand afterwards gained 17 % and 104 %. Costs
+  one arm per step, bounded by `maxExtensionArms` (default 4), disabled with
+  `extendSweepWhenWinnerIsAtTheEdge: false`. `batchSizeInBits=24` is treated as the framework
+  maximum rather than a truncation, so it extends no further and the report says why.
+- **Separate CI pipeline for the measurement tooling** — `.github/workflows/measurement-tools.yml`
+  runs the `register_machine.py` tests on Python 3.9 and 3.13, path-filtered to
+  `docs/measurements/**`. Kept out of the Java build, which shares none of its setup and takes
+  minutes rather than a second.
 - **Step-by-step tuning guide** — [`docs/tuning-your-gpu.md`](docs/tuning-your-gpu.md) walks through
   finding device indices, writing a tuning config, capturing the log, reading the report, tuning a
   second GPU and contributing the numbers back, with every command explained. Linked from the

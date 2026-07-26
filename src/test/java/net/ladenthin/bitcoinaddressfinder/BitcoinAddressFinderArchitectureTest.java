@@ -308,8 +308,14 @@ public class BitcoinAddressFinderArchitectureTest {
             .whereLayer("Configuration")
             .mayOnlyBeAccessedByLayers(
                     "Cli", "Command", "Consumer", "Engine", "Io", "Keyproducer", "Opencl", "Persistence", "Producer")
+            // "Command" is on this list because TuneConfiguration decides how far it may extend a
+            // sweep from BIT_COUNT_FOR_MAX_CHUNKS_ARRAY — the framework's own grid ceiling. Reading
+            // the constant is the point: hard-coding 24 in the command would be a second source of
+            // truth for a limit the kernel layout defines. Constants is the architectural leaf, so
+            // the dependency is downward and introduces no cycle.
             .whereLayer("Constants")
-            .mayOnlyBeAccessedByLayers("Configuration", "Consumer", "Io", "Keyproducer", "Model", "Opencl", "Util");
+            .mayOnlyBeAccessedByLayers(
+                    "Command", "Configuration", "Consumer", "Io", "Keyproducer", "Model", "Opencl", "Util");
 
     /**
      * The {@code constants} sub-package is a true architectural leaf. Pure

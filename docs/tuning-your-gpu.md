@@ -155,8 +155,19 @@ On modern GPUs the best value is frequently **above 256**, and a sweep that stop
 Dropping `1` and `4` costs you nothing — they are far too small to win on any GPU — and pays for the
 larger values without lengthening the run.
 
-**How to tell your sweep was too narrow:** if the winner sits at the *largest* value you swept, the
-real optimum is probably higher. Add another value and re-run.
+**You no longer have to catch this yourself.** If the winner lands on the largest value swept, the
+tuner keeps measuring past your list on its own — doubling `keysPerWorkItem`, or adding a bit to
+`batchSizeInBits` — until an extra arm stops improving. It costs one arm per step instead of a second
+20-minute run. The report and the log say when it happened.
+
+It stops for two different reasons, and the report distinguishes them:
+
+- **The optimum was inside your range.** The extra arm did not beat the winner. Nothing to do.
+- **`batchSizeInBits=24` was reached.** That is the framework maximum
+  (`BIT_COUNT_FOR_MAX_CHUNKS_ARRAY`), not a truncated sweep — there is nothing above it to try.
+
+Set `extendSweepWhenWinnerIsAtTheEdge: false` to measure exactly the candidates you listed and
+nothing more, or raise `maxExtensionArms` (default `4`) to let it look further.
 
 ### 4.3 Set `targetDatabaseEntries` to your real database size
 
@@ -285,8 +296,9 @@ published constant that does not vary by machine), so you always know which is w
 
 Three things to check before trusting the winner:
 
-1. **Is the winner at the edge of your sweep?** If `keysPerWorkItem` won at the largest value you
-   listed, widen the list and re-run — see [4.2](#42-widen-keysperworkitemcandidates--this-one-matters).
+1. **Did the sweep extend itself?** If the winner landed on the largest value you listed, the tuner
+   continued past it automatically and the extra arms appear in the table. A line stating why it
+   stopped tells you whether the optimum was inside your range or the framework maximum was reached.
 2. **Any `FAILED:` arms?** Those are combinations your driver rejected, usually because the output
    buffer for that `batchSizeInBits` exceeds the device's maximum allocation. Harmless — the sweep
    records them and moves on.

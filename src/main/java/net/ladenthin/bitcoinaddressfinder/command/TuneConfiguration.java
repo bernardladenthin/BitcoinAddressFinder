@@ -33,6 +33,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.configuration.CTuneConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.GpuFilterType;
+import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.consumer.Consumer;
 import net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.core.FireAndForget;
@@ -459,6 +460,96 @@ public class TuneConfiguration implements Runnable, Interruptable {
                 LOGGER.info("Arm {}/{}: {}", armIndex, armCount, describeArm(result));
             }
         }
+
+        extendSweepBeyondTheCandidates(
+                template,
+                finder,
+                consumer,
+                runtimeStatistics,
+                producerExecutor,
+                payload,
+                keyUtility,
+                bitHelper,
+                Collections.max(batchCandidates),
+                Collections.max(keysPerWorkItemCandidates));
+    }
+
+    /**
+     * Keeps measuring past the configured candidates while the winner sits on the edge of what was
+     * swept, so a truncated list yields the real optimum instead of a lower bound labelled "Winner".
+     *
+     * <p>See {@link #nextExtensionArm} for which edges are worth continuing past and which are the
+     * end of the road. The loop stops as soon as an extra arm fails to beat the winner, so the usual
+     * cost is one wasted arm rather than a second sweep; {@code maxExtensionArms} bounds the
+     * pathological case where every step keeps improving.
+     */
+    private void extendSweepBeyondTheCandidates(
+            CProducer template,
+            Finder finder,
+            ConsumerJava consumer,
+            RuntimeStatistics runtimeStatistics,
+            ExecutorService producerExecutor,
+            FilterPayload payload,
+            KeyUtility keyUtility,
+            BitHelper bitHelper,
+            int largestSweptBatchSizeInBits,
+            int largestSweptKeysPerWorkItem) {
+        if (!cTuneConfiguration.extendSweepWhenWinnerIsAtTheEdge) {
+            return;
+        }
+        boolean openCl = template instanceof CProducerOpenCL;
+        int largestBatchSizeInBits = largestSweptBatchSizeInBits;
+        int largestKeysPerWorkItem = largestSweptKeysPerWorkItem;
+
+        for (int extension = 1; extension <= cTuneConfiguration.maxExtensionArms; extension++) {
+            if (!shouldRun.get()) {
+                return;
+            }
+            ArmResult currentWinner = pickWinner(results);
+            if (currentWinner == null) {
+                return;
+            }
+            SweepExtension next =
+                    nextExtensionArm(currentWinner, largestKeysPerWorkItem, largestBatchSizeInBits, openCl);
+            if (next == null) {
+                return;
+            }
+            LOGGER.info(
+                    "Winner is at the largest {} swept ({}); continuing with {}={} rather than reporting a lower"
+                            + " bound. Extension arm {}/{}.",
+                    next.axis(),
+                    "keysPerWorkItem".equals(next.axis()) ? largestKeysPerWorkItem : largestBatchSizeInBits,
+                    next.axis(),
+                    "keysPerWorkItem".equals(next.axis()) ? next.keysPerWorkItem() : next.batchSizeInBits(),
+                    extension,
+                    cTuneConfiguration.maxExtensionArms);
+
+            ArmResult result = runArm(
+                    next.batchSizeInBits(),
+                    next.keysPerWorkItem(),
+                    template,
+                    finder,
+                    consumer,
+                    runtimeStatistics,
+                    producerExecutor,
+                    payload,
+                    keyUtility,
+                    bitHelper);
+            results.add(result);
+            LOGGER.info("Extension arm: {}", describeArm(result));
+
+            largestBatchSizeInBits = Math.max(largestBatchSizeInBits, next.batchSizeInBits());
+            largestKeysPerWorkItem = Math.max(largestKeysPerWorkItem, next.keysPerWorkItem());
+
+            if (!result.succeeded() || result.candidatesPerSecond() <= currentWinner.candidatesPerSecond()) {
+                LOGGER.info("Extension stopped: the extra arm did not beat the winner. The optimum was inside range.");
+                return;
+            }
+        }
+        LOGGER.info(
+                "Extension stopped after {} arms (maxExtensionArms). The winner may still be a lower bound;"
+                        + " raise maxExtensionArms or widen the candidate lists to look further.",
+                cTuneConfiguration.maxExtensionArms);
     }
 
     /**
@@ -911,6 +1002,10 @@ public class TuneConfiguration implements Runnable, Interruptable {
                     best.batchSizeInBits(),
                     best.keysPerWorkItem(),
                     format(best.candidatesPerSecond())));
+            String boundaryNote = winnerBoundaryNote(best);
+            if (!boundaryNote.isEmpty()) {
+                report.append(boundaryNote).append('\n');
+            }
         }
 
         report.append('\n').append("Filter choice - total = probe + fpr x verification:\n");
@@ -958,6 +1053,94 @@ public class TuneConfiguration implements Runnable, Interruptable {
         }
         report.append("########## END TuneConfiguration report ##########\n");
         return report.toString();
+    }
+
+    /**
+     * One further arm the sweep should measure because the grid's winner landed on the edge of what
+     * was swept.
+     *
+     * @param batchSizeInBits the grid size exponent to try next
+     * @param keysPerWorkItem the keys per work item to try next
+     * @param axis            which axis is being extended, for the log line
+     */
+    public record SweepExtension(int batchSizeInBits, int keysPerWorkItem, String axis) {}
+
+    /**
+     * Decides whether the sweep should keep going past the candidates it was given, and with what.
+     *
+     * <h2>Why extend instead of advising a re-run</h2>
+     * A winner sitting on the largest value tried is a <em>lower bound</em>, not a peak: the sweep
+     * stopped looking, not the hardware. Both of a contributor's first sweeps won at the shipped
+     * list's last {@code keysPerWorkItem} of 256; widening it by hand afterwards gained 17 % on
+     * their RTX 500 and 104 % on their Arc. Documentation saying "widen and re-run" only reaches
+     * someone who reads it before starting, and a 20-minute measurement is run once. So the sweep
+     * continues on its own, at the cost of one arm per step rather than a whole second run.
+     *
+     * <h2>Edge of the list versus edge of the possible</h2>
+     * Only the first is worth continuing past, and conflating them is what would make this useless.
+     * {@code batchSizeInBits} tops out at {@link OpenClKernelConstants#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY}
+     * (24), which the shipped candidate list already reaches, so a winner there is at the maximum
+     * the framework supports rather than at a truncation — extending would only produce a rejected
+     * arm, and flagging it would fire on most default runs until nobody read it any more.
+     * {@code keysPerWorkItem} has its own hard bound: {@code OpenClTask} rejects a value above
+     * {@code 2^batchSizeInBits}, since work items are {@code grid / keysPerWorkItem}.
+     *
+     * <p>A CPU producer is excluded outright — {@code keysPerWorkItem} is inert there, so extending
+     * along it would spend real minutes re-measuring one arm.
+     *
+     * <p><b>What this deliberately does not do</b> is re-explore the other axis after extending:
+     * it follows the winner's own row. The optimum could in principle move to a different
+     * {@code batchSizeInBits} once {@code keysPerWorkItem} grows, and this would not find that. A
+     * full second cross product would cost as much as the sweep itself, which is the thing being
+     * avoided.
+     *
+     * @param winner                        the best arm the sweep has produced so far
+     * @param largestSweptKeysPerWorkItem   the largest {@code keysPerWorkItem} measured so far
+     * @param largestSweptBatchSizeInBits   the largest {@code batchSizeInBits} measured so far
+     * @param openCl                        whether the swept producer is GPU-backed
+     * @return the next arm to measure, or {@code null} when the sweep should stop
+     */
+    @VisibleForTesting
+    static @Nullable SweepExtension nextExtensionArm(
+            ArmResult winner, int largestSweptKeysPerWorkItem, int largestSweptBatchSizeInBits, boolean openCl) {
+        if (!openCl || !winner.succeeded()) {
+            return null;
+        }
+        if (winner.keysPerWorkItem() == largestSweptKeysPerWorkItem) {
+            long doubled = (long) largestSweptKeysPerWorkItem * 2L;
+            // OpenClTask requires keysPerWorkItem <= 2^batchSizeInBits (work items = grid / kpwi).
+            if (doubled <= (1L << winner.batchSizeInBits())) {
+                return new SweepExtension(winner.batchSizeInBits(), (int) doubled, "keysPerWorkItem");
+            }
+            return null;
+        }
+        if (winner.batchSizeInBits() == largestSweptBatchSizeInBits
+                && winner.batchSizeInBits() < OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY) {
+            return new SweepExtension(winner.batchSizeInBits() + 1, winner.keysPerWorkItem(), "batchSizeInBits");
+        }
+        return null;
+    }
+
+    /**
+     * Explains, in the report, that a winner at the top of the {@code batchSizeInBits} range is
+     * there because the range ends, not because the sweep stopped early.
+     *
+     * <p>Without this a reader sees the winner in the table's last row and cannot tell whether the
+     * measurement was truncated. Saying so only at the framework maximum keeps the note meaningful:
+     * every other edge is now extended automatically rather than reported.
+     *
+     * @param winner the winning arm
+     * @return the note to append after the winner line, or an empty string when there is nothing to
+     *         explain
+     */
+    @VisibleForTesting
+    static String winnerBoundaryNote(ArmResult winner) {
+        if (winner.batchSizeInBits() == OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY) {
+            return "  batchSizeInBits=" + OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY
+                    + " is the framework maximum (BIT_COUNT_FOR_MAX_CHUNKS_ARRAY), so this axis had no"
+                    + " room left to explore.";
+        }
+        return "";
     }
 
     @VisibleForTesting

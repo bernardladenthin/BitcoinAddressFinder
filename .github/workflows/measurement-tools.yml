@@ -1,0 +1,53 @@
+# SPDX-FileCopyrightText: 2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Tests for the Python tooling under docs/measurements/.
+#
+# A separate pipeline rather than a step in publish.yml, because it shares nothing with the Java
+# build: no JDK, no Maven cache, no LMDB or OpenCL, and it finishes in well under a second. Bolting
+# it onto a job that takes minutes would only make the Java build slower to report.
+#
+# It also runs on a path filter. register_machine.py is touched a few times a year; running it on
+# every push to unrelated Java code would be noise, and a check that is usually irrelevant is a check
+# people learn to ignore.
+name: Measurement tooling
+
+on:
+  push:
+    paths:
+      - 'docs/measurements/**.py'
+      - 'docs/measurements/machines.json'
+      - '.github/workflows/measurement-tools.yml'
+  pull_request:
+    paths:
+      - 'docs/measurements/**.py'
+      - 'docs/measurements/machines.json'
+      - '.github/workflows/measurement-tools.yml'
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # The version matters: register_machine.py is written for a contributor's own machine, so it
+      # must keep working on whatever Python a distribution ships, not only on the newest. 3.9 is the
+      # oldest still receiving security fixes; the type hints in the script use `X | None`, which
+      # needs `from __future__ import annotations` to parse there — this matrix is what keeps that
+      # true rather than assumed.
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run the measurement tooling tests
+        run: python -m unittest discover -s docs/measurements -p 'test_*.py' -v
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.13']

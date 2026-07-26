@@ -103,6 +103,32 @@ public class CTuneConfiguration {
     public List<Integer> keysPerWorkItemCandidates = new ArrayList<>(List.of(1, 4, 16, 64, 256));
 
     /**
+     * Whether the sweep keeps measuring past {@link #keysPerWorkItemCandidates} /
+     * {@link #batchSizeInBitsCandidates} when the winner lands on the largest value tried.
+     *
+     * <p><b>On by default because a winner at the edge is a lower bound, not a peak</b>, and telling
+     * the operator to widen the list and start over does not help someone who runs a 20-minute
+     * measurement once. Two field sweeps both won at the shipped list's last {@code keysPerWorkItem}
+     * of 256; widening by hand afterwards gained 17 % on one GPU and 104 % on another, which is the
+     * difference between a usable result and a misleading one.
+     *
+     * <p>Costs one arm per step, and stops at the first step that fails to beat the winner — so the
+     * usual price of being wrong is a single wasted arm rather than a second sweep. Set {@code false}
+     * to measure exactly the candidates given and nothing else.
+     */
+    public boolean extendSweepWhenWinnerIsAtTheEdge = true;
+
+    /**
+     * Upper bound on how many extra arms {@link #extendSweepWhenWinnerIsAtTheEdge} may add.
+     *
+     * <p>The extension already stops as soon as an extra arm fails to improve, so this only bounds
+     * the case where every step keeps winning — a device whose optimum lies far outside the
+     * configured list. Four doublings reach 16× the largest candidate, past which the list itself
+     * was the wrong starting point.
+     */
+    public int maxExtensionArms = 4;
+
+    /**
      * Whether to measure the {@code FUSE_8} / {@code FUSE_16} choice empirically instead of
      * deriving it.
      *

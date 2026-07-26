@@ -229,6 +229,11 @@ public class TuneConfigurationTest extends LMDBBase {
         cTuneConfiguration.finder.producerOpenCL.add(cProducerOpenCL);
         cTuneConfiguration.batchSizeInBitsCandidates = List.of(gridBits);
         cTuneConfiguration.keysPerWorkItemCandidates = List.of(1);
+        // This test is about the grid enumeration alone: one arm per candidate pair. Automatic
+        // extension deliberately adds arms beyond the candidates when the winner lands on the edge
+        // — which a one-by-one sweep always does — so it is switched off here rather than folded
+        // into the expected count. Extension has its own tests in the "sweep extension" fold.
+        cTuneConfiguration.extendSweepWhenWinnerIsAtTheEdge = false;
 
         // act
         TuneConfiguration tuneConfiguration = new TuneConfiguration(cTuneConfiguration);
@@ -239,6 +244,36 @@ public class TuneConfigurationTest extends LMDBBase {
         assertThat(tuneConfiguration.getResults().get(0).batchSizeInBits(), is(equalTo(gridBits)));
     }
 
+    /**
+     * The extension must actually run, not merely be decidable. Asserted on real hardware: a
+     * one-candidate sweep necessarily wins at the edge, so leaving extension on has to produce more
+     * arms than candidates — the thing the unit tests around {@link TuneConfiguration#nextExtensionArm}
+     * cannot show, because they never start a producer.
+     */
+    @Test
+    @OpenCLTest
+    public void run_openClProducerWinningAtTheEdge_measuresBeyondTheConfiguredCandidates() {
+        // arrange
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        int gridBits = Math.min(4, new OpenCLPlatformAssume().maxGridBitsForAvailableDevice());
+        CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();
+        cTuneConfiguration.finder.producerJava.clear();
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.keyProducerId = "tuneKeyProducer";
+        cProducerOpenCL.enableGpuFilter = false;
+        cTuneConfiguration.finder.producerOpenCL.add(cProducerOpenCL);
+        cTuneConfiguration.batchSizeInBitsCandidates = List.of(gridBits);
+        cTuneConfiguration.keysPerWorkItemCandidates = List.of(1);
+        cTuneConfiguration.maxExtensionArms = 1;
+
+        // act
+        TuneConfiguration tuneConfiguration = new TuneConfiguration(cTuneConfiguration);
+        tuneConfiguration.run();
+
+        // assert
+        assertThat(tuneConfiguration.getResults().size(), is(greaterThan(1)));
+    }
+
     // </editor-fold>
 
     /**
@@ -247,6 +282,115 @@ public class TuneConfigurationTest extends LMDBBase {
      * <p>{@code warmupSecondsPerArm = 0} on purpose: warmup exists to absorb kernel compilation and
      * GPU clock ramp, neither of which a CPU producer has, so here it would only spend fork time.
      */
+    // <editor-fold desc="sweep extension">
+    /**
+     * A sweep whose winner sits at the largest value it tried has measured a lower bound, not a
+     * peak — and telling the user to run the whole thing again is not a fix, because they run it
+     * once. Both of a contributor's first sweeps won at `keysPerWorkItem=256`, the last candidate in
+     * the shipped list; widening it by hand afterwards gained 17 % on one GPU and 104 % on the
+     * other. The sweep must therefore carry on by itself rather than emit advice.
+     */
+    @Test
+    public void nextExtensionArm_winnerAtTheLargestSweptKeysPerWorkItem_continuesByDoubling() {
+        TuneConfiguration.ArmResult winner =
+                new TuneConfiguration.ArmResult(23, 256, 94_791_059.02d, 1_473_710.16d, 20.0d, null);
+
+        TuneConfiguration.SweepExtension next = TuneConfiguration.nextExtensionArm(winner, 256, 24, true);
+
+        assertThat(next, is(notNullValue()));
+        assertThat(next.keysPerWorkItem(), is(equalTo(512)));
+        assertThat(next.batchSizeInBits(), is(equalTo(23)));
+    }
+
+    @Test
+    public void nextExtensionArm_winnerInsideTheSweptRange_doesNotContinue() {
+        TuneConfiguration.ArmResult winner =
+                new TuneConfiguration.ArmResult(23, 256, 94_791_059.02d, 1_473_710.16d, 20.0d, null);
+
+        assertThat(TuneConfiguration.nextExtensionArm(winner, 2048, 24, true), is(nullValue()));
+    }
+
+    /**
+     * {@code keysPerWorkItem} may not exceed the grid: {@code OpenClTask} rejects a value larger
+     * than {@code 2^batchSizeInBits}. Extending into that would produce an arm the device refuses.
+     */
+    @Test
+    public void nextExtensionArm_doublingWouldExceedTheGrid_doesNotContinue() {
+        TuneConfiguration.ArmResult winner = new TuneConfiguration.ArmResult(4, 16, 1_000.0d, 10.0d, 20.0d, null);
+
+        assertThat(TuneConfiguration.nextExtensionArm(winner, 16, 5, true), is(nullValue()));
+    }
+
+    @Test
+    public void nextExtensionArm_winnerAtTheLargestSweptBatchSizeBelowTheCap_continuesByOneBit() {
+        TuneConfiguration.ArmResult winner = new TuneConfiguration.ArmResult(20, 64, 60_076_715.26d, 1.0d, 20.0d, null);
+
+        TuneConfiguration.SweepExtension next = TuneConfiguration.nextExtensionArm(winner, 2048, 20, true);
+
+        assertThat(next, is(notNullValue()));
+        assertThat(next.batchSizeInBits(), is(equalTo(21)));
+        assertThat(next.keysPerWorkItem(), is(equalTo(64)));
+    }
+
+    /**
+     * The distinction that keeps this from becoming noise: <b>the edge of your list</b> is worth
+     * continuing past, <b>the edge of what the framework supports</b> is not. A winner at
+     * {@code batchSizeInBits=24} is at {@code BIT_COUNT_FOR_MAX_CHUNKS_ARRAY} and there is nothing
+     * above it — extending would produce a rejected arm, and warning about it would fire on most
+     * default runs, which is how a warning stops being read.
+     */
+    @Test
+    public void nextExtensionArm_winnerAtTheFrameworkMaximum_doesNotContinue() {
+        TuneConfiguration.ArmResult winner =
+                new TuneConfiguration.ArmResult(24, 2048, 110_725_506.61d, 1_727_398.44d, 20.0d, null);
+
+        // at the largest swept batch size AND at the framework cap, and kpwi is inside its range
+        assertThat(TuneConfiguration.nextExtensionArm(winner, 4096, 24, true), is(nullValue()));
+    }
+
+    /**
+     * {@code keysPerWorkItem} has no meaning for a CPU producer — the candidates collapse to
+     * repeated measurements of one arm — so extending along it would burn minutes measuring the same
+     * thing repeatedly.
+     */
+    @Test
+    public void nextExtensionArm_cpuProducer_doesNotContinue() {
+        TuneConfiguration.ArmResult winner = new TuneConfiguration.ArmResult(20, 256, 1_000_000.0d, 1.0d, 20.0d, null);
+
+        assertThat(TuneConfiguration.nextExtensionArm(winner, 256, 20, false), is(nullValue()));
+    }
+
+    /** A failed winner is no basis for deciding where to look next. */
+    @Test
+    public void nextExtensionArm_winnerIsAFailedArm_doesNotContinue() {
+        TuneConfiguration.ArmResult failed =
+                new TuneConfiguration.ArmResult(23, 256, 0.0d, 0.0d, 0.0d, "CLException: CL_OUT_OF_HOST_MEMORY");
+
+        assertThat(TuneConfiguration.nextExtensionArm(failed, 256, 24, true), is(nullValue()));
+    }
+
+    /**
+     * The report has to tell the two boundaries apart in words too, or a reader sees a winner at the
+     * top of the table and cannot know whether the sweep stopped early or ran out of room.
+     */
+    @Test
+    public void winnerBoundaryNote_winnerAtTheFrameworkMaximum_saysItIsTheMaximumNotATruncatedSweep() {
+        String note = TuneConfiguration.winnerBoundaryNote(
+                new TuneConfiguration.ArmResult(24, 2048, 110_725_506.61d, 1_727_398.44d, 20.0d, null));
+
+        assertThat(note, containsString("framework maximum"));
+        assertThat(note, not(containsString("truncated")));
+    }
+
+    @Test
+    public void winnerBoundaryNote_winnerBelowTheFrameworkMaximum_saysNothing() {
+        String note = TuneConfiguration.winnerBoundaryNote(
+                new TuneConfiguration.ArmResult(21, 512, 97_828_095.12d, 1_524_704.05d, 20.0d, null));
+
+        assertThat(note, is(equalTo("")));
+    }
+    // </editor-fold>
+
     // <editor-fold desc="report rendering">
     /**
      * The three arm outcomes must be distinguishable <b>in the rendered output</b>, not merely in
