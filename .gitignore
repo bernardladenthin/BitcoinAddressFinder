@@ -53,3 +53,7 @@ nbactions.xml
 
 # Local scratch dir for running the jar against real databases (jars, logs, LMDBs)
 /runningtest/
+
+# Python bytecode from running docs/measurements/test_register_machine.py
+__pycache__/
+*.py[cod]
