@@ -89,6 +89,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TuneConfiguration`); only the rendered field changed.
 
 ### Fixed
+- **CI on `main` was red after the multi-GPU merge** — two independent failures, both reachable
+  locally and neither run before merging. `spotbugs:check` reported 14 findings in the new code; ten
+  were fixed properly (a defensive copy in `DeviceSweep`, wider parameter types, exception messages
+  that name the device and the counts, literal format strings, an empty array instead of `null`) and
+  four are suppressed with rationale, following the precedent already in `spotbugs-exclude.xml`.
+  Separately, `run_noProducerConfiguredButGpuPresent_sweepsTheDetectedDevices` failed on the pocl CI
+  job: an OpenCL device is not necessarily a GPU, and auto-discovery deliberately sweeps GPUs only,
+  so the test asked the tuner to find something correctly filtered out. It now assumes a GPU-type
+  device via the existing `hasGpuOpenCLDevice()` helper.
 - **Auto-discovered devices are swept with the GPU pre-filter on** — they inherited
   `CProducerOpenCL`'s default of `false`, which caused three faults at once: the filter payload the
   tuner builds for `targetDatabaseEntries` was thrown away unused, the sweep measured full-transfer

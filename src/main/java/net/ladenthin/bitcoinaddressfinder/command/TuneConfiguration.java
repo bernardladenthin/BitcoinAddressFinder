@@ -284,7 +284,20 @@ public class TuneConfiguration implements Runnable, Interruptable {
     public record DeviceSweep(
             String deviceLabel,
             List<ArmResult> arms,
-            @Nullable ArmResult winner) {}
+            @Nullable ArmResult winner) {
+
+        /**
+         * Copies the arm list so the record cannot be mutated through the reference it was built
+         * from — the sweep hands in a live slice of its own accumulator.
+         *
+         * @param deviceLabel how the device is identified in the report
+         * @param arms        the arms measured on this device, in measurement order
+         * @param winner      the best arm on this device, or {@code null} if none succeeded
+         */
+        public DeviceSweep {
+            arms = List.copyOf(arms);
+        }
+    }
 
     /**
      * Returns the per-arm results, one entry per swept candidate pair, in sweep order.
@@ -1121,7 +1134,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
      * @return the rendered section (terminated by a newline), or an empty string for a single device
      */
     @VisibleForTesting
-    static String renderPerDeviceWinners(List<DeviceSweep> deviceSweeps) {
+    static String renderPerDeviceWinners(Collection<DeviceSweep> deviceSweeps) {
         if (deviceSweeps.size() < 2) {
             return "";
         }
@@ -1418,13 +1431,16 @@ public class TuneConfiguration implements Runnable, Interruptable {
      * @return one template per device, independent of the prototype and of each other
      */
     @VisibleForTesting
-    static List<CProducerOpenCL> templatesForDevices(List<DetectedDevice> devices, CProducerOpenCL prototype) {
+    static List<CProducerOpenCL> templatesForDevices(Iterable<DetectedDevice> devices, CProducerOpenCL prototype) {
         ObjectMapper mapper = configurationMapper();
         String serialisedPrototype;
         try {
             serialisedPrototype = mapper.writeValueAsString(prototype);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to copy the producer template for multi-device tuning", e);
+            throw new IllegalStateException(
+                    "Failed to serialise the producer template for multi-device tuning (platformIndex="
+                            + prototype.platformIndex + ", deviceIndex=" + prototype.deviceIndex + ")",
+                    e);
         }
         List<CProducerOpenCL> templates = new ArrayList<>();
         for (DetectedDevice device : devices) {
@@ -1435,7 +1451,10 @@ public class TuneConfiguration implements Runnable, Interruptable {
                 templates.add(copy);
             } catch (JsonProcessingException e) {
                 throw new IllegalStateException(
-                        "Failed to copy the producer template for device " + device.deviceName(), e);
+                        "Failed to copy the producer template for device " + device.deviceName()
+                                + " (platformIndex=" + device.platformIndex() + ", deviceIndex="
+                                + device.deviceIndex() + ")",
+                        e);
             }
         }
         return templates;
@@ -1536,7 +1555,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
      * lower bound, which is precisely what the extension exists to prevent. A single-GPU machine
      * cannot show this, because there the global winner and the device winner are the same arm.
      *
-     * @param deviceArms                  the arms measured on this device, in measurement order
+     * @param deviceArms                  the arms measured on this device
      * @param largestSweptKeysPerWorkItem the largest {@code keysPerWorkItem} measured on it
      * @param largestSweptBatchSizeInBits the largest {@code batchSizeInBits} measured on it
      * @param openCl                      whether the swept producer is GPU-backed
@@ -1544,7 +1563,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
      */
     @VisibleForTesting
     static @Nullable SweepExtension nextExtensionArmForDevice(
-            List<ArmResult> deviceArms,
+            Collection<ArmResult> deviceArms,
             int largestSweptKeysPerWorkItem,
             int largestSweptBatchSizeInBits,
             boolean openCl) {
@@ -1723,8 +1742,10 @@ public class TuneConfiguration implements Runnable, Interruptable {
         }
         throw new IllegalArgumentException(
                 "tuneConfiguration.finder has no producerOpenCL or producerJava entry and no OpenCL GPU could be"
-                        + " detected to sweep automatically. Configure a producer, or install an OpenCL runtime"
-                        + " and verify it with the OpenCLInfo command.");
+                        + " detected to sweep automatically (OpenCL native library loaded: "
+                        + OpenCLBuilder.isOpenClNativeLibraryLoaded()
+                        + "). Configure a producer, or install an OpenCL runtime and verify it with the OpenCLInfo"
+                        + " command.");
     }
 
     /**
@@ -1859,7 +1880,10 @@ public class TuneConfiguration implements Runnable, Interruptable {
         }
         throw new IllegalArgumentException(
                 "tuneConfiguration.finder needs at least one key producer (for example keyProducerJavaRandom) so the"
-                        + " automatically detected devices have a source of secrets to measure with.");
+                        + " automatically detected devices have a source of secrets to measure with. Configured:"
+                        + " keyProducerJavaRandom=" + cFinder.keyProducerJavaRandom.size()
+                        + ", keyProducerJavaIncremental=" + cFinder.keyProducerJavaIncremental.size()
+                        + ", keyProducerJavaBip39=" + cFinder.keyProducerJavaBip39.size() + ".");
     }
 
     /**

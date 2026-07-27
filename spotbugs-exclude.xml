@@ -1322,4 +1322,38 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
     </Match>
 
+    <!--
+        EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
+        TuneConfiguration.templatesForDevices / giveEveryProducerItsOwnKeyProducer.
+        Both wrap Jackson's checked JsonProcessingException in an IllegalStateException.
+        They serialise and re-read configuration POJOs this project owns and populates
+        itself, with no external input involved, so a failure means the POJO shape and
+        the mapper have gone out of step: a programming error, not a runtime condition
+        a caller could handle. Declaring the checked exception would push it up through
+        the sweep into run(), which cannot do anything with it either. The messages name
+        the device and indices so the report says which copy failed.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration"/>
+        <Or>
+            <Method name="templatesForDevices"/>
+            <Method name="giveEveryProducerItsOwnKeyProducer"/>
+        </Or>
+        <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
+    </Match>
+
+    <!--
+        ENMI_ONE_ENUM_VALUE on ConsumerJava$AbsentAddressPresence.
+        A single-element enum is the standard way to express a stateless singleton in
+        Java: it is serialisation-safe and cannot be instantiated a second time. The
+        type answers "absent" for every address when address lookup is disabled and no
+        database is opened, so a second constant would have no meaning. Replacing it
+        with a static final field of an anonymous class would trade a documented idiom
+        for a weaker guarantee purely to satisfy the detector.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava$AbsentAddressPresence"/>
+        <Bug pattern="ENMI_ONE_ENUM_VALUE"/>
+    </Match>
+
 </FindBugsFilter>
