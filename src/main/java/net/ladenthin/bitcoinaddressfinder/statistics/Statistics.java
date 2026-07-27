@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.statistics;
 
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -144,7 +145,17 @@ public class Statistics {
     private static String withSignificantDigits(double scaled) {
         int integerDigits = (int) Math.floor(Math.log10(scaled)) + 1;
         int decimals = Math.max(0, SIGNIFICANT_DIGITS - integerDigits);
-        return String.format(java.util.Locale.ROOT, "%." + decimals + "f", scaled);
+        // A literal format string per branch, rather than one assembled from `decimals` or looked up
+        // in an array. Both of those are still "computed" to a static analyser even when every input
+        // is our own arithmetic, and spelling the three cases out documents the only shapes this
+        // produces: a value scaled into its unit lies in [1, 1000), so it has one to three integer
+        // digits.
+        return switch (decimals) {
+            case 0 -> String.format(Locale.ROOT, "%.0f", scaled);
+            case 1 -> String.format(Locale.ROOT, "%.1f", scaled);
+            case 2 -> String.format(Locale.ROOT, "%.2f", scaled);
+            default -> String.format(Locale.ROOT, "%.3f", scaled);
+        };
     }
 
     /**
@@ -187,7 +198,7 @@ public class Statistics {
         if (total <= 0L) {
             return "";
         }
-        return String.format(java.util.Locale.ROOT, " (%.1f%%)", generated * 100.0d / total);
+        return String.format(Locale.ROOT, " (%.1f%%)", generated * 100.0d / total);
     }
 
     /**
@@ -228,6 +239,6 @@ public class Statistics {
             return "";
         }
         double prunedPercent = (1.0 - lookupsPerSecond / potentialLookups) * 100.0;
-        return String.format(java.util.Locale.ROOT, ", %.2f%% pre-filtered", prunedPercent);
+        return String.format(Locale.ROOT, ", %.2f%% pre-filtered", prunedPercent);
     }
 }

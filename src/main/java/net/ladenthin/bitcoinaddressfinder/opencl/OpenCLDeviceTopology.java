@@ -124,9 +124,10 @@ public final class OpenCLDeviceTopology {
      * @param device the device to query
      * @param param  the {@code cl_device_info} parameter name
      * @param bytes  the expected payload size
-     * @return the payload, or {@code null} when the driver rejected the query
+     * @return the payload, or an empty array when the driver rejected the query — the parsers below
+     *     reject it on length, so an empty array and a refusal are the same outcome without a null
      */
-    private static byte @Nullable [] query(OpenCLDevice device, int param, int bytes) {
+    private static byte[] query(OpenCLDevice device, int param, int bytes) {
         try {
             byte[] payload = new byte[bytes];
             // A length-1 array receives the number of bytes actually written; the value is unused,
@@ -137,7 +138,7 @@ public final class OpenCLDeviceTopology {
         } catch (RuntimeException | LinkageError e) {
             // Any driver/JOCL failure: treat the identity as unknown so the device is kept, never
             // merged. De-duplication is a best-effort optimisation, not a correctness requirement.
-            return null;
+            return new byte[0];
         }
     }
 

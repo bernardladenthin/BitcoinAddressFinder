@@ -16,6 +16,7 @@ import static org.hamcrest.Matchers.isIn;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.File;
 import java.util.List;
@@ -140,6 +141,13 @@ public class TuneConfigurationTest extends LMDBBase {
     public void run_noProducerConfiguredButGpuPresent_sweepsTheDetectedDevices() {
         // arrange
         new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        // An OpenCL device is not necessarily a GPU, and auto-discovery deliberately sweeps only
+        // GPUs — a CPU runtime duplicates producerJava. The project's own OpenCL CI job runs on
+        // pocl, which exposes exactly one CPU device, so without this the test asks the tuner to
+        // discover something that is correctly filtered out and fails on its own premise.
+        assumeTrue(
+                new OpenCLPlatformAssume().hasGpuOpenCLDevice(),
+                "auto-discovery sweeps GPUs only; this OpenCL runtime exposes no GPU device");
         CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();
         cTuneConfiguration.finder.producerJava.clear();
         cTuneConfiguration.batchSizeInBitsCandidates =
