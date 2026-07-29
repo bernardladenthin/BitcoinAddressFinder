@@ -62,7 +62,8 @@ SPDX-License-Identifier: Apache-2.0
              coding agents at all." 1.9.3 is the last pre-disclosure release
              and is the pinned version for this repo. Any CI / Dependabot /
              contributor PR that bumps this MUST be rejected. See CLAUDE.md
-             section "jqwik prompt-injection in test output" for full context. -->
+             section "## jqwik Policy" (which defers to the workspace jqwik
+             policy) for full context. -->
         <jqwik.version>1.9.3</jqwik.version>
         <archunit.version>1.4.2</archunit.version>
         <spotbugs.version>4.10.3.0</spotbugs.version>
@@ -1154,8 +1155,9 @@ SPDX-License-Identifier: Apache-2.0
                 Builds the fat (jar-with-dependencies) jar for shipping the CLI.
                 Off by default because the assembly step is expensive and only
                 needed when packaging a runnable artifact, not during inner-loop
-                builds. Documented in CLAUDE.md "Build Commands" as
-                `./mvnw package -P assembly`.
+                builds. Documented in CLAUDE.md under "Build System" >
+                "Common Commands" as `mvn package -P assembly` (this repo
+                has no Maven wrapper, so `./mvnw` does not exist).
             -->
             <id>assembly</id>
             <build>
