@@ -209,7 +209,7 @@ The central design separates **key production** from **address checking**:
 | `LMDBToAddressFile.java` | Exports LMDB database to address files |
 | `NetworkParameterFactory.java` | Creates BitcoinJ `NetworkParameters` for 100+ coins |
 | `SeparatorFormat.java` | Parses address file formats (various separators) |
-| `Shutdown.java` | Graceful shutdown logic with 30-second timeout |
+| `Shutdown.java` | Shutdown contract (marker interface, `void shutdown()`) implemented by components that need a graceful stop |
 
 ### Key Producer Strategies (`keyproducer/`)
 
@@ -324,7 +324,7 @@ See `examples/config_*.json` for all configuration variants.
   ```
   -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true
   ```
-- Test ratio is approximately 1.7:1 (test lines to source lines). New code should have corresponding tests.
+- Test ratio is approximately 1.5:1 (~1.55:1, test lines to source lines). New code should have corresponding tests.
 
 ### Test execution policy for AI assistants
 
