@@ -86,7 +86,7 @@ SPDX-License-Identifier: Apache-2.0
         <lmdbjava.version>0.9.3</lmdbjava.version>
         <jocl.version>2.0.6</jocl.version>
         <commons-io.version>2.22.0</commons-io.version>
-        <commons-codec.version>1.22.0</commons-codec.version>
+        <commons-codec.version>1.22.1</commons-codec.version>
         <maven-artifact.version>3.9.16</maven-artifact.version>
         <junit.version>6.1.2</junit.version>
         <hamcrest.version>3.0</hamcrest.version>
