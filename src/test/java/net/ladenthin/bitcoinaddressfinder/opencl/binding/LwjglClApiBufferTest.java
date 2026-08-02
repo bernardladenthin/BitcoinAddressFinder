@@ -31,7 +31,9 @@ import org.lwjgl.opencl.CL10;
  * round-tripped and compared byte for byte; an off-by-one in the offset would silently corrupt a
  * filter and show up only as missed addresses.
  *
- * <p>{@code @OpenCLTest}: needs a real device to write to.
+ * <p>{@code @OpenCLTest}: needs a real device to write to — hence
+ * {@link OpenCLPlatformAssume#assumeOneOpenClDeviceAvailable()} rather than the loadability check,
+ * which on Windows is satisfied by the system loader even with no ICD installed.
  */
 class LwjglClApiBufferTest {
 
@@ -51,7 +53,7 @@ class LwjglClApiBufferTest {
     @Test
     @OpenCLTest
     void writeBufferChunked_payloadLargerThanOneChunk_roundTripsUnchanged() {
-        new OpenCLPlatformAssume().assumeOpenClLibraryAvailable();
+        new OpenCLPlatformAssume().assumeOneOpenClDeviceAvailable();
 
         // arrange
         final byte[] source = new byte[PAYLOAD_BYTES];
@@ -69,7 +71,7 @@ class LwjglClApiBufferTest {
     @Test
     @OpenCLTest
     void writeBufferChunked_shortPayload_roundTripsInNativeByteOrder() {
-        new OpenCLPlatformAssume().assumeOpenClLibraryAvailable();
+        new OpenCLPlatformAssume().assumeOneOpenClDeviceAvailable();
 
         // arrange
         final short[] source = new short[SHORT_ELEMENT_COUNT];

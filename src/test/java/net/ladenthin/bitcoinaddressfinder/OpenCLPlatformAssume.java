@@ -33,6 +33,30 @@ public class OpenCLPlatformAssume implements PlatformAssume {
         Assumptions.assumeTrue(new OpenCLBuilder().isOpenClLibraryAvailable(), "OpenCL library not available");
     }
 
+    /**
+     * Assumes at least one OpenCL device is present, at any version.
+     *
+     * <p>Deliberately distinct from {@link #assumeOpenClLibraryAvailable()}: the library loading and
+     * a device existing are two different conditions, and on Windows they come apart. Windows ships
+     * the OpenCL <em>loader</em> ({@code OpenCL.dll}) as part of the system, so the library resolves
+     * even where no ICD is registered at all — a stock GitHub {@code windows-latest} runner is
+     * exactly that case. A test that only checks loadability and then reaches for
+     * {@code getPlatformIds().get(0)} therefore does not skip there; it fails with an index error.
+     *
+     * <p>Prefer this over
+     * {@link #assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable()} whenever the
+     * test does not actually need OpenCL 2.0 — requiring 2.0 would needlessly skip on an older
+     * device that can run the test perfectly well.
+     */
+    public void assumeOneOpenClDeviceAvailable() {
+        assumeOpenClLibraryAvailable();
+        int deviceCount = 0;
+        for (OpenCLPlatform openCLPlatform : new OpenCLBuilder().build()) {
+            deviceCount += openCLPlatform.openCLDevices().size();
+        }
+        Assumptions.assumeTrue(deviceCount > 0, "No OpenCL device available");
+    }
+
     public void assumeOneOpenCL2_0OrGreaterDeviceAvailable(List<OpenCLPlatform> openCLPlatforms) {
         Assumptions.assumeTrue(
                 new OpenCLBuilder().isOneOpenCL2_0OrGreaterDeviceAvailable(openCLPlatforms),
