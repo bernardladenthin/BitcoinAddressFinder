@@ -7,7 +7,7 @@ package net.ladenthin.bitcoinaddressfinder.opencl;
  * Represents an OpenCL-related object that holds a native resource and must be explicitly released.
  * <p>
  * Extends {@link AutoCloseable} to support usage with Java's {@code try-with-resources} construct.
- * This interface is intended for resources such as {@link org.jocl.cl_mem}, {@link org.jocl.cl_kernel}, etc.
+ * This interface is intended for wrappers around OpenCL objects such as device buffers and kernels,
  * which require manual cleanup via OpenCL's native API.
  * </p>
  *

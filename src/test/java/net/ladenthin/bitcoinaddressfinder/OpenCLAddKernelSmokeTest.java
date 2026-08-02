@@ -5,40 +5,22 @@ package net.ladenthin.bitcoinaddressfinder;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.jocl.CL.CL_MEM_COPY_HOST_PTR;
-import static org.jocl.CL.CL_MEM_READ_ONLY;
-import static org.jocl.CL.CL_MEM_WRITE_ONLY;
-import static org.jocl.CL.CL_TRUE;
-import static org.jocl.CL.clBuildProgram;
-import static org.jocl.CL.clCreateBuffer;
-import static org.jocl.CL.clCreateCommandQueueWithProperties;
-import static org.jocl.CL.clCreateContext;
-import static org.jocl.CL.clCreateKernel;
-import static org.jocl.CL.clCreateProgramWithSource;
-import static org.jocl.CL.clEnqueueNDRangeKernel;
-import static org.jocl.CL.clEnqueueReadBuffer;
-import static org.jocl.CL.clFinish;
-import static org.jocl.CL.clReleaseCommandQueue;
-import static org.jocl.CL.clReleaseContext;
-import static org.jocl.CL.clReleaseKernel;
-import static org.jocl.CL.clReleaseMemObject;
-import static org.jocl.CL.clReleaseProgram;
-import static org.jocl.CL.clSetKernelArg;
-import static org.jocl.CL.setExceptionsEnabled;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
-import org.jocl.Pointer;
-import org.jocl.Sizeof;
-import org.jocl.cl_command_queue;
-import org.jocl.cl_context;
-import org.jocl.cl_device_id;
-import org.jocl.cl_kernel;
-import org.jocl.cl_mem;
-import org.jocl.cl_program;
-import org.jocl.cl_queue_properties;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClApi;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClBufferFlags;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClCommandQueue;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClContext;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClDeviceId;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClKernel;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClMem;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClProgram;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.OpenClBinding;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
@@ -83,7 +65,7 @@ public class OpenCLAddKernelSmokeTest {
     public void addKernel_allDevices_computeElementwiseSum() {
         new OpenCLPlatformAssume().assumeOpenClLibraryAvailable();
         // arrange
-        setExceptionsEnabled(true);
+        // No global error-reporting switch to flip: every call is checked at the binding seam.
         List<OpenCLPlatform> openCLPlatforms = new OpenCLBuilder().build();
 
         // act + assert: run the add kernel on every discovered device and verify each result.
@@ -108,41 +90,47 @@ public class OpenCLAddKernelSmokeTest {
      * every output element equals the element-wise sum of its inputs. All OpenCL resources created
      * here are released before returning so the test never leaks across devices.
      *
-     * @param openCLPlatform the platform owning the device (provides the context properties)
+     * @param openCLPlatform the platform owning the device
      * @param openCLDevice   the device to build and run the kernel on
      */
     private void runAddKernelOnDevice(OpenCLPlatform openCLPlatform, OpenCLDevice openCLDevice) {
         final int[] a = new int[ELEMENT_COUNT];
         final int[] b = new int[ELEMENT_COUNT];
-        final int[] out = new int[ELEMENT_COUNT];
         for (int i = 0; i < ELEMENT_COUNT; i++) {
             a[i] = i;
             b[i] = 2 * i + 1;
         }
 
-        final cl_device_id deviceId = openCLDevice.device();
-        final cl_context context =
-                clCreateContext(openCLPlatform.contextProperties(), 1, new cl_device_id[] {deviceId}, null, null, null);
-        final cl_command_queue commandQueue =
-                clCreateCommandQueueWithProperties(context, deviceId, new cl_queue_properties(), null);
-        final cl_program program = clCreateProgramWithSource(context, 1, new String[] {ADD_KERNEL_SOURCE}, null, null);
-        clBuildProgram(program, 0, null, BUILD_OPTIONS, null, null);
-        final cl_kernel kernel = clCreateKernel(program, KERNEL_NAME, null);
+        final ClApi clApi = OpenClBinding.defaultClApi();
+        final ClDeviceId deviceId = openCLDevice.device();
+        final ClContext context = clApi.createContext(openCLPlatform.platformId(), deviceId);
+        final ClCommandQueue commandQueue = clApi.createCommandQueue(context, deviceId, false);
+        final ClProgram program = clApi.createProgramWithSource(context, new String[] {ADD_KERNEL_SOURCE});
+        clApi.buildProgram(program, deviceId, BUILD_OPTIONS);
+        final ClKernel kernel = clApi.createKernel(program, KERNEL_NAME);
 
-        final long intBufferBytes = (long) Sizeof.cl_int * ELEMENT_COUNT;
-        final cl_mem aMem =
-                clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, intBufferBytes, Pointer.to(a), null);
-        final cl_mem bMem =
-                clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, intBufferBytes, Pointer.to(b), null);
-        final cl_mem outMem = clCreateBuffer(context, CL_MEM_WRITE_ONLY, intBufferBytes, null, null);
+        final long intBufferBytes = (long) Integer.BYTES * ELEMENT_COUNT;
+        final ClMem aMem = clApi.createBuffer(context, ClBufferFlags.READ_ONLY, intBufferBytes);
+        final ClMem bMem = clApi.createBuffer(context, ClBufferFlags.READ_ONLY, intBufferBytes);
+        final ClMem outMem = clApi.createBuffer(context, ClBufferFlags.WRITE_ONLY, intBufferBytes);
         try {
-            clSetKernelArg(kernel, 0, Sizeof.cl_mem, Pointer.to(aMem));
-            clSetKernelArg(kernel, 1, Sizeof.cl_mem, Pointer.to(bMem));
-            clSetKernelArg(kernel, 2, Sizeof.cl_mem, Pointer.to(outMem));
+            clApi.writeBufferChunked(commandQueue, aMem, a);
+            clApi.writeBufferChunked(commandQueue, bMem, b);
 
-            clEnqueueNDRangeKernel(commandQueue, kernel, 1, null, new long[] {ELEMENT_COUNT}, null, 0, null, null);
-            clEnqueueReadBuffer(commandQueue, outMem, CL_TRUE, 0, intBufferBytes, Pointer.to(out), 0, null, null);
-            clFinish(commandQueue);
+            clApi.setKernelArg(kernel, 0, aMem);
+            clApi.setKernelArg(kernel, 1, bMem);
+            clApi.setKernelArg(kernel, 2, outMem);
+
+            clApi.enqueueNDRangeKernel(commandQueue, kernel, new long[] {ELEMENT_COUNT}, false);
+
+            final ByteBuffer readBack =
+                    ByteBuffer.allocateDirect((int) intBufferBytes).order(ByteOrder.nativeOrder());
+            clApi.enqueueReadBuffer(commandQueue, outMem, 0L, readBack, false);
+            clApi.finish(commandQueue);
+
+            final int[] out = new int[ELEMENT_COUNT];
+            readBack.position(0);
+            readBack.asIntBuffer().get(out);
 
             for (int i = 0; i < ELEMENT_COUNT; i++) {
                 assertThat(
@@ -151,13 +139,13 @@ public class OpenCLAddKernelSmokeTest {
                         is(a[i] + b[i]));
             }
         } finally {
-            clReleaseMemObject(aMem);
-            clReleaseMemObject(bMem);
-            clReleaseMemObject(outMem);
-            clReleaseKernel(kernel);
-            clReleaseProgram(program);
-            clReleaseCommandQueue(commandQueue);
-            clReleaseContext(context);
+            clApi.releaseMemObject(aMem);
+            clApi.releaseMemObject(bMem);
+            clApi.releaseMemObject(outMem);
+            clApi.releaseKernel(kernel);
+            clApi.releaseProgram(program);
+            clApi.releaseCommandQueue(commandQueue);
+            clApi.releaseContext(context);
         }
     }
 }

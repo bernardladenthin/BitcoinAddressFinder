@@ -24,6 +24,7 @@ path = [
     "examples/config_Find_GPU_Fuse16Cascade.json",
     "examples/config_Find_GPU_LowVram.json",
     "examples/config_LMDBDelta.json",
+    "examples/config_Find_WebSocketUi.json",
     "src/test/resources/testOpenCLInfo/config_OpenCLInfo.json",
     "src/test/resources/testRoundtrip/config_AddressFilesToLMDB.json",
     "src/test/resources/testRoundtrip/config_Find_1OpenCLDevice.json",

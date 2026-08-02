@@ -412,17 +412,23 @@ public class BitcoinAddressFinderArchitectureTest {
     // ---------------------------------------------------------------------------------------
 
     /**
-     * The JOCL / OpenCL GPU binding ({@code org.jocl..}) may only be referenced from the
+     * The LWJGL OpenCL GPU binding ({@code org.lwjgl..}) may only be referenced from the
      * {@code opencl} package. No other layer may take a compile dependency on the GPU runtime;
      * everything above consumes the GPU exclusively through {@code opencl}'s own types.
+     *
+     * <p>Within {@code opencl}, the binding is confined further still: only the
+     * {@code opencl.binding} sub-package calls into it, which is what makes the rest of the GPU
+     * layer testable without a device. That inner boundary is a design rule rather than a test,
+     * because the constant classes ({@code CL10} and friends) are legitimately read wherever an
+     * OpenCL parameter name is needed.
      */
     @ArchTest
-    static final ArchRule joclConfinedToOpencl = noClasses()
+    static final ArchRule openClBindingConfinedToOpencl = noClasses()
             .that()
             .resideOutsideOfPackage("net.ladenthin.bitcoinaddressfinder.opencl..")
             .should()
             .dependOnClassesThat()
-            .resideInAPackage("org.jocl..")
+            .resideInAPackage("org.lwjgl..")
             .allowEmptyShould(true);
 
     /**

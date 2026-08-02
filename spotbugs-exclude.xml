@@ -130,7 +130,18 @@ SPDX-License-Identifier: Apache-2.0
         the PREDICTABLE_RANDOM suppression above.
     -->
     <Match>
-        <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocket"/>
+        <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocket"/>
+            <!--
+                SocketResultBroadcaster is the outbound half of the same channel and runs under the
+                same deployment assumption: localhost or a trusted LAN, as part of an operator's own
+                batch-scan setup. Note it carries MORE than the inbound side does - the results
+                include private keys - so the assumption is doing real work here. Accepted
+                deliberately; if this ever has to cross an untrusted network it needs a tunnel or
+                TLS, not a wider suppression.
+            -->
+            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.SocketResultBroadcaster"/>
+        </Or>
         <Or>
             <Bug pattern="UNENCRYPTED_SOCKET"/>
             <Bug pattern="UNENCRYPTED_SERVER_SOCKET"/>
@@ -189,10 +200,6 @@ SPDX-License-Identifier: Apache-2.0
             Bech32.Bech32Bytes.witnessProgram / witnessVersion are
             protected; both are needed for SegWit address decoding
             paths that bitcoinj does not expose publicly.
-          - OpenCLBuilder.isOpenClNativeLibraryLoaded: JOCL exposes
-            no public probe for whether its native lib loaded.
-            Needed for graceful CPU-only fallback on hosts without
-            GPU drivers.
           - LMDBPersistence.getApproximateSizeBytes: Guava's
             BloomFilter does not expose its in-memory size. We read
             the private backing array length for diagnostics.
@@ -208,10 +215,6 @@ SPDX-License-Identifier: Apache-2.0
                     <Method name="invokeConvertBitsStatic"/>
                     <Method name="invokeProtectedMethod"/>
                 </Or>
-            </And>
-            <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder"/>
-                <Method name="isOpenClNativeLibraryLoaded"/>
             </And>
             <And>
                 <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
@@ -405,7 +408,7 @@ SPDX-License-Identifier: Apache-2.0
 
         1. Hot-path byte[] / ByteBuffer ownership transfer.
            PublicKeyBytes, AddressToCoin.hash160,
-           OpenClTask$CLByteBufferPointerArgument.byteBuffer,
+           OpenClTask$SourceArgument.byteBuffer,
            OpenCLGridResult.result, and the cached read-only
            PersistenceUtils.zeroByteBuffer are passed across the
            GPU/CPU key-derivation pipeline at millions of operations
@@ -415,11 +418,20 @@ SPDX-License-Identifier: Apache-2.0
            PersistenceUtils.zeroByteBuffer is additionally pinned as
            asReadOnlyBuffer() to defeat mutation.
 
-        2. JOCL native handles. cl_context, cl_mem, cl_device_id,
-           cl_context_properties, and Pointer are opaque native
-           resource references. They cannot be cloned; the Java owner
-           must retain the reference to release the resource via
-           clRelease*.
+        2. OpenCL handles and the binding seam. The ClContext, ClMem,
+           ClDeviceId, ClCommandQueue, ... records wrap an opaque
+           native pointer; they cannot be cloned, and the Java owner
+           must keep the reference to release the resource via
+           clRelease*. The ClApi they are used through is the single
+           seam the whole OpenCL layer talks to the driver over, so
+           OpenCLBuilder, OpenCLContext, OpenCLDeviceTopology and
+           OpenClTask all deliberately share one instance — handing
+           out a copy would defeat the injection point tests
+           substitute at. OpenClTask$SourceArgument.getByteBuffer
+           exposes the host buffer for the same reason as category 1
+           and one stronger one: the device buffer is created OVER
+           that exact allocation, so a copy would be memory the GPU
+           never reads.
 
         3. Effectively-immutable bitcoinj Coin. AddressToCoin.coin
            holds a Coin instance which is a value-class style
@@ -444,7 +456,10 @@ SPDX-License-Identifier: Apache-2.0
             <Class name="net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.model.AddressToCoin"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenClTask"/>
-            <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenClTask$CLByteBufferPointerArgument"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenClTask$SourceArgument"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDeviceTopology"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLGridResult"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils"/>
             <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice"/>
@@ -891,7 +906,7 @@ SPDX-License-Identifier: Apache-2.0
         initProducer/produceKeys and on ConsumerJava.initLMDB.
 
         Producer is the abstract contract every producer impl honours. Concrete
-        impls throw a heterogeneous mix (LmdbException, JOCL CLException,
+        impls throw a heterogeneous mix (LmdbException, OpenClCallFailedException,
         IOException from socket binds, NoMoreSecretsAvailableException, etc.)
         with no shared checked-exception supertype. Narrowing the throws clause
         would require either (a) wrapping every impl's exception into a single
@@ -977,19 +992,6 @@ SPDX-License-Identifier: Apache-2.0
     <Match>
         <Class name="net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants"/>
         <Bug pattern="HARD_CODE_KEY"/>
-    </Match>
-
-    <!--
-        NP_LOAD_OF_KNOWN_NULL_VALUE on OpenClTask.executeKernel — false
-        positive on the JOCL API contract. clEnqueueNDRangeKernel takes
-        explicit null arguments for the global_work_offset, event_wait_list,
-        and event return-pointer when the caller has nothing to provide; the
-        nulls are not a defensive omission, they are the JOCL spec.
-    -->
-    <Match>
-        <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenClTask"/>
-        <Method name="executeKernel"/>
-        <Bug pattern="NP_LOAD_OF_KNOWN_NULL_VALUE"/>
     </Match>
 
     <!--
@@ -1354,6 +1356,87 @@ SPDX-License-Identifier: Apache-2.0
     <Match>
         <Class name="net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava$AbsentAddressPresence"/>
         <Bug pattern="ENMI_ONE_ENUM_VALUE"/>
+    </Match>
+
+
+    <!--
+        ==========================================================================================
+        Result broadcast + OpenCL binding seam (added with the LWJGL migration and the result
+        broadcast). Each entry below is a deliberate design decision, not a deferred cleanup.
+        ==========================================================================================
+
+        EI_EXPOSE_REP / EI_EXPOSE_REP2 - KeyProducerJavaWebSocket hands out the very
+        WebSocketEndpoint the broadcaster must send on, because one port serves both directions;
+        a copy would be a second, unbound server. This is the same design intent as category 4
+        ("deliberate dependency injection") in the main EI_EXPOSE_REP block above, where the
+        OpenCL classes are listed.
+
+        DLS_DEAD_LOCAL_STORE - the "Object unused = executor.submit(...)" form used to satisfy
+        Error Prone's FutureReturnValueIgnored for a deliberately fire-and-forget task. Both sites
+        carry @FireAndForget naming the lifecycle that replaces the Future.
+
+        EXS_EXCEPTION_SOFTENING_* - both sites soften on purpose. OpenClLibraryLoader turns an
+        UnsatisfiedLinkError from a failed library-name probe into a domain exception that names
+        every candidate tried; SocketResultBroadcaster.writeTo turns a broken pipe into "false" so
+        the dead peer is dropped and the remaining listeners keep being served.
+
+        MDM_THREAD_YIELD - awaitClientCount polls for a registration that happens on the accept
+        thread. It exists for tests only (a client's socket is connected before the accept loop has
+        registered it), and polling is the honest primitive for that.
+
+        IMC_IMMATURE_CLASS_NO_EQUALS - OpenClCallFailedException is an exception; exceptions are
+        identified by their stack, not compared by value. Same rationale as the existing entries.
+
+        PRMC_POSSIBLY_REDUNDANT_METHOD_CALLS - LwjglClApi calls the (trivial, final) record accessor
+        handle() on two different handles in one method; there is nothing to hoist.
+    -->
+    <Match>
+        <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaWebSocket"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.WebSocketResultBroadcaster"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <Match>
+        <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.SocketResultBroadcaster"/>
+            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.WebSocketEndpoint"/>
+        </Or>
+        <Bug pattern="DLS_DEAD_LOCAL_STORE"/>
+    </Match>
+
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.opencl.binding.OpenClLibraryLoader"/>
+        <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
+    </Match>
+
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.SocketResultBroadcaster"/>
+        <Or>
+            <Bug pattern="EXS_EXCEPTION_SOFTENING_RETURN_FALSE"/>
+            <Bug pattern="MDM_THREAD_YIELD"/>
+        </Or>
+    </Match>
+
+    <Match>
+        <Or>
+            <Class name="net.ladenthin.bitcoinaddressfinder.opencl.binding.OpenClCallFailedException"/>
+            <!--
+                ProducerReleaser is a stateful collaborator that owns a release history, not a value:
+                two releasers are never interchangeable, so equality has no meaning for it.
+            -->
+            <Class name="net.ladenthin.bitcoinaddressfinder.producer.ProducerReleaser"/>
+        </Or>
+        <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
+    </Match>
+
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.opencl.binding.LwjglClApi"/>
+        <Bug pattern="PRMC_POSSIBLY_REDUNDANT_METHOD_CALLS"/>
     </Match>
 
 </FindBugsFilter>

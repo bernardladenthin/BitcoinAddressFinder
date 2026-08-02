@@ -32,6 +32,22 @@ public class CKeyProducerJavaSocket extends CKeyProducerJavaReceiver {
     /** Port number to connect to or listen on */
     public int port = 12345;
 
+    /**
+     * Serve the outcome of every checked batch to TCP clients on {@link #resultPort}.
+     *
+     * <p><b>The messages contain private keys</b>, and every connected client receives every result —
+     * including hits from ranges somebody else submitted. Off by default.
+     *
+     * <p>Results are served on a port of their own rather than on this producer's connection: the
+     * inbound side handles exactly one peer and reads fixed-width records, while results go to every
+     * listener as newline-delimited JSON. Mixing both framings on one socket would make the stream
+     * ambiguous.
+     */
+    public boolean broadcastResults = false;
+
+    /** TCP port the result server binds to, used only when {@link #broadcastResults} is set. */
+    public int resultPort = 5556;
+
     /** Operating mode: client or server */
     public Mode mode = Mode.SERVER;
 

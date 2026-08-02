@@ -20,7 +20,7 @@ public class OpenCLPlatformSelector {
      * @param platformIndex The index of the platform to select
      * @param deviceType The OpenCL device type (e.g., CL_DEVICE_TYPE_GPU)
      * @param deviceIndex The index of the device within the platform
-     * @return A selected OpenCLDeviceSelection containing platform, device, and context properties
+     * @return A selected OpenCLDeviceSelection containing the platform and the device
      */
     public OpenCLDeviceSelection select(
             List<OpenCLPlatform> platforms, int platformIndex, long deviceType, int deviceIndex) {
@@ -41,6 +41,6 @@ public class OpenCLPlatformSelector {
 
         OpenCLDevice selectedDevice = matchingDevices.get(deviceIndex);
 
-        return new OpenCLDeviceSelection(selectedPlatform, selectedDevice, selectedPlatform.contextProperties());
+        return new OpenCLDeviceSelection(selectedPlatform, selectedDevice);
     }
 }

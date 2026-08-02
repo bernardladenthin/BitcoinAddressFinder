@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.consumer;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,8 +26,11 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
 import net.ladenthin.bitcoinaddressfinder.configuration.GpuFilterType;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
+import net.ladenthin.bitcoinaddressfinder.core.BatchResult;
 import net.ladenthin.bitcoinaddressfinder.core.FireAndForget;
+import net.ladenthin.bitcoinaddressfinder.core.Hit;
 import net.ladenthin.bitcoinaddressfinder.core.InterruptedRuntimeException;
+import net.ladenthin.bitcoinaddressfinder.core.ResultListener;
 import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
@@ -48,6 +52,7 @@ import net.ladenthin.bitcoinaddressfinder.statistics.SlidingWindowRate;
 import net.ladenthin.bitcoinaddressfinder.statistics.Statistics;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import org.apache.commons.codec.binary.Hex;
+import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.crypto.ECKey;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -204,7 +209,14 @@ public class ConsumerJava implements Consumer {
      * batch would be log-killing.
      */
     @ToString.Exclude
-    protected final LinkedBlockingQueue<PublicKeyBytes[]> keysQueue;
+    protected final LinkedBlockingQueue<QueuedBatch> keysQueue;
+
+    /**
+     * Sinks notified once per checked batch. Empty unless something was configured, in which case
+     * nothing about the pipeline changes.
+     */
+    @ToString.Exclude
+    private final List<ResultListener> resultListeners;
 
     /** Total number of vanity-pattern hits found so far. */
     protected final AtomicLong vanityHits = new AtomicLong();
@@ -254,6 +266,54 @@ public class ConsumerJava implements Consumer {
     }
 
     /**
+     * Creates a new consumer with the shared metrics sink and the result listeners.
+     *
+     * @param consumerJava      consumer configuration
+     * @param keyUtility        cryptographic helper
+     * @param persistenceUtils  persistence helper used to construct the LMDB layer
+     * @param runtimeStatistics shared runtime metrics sink (also written by the producers)
+     * @param resultListeners   sinks notified once per checked batch
+     */
+    public ConsumerJava(
+            CConsumerJava consumerJava,
+            KeyUtility keyUtility,
+            PersistenceUtils persistenceUtils,
+            RuntimeStatistics runtimeStatistics,
+            List<ResultListener> resultListeners) {
+        this(
+                consumerJava,
+                keyUtility,
+                persistenceUtils,
+                runtimeStatistics,
+                Executors.newSingleThreadScheduledExecutor(),
+                Executors.newFixedThreadPool(consumerJava.threads),
+                resultListeners);
+    }
+
+    /**
+     * Creates a new consumer that reports every checked batch to the given listeners.
+     *
+     * @param consumerJava     consumer configuration
+     * @param keyUtility       cryptographic helper
+     * @param persistenceUtils persistence helper used to construct the LMDB layer
+     * @param resultListeners  sinks notified once per checked batch
+     */
+    public ConsumerJava(
+            CConsumerJava consumerJava,
+            KeyUtility keyUtility,
+            PersistenceUtils persistenceUtils,
+            List<ResultListener> resultListeners) {
+        this(
+                consumerJava,
+                keyUtility,
+                persistenceUtils,
+                new RuntimeStatistics(),
+                Executors.newSingleThreadScheduledExecutor(),
+                Executors.newFixedThreadPool(consumerJava.threads),
+                resultListeners);
+    }
+
+    /**
      * Production constructor that injects the shared {@link RuntimeStatistics} so the
      * statistics line can report per-producer batch counts and the running-producer gauge.
      *
@@ -273,7 +333,8 @@ public class ConsumerJava implements Consumer {
                 persistenceUtils,
                 runtimeStatistics,
                 Executors.newSingleThreadScheduledExecutor(),
-                Executors.newFixedThreadPool(consumerJava.threads));
+                Executors.newFixedThreadPool(consumerJava.threads),
+                List.of());
     }
 
     /**
@@ -298,8 +359,38 @@ public class ConsumerJava implements Consumer {
             RuntimeStatistics runtimeStatistics,
             ScheduledExecutorService scheduledExecutorService,
             ExecutorService consumeKeysExecutorService) {
+        this(
+                consumerJava,
+                keyUtility,
+                persistenceUtils,
+                runtimeStatistics,
+                scheduledExecutorService,
+                consumeKeysExecutorService,
+                List.of());
+    }
+
+    /**
+     * Full constructor: injects the executors and the result listeners.
+     *
+     * @param consumerJava              consumer configuration
+     * @param keyUtility                cryptographic helper
+     * @param persistenceUtils          persistence helper used to construct the LMDB layer
+     * @param runtimeStatistics         shared runtime metrics sink
+     * @param scheduledExecutorService  scheduler used for the periodic stats logger
+     * @param consumeKeysExecutorService pool used for the worker threads that drain the keys queue
+     * @param resultListeners           sinks notified once per checked batch
+     */
+    ConsumerJava(
+            CConsumerJava consumerJava,
+            KeyUtility keyUtility,
+            PersistenceUtils persistenceUtils,
+            RuntimeStatistics runtimeStatistics,
+            ScheduledExecutorService scheduledExecutorService,
+            ExecutorService consumeKeysExecutorService,
+            List<ResultListener> resultListeners) {
         this.consumerJava = consumerJava;
         this.keysQueue = new LinkedBlockingQueue<>(consumerJava.queueSize);
+        this.resultListeners = List.copyOf(resultListeners);
         this.keyUtility = keyUtility;
         this.persistenceUtils = persistenceUtils;
         this.runtimeStatistics = runtimeStatistics;
@@ -700,7 +791,7 @@ public class ConsumerJava implements Consumer {
         // Wait for the next batch instead of an unconditional sleep — wakes the instant a
         // producer enqueues, so queuePollTimeoutMillis is the max idle wait window per
         // cycle, not a fixed back-off.
-        PublicKeyBytes[] next = keysQueue.poll(consumerJava.queuePollTimeoutMillis, TimeUnit.MILLISECONDS);
+        QueuedBatch next = keysQueue.poll(consumerJava.queuePollTimeoutMillis, TimeUnit.MILLISECONDS);
         if (next != null) {
             processBatch(next, threadLocalReuseableByteBuffer);
         }
@@ -721,7 +812,7 @@ public class ConsumerJava implements Consumer {
     long consumeKeys(ByteBuffer threadLocalReuseableByteBuffer) {
         LOGGER.trace("consumeKeys");
         long drained = 0;
-        PublicKeyBytes[] publicKeyBytesArray = keysQueue.poll();
+        QueuedBatch publicKeyBytesArray = keysQueue.poll();
         while (publicKeyBytesArray != null) {
             processBatch(publicKeyBytesArray, threadLocalReuseableByteBuffer);
             drained++;
@@ -736,10 +827,13 @@ public class ConsumerJava implements Consumer {
      * batch returned by its timed wait between drain cycles without re-entering the
      * non-blocking drain loop in {@link #consumeKeys(ByteBuffer)}.
      *
-     * @param publicKeyBytesArray              the batch to process
+     * @param queuedBatch                      the batch to process, with the base it was expanded from
      * @param threadLocalReuseableByteBuffer   thread-local buffer reused across address lookups
      */
-    private void processBatch(PublicKeyBytes[] publicKeyBytesArray, ByteBuffer threadLocalReuseableByteBuffer) {
+    private void processBatch(QueuedBatch queuedBatch, ByteBuffer threadLocalReuseableByteBuffer) {
+        final PublicKeyBytes[] publicKeyBytesArray = queuedBatch.keys();
+        // Collected rather than only logged, so the batch can be reported as a whole below.
+        final List<Hit> batchHits = new ArrayList<>();
         for (PublicKeyBytes publicKeyBytes : publicKeyBytesArray) {
             if (publicKeyBytes.isOutsidePrivateKeyRange()) {
                 continue;
@@ -763,6 +857,7 @@ public class ConsumerJava implements Consumer {
                         publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getUncompressed());
                 String hitMessageUncompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
                 LOGGER.info(hitMessageUncompressed);
+                batchHits.add(toHit(publicKeyBytes, hash160Uncompressed, ecKeyUncompressed, false, false));
             }
 
             if (containsAddressCompressed) {
@@ -773,6 +868,7 @@ public class ConsumerJava implements Consumer {
                         publicKeyBytes.getSecretKey().toByteArray(), publicKeyBytes.getCompressed());
                 String hitMessageCompressed = HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
                 LOGGER.info(hitMessageCompressed);
+                batchHits.add(toHit(publicKeyBytes, hash160Compressed, ecKeyCompressed, true, false));
             }
 
             if (consumerJava.enableVanity) {
@@ -788,6 +884,7 @@ public class ConsumerJava implements Consumer {
                     String vanityHitMessageUncompressed =
                             VANITY_HIT_PREFIX + keyUtility.createKeyDetails(ecKeyUncompressed);
                     LOGGER.info(vanityHitMessageUncompressed);
+                    batchHits.add(toHit(publicKeyBytes, hash160Uncompressed, ecKeyUncompressed, false, true));
                 }
 
                 String compressedKeyHashAsBase58 = publicKeyBytes.getCompressedKeyHashAsBase58(keyUtility);
@@ -801,6 +898,7 @@ public class ConsumerJava implements Consumer {
                     String vanityHitMessageCompressed =
                             VANITY_HIT_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
                     LOGGER.info(vanityHitMessageCompressed);
+                    batchHits.add(toHit(publicKeyBytes, hash160Compressed, ecKeyCompressed, true, true));
                 }
             }
 
@@ -816,6 +914,48 @@ public class ConsumerJava implements Consumer {
                     String missMessageCompressed = MISS_PREFIX + keyUtility.createKeyDetails(ecKeyCompressed);
                     LOGGER.trace(missMessageCompressed);
                 }
+            }
+        }
+
+        // One event per batch, emitted after the checks so it is exact. Reported even when
+        // nothing was found: a client sweeping a range needs 'checked, empty' to be
+        // distinguishable from 'never checked'.
+        notifyResultListeners(new BatchResult(queuedBatch.secretBase(), publicKeyBytesArray.length, batchHits));
+    }
+
+    /**
+     * Builds the reportable form of a hit.
+     *
+     * @param publicKeyBytes the candidate that matched
+     * @param hash160        the matching address hash
+     * @param ecKey          the key pair for the matching representation
+     * @param compressed     whether the compressed representation matched
+     * @param vanity         whether this was a vanity-pattern match rather than a database hit
+     * @return the hit as reported to the result listeners
+     */
+    private Hit toHit(PublicKeyBytes publicKeyBytes, byte[] hash160, ECKey ecKey, boolean compressed, boolean vanity) {
+        return new Hit(
+                publicKeyBytes.getSecretKey(),
+                Hex.encodeHexString(hash160),
+                ecKey.toAddress(ScriptType.P2PKH, keyUtility.network()).toString(),
+                compressed,
+                vanity);
+    }
+
+    /**
+     * Reports a checked batch to every configured listener.
+     *
+     * <p>A listener that throws must not take the scan down with it: this runs on the worker thread
+     * that drains the key queue, and the batch has already been checked by the time we get here.
+     *
+     * @param batchResult the outcome to report
+     */
+    private void notifyResultListeners(BatchResult batchResult) {
+        for (ResultListener resultListener : resultListeners) {
+            try {
+                resultListener.onBatchChecked(batchResult);
+            } catch (RuntimeException e) {
+                LOGGER.error("Result listener failed; continuing the scan.", e);
             }
         }
     }
@@ -882,7 +1022,8 @@ public class ConsumerJava implements Consumer {
     }
 
     @Override
-    public void consumeKeys(PublicKeyBytes[] publicKeyBytes) throws InterruptedException {
+    public void consumeKeys(PublicKeyBytes[] publicKeyBytes, @Nullable BigInteger secretBase)
+            throws InterruptedException {
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("keysQueue.put(publicKeyBytes) with length: " + publicKeyBytes.length);
         }
@@ -893,7 +1034,7 @@ public class ConsumerJava implements Consumer {
             // the bottleneck (cannot drain as fast as producers generate).
             producerBlockedCount.incrementAndGet();
         }
-        keysQueue.put(publicKeyBytes);
+        keysQueue.put(new QueuedBatch(publicKeyBytes, secretBase));
 
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("keysQueue.size(): " + keysQueue.size());

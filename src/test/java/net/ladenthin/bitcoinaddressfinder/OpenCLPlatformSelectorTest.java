@@ -16,11 +16,16 @@ import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDeviceSelection;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatformSelector;
-import org.jocl.cl_context_properties;
-import org.jocl.cl_device_id;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClDeviceId;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClPlatformId;
 import org.junit.jupiter.api.Test;
 
 public class OpenCLPlatformSelectorTest {
+    /** Stand-in platform handle: these tests describe the value object, never a real platform. */
+    private static final ClPlatformId TEST_PLATFORM_ID = new ClPlatformId(1L);
+
+    /** Stand-in device handle: these tests describe the value object, never a real device. */
+    private static final ClDeviceId TEST_DEVICE_ID = new ClDeviceId(1L);
 
     // CL_DEVICE_TYPE_CPU = (1 << 1) = 2, CL_DEVICE_TYPE_GPU = (1 << 2) = 4
     private static final long DEVICE_TYPE_CPU = 2L;
@@ -142,12 +147,12 @@ public class OpenCLPlatformSelectorTest {
 
     // <editor-fold defaultstate="collapsed" desc="helper">
     private static OpenCLPlatform createTestPlatform(String name, OpenCLDevice... devices) {
-        return new OpenCLPlatform(name, new cl_context_properties(), ImmutableList.copyOf(devices));
+        return new OpenCLPlatform(TEST_PLATFORM_ID, name, ImmutableList.copyOf(devices));
     }
 
     private static OpenCLDevice createTestDevice(long deviceType) {
         return new OpenCLDevice(
-                new cl_device_id(),
+                TEST_DEVICE_ID,
                 "TestDevice",
                 "TestVendor",
                 "1.0",

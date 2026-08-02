@@ -84,7 +84,7 @@ SPDX-License-Identifier: Apache-2.0
         <guava.version>33.6.0-jre</guava.version>
         <jackson.version>2.22.1</jackson.version>
         <lmdbjava.version>0.9.3</lmdbjava.version>
-        <jocl.version>2.0.6</jocl.version>
+        <lwjgl.version>3.4.2</lwjgl.version>
         <commons-io.version>2.22.0</commons-io.version>
         <commons-codec.version>1.22.1</commons-codec.version>
         <maven-artifact.version>3.9.16</maven-artifact.version>
@@ -950,10 +950,86 @@ SPDX-License-Identifier: Apache-2.0
             <artifactId>lmdbjava</artifactId>
             <version>${lmdbjava.version}</version>
         </dependency>
+        <!--
+            LWJGL 3: the core module carries the JNI shim (lwjgl.dll / liblwjgl.so) and the
+            MemoryStack/PointerBuffer plumbing; lwjgl-opencl is a pure binding jar with no
+            natives of its own (OpenCL itself is reached through the driver's system ICD).
+            Only the core module therefore needs natives-* classifier jars. They may all sit on
+            one classpath at once - LWJGL picks the matching one at runtime - which is what keeps
+            this project on a SINGLE fat jar even though the binding ships per-platform natives.
+        -->
         <dependency>
-            <groupId>org.jocl</groupId>
-            <artifactId>jocl</artifactId>
-            <version>${jocl.version}</version>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl</artifactId>
+            <version>${lwjgl.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl-opencl</artifactId>
+            <version>${lwjgl.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl</artifactId>
+            <version>${lwjgl.version}</version>
+            <classifier>natives-windows</classifier>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl</artifactId>
+            <version>${lwjgl.version}</version>
+            <classifier>natives-windows-x86</classifier>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl</artifactId>
+            <version>${lwjgl.version}</version>
+            <classifier>natives-windows-arm64</classifier>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl</artifactId>
+            <version>${lwjgl.version}</version>
+            <classifier>natives-linux</classifier>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl</artifactId>
+            <version>${lwjgl.version}</version>
+            <classifier>natives-linux-arm64</classifier>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl</artifactId>
+            <version>${lwjgl.version}</version>
+            <classifier>natives-linux-arm32</classifier>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl</artifactId>
+            <version>${lwjgl.version}</version>
+            <classifier>natives-macos</classifier>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl</artifactId>
+            <version>${lwjgl.version}</version>
+            <classifier>natives-macos-arm64</classifier>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl</artifactId>
+            <version>${lwjgl.version}</version>
+            <classifier>natives-freebsd</classifier>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>commons-io</groupId>

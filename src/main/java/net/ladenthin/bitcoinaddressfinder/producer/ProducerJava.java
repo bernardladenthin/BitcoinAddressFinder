@@ -52,7 +52,7 @@ public class ProducerJava extends AbstractProducer {
     public void processSecretBase(BigInteger secretBase) {
         try {
             PublicKeyBytes[] publicKeyBytesArray = createGrid(secretBase);
-            consumer.consumeKeys(publicKeyBytesArray);
+            consumer.consumeKeys(publicKeyBytesArray, secretBase);
         } catch (Exception e) {
             logErrorInProduceKeys(e, secretBase);
         }
@@ -65,7 +65,8 @@ public class ProducerJava extends AbstractProducer {
             for (int i = 0; i < secrets.length; i++) {
                 publicKeyBytesArray[i] = PublicKeyBytes.fromPrivate(secrets[i]);
             }
-            consumer.consumeKeys(publicKeyBytesArray);
+            // Independent secrets, so there is no common base to report.
+            consumer.consumeKeys(publicKeyBytesArray, null);
         } catch (Exception e) {
             logErrorInProduceKeys(e);
         }

@@ -3,15 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.opencl;
 
-import org.jocl.cl_context_properties;
-
 /**
- * Result of {@link OpenCLPlatformSelector#select}: the selected platform and device plus the
- * matching {@link cl_context_properties}.
+ * Result of {@link OpenCLPlatformSelector#select}: the selected platform and the device chosen on it.
  *
- * @param platform           the selected OpenCL platform
- * @param device             the selected OpenCL device on that platform
- * @param contextProperties  the context properties referencing the platform
+ * <p>The platform is kept alongside the device because creating a context needs both — the device
+ * handle alone does not say which platform it came from.
+ *
+ * @param platform the selected OpenCL platform
+ * @param device   the selected OpenCL device on that platform
  */
-public record OpenCLDeviceSelection(
-        OpenCLPlatform platform, OpenCLDevice device, cl_context_properties contextProperties) {}
+public record OpenCLDeviceSelection(OpenCLPlatform platform, OpenCLDevice device) {}

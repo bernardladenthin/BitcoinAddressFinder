@@ -135,7 +135,7 @@ public class ConsumerJavaTest {
             // through the live env rather than throwing Env$AlreadyClosedException.
             assertThat(consumerJava.persistence, is(notNullValue()));
             ByteBuffer buffer = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
-            consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
+            consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), null);
             consumerJava.consumeOneCycle(buffer);
         } finally {
             consumerJava.interrupt();
@@ -166,7 +166,7 @@ public class ConsumerJavaTest {
             // through the live env rather than throwing Env$AlreadyClosedException.
             assertThat(consumerJava.persistence, is(notNullValue()));
             ByteBuffer buffer = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
-            consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
+            consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), null);
             consumerJava.consumeOneCycle(buffer);
         } finally {
             consumerJava.interrupt();
@@ -315,7 +315,7 @@ public class ConsumerJavaTest {
         consumerJava.initLMDB();
         try {
             // enqueue one batch the cycle must drain and process
-            consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
+            consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), null);
             ByteBuffer buffer = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
 
             // act
@@ -340,14 +340,14 @@ public class ConsumerJavaTest {
         ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
 
         // first enqueue fills the only slot; remaining capacity was 1 beforehand -> not counted
-        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
+        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), null);
         assertThat(consumerJava.producerBlockedCount.get(), is(equalTo(0L)));
 
         // a second producer finds the queue full -> counts the block, then parks in put()
         ExecutorService producer = Executors.newSingleThreadExecutor();
         try {
             producer.submit(() -> {
-                consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
+                consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), null);
                 return null;
             });
 
@@ -471,7 +471,7 @@ public class ConsumerJavaTest {
         consumerJava.initLMDB();
 
         // add keys
-        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
+        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), null);
 
         // pre-assert, assert the keys queue is not empty
         assertThat(consumerJava.keysQueueSize(), is(equalTo(1)));
@@ -738,7 +738,7 @@ public class ConsumerJavaTest {
 
         PublicKeyBytes invalidPublicKeyBytes = PublicKeyBytes.INVALID_KEY_ONE;
         PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[] {invalidPublicKeyBytes};
-        consumerJava.consumeKeys(publicKeyBytesArray);
+        consumerJava.consumeKeys(publicKeyBytesArray, null);
         consumerJava.consumeKeys(createHash160ByteBuffer());
         consumerJava.interrupt();
     }
@@ -769,7 +769,7 @@ public class ConsumerJavaTest {
         PublicKeyBytes[] publicKeyBytesArray = new PublicKeyBytes[] {invalidPublicKeyBytes};
 
         try (LogCaptor logCaptor = LogCaptor.forClass(PublicKeyBytes.class)) {
-            consumerJava.consumeKeys(publicKeyBytesArray);
+            consumerJava.consumeKeys(publicKeyBytesArray, null);
             consumerJava.consumeKeys(createHash160ByteBuffer());
 
             // assert
@@ -845,7 +845,7 @@ public class ConsumerJavaTest {
         consumerJava.initLMDB();
 
         try (LogCaptor logCaptor = LogCaptor.forClass(ConsumerJava.class)) {
-            consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73());
+            consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), null);
             consumerJava.consumeKeys(createHash160ByteBuffer());
 
             // assert

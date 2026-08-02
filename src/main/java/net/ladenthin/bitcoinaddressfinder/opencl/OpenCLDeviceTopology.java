@@ -3,14 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.opencl;
 
-import static org.jocl.CL.clGetDeviceInfo;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Locale;
-import org.jocl.Pointer;
+import lombok.ToString;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClApi;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.OpenClBinding;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -44,9 +44,10 @@ import org.jspecify.annotations.Nullable;
  * cannot cause a merge, so an unsupported device falls back to today's behaviour (swept once per
  * enumeration entry) and can never be wrongly folded into another.
  */
-public final class OpenCLDeviceTopology {
+@ToString
+public class OpenCLDeviceTopology {
 
-    /** {@code CL_DEVICE_UUID_KHR} from {@code cl_ext.h}; not defined by JOCL's {@code CL}. */
+    /** {@code CL_DEVICE_UUID_KHR} from {@code cl_ext.h}; not exposed as a binding constant. */
     private static final int CL_DEVICE_UUID_KHR = 0x106A;
 
     /** {@code CL_UUID_SIZE_KHR}: the UUID is exactly this many opaque bytes. */
@@ -87,8 +88,20 @@ public final class OpenCLDeviceTopology {
      */
     private static final Splitter EXTENSION_SPLITTER = Splitter.on(' ').omitEmptyStrings();
 
-    private OpenCLDeviceTopology() {
-        // static helper
+    private final ClApi clApi;
+
+    /** Creates a topology resolver using the project's default OpenCL binding. */
+    public OpenCLDeviceTopology() {
+        this(OpenClBinding.defaultClApi());
+    }
+
+    /**
+     * Creates a topology resolver on an explicit OpenCL API, so tests can substitute it.
+     *
+     * @param clApi the OpenCL API used to read the identity properties
+     */
+    public OpenCLDeviceTopology(ClApi clApi) {
+        this.clApi = clApi;
     }
 
     /**
@@ -98,7 +111,7 @@ public final class OpenCLDeviceTopology {
      * @param device the device to fingerprint
      * @return a stable fingerprint, or {@code null} when no source is available
      */
-    public static @Nullable String physicalDeviceFingerprintOf(OpenCLDevice device) {
+    public @Nullable String physicalDeviceFingerprintOf(OpenCLDevice device) {
         String extensions = device.deviceExtensions();
         if (supportsDeviceUuid(extensions)) {
             String uuid = parseDeviceUuid(query(device, CL_DEVICE_UUID_KHR, CL_UUID_SIZE_KHR));
@@ -127,19 +140,11 @@ public final class OpenCLDeviceTopology {
      * @return the payload, or an empty array when the driver rejected the query — the parsers below
      *     reject it on length, so an empty array and a refusal are the same outcome without a null
      */
-    private static byte[] query(OpenCLDevice device, int param, int bytes) {
-        try {
-            byte[] payload = new byte[bytes];
-            // A length-1 array receives the number of bytes actually written; the value is unused,
-            // but the binding's nullness contract requires a non-null array here.
-            long[] bytesWritten = new long[1];
-            clGetDeviceInfo(device.device(), param, bytes, Pointer.to(payload), bytesWritten);
-            return payload;
-        } catch (RuntimeException | LinkageError e) {
-            // Any driver/JOCL failure: treat the identity as unknown so the device is kept, never
-            // merged. De-duplication is a best-effort optimisation, not a correctness requirement.
-            return new byte[0];
-        }
+    private byte[] query(OpenCLDevice device, int param, int bytes) {
+        // Any driver failure is absorbed by the API and surfaces as an empty payload: the identity
+        // is then unknown, so the device is kept and never merged. De-duplication is a best-effort
+        // optimisation, not a correctness requirement.
+        return clApi.getDeviceInfoBytesOrEmpty(device.device(), param, bytes);
     }
 
     /**
@@ -153,7 +158,8 @@ public final class OpenCLDeviceTopology {
      * @return the fingerprint, or {@code null} when the payload is unusable
      */
     @VisibleForTesting
-    static @Nullable String parseDeviceUuid(byte @Nullable [] uuid) {
+    @Nullable
+    String parseDeviceUuid(byte @Nullable [] uuid) {
         if (uuid == null || uuid.length != CL_UUID_SIZE_KHR) {
             return null;
         }
@@ -180,7 +186,8 @@ public final class OpenCLDeviceTopology {
      * @return the fingerprint, or {@code null} when the payload is unusable
      */
     @VisibleForTesting
-    static @Nullable String parsePciBusInfo(byte @Nullable [] payload) {
+    @Nullable
+    String parsePciBusInfo(byte @Nullable [] payload) {
         if (payload == null || payload.length != PCI_BUS_INFO_BYTES) {
             return null;
         }
@@ -203,7 +210,8 @@ public final class OpenCLDeviceTopology {
      * @return the fingerprint, or {@code null} when the payload is unusable
      */
     @VisibleForTesting
-    static @Nullable String parseAmdTopology(byte @Nullable [] topology) {
+    @Nullable
+    String parseAmdTopology(byte @Nullable [] topology) {
         if (topology == null || topology.length != CL_DEVICE_TOPOLOGY_AMD_BYTES) {
             return null;
         }
@@ -224,7 +232,7 @@ public final class OpenCLDeviceTopology {
      * @return {@code true} if the extension is present
      */
     @VisibleForTesting
-    static boolean supportsDeviceUuid(String extensions) {
+    boolean supportsDeviceUuid(String extensions) {
         return hasExtension(extensions, DEVICE_UUID_EXTENSION);
     }
 
@@ -235,7 +243,7 @@ public final class OpenCLDeviceTopology {
      * @return {@code true} if the extension is present
      */
     @VisibleForTesting
-    static boolean supportsPciBusInfo(String extensions) {
+    boolean supportsPciBusInfo(String extensions) {
         return hasExtension(extensions, PCI_BUS_INFO_EXTENSION);
     }
 
@@ -246,7 +254,7 @@ public final class OpenCLDeviceTopology {
      * @return {@code true} if the extension is present
      */
     @VisibleForTesting
-    static boolean supportsAmdTopology(String extensions) {
+    boolean supportsAmdTopology(String extensions) {
         return hasExtension(extensions, AMD_ATTRIBUTE_QUERY_EXTENSION);
     }
 
@@ -261,7 +269,7 @@ public final class OpenCLDeviceTopology {
      * @param extension  the extension to look for
      * @return {@code true} if the list contains it as a whole token
      */
-    private static boolean hasExtension(String extensions, String extension) {
+    private boolean hasExtension(String extensions, String extension) {
         for (String candidate : EXTENSION_SPLITTER.split(extensions)) {
             if (candidate.equals(extension)) {
                 return true;

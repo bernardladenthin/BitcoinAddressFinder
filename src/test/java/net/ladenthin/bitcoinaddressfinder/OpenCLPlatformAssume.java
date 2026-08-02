@@ -8,8 +8,8 @@ import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
-import org.jocl.CL;
 import org.junit.jupiter.api.Assumptions;
+import org.lwjgl.opencl.CL10;
 
 public class OpenCLPlatformAssume implements PlatformAssume {
 
@@ -30,12 +30,12 @@ public class OpenCLPlatformAssume implements PlatformAssume {
             "net.ladenthin.bitcoinaddressfinder.test.opencl.cpu.maxGridBits";
 
     public void assumeOpenClLibraryAvailable() {
-        Assumptions.assumeTrue(OpenCLBuilder.isOpenClNativeLibraryLoaded(), "OpenCL library not available");
+        Assumptions.assumeTrue(new OpenCLBuilder().isOpenClLibraryAvailable(), "OpenCL library not available");
     }
 
     public void assumeOneOpenCL2_0OrGreaterDeviceAvailable(List<OpenCLPlatform> openCLPlatforms) {
         Assumptions.assumeTrue(
-                OpenCLBuilder.isOneOpenCL2_0OrGreaterDeviceAvailable(openCLPlatforms),
+                new OpenCLBuilder().isOneOpenCL2_0OrGreaterDeviceAvailable(openCLPlatforms),
                 "One OpenCL 2.0 or greater device available");
     }
 
@@ -49,13 +49,13 @@ public class OpenCLPlatformAssume implements PlatformAssume {
     /**
      * Returns whether at least one available OpenCL device is a GPU.
      *
-     * @return {@code true} if any discovered device reports {@link CL#CL_DEVICE_TYPE_GPU}
+     * @return {@code true} if any discovered device reports {@code CL_DEVICE_TYPE_GPU}
      */
     public boolean hasGpuOpenCLDevice() {
         List<OpenCLPlatform> openCLPlatforms = new OpenCLBuilder().build();
         for (OpenCLPlatform openCLPlatform : openCLPlatforms) {
             for (OpenCLDevice openCLDevice : openCLPlatform.openCLDevices()) {
-                if ((openCLDevice.deviceType() & CL.CL_DEVICE_TYPE_GPU) != 0) {
+                if ((openCLDevice.deviceType() & CL10.CL_DEVICE_TYPE_GPU) != 0) {
                     return true;
                 }
             }

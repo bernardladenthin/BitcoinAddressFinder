@@ -68,8 +68,8 @@ import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.util.MultilineLogger;
 import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
 import org.bitcoinj.base.Network;
-import org.jocl.CL;
 import org.jspecify.annotations.Nullable;
+import org.lwjgl.opencl.CL10;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -746,7 +746,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
             // 24) and can exceed what a smaller card allocates. Such an arm must be recorded as
             // unusable and the sweep must continue to the next candidate.
             //
-            // The device rejection surfaces as a JOCL CLException — a RuntimeException carrying a
+            // The device rejection surfaces as an OpenClCallFailedException — a RuntimeException carrying a
             // status such as CL_INVALID_BUFFER_SIZE / CL_MEM_OBJECT_ALLOCATION_FAILURE — which
             // catch (Exception) already covers. This was confirmed on real hardware, not assumed:
             // OpenCLContextAllocationFailureTest requests an impossible allocation and asserts the
@@ -1302,7 +1302,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
          * @return {@code true} if the device reports the GPU type bit
          */
         public boolean isGpu() {
-            return (deviceType & CL.CL_DEVICE_TYPE_GPU) != 0L;
+            return (deviceType & CL10.CL_DEVICE_TYPE_GPU) != 0L;
         }
     }
 
@@ -1316,6 +1316,8 @@ public class TuneConfiguration implements Runnable, Interruptable {
     @VisibleForTesting
     static List<DetectedDevice> gpuDevicesOf(List<OpenCLPlatform> platforms) {
         List<DetectedDevice> devices = new ArrayList<>();
+        // Hoisted: the resolver is stateless, so building one per device was pure allocation.
+        final OpenCLDeviceTopology topology = new OpenCLDeviceTopology();
         for (int platformIndex = 0; platformIndex < platforms.size(); platformIndex++) {
             List<OpenCLDevice> platformDevices = platforms.get(platformIndex).openCLDevices();
             for (int deviceIndex = 0; deviceIndex < platformDevices.size(); deviceIndex++) {
@@ -1328,7 +1330,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
                             deviceIndex,
                             device.deviceName(),
                             device.deviceType(),
-                            OpenCLDeviceTopology.physicalDeviceFingerprintOf(device)));
+                            topology.physicalDeviceFingerprintOf(device)));
                 }
             }
         }
@@ -1743,7 +1745,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
         throw new IllegalArgumentException(
                 "tuneConfiguration.finder has no producerOpenCL or producerJava entry and no OpenCL GPU could be"
                         + " detected to sweep automatically (OpenCL native library loaded: "
-                        + OpenCLBuilder.isOpenClNativeLibraryLoaded()
+                        + new OpenCLBuilder().isOpenClLibraryAvailable()
                         + "). Configure a producer, or install an OpenCL runtime and verify it with the OpenCLInfo"
                         + " command.");
     }
@@ -1756,7 +1758,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
      * @return a template per detected GPU, empty when none could be detected
      */
     private List<CProducerOpenCL> discoverTemplates(CFinder cFinder) {
-        if (!OpenCLBuilder.isOpenClNativeLibraryLoaded()) {
+        if (!new OpenCLBuilder().isOpenClLibraryAvailable()) {
             return Collections.emptyList();
         }
         List<DetectedDevice> devices = gpuDevicesOf(new OpenCLBuilder().build());
@@ -1849,7 +1851,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
      * @param configuredCount how many OpenCL producers the configuration names
      */
     private void hintAtUndetectedDevices(int configuredCount) {
-        if (!OpenCLBuilder.isOpenClNativeLibraryLoaded()) {
+        if (!new OpenCLBuilder().isOpenClLibraryAvailable()) {
             return;
         }
         int detected = gpuDevicesOf(new OpenCLBuilder().build()).size();

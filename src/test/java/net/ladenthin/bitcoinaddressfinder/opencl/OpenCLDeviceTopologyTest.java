@@ -23,6 +23,13 @@ import org.junit.jupiter.api.Test;
  */
 public class OpenCLDeviceTopologyTest {
 
+    /**
+     * The resolver under test. An instance rather than a static entry point since the migration:
+     * reading the identity properties needs an OpenCL API, and injecting it is what makes that
+     * substitutable. The parsers exercised below touch no device.
+     */
+    private static final OpenCLDeviceTopology TOPOLOGY = new OpenCLDeviceTopology();
+
     public OpenCLDeviceTopologyTest() {}
 
     // <editor-fold defaultstate="collapsed" desc="cl_khr_device_uuid">
@@ -39,18 +46,18 @@ public class OpenCLDeviceTopologyTest {
             (byte) 0x76, (byte) 0x54, (byte) 0x32, (byte) 0x10
         };
 
-        assertThat(OpenCLDeviceTopology.parseDeviceUuid(uuid), is(equalTo("uuid:0123456789abcdeffedcba9876543210")));
+        assertThat(TOPOLOGY.parseDeviceUuid(uuid), is(equalTo("uuid:0123456789abcdeffedcba9876543210")));
     }
 
     /** An all-zero UUID is what a driver returns when it has nothing to report. It identifies nothing. */
     @Test
     public void parseDeviceUuid_allZero_isRejected() {
-        assertThat(OpenCLDeviceTopology.parseDeviceUuid(new byte[16]), is(nullValue()));
+        assertThat(TOPOLOGY.parseDeviceUuid(new byte[16]), is(nullValue()));
     }
 
     @Test
     public void parseDeviceUuid_wrongLength_isRejected() {
-        assertThat(OpenCLDeviceTopology.parseDeviceUuid(new byte[8]), is(nullValue()));
+        assertThat(TOPOLOGY.parseDeviceUuid(new byte[8]), is(nullValue()));
     }
 
     /** Two different devices must not collide. */
@@ -61,9 +68,7 @@ public class OpenCLDeviceTopologyTest {
         byte[] second = new byte[16];
         second[15] = 1;
 
-        assertThat(
-                OpenCLDeviceTopology.parseDeviceUuid(first),
-                is(not(equalTo(OpenCLDeviceTopology.parseDeviceUuid(second)))));
+        assertThat(TOPOLOGY.parseDeviceUuid(first), is(not(equalTo(TOPOLOGY.parseDeviceUuid(second)))));
     }
     // </editor-fold>
 
@@ -78,7 +83,7 @@ public class OpenCLDeviceTopologyTest {
         ByteBuffer buffer = ByteBuffer.allocate(16).order(ByteOrder.nativeOrder());
         buffer.putInt(0).putInt(0x0B).putInt(0x00).putInt(0x01);
 
-        assertThat(OpenCLDeviceTopology.parsePciBusInfo(buffer.array()), is(equalTo("pci:0:11:0:1")));
+        assertThat(TOPOLOGY.parsePciBusInfo(buffer.array()), is(equalTo("pci:0:11:0:1")));
     }
 
     /**
@@ -92,14 +97,12 @@ public class OpenCLDeviceTopologyTest {
         ByteBuffer second = ByteBuffer.allocate(16).order(ByteOrder.nativeOrder());
         second.putInt(0).putInt(0x0C).putInt(0).putInt(0);
 
-        assertThat(
-                OpenCLDeviceTopology.parsePciBusInfo(first.array()),
-                is(not(equalTo(OpenCLDeviceTopology.parsePciBusInfo(second.array())))));
+        assertThat(TOPOLOGY.parsePciBusInfo(first.array()), is(not(equalTo(TOPOLOGY.parsePciBusInfo(second.array())))));
     }
 
     @Test
     public void parsePciBusInfo_wrongLength_isRejected() {
-        assertThat(OpenCLDeviceTopology.parsePciBusInfo(new byte[12]), is(nullValue()));
+        assertThat(TOPOLOGY.parsePciBusInfo(new byte[12]), is(nullValue()));
     }
     // </editor-fold>
 
@@ -117,7 +120,7 @@ public class OpenCLDeviceTopologyTest {
         topology[22] = (byte) 0x00;
         topology[23] = (byte) 0x01;
 
-        assertThat(OpenCLDeviceTopology.parseAmdTopology(topology), is(equalTo("amd-pcie:11:0:1")));
+        assertThat(TOPOLOGY.parseAmdTopology(topology), is(equalTo("amd-pcie:11:0:1")));
     }
 
     /** Bus numbers above 127 must not come back negative. */
@@ -127,7 +130,7 @@ public class OpenCLDeviceTopologyTest {
         ByteBuffer.wrap(topology).order(ByteOrder.nativeOrder()).putInt(1);
         topology[21] = (byte) 0xC1;
 
-        assertThat(OpenCLDeviceTopology.parseAmdTopology(topology), is(equalTo("amd-pcie:193:0:0")));
+        assertThat(TOPOLOGY.parseAmdTopology(topology), is(equalTo("amd-pcie:193:0:0")));
     }
 
     /** Any topology type other than PCIe carries no slot information this can use. */
@@ -137,12 +140,12 @@ public class OpenCLDeviceTopologyTest {
         ByteBuffer.wrap(topology).order(ByteOrder.nativeOrder()).putInt(0);
         topology[21] = (byte) 0x0B;
 
-        assertThat(OpenCLDeviceTopology.parseAmdTopology(topology), is(nullValue()));
+        assertThat(TOPOLOGY.parseAmdTopology(topology), is(nullValue()));
     }
 
     @Test
     public void parseAmdTopology_wrongLength_isRejected() {
-        assertThat(OpenCLDeviceTopology.parseAmdTopology(new byte[16]), is(nullValue()));
+        assertThat(TOPOLOGY.parseAmdTopology(new byte[16]), is(nullValue()));
     }
     // </editor-fold>
 
@@ -157,18 +160,18 @@ public class OpenCLDeviceTopologyTest {
     public void supportedQuery_khronosExtensionsPresent_arePreferredOverTheVendorOne() {
         String extensions = "cl_khr_device_uuid cl_khr_pci_bus_info cl_amd_device_attribute_query";
 
-        assertThat(OpenCLDeviceTopology.supportsDeviceUuid(extensions), is(true));
-        assertThat(OpenCLDeviceTopology.supportsPciBusInfo(extensions), is(true));
-        assertThat(OpenCLDeviceTopology.supportsAmdTopology(extensions), is(true));
+        assertThat(TOPOLOGY.supportsDeviceUuid(extensions), is(true));
+        assertThat(TOPOLOGY.supportsPciBusInfo(extensions), is(true));
+        assertThat(TOPOLOGY.supportsAmdTopology(extensions), is(true));
     }
 
     @Test
     public void supportedQuery_noIdentityExtensions_reportsNoneSupported() {
         String extensions = "cl_khr_fp64 cl_khr_icd cl_khr_global_int32_base_atomics";
 
-        assertThat(OpenCLDeviceTopology.supportsDeviceUuid(extensions), is(false));
-        assertThat(OpenCLDeviceTopology.supportsPciBusInfo(extensions), is(false));
-        assertThat(OpenCLDeviceTopology.supportsAmdTopology(extensions), is(false));
+        assertThat(TOPOLOGY.supportsDeviceUuid(extensions), is(false));
+        assertThat(TOPOLOGY.supportsPciBusInfo(extensions), is(false));
+        assertThat(TOPOLOGY.supportsAmdTopology(extensions), is(false));
     }
 
     /**
@@ -177,7 +180,7 @@ public class OpenCLDeviceTopologyTest {
      */
     @Test
     public void supportedQuery_extensionNameIsASubstringOfAnother_isNotMistakenForSupport() {
-        assertThat(OpenCLDeviceTopology.supportsDeviceUuid("cl_khr_device_uuid_extended"), is(false));
+        assertThat(TOPOLOGY.supportsDeviceUuid("cl_khr_device_uuid_extended"), is(false));
     }
     // </editor-fold>
 }

@@ -11,55 +11,55 @@ import java.io.Serializable;
 import java.nio.ByteOrder;
 import java.nio.charset.Charset;
 import java.util.List;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClDeviceId;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClDeviceInfoFormatter;
 import org.apache.maven.artifact.versioning.ComparableVersion;
-import org.jocl.CL;
-import org.jocl.cl_device_id;
 import org.jspecify.annotations.NonNull;
 
 /**
  * Represents an OpenCL device and its properties.
  *
- * @param device                     See {@link org.jocl.cl_device_id}
- * @param deviceName                 See {@link org.jocl.CL#CL_DEVICE_NAME}
- * @param deviceVendor               See {@link org.jocl.CL#CL_DEVICE_VENDOR}
- * @param driverVersion              See {@link org.jocl.CL#CL_DRIVER_VERSION}
- * @param deviceProfile              See {@link org.jocl.CL#CL_DEVICE_PROFILE}
- * @param deviceVersion              See {@link org.jocl.CL#CL_DEVICE_VERSION}
- * @param deviceExtensions           See {@link org.jocl.CL#CL_DEVICE_EXTENSIONS}
- * @param deviceType                 See {@link org.jocl.CL#CL_DEVICE_TYPE}
- * @param endianLittle               See {@link org.jocl.CL#CL_DEVICE_ENDIAN_LITTLE}
- * @param maxComputeUnits            See {@link org.jocl.CL#CL_DEVICE_MAX_COMPUTE_UNITS}
- * @param maxWorkItemDimensions      See {@link org.jocl.CL#CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS}
- * @param maxWorkItemSizes           See {@link org.jocl.CL#CL_DEVICE_MAX_WORK_ITEM_SIZES}
- * @param maxWorkGroupSize           See {@link org.jocl.CL#CL_DEVICE_MAX_WORK_GROUP_SIZE}
- * @param maxClockFrequency          See {@link org.jocl.CL#CL_DEVICE_MAX_CLOCK_FREQUENCY}
- * @param addressBits                See {@link org.jocl.CL#CL_DEVICE_ADDRESS_BITS}
- * @param maxMemAllocSize            See {@link org.jocl.CL#CL_DEVICE_MAX_MEM_ALLOC_SIZE}
- * @param globalMemSize              See {@link org.jocl.CL#CL_DEVICE_GLOBAL_MEM_SIZE}
- * @param errorCorrectionSupport     See {@link org.jocl.CL#CL_DEVICE_ERROR_CORRECTION_SUPPORT}
- * @param localMemType               See {@link org.jocl.CL#CL_DEVICE_LOCAL_MEM_TYPE}
- * @param localMemSize               See {@link org.jocl.CL#CL_DEVICE_LOCAL_MEM_SIZE}
- * @param maxConstantBufferSize      See {@link org.jocl.CL#CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE}
- * @param queueProperties            See {@link org.jocl.CL#CL_DEVICE_QUEUE_PROPERTIES}
- * @param imageSupport               See {@link org.jocl.CL#CL_DEVICE_IMAGE_SUPPORT}
- * @param maxReadImageArgs           See {@link org.jocl.CL#CL_DEVICE_MAX_READ_IMAGE_ARGS}
- * @param maxWriteImageArgs          See {@link org.jocl.CL#CL_DEVICE_MAX_WRITE_IMAGE_ARGS}
- * @param singleFpConfig             See {@link org.jocl.CL#CL_DEVICE_SINGLE_FP_CONFIG}
- * @param image2dMaxWidth            See {@link org.jocl.CL#CL_DEVICE_IMAGE2D_MAX_WIDTH}
- * @param image2dMaxHeight           See {@link org.jocl.CL#CL_DEVICE_IMAGE2D_MAX_HEIGHT}
- * @param image3dMaxWidth            See {@link org.jocl.CL#CL_DEVICE_IMAGE3D_MAX_WIDTH}
- * @param image3dMaxHeight           See {@link org.jocl.CL#CL_DEVICE_IMAGE3D_MAX_HEIGHT}
- * @param image3dMaxDepth            See {@link org.jocl.CL#CL_DEVICE_IMAGE3D_MAX_DEPTH}
- * @param preferredVectorWidthChar   See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_CHAR}
- * @param preferredVectorWidthShort  See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_SHORT}
- * @param preferredVectorWidthInt    See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_INT}
- * @param preferredVectorWidthLong   See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_LONG}
- * @param preferredVectorWidthFloat  See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT}
- * @param preferredVectorWidthDouble See {@link org.jocl.CL#CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE}
+ * @param device                     the device handle
+ * @param deviceName                 See {@code CL_DEVICE_NAME}
+ * @param deviceVendor               See {@code CL_DEVICE_VENDOR}
+ * @param driverVersion              See {@code CL_DRIVER_VERSION}
+ * @param deviceProfile              See {@code CL_DEVICE_PROFILE}
+ * @param deviceVersion              See {@code CL_DEVICE_VERSION}
+ * @param deviceExtensions           See {@code CL_DEVICE_EXTENSIONS}
+ * @param deviceType                 See {@code CL_DEVICE_TYPE}
+ * @param endianLittle               See {@code CL_DEVICE_ENDIAN_LITTLE}
+ * @param maxComputeUnits            See {@code CL_DEVICE_MAX_COMPUTE_UNITS}
+ * @param maxWorkItemDimensions      See {@code CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS}
+ * @param maxWorkItemSizes           See {@code CL_DEVICE_MAX_WORK_ITEM_SIZES}
+ * @param maxWorkGroupSize           See {@code CL_DEVICE_MAX_WORK_GROUP_SIZE}
+ * @param maxClockFrequency          See {@code CL_DEVICE_MAX_CLOCK_FREQUENCY}
+ * @param addressBits                See {@code CL_DEVICE_ADDRESS_BITS}
+ * @param maxMemAllocSize            See {@code CL_DEVICE_MAX_MEM_ALLOC_SIZE}
+ * @param globalMemSize              See {@code CL_DEVICE_GLOBAL_MEM_SIZE}
+ * @param errorCorrectionSupport     See {@code CL_DEVICE_ERROR_CORRECTION_SUPPORT}
+ * @param localMemType               See {@code CL_DEVICE_LOCAL_MEM_TYPE}
+ * @param localMemSize               See {@code CL_DEVICE_LOCAL_MEM_SIZE}
+ * @param maxConstantBufferSize      See {@code CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE}
+ * @param queueProperties            See {@code CL_DEVICE_QUEUE_PROPERTIES}
+ * @param imageSupport               See {@code CL_DEVICE_IMAGE_SUPPORT}
+ * @param maxReadImageArgs           See {@code CL_DEVICE_MAX_READ_IMAGE_ARGS}
+ * @param maxWriteImageArgs          See {@code CL_DEVICE_MAX_WRITE_IMAGE_ARGS}
+ * @param singleFpConfig             See {@code CL_DEVICE_SINGLE_FP_CONFIG}
+ * @param image2dMaxWidth            See {@code CL_DEVICE_IMAGE2D_MAX_WIDTH}
+ * @param image2dMaxHeight           See {@code CL_DEVICE_IMAGE2D_MAX_HEIGHT}
+ * @param image3dMaxWidth            See {@code CL_DEVICE_IMAGE3D_MAX_WIDTH}
+ * @param image3dMaxHeight           See {@code CL_DEVICE_IMAGE3D_MAX_HEIGHT}
+ * @param image3dMaxDepth            See {@code CL_DEVICE_IMAGE3D_MAX_DEPTH}
+ * @param preferredVectorWidthChar   See {@code CL_DEVICE_PREFERRED_VECTOR_WIDTH_CHAR}
+ * @param preferredVectorWidthShort  See {@code CL_DEVICE_PREFERRED_VECTOR_WIDTH_SHORT}
+ * @param preferredVectorWidthInt    See {@code CL_DEVICE_PREFERRED_VECTOR_WIDTH_INT}
+ * @param preferredVectorWidthLong   See {@code CL_DEVICE_PREFERRED_VECTOR_WIDTH_LONG}
+ * @param preferredVectorWidthFloat  See {@code CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT}
+ * @param preferredVectorWidthDouble See {@code CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE}
  */
 @Immutable
 public record OpenCLDevice(
-        @SuppressWarnings("Immutable") cl_device_id device,
+        ClDeviceId device,
         String deviceName,
         String deviceVendor,
         String driverVersion,
@@ -99,6 +99,25 @@ public record OpenCLDevice(
         implements Serializable {
 
     /**
+     * Renders the OpenCL bit fields in {@link #toStringPretty()}. A shared instance: the formatter is
+     * stateless, and a record component would make it part of this device's identity.
+     */
+    @SuppressWarnings("Immutable")
+    private static final ClDeviceInfoFormatter FORMATTER = new ClDeviceInfoFormatter();
+
+    /**
+     * Renders the device handle for the human-readable dump.
+     *
+     * <p>Formatted as hexadecimal rather than as the record's own {@code toString()}: the value is a
+     * native pointer, which is how every driver tool and log prints it.
+     *
+     * @return the handle as {@code cl_device_id[0x...]}
+     */
+    private String formatHandle() {
+        return String.format("cl_device_id[0x%x]", device.handle());
+    }
+
+    /**
      * Returns the byte order this device uses.
      *
      * @return {@link ByteOrder#LITTLE_ENDIAN} or {@link ByteOrder#BIG_ENDIAN}
@@ -121,14 +140,14 @@ public record OpenCLDevice(
 
         try (PrintStream ps = new PrintStream(baos, true, charset)) {
             ps.println("--- Info for OpenCL device: " + deviceName + " ---");
-            ps.printf("cl_device_id:                          %s%n", device);
+            ps.printf("cl_device_id:                          %s%n", formatHandle());
             ps.printf("CL_DEVICE_NAME:                        %s%n", deviceName);
             ps.printf("CL_DEVICE_VENDOR:                      %s%n", deviceVendor);
             ps.printf("CL_DRIVER_VERSION:                     %s%n", driverVersion);
             ps.printf("CL_DEVICE_PROFILE:                     %s%n", deviceProfile);
             ps.printf("CL_DEVICE_VERSION:                     %s%n", deviceVersion);
             ps.printf("CL_DEVICE_EXTENSIONS:                  %s%n", deviceExtensions);
-            ps.printf("CL_DEVICE_TYPE:                        %s%n", CL.stringFor_cl_device_type(deviceType));
+            ps.printf("CL_DEVICE_TYPE:                        %s%n", FORMATTER.formatDeviceType(deviceType));
             ps.printf("CL_DEVICE_ENDIAN_LITTLE:               %b%n", endianLittle);
             ps.printf("CL_DEVICE_MAX_COMPUTE_UNITS:           %d%n", maxComputeUnits);
             ps.printf("CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS:    %d%n", maxWorkItemDimensions);
@@ -139,17 +158,16 @@ public record OpenCLDevice(
             ps.printf("CL_DEVICE_MAX_MEM_ALLOC_SIZE:          %d MByte%n", maxMemAllocSize / (1024 * 1024));
             ps.printf("CL_DEVICE_GLOBAL_MEM_SIZE:             %d MByte%n", globalMemSize / (1024 * 1024));
             ps.printf("CL_DEVICE_ERROR_CORRECTION_SUPPORT:    %s%n", errorCorrectionSupport != 0 ? "yes" : "no");
-            ps.printf(
-                    "CL_DEVICE_LOCAL_MEM_TYPE:              %s%n", CL.stringFor_cl_device_local_mem_type(localMemType));
+            ps.printf("CL_DEVICE_LOCAL_MEM_TYPE:              %s%n", FORMATTER.formatLocalMemType(localMemType));
             ps.printf("CL_DEVICE_LOCAL_MEM_SIZE:              %d KByte%n", localMemSize / 1024);
             ps.printf("CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE:    %d KByte%n", maxConstantBufferSize / 1024);
             ps.printf(
                     "CL_DEVICE_QUEUE_PROPERTIES:            %s%n",
-                    CL.stringFor_cl_command_queue_properties(queueProperties));
+                    FORMATTER.formatCommandQueueProperties(queueProperties));
             ps.printf("CL_DEVICE_IMAGE_SUPPORT:               %d%n", imageSupport);
             ps.printf("CL_DEVICE_MAX_READ_IMAGE_ARGS:         %d%n", maxReadImageArgs);
             ps.printf("CL_DEVICE_MAX_WRITE_IMAGE_ARGS:        %d%n", maxWriteImageArgs);
-            ps.printf("CL_DEVICE_SINGLE_FP_CONFIG:            %s%n", CL.stringFor_cl_device_fp_config(singleFpConfig));
+            ps.printf("CL_DEVICE_SINGLE_FP_CONFIG:            %s%n", FORMATTER.formatDeviceFpConfig(singleFpConfig));
             ps.printf("CL_DEVICE_IMAGE2D_MAX_WIDTH:           %d%n", image2dMaxWidth);
             ps.printf("CL_DEVICE_IMAGE2D_MAX_HEIGHT:          %d%n", image2dMaxHeight);
             ps.printf("CL_DEVICE_IMAGE3D_MAX_WIDTH:           %d%n", image3dMaxWidth);

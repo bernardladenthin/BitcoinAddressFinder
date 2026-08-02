@@ -58,7 +58,7 @@ We ask that reporters respect the embargo period and not disclose the vulnerabil
 
 **Out of scope:**
 
-- Vulnerabilities in upstream dependencies (e.g., `bitcoinj-core`, `lmdbjava`, `jocl`, `jackson-*`, `guava`). These are tracked automatically through GitHub Dependabot and CodeQL alerts; please report them upstream.
+- Vulnerabilities in upstream dependencies (e.g., `bitcoinj-core`, `lmdbjava`, `lwjgl`, `jackson-*`, `guava`). These are tracked automatically through GitHub Dependabot and CodeQL alerts; please report them upstream.
 - Issues that require an attacker to already control the host running the tool (the tool is a local key-search utility; it deliberately processes private-key material).
 - Findings against forks or third-party redistributions.
 

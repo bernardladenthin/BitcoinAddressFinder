@@ -1,0 +1,45 @@
+{
+  "command": "Find",
+  "finder": {
+    "keyProducerJavaWebSocket": [
+      {
+        "keyProducerId": "browser",
+        "logReceivedSecret": false,
+        "port": 8080,
+        "timeoutMillis": -1,
+        "broadcastResults": true
+      }
+    ],
+    "consumerJava": {
+      "lmdbConfigurationReadOnly": {
+        "lmdbDirectory": "lmdb",
+        "useProxyOptimal": true,
+        "useNoReadAhead": false,
+        "logStatsOnInit": true,
+        "logStatsOnClose": false
+      },
+      "printStatisticsEveryNSeconds": 10,
+      "statisticsRateWindowSeconds": 60,
+      "threads": 4,
+      "queuePollTimeoutMillis": 50,
+      "queueSize": 4,
+      "awaitQueueEmptySeconds": 60,
+      "runtimePublicKeyCalculationCheck": false,
+      "enableVanity": false,
+      "vanityPattern": "1[Ee][Mm][Ii][Ll].*"
+    },
+    "awaitTerminateSeconds": 31536000000,
+    "producerJava": [
+      {
+        "keyProducerId": "browser",
+        "batchSizeInBits": 18,
+        "batchUsePrivateKeyIncrement": true,
+        "logSecretBase": false,
+        "runOnce": false,
+        "shutdownTimeoutSeconds": 300
+      }
+    ],
+    "producerJavaSecretsFiles": [],
+    "producerOpenCL": []
+  }
+}

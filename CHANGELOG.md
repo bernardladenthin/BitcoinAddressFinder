@@ -8,6 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Results can be broadcast, not just logged** — one message per *checked batch*, sent whether or
+  not anything was found. Reporting only hits would leave a client unable to tell "range checked,
+  nothing there" from "range never checked", which makes an automated from/to sweep unsafe: a range
+  still queued when the process stops looks exactly like a clean one. The event is emitted after the
+  batch has been checked, so it doubles as an exact completion signal. Available over all three
+  existing transports, each off by default (`broadcastResults`), and each with different limits — the
+  WebSocket serves both directions on one port and can catch up a client that connected early;
+  ZeroMQ needs a second address (a `PULL` socket cannot send) and cannot detect subscribers at all,
+  so it republishes the grid configuration periodically; plain TCP gets its own port and
+  newline-delimited framing, because its inbound side reads fixed-width records from a single peer.
+  **The payload contains private keys and every connected client receives every result.**
+- **`examples/websocket_scanner.html`** — the browser as the whole user interface: it produces the
+  ranges and displays the outcome over one connection. Defragmenter-style range map (in flight /
+  checked / hit) plus a 256-bit view showing the base bits and the swept batch bits. It derives its
+  step from the grid configuration the server announces, which is what keeps a systematic sweep from
+  silently rescanning one block: the server aligns every incoming base down to a multiple of
+  `2^batchSizeInBits`. Paired with `examples/config_Find_WebSocketUi.json`, which sets
+  `timeoutMillis: -1` so a pause in the UI does not end the run.
 - **Second contributed multi-GPU machine in the measurement registry** —
   `tuner_ryzen9800x3d_dualgpu.csv` carries all 73 arms of an RX 7900 XTX plus an integrated gfx1036,
   measured through the GPU-filtered pipeline with the shipped default candidates: **190.4 M keys/s**
@@ -70,6 +88,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   single GPU.
 
 ### Changed
+- **The OpenCL binding moved from JOCL to LWJGL 3** (`org.lwjgl:lwjgl` + `lwjgl-opencl` 3.4.2);
+  `org.jocl` is gone from the build. Calls no longer reach the binding directly: a new
+  `opencl/binding/` package carries an instance-based `ClApi` (mockable, unlike the binding's static
+  surface), typed handle records restoring the per-object types LWJGL collapses into a bare `long`,
+  and explicit error checking — LWJGL only *returns* `cl_int` codes and never throws, so an unchecked
+  call would fail silently. Three consequences are worth knowing:
+  - **A stock Linux install would not have started.** LWJGL resolves the library by plain name, but
+    an OpenCL runtime package ships only the versioned SONAME `libOpenCL.so.1`; the unversioned
+    symlink comes from the separate development package. JOCL never noticed, its JNI shim being
+    linked against the SONAME. `OpenClLibraryLoader` therefore tries a fallback name chain,
+    reproduced in a container carrying `pocl-opencl-icd` and nothing else.
+  - **Host-to-device uploads are written in bounded slices** (`ClApi.writeBufferChunked`) instead of
+    a `CL_MEM_COPY_HOST_PTR` allocation. LWJGL cannot hand a Java array to the driver, so a
+    single-shot upload would need an off-heap staging copy the size of the payload — several
+    gigabytes for the Full-DB 16-bit filter, whose byte image does not even fit a Java `byte[]`.
+  - **The fat jar stays a single jar.** LWJGL ships one `natives-*` classifier per platform, but all
+    nine may sit on one classpath and it picks the match at runtime, so no classifier split is
+    needed.
 - **The documented iGPU interference figure is qualified, not a single number** — `docs/tuning-your-gpu.md`
   cited "~3×" from one laptop pair (Intel Arc next to an RTX 500 Ada). A desktop pair (AMD gfx1036 next
   to an RX 7900 XTX) measured ~1.5×. Both are now shown side by side with the advice to measure your
@@ -89,6 +125,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TuneConfiguration`); only the rendered field changed.
 
 ### Fixed
+- **A run fed by a blocking key producer could not be shut down** — `Finder.interrupt()` waited for
+  the producers to stop *before* waking the key producers. A producer waiting for its next secret is
+  parked inside the key producer, and one configured to block indefinitely (`timeoutMillis: -1`,
+  which is what an interactively driven source wants) only releases that wait when interrupted — so
+  the wake-up came after the wait it was supposed to end, and every shutdown stalled until
+  `shutdownTimeoutSeconds` ran out. Key producers are now interrupted first.
+- **A finished run logged `Main#run end.` and then never exited** — reported for incremental scans,
+  reproduced here for a GPU producer, for `runOnce`, and for a merely *configured* socket / websocket
+  / ZeroMQ key producer even on the CPU path. The completion path stopped the producers but never
+  released what they own, so a producer's result-reader pool and the key producers' reader threads —
+  all non-daemon — kept the JVM alive; a thread dump showed exactly `maxResultReaderThreads` idle
+  workers parked in `LinkedBlockingQueue.take()` with `DestroyJavaVM` waiting on them. Releasing them
+  happened only in `Finder.interrupt()`, which on that path was reached solely from the JVM shutdown
+  hook — and a shutdown hook cannot run until every non-daemon thread has already ended, so the
+  release that would have ended them was unreachable. The teardown now runs on the completion path
+  itself. Note that `runOnce` is not a workaround and never was: it runs `produceKeys()` once, which
+  is one *batch*, not one range.
+- **Two overlapping teardowns released the same producer twice** — surfaced by the fix above, since
+  the teardown now runs both on the completion path and from the shutdown hook, and a `Ctrl+C`
+  landing while a finished run releases its producers is enough to overlap them. Each caller read the
+  producer list before either had cleared it, and the second release of an OpenCL producer is
+  rejected by the driver with `CL_INVALID_MEM_OBJECT`, ending an otherwise successful run with a
+  fatal error. The "release each producer exactly once" guarantee was implicit in the order of a loop
+  and a list-clear; it is now an object of its own (`ProducerReleaser`, tracking producers by
+  identity), which is also what made it statable as a test.
 - **CI on `main` was red after the multi-GPU merge** — two independent failures, both reachable
   locally and neither run before merging. `spotbugs:check` reported 14 findings in the new code; ten
   were fixed properly (a defensive copy in `DeviceSweep`, wider parameter types, exception messages

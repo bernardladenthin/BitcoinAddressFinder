@@ -37,8 +37,8 @@ import net.ladenthin.bitcoinaddressfinder.configuration.GpuFilterType;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import nl.altindag.log.LogCaptor;
-import org.jocl.CL;
 import org.junit.jupiter.api.Test;
+import org.lwjgl.opencl.CL10;
 
 /**
  * Tests for {@link TuneConfiguration}.
@@ -175,10 +175,10 @@ public class TuneConfigurationTest extends LMDBBase {
         // The real topology of a Windows AMD box with a duplicate ICD: two platforms, each exposing
         // both physical GPUs, so four entries for two cards. Same PCIe fingerprint => same card.
         List<TuneConfiguration.DetectedDevice> detected = List.of(
-                new TuneConfiguration.DetectedDevice(0, 0, "gfx1100", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:3:0:0"),
-                new TuneConfiguration.DetectedDevice(0, 1, "gfx1036", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:16:0:0"),
-                new TuneConfiguration.DetectedDevice(1, 0, "gfx1100", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:3:0:0"),
-                new TuneConfiguration.DetectedDevice(1, 1, "gfx1036", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:16:0:0"));
+                new TuneConfiguration.DetectedDevice(0, 0, "gfx1100", CL10.CL_DEVICE_TYPE_GPU, "amd-pcie:3:0:0"),
+                new TuneConfiguration.DetectedDevice(0, 1, "gfx1036", CL10.CL_DEVICE_TYPE_GPU, "amd-pcie:16:0:0"),
+                new TuneConfiguration.DetectedDevice(1, 0, "gfx1100", CL10.CL_DEVICE_TYPE_GPU, "amd-pcie:3:0:0"),
+                new TuneConfiguration.DetectedDevice(1, 1, "gfx1036", CL10.CL_DEVICE_TYPE_GPU, "amd-pcie:16:0:0"));
 
         List<TuneConfiguration.DetectedDevice> deduped = TuneConfiguration.dedupePhysicalDevices(detected);
 
@@ -195,9 +195,9 @@ public class TuneConfigurationTest extends LMDBBase {
         // A mining rig: several identical cards in one platform share a name but sit in distinct PCIe
         // slots. They must NOT be collapsed — distinct fingerprints keep them all.
         List<TuneConfiguration.DetectedDevice> detected = List.of(
-                new TuneConfiguration.DetectedDevice(0, 0, "gfx1030", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:1:0:0"),
-                new TuneConfiguration.DetectedDevice(0, 1, "gfx1030", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:2:0:0"),
-                new TuneConfiguration.DetectedDevice(0, 2, "gfx1030", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:3:0:0"));
+                new TuneConfiguration.DetectedDevice(0, 0, "gfx1030", CL10.CL_DEVICE_TYPE_GPU, "amd-pcie:1:0:0"),
+                new TuneConfiguration.DetectedDevice(0, 1, "gfx1030", CL10.CL_DEVICE_TYPE_GPU, "amd-pcie:2:0:0"),
+                new TuneConfiguration.DetectedDevice(0, 2, "gfx1030", CL10.CL_DEVICE_TYPE_GPU, "amd-pcie:3:0:0"));
 
         assertThat(TuneConfiguration.dedupePhysicalDevices(detected), hasSize(3));
     }
@@ -207,8 +207,8 @@ public class TuneConfigurationTest extends LMDBBase {
         // No topology available (null fingerprint): the tuner must never merge on the weaker name
         // signal, so every entry is kept — falling back to today's behaviour, not regressing it.
         List<TuneConfiguration.DetectedDevice> detected = List.of(
-                new TuneConfiguration.DetectedDevice(0, 0, "GPU", CL.CL_DEVICE_TYPE_GPU, null),
-                new TuneConfiguration.DetectedDevice(1, 0, "GPU", CL.CL_DEVICE_TYPE_GPU, null));
+                new TuneConfiguration.DetectedDevice(0, 0, "GPU", CL10.CL_DEVICE_TYPE_GPU, null),
+                new TuneConfiguration.DetectedDevice(1, 0, "GPU", CL10.CL_DEVICE_TYPE_GPU, null));
 
         assertThat(TuneConfiguration.dedupePhysicalDevices(detected), hasSize(2));
     }
@@ -235,8 +235,8 @@ public class TuneConfigurationTest extends LMDBBase {
     @Test
     public void dedupePhysicalDevices_sameFingerprintButDifferentNames_keepsBothRatherThanTrustingIt() {
         List<TuneConfiguration.DetectedDevice> detected = List.of(
-                new TuneConfiguration.DetectedDevice(0, 0, "Radeon RX 7900 XTX", CL.CL_DEVICE_TYPE_GPU, "uuid:dead"),
-                new TuneConfiguration.DetectedDevice(0, 1, "Radeon Graphics", CL.CL_DEVICE_TYPE_GPU, "uuid:dead"));
+                new TuneConfiguration.DetectedDevice(0, 0, "Radeon RX 7900 XTX", CL10.CL_DEVICE_TYPE_GPU, "uuid:dead"),
+                new TuneConfiguration.DetectedDevice(0, 1, "Radeon Graphics", CL10.CL_DEVICE_TYPE_GPU, "uuid:dead"));
 
         List<TuneConfiguration.DetectedDevice> unique = TuneConfiguration.dedupePhysicalDevices(detected);
 
@@ -247,8 +247,8 @@ public class TuneConfigurationTest extends LMDBBase {
     @Test
     public void dedupePhysicalDevices_sameFingerprintAndSameName_stillCollapses() {
         List<TuneConfiguration.DetectedDevice> detected = List.of(
-                new TuneConfiguration.DetectedDevice(0, 0, "gfx1100", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:3:0:0"),
-                new TuneConfiguration.DetectedDevice(1, 0, "gfx1100", CL.CL_DEVICE_TYPE_GPU, "amd-pcie:3:0:0"));
+                new TuneConfiguration.DetectedDevice(0, 0, "gfx1100", CL10.CL_DEVICE_TYPE_GPU, "amd-pcie:3:0:0"),
+                new TuneConfiguration.DetectedDevice(1, 0, "gfx1100", CL10.CL_DEVICE_TYPE_GPU, "amd-pcie:3:0:0"));
 
         List<TuneConfiguration.DetectedDevice> unique = TuneConfiguration.dedupePhysicalDevices(detected);
 
@@ -542,8 +542,8 @@ public class TuneConfigurationTest extends LMDBBase {
         CProducerOpenCL prototype = new CProducerOpenCL();
         prototype.keyProducerId = "tuneKeyProducer";
         List<TuneConfiguration.DetectedDevice> devices = List.of(
-                new TuneConfiguration.DetectedDevice(0, 0, "NVIDIA RTX 500 Ada", CL.CL_DEVICE_TYPE_GPU),
-                new TuneConfiguration.DetectedDevice(1, 0, "Intel(R) Arc(TM) Pro Graphics", CL.CL_DEVICE_TYPE_GPU));
+                new TuneConfiguration.DetectedDevice(0, 0, "NVIDIA RTX 500 Ada", CL10.CL_DEVICE_TYPE_GPU),
+                new TuneConfiguration.DetectedDevice(1, 0, "Intel(R) Arc(TM) Pro Graphics", CL10.CL_DEVICE_TYPE_GPU));
 
         List<CProducerOpenCL> templates = TuneConfiguration.templatesForDevices(devices, prototype);
 
@@ -568,7 +568,7 @@ public class TuneConfigurationTest extends LMDBBase {
         prototype.gpuFilterType = GpuFilterType.FUSE_16;
 
         List<CProducerOpenCL> templates = TuneConfiguration.templatesForDevices(
-                List.of(new TuneConfiguration.DetectedDevice(2, 1, "GPU", CL.CL_DEVICE_TYPE_GPU)), prototype);
+                List.of(new TuneConfiguration.DetectedDevice(2, 1, "GPU", CL10.CL_DEVICE_TYPE_GPU)), prototype);
 
         assertThat(templates, hasSize(1));
         assertThat(templates.get(0).maxResultReaderThreads, is(equalTo(7)));
@@ -584,8 +584,8 @@ public class TuneConfigurationTest extends LMDBBase {
         prototype.keyProducerId = "tuneKeyProducer";
         List<CProducerOpenCL> templates = TuneConfiguration.templatesForDevices(
                 List.of(
-                        new TuneConfiguration.DetectedDevice(0, 0, "A", CL.CL_DEVICE_TYPE_GPU),
-                        new TuneConfiguration.DetectedDevice(1, 0, "B", CL.CL_DEVICE_TYPE_GPU)),
+                        new TuneConfiguration.DetectedDevice(0, 0, "A", CL10.CL_DEVICE_TYPE_GPU),
+                        new TuneConfiguration.DetectedDevice(1, 0, "B", CL10.CL_DEVICE_TYPE_GPU)),
                 prototype);
 
         templates.get(0).batchSizeInBits = 22;
@@ -601,8 +601,8 @@ public class TuneConfigurationTest extends LMDBBase {
      */
     @Test
     public void detectedDevice_cpuRuntime_isNotTreatedAsAGpu() {
-        assertThat(new TuneConfiguration.DetectedDevice(0, 0, "pocl CPU", CL.CL_DEVICE_TYPE_CPU).isGpu(), is(false));
-        assertThat(new TuneConfiguration.DetectedDevice(0, 0, "Radeon", CL.CL_DEVICE_TYPE_GPU).isGpu(), is(true));
+        assertThat(new TuneConfiguration.DetectedDevice(0, 0, "pocl CPU", CL10.CL_DEVICE_TYPE_CPU).isGpu(), is(false));
+        assertThat(new TuneConfiguration.DetectedDevice(0, 0, "Radeon", CL10.CL_DEVICE_TYPE_GPU).isGpu(), is(true));
     }
     // </editor-fold>
 

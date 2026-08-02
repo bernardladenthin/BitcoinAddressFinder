@@ -51,7 +51,7 @@ public class ProducerOpenCL extends AbstractProducer {
     @ToString.Exclude
     private final Semaphore submitSlot;
 
-    // OpenCLContext aggregates JOCL native pointers + own state — exposed via the
+    // OpenCLContext aggregates OpenCL native handles + own state — exposed via the
     // isInitialized() getter below instead so callers see "initialized=true/false"
     // without the heavyweight inner dump.
     @ToString.Exclude
@@ -332,7 +332,7 @@ public class ProducerOpenCL extends AbstractProducer {
             try {
                 try {
                     PublicKeyBytes[] publicKeyBytesArray = openCLGridResult.getPublicKeyBytes();
-                    consumer.consumeKeys(publicKeyBytesArray);
+                    consumer.consumeKeys(publicKeyBytesArray, secretBase);
                 } catch (Throwable e) {
                     abstractProducer.logErrorInProduceKeys(e, secretBase);
                 } finally {
