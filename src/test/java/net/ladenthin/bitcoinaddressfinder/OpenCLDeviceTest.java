@@ -17,12 +17,15 @@ import java.util.List;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLBuilder;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClDeviceId;
 import org.apache.maven.artifact.versioning.ComparableVersion;
-import org.jocl.CL;
-import org.jocl.cl_device_id;
 import org.junit.jupiter.api.Test;
+import org.lwjgl.opencl.CL10;
+import org.lwjgl.opencl.CL12;
 
 public class OpenCLDeviceTest {
+    /** Stand-in device handle: these tests describe the value object, never a real device. */
+    private static final ClDeviceId TEST_DEVICE_ID = new ClDeviceId(1L);
 
     // <editor-fold defaultstate="collapsed" desc="getByteOrder">
     @Test
@@ -79,14 +82,14 @@ public class OpenCLDeviceTest {
         new OpenCLPlatformAssume().assumeOpenClLibraryAvailable();
         // arrange
         OpenCLDevice device = new OpenCLDevice(
-                new cl_device_id(),
+                TEST_DEVICE_ID,
                 "NVIDIA GeForce RTX 3070 Laptop GPU",
                 "NVIDIA Corporation",
                 "561.19",
                 "FULL_PROFILE",
                 "OpenCL 3.0 CUDA",
                 "cl_khr_global_int32_base_atomics cl_khr_global_int32_extended_atomics cl_khr_local_int32_base_atomics cl_khr_local_int32_extended_atomics cl_khr_fp64 cl_khr_3d_image_writes cl_khr_byte_addressable_store cl_khr_icd cl_khr_gl_sharing cl_nv_compiler_options cl_nv_device_attribute_query cl_nv_pragma_unroll cl_nv_d3d10_sharing cl_khr_d3d10_sharing cl_nv_d3d11_sharing cl_nv_copy_opts cl_nv_create_buffer cl_khr_int64_base_atomics cl_khr_int64_extended_atomics cl_khr_device_uuid cl_khr_pci_bus_info cl_khr_external_semaphore cl_khr_external_memory cl_khr_external_semaphore_win32 cl_khr_external_memory_win32",
-                CL.CL_DEVICE_TYPE_GPU,
+                CL10.CL_DEVICE_TYPE_GPU,
                 true,
                 40,
                 3,
@@ -97,20 +100,20 @@ public class OpenCLDeviceTest {
                 2047L * 1024 * 1024,
                 8191L * 1024 * 1024,
                 0,
-                CL.CL_LOCAL,
+                CL10.CL_LOCAL,
                 48L * 1024,
                 64L * 1024,
-                CL.CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE | CL.CL_QUEUE_PROFILING_ENABLE,
+                CL10.CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE | CL10.CL_QUEUE_PROFILING_ENABLE,
                 1,
                 256,
                 32,
-                CL.CL_FP_DENORM
-                        | CL.CL_FP_INF_NAN
-                        | CL.CL_FP_ROUND_TO_NEAREST
-                        | CL.CL_FP_ROUND_TO_ZERO
-                        | CL.CL_FP_ROUND_TO_INF
-                        | CL.CL_FP_FMA
-                        | CL.CL_FP_CORRECTLY_ROUNDED_DIVIDE_SQRT,
+                CL10.CL_FP_DENORM
+                        | CL10.CL_FP_INF_NAN
+                        | CL10.CL_FP_ROUND_TO_NEAREST
+                        | CL10.CL_FP_ROUND_TO_ZERO
+                        | CL10.CL_FP_ROUND_TO_INF
+                        | CL10.CL_FP_FMA
+                        | CL12.CL_FP_CORRECTLY_ROUNDED_DIVIDE_SQRT,
                 32768,
                 32768,
                 16384,
@@ -129,7 +132,7 @@ public class OpenCLDeviceTest {
         // assert
         final String expectedString = """
             --- Info for OpenCL device: NVIDIA GeForce RTX 3070 Laptop GPU ---
-            cl_device_id:                          cl_device_id[0x0]
+            cl_device_id:                          cl_device_id[0x1]
             CL_DEVICE_NAME:                        NVIDIA GeForce RTX 3070 Laptop GPU
             CL_DEVICE_VENDOR:                      NVIDIA Corporation
             CL_DRIVER_VERSION:                     561.19
@@ -296,7 +299,7 @@ public class OpenCLDeviceTest {
 
     private static OpenCLDevice createTestDeviceWithEndianness(boolean endianLittle) {
         return new OpenCLDevice(
-                new cl_device_id(),
+                TEST_DEVICE_ID,
                 "TestDevice",
                 "TestVendor",
                 "1.0",

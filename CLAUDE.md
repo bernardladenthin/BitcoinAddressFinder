@@ -198,7 +198,7 @@ The central design separates **key production** from **address checking**:
 | `cli/Main.java` | Entry point; parses args, loads config, starts `Finder` |
 | `Finder.java` | Orchestrator; starts/stops producers and consumer |
 | `ProducerJava.java` | CPU-based key generator using `KeyProducer` strategies |
-| `ProducerOpenCL.java` | GPU-accelerated key generator via JOCL |
+| `ProducerOpenCL.java` | GPU-accelerated key generator via LWJGL |
 | `ProducerJavaSecretsFiles.java` | Reads keys from a secrets file |
 | `ConsumerJava.java` | Derives addresses, queries LMDB, logs hits |
 | `PublicKeyBytes.java` | Public key representation and address derivation |
@@ -445,7 +445,83 @@ OpenCL kernels live in `src/main/resources/` as `.cl` and `.h` files:
 | `inc_platform.cl` | Platform-specific abstractions |
 | `inc_types.h` | OpenCL type definitions |
 
-GPU code is bound through JOCL (`jocl` 2.0.6). `OpenCLBuilder` constructs the platform/device hierarchy; `OpenCLContext` manages kernel compilation and execution; `OpenClTask` processes a batch of keys on the GPU.
+GPU code is bound through **LWJGL 3** (`lwjgl` + `lwjgl-opencl` 3.4.2). Every call into the binding
+goes through the `opencl/binding/` seam — never directly:
+
+| Type | Role |
+|---|---|
+| `ClApi` / `LwjglClApi` | instance-based OpenCL surface; the only class calling `org.lwjgl` directly |
+| `ClHandle` + `ClContext`/`ClMem`/`ClKernel`/… | typed handle records; LWJGL models every OpenCL object as a bare `long`, so these restore the per-object types the compiler needs |
+| `ClErrorChecker` / `ClErrorCodeResolver` | LWJGL only *returns* `cl_int` codes and never throws, so every call is checked here and raised as `OpenClCallFailedException` |
+| `OpenClLibraryLoader` | loads the native library with a fallback name chain — a stock Linux runtime ships only `libOpenCL.so.1`, and LWJGL's plain-name lookup would fail on it |
+| `ClDeviceInfoFormatter` | renders `cl_device_type` / fp-config / queue-property bit fields, which LWJGL has no equivalent for |
+
+Above that seam: `OpenCLBuilder` constructs the platform/device hierarchy; `OpenCLContext` manages
+kernel compilation and execution; `OpenClTask` processes a batch of keys on the GPU.
+
+**Host-to-device transfers go through `ClApi.writeBufferChunked`, not `CL_MEM_COPY_HOST_PTR`.**
+LWJGL cannot pass a Java array to the driver — only direct NIO buffers — so a single-shot upload
+would need an off-heap staging copy as large as the payload. The fingerprint filters reach multiple
+gigabytes (the Full-DB 16-bit filter's byte image does not even fit a Java `byte[]`), so uploads are
+written in bounded slices through a small reusable staging buffer instead.
+
+---
+
+## Result broadcast (`core` seam + `keyproducer` transports)
+
+Results leave the process by two routes: the log, which stays the authoritative record, and an
+optional broadcast to connected clients.
+
+**One event per checked batch — reported whether or not anything was found.** That is the whole
+design decision. Reporting only hits would leave a client unable to tell *"range checked, nothing
+there"* from *"range never checked"*, and those two look identical after a shutdown drops a queued
+range. Because the event is emitted after the batch has been checked against the database, it is
+also an exact completion signal: no dispatch-ahead lag to compensate for.
+
+| Type | Layer | Role |
+|---|---|---|
+| `ResultListener` | `core` | the seam; one method, `onBatchChecked(BatchResult)` |
+| `BatchResult` / `Hit` | `core` | payload; plain JDK types only |
+| `QueuedBatch` | `consumer` | carries the batch's `secretBase` to the check |
+| `BatchResultJsonFormatter` | `keyproducer` | the wire format, defined once for all transports |
+| `WebSocketResultBroadcaster` | `keyproducer` | shares the key producer's server — one port, both directions |
+| `ZmqResultBroadcaster` | `keyproducer` | own `PUB` socket on its own address |
+| `SocketResultBroadcaster` | `keyproducer` | own accept loop, newline-delimited JSON |
+
+**Why the types live in `core` and the transports in `keyproducer`.** `Consumer` must not depend on
+`keyproducer` (layering), and `core` may not depend on `model` — so the payload is built from JDK
+types in `core`, which both sides may see. `Finder` constructs the transports and hands them to the
+consumer as `ResultListener`. No architecture rule had to be changed for any of this.
+
+**The grid configuration is announced late, on purpose.** A client needs `batchSizeInBits` to know
+its step: the server aligns every incoming base down to a multiple of `2^batchSizeInBits`, so a
+client stepping by less resubmits one block forever while the rest of its range is never touched —
+silently, since nothing rejects a misaligned base. But the servers accept connections in
+`startKeyProducer()`, before `configureProducer()` exists to say what the grid is. Each transport
+therefore catches up as best it can (see the table below). When producers disagree on
+`batchSizeInBits`, the largest is announced — the only value that cannot make ranges overlap.
+
+### What each transport can and cannot promise
+
+| | WebSocket | ZeroMQ | plain TCP |
+|---|---|---|---|
+| Directions on one port | **yes** | no — `PULL` cannot send, so a second address | no — different framing per direction |
+| Greet on connect | yes | **impossible** (`PUB` has no connect event) | yes, on accept |
+| Catch up an early client | yes | only by republishing (every 64 batches) | yes |
+| Late joiner | fine | **misses messages** (slow joiner) | fine |
+
+Delivery is best-effort everywhere: a client not connected when a batch completes misses that
+message and nothing replays it.
+
+**Security.** The payload contains **private keys**, and every connected client receives every
+result — including hits from ranges somebody else submitted. Each transport is off by default
+(`broadcastResults`).
+
+**Configuration.** `keyProducerJavaWebSocket.broadcastResults` (same port);
+`keyProducerJavaZmq.broadcastResults` + `publishAddress`; `keyProducerJavaSocket.broadcastResults` +
+`resultPort`. For an interactively fed run set `timeoutMillis: -1` — with a positive timeout a pause
+in the UI raises `NoMoreSecretsAvailableException`, which ends the producer permanently. See
+`examples/config_Find_WebSocketUi.json` and `examples/websocket_scanner.html`.
 
 ---
 
@@ -489,7 +565,7 @@ No other sibling repo has OpenCL code, so this distinction is BAF-only.
 | `jsr305` | 3.0.2 | Findbugs nullability annotations (bitcoinj transitive, runtime) |
 | `jcip-annotations` | 1.0 | JCIP concurrency annotations (bitcoinj transitive, runtime) |
 | `lmdbjava` | 0.9.3 | LMDB database bindings |
-| `jocl` | 2.0.6 | Java OpenCL bindings |
+| `lwjgl` / `lwjgl-opencl` | 3.4.2 | Java OpenCL bindings (plus per-platform `natives-*` classifiers) |
 | `jackson-databind` | 2.22.1 | JSON config parsing |
 | `jackson-dataformat-yaml` | 2.22.1 | YAML config parsing |
 | `guava` | 33.6.0-jre | Google core utilities |
@@ -602,7 +678,8 @@ Run PIT with the lifecycle prefix — `mvn test-compile org.pitest:pitest-maven:
 ## Fat-jar release assets
 
 The runnable fat jar (`bitcoinaddressfinder-<version>-jar-with-dependencies.jar`) is a
-**GitHub-Release asset only — never Maven Central** (a jocl-bundled single jar, so no classifier
+**GitHub-Release asset only — never Maven Central** (all LWJGL `natives-*` classifiers coexist on
+one classpath, so it stays a single jar with no classifier
 split), attached with a detached GPG `.asc`. The publish jobs build + sign it off-Central via a
 second `mvn -P release,assembly verify` (which stops before `deploy`, so `central-publishing` never
 uploads it). The cross-repo convention + per-repo shapes are documented in

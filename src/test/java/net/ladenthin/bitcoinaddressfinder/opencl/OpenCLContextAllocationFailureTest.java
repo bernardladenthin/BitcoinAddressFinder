@@ -14,8 +14,8 @@ import java.io.IOException;
 import net.ladenthin.bitcoinaddressfinder.OpenCLPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.OpenCLTest;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.OpenClCallFailedException;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
-import org.jocl.CLException;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
  * (~1.8&nbsp;GB at 24). A card too small to serve that buffer must skip the arm, not abort the run.
  * Whether {@code catch (Exception)} is enough hinges on <em>what type</em> the driver throws. This
  * test answers it by measurement rather than assumption: with JOCL exceptions enabled it is a JOCL
- * {@link CLException} (a {@link RuntimeException}), <b>not</b> an {@link OutOfMemoryError}. So the
+ * {@link OpenClCallFailedException} (a {@link RuntimeException}), <b>not</b> an {@link OutOfMemoryError}. So the
  * pre-existing {@code catch (Exception)} already covered it; the failure is an ordinary skipped arm.
  *
  * <p>The buffer size requested here is deliberately larger than any device's global memory rather
@@ -44,20 +44,20 @@ public class OpenCLContextAllocationFailureTest {
      * A single buffer of 2<sup>60</sup> bytes (~1.15&nbsp;EB) — far beyond the global memory of any
      * real OpenCL device, and beyond the practically addressable range — so every conforming driver
      * rejects it with {@code CL_INVALID_BUFFER_SIZE} (or, if it clamps to available memory first,
-     * {@code CL_MEM_OBJECT_ALLOCATION_FAILURE}). Both are {@code CLException} statuses; neither is an
+     * {@code CL_MEM_OBJECT_ALLOCATION_FAILURE}). Both are OpenCL error statuses; neither is an
      * {@code OutOfMemoryError}.
      */
     private static final long IMPOSSIBLE_BUFFER_BYTES = 1L << 60;
 
     /**
-     * The core assertion: an impossible device allocation throws a JOCL {@link CLException} that is a
+     * The core assertion: an impossible device allocation throws an {@link OpenClCallFailedException} that is a
      * {@link RuntimeException}. This is precisely why {@code TuneConfiguration.runArm} can rely on
      * {@code catch (Exception)} to demote an over-large {@code batchSizeInBits} arm to "unusable" and
      * carry on to the next candidate — no {@code OutOfMemoryError} (an {@link Error}) is involved.
      */
     @OpenCLTest
     @Test
-    public void oversizedDeviceAllocation_throwsClExceptionNotOutOfMemoryError() throws IOException {
+    public void oversizedDeviceAllocation_throwsOpenClCallFailedExceptionNotOutOfMemoryError() throws IOException {
         OpenCLPlatformAssume assume = new OpenCLPlatformAssume();
         assume.assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
@@ -68,10 +68,11 @@ public class OpenCLContextAllocationFailureTest {
         try {
             context.init();
 
-            CLException ex = assertThrows(
-                    CLException.class, () -> context.allocateDeviceReadWriteBufferForTesting(IMPOSSIBLE_BUFFER_BYTES));
+            OpenClCallFailedException ex = assertThrows(
+                    OpenClCallFailedException.class,
+                    () -> context.allocateDeviceReadWriteBufferForTesting(IMPOSSIBLE_BUFFER_BYTES));
 
-            // A CLException is a RuntimeException, so catch (Exception) in the tuner covers it.
+            // It is a RuntimeException, so catch (Exception) in the tuner covers it.
             assertThat(ex, is(instanceOf(RuntimeException.class)));
             // Drivers reject an impossible buffer with one of these two OpenCL status codes.
             assertThat(

@@ -122,7 +122,7 @@ public class LMDBPersistencePerformanceTest {
             threadPoolExecutor.submit(() -> {
                 while (producerShouldRun.get()) {
                     try {
-                        consumerJava.consumeKeys(publicKeyByteses);
+                        consumerJava.consumeKeys(publicKeyByteses, null);
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
                     }

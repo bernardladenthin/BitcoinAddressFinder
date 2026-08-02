@@ -8,7 +8,6 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
-import static org.jocl.CL.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.io.Resources;
@@ -32,6 +31,16 @@ import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLGridResult;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenClTask;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClApi;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClBufferFlags;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClCommandQueue;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClContext;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClDeviceId;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClKernel;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClMem;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClPlatformId;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClProgram;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.OpenClBinding;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses42;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
@@ -42,7 +51,6 @@ import net.ladenthin.bitcoinaddressfinder.util.PrivateKeyTooLargeException;
 import org.apache.commons.io.FileUtils;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
-import org.jocl.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -50,6 +58,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.lwjgl.opencl.CL10;
 
 public class ProbeAddressesOpenCLTest {
 
@@ -91,13 +100,11 @@ public class ProbeAddressesOpenCLTest {
 
     @Test
     @OpenCLTest
-    public void joclTest() {
+    public void sampleKernel_elementwiseMultiply_matchesHostComputation() {
         new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
 
-        /**
-         * The source code of the OpenCL program to execute
-         */
-        String programSource = "__kernel void "
+        // arrange
+        final String programSource = "__kernel void "
                 + "sampleKernel(__global const float *a,"
                 + "             __global const float *b,"
                 + "             __global float *c)"
@@ -106,108 +113,69 @@ public class ProbeAddressesOpenCLTest {
                 + "    c[gid] = a[gid] * b[gid];"
                 + "}";
 
-        // Create input- and output data
-        int n = 10;
-        float[] srcArrayA = new float[n];
-        float[] srcArrayB = new float[n];
-        float[] dstArray = new float[n];
+        final int n = 10;
+        final float[] srcArrayA = new float[n];
+        final float[] srcArrayB = new float[n];
         for (int i = 0; i < n; i++) {
             srcArrayA[i] = i;
             srcArrayB[i] = i;
         }
-        Pointer srcA = Pointer.to(srcArrayA);
-        Pointer srcB = Pointer.to(srcArrayB);
-        Pointer dst = Pointer.to(dstArray);
 
-        // The platform, device type and device number
-        // that will be used
-        final int platformIndex = 0;
-        final long deviceType = CL_DEVICE_TYPE_ALL;
-        final int deviceIndex = 0;
+        final ClApi clApi = OpenClBinding.defaultClApi();
+        final ClPlatformId platform = clApi.getPlatformIds().get(0);
+        final ClDeviceId device =
+                clApi.getDeviceIds(platform, CL10.CL_DEVICE_TYPE_ALL).get(0);
+        final ClContext context = clApi.createContext(platform, device);
+        final ClCommandQueue commandQueue = clApi.createCommandQueue(context, device, false);
+        final ClProgram program = clApi.createProgramWithSource(context, new String[] {programSource});
+        clApi.buildProgram(program, device, "");
+        final ClKernel kernel = clApi.createKernel(program, "sampleKernel");
 
-        // Enable exceptions and subsequently omit error checks in this sample
-        CL.setExceptionsEnabled(true);
+        final long byteSize = (long) Float.BYTES * n;
+        final ClMem srcMemA = clApi.createBuffer(context, ClBufferFlags.READ_ONLY, byteSize);
+        final ClMem srcMemB = clApi.createBuffer(context, ClBufferFlags.READ_ONLY, byteSize);
+        final ClMem dstMem = clApi.createBuffer(context, ClBufferFlags.READ_WRITE, byteSize);
 
-        // Obtain the number of platforms
-        int[] numPlatformsArray = new int[1];
-        clGetPlatformIDs(0, null, numPlatformsArray);
-        int numPlatforms = numPlatformsArray[0];
+        final float[] dstArray = new float[n];
+        try {
+            // Floats travel as raw bytes: the binding transfers buffers, and a float payload is just
+            // its native-order bit pattern.
+            final ByteBuffer inputA = ByteBuffer.allocateDirect((int) byteSize).order(ByteOrder.nativeOrder());
+            inputA.asFloatBuffer().put(srcArrayA);
+            final ByteBuffer inputB = ByteBuffer.allocateDirect((int) byteSize).order(ByteOrder.nativeOrder());
+            inputB.asFloatBuffer().put(srcArrayB);
+            clApi.enqueueWriteBuffer(commandQueue, srcMemA, 0L, inputA);
+            clApi.enqueueWriteBuffer(commandQueue, srcMemB, 0L, inputB);
 
-        // Obtain a platform ID
-        cl_platform_id[] platforms = new cl_platform_id[numPlatforms];
-        clGetPlatformIDs(platforms.length, platforms, null);
-        cl_platform_id platform = platforms[platformIndex];
+            clApi.setKernelArg(kernel, 0, srcMemA);
+            clApi.setKernelArg(kernel, 1, srcMemB);
+            clApi.setKernelArg(kernel, 2, dstMem);
 
-        // Initialize the context properties
-        cl_context_properties contextProperties = new cl_context_properties();
-        contextProperties.addProperty(CL_CONTEXT_PLATFORM, platform);
+            // act
+            clApi.enqueueNDRangeKernel(commandQueue, kernel, new long[] {n}, false);
 
-        // Obtain the number of devices for the platform
-        int[] numDevicesArray = new int[1];
-        clGetDeviceIDs(platform, deviceType, 0, null, numDevicesArray);
-        int numDevices = numDevicesArray[0];
+            final ByteBuffer output = ByteBuffer.allocateDirect((int) byteSize).order(ByteOrder.nativeOrder());
+            clApi.enqueueReadBuffer(commandQueue, dstMem, 0L, output, false);
+            clApi.finish(commandQueue);
+            output.position(0);
+            output.asFloatBuffer().get(dstArray);
+        } finally {
+            clApi.releaseMemObject(srcMemA);
+            clApi.releaseMemObject(srcMemB);
+            clApi.releaseMemObject(dstMem);
+            clApi.releaseKernel(kernel);
+            clApi.releaseProgram(program);
+            clApi.releaseCommandQueue(commandQueue);
+            clApi.releaseContext(context);
+        }
 
-        // Obtain a device ID
-        cl_device_id[] devices = new cl_device_id[numDevices];
-        clGetDeviceIDs(platform, deviceType, numDevices, devices, null);
-        cl_device_id device = devices[deviceIndex];
-
-        // Create a context for the selected device
-        cl_context context = clCreateContext(contextProperties, 1, new cl_device_id[] {device}, null, null, null);
-
-        // Create a command-queue for the selected device
-        cl_queue_properties properties = new cl_queue_properties();
-        cl_command_queue commandQueue = clCreateCommandQueueWithProperties(context, device, properties, null);
-
-        // Allocate the memory objects for the input- and output data
-        cl_mem srcMemA = clCreateBuffer(
-                context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_float * n, srcA, null);
-        cl_mem srcMemB = clCreateBuffer(
-                context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_float * n, srcB, null);
-        cl_mem dstMem = clCreateBuffer(context, CL_MEM_READ_WRITE, (long) Sizeof.cl_float * n, null, null);
-
-        // Create the program from the source code
-        cl_program program = clCreateProgramWithSource(context, 1, new String[] {programSource}, null, null);
-
-        // Build the program
-        clBuildProgram(program, 0, null, null, null, null);
-
-        // Create the kernel
-        cl_kernel kernel = clCreateKernel(program, "sampleKernel", null);
-
-        // Set the arguments for the kernel
-        int a = 0;
-        clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(srcMemA));
-        clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(srcMemB));
-        clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(dstMem));
-
-        // Set the work-item dimensions
-        long[] global_work_size = new long[] {n};
-
-        // Execute the kernel
-        clEnqueueNDRangeKernel(commandQueue, kernel, 1, null, global_work_size, null, 0, null, null);
-
-        // Read the output data
-        long cb = (long) n * Sizeof.cl_float;
-        clEnqueueReadBuffer(commandQueue, dstMem, CL_TRUE, 0, cb, dst, 0, null, null);
-
-        // Release kernel, program, and memory objects
-        clReleaseMemObject(srcMemA);
-        clReleaseMemObject(srcMemB);
-        clReleaseMemObject(dstMem);
-        clReleaseKernel(kernel);
-        clReleaseProgram(program);
-        clReleaseCommandQueue(commandQueue);
-        clReleaseContext(context);
-
-        // Verify the result
+        // assert
         boolean passed = true;
         final float epsilon = 1e-7f;
         for (int i = 0; i < n; i++) {
-            float x = dstArray[i];
-            float y = srcArrayA[i] * srcArrayB[i];
-            boolean epsilonEqual = Math.abs(x - y) <= epsilon * Math.abs(x);
-            if (!epsilonEqual) {
+            final float x = dstArray[i];
+            final float y = srcArrayA[i] * srcArrayB[i];
+            if (Math.abs(x - y) > epsilon * Math.abs(x)) {
                 passed = false;
                 break;
             }
@@ -264,7 +232,6 @@ public class ProbeAddressesOpenCLTest {
     public void calcAddrsFixZeroCl_loadWithoutErrors() throws IOException {
         // ATTENTION: BLDEBUG
 
-        int CELLS = 64;
         int ROW_SIZE = 2; // x1, y1
         int COL_SIZE = 2; // rx, ry
 
@@ -272,94 +239,34 @@ public class ProbeAddressesOpenCLTest {
         URL url = Resources.getResource(calcAddrsFixZeroClFileName);
         String calcAddrsFixZeroCl = Resources.toString(url, StandardCharsets.UTF_8);
 
-        // Create input- and output data
-        // out:
-        int[] src_points_out = new int[ACCESS_BUNDLE];
-        int[] src_z_heap = new int[ACCESS_BUNDLE];
-        // in:
-        int[] src_row_in = new int[ACCESS_BUNDLE * ACCESS_STRIDE * ROW_SIZE];
-        int[] src_col_in = new int[ACCESS_BUNDLE * COL_SIZE];
+        final int pointsOutInts = ACCESS_BUNDLE;
+        final int zHeapInts = ACCESS_BUNDLE;
+        final int rowInInts = ACCESS_BUNDLE * ACCESS_STRIDE * ROW_SIZE;
+        final int colInInts = ACCESS_BUNDLE * COL_SIZE;
 
-        Pointer pointsOut = Pointer.to(src_points_out);
-        Pointer zHeap = Pointer.to(src_z_heap);
-        Pointer rowIn = Pointer.to(src_row_in);
-        Pointer colIn = Pointer.to(src_col_in);
+        final ClApi clApi = OpenClBinding.defaultClApi();
+        final ClPlatformId platform = clApi.getPlatformIds().get(0);
+        final ClDeviceId device =
+                clApi.getDeviceIds(platform, CL10.CL_DEVICE_TYPE_ALL).get(0);
+        final ClContext context = clApi.createContext(platform, device);
+        final ClCommandQueue commandQueue = clApi.createCommandQueue(context, device, false);
 
-        // The platform, device type and device number
-        // that will be used
-        final int platformIndex = 0;
-        final long deviceType = CL_DEVICE_TYPE_ALL;
-        final int deviceIndex = 0;
+        final ClMem pointsOutMem =
+                clApi.createBuffer(context, ClBufferFlags.READ_WRITE, (long) Integer.BYTES * pointsOutInts);
+        final ClMem zHeapMem = clApi.createBuffer(context, ClBufferFlags.READ_WRITE, (long) Integer.BYTES * zHeapInts);
+        final ClMem rowInMem = clApi.createBuffer(context, ClBufferFlags.READ_ONLY, (long) Integer.BYTES * rowInInts);
+        final ClMem colInMem = clApi.createBuffer(context, ClBufferFlags.READ_ONLY, (long) Integer.BYTES * colInInts);
 
-        // Enable exceptions and subsequently omit error checks in this sample
-        CL.setExceptionsEnabled(true);
+        final ClProgram program = clApi.createProgramWithSource(context, new String[] {calcAddrsFixZeroCl});
+        clApi.buildProgram(program, device, "");
 
-        // Obtain the number of platforms
-        int[] numPlatformsArray = new int[1];
-        clGetPlatformIDs(0, null, numPlatformsArray);
-        int numPlatforms = numPlatformsArray[0];
+        final ClKernel kernelEcAddGrid = clApi.createKernel(program, "ec_add_grid");
+        clApi.setKernelArg(kernelEcAddGrid, 0, pointsOutMem);
+        clApi.setKernelArg(kernelEcAddGrid, 1, zHeapMem);
+        clApi.setKernelArg(kernelEcAddGrid, 2, rowInMem);
+        clApi.setKernelArg(kernelEcAddGrid, 3, colInMem);
 
-        // Obtain a platform ID
-        cl_platform_id[] platforms = new cl_platform_id[numPlatforms];
-        clGetPlatformIDs(platforms.length, platforms, null);
-        cl_platform_id platform = platforms[platformIndex];
-
-        // Initialize the context properties
-        cl_context_properties contextProperties = new cl_context_properties();
-        contextProperties.addProperty(CL_CONTEXT_PLATFORM, platform);
-
-        // Obtain the number of devices for the platform
-        int[] numDevicesArray = new int[1];
-        clGetDeviceIDs(platform, deviceType, 0, null, numDevicesArray);
-        int numDevices = numDevicesArray[0];
-
-        // Obtain a device ID
-        cl_device_id[] devices = new cl_device_id[numDevices];
-        clGetDeviceIDs(platform, deviceType, numDevices, devices, null);
-        cl_device_id device = devices[deviceIndex];
-
-        // Create a context for the selected device
-        cl_context context = clCreateContext(contextProperties, 1, new cl_device_id[] {device}, null, null, null);
-
-        // Create a command-queue for the selected device
-        cl_queue_properties properties = new cl_queue_properties();
-        cl_command_queue commandQueue = clCreateCommandQueueWithProperties(context, device, properties, null);
-
-        // Allocate the memory objects for the input- and output data
-        cl_mem pointsOutMem = clCreateBuffer(
-                context, CL_MEM_READ_WRITE, (long) Sizeof.cl_int * src_points_out.length, pointsOut, null);
-        cl_mem zHeapMem =
-                clCreateBuffer(context, CL_MEM_READ_WRITE, (long) Sizeof.cl_int * src_z_heap.length, zHeap, null);
-        cl_mem rowInMem = clCreateBuffer(
-                context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_int * src_row_in.length, null, null);
-        cl_mem colInMem = clCreateBuffer(
-                context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_int * src_col_in.length, null, null);
-
-        // Create the program from the source code
-        cl_program program = clCreateProgramWithSource(context, 1, new String[] {calcAddrsFixZeroCl}, null, null);
-
-        // Build the program
-        clBuildProgram(program, 0, null, null, null, null);
-
-        // Create the kernel
-        cl_kernel kernel_ec_add_grid = clCreateKernel(program, "ec_add_grid", null);
-        cl_kernel kernel_heap_invert = clCreateKernel(program, "heap_invert", null);
-        cl_kernel kernel_hash_ec_point_get = clCreateKernel(program, "hash_ec_point_get", null);
-
-        // Set the arguments for the kernel
-        int a = 0;
-        clSetKernelArg(kernel_ec_add_grid, a++, Sizeof.cl_mem, Pointer.to(pointsOutMem));
-        clSetKernelArg(kernel_ec_add_grid, a++, Sizeof.cl_mem, Pointer.to(zHeapMem));
-        clSetKernelArg(kernel_ec_add_grid, a++, Sizeof.cl_mem, Pointer.to(rowInMem));
-        clSetKernelArg(kernel_ec_add_grid, a++, Sizeof.cl_mem, Pointer.to(colInMem));
-
-        // Set the work-item dimensions
-        long[] global_work_size = new long[] {
-            ACCESS_BUNDLE,
-        };
-
-        // Execute the kernel
-        clEnqueueNDRangeKernel(commandQueue, kernel_ec_add_grid, 1, null, global_work_size, null, 0, null, null);
+        clApi.enqueueNDRangeKernel(commandQueue, kernelEcAddGrid, new long[] {ACCESS_BUNDLE}, false);
     }
 
     @ParameterizedTest

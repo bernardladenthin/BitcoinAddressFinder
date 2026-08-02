@@ -127,7 +127,7 @@ Available assume classes:
 
 A test must be annotated with `@OpenCLTest` and call `assumeOpenCLLibraryLoadableAndOneOpenCL2_0OrGreaterDeviceAvailable()` as its **first statement** when the test body invokes OpenCL API functions:
 
-- `CL.stringFor_*` or any `CL.*` native call
+- Any method on a real `ClApi` (`LwjglClApi`, or an instance from `OpenClBinding`)
 - `OpenCLBuilder.build()` or methods that load/query the OpenCL runtime
 - Any code path triggering native library loading
 
@@ -138,7 +138,7 @@ A test must be annotated with `@OpenCLTest` and call `assumeOpenCLLibraryLoadabl
 
 ### When `@OpenCLTest` + assume is NOT required
 
-Tests that **only** use JOCL wrapper types (`cl_device_id`, `cl_context_properties`, `cl_platform_id`) as plain Java objects — without calling native OpenCL API functions — do **not** need `@OpenCLTest`.
+Tests that **only** use the handle records (`ClDeviceId`, `ClPlatformId`, `ClContext`, …) as plain Java values, or that drive a mocked/stubbed `ClApi`, do **not** need `@OpenCLTest` — no native function is invoked. This is what the `ClApi` seam buys: the pure helpers around it (`ClDeviceInfoFormatter`, `ClErrorChecker`, `ClErrorCodeResolver`) are testable on any machine.
 
 **Decision rule:** "Does this test call any method that invokes a native OpenCL function?" If yes → `@OpenCLTest` + assume. If no → no annotation needed.
 

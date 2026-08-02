@@ -33,26 +33,25 @@ public class OpenCLBuilderTest {
         assertThat(openCLPlatforms.size(), is(greaterThan(Integer.valueOf(0))));
         assertThat(openCLPlatforms.getFirst().openCLDevices().size(), is(greaterThan(Integer.valueOf(0))));
         System.out.println(openCLPlatforms);
-        System.out.println("isOpenClNativeLibraryLoaded: " + OpenCLBuilder.isOpenClNativeLibraryLoaded());
+        System.out.println("isOpenClNativeLibraryLoaded: " + new OpenCLBuilder().isOpenClLibraryAvailable());
         System.out.println("isOneOpenCL2DeviceAvailable: "
-                + OpenCLBuilder.isOneOpenCL2_0OrGreaterDeviceAvailable(openCLPlatforms));
+                + new OpenCLBuilder().isOneOpenCL2_0OrGreaterDeviceAvailable(openCLPlatforms));
     }
     // </editor-fold>
 
     @Test
     public void isOpenCL2_0OrGreater_OpenCLVersion1_2Given_ReturnFalse() throws IOException {
-        OpenCLBuilder openCLBuilder = new OpenCLBuilder();
         assertThat(
-                OpenCLBuilder.isOpenCL2_0OrGreater(OpenCLDevice.getComparableVersionFromDeviceVersion("OpenCL 1.2")),
+                new OpenCLBuilder()
+                        .isOpenCL2_0OrGreater(OpenCLDevice.getComparableVersionFromDeviceVersion("OpenCL 1.2")),
                 is(equalTo(Boolean.FALSE)));
     }
 
     @Test
     public void isOpenCL2_0OrGreater_OpenCLVersion3_0_CUDA_Given_ReturnFalse() throws IOException {
-        OpenCLBuilder openCLBuilder = new OpenCLBuilder();
         assertThat(
-                OpenCLBuilder.isOpenCL2_0OrGreater(
-                        OpenCLDevice.getComparableVersionFromDeviceVersion("OpenCL 3.0 CUDA")),
+                new OpenCLBuilder()
+                        .isOpenCL2_0OrGreater(OpenCLDevice.getComparableVersionFromDeviceVersion("OpenCL 3.0 CUDA")),
                 is(equalTo(Boolean.TRUE)));
     }
 }

@@ -756,10 +756,22 @@ Until the investigation settles on a toolkit, no UI code should be added to the 
 
 ### OpenCL backend abstraction & multi-device coverage (migrated from GitHub issues)
 
-- **Pluggable OpenCL backend behind a small device/library abstraction** (migrated from GitHub issue #22 "Can jogamp be used to improve OpenCL handling?"). Today the GPU layer is bound directly to **JOCL** (`org.jocl`, `jocl 2.0.6`): `opencl/OpenCLBuilder` enumerates platforms/devices via raw `org.jocl.CL` calls, `opencl/OpenCLContext` compiles/runs the kernel, `opencl/OpenClTask` sets kernel args, and `opencl/OpenCLDevice` is a hand-written value type. The goal is a **tiny internal API** (interface) for "list platforms/devices" + "build a context / run the kernel grid" so the OpenCL implementation can be **switched between backends** without touching producers/config.
-  - **Step 1 — define the abstraction over the existing JOCL impl.** Extract a minimal interface set (e.g. an `OpenClBackend` / device-enumeration + context-and-grid-execution contract) and make the current JOCL code the first implementation behind it. No behaviour change; pure introduction of the seam. Keep `jocl` confined to the `opencl` package (already enforced by the `joclConfinedToOpencl` ArchUnit rule).
-  - **Step 2 — wire a second backend behind the same API.** Add **JogAmp JOCL** (`com.jogamp.opencl`, OO `CLPlatform`/`CLDevice`/`CLContext`) as an alternative implementation selectable at runtime/config, so the two bindings can be A/B'd (device enumeration, kernel build/run, native-lib packaging). Decide based on results whether JogAmp simplifies the layer enough to become the default or stays optional.
-  - Open questions to settle when picked up: where the backend is selected (new `configuration` field vs auto-detect), how kernel source/args map across the two APIs, and the native-library/packaging impact of adding JogAmp.
+- **✅ DONE — Pluggable OpenCL backend behind a small device/library abstraction** (migrated from
+  GitHub issue #22 "Can jogamp be used to improve OpenCL handling?"). The abstraction exists as
+  `opencl/binding/` (`ClApi` + `LwjglClApi`, typed handle records, `ClErrorChecker`,
+  `OpenClLibraryLoader`, `ClDeviceInfoFormatter`); `OpenCLBuilder`, `OpenCLContext`, `OpenClTask` and
+  `OpenCLDeviceTopology` all consume it and no longer name a binding library.
+  - **Step 1 (define the seam over the existing impl) and Step 2 (swap the backend) were done in one
+    move, and the outcome differs from the original plan:** JOCL was **replaced by LWJGL 3**, not
+    joined by JogAmp as a selectable second backend. Two findings drove that. First, OpenCL handles
+    cannot cross a binding boundary — JOCL's `cl_platform_id` / `cl_device_id` / `cl_context` are
+    `NativePointerObject` subclasses that cannot be built from a `long` — so discovery, context
+    creation and kernel execution form one indivisible migration unit and a "both backends at once"
+    runtime switch would have meant duplicating that whole unit. Second, with the seam in place the
+    remaining value of a second backend is a config flag nobody asked for. Adding a JogAmp
+    implementation later is now a matter of writing one more `ClApi`.
+  - All nine LWJGL `natives-*` classifiers are declared, so the single fat jar still runs on every
+    supported platform.
 
 - **Add a test exercising two OpenCL devices simultaneously** (migrated from GitHub issue #6). Current OpenCL coverage drives a **single** device (`ProbeAddressesOpenCLTest`, gated by `OpenCLPlatformAssume`). Add a test that runs **two `producerOpenCL` instances concurrently** (the multi-device path the project supports via multiple `producerOpenCL` entries) and asserts both produce and feed the consumer correctly at the same time.
   - **Scope: two _physical_ OpenCL devices** — e.g. a machine with two GPUs, or one GPU plus a CPU that exposes an OpenCL device. (Not two logical handles to the same device.) Each `producerOpenCL` targets a distinct `(platformIndex, deviceIndex)`.

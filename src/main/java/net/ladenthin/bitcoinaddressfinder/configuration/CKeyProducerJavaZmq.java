@@ -33,6 +33,28 @@ public class CKeyProducerJavaZmq extends CKeyProducerJavaReceiver {
     public Mode mode = Mode.BIND;
 
     /**
+     * Send the outcome of every checked batch to ZeroMQ subscribers.
+     *
+     * <p><b>The messages contain private keys</b>, and every subscriber receives every result —
+     * including hits from ranges somebody else submitted. Off by default.
+     */
+    public boolean broadcastResults = false;
+
+    /**
+     * Address the result publisher binds to, used only when {@link #broadcastResults} is set.
+     *
+     * <p>A second address is unavoidable: results go out over a {@code PUB} socket while secrets
+     * arrive on a {@code PULL} socket, and two socket types cannot share one endpoint. Unlike the
+     * WebSocket, which serves both directions on one port, ZeroMQ needs both configured.
+     *
+     * <p>Note for subscribers: {@code PUB}/{@code SUB} drops what is published before a subscriber
+     * has finished connecting (the "slow joiner" problem), and the socket cannot tell when someone
+     * subscribes. The grid configuration is therefore republished periodically rather than on
+     * connect - see the publisher for the interval.
+     */
+    public String publishAddress = "tcp://127.0.0.1:5558";
+
+    /**
      * Timeout for receiving secrets, in milliseconds.
      *
      * <p>This timeout is applied consistently to:

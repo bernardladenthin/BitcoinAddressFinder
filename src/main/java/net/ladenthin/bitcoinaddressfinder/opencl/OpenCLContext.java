@@ -3,29 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.opencl;
 
-import static org.jocl.CL.CL_MEM_COPY_HOST_PTR;
-import static org.jocl.CL.CL_MEM_READ_ONLY;
-import static org.jocl.CL.CL_MEM_READ_WRITE;
-import static org.jocl.CL.CL_MEM_WRITE_ONLY;
-import static org.jocl.CL.CL_QUEUE_PROFILING_ENABLE;
-import static org.jocl.CL.CL_QUEUE_PROPERTIES;
-import static org.jocl.CL.CL_TRUE;
-import static org.jocl.CL.clBuildProgram;
-import static org.jocl.CL.clCreateBuffer;
-import static org.jocl.CL.clCreateCommandQueueWithProperties;
-import static org.jocl.CL.clCreateContext;
-import static org.jocl.CL.clCreateKernel;
-import static org.jocl.CL.clCreateProgramWithSource;
-import static org.jocl.CL.clEnqueueNDRangeKernel;
-import static org.jocl.CL.clEnqueueReadBuffer;
-import static org.jocl.CL.clFinish;
-import static org.jocl.CL.clReleaseCommandQueue;
-import static org.jocl.CL.clReleaseContext;
-import static org.jocl.CL.clReleaseKernel;
-import static org.jocl.CL.clReleaseMemObject;
-import static org.jocl.CL.clReleaseProgram;
-import static org.jocl.CL.clSetKernelArg;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.Resources;
 import java.io.IOException;
@@ -44,33 +21,27 @@ import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.configuration.GpuFilterType;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClApi;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClBufferFlags;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClCommandQueue;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClContext;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClKernel;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClMem;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClProgram;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.OpenClBinding;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.MultilineLogger;
 import org.apache.maven.artifact.versioning.ComparableVersion;
-import org.jocl.CL;
-import org.jocl.Pointer;
-import org.jocl.Sizeof;
-import org.jocl.cl_command_queue;
-import org.jocl.cl_context;
-import org.jocl.cl_context_properties;
-import org.jocl.cl_device_id;
-import org.jocl.cl_kernel;
-import org.jocl.cl_mem;
-import org.jocl.cl_program;
-import org.jocl.cl_queue_properties;
 import org.jspecify.annotations.Nullable;
+import org.lwjgl.opencl.CL10;
+import org.lwjgl.opencl.CL11;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * OpenCL context and kernel lifecycle wrapper used by the GPU producer.
  */
-// The JOCL upstream API is not annotated for nullness; every clXxx(...) call here
-// passes the null values that the OpenCL C ABI accepts (e.g. pfn_notify, user_data,
-// errcode_ret). Checker Framework reads those parameters as @NonNull by default and
-// flags every site. Suppress at class scope rather than per call — same justification.
-@SuppressWarnings({"nullness:argument", "nullness:dereference.of.nullable"})
 @ToString
 public class OpenCLContext implements ReleaseCLObject {
 
@@ -119,7 +90,12 @@ public class OpenCLContext implements ReleaseCLObject {
     }
 
     private static final String KERNEL_NAME = "generateKeysKernel_grid";
-    private static final boolean EXCEPTIONS_ENABLED = true;
+
+    /** Placeholder used in log lines when the driver reports no {@code CL_DEVICE_VENDOR}. */
+    private static final String UNKNOWN_VENDOR = "unknown";
+
+    /** Global work size of the fixed-base precompute kernels, which are single-work-item by design. */
+    private static final long[] SINGLE_WORK_ITEM = {1L};
 
     /**
      * {@code clBuildProgram} options string (Stage-0 quick win). Kept as a single constant so it is
@@ -232,6 +208,9 @@ public class OpenCLContext implements ReleaseCLObject {
     boolean resolveEffectiveNoInlineHelpers(String deviceName, @Nullable String deviceVendor) {
         final Boolean configured = producerOpenCL.noInlineHelpers;
         final boolean amd = isAmdVendor(deviceVendor);
+        // A driver may report no vendor at all. Naming that explicitly beats logging a bare null,
+        // and it keeps the log arguments non-null, which is what the nullness checker requires.
+        final String vendorForLog = deviceVendor == null ? UNKNOWN_VENDOR : deviceVendor;
         // Effective decision (semantics unchanged): explicit true/false verbatim; null (auto) = out-of-line
         // on AMD only, inline elsewhere. Only the LOGGING differs — every path that is not already both
         // fast to compile AND fast at runtime now warns, so the tradeoff is never silent.
@@ -248,7 +227,7 @@ public class OpenCLContext implements ReleaseCLObject {
                             + "kernel "
                             + "(one-time 8-16+ min compile on AMD, then comgr-cached).",
                     deviceName,
-                    deviceVendor,
+                    vendorForLog,
                     source);
         } else if (amd) {
             // INLINE on AMD: full runtime speed, but the first compile is slow (then comgr-cached).
@@ -259,7 +238,7 @@ public class OpenCLContext implements ReleaseCLObject {
                             + "are fast. Set noInlineHelpers=true for a fast ~3 s compile at ~4x lower runtime "
                             + "throughput.",
                     deviceName,
-                    deviceVendor,
+                    vendorForLog,
                     source);
         } else {
             // INLINE on non-AMD: fast to compile AND full runtime speed — nothing to warn about.
@@ -267,7 +246,7 @@ public class OpenCLContext implements ReleaseCLObject {
                     "noInlineHelpers -> INLINED kernel on non-AMD device '{}' (vendor '{}', source: {}) for full "
                             + "throughput; compiles quickly on this vendor.",
                     deviceName,
-                    deviceVendor,
+                    vendorForLog,
                     source);
         }
         return effective;
@@ -351,20 +330,23 @@ public class OpenCLContext implements ReleaseCLObject {
     private final CProducerOpenCL producerOpenCL;
     private final BitHelper bitHelper;
 
-    // JOCL native-pointer wrappers (cl_context / cl_command_queue / cl_program / cl_kernel) —
+    @ToString.Exclude
+    private final ClApi clApi;
+
+    // Native-handle wrappers (ClContext / ClCommandQueue / ClProgram / ClKernel) —
     // toString is uninformative for any of them. openClTask is also excluded to avoid
     // recursive aggregation into this context's snapshot.
     @ToString.Exclude
-    private @Nullable cl_context context;
+    private @Nullable ClContext context;
 
     @ToString.Exclude
-    private @Nullable cl_command_queue commandQueue;
+    private @Nullable ClCommandQueue commandQueue;
 
     @ToString.Exclude
-    private @Nullable cl_program program;
+    private @Nullable ClProgram program;
 
     @ToString.Exclude
-    private @Nullable cl_kernel kernel;
+    private @Nullable ClKernel kernel;
 
     @ToString.Exclude
     private @Nullable OpenClTask openClTask;
@@ -378,7 +360,7 @@ public class OpenCLContext implements ReleaseCLObject {
      * {@code init()} and after {@code close()}.
      */
     @ToString.Exclude
-    private @Nullable cl_mem fuse8FingerprintsMem;
+    private @Nullable ClMem fuse8FingerprintsMem;
 
     /**
      * GPU VRAM buffer holding the 5-int Binary Fuse 8 metadata
@@ -390,7 +372,7 @@ public class OpenCLContext implements ReleaseCLObject {
      * the real metadata. {@code null} before {@code init()} and after {@code close()}.
      */
     @ToString.Exclude
-    private @Nullable cl_mem fuse8MetadataMem;
+    private @Nullable ClMem fuse8MetadataMem;
 
     /**
      * Which fingerprint width was actually uploaded, or {@code null} when only the placeholder is
@@ -423,7 +405,7 @@ public class OpenCLContext implements ReleaseCLObject {
      * {@code init()} and after {@code close()}.
      */
     @ToString.Exclude
-    private @Nullable cl_mem igTableMem;
+    private @Nullable ClMem igTableMem;
 
     /**
      * GPU VRAM buffer holding the fixed-base comb table used to compute the one-time anchor
@@ -436,7 +418,7 @@ public class OpenCLContext implements ReleaseCLObject {
      * {@link #close()}. ~64 KB. {@code null} before {@code init()} and after {@code close()}.
      */
     @ToString.Exclude
-    private @Nullable cl_mem combTableMem;
+    private @Nullable ClMem combTableMem;
 
     private final ByteBufferUtility byteBufferUtility = new ByteBufferUtility(true);
 
@@ -449,8 +431,20 @@ public class OpenCLContext implements ReleaseCLObject {
      * @param bitHelper      the bit/batch-size helper
      */
     public OpenCLContext(CProducerOpenCL producerOpenCL, BitHelper bitHelper) {
+        this(producerOpenCL, bitHelper, OpenClBinding.defaultClApi());
+    }
+
+    /**
+     * Creates a new OpenCL context on an explicit OpenCL API, so tests can substitute it.
+     *
+     * @param producerOpenCL the OpenCL producer configuration
+     * @param bitHelper      the bit/batch-size helper
+     * @param clApi          the OpenCL API to work through
+     */
+    public OpenCLContext(CProducerOpenCL producerOpenCL, BitHelper bitHelper, ClApi clApi) {
         this.producerOpenCL = producerOpenCL;
         this.bitHelper = bitHelper;
+        this.clApi = clApi;
     }
 
     /** Reclaims the heap before a filter upload; injectable so the trigger can be verified. */
@@ -490,10 +484,7 @@ public class OpenCLContext implements ReleaseCLObject {
 
         // #################### general ####################
 
-        // Enable exceptions and subsequently omit error checks in this sample
-        CL.setExceptionsEnabled(EXCEPTIONS_ENABLED);
-
-        List<OpenCLPlatform> platforms = new OpenCLBuilder().build();
+        List<OpenCLPlatform> platforms = new OpenCLBuilder(clApi).build();
 
         OpenCLPlatformSelector platformSelector = new OpenCLPlatformSelector();
         OpenCLDeviceSelection selection = platformSelector.select(
@@ -512,26 +503,21 @@ public class OpenCLContext implements ReleaseCLObject {
                 producerOpenCL.enableGpuFilter && !producerOpenCL.transferAll,
                 device.getDeviceVersionAsComparableVersion(),
                 device.deviceName());
-        cl_context_properties contextProperties = selection.contextProperties();
-        cl_device_id[] cl_device_ids = new cl_device_id[] {device.device()};
-
         // Create a context for the selected device
-        context = clCreateContext(contextProperties, 1, cl_device_ids, null, null, null);
+        final ClContext localContext = clApi.createContext(selection.platform().platformId(), device.device());
+        context = localContext;
 
-        // Create a command-queue for the selected device. Opt-in device-side profiling
-        // (CL_QUEUE_PROFILING_ENABLE) is enabled only when the diagnostic flag is set, so the
-        // production pipeline pays no profiling overhead (see CProducerOpenCL.enableProfiling).
-        cl_queue_properties properties = new cl_queue_properties();
-        if (producerOpenCL.enableProfiling) {
-            properties.addProperty(CL_QUEUE_PROPERTIES, CL_QUEUE_PROFILING_ENABLE);
-        }
-        commandQueue = clCreateCommandQueueWithProperties(context, device.device(), properties, null);
+        // Create a command-queue for the selected device. Opt-in device-side profiling is enabled
+        // only when the diagnostic flag is set, so the production pipeline pays no profiling
+        // overhead (see CProducerOpenCL.enableProfiling).
+        commandQueue = clApi.createCommandQueue(localContext, device.device(), producerOpenCL.enableProfiling);
 
         // #################### kernel specifix ####################
 
         String[] openCLPrograms = getOpenCLPrograms();
         // Create the program from the source code
-        program = clCreateProgramWithSource(context, openCLPrograms.length, openCLPrograms, null, null);
+        final ClProgram localProgram = clApi.createProgramWithSource(localContext, openCLPrograms);
+        program = localProgram;
 
         // Build the program with the Stage-0 quick-win options (see CL_BUILD_OPTIONS), plus the
         // per-config modular-inverse selector (see CProducerOpenCL.useSafeGcdInverse). The noinline
@@ -539,18 +525,18 @@ public class OpenCLContext implements ReleaseCLObject {
         // only; logged) — see resolveEffectiveNoInlineHelpers.
         final boolean effectiveNoInlineHelpers =
                 resolveEffectiveNoInlineHelpers(device.deviceName(), device.deviceVendor());
-        clBuildProgram(program, 0, null, buildOptions(effectiveNoInlineHelpers), null, null);
+        clApi.buildProgram(localProgram, device.device(), buildOptions(effectiveNoInlineHelpers));
 
         if (producerOpenCL.logGpuDiagnostics) {
             logProgramBuildLog(device);
         }
 
         // Create the kernel
-        kernel = clCreateKernel(program, KERNEL_NAME, null);
+        kernel = clApi.createKernel(localProgram, KERNEL_NAME);
 
         logKernelResourceUsage(device);
 
-        openClTask = new OpenClTask(context, producerOpenCL, bitHelper, byteBufferUtility);
+        openClTask = new OpenClTask(clApi, localContext, producerOpenCL, bitHelper, byteBufferUtility);
 
         // Allocate a dummy empty filter so the kernel's fuse8 arguments are always bindable.
         // uploadGpuFilter() replaces it with the real filter; until then the kernel runs in
@@ -578,25 +564,16 @@ public class OpenCLContext implements ReleaseCLObject {
      * @param device the selected OpenCL device the kernel was built for
      */
     private void logKernelResourceUsage(OpenCLDevice device) {
-        final cl_kernel localKernel = Objects.requireNonNull(kernel);
-        final long[] value = new long[1];
-        CL.clGetKernelWorkGroupInfo(
-                localKernel, device.device(), CL.CL_KERNEL_WORK_GROUP_SIZE, Sizeof.size_t, Pointer.to(value), null);
-        final long kernelMaxWorkGroupSize = value[0];
-        CL.clGetKernelWorkGroupInfo(
-                localKernel,
-                device.device(),
-                CL.CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE,
-                Sizeof.size_t,
-                Pointer.to(value),
-                null);
-        final long workGroupSizeMultiple = value[0];
-        CL.clGetKernelWorkGroupInfo(
-                localKernel, device.device(), CL.CL_KERNEL_PRIVATE_MEM_SIZE, Sizeof.cl_ulong, Pointer.to(value), null);
-        final long privateMemBytes = value[0];
-        CL.clGetKernelWorkGroupInfo(
-                localKernel, device.device(), CL.CL_KERNEL_LOCAL_MEM_SIZE, Sizeof.cl_ulong, Pointer.to(value), null);
-        final long localMemBytes = value[0];
+        final ClKernel localKernel = Objects.requireNonNull(kernel);
+        // Width matters: the two work-group sizes are size_t, the two memory sizes are cl_ulong.
+        final long kernelMaxWorkGroupSize =
+                clApi.getKernelWorkGroupInfoSize(localKernel, device.device(), CL10.CL_KERNEL_WORK_GROUP_SIZE);
+        final long workGroupSizeMultiple = clApi.getKernelWorkGroupInfoSize(
+                localKernel, device.device(), CL11.CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE);
+        final long privateMemBytes =
+                clApi.getKernelWorkGroupInfoUlong(localKernel, device.device(), CL11.CL_KERNEL_PRIVATE_MEM_SIZE);
+        final long localMemBytes =
+                clApi.getKernelWorkGroupInfoUlong(localKernel, device.device(), CL10.CL_KERNEL_LOCAL_MEM_SIZE);
         LOGGER.info(
                 "Kernel resource usage: kernelMaxWorkGroupSize={} workGroupSizeMultiple={} privateMemBytes={} localMemBytes={}",
                 kernelMaxWorkGroupSize,
@@ -615,13 +592,8 @@ public class OpenCLContext implements ReleaseCLObject {
      * @param device the device the program was built for
      */
     private void logProgramBuildLog(OpenCLDevice device) {
-        final cl_program localProgram = Objects.requireNonNull(program);
-        final long[] size = new long[1];
-        CL.clGetProgramBuildInfo(localProgram, device.device(), CL.CL_PROGRAM_BUILD_LOG, 0, null, size);
-        final byte[] logBytes = new byte[(int) size[0]];
-        CL.clGetProgramBuildInfo(
-                localProgram, device.device(), CL.CL_PROGRAM_BUILD_LOG, logBytes.length, Pointer.to(logBytes), null);
-        LOGGER.info("GPU program build log:\n{}", new String(logBytes, StandardCharsets.UTF_8));
+        final ClProgram localProgram = Objects.requireNonNull(program);
+        LOGGER.info("GPU program build log:\n{}", clApi.getProgramBuildLog(localProgram, device.device()));
     }
 
     /**
@@ -766,11 +738,14 @@ public class OpenCLContext implements ReleaseCLObject {
     /** Fuse-8 buffer upload: the {@code byte[]} slot array goes to the device as-is. */
     private void allocateFilterBuffers(
             byte[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
-        // Avoid Pointer.to on a zero-length array (the empty-filter placeholder); the pointer would
-        // be unused anyway because FromPointer pads a zero-size upload with its own dummy byte.
-        final Pointer host = fingerprints.length == 0 ? Pointer.to(new byte[] {0}) : Pointer.to(fingerprints);
-        allocateFilterBuffersFromPointer(
-                host, (long) fingerprints.length, seedLo, seedHi, segLen, segLenMask, segCountLen);
+        allocateFilterBuffers(
+                (long) fingerprints.length,
+                (queue, mem) -> clApi.writeBufferChunked(queue, mem, fingerprints),
+                seedLo,
+                seedHi,
+                segLen,
+                segLenMask,
+                segCountLen);
     }
 
     /**
@@ -787,9 +762,9 @@ public class OpenCLContext implements ReleaseCLObject {
      */
     private void allocateFilterBuffersShort(
             short[] fingerprints, int seedLo, int seedHi, int segLen, int segLenMask, int segCountLen) {
-        allocateFilterBuffersFromPointer(
-                Pointer.to(fingerprints),
+        allocateFilterBuffers(
                 (long) fingerprints.length * Short.BYTES,
+                (queue, mem) -> clApi.writeBufferChunked(queue, mem, fingerprints),
                 seedLo,
                 seedHi,
                 segLen,
@@ -797,16 +772,33 @@ public class OpenCLContext implements ReleaseCLObject {
                 segCountLen);
     }
 
-    private void allocateFilterBuffersFromPointer(
-            Pointer fingerprintHost,
+    /**
+     * Allocates the two filter buffers and fills the fingerprint buffer through {@code upload}.
+     *
+     * <p>The payload is written in slices rather than allocated with a copy-host-pointer flag. The
+     * binding cannot hand a Java array to the driver, so a single-shot upload would first need an
+     * off-heap staging copy the size of the whole filter — several gigabytes at the Full-DB tier,
+     * where the 16-bit filter's byte image does not even fit a Java {@code byte[]}.
+     *
+     * @param fingerprintByteSize size of the fingerprint payload in bytes
+     * @param upload              writes the fingerprint payload into the allocated buffer
+     * @param seedLo              low 32 bits of the construction seed
+     * @param seedHi              high 32 bits of the construction seed
+     * @param segLen              per-segment {@code reduce} length
+     * @param segLenMask          {@code segLen - 1}
+     * @param segCountLen         total fingerprint slot count
+     */
+    private void allocateFilterBuffers(
             long fingerprintByteSize,
+            FilterUpload upload,
             int seedLo,
             int seedHi,
             int segLen,
             int segLenMask,
             int segCountLen) {
-        final cl_context localContext = context;
-        if (localContext == null || closed) {
+        final ClContext localContext = context;
+        final ClCommandQueue localQueue = commandQueue;
+        if (localContext == null || localQueue == null || closed) {
             throw new IllegalStateException("uploadGpuFilter called before init() or after close() (context="
                     + (localContext == null ? "null" : "set")
                     + ", closed="
@@ -822,46 +814,63 @@ public class OpenCLContext implements ReleaseCLObject {
         // Zero-size device buffers are invalid; pad an empty filter to a single zero byte. The
         // kernel relies on segCountLen == 0 (not the buffer length) to detect the empty filter, so
         // the padding byte is never read.
-        final Pointer host = fingerprintByteSize <= 0L ? Pointer.to(new byte[] {0}) : fingerprintHost;
-        final long byteSize = fingerprintByteSize <= 0L ? 1L : fingerprintByteSize;
+        final boolean empty = fingerprintByteSize <= 0L;
+        final long byteSize = empty ? 1L : fingerprintByteSize;
         // An upload right after a filter build can fail to pin host memory while the build's
         // transient garbage still occupies the heap (measured on RDNA3); reclaim it first.
         reclaimHeapBeforeUpload();
-        final cl_mem localFpMem =
-                clCreateBuffer(localContext, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, byteSize, host, null);
+        final ClMem localFpMem = clApi.createBuffer(localContext, ClBufferFlags.READ_ONLY, byteSize);
+        try {
+            if (!empty) {
+                upload.writeInto(localQueue, localFpMem);
+            }
+        } catch (RuntimeException e) {
+            clApi.releaseMemObject(localFpMem);
+            throw e;
+        }
 
         final int[] metadata = new int[] {seedLo, seedHi, segLen, segLenMask, segCountLen};
-        final cl_mem localMetaMem;
+        final ClMem localMetaMem;
         try {
-            localMetaMem = clCreateBuffer(
-                    localContext,
-                    CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                    (long) metadata.length * Sizeof.cl_int,
-                    Pointer.to(metadata),
-                    null);
+            localMetaMem =
+                    clApi.createBuffer(localContext, ClBufferFlags.READ_ONLY, (long) metadata.length * Integer.BYTES);
+            clApi.writeBufferChunked(localQueue, localMetaMem, metadata);
         } catch (RuntimeException e) {
             // First buffer was allocated; free it before propagating so no VRAM is leaked.
-            clReleaseMemObject(localFpMem);
+            clApi.releaseMemObject(localFpMem);
             throw e;
         }
         fuse8FingerprintsMem = localFpMem;
         fuse8MetadataMem = localMetaMem;
     }
 
+    /** Writes a filter payload into an already-allocated device buffer. */
+    @FunctionalInterface
+    private interface FilterUpload {
+
+        /**
+         * Writes the payload.
+         *
+         * @param commandQueue the queue to submit the writes to
+         * @param mem          the destination device buffer
+         */
+        void writeInto(ClCommandQueue commandQueue, ClMem mem);
+    }
+
     private void releaseGpuFilter() {
         uploadedFilterType = null;
         if (fuse8FingerprintsMem != null) {
-            clReleaseMemObject(fuse8FingerprintsMem);
+            clApi.releaseMemObject(fuse8FingerprintsMem);
             fuse8FingerprintsMem = null;
         }
         if (fuse8MetadataMem != null) {
-            clReleaseMemObject(fuse8MetadataMem);
+            clApi.releaseMemObject(fuse8MetadataMem);
             fuse8MetadataMem = null;
         }
     }
 
     private void uploadIGTable(int keysPerWorkItem) {
-        final cl_context localContext = Objects.requireNonNull(context);
+        final ClContext localContext = Objects.requireNonNull(context);
         // One entry per walked key (m = 1 .. keysPerWorkItem-1); at least one so the device buffer is
         // never zero-size. When keysPerWorkItem == 1 the walk reads no i*G entry, so the placeholder
         // (left unwritten by the kernel's count=0 run) is never consumed.
@@ -872,19 +881,21 @@ public class OpenCLContext implements ReleaseCLObject {
             // precompute_ig_table emits only radix-2^32, so build into a scratch buffer and lower it
             // once with our own convert_ig_table_to_fe10x26 kernel (present only on the 2^26 build).
             final long radixBytes = (long) entries * OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES;
-            final cl_mem radix32Table = clCreateBuffer(localContext, CL_MEM_READ_WRITE, radixBytes, null, null);
+            final ClMem radix32Table = clApi.createBuffer(localContext, ClBufferFlags.READ_WRITE, radixBytes);
             try {
                 enqueuePrecomputeKernel(radix32Table, "precompute_ig_table", keysPerWorkItem - 1);
                 final long bytes = (long) entries * OpenClKernelConstants.FE10X26_TWO_COORDINATES_NUM_BYTES;
-                igTableMem = clCreateBuffer(localContext, CL_MEM_READ_WRITE, bytes, null, null);
-                enqueueConvertIgTableToFe10x26(igTableMem, radix32Table, keysPerWorkItem - 1);
+                final ClMem localIgTable = clApi.createBuffer(localContext, ClBufferFlags.READ_WRITE, bytes);
+                igTableMem = localIgTable;
+                enqueueConvertIgTableToFe10x26(localIgTable, radix32Table, keysPerWorkItem - 1);
             } finally {
-                clReleaseMemObject(radix32Table);
+                clApi.releaseMemObject(radix32Table);
             }
         } else {
             final long bytes = (long) entries * OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES;
-            igTableMem = clCreateBuffer(localContext, CL_MEM_READ_WRITE, bytes, null, null);
-            enqueuePrecomputeKernel(igTableMem, "precompute_ig_table", keysPerWorkItem - 1);
+            final ClMem localIgTable = clApi.createBuffer(localContext, ClBufferFlags.READ_WRITE, bytes);
+            igTableMem = localIgTable;
+            enqueuePrecomputeKernel(localIgTable, "precompute_ig_table", keysPerWorkItem - 1);
         }
     }
 
@@ -898,18 +909,18 @@ public class OpenCLContext implements ReleaseCLObject {
      * @param in    the source radix-2³² table buffer ({@code [x(8)][y(8)]} per entry)
      * @param count number of entries to convert ({@code keysPerWorkItem - 1}; 0 is a valid no-op)
      */
-    private void enqueueConvertIgTableToFe10x26(cl_mem out, cl_mem in, int count) {
-        final cl_program localProgram = Objects.requireNonNull(program);
-        final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
-        final cl_kernel convertKernel = clCreateKernel(localProgram, "convert_ig_table_to_fe10x26", null);
+    private void enqueueConvertIgTableToFe10x26(ClMem out, ClMem in, int count) {
+        final ClProgram localProgram = Objects.requireNonNull(program);
+        final ClCommandQueue localQueue = Objects.requireNonNull(commandQueue);
+        final ClKernel convertKernel = clApi.createKernel(localProgram, "convert_ig_table_to_fe10x26");
         try {
-            clSetKernelArg(convertKernel, 0, Sizeof.cl_mem, Pointer.to(out));
-            clSetKernelArg(convertKernel, 1, Sizeof.cl_mem, Pointer.to(in));
-            clSetKernelArg(convertKernel, 2, Sizeof.cl_uint, Pointer.to(new int[] {count}));
-            clEnqueueNDRangeKernel(localQueue, convertKernel, 1, null, new long[] {1L}, null, 0, null, null);
-            clFinish(localQueue);
+            clApi.setKernelArg(convertKernel, 0, out);
+            clApi.setKernelArg(convertKernel, 1, in);
+            clApi.setKernelArgInt(convertKernel, 2, count);
+            clApi.enqueueNDRangeKernel(localQueue, convertKernel, SINGLE_WORK_ITEM, false);
+            clApi.finish(localQueue);
         } finally {
-            clReleaseKernel(convertKernel);
+            clApi.releaseKernel(convertKernel);
         }
     }
 
@@ -923,39 +934,40 @@ public class OpenCLContext implements ReleaseCLObject {
      * @param kernelName the precompute kernel name
      * @param countArg   value for a trailing {@code const u32 count} argument, or {@code null}
      */
-    private void enqueuePrecomputeKernel(cl_mem out, String kernelName, @Nullable Integer countArg) {
-        final cl_program localProgram = Objects.requireNonNull(program);
-        final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
-        final cl_kernel precomputeKernel = clCreateKernel(localProgram, kernelName, null);
+    private void enqueuePrecomputeKernel(ClMem out, String kernelName, @Nullable Integer countArg) {
+        final ClProgram localProgram = Objects.requireNonNull(program);
+        final ClCommandQueue localQueue = Objects.requireNonNull(commandQueue);
+        final ClKernel precomputeKernel = clApi.createKernel(localProgram, kernelName);
         try {
-            clSetKernelArg(precomputeKernel, 0, Sizeof.cl_mem, Pointer.to(out));
+            clApi.setKernelArg(precomputeKernel, 0, out);
             if (countArg != null) {
-                clSetKernelArg(precomputeKernel, 1, Sizeof.cl_uint, Pointer.to(new int[] {countArg}));
+                clApi.setKernelArgInt(precomputeKernel, 1, countArg);
             }
-            clEnqueueNDRangeKernel(localQueue, precomputeKernel, 1, null, new long[] {1L}, null, 0, null, null);
-            clFinish(localQueue);
+            clApi.enqueueNDRangeKernel(localQueue, precomputeKernel, SINGLE_WORK_ITEM, false);
+            clApi.finish(localQueue);
         } finally {
-            clReleaseKernel(precomputeKernel);
+            clApi.releaseKernel(precomputeKernel);
         }
     }
 
     private void releaseIGTable() {
         if (igTableMem != null) {
-            clReleaseMemObject(igTableMem);
+            clApi.releaseMemObject(igTableMem);
             igTableMem = null;
         }
     }
 
     private void uploadCombTable() {
-        final cl_context localContext = Objects.requireNonNull(context);
+        final ClContext localContext = Objects.requireNonNull(context);
         final long bytes = (long) COMB_POSITIONS * COMB_MAGNITUDES * OpenClKernelConstants.TWO_COORDINATES_NUM_BYTES;
-        combTableMem = clCreateBuffer(localContext, CL_MEM_READ_WRITE, bytes, null, null);
-        enqueuePrecomputeKernel(combTableMem, "precompute_comb_table", null);
+        final ClMem localCombTable = clApi.createBuffer(localContext, ClBufferFlags.READ_WRITE, bytes);
+        combTableMem = localCombTable;
+        enqueuePrecomputeKernel(localCombTable, "precompute_comb_table", null);
     }
 
     private void releaseCombTable() {
         if (combTableMem != null) {
-            clReleaseMemObject(combTableMem);
+            clApi.releaseMemObject(combTableMem);
             combTableMem = null;
         }
     }
@@ -970,13 +982,14 @@ public class OpenCLContext implements ReleaseCLObject {
      * success from {@code clCreateBuffer} even for an absurd multi-exabyte request, deferring the
      * backing storage until first use. Only touching the buffer (a blocking 1-byte read here) forces
      * the driver to materialize it, which is where an impossible size is rejected. This is the same
-     * reason the real RDNA3 failure appeared with {@code CL_MEM_COPY_HOST_PTR} (which must pin host
-     * memory immediately), not with a bare create.
+     * reason the real RDNA3 failure appeared with an upload that pins host memory immediately, not
+     * with a bare create.
      *
-     * <p>With JOCL exceptions enabled ({@link #EXCEPTIONS_ENABLED}) the rejection surfaces as a JOCL
-     * {@link org.jocl.CLException} — a {@link RuntimeException} carrying a status such as {@code
-     * CL_MEM_OBJECT_ALLOCATION_FAILURE} / {@code CL_OUT_OF_RESOURCES} / {@code CL_INVALID_BUFFER_SIZE}
-     * — and <b>never</b> an {@link OutOfMemoryError}. That is the evidence behind {@code
+     * <p>The rejection surfaces as an
+     * {@link net.ladenthin.bitcoinaddressfinder.opencl.binding.OpenClCallFailedException} — a
+     * {@link RuntimeException} carrying a status such as {@code CL_MEM_OBJECT_ALLOCATION_FAILURE} /
+     * {@code CL_OUT_OF_RESOURCES} / {@code CL_INVALID_BUFFER_SIZE} — and <b>never</b> an
+     * {@link OutOfMemoryError}. That is the evidence behind {@code
      * TuneConfiguration.runArm}'s per-arm catch: the sweep probes {@code batchSizeInBits} up to {@link
      * net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants#BIT_COUNT_FOR_MAX_CHUNKS_ARRAY},
      * whose output buffer scales as {@code 2^bits} and can exceed what a smaller card allocates.
@@ -991,18 +1004,18 @@ public class OpenCLContext implements ReleaseCLObject {
      */
     @VisibleForTesting
     void allocateDeviceReadWriteBufferForTesting(long bytes) {
-        final cl_context localContext = Objects.requireNonNull(context, "init() must run before allocating a buffer");
-        final cl_command_queue localQueue =
+        final ClContext localContext = Objects.requireNonNull(context, "init() must run before allocating a buffer");
+        final ClCommandQueue localQueue =
                 Objects.requireNonNull(commandQueue, "init() must run before allocating a buffer");
-        final cl_mem mem = clCreateBuffer(localContext, CL_MEM_READ_WRITE, bytes, null, null);
+        final ClMem mem = clApi.createBuffer(localContext, ClBufferFlags.READ_WRITE, bytes);
         try {
             // Force the (possibly lazy) driver to materialize the backing storage; this is where an
-            // impossible size is rejected with a CLException.
-            final byte[] probe = new byte[1];
-            clEnqueueReadBuffer(localQueue, mem, CL_TRUE, 0L, 1L, Pointer.to(probe), 0, null, null);
-            clFinish(localQueue);
+            // impossible size is rejected.
+            final ByteBuffer probe = ByteBuffer.allocateDirect(1);
+            clApi.enqueueReadBuffer(localQueue, mem, 0L, probe, false);
+            clApi.finish(localQueue);
         } finally {
-            clReleaseMemObject(mem);
+            clApi.releaseMemObject(mem);
         }
     }
 
@@ -1021,22 +1034,23 @@ public class OpenCLContext implements ReleaseCLObject {
      */
     @VisibleForTesting
     byte[] runPrecomputeKernelForTesting(String kernelName, int outputBytes, @Nullable Integer countArg) {
-        final cl_context localContext = Objects.requireNonNull(context);
-        final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
+        final ClContext localContext = Objects.requireNonNull(context);
+        final ClCommandQueue localQueue = Objects.requireNonNull(commandQueue);
 
-        final cl_mem out = clCreateBuffer(localContext, CL_MEM_READ_WRITE, outputBytes, null, null);
+        final ClMem out = clApi.createBuffer(localContext, ClBufferFlags.READ_WRITE, outputBytes);
         try {
             enqueuePrecomputeKernel(out, kernelName, countArg);
 
             final ByteBuffer buf = ByteBuffer.allocateDirect(outputBytes);
-            clEnqueueReadBuffer(localQueue, out, CL_TRUE, 0, outputBytes, Pointer.to(buf), 0, null, null);
-            clFinish(localQueue);
+            clApi.enqueueReadBuffer(localQueue, out, 0L, buf, false);
+            clApi.finish(localQueue);
 
             final byte[] bytes = new byte[outputBytes];
+            buf.position(0);
             buf.get(bytes);
             return bytes;
         } finally {
-            clReleaseMemObject(out);
+            clApi.releaseMemObject(out);
         }
     }
 
@@ -1054,32 +1068,32 @@ public class OpenCLContext implements ReleaseCLObject {
      */
     @VisibleForTesting
     public void runBenchInvMod(int globalWorkSize, int iterations, boolean inputHighLimbsZero) {
-        final cl_context localContext = Objects.requireNonNull(context);
-        final cl_program localProgram = Objects.requireNonNull(program);
-        final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
+        final ClContext localContext = Objects.requireNonNull(context);
+        final ClProgram localProgram = Objects.requireNonNull(program);
+        final ClCommandQueue localQueue = Objects.requireNonNull(commandQueue);
 
-        final cl_kernel benchKernel = clCreateKernel(localProgram, "bench_inv_mod", null);
-        final cl_mem out =
-                clCreateBuffer(localContext, CL_MEM_WRITE_ONLY, (long) globalWorkSize * Sizeof.cl_uint, null, null);
+        final ClKernel benchKernel = clApi.createKernel(localProgram, "bench_inv_mod");
+        final ClMem out =
+                clApi.createBuffer(localContext, ClBufferFlags.WRITE_ONLY, (long) globalWorkSize * Integer.BYTES);
         try {
-            clSetKernelArg(benchKernel, 0, Sizeof.cl_mem, Pointer.to(out));
-            clSetKernelArg(benchKernel, 1, Sizeof.cl_uint, Pointer.to(new int[] {iterations}));
-            clSetKernelArg(benchKernel, 2, Sizeof.cl_uint, Pointer.to(new int[] {inputHighLimbsZero ? 1 : 0}));
-            clEnqueueNDRangeKernel(localQueue, benchKernel, 1, null, new long[] {globalWorkSize}, null, 0, null, null);
-            clFinish(localQueue);
+            clApi.setKernelArg(benchKernel, 0, out);
+            clApi.setKernelArgInt(benchKernel, 1, iterations);
+            clApi.setKernelArgInt(benchKernel, 2, inputHighLimbsZero ? 1 : 0);
+            clApi.enqueueNDRangeKernel(localQueue, benchKernel, new long[] {globalWorkSize}, false);
+            clApi.finish(localQueue);
         } finally {
-            clReleaseMemObject(out);
-            clReleaseKernel(benchKernel);
+            clApi.releaseMemObject(out);
+            clApi.releaseKernel(benchKernel);
         }
     }
 
     // Filter-probe microbenchmark state. Held across calls on purpose: the filter reaches gigabytes
     // at production sizes, so uploading it per measured invocation would measure PCIe, not the probe.
-    private @Nullable cl_kernel benchFilterKernel;
-    private @Nullable cl_mem benchFilterMem;
-    private @Nullable cl_mem benchFilterMetaMem;
-    private @Nullable cl_mem benchFilterKeysMem;
-    private @Nullable cl_mem benchFilterHitsMem;
+    private @Nullable ClKernel benchFilterKernel;
+    private @Nullable ClMem benchFilterMem;
+    private @Nullable ClMem benchFilterMetaMem;
+    private @Nullable ClMem benchFilterKeysMem;
+    private @Nullable ClMem benchFilterHitsMem;
     private int benchFilterProbeCount;
 
     /**
@@ -1096,7 +1110,12 @@ public class OpenCLContext implements ReleaseCLObject {
      */
     @VisibleForTesting
     public void prepareBenchFilterProbeFuse8(byte[] fingerprints, int[] meta, long[] probeKeys) {
-        prepareBenchFilterProbe("benchmarkFilterFuse8", Pointer.to(fingerprints), fingerprints.length, meta, probeKeys);
+        prepareBenchFilterProbe(
+                "benchmarkFilterFuse8",
+                fingerprints.length,
+                (queue, mem) -> clApi.writeBufferChunked(queue, mem, fingerprints),
+                meta,
+                probeKeys);
     }
 
     /**
@@ -1117,8 +1136,8 @@ public class OpenCLContext implements ReleaseCLObject {
         // image exceeds Integer.MAX_VALUE, still uploads. See allocateFilterBuffersShort.
         prepareBenchFilterProbe(
                 "benchmarkFilterFuse16",
-                Pointer.to(fingerprints),
                 (long) fingerprints.length * Short.BYTES,
+                (queue, mem) -> clApi.writeBufferChunked(queue, mem, fingerprints),
                 meta,
                 probeKeys);
     }
@@ -1136,45 +1155,48 @@ public class OpenCLContext implements ReleaseCLObject {
     public void prepareBenchFilterProbeBlockedBloom(long[] words, int[] meta, long[] probeKeys) {
         prepareBenchFilterProbe(
                 "benchmarkFilterBlockedBloom",
-                Pointer.to(words),
-                (long) words.length * Sizeof.cl_ulong,
+                (long) words.length * Long.BYTES,
+                (queue, mem) -> clApi.writeBufferChunked(queue, mem, words),
                 meta,
                 probeKeys);
     }
 
     private void prepareBenchFilterProbe(
-            String kernelName, Pointer filterHost, long filterBytes, int[] meta, long[] probeKeys) {
-        final cl_context localContext = Objects.requireNonNull(context);
-        final cl_program localProgram = Objects.requireNonNull(program);
+            String kernelName, long filterBytes, FilterUpload filterUpload, int[] meta, long[] probeKeys) {
+        final ClContext localContext = Objects.requireNonNull(context);
+        final ClProgram localProgram = Objects.requireNonNull(program);
+        final ClCommandQueue localQueue = Objects.requireNonNull(commandQueue);
 
         releaseBenchFilterProbe(); // idempotent: a second prepare must not leak the first upload
         benchFilterProbeCount = probeKeys.length;
-        benchFilterKernel = clCreateKernel(localProgram, kernelName, null);
+        benchFilterKernel = clApi.createKernel(localProgram, kernelName);
         // Same host-memory-pinning trap as the production upload: reclaim the build's transient
         // garbage so the driver can pin the staging region (see reclaimHeapBeforeUpload).
         reclaimHeapBeforeUpload();
-        benchFilterMem =
-                clCreateBuffer(localContext, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, filterBytes, filterHost, null);
-        benchFilterMetaMem = clCreateBuffer(
-                localContext,
-                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                (long) meta.length * Sizeof.cl_uint,
-                Pointer.to(meta),
-                null);
-        benchFilterKeysMem = clCreateBuffer(
-                localContext,
-                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                (long) probeKeys.length * Sizeof.cl_ulong,
-                Pointer.to(probeKeys),
-                null);
-        benchFilterHitsMem = clCreateBuffer(localContext, CL_MEM_WRITE_ONLY, benchFilterProbeCount, null, null);
 
-        final cl_kernel k = Objects.requireNonNull(benchFilterKernel);
-        clSetKernelArg(k, 0, Sizeof.cl_mem, Pointer.to(Objects.requireNonNull(benchFilterMem)));
-        clSetKernelArg(k, 1, Sizeof.cl_mem, Pointer.to(Objects.requireNonNull(benchFilterMetaMem)));
-        clSetKernelArg(k, 2, Sizeof.cl_mem, Pointer.to(Objects.requireNonNull(benchFilterKeysMem)));
-        clSetKernelArg(k, 3, Sizeof.cl_mem, Pointer.to(Objects.requireNonNull(benchFilterHitsMem)));
-        clSetKernelArg(k, 4, Sizeof.cl_uint, Pointer.to(new int[] {benchFilterProbeCount}));
+        final ClMem localFilterMem = clApi.createBuffer(localContext, ClBufferFlags.READ_ONLY, filterBytes);
+        filterUpload.writeInto(localQueue, localFilterMem);
+        benchFilterMem = localFilterMem;
+
+        final ClMem localMetaMem =
+                clApi.createBuffer(localContext, ClBufferFlags.READ_ONLY, (long) meta.length * Integer.BYTES);
+        clApi.writeBufferChunked(localQueue, localMetaMem, meta);
+        benchFilterMetaMem = localMetaMem;
+
+        final ClMem localKeysMem =
+                clApi.createBuffer(localContext, ClBufferFlags.READ_ONLY, (long) probeKeys.length * Long.BYTES);
+        clApi.writeBufferChunked(localQueue, localKeysMem, probeKeys);
+        benchFilterKeysMem = localKeysMem;
+
+        final ClMem localHitsMem = clApi.createBuffer(localContext, ClBufferFlags.WRITE_ONLY, benchFilterProbeCount);
+        benchFilterHitsMem = localHitsMem;
+
+        final ClKernel k = Objects.requireNonNull(benchFilterKernel);
+        clApi.setKernelArg(k, 0, localFilterMem);
+        clApi.setKernelArg(k, 1, localMetaMem);
+        clApi.setKernelArg(k, 2, localKeysMem);
+        clApi.setKernelArg(k, 3, localHitsMem);
+        clApi.setKernelArgInt(k, 4, benchFilterProbeCount);
     }
 
     /**
@@ -1186,25 +1208,25 @@ public class OpenCLContext implements ReleaseCLObject {
      */
     @VisibleForTesting
     public int runBenchFilterProbe() {
-        final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
-        final cl_kernel k = benchFilterKernel;
+        final ClCommandQueue localQueue = Objects.requireNonNull(commandQueue);
+        final ClKernel k = benchFilterKernel;
         if (k == null) {
             throw new IllegalStateException(
                     "prepareBenchFilterProbe* must be called before runBenchFilterProbe() (benchFilterKernel=null, benchFilterProbeCount="
                             + benchFilterProbeCount
                             + ")");
         }
-        clEnqueueNDRangeKernel(localQueue, k, 1, null, new long[] {benchFilterProbeCount}, null, 0, null, null);
-        clFinish(localQueue);
+        clApi.enqueueNDRangeKernel(localQueue, k, new long[] {benchFilterProbeCount}, false);
+        clApi.finish(localQueue);
         return benchFilterProbeCount;
     }
 
     /** Releases the filter-probe benchmark buffers and kernel. Safe to call repeatedly. */
     @VisibleForTesting
     public void releaseBenchFilterProbe() {
-        for (cl_mem mem : new cl_mem[] {benchFilterMem, benchFilterMetaMem, benchFilterKeysMem, benchFilterHitsMem}) {
+        for (ClMem mem : new ClMem[] {benchFilterMem, benchFilterMetaMem, benchFilterKeysMem, benchFilterHitsMem}) {
             if (mem != null) {
-                clReleaseMemObject(mem);
+                clApi.releaseMemObject(mem);
             }
         }
         benchFilterMem = null;
@@ -1212,7 +1234,7 @@ public class OpenCLContext implements ReleaseCLObject {
         benchFilterKeysMem = null;
         benchFilterHitsMem = null;
         if (benchFilterKernel != null) {
-            clReleaseKernel(benchFilterKernel);
+            clApi.releaseKernel(benchFilterKernel);
             benchFilterKernel = null;
         }
         benchFilterProbeCount = 0;
@@ -1233,22 +1255,22 @@ public class OpenCLContext implements ReleaseCLObject {
      */
     @VisibleForTesting
     public void runBenchFeMul(int globalWorkSize, int iterations, boolean useReducedRadix) {
-        final cl_context localContext = Objects.requireNonNull(context);
-        final cl_program localProgram = Objects.requireNonNull(program);
-        final cl_command_queue localQueue = Objects.requireNonNull(commandQueue);
+        final ClContext localContext = Objects.requireNonNull(context);
+        final ClProgram localProgram = Objects.requireNonNull(program);
+        final ClCommandQueue localQueue = Objects.requireNonNull(commandQueue);
 
-        final cl_kernel benchKernel = clCreateKernel(localProgram, "bench_fe_mul", null);
-        final cl_mem out =
-                clCreateBuffer(localContext, CL_MEM_WRITE_ONLY, (long) globalWorkSize * Sizeof.cl_uint, null, null);
+        final ClKernel benchKernel = clApi.createKernel(localProgram, "bench_fe_mul");
+        final ClMem out =
+                clApi.createBuffer(localContext, ClBufferFlags.WRITE_ONLY, (long) globalWorkSize * Integer.BYTES);
         try {
-            clSetKernelArg(benchKernel, 0, Sizeof.cl_mem, Pointer.to(out));
-            clSetKernelArg(benchKernel, 1, Sizeof.cl_uint, Pointer.to(new int[] {iterations}));
-            clSetKernelArg(benchKernel, 2, Sizeof.cl_uint, Pointer.to(new int[] {useReducedRadix ? 1 : 0}));
-            clEnqueueNDRangeKernel(localQueue, benchKernel, 1, null, new long[] {globalWorkSize}, null, 0, null, null);
-            clFinish(localQueue);
+            clApi.setKernelArg(benchKernel, 0, out);
+            clApi.setKernelArgInt(benchKernel, 1, iterations);
+            clApi.setKernelArgInt(benchKernel, 2, useReducedRadix ? 1 : 0);
+            clApi.enqueueNDRangeKernel(localQueue, benchKernel, new long[] {globalWorkSize}, false);
+            clApi.finish(localQueue);
         } finally {
-            clReleaseMemObject(out);
-            clReleaseKernel(benchKernel);
+            clApi.releaseMemObject(out);
+            clApi.releaseKernel(benchKernel);
         }
     }
 
@@ -1268,19 +1290,19 @@ public class OpenCLContext implements ReleaseCLObject {
                 openClTask = null;
             }
             if (kernel != null) {
-                clReleaseKernel(kernel);
+                clApi.releaseKernel(kernel);
                 kernel = null;
             }
             if (program != null) {
-                clReleaseProgram(program);
+                clApi.releaseProgram(program);
                 program = null;
             }
             if (commandQueue != null) {
-                clReleaseCommandQueue(commandQueue);
+                clApi.releaseCommandQueue(commandQueue);
                 commandQueue = null;
             }
             if (context != null) {
-                clReleaseContext(context);
+                clApi.releaseContext(context);
                 context = null;
             }
             closed = true;
@@ -1295,12 +1317,12 @@ public class OpenCLContext implements ReleaseCLObject {
      */
     public OpenCLGridResult createKeys(BigInteger privateKeyBase) {
         OpenClTask localOpenClTask = Objects.requireNonNull(openClTask);
-        cl_kernel localKernel = Objects.requireNonNull(kernel);
-        cl_command_queue localCommandQueue = Objects.requireNonNull(commandQueue);
-        cl_mem localFuse8FingerprintsMem = Objects.requireNonNull(fuse8FingerprintsMem);
-        cl_mem localFuse8MetadataMem = Objects.requireNonNull(fuse8MetadataMem);
-        cl_mem localIgTableMem = Objects.requireNonNull(igTableMem);
-        cl_mem localCombTableMem = Objects.requireNonNull(combTableMem);
+        ClKernel localKernel = Objects.requireNonNull(kernel);
+        ClCommandQueue localCommandQueue = Objects.requireNonNull(commandQueue);
+        ClMem localFuse8FingerprintsMem = Objects.requireNonNull(fuse8FingerprintsMem);
+        ClMem localFuse8MetadataMem = Objects.requireNonNull(fuse8MetadataMem);
+        ClMem localIgTableMem = Objects.requireNonNull(igTableMem);
+        ClMem localCombTableMem = Objects.requireNonNull(combTableMem);
 
         // Compact (filter) mode only when a real filter is uploaded AND the caller did not force
         // full transfer; otherwise run full transfer (no filter, or vanity forced transferAll).

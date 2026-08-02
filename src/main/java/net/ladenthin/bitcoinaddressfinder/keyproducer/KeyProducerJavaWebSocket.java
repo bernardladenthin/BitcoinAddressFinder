@@ -3,32 +3,25 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
-import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.util.concurrent.Executors;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
-import net.ladenthin.bitcoinaddressfinder.core.FireAndForget;
 import net.ladenthin.bitcoinaddressfinder.core.Startable;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
-import org.java_websocket.WebSocket;
-import org.java_websocket.handshake.ClientHandshake;
-import org.java_websocket.server.WebSocketServer;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Key producer that receives secrets through a WebSocket server.
  *
- * <p>The embedded {@link WebSocketServer} is not constructed by the constructor;
- * callers must invoke {@link #start()} after construction. This matches the
- * sibling {@link KeyProducerJavaSocket} and {@link KeyProducerJavaZmq} producers
- * and removes the same partial-construction publication hazard (the anonymous
- * {@code WebSocketServer} subclass captures the outer-class {@code this} and its
- * callbacks call back into {@code addSecret} / read {@code shouldStop}).</p>
+ * <p>The server itself lives in {@link WebSocketEndpoint}, which this producer shares with the
+ * result broadcaster: one port carries the ranges in and the outcomes back, so a browser page needs
+ * a single connection to act as the whole user interface.
+ *
+ * <p>The endpoint is not started by the constructor; callers must invoke {@link #start()}
+ * afterwards. That keeps a partially-constructed instance from being published to the server's
+ * callback threads, which read {@code shouldStop} and call {@code addSecret}.
  */
 @ToString(callSuper = true)
 public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<CKeyProducerJavaWebSocket>
@@ -36,72 +29,57 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KeyProducerJavaWebSocket.class);
 
-    private @Nullable WebSocketServer webSocketServer;
+    @ToString.Exclude
+    private final WebSocketEndpoint endpoint;
 
     /**
-     * Creates a new WebSocket-based key producer. The embedded server is NOT
-     * constructed here; the caller must invoke {@link #start()} afterwards.
+     * Creates a new WebSocket-based key producer. The server is NOT started here; the caller must
+     * invoke {@link #start()} afterwards.
      *
      * @param config      the WebSocket configuration
      * @param keyUtility  cryptographic helper
      * @param bitHelper   bit/batch-size helper (unused but kept for symmetry)
      */
     public KeyProducerJavaWebSocket(CKeyProducerJavaWebSocket config, KeyUtility keyUtility, BitHelper bitHelper) {
-        super(config, keyUtility);
+        this(config, keyUtility, bitHelper, new WebSocketEndpoint(config.getPort()));
     }
 
     /**
-     * Builds the embedded {@link WebSocketServer} and submits its blocking
-     * {@code start()} call to a single-thread executor so the server runs in the
-     * background. Idempotency: calling {@code start()} more than once will
-     * replace the server reference; the intended usage is a single invocation
-     * right after construction.
+     * Creates a new WebSocket-based key producer on an explicit endpoint.
+     *
+     * @param config      the WebSocket configuration
+     * @param keyUtility  cryptographic helper
+     * @param bitHelper   bit/batch-size helper (unused but kept for symmetry)
+     * @param endpoint    the server shared with the result broadcaster
      */
+    public KeyProducerJavaWebSocket(
+            CKeyProducerJavaWebSocket config, KeyUtility keyUtility, BitHelper bitHelper, WebSocketEndpoint endpoint) {
+        super(config, keyUtility);
+        this.endpoint = endpoint;
+    }
+
+    /**
+     * Returns the shared server, so a result broadcaster can send on the same port.
+     *
+     * @return the endpoint backing this producer
+     */
+    public WebSocketEndpoint getEndpoint() {
+        return endpoint;
+    }
+
     @Override
     public void start() {
-        final WebSocketServer localServer = new WebSocketServer(new InetSocketAddress(cKeyProducerJava.getPort())) {
-            @Override
-            public void onOpen(WebSocket conn, ClientHandshake handshake) {
-                LOGGER.info("WebSocket connection opened from: {}", conn.getRemoteSocketAddress());
+        endpoint.setMessageHandler(message -> {
+            if (shouldStop) {
+                return;
             }
-
-            @Override
-            public void onClose(WebSocket conn, int code, String reason, boolean remote) {
-                LOGGER.info("WebSocket closed: {}", conn.getRemoteSocketAddress());
+            if (message.length == OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES) {
+                addSecret(message);
+            } else {
+                LOGGER.warn("Invalid message length: {}", message.length);
             }
-
-            @Override
-            public void onMessage(WebSocket conn, ByteBuffer message) {
-                if (shouldStop) return;
-                if (message.remaining() == OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES) {
-                    byte[] secret = new byte[OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES];
-                    message.get(secret);
-                    addSecret(secret);
-                } else {
-                    LOGGER.warn("Invalid message length: {}", message.remaining());
-                }
-            }
-
-            @Override
-            public void onError(WebSocket conn, Exception ex) {
-                LOGGER.error("WebSocket error", ex);
-            }
-
-            @Override
-            public void onStart() {
-                LOGGER.info("WebSocket server started on port: {}", getPort());
-            }
-
-            @Override
-            public void onMessage(WebSocket ws, String string) {
-                LOGGER.info("onMessage: {}", string);
-            }
-        };
-        webSocketServer = localServer;
-
-        @FireAndForget("lifecycle via WebSocketServer.stop() in interrupt()")
-        @SuppressWarnings("FutureReturnValueIgnored")
-        Object unused = Executors.newSingleThreadExecutor().submit(localServer::start);
+        });
+        endpoint.start();
     }
 
     @Override
@@ -112,12 +90,6 @@ public class KeyProducerJavaWebSocket extends AbstractKeyProducerQueueBuffered<C
     @Override
     public void interrupt() {
         signalShutdown(); // wakes any caller blocked in createSecrets()
-        if (webSocketServer != null) {
-            try {
-                webSocketServer.stop();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
+        endpoint.stop();
     }
 }

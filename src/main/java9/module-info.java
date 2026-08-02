@@ -18,7 +18,7 @@
  * are required for resource access.</p>
  *
  * <p>No non-implicit {@code requires} clauses are declared. The dependency graph
- * (bitcoinj, LMDB, JOCL, Jackson, SLF4J, Guava, etc.) is referenced from ordinary source
+ * (bitcoinj, LMDB, LWJGL, Jackson, SLF4J, Guava, etc.) is referenced from ordinary source
  * files only; consumers that put this jar on the module path resolve those dependencies
  * through their own {@code requires} graph. The fat-jar produced by {@code mvn package
  * -P assembly} runs on the classpath, where the module descriptor is ignored.</p>

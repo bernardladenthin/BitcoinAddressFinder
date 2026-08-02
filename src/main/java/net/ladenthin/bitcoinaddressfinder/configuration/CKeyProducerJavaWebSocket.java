@@ -41,6 +41,20 @@ public class CKeyProducerJavaWebSocket extends CKeyProducerJavaReceiver {
     public int port = 8080;
 
     /**
+     * Send the outcome of every checked batch back to all connected clients on this same port.
+     *
+     * <p>Turns the WebSocket into a two-way channel: ranges go in, results come back. That is what
+     * lets a browser page act as the whole user interface with a single connection, and what lets an
+     * automated client tell "range checked, nothing there" from "range never checked" — reporting
+     * only hits would make those two indistinguishable.
+     *
+     * <p><b>The messages contain private keys, and every connected client receives every result</b>
+     * — including hits from ranges somebody else submitted. Off by default; only enable it on a port
+     * you control.
+     */
+    public boolean broadcastResults = false;
+
+    /**
      * Returns the configured port number.
      *
      * @return the configured port number

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.configuration;
 
-import static org.jocl.CL.CL_DEVICE_TYPE_ALL;
+import static org.lwjgl.opencl.CL10.CL_DEVICE_TYPE_ALL;
 
 import lombok.EqualsAndHashCode;
 import lombok.ToString;

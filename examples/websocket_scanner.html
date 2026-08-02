@@ -1,0 +1,326 @@
+<!--
+SPDX-FileCopyrightText: 2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BitcoinAddressFinder – WebSocket Scanner</title>
+  <style>
+    body { font-family: monospace; background:#f4f4f4; padding:1.5rem; }
+    h1 { text-align:center; margin-bottom:0.2rem; }
+    .sub { text-align:center; color:#666; margin-top:0; }
+    .panel { max-width:1000px; margin:1rem auto; background:#fff; border:1px solid #ccc; padding:1rem; }
+    label { display:inline-block; min-width:9rem; }
+    input, select { font-family:monospace; }
+    input[type=text] { width:34rem; }
+    button { margin:0.25rem 0.25rem 0.25rem 0; padding:0.4rem 0.9rem; }
+    .row { margin:0.35rem 0; }
+    .warn { background:#fff3cd; border:1px solid #e0c060; padding:0.6rem; margin-top:0.6rem; }
+    .danger { background:#f8d7da; border:1px solid #d09a9f; padding:0.6rem; margin-top:0.6rem; }
+
+    /* Defragmenter-style map: one cell per batch of the swept range. */
+    .map { display:flex; flex-wrap:wrap; gap:2px; margin-top:0.6rem; }
+    .blk { width:12px; height:12px; background:#d8d8d8; border-radius:2px; }
+    .blk.pending { background:#9ec5ff; }
+    .blk.flash   { background:#ffffff; box-shadow:0 0 4px 2px #7fd0ff; }
+    .blk.done    { background:#2f7d32; }
+    .blk.hit     { background:#c62828; }
+
+    /* 256-bit view: leading bits are the base, trailing batch bits are swept. */
+    .bits { margin-top:0.6rem; line-height:1.5rem; word-break:break-all; }
+    .bits .b { color:#111; }
+    .bits .x { color:#b8860b; background:#fff8dc; font-weight:bold; }
+
+    .stats span { display:inline-block; min-width:11rem; }
+    #results { max-height:16rem; overflow:auto; background:#111; color:#eee; padding:0.6rem; }
+    #results div { white-space:pre-wrap; }
+    #results .h { color:#ff8a80; font-weight:bold; }
+  </style>
+</head>
+<body>
+
+<h1>BitcoinAddressFinder – WebSocket Scanner</h1>
+<p class="sub">The browser is the key producer and the display. One connection carries ranges in and results back.</p>
+
+<div class="panel">
+  <div class="row">
+    <label>Server</label>
+    <input type="text" id="wsUrl" value="ws://127.0.0.1:8080" />
+    <button id="btnConnect">Connect</button>
+    <button id="btnDisconnect" disabled>Disconnect</button>
+  </div>
+  <div class="row" id="configLine">Not connected. The server announces its grid size on connect.</div>
+  <div id="configWarning"></div>
+</div>
+
+<div class="panel">
+  <div class="row">
+    <label>Mode</label>
+    <select id="mode">
+      <option value="sequential">Sequential (from / to)</option>
+      <option value="random">Random</option>
+    </select>
+  </div>
+  <div class="row"><label>From (hex)</label><input type="text" id="fromHex" value="0000000000000000000000000000000000000000000000000000000100000000" /></div>
+  <div class="row"><label>To (hex)</label><input type="text" id="toHex"   value="0000000000000000000000000000000000000000000000000000000108000000" /></div>
+  <div class="row">
+    <label>Lookahead</label>
+    <input type="number" id="lookahead" value="4" min="1" max="64" style="width:5rem" />
+    <span>batches kept in flight — see the note below</span>
+  </div>
+  <div class="row">
+    <button id="btnStart" disabled>Start</button>
+    <button id="btnStop" disabled>Stop</button>
+  </div>
+  <div class="row stats">
+    <span>sent: <b id="statSent">0</b></span>
+    <span>checked: <b id="statChecked">0</b></span>
+    <span>keys: <b id="statKeys">0</b></span>
+    <span>hits: <b id="statHits">0</b></span>
+  </div>
+</div>
+
+<div class="panel">
+  <b>Range map</b> — one block per batch. Blue = in flight, green = checked and empty, red = hit.
+  <div class="map" id="map"></div>
+</div>
+
+<div class="panel">
+  <b>Current base (256 bit)</b> — leading bits are the base; the trailing
+  <span id="bitsLabel">n</span> bits are the batch the device sweeps, shown as
+  <span class="x">X</span>.
+  <div class="bits" id="bits"></div>
+</div>
+
+<div class="panel">
+  <b>Results</b>
+  <div id="results"></div>
+</div>
+
+<script>
+"use strict";
+
+const KEY_BYTES = 32;
+const KEY_BITS = 256;
+
+let ws = null;
+let running = false;
+let config = null;          // {batchSizeInBits, batchUsePrivateKeyIncrement, secretByteLength}
+let step = 0n;              // 2^batchSizeInBits — the only correct increment, see note below
+let fromBase = 0n;
+let toBase = 0n;
+let nextBase = 0n;
+let inFlight = 0;
+let sent = 0, checked = 0, hits = 0, keys = 0;
+let blocks = new Map();     // base (string) -> cell element
+
+const $ = (id) => document.getElementById(id);
+
+function log(text, isHit) {
+  const div = document.createElement("div");
+  if (isHit) div.className = "h";
+  div.textContent = text;
+  $("results").prepend(div);
+}
+
+/** Renders a 256-bit big integer, with the swept low bits marked instead of printed. */
+function renderBits(base) {
+  const bits = base.toString(2).padStart(KEY_BITS, "0");
+  const sweptBits = config ? config.batchSizeInBits : 0;
+  const fixed = bits.slice(0, KEY_BITS - sweptBits);
+  let html = '<span class="b">' + fixed + '</span>';
+  if (sweptBits > 0) html += '<span class="x">' + "X".repeat(sweptBits) + '</span>';
+  $("bits").innerHTML = html;
+}
+
+function toFixedBytes(value) {
+  let hex = value.toString(16).padStart(KEY_BYTES * 2, "0");
+  if (hex.length > KEY_BYTES * 2) hex = hex.slice(-KEY_BYTES * 2);
+  const out = new Uint8Array(KEY_BYTES);
+  for (let i = 0; i < KEY_BYTES; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+  return out;
+}
+
+/**
+ * The server aligns every incoming base down to a multiple of 2^batchSizeInBits. Sending a base
+ * that is not aligned means the same block is swept again while the rest of the range is never
+ * touched — silently, because nothing rejects it. So align here and advance by exactly one grid.
+ */
+function alignDown(value) {
+  return step === 0n ? value : (value / step) * step;
+}
+
+function buildMap() {
+  const map = $("map");
+  map.innerHTML = "";
+  blocks = new Map();
+  if (step === 0n || toBase <= fromBase) return;
+  const total = (toBase - fromBase) / step;
+  const capped = total > 4000n ? 4000n : total;   // a map, not a pixel-per-key rendering
+  for (let i = 0n; i < capped; i++) {
+    const cell = document.createElement("div");
+    cell.className = "blk";
+    const base = fromBase + i * step;
+    cell.title = base.toString(16);
+    map.appendChild(cell);
+    blocks.set(base.toString(16), cell);
+  }
+}
+
+function markBlock(baseHex, cls) {
+  const cell = blocks.get(baseHex);
+  if (!cell) return;
+  cell.classList.remove("pending", "flash");
+  cell.classList.add(cls);
+}
+
+function flashBlock(baseHex) {
+  const cell = blocks.get(baseHex);
+  if (!cell) return;
+  cell.classList.add("flash");
+  setTimeout(() => { cell.classList.remove("flash"); cell.classList.add("pending"); }, 90);
+}
+
+function randomBase() {
+  const raw = new Uint8Array(KEY_BYTES);
+  crypto.getRandomValues(raw);
+  let hex = "";
+  for (const b of raw) hex += b.toString(16).padStart(2, "0");
+  return alignDown(BigInt("0x" + hex));
+}
+
+/** Keeps `lookahead` batches in flight so the server's queue never runs dry between batches. */
+function pump() {
+  if (!running || !ws || ws.readyState !== WebSocket.OPEN) return;
+  const lookahead = parseInt($("lookahead").value, 10) || 1;
+  while (inFlight < lookahead) {
+    let base;
+    if ($("mode").value === "random") {
+      base = randomBase();
+    } else {
+      if (nextBase >= toBase) {
+        if (inFlight === 0) { log("Range complete."); stop(); }
+        return;
+      }
+      base = nextBase;
+      nextBase += step;
+    }
+    ws.send(toFixedBytes(base));
+    sent++; inFlight++;
+    $("statSent").textContent = sent;
+    renderBits(base);
+    flashBlock(base.toString(16));
+  }
+}
+
+function onBatch(msg) {
+  checked++;
+  keys += msg.checkedCount || 0;
+  inFlight = Math.max(0, inFlight - 1);
+  $("statChecked").textContent = checked;
+  $("statKeys").textContent = keys;
+
+  if (msg.secretBase) {
+    const hex = BigInt("0x" + msg.secretBase).toString(16);
+    markBlock(hex, msg.hits && msg.hits.length ? "hit" : "done");
+  }
+  if (msg.hits && msg.hits.length) {
+    hits += msg.hits.length;
+    $("statHits").textContent = hits;
+    for (const h of msg.hits) {
+      log("HIT  address=" + h.address + "  compressed=" + h.compressed +
+          "\n     privateKey=" + h.privateKey, true);
+    }
+  }
+  pump();
+}
+
+function onConfig(msg) {
+  config = msg;
+  step = 1n << BigInt(msg.batchSizeInBits);
+  $("bitsLabel").textContent = msg.batchSizeInBits;
+  $("configLine").textContent =
+      "Server grid: batchSizeInBits=" + msg.batchSizeInBits +
+      " (" + step.toString() + " keys per message), secretByteLength=" + msg.secretByteLength;
+  const warn = $("configWarning");
+  if (!msg.batchUsePrivateKeyIncrement) {
+    warn.className = "danger";
+    warn.textContent =
+        "This server runs with batchUsePrivateKeyIncrement=false. It then wants one secret per " +
+        "candidate instead of one base per grid, which this page cannot feed at a useful rate. " +
+        "Set it to true in the producer configuration.";
+    $("btnStart").disabled = true;
+  } else {
+    warn.className = "";
+    warn.textContent = "";
+    $("btnStart").disabled = false;
+  }
+}
+
+function connect() {
+  ws = new WebSocket($("wsUrl").value);
+  ws.binaryType = "arraybuffer";
+  ws.onopen = () => {
+    $("btnConnect").disabled = true;
+    $("btnDisconnect").disabled = false;
+    $("configLine").textContent = "Connected. Waiting for the server to announce its grid size…";
+  };
+  ws.onmessage = (event) => {
+    let msg;
+    try { msg = JSON.parse(event.data); } catch (e) { return; }
+    if (msg.type === "config") onConfig(msg);
+    else if (msg.type === "batch") onBatch(msg);
+  };
+  ws.onclose = () => {
+    stop();
+    $("btnConnect").disabled = false;
+    $("btnDisconnect").disabled = true;
+    $("btnStart").disabled = true;
+    $("configLine").textContent = "Disconnected.";
+  };
+  ws.onerror = () => log("WebSocket error — is the server running and is broadcastResults enabled?");
+}
+
+function start() {
+  if (!config) { log("No server configuration yet."); return; }
+  fromBase = alignDown(BigInt("0x" + $("fromHex").value.trim().replace(/^0x/, "")));
+  toBase   = alignDown(BigInt("0x" + $("toHex").value.trim().replace(/^0x/, "")));
+  nextBase = fromBase;
+  sent = checked = hits = keys = 0; inFlight = 0;
+  $("statSent").textContent = $("statChecked").textContent = $("statHits").textContent = $("statKeys").textContent = 0;
+  buildMap();
+  running = true;
+  $("btnStart").disabled = true;
+  $("btnStop").disabled = false;
+  pump();
+}
+
+function stop() {
+  running = false;
+  $("btnStart").disabled = !config;
+  $("btnStop").disabled = true;
+}
+
+$("btnConnect").onclick = connect;
+$("btnDisconnect").onclick = () => { if (ws) ws.close(); };
+$("btnStart").onclick = start;
+$("btnStop").onclick = stop;
+</script>
+
+<div class="panel warn">
+  <b>Notes.</b>
+  One message carries one <i>base</i>, not one key: the device expands it into
+  2<sup>batchSizeInBits</sup> candidates, so a few dozen messages per second are enough to keep a GPU
+  busy. The lookahead exists because the server's queue is unbounded — keep it small, since anything
+  still queued when the process stops was never checked, and only the batches reported back here are
+  known to be done. Results are broadcast to <b>every</b> connected client and
+  <b>contain private keys</b>.
+</div>
+
+</body>
+</html>

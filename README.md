@@ -1357,6 +1357,8 @@ Useful for piping externally generated secrets (e.g., from Python, Go, etc.) dir
 | `timeoutMillis`               | number                           | `3000`        | Socket timeout in milliseconds, applied to accept (server), connect (client) and per-read. Must be non-negative |
 | `logReceivedSecret`           | boolean                          | `false`       | Whether to log each received private key as a hex string                            |
 | `connectRetryCount`           | number                           | `5`           | Number of times to retry establishing a socket connection (client mode)             |
+| `broadcastResults`            | boolean                          | `false`       | Serve the outcome of every checked batch on `resultPort` (see below)                |
+| `resultPort`                  | number                           | `5556`        | TCP port the result server binds to, used only when `broadcastResults` is set       |
 | `connectRetryDelayMillis`     | number                           | `1000`        | Delay between connection retry attempts (in milliseconds)                           |
 | `maxWorkSize`                 | number                           | `16777216`    | Maximum number of secrets to request in a single call                               |
 
@@ -1438,6 +1440,8 @@ Ideal for decoupled key streaming where producers push keys using ZeroMQ `PUSH` 
 | mode               | string enum (BIND, CONNECT)  | BIND                   | Whether this socket binds to or connects    |
 | timeoutMillis      | number                       | `-1`                   | Receive timeout in milliseconds:<br> `0` = non-blocking,<br> `-1` = infinite,<br> `>0` = wait that long |
 | logReceivedSecret  | boolean                      | false                  | Whether to log each received secret in hex  |
+| broadcastResults   | boolean                      | false                  | Publish the outcome of every checked batch (see below) |
+| publishAddress     | string                       | tcp://127.0.0.1:5558   | Address the result `PUB` socket binds to, used only when `broadcastResults` is set |
 
 Minimal:
 ```jsonc
@@ -1465,6 +1469,68 @@ Full:
 ],
 // ...
 ```
+
+
+#### 🌐 WebSocket (`keyProducerJavaWebSocket`)
+Receive raw private keys from a WebSocket server embedded in the finder. With
+`broadcastResults` enabled the same port also carries the results back, which is what lets a browser
+page act as the entire user interface: start `examples/run_Find_WebSocketUi.sh` (or `.bat`), then
+open `examples/websocket_scanner.html` in a browser.
+
+| JSON field         | Type    | Default | Description                                                        |
+|--------------------|---------|---------|--------------------------------------------------------------------|
+| keyProducerId      | string  | —       | Unique identifier for this key producer                             |
+| port               | number  | `8080`  | TCP port the WebSocket server binds to                              |
+| timeoutMillis      | number  | `1000`  | How long `createSecrets()` waits for a queued secret:<br> `-1` = block forever, `0` = return immediately, `>0` = wait that long |
+| logReceivedSecret  | boolean | `false` | Whether to log each received secret in hex                          |
+| broadcastResults   | boolean | `false` | Send the outcome of every checked batch back on this same port      |
+
+> **Set `timeoutMillis: -1` for an interactively driven run.** With a positive timeout, a pause of
+> that length — a user clicking *Stop*, a throttled browser tab — raises
+> `NoMoreSecretsAvailableException`, which ends the producer **permanently**.
+
+### 📢 Broadcasting results
+
+By default a hit only reaches the log. Every transport above can additionally report the outcome of
+each checked batch to connected clients.
+
+**Every batch is reported, hit or not.** That is deliberate: reporting only hits would leave a client
+unable to tell *"range checked, nothing there"* from *"range never checked"*, and those two are
+indistinguishable after a shutdown drops a queued range — an automated from/to sweep would then move
+past ground it never covered. The message is emitted after the batch has been checked, so it doubles
+as an exact completion signal.
+
+> ⚠️ **The payload contains private keys**, and every connected client receives every result —
+> including hits from ranges somebody else submitted. Each transport is off by default. Only enable
+> this on a port you control.
+
+| Transport | Enable with | Where results go | Limitations |
+|---|---|---|---|
+| WebSocket | `broadcastResults` | **the same port** | — |
+| ZeroMQ    | `broadcastResults` + `publishAddress` | a separate `PUB` socket | A `PULL` socket cannot send, hence the second address. A `PUB` socket cannot detect subscribers, so there is no greeting on connect: the grid configuration is republished every 64 batches instead, and a late subscriber misses whatever was published before it finished connecting. |
+| TCP socket | `broadcastResults` + `resultPort` | a separate port | The inbound side serves one peer and reads fixed-width records; results go to every listener as newline-delimited JSON, so they cannot share the stream. |
+
+Delivery is best-effort everywhere: a client that is not connected when a batch completes misses that
+message and nothing replays it. **The log remains the authoritative record of a hit.**
+
+#### Message format
+
+Two shapes, told apart by `type`. Big integers are hex without a prefix.
+
+```jsonc
+// sent once a client can be told which grid the producers use
+{"type":"config","batchSizeInBits":18,"batchUsePrivateKeyIncrement":true,"secretByteLength":32}
+
+// one per checked batch — "hits" is empty when nothing was found
+{"type":"batch","secretBase":"100000000","checkedCount":262144,"hits":[
+  {"privateKey":"49","hash160Hex":"aabb…","address":"1…","compressed":true,"vanity":false}
+]}
+```
+
+A client **must** advance by exactly `2^batchSizeInBits`. The finder aligns every incoming base down
+to a multiple of it, so a smaller step resubmits the same block over and over while the rest of the
+range is never touched — silently, because nothing rejects a misaligned base. The `config` message
+exists so a client can derive that step instead of guessing it.
 
 
 ##### Example: Python Socket Stream Server:
@@ -2097,7 +2163,7 @@ BitcoinAddressFinder stands on the shoulders of excellent open-source work. In p
   across the CPU path and as the reference for the GPU parity tests.
 - **[LMDB](https://www.symas.com/lmdb)** / **[lmdbjava](https://github.com/lmdbjava/lmdbjava)** — the
   high-performance memory-mapped address database.
-- **[JOCL](https://www.jocl.org/)** — Java bindings to OpenCL.
+- **[LWJGL](https://www.lwjgl.org/)** — Java bindings to OpenCL.
 - **Binary Fuse filters** — by [Thomas Mueller Graf and Daniel Lemire](https://github.com/FastFilter),
   with the [SipHash](https://github.com/veorq/SipHash) construction by Jean-Philippe Aumasson and
   Daniel J. Bernstein.

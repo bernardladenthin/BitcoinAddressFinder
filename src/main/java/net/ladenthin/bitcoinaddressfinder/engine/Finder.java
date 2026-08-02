@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder.engine;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -13,6 +14,9 @@ import java.util.function.*;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.configuration.GpuFilterType;
@@ -20,6 +24,7 @@ import net.ladenthin.bitcoinaddressfinder.consumer.Consumer;
 import net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.core.FireAndForget;
 import net.ladenthin.bitcoinaddressfinder.core.Interruptable;
+import net.ladenthin.bitcoinaddressfinder.core.ResultListener;
 import net.ladenthin.bitcoinaddressfinder.core.Startable;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducer;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdIsNotUniqueException;
@@ -31,6 +36,9 @@ import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaRandom;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocket;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaZmq;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.SocketResultBroadcaster;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.WebSocketResultBroadcaster;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.ZmqResultBroadcaster;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16GpuFilterData;
 import net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse8GpuFilterData;
@@ -38,6 +46,7 @@ import net.ladenthin.bitcoinaddressfinder.producer.Producer;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerJava;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerJavaSecretsFiles;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.producer.ProducerReleaser;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerState;
 import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
@@ -86,6 +95,24 @@ public class Finder implements Interruptable {
     // ExecutorService toString is verbose pool internals — not useful in aggregate logs.
     @ToString.Exclude
     private final ExecutorService producerExecutorService;
+
+    /**
+     * Result broadcasters built from the configured key producers, kept so the grid configuration
+     * can be announced to them once the producers are known and so they can be closed on shutdown.
+     */
+    @ToString.Exclude
+    private final List<ResultBroadcaster> resultBroadcasters = new ArrayList<>();
+
+    /** ZeroMQ publishers, kept so their context can be closed on shutdown. */
+    @ToString.Exclude
+    private final List<ZmqResultBroadcaster> zmqBroadcasters = new ArrayList<>();
+
+    /** Result servers, kept so their listening socket can be closed on shutdown. */
+    @ToString.Exclude
+    private final List<SocketResultBroadcaster> socketBroadcasters = new ArrayList<>();
+
+    /** Guarantees each producer is released exactly once, even when two teardowns overlap. */
+    private final ProducerReleaser producerReleaser = new ProducerReleaser();
 
     private final KeyUtility keyUtility;
     private final PersistenceUtils persistenceUtils;
@@ -200,8 +227,8 @@ public class Finder implements Interruptable {
         LOGGER.info("startConsumer");
         CConsumerJava localCConsumerJava = Objects.requireNonNull(finder.consumerJava);
 
-        final ConsumerJava localConsumerJava =
-                new ConsumerJava(localCConsumerJava, keyUtility, persistenceUtils, runtimeStatistics);
+        final ConsumerJava localConsumerJava = new ConsumerJava(
+                localCConsumerJava, keyUtility, persistenceUtils, runtimeStatistics, createResultListeners());
         consumerJava = localConsumerJava;
         // Decide up-front whether the GPU pre-filter is needed so initLMDB() can build it while
         // LMDB is still open — a self-contained backend closes the env at the end of initLMDB().
@@ -210,6 +237,145 @@ public class Finder implements Interruptable {
         localConsumerJava.initLMDB();
         localConsumerJava.startConsumer();
         localConsumerJava.startStatisticsTimer();
+    }
+
+    /**
+     * Builds the result listeners for every key producer configured to broadcast.
+     *
+     * <p>Wired here rather than inside the consumer because only this class knows both sides: the
+     * consumer must not depend on the key-producer layer, and the transport lives there. The
+     * consumer sees nothing but the {@code ResultListener} contract.
+     *
+     * @return the listeners to notify for every checked batch, possibly empty
+     */
+    private List<ResultListener> createResultListeners() {
+        final List<ResultListener> listeners = new ArrayList<>();
+        addWebSocketBroadcasters(listeners);
+        addZmqBroadcasters(listeners);
+        addSocketBroadcasters(listeners);
+        return listeners;
+    }
+
+    /**
+     * Adds a broadcaster for every WebSocket key producer configured to report results.
+     *
+     * <p>Shares the key producer's server, so ranges in and results out travel one port.
+     *
+     * @param listeners the list to add to
+     */
+    private void addWebSocketBroadcasters(List<ResultListener> listeners) {
+        for (CKeyProducerJavaWebSocket config : finder.keyProducerJavaWebSocket) {
+            if (!config.broadcastResults) {
+                continue;
+            }
+            final String keyProducerId = config.keyProducerId;
+            if (keyProducerId == null) {
+                // An id-less entry never started a key producer; startKeyProducer already rejected it.
+                continue;
+            }
+            final KeyProducer keyProducer = keyProducers.get(keyProducerId);
+            if (!(keyProducer instanceof KeyProducerJavaWebSocket webSocketKeyProducer)) {
+                LOGGER.warn(
+                        "broadcastResults is set for keyProducerId {} but no WebSocket key producer was started;"
+                                + " results will not be broadcast.",
+                        keyProducerId);
+                continue;
+            }
+            final WebSocketResultBroadcaster broadcaster =
+                    new WebSocketResultBroadcaster(webSocketKeyProducer.getEndpoint());
+            resultBroadcasters.add(broadcaster::announceConfiguration);
+            listeners.add(broadcaster);
+            LOGGER.info("Broadcasting results on the WebSocket of keyProducerId {}", keyProducerId);
+        }
+    }
+
+    /**
+     * Adds a publisher for every ZeroMQ key producer configured to report results.
+     *
+     * <p>Needs an address of its own: secrets arrive on a {@code PULL} socket, which cannot send.
+     *
+     * @param listeners the list to add to
+     */
+    private void addZmqBroadcasters(List<ResultListener> listeners) {
+        for (CKeyProducerJavaZmq config : finder.keyProducerJavaZmq) {
+            if (!config.broadcastResults) {
+                continue;
+            }
+            final ZmqResultBroadcaster broadcaster = new ZmqResultBroadcaster(config.publishAddress);
+            resultBroadcasters.add(broadcaster::announceConfiguration);
+            zmqBroadcasters.add(broadcaster);
+            listeners.add(broadcaster);
+            LOGGER.info("Publishing results on {}", config.publishAddress);
+        }
+    }
+
+    /**
+     * Adds a result server for every plain-socket key producer configured to report results.
+     *
+     * <p>Serves on a port of its own, because the inbound side handles a single peer with a
+     * different framing.
+     *
+     * @param listeners the list to add to
+     */
+    private void addSocketBroadcasters(List<ResultListener> listeners) {
+        for (CKeyProducerJavaSocket config : finder.keyProducerJavaSocket) {
+            if (!config.broadcastResults) {
+                continue;
+            }
+            final SocketResultBroadcaster broadcaster = new SocketResultBroadcaster(config.resultPort);
+            try {
+                broadcaster.start();
+            } catch (IOException e) {
+                LOGGER.error("Could not serve results on port {}; continuing without it.", config.resultPort, e);
+                continue;
+            }
+            resultBroadcasters.add(broadcaster::announceConfiguration);
+            socketBroadcasters.add(broadcaster);
+            listeners.add(broadcaster);
+        }
+    }
+
+    /**
+     * Tells the connected clients which grid the running producers expand a base into.
+     *
+     * <p>Called once the producers are configured, which is necessarily later than the moment the
+     * WebSocket started accepting connections. A client cannot derive its step without it: every
+     * incoming base is aligned down to a multiple of {@code 2^batchSizeInBits}, so a client stepping
+     * by less would resubmit the same block and never cover the rest of its range.
+     *
+     * <p>When producers disagree on the grid size the largest is announced, which is the only choice
+     * that cannot make ranges overlap.
+     */
+    private void announceGridConfigurationToBroadcasters() {
+        if (resultBroadcasters.isEmpty()) {
+            return;
+        }
+        final List<Producer> allProducers = getAllProducers();
+        if (allProducers.isEmpty()) {
+            return;
+        }
+        int batchSizeInBits = 0;
+        boolean batchUsePrivateKeyIncrement = true;
+        for (CProducer cProducer : configuredProducerConfigs()) {
+            batchSizeInBits = Math.max(batchSizeInBits, cProducer.batchSizeInBits);
+            batchUsePrivateKeyIncrement &= cProducer.batchUsePrivateKeyIncrement;
+        }
+        for (ResultBroadcaster broadcaster : resultBroadcasters) {
+            broadcaster.announceConfiguration(batchSizeInBits, batchUsePrivateKeyIncrement);
+        }
+    }
+
+    /**
+     * Returns the configuration of every producer that was actually created.
+     *
+     * @return the producer configurations backing the running producers
+     */
+    private List<CProducer> configuredProducerConfigs() {
+        final List<CProducer> configs = new ArrayList<>();
+        configs.addAll(finder.producerJava);
+        configs.addAll(finder.producerJavaSecretsFiles);
+        configs.addAll(finder.producerOpenCL);
+        return configs;
     }
 
     /**
@@ -305,6 +471,8 @@ public class Finder implements Interruptable {
         // only to the producers that remain in compact mode.
         applyVanityFullTransferOverride();
         uploadGpuFilterToProducers();
+        // Only now is the grid known; clients that connected earlier are caught up here.
+        announceGridConfigurationToBroadcasters();
     }
 
     /**
@@ -511,6 +679,19 @@ public class Finder implements Interruptable {
         producerExecutorService.shutdown();
         producerExecutorService.awaitTermination(finder.awaitTerminateSeconds, TimeUnit.SECONDS);
 
+        // The producers have stopped, but stopping them does not release what they own: a
+        // ProducerOpenCL still holds its result-reader pool, and the key producers still hold the
+        // reader threads behind their socket / websocket / ZeroMQ sources. Those threads are
+        // non-daemon, so leaving them running keeps the JVM alive after Main#run has returned — the
+        // process then logs its completion and never exits.
+        //
+        // Releasing them from the JVM shutdown hook, which is where interrupt() used to be reached
+        // on this path, cannot work: a shutdown hook only starts once every non-daemon thread has
+        // already ended, so the release that would end them would never be reached. The teardown
+        // therefore belongs here, on the completion path itself. interrupt() is idempotent (it frees
+        // the collections it walks), so the hook calling it again later is harmless.
+        interrupt();
+
         // no producers are running anymore, the consumer can be interrupted
         final ConsumerJava localConsumerJava = consumerJava;
         if (localConsumerJava != null) {
@@ -521,26 +702,46 @@ public class Finder implements Interruptable {
         LOGGER.info("consumerJava released.");
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Two callers can arrive here at once: the teardown runs both on the ordinary completion path
+     * ({@link #shutdownAndAwaitTermination()}) and from the JVM shutdown hook, and a {@code Ctrl+C}
+     * landing while a finished run releases its producers is enough to overlap them. Releasing a
+     * producer twice is not harmless — an OpenCL producer's second release is rejected by the driver
+     * with {@code CL_INVALID_MEM_OBJECT}. {@link ProducerReleaser} owns that guarantee; clearing the
+     * collections below is bookkeeping, not the safeguard.
+     */
     @Override
     public void interrupt() {
         LOGGER.info("interrupt called: delegate interrupt to all keyProducers and producers");
 
-        // Interrupt all Producers
-        for (Producer producer : getAllProducers()) {
-            LOGGER.info("Interrupt Producer: " + producer.toString());
-            producer.interrupt();
-            LOGGER.info("waitTillProducerNotRunning ...");
-            producer.waitTillProducerNotRunning();
-            producer.releaseProducer();
-        }
-        freeAllProducers();
-
-        // Interrupt all KeyProducers
+        // Key producers first. A producer waiting for its next secret is parked inside the key
+        // producer, and a key producer configured to block indefinitely (timeoutMillis < 0, which is
+        // what an interactively driven source wants) only releases that wait when it is interrupted.
+        // Waiting for the producers first would therefore wait for something that cannot happen
+        // until after the wait — the producer would sit there until its shutdownTimeoutSeconds ran
+        // out, turning every shutdown into a multi-minute stall.
         for (KeyProducer keyProducer : getKeyProducers().values()) {
             LOGGER.info("Interrupt KeyProducer: " + keyProducer.toString());
             keyProducer.interrupt();
         }
         freeAllKeyProducers();
+
+        // Broadcasters own sockets of their own; releasing them here keeps the process able to exit.
+        for (ZmqResultBroadcaster broadcaster : zmqBroadcasters) {
+            broadcaster.close();
+        }
+        zmqBroadcasters.clear();
+        for (SocketResultBroadcaster broadcaster : socketBroadcasters) {
+            broadcaster.close();
+        }
+        socketBroadcasters.clear();
+        resultBroadcasters.clear();
+
+        // Interrupt and release all Producers, each exactly once even under a concurrent teardown.
+        producerReleaser.release(getAllProducers());
+        freeAllProducers();
 
         LOGGER.info("All producers released and freed.");
     }

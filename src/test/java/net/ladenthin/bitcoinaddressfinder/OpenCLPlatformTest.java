@@ -13,11 +13,13 @@ import static org.hamcrest.Matchers.not;
 import com.google.common.collect.ImmutableList;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
-import org.jocl.cl_context_properties;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClPlatformId;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 
 public class OpenCLPlatformTest {
+    /** Stand-in platform handle: these tests describe the value object, never a real platform. */
+    private static final ClPlatformId TEST_PLATFORM_ID = new ClPlatformId(1L);
 
     // <editor-fold defaultstate="collapsed" desc="constructor and getters">
     @Test
@@ -28,7 +30,7 @@ public class OpenCLPlatformTest {
                 ImmutableList.<OpenCLDevice>builder().build();
 
         // act
-        OpenCLPlatform platform = new OpenCLPlatform(platformName, new cl_context_properties(), devices);
+        OpenCLPlatform platform = new OpenCLPlatform(TEST_PLATFORM_ID, platformName, devices);
 
         // assert
         assertThat(platform, is(notNullValue()));
@@ -44,8 +46,8 @@ public class OpenCLPlatformTest {
         // arrange
         String platformName = "Platform A";
         OpenCLPlatform platform = new OpenCLPlatform(
+                TEST_PLATFORM_ID,
                 platformName,
-                new cl_context_properties(),
                 ImmutableList.<OpenCLDevice>builder().build());
 
         // act

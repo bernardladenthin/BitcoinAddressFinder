@@ -178,6 +178,52 @@ public class FinderTest {
         // assert the waiting time is over, substract imprecision
         assertThat(waitTime, is(greaterThan(AwaitTimeTests.AWAIT_DURATION.minus(AwaitTimeTests.IMPRECISION))));
     }
+    /**
+     * A completed run must leave nothing of the finder's own running.
+     *
+     * <p>This is the unit-level guard for a reproduced defect: after a producer exhausted its key
+     * range the process logged {@code Main#run end.} and then never exited. The threads holding it
+     * open were ones the finder had started and never released - a producer's result-reader pool and
+     * the key producers' reader threads, all non-daemon. Releasing them happened only in
+     * {@link Finder#interrupt()}, which on the ordinary completion path ran solely from the JVM
+     * shutdown hook; and a shutdown hook cannot run until every non-daemon thread has already ended,
+     * so the release that would have ended them was unreachable.
+     *
+     * <p>The two collections asserted here are emptied by exactly that release step, which makes them
+     * the observable proxy for "the JVM can now exit" in a test that must not depend on a GPU or on
+     * counting live threads.
+     */
+    @Test
+    public void shutdownAndAwaitTermination_producerFinished_producersAndKeyProducersReleased() throws Exception {
+        // arrange
+        CFinder cFinder = new CFinder();
+        String keyProducerId = "exampleId";
+        final CProducerJava cProducerJava = new CProducerJava();
+        cProducerJava.keyProducerId = keyProducerId;
+        // One batch, then the producer ends by itself - the completion path under test.
+        cProducerJava.runOnce = true;
+        cFinder.producerJava.add(cProducerJava);
+        configureKeyProducerJavaRandom(keyProducerId, cFinder);
+        configureConsumerJava(cFinder);
+
+        Finder finder = new Finder(cFinder);
+        finder.startKeyProducer();
+        finder.startConsumer();
+        finder.configureProducer();
+        finder.initProducer();
+        finder.startProducer();
+
+        // pre-assert
+        assertThat(finder.getAllProducers(), is(not(empty())));
+        assertThat(finder.getKeyProducers().values(), is(not(empty())));
+
+        // act
+        finder.shutdownAndAwaitTermination();
+
+        // assert
+        assertThat(finder.getAllProducers(), is(empty()));
+        assertThat(finder.getKeyProducers().values(), is(empty()));
+    }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="getAllProducers">
