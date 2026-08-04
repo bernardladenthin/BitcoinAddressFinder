@@ -77,20 +77,29 @@ mode is unusable here — the module declares no `requires` and `module-info.jav
 in `src/main/java9`, off javadoc's source path). See the extensive comments on those two
 `pom.xml` executions before touching their phase or ordering.
 
-**The single surviving `-Dmaven.javadoc.skip=true` in CI (BAF-only, do not remove blindly).**
-After a cross-repo cleanup that deleted every other javadoc-skip flag from all four sibling
-pipelines, exactly **one** remains: the `build` job in `.github/workflows/publish.yml`. It is
-necessary because that job runs plain `mvn package`, which triggers `attach-javadocs` at
-`prepare-package`; BAF's javadoc is module-aware (`<source>21</source>` + `module-info.java`
-in `src/main/java9`), so an unguarded run can flip into JPMS module mode and fail with
-`No source files for package net.ladenthin...`. The Java-8 siblings (java-llama.cpp,
-streambuffer, llamacpp-ai-index — all `<source>8>`) stay in classpath mode regardless and
-therefore carry **no** skip flag; the redundant/no-op flags they used to have were removed,
-and streambuffer/llamacpp let javadoc build during their `verify` test job so it is gated in
-PR CI. BAF cannot do the same cheaply (the module-mode trap needs the full `-P release
-package` ordering), which is why BAF's javadoc is validated only at publish. Before dropping
-this last flag, prove `mvn package` builds BAF's javadoc clean — a standalone `mvn
-javadoc:jar` cannot, it always runs classpath mode and hides the trap.
+**The `-Dmaven.javadoc.skip=true` flags in CI (BAF-only, do not remove blindly).** After a
+cross-repo cleanup that deleted every other javadoc-skip flag from all four sibling pipelines,
+BAF still carries three: the `build` job's flag (guards a single `mvn package` invocation —
+that job runs plain `mvn package`, which triggers `attach-javadocs` at `prepare-package`; an
+unguarded run can flip into JPMS module mode) and one flag each on the `publish-snapshot` /
+`publish-release` jobs' "Build & sign fat jar" steps (guards a **second** `mvn -P
+release,assembly verify` invocation that shares `target/` with the preceding `mvn -P release
+deploy` invocation in the same job, with no `mvn clean` in between). The fat-jar flags guard a
+*different* trigger of the same trap than the `build` job's flag — see
+[`../workspace/policies/jpms-module-descriptor.md`](../workspace/policies/jpms-module-descriptor.md)
+"A second trigger: multiple Maven invocations sharing `target/`" for the general mechanism
+(incident: 2026-08-02, CI run 30768800950, `error: No source files for package
+net.ladenthin.bitcoinaddressfinder.io`). The Java-8 siblings (java-llama.cpp, streambuffer,
+srcmorph — all `<source>8>`) stay in classpath mode regardless and therefore carry **no** skip
+flag; the redundant/no-op flags they used to have were removed, and streambuffer/llamacpp let
+javadoc build during their `verify` test job so it is gated in PR CI. BAF cannot do the same
+cheaply (the module-mode trap needs the full `-P release package` ordering), which is why
+BAF's javadoc is validated only at publish. Before dropping the `build` job's flag, prove `mvn
+package` builds BAF's javadoc clean — a standalone `mvn javadoc:jar` cannot, it always runs
+classpath mode and hides the trap. Before dropping either fat-jar flag, prove the
+**two-invocation, no-`clean`** sequence (`mvn -P release package` then, without `clean`, `mvn
+-P release,assembly verify`) builds javadoc clean — a single-invocation `mvn -P release clean
+package` proves nothing about this trigger, since `clean` is exactly what makes it disappear.
 
 ### JPMS module descriptor (`module-info.java`) handling — why it's hidden until the end
 
