@@ -694,6 +694,13 @@ second `mvn -P release,assembly verify` (which stops before `deploy`, so `centra
 uploads it). The cross-repo convention + per-repo shapes are documented in
 [`../workspace/policies/fat-jar-release-assets.md`](../workspace/policies/fat-jar-release-assets.md).
 
+## Dependency Convergence Pinning
+
+`dependencyConvergence` is enabled (maven-enforcer). Convention for pinning a direct-vs-transitive
+version mismatch in `dependencyManagement`, the `excludedScopes=[test,provided]` enforcer default
+gotcha, and merge-discipline guidance are in
+[`../workspace/policies/dependency-convergence-pinning.md`](../workspace/policies/dependency-convergence-pinning.md).
+
 ## Open TODOs
 
 Open TODOs for this repo live in [`TODO.md`](TODO.md). Cross-repo status
