@@ -314,7 +314,7 @@ See `examples/config_*.json` for all configuration variants.
 
 ### Frameworks
 
-- **JUnit 6** (6.1.2) — `junit-jupiter` (JUnit Jupiter) for all tests
+- **JUnit 6** (6.1.3) — `junit-jupiter` (JUnit Jupiter) for all tests
 - **Hamcrest** (3.0) — matchers
 - **Mockito** (5.23.0) — mocking
 
@@ -569,7 +569,7 @@ No other sibling repo has OpenCL code, so this distinction is BAF-only.
 | Dependency | Version | Purpose |
 |---|---|---|
 | `bitcoinj-core` | 0.17.1 | Bitcoin crypto, address derivation |
-| `bcprov-jdk15to18` | 1.85.1 | Bouncy Castle crypto provider (bitcoinj transitive; pinned to fix GHSA-c3fc-8qff-9hwx, GHSA-p93r-85wp-75v3) |
+| `bcprov-jdk15to18` | 1.85.2 | Bouncy Castle crypto provider (bitcoinj transitive; pinned to fix GHSA-c3fc-8qff-9hwx, GHSA-p93r-85wp-75v3) |
 | `protobuf-javalite` | 4.35.1 | Protocol Buffers (bitcoinj transitive; pinned to latest) |
 | `jsr305` | 3.0.2 | Findbugs nullability annotations (bitcoinj transitive, runtime) |
 | `jcip-annotations` | 1.0 | JCIP concurrency annotations (bitcoinj transitive, runtime) |
@@ -587,7 +587,7 @@ No other sibling repo has OpenCL code, so this distinction is BAF-only.
 | `logback-classic` | 1.6.1 | SLF4J implementation |
 
 Test-only:
-| `junit-jupiter` | 6.1.2 | JUnit 6 (Jupiter) test framework |
+| `junit-jupiter` | 6.1.3 | JUnit 6 (Jupiter) test framework |
 | `hamcrest` | 3.0 | Assertion matchers |
 | `mockito-core` | 5.23.0 | Mocking |
 
