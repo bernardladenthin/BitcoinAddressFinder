@@ -559,10 +559,23 @@ jobs:
       # reaching `deploy`), so the central-publishing plugin's publish goal — bound to the deploy phase —
       # does nothing here. `verify` runs: package (assembly `single` attaches the fat jar) → verify
       # (maven-gpg-plugin signs every attached artifact, incl. the fat jar → .jar.asc). It rebuilds and
-      # re-signs the main/sources/javadoc jars in target/ too (harmless), so the Collect step below now
+      # re-signs the main/sources jars in target/ too (harmless), so the Collect step below now
       # also finds the fat jar + its .asc. Runs only if the deploy succeeded.
+      #
+      # -Dmaven.javadoc.skip=true is REQUIRED here: this invocation shares target/ with the Deploy
+      # step above with no `mvn clean` between them. That step's own module-info-compile execution
+      # already left target/classes/module-info.class on disk, so THIS invocation's attach-javadocs
+      # would see the module descriptor and flip into JPMS module mode — before this invocation's own
+      # module-info-compile even runs, since attach-javadocs is ordered first (see CLAUDE.md "JPMS
+      # module descriptor" section). The single-invocation "javadoc before module-info-compile"
+      # ordering fix protects against a fresh compile within one invocation; it does nothing against
+      # a *prior* invocation's leftover module-info.class (2026-08-02 incident, run 30768800950:
+      # "error: No source files for package net.ladenthin.bitcoinaddressfinder.io"). Safe to skip:
+      # the Deploy step already built + signed a correct, classpath-mode javadoc jar, and this
+      # invocation never touches or re-signs it — the untouched javadoc.jar + javadoc.jar.asc from
+      # the Deploy step are what the Collect step below picks up.
       - name: Build & sign fat jar (GitHub asset only — not deployed to Central)
-        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release,assembly verify -DskipTests
+        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -Dmaven.javadoc.skip=true -P release,assembly verify -DskipTests
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       # Runs even when the deploy step failed: a Central publish-poll timeout reds the
@@ -648,10 +661,23 @@ jobs:
       # reaching `deploy`), so the central-publishing plugin's publish goal — bound to the deploy phase —
       # does nothing here. `verify` runs: package (assembly `single` attaches the fat jar) → verify
       # (maven-gpg-plugin signs every attached artifact, incl. the fat jar → .jar.asc). It rebuilds and
-      # re-signs the main/sources/javadoc jars in target/ too (harmless), so the Collect step below now
+      # re-signs the main/sources jars in target/ too (harmless), so the Collect step below now
       # also finds the fat jar + its .asc. Runs only if the deploy succeeded.
+      #
+      # -Dmaven.javadoc.skip=true is REQUIRED here: this invocation shares target/ with the Deploy
+      # step above with no `mvn clean` between them. That step's own module-info-compile execution
+      # already left target/classes/module-info.class on disk, so THIS invocation's attach-javadocs
+      # would see the module descriptor and flip into JPMS module mode — before this invocation's own
+      # module-info-compile even runs, since attach-javadocs is ordered first (see CLAUDE.md "JPMS
+      # module descriptor" section). The single-invocation "javadoc before module-info-compile"
+      # ordering fix protects against a fresh compile within one invocation; it does nothing against
+      # a *prior* invocation's leftover module-info.class (2026-08-02 incident, run 30768800950:
+      # "error: No source files for package net.ladenthin.bitcoinaddressfinder.io"). Safe to skip:
+      # the Deploy step already built + signed a correct, classpath-mode javadoc jar, and this
+      # invocation never touches or re-signs it — the untouched javadoc.jar + javadoc.jar.asc from
+      # the Deploy step are what the Collect step below picks up.
       - name: Build & sign fat jar (GitHub asset only — not deployed to Central)
-        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release,assembly verify -DskipTests
+        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -Dmaven.javadoc.skip=true -P release,assembly verify -DskipTests
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       # Runs even when the deploy step failed: a Central publish-poll timeout reds the
