@@ -74,7 +74,7 @@ SPDX-License-Identifier: Apache-2.0
         <checker.version>4.2.1</checker.version>
         <java-websocket.version>1.6.0</java-websocket.version>
         <jeromq.version>0.6.0</jeromq.version>
-        <jspecify.version>1.0.0</jspecify.version>
+        <jspecify.version>1.0.1</jspecify.version>
         <lombok.version>1.18.46</lombok.version>
         <bitcoinj.version>0.17.1</bitcoinj.version>
         <bcprov.version>1.85.1</bcprov.version>
