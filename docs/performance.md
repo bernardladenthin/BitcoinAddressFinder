@@ -751,7 +751,7 @@ with the arithmetic-heavy affine walk" trend seen on NVIDIA, though it stays wel
 OpenCL 2.0 AMD-APP, wave32.
 
 > **Methodology caveat — the sweep tables above are measured with `noinline` (§9).** The RX 7900 XTX
-> sweep uses `-D AMD_NOINLINE_HELPERS` because the inlined kernel takes 8–16+ min to compile on AMD (§9),
+> sweep uses `-D FORCE_NO_INLINE` because the inlined kernel takes 8–16+ min to compile on AMD (§9),
 > so those out-of-line absolutes are *understated* relative to the **inlined AMD build, which is much
 > faster.** An earlier edition could only *speculate* the inlined ceiling (≈ 288 M keys/s, extrapolated
 > from a `batch=20, kpwi=64` re-sweep, §10 "Track B"); the **2026-07-23 inline A/B supersedes it**: at the
@@ -1840,13 +1840,13 @@ does not share LLVM's per-function scaling, which is why CUDA was always fast.
   uninterrupted. Every earlier attempt was killed before it could populate the cache.
 
 **The fix — force the helpers out-of-line (`noinline`).** Build the kernel with
-`-D AMD_NOINLINE_HELPERS`, which makes the vendored `DECLSPEC` expand to
+`-D FORCE_NO_INLINE`, which makes the vendored `DECLSPEC` expand to
 `__attribute__((noinline))` (`copyfromhashcat/inc_vendor.h`). The kernel is then **partitioned into
 many small functions**, each compiling in roughly linear time, instead of one quadratic-cost giant.
 Note removing the `inline` *keyword* alone does nothing — LLVM still inlines at `-O3`; only the hard
 `noinline` attribute stops it.
 
-| Cold compile (fresh `comgr` cache), RX 7900 XTX | inlined (`noInlineHelpers=false`) | out-of-line (`-D AMD_NOINLINE_HELPERS`, AMD auto-default) |
+| Cold compile (fresh `comgr` cache), RX 7900 XTX | inlined (`noInlineHelpers=false`) | out-of-line (`-D FORCE_NO_INLINE`, AMD auto-default) |
 |---|--:|--:|
 | Stripped (no hash160, legacy inverse) | 8m 02s | **2.99 s** |
 | **Full (both hash160 chains + safegcd)** | **>16 min (never finished)** | **3.09 s** |

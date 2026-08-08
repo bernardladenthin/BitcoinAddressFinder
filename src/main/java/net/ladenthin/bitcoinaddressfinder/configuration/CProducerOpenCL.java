@@ -192,7 +192,7 @@ public class CProducerOpenCL extends CProducer {
      *       {@code OpenCLContext.resolveEffectiveNoInlineHelpers(...)}. This is the recommended
      *       setting: AMD gets the compile-time fix automatically, NVIDIA keeps full throughput.</li>
      *   <li>{@link Boolean#TRUE} — <b>force on</b> regardless of vendor: the kernel is always built
-     *       with {@code -D AMD_NOINLINE_HELPERS}.</li>
+     *       with {@code -D FORCE_NO_INLINE}.</li>
      *   <li>{@link Boolean#FALSE} — <b>force off</b> regardless of vendor: the define is never added,
      *       even on AMD (a slow-compile warning is logged). Needed to A/B inlined vs. out-of-line on
      *       an AMD device.</li>
@@ -202,7 +202,7 @@ public class CProducerOpenCL extends CProducer {
      * allocation + SelectionDAG scheduling) scales ~super-linearly per function, so the single giant
      * {@code generateKeysKernel_grid} takes <b>8–16+ minutes</b> to build on AMD RDNA3 (the full kernel
      * did not finish within 16&nbsp;min on an RX&nbsp;7900&nbsp;XTX / gfx1100). The {@code -D
-     * AMD_NOINLINE_HELPERS} define makes the vendored {@code DECLSPEC} helpers
+     * FORCE_NO_INLINE} define makes the vendored {@code DECLSPEC} helpers
      * {@code __attribute__((noinline))}, partitioning the back-end work into many small functions and
      * cutting the cold compile to <b>≈3&nbsp;s</b>. (Removing the {@code inline} hint alone does nothing
      * — LLVM still inlines at {@code -O3}; only a hard {@code noinline} stops it.)

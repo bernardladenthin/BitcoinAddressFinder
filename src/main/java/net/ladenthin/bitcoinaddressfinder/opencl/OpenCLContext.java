@@ -161,7 +161,7 @@ public class OpenCLContext implements ReleaseCLObject {
      * runtime cost on other vendors (≈4.5× slower on NVIDIA). See {@code docs/performance.md}.
      */
     @VisibleForTesting
-    static final String NO_INLINE_HELPERS_BUILD_OPTION = "-D AMD_NOINLINE_HELPERS";
+    static final String NO_INLINE_HELPERS_BUILD_OPTION = "-D FORCE_NO_INLINE";
 
     /**
      * Returns whether an OpenCL {@code CL_DEVICE_VENDOR} string denotes an AMD device. Case-insensitive
@@ -218,9 +218,9 @@ public class OpenCLContext implements ReleaseCLObject {
         final String source = (configured == null) ? "auto" : "explicit configuration";
 
         if (effective) {
-            // OUT-OF-LINE (-D AMD_NOINLINE_HELPERS): compiles fast (~3 s) but is ~4x slower at runtime.
+            // OUT-OF-LINE (-D FORCE_NO_INLINE): compiles fast (~3 s) but is ~4x slower at runtime.
             LOGGER.warn(
-                    "noInlineHelpers -> OUT-OF-LINE kernel (-D AMD_NOINLINE_HELPERS) on device '{}' (vendor '{}', "
+                    "noInlineHelpers -> OUT-OF-LINE kernel (-D FORCE_NO_INLINE) on device '{}' (vendor '{}', "
                             + "source: {}): the DECLSPEC helpers are out-of-lined, so the kernel compiles fast (~3 s) "
                             + "but runs ~4x SLOWER (measured ~3.6x on AMD RDNA3, ~4.5x on NVIDIA; see "
                             + "docs/performance.md sections 9-10). Set noInlineHelpers=false for the full-speed inlined "
