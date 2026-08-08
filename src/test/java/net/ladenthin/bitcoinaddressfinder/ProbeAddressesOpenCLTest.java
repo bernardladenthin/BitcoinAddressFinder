@@ -537,7 +537,7 @@ public class ProbeAddressesOpenCLTest {
     }
 
     /**
-     * Byte-identical parity with {@code noInlineHelpers = true} ({@code -D AMD_NOINLINE_HELPERS}).
+     * Byte-identical parity with {@code noInlineHelpers = true} ({@code -D FORCE_NO_INLINE}).
      *
      * <p>The {@code noinline} build forces the kernel's {@code DECLSPEC} helpers out-of-line to fix
      * the multi-minute AMD/LLVM compile (see {@code docs/performance.md} §9). It is a pure compile

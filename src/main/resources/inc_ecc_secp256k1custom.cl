@@ -1591,3 +1591,120 @@ __kernel void bench_fe_mul(__global u32 *out, const u32 iterations, const u32 us
 
     out[gid] = checksum;
 }
+
+/*
+ * Fixed-base precompute kernels (self-contained).
+ *
+ * These build, on the device, the lookup tables used by a fixed-base-comb + affine-addition-walk
+ * key generator (the BitCrack / VanitySearch design). They depend only on this library's generic
+ * primitives (point_add, point_double, point_to_affine) and the public base point G
+ * (SECP256K1_G0..G7, SECP256K1_GY0..GY7) — no wNAF precomputed table, no host upload. Each table
+ * point is stored as [x(8 u32 words)][y(8 u32 words)] in device word order (8 little-endian limbs
+ * per coordinate), i.e. 16 words per entry. Launch each with a single work-item; this is one-time
+ * init work, off the hot path.
+ */
+
+// iG_table[m-1] = m*G (affine), for m = 1..count. Built from G by repeated mixed point_add.
+__kernel void precompute_ig_table (__global u32 *iG_table, const u32 count)
+{
+  // affine base point G: x = SECP256K1_G0..G7; y = SECP256K1_G_PRE_COMPUTED_08..15 (the y1 of the
+  // precomputed table, i.e. y(G)) — reused so no constant is duplicated.
+  u32 gx[8] = { SECP256K1_G0, SECP256K1_G1, SECP256K1_G2, SECP256K1_G3,
+                SECP256K1_G4, SECP256K1_G5, SECP256K1_G6, SECP256K1_G7 };
+  u32 gy[8] = { SECP256K1_G_PRE_COMPUTED_08, SECP256K1_G_PRE_COMPUTED_09,
+                SECP256K1_G_PRE_COMPUTED_10, SECP256K1_G_PRE_COMPUTED_11,
+                SECP256K1_G_PRE_COMPUTED_12, SECP256K1_G_PRE_COMPUTED_13,
+                SECP256K1_G_PRE_COMPUTED_14, SECP256K1_G_PRE_COMPUTED_15 };
+
+  // running point P = G in Jacobian coordinates (z = 1)
+  u32 px[8], py[8], pz[8] = { 0 };
+  pz[0] = 1;
+  for (int i = 0; i < 8; i++) { px[i] = gx[i]; py[i] = gy[i]; }
+
+  for (u32 m = 1; m <= count; m++)
+  {
+    // affine(P) -> entry m-1
+    u32 ax[8], ay[8], az[8];
+    for (int i = 0; i < 8; i++) { ax[i] = px[i]; ay[i] = py[i]; az[i] = pz[i]; }
+    point_to_affine (ax, ay, az);
+
+    const u32 out = (m - 1) * 16; // 16 words per entry: [x(8)][y(8)]
+    for (int i = 0; i < 8; i++) { iG_table[out + i] = ax[i]; iG_table[out + 8 + i] = ay[i]; }
+
+    // Advance P to (m+1)*G. The first step (m==1) is G+G, a doubling, which the mixed
+    // point_add cannot handle; every later step adds the (distinct) base G.
+    if (m < count)
+    {
+      if (m == 1) point_double (px, py, pz);      // 1*G -> 2*G
+      else        point_add (px, py, pz, gx, gy); // m*G -> (m+1)*G
+    }
+  }
+}
+
+// Signed-digit comb table: comb_table[pos][mag-1] = (mag * 2^(4*pos)) * G (affine),
+// pos = 0..64, mag = 1..8. Entry (pos, mag) starts at word offset (pos*8 + (mag-1))*16.
+//
+// Only magnitudes 1..8 are stored (8 slots/position), not the full digit set 0..15: the consuming
+// comb routine recodes each 4-bit window into a SIGNED digit b in {-8..+7} (carry-propagated), and
+// gets the negative entries for free as -P = (x, p - y). This halves the table vs. the unsigned
+// 0..15 layout. A signed recode of a 256-bit scalar can carry out of the top window, so there is
+// one extra position (64): it only ever holds magnitude 1 = 2^256 * G, but all 8 slots are built
+// uniformly. Built from G with a per-position 2^4 doubling step and a per-magnitude addition.
+__kernel void precompute_comb_table (__global u32 *comb_table)
+{
+  // affine base point G: x = SECP256K1_G0..G7; y = SECP256K1_G_PRE_COMPUTED_08..15 (the y1 of the
+  // precomputed table, i.e. y(G)) — reused so no constant is duplicated.
+  u32 gx[8] = { SECP256K1_G0, SECP256K1_G1, SECP256K1_G2, SECP256K1_G3,
+                SECP256K1_G4, SECP256K1_G5, SECP256K1_G6, SECP256K1_G7 };
+  u32 gy[8] = { SECP256K1_G_PRE_COMPUTED_08, SECP256K1_G_PRE_COMPUTED_09,
+                SECP256K1_G_PRE_COMPUTED_10, SECP256K1_G_PRE_COMPUTED_11,
+                SECP256K1_G_PRE_COMPUTED_12, SECP256K1_G_PRE_COMPUTED_13,
+                SECP256K1_G_PRE_COMPUTED_14, SECP256K1_G_PRE_COMPUTED_15 };
+
+  // base = 2^(4*pos) * G in Jacobian coordinates, starting at G (pos = 0)
+  u32 bx[8], by[8], bz[8] = { 0 };
+  bz[0] = 1;
+  for (int i = 0; i < 8; i++) { bx[i] = gx[i]; by[i] = gy[i]; }
+
+  for (u32 pos = 0; pos < 65; pos++)
+  {
+    // affine base for this position: abx,aby = (2^(4*pos)) * G
+    u32 abx[8], aby[8], abz[8];
+    for (int i = 0; i < 8; i++) { abx[i] = bx[i]; aby[i] = by[i]; abz[i] = bz[i]; }
+    point_to_affine (abx, aby, abz);
+
+    const u32 row = pos * 8; // 8 magnitude slots per position
+
+    // mag 1 -> slot 0: 1 * base
+    const u32 o1 = row * 16;
+    for (int i = 0; i < 8; i++) { comb_table[o1 + i] = abx[i]; comb_table[o1 + 8 + i] = aby[i]; }
+
+    // mag 2..8 -> slots 1..7: accumulate mag * base. mag 2 is a doubling (point_add cannot double);
+    // mag >= 3 adds the (distinct) affine base to the running multiple.
+    u32 cx[8], cy[8], cz[8] = { 0 };
+    cz[0] = 1;
+    for (int i = 0; i < 8; i++) { cx[i] = abx[i]; cy[i] = aby[i]; } // cur = 1 * base (affine)
+
+    for (u32 mag = 2; mag <= 8; mag++)
+    {
+      if (mag == 2) point_double (cx, cy, cz);
+      else          point_add (cx, cy, cz, abx, aby);
+
+      u32 ax[8], ay[8], az[8];
+      for (int i = 0; i < 8; i++) { ax[i] = cx[i]; ay[i] = cy[i]; az[i] = cz[i]; }
+      point_to_affine (ax, ay, az);
+
+      const u32 od = (row + (mag - 1)) * 16;
+      for (int i = 0; i < 8; i++) { comb_table[od + i] = ax[i]; comb_table[od + 8 + i] = ay[i]; }
+    }
+
+    // advance base to the next position: base *= 2^4 (four doublings)
+    if (pos < 64)
+    {
+      point_double (bx, by, bz);
+      point_double (bx, by, bz);
+      point_double (bx, by, bz);
+      point_double (bx, by, bz);
+    }
+  }
+}

@@ -220,7 +220,7 @@ public class GpuFuse8FilterBenchmark {
 
     /**
      * Forces the kernel's {@code DECLSPEC} helpers out-of-line ({@link CProducerOpenCL#noInlineHelpers},
-     * build define {@code -D AMD_NOINLINE_HELPERS}). {@code false} = normal fully-inlined kernel
+     * build define {@code -D FORCE_NO_INLINE}). {@code false} = normal fully-inlined kernel
      * (default); {@code true} = helpers built {@code __attribute__((noinline))}. This is purely a
      * compile-time fix for AMD's LLVM/comgr back-end (minutes → seconds; see {@code docs/performance.md}
      * §9) and is correctness-neutral. Sweep both (e.g. {@code -p noInlineHelpers=false,true}, both
