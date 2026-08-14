@@ -694,6 +694,19 @@ second `mvn -P release,assembly verify` (which stops before `deploy`, so `centra
 uploads it). The cross-repo convention + per-repo shapes are documented in
 [`../workspace/policies/fat-jar-release-assets.md`](../workspace/policies/fat-jar-release-assets.md).
 
+**BAF-specific smoke.** The cross-repo rule "no release asset is attached that CI has not run" is
+implemented here by the `smoke-fatjar` job (`needs: [build]`, gates both publish jobs): it downloads
+the `jars` artifact and runs the **byte-identical shared** `.github/smoke-fatjar-cli.sh` (synced with
+srcmorph — see the checksum table in `crossrepostatus.md`) against
+`examples/config_AddressFilesToLMDB.json`, asserting exit 0 plus `Main#run end.` in the output. That
+config imports the bundled sample address files into a fresh LMDB under `examples/`, so it also
+exercises the **lmdbjava native library out of the fat jar** — the BAF analogue of what jllama's
+smoke checks. Two BAF-specific notes: it is deliberately a plain `java -jar` even though
+`examples/run_AddressFilesToLMDB.sh` passes the long `--add-opens`/`--add-exports` list (the import
+runs clean without it on JDK 21, and the contract under test is that the published artifact runs
+as-is), and the job must stay on the **OpenCL-free** `ubuntu-latest` runner — it must never come to
+depend on an ICD being installed.
+
 ## Dependency Convergence Pinning
 
 `dependencyConvergence` is enabled (maven-enforcer). Convention for pinning a direct-vs-transitive

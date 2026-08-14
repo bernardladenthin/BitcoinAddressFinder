@@ -461,6 +461,51 @@ jobs:
             *.hprof
           if-no-files-found: ignore
 
+  # ---------------------------------------------------------------------------
+  # Fat-jar smoke test — cross-repo standard job, kept in the same shape in srcmorph and
+  # java-llama.cpp (see workspace/policies/fat-jar-release-assets.md, "No release asset is
+  # attached that CI has not run"). The fat jar is a GitHub-Release asset, and unit tests never
+  # touch it: they run off target/classes, so an unrunnable uber jar — no Main-Class, a
+  # shade-mangled resource, a missing SLF4J binding — is built and GPG-signed without anything
+  # noticing. Signing proves who built it, not that it works.
+  #
+  # BAF-specific: config_AddressFilesToLMDB.json imports the bundled sample address files into a
+  # fresh LMDB under examples/, so this also exercises the lmdbjava NATIVE library out of the fat
+  # jar — the closest analogue to what jllama's smoke checks — with no network and no GPU. It is
+  # deliberately a plain `java -jar`: examples/run_AddressFilesToLMDB.sh passes a long
+  # --add-opens/--add-exports list for lmdbjava's internal-JDK reflection, but the import runs
+  # clean without it on JDK 21, and the contract under test is that the published artifact runs
+  # as-is. Keep this job on the OpenCL-free runner: it must not depend on an ICD being installed.
+  # ---------------------------------------------------------------------------
+
+  smoke-fatjar:
+    name: Smoke test fat jar
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: jars
+          path: fatjar/
+      - uses: actions/setup-java@v5
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+      - name: Run fat-jar smoke test
+        run: |
+          .github/smoke-fatjar-cli.sh fatjar 'bitcoinaddressfinder-*-jar-with-dependencies.jar' \
+            examples 'Main#run end\.' config_AddressFilesToLMDB.json
+      - name: Upload smoke logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-fatjar-logs
+          path: |
+            smoke-out.log
+            smoke-err.log
+          if-no-files-found: warn
+
   report:
     name: Report
     needs: [test, test-opencl]
@@ -516,7 +561,7 @@ jobs:
 
   publish-snapshot:
     name: Publish Snapshot to Central
-    needs: [check-snapshot, code-style]
+    needs: [check-snapshot, code-style, smoke-fatjar]
     if: needs.check-snapshot.result == 'success' && inputs.publish_to_central
     runs-on: ubuntu-latest
     environment: maven-central
@@ -625,7 +670,7 @@ jobs:
 
   publish-release:
     name: Publish Release to Central
-    needs: [check-tag, code-style]
+    needs: [check-tag, code-style, smoke-fatjar]
     if: needs.check-tag.result == 'success' && inputs.publish_to_central
     runs-on: ubuntu-latest
     environment: maven-central
