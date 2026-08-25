@@ -88,6 +88,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   single GPU.
 
 ### Changed
+- Dependencies bumped to latest stable: `com.google.protobuf:protobuf-javalite` 4.35.1 → 4.36.0
+  (4.36.0 left RC), `org.lwjgl:lwjgl` / `lwjgl-opencl` 3.4.2 → 3.4.3 (including every `natives-*`
+  classifier), `com.github.spotbugs:spotbugs-maven-plugin` 4.10.3.0 → 4.10.4.0.
+- CI actions bumped to latest: `actions/setup-java` v5 → v6, `github/codeql-action/*` v4.37.7 →
+  v4.37.8.
 - **The OpenCL binding moved from JOCL to LWJGL 3** (`org.lwjgl:lwjgl` + `lwjgl-opencl` 3.4.2);
   `org.jocl` is gone from the build. Calls no longer reach the binding directly: a new
   `opencl/binding/` package carries an instance-based `ClApi` (mockable, unlike the binding's static

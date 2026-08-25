@@ -454,7 +454,7 @@ OpenCL kernels live in `src/main/resources/` as `.cl` and `.h` files:
 | `inc_platform.cl` | Platform-specific abstractions |
 | `inc_types.h` | OpenCL type definitions |
 
-GPU code is bound through **LWJGL 3** (`lwjgl` + `lwjgl-opencl` 3.4.2). Every call into the binding
+GPU code is bound through **LWJGL 3** (`lwjgl` + `lwjgl-opencl` 3.4.3). Every call into the binding
 goes through the `opencl/binding/` seam — never directly:
 
 | Type | Role |
@@ -570,21 +570,21 @@ No other sibling repo has OpenCL code, so this distinction is BAF-only.
 |---|---|---|
 | `bitcoinj-core` | 0.17.1 | Bitcoin crypto, address derivation |
 | `bcprov-jdk15to18` | 1.85.2 | Bouncy Castle crypto provider (bitcoinj transitive; pinned to fix GHSA-c3fc-8qff-9hwx, GHSA-p93r-85wp-75v3) |
-| `protobuf-javalite` | 4.35.1 | Protocol Buffers (bitcoinj transitive; pinned to latest) |
+| `protobuf-javalite` | 4.36.0 | Protocol Buffers (bitcoinj transitive; pinned to latest) |
 | `jsr305` | 3.0.2 | Findbugs nullability annotations (bitcoinj transitive, runtime) |
 | `jcip-annotations` | 1.0 | JCIP concurrency annotations (bitcoinj transitive, runtime) |
 | `lmdbjava` | 0.9.3 | LMDB database bindings |
-| `lwjgl` / `lwjgl-opencl` | 3.4.2 | Java OpenCL bindings (plus per-platform `natives-*` classifiers) |
-| `jackson-databind` | 2.22.1 | JSON config parsing |
-| `jackson-dataformat-yaml` | 2.22.1 | YAML config parsing |
-| `guava` | 33.6.0-jre | Google core utilities |
-| `commons-codec` | 1.22.0 | Base58, hex encoding |
+| `lwjgl` / `lwjgl-opencl` | 3.4.3 | Java OpenCL bindings (plus per-platform `natives-*` classifiers) |
+| `jackson-databind` | 2.22.2 | JSON config parsing |
+| `jackson-dataformat-yaml` | 2.22.2 | YAML config parsing |
+| `guava` | 33.7.1-jre | Google core utilities |
+| `commons-codec` | 1.22.1 | Base58, hex encoding |
 | `commons-io` | 2.22.0 | I/O utilities |
 | `Java-WebSocket` | 1.6.0 | WebSocket producer |
 | `jeromq` | 0.6.0 | ZeroMQ producer |
-| `jspecify` | 1.0.0 | Nullness annotations |
+| `jspecify` | 1.0.1 | Nullness annotations |
 | `slf4j-api` | 2.0.18 | Logging facade |
-| `logback-classic` | 1.6.1 | SLF4J implementation |
+| `logback-classic` | 1.6.3 | SLF4J implementation |
 
 Test-only:
 | `junit-jupiter` | 6.1.3 | JUnit 6 (Jupiter) test framework |
