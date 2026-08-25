@@ -92,6 +92,12 @@ SPDX-License-Identifier: Apache-2.0
         <hamcrest.version>3.0</hamcrest.version>
         <mockito.version>5.23.0</mockito.version>
         <logcaptor.version>2.12.6</logcaptor.version>
+        <!-- log4j-api / log4j-to-slf4j arrive ONLY as test-scope transitives of
+             io.github.hakky54:logcaptor, which requests 2.25.3. That version is affected by
+             CVE-2026-49844 (GHSA-qv9r-c865-cp47, moderate): MapMessage.asJson() emits bare
+             NaN/Infinity tokens for non-finite floats, producing non-RFC-8259 JSON. Pinned to the
+             newest patched stable so the alert clears; see the dependencyManagement entries. -->
+        <log4j.version>2.26.1</log4j.version>
         <jmh.version>1.37</jmh.version>
         <spotless.version>3.10.0</spotless.version>
         <palantir-java-format.version>2.96.0</palantir-java-format.version>
@@ -136,6 +142,20 @@ SPDX-License-Identifier: Apache-2.0
                 <groupId>org.jspecify</groupId>
                 <artifactId>jspecify</artifactId>
                 <version>${jspecify.version}</version>
+            </dependency>
+            <!-- log4j-api + log4j-to-slf4j: io.github.hakky54:logcaptor (test scope) brings 2.25.3,
+                 which is affected by CVE-2026-49844; we declare ${log4j.version} directly. Both are
+                 pinned together because log4j-to-slf4j depends on log4j-api of the same version and
+                 the two must not skew. Test-scope only — neither reaches a published artifact. -->
+            <dependency>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-api</artifactId>
+                <version>${log4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-to-slf4j</artifactId>
+                <version>${log4j.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

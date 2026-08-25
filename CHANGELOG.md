@@ -130,6 +130,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TuneConfiguration`); only the rendered field changed.
 
 ### Fixed
+- **CVE-2026-49844** (GHSA-qv9r-c865-cp47, moderate): `org.apache.logging.log4j:log4j-api`
+  2.25.3 arrives as a **test-scope** transitive of `io.github.hakky54:logcaptor` 2.12.6, and
+  Dependabot could not update it on its own. Pinned `log4j-api` **and** `log4j-to-slf4j` to
+  **2.26.1** in `dependencyManagement` — both together, since `log4j-to-slf4j` requires a
+  matching `log4j-api` and the two must not skew. Neither reaches a published artifact.
 - **A run fed by a blocking key producer could not be shut down** — `Finder.interrupt()` waited for
   the producers to stop *before* waking the key producers. A producer waiting for its next secret is
   parked inside the key producer, and one configured to block indefinitely (`timeoutMillis: -1`,
