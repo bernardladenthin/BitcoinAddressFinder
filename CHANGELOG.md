@@ -88,6 +88,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   single GPU.
 
 ### Changed
+- Dependencies bumped to latest stable: `com.google.protobuf:protobuf-javalite` 4.35.1 → 4.36.0
+  (4.36.0 left RC), `org.lwjgl:lwjgl` / `lwjgl-opencl` 3.4.2 → 3.4.3 (including every `natives-*`
+  classifier), `com.github.spotbugs:spotbugs-maven-plugin` 4.10.3.0 → 4.10.4.0.
+- CI actions bumped to latest: `actions/setup-java` v5 → v6, `github/codeql-action/*` v4.37.7 →
+  v4.37.8.
 - **The OpenCL binding moved from JOCL to LWJGL 3** (`org.lwjgl:lwjgl` + `lwjgl-opencl` 3.4.2);
   `org.jocl` is gone from the build. Calls no longer reach the binding directly: a new
   `opencl/binding/` package carries an instance-based `ClApi` (mockable, unlike the binding's static
@@ -125,6 +130,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TuneConfiguration`); only the rendered field changed.
 
 ### Fixed
+- **CVE-2026-49844** (GHSA-qv9r-c865-cp47, moderate): `org.apache.logging.log4j:log4j-api`
+  2.25.3 arrives as a **test-scope** transitive of `io.github.hakky54:logcaptor` 2.12.6, and
+  Dependabot could not update it on its own. Pinned `log4j-api` **and** `log4j-to-slf4j` to
+  **2.26.1** in `dependencyManagement` — both together, since `log4j-to-slf4j` requires a
+  matching `log4j-api` and the two must not skew. Neither reaches a published artifact.
 - **A run fed by a blocking key producer could not be shut down** — `Finder.interrupt()` waited for
   the producers to stop *before* waking the key producers. A producer waiting for its next secret is
   parked inside the key producer, and one configured to block indefinitely (`timeoutMillis: -1`,
