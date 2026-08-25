@@ -66,7 +66,7 @@ SPDX-License-Identifier: Apache-2.0
              policy) for full context. -->
         <jqwik.version>1.9.3</jqwik.version>
         <archunit.version>1.5.0</archunit.version>
-        <spotbugs.version>4.10.3.0</spotbugs.version>
+        <spotbugs.version>4.10.4.0</spotbugs.version>
         <fb-contrib.version>7.7.4</fb-contrib.version>
         <findsecbugs.version>1.14.0</findsecbugs.version>
         <errorprone.version>2.50.0</errorprone.version>
@@ -78,13 +78,13 @@ SPDX-License-Identifier: Apache-2.0
         <lombok.version>1.18.46</lombok.version>
         <bitcoinj.version>0.17.1</bitcoinj.version>
         <bcprov.version>1.85.2</bcprov.version>
-        <protobuf.version>4.35.1</protobuf.version>
+        <protobuf.version>4.36.0</protobuf.version>
         <jsr305.version>3.0.2</jsr305.version>
         <jcip-annotations.version>1.0</jcip-annotations.version>
         <guava.version>33.7.1-jre</guava.version>
         <jackson.version>2.22.2</jackson.version>
         <lmdbjava.version>0.9.3</lmdbjava.version>
-        <lwjgl.version>3.4.2</lwjgl.version>
+        <lwjgl.version>3.4.3</lwjgl.version>
         <commons-io.version>2.22.0</commons-io.version>
         <commons-codec.version>1.22.1</commons-codec.version>
         <maven-artifact.version>3.9.16</maven-artifact.version>
