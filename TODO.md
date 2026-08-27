@@ -821,6 +821,25 @@ Until the investigation settles on a toolkit, no UI code should be added to the 
 
 ## Done (kept for history)
 
+### `LmdbCrashReproDriverTest` — resolved: it stays
+
+Raised as an open question after the issue #50 repro *workflow* was deleted (commit `04f7142`, "the
+bug is fixed and guarded"): should the driver test go with it? **No.** They are different things:
+
+- The **workflow** ran on a schedule and burned runner time reproducing a bug that is now fixed —
+  correctly removed.
+- The **driver** costs nothing when idle. It is gated behind
+  `-Dnet.ladenthin.bitcoinaddressfinder.lmdbCrashDriver=true`, so a normal `mvn test` never runs it,
+  and it is not flaky by construction: it *never* fails on a crash (a crash is the goal and is
+  probabilistic), only if the harness itself misbehaves — a child that would not launch, or a run
+  that neither finished nor crashed inside its timeout.
+
+Deleting it would throw away the only on-demand reproducer for a native `SIGSEGV` in
+`mdb_txn_renew0` — a fault that kills the JVM outright and therefore cannot be asserted from inside
+a test JVM at all. If #50 ever regresses, this is what turns "sporadic and untestable" back into a
+crash *rate* and gives a fix something to be measured against. Keep it.
+
+
 ### Layered-rule tightening + latent upward-edge fix (fact-based jdeps audit)
 
 A bytecode-level (`jdeps`) audit of the compiled package graph found one latent

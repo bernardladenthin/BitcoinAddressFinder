@@ -15,6 +15,21 @@ on:
         type: boolean
         default: false
 
+# Supersede an in-flight run when a PR branch is pushed again.
+#
+# Without this every push starts a full parallel pipeline and the older ones keep
+# draining -- four were live at once during one session, which makes "what is CI
+# saying right now" genuinely ambiguous and wastes a lot of runner time on results
+# nobody will read.
+#
+# cancel-in-progress is deliberately scoped to pull_request ONLY. A push to main or
+# to a v* tag is a release path: cancelling one midway could leave a partially
+# published set of artifacts, so those always run to completion even if another push
+# lands behind them.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
@@ -287,8 +302,15 @@ jobs:
           done
           if [ "$found" = 0 ]; then
             echo "No hs_err_pid*.log and no surefire dump/dumpstream was written."
-            echo "The fork died without the JVM writing a crash log -- the abort bypassed"
-            echo "the JVM error handler (native exit()/terminate) rather than raising a signal."
+            echo
+            echo "For an ordinary test failure that is EXPECTED, not a finding: this step runs on"
+            echo "any job failure, and an assertion failure, a timeout or a compile error writes no"
+            echo "crash log. Read the surefire output above for the real cause."
+            echo
+            echo "It points at a JVM-level abort only if the log ALSO shows a fork ending abnormally"
+            echo "-- 'The forked VM terminated without properly saying goodbye', or an exit with no"
+            echo "test results. In that case the abort bypassed the JVM error handler (a native"
+            echo "exit()/terminate() rather than a raised signal), which is why no file was written."
           fi
       - uses: actions/upload-artifact@v7
         if: always()
@@ -348,8 +370,15 @@ jobs:
           done
           if [ "$found" = 0 ]; then
             echo "No hs_err_pid*.log and no surefire dump/dumpstream was written."
-            echo "The fork died without the JVM writing a crash log -- the abort bypassed"
-            echo "the JVM error handler (native exit()/terminate) rather than raising a signal."
+            echo
+            echo "For an ordinary test failure that is EXPECTED, not a finding: this step runs on"
+            echo "any job failure, and an assertion failure, a timeout or a compile error writes no"
+            echo "crash log. Read the surefire output above for the real cause."
+            echo
+            echo "It points at a JVM-level abort only if the log ALSO shows a fork ending abnormally"
+            echo "-- 'The forked VM terminated without properly saying goodbye', or an exit with no"
+            echo "test results. In that case the abort bypassed the JVM error handler (a native"
+            echo "exit()/terminate() rather than a raised signal), which is why no file was written."
           fi
       - uses: actions/upload-artifact@v7
         if: always()
