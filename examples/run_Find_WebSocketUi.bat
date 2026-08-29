@@ -36,6 +36,6 @@ java ^
 -Xmx16G ^
 -Dlogback.configurationFile=logbackConfiguration.xml ^
 -jar ^
-bitcoinaddressfinder-1.8.0-SNAPSHOT-jar-with-dependencies.jar ^
+bitcoinaddressfinder-1.8.0-jar-with-dependencies.jar ^
 config_Find_WebSocketUi.json
 rem >> log_Find_WebSocketUi.txt 2>&1

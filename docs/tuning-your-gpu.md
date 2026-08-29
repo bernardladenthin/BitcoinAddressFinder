@@ -90,7 +90,7 @@ Run it with the supplied launcher (`run_OpenCLInfo.bat` on Windows, `run_OpenCLI
 or directly:
 
 ```bash
-java -jar bitcoinaddressfinder-1.8.0-SNAPSHOT-jar-with-dependencies.jar config_OpenCLInfo.json
+java -jar bitcoinaddressfinder-1.8.0-jar-with-dependencies.jar config_OpenCLInfo.json
 ```
 
 No database is involved here, so nothing beyond the plain command is needed.
@@ -454,7 +454,7 @@ the arm as failed and continues, so this is not fatal during tuning. If it happe
 start from the `SUGGESTED START CONFIG` values that `OpenCLInfo` printed.
 
 **`InaccessibleObjectException` at startup.**
-Your jar predates the manifest that carries the required `Add-Opens` (added in 1.8.0-SNAPSHOT). Use
+Your jar predates the manifest that carries the required `Add-Opens` (added in 1.8.0). Use
 the launcher script, which passes the same flags on the command line, or rebuild from a current
 checkout.
 

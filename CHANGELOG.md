@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-08-29
+
 ### Added
 - **Results can be broadcast, not just logged** — one message per *checked batch*, sent whether or
   not anything was found. Reporting only hits would leave a client unable to tell "range checked,
@@ -430,7 +432,9 @@ First public pre-release version (Java 8).
 - LMDB database:
   <https://github.com/bernardladenthin/BitcoinAddressFinder#use-my-prepared-database>
 
-[Unreleased]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.6.1...HEAD
+[Unreleased]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.7.0...v1.8.0
+[1.7.0]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/bernardladenthin/BitcoinAddressFinder/compare/v1.4.0...v1.5.0

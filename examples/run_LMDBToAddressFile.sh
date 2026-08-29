@@ -33,6 +33,6 @@ java \
 -Xmx512m \
 -Dlogback.configurationFile=logbackConfiguration.xml \
 -jar \
-bitcoinaddressfinder-1.8.0-SNAPSHOT-jar-with-dependencies.jar \
+bitcoinaddressfinder-1.8.0-jar-with-dependencies.jar \
 config_LMDBToAddressFile.json
 # >> log_LMDBToAddressFile.txt 2>&1
