@@ -15,6 +15,21 @@ on:
         type: boolean
         default: false
 
+# Supersede an in-flight run when a PR branch is pushed again.
+#
+# Without this every push starts a full parallel pipeline and the older ones keep
+# draining -- four were live at once during one session, which makes "what is CI
+# saying right now" genuinely ambiguous and wastes a lot of runner time on results
+# nobody will read.
+#
+# cancel-in-progress is deliberately scoped to pull_request ONLY. A push to main or
+# to a v* tag is a release path: cancelling one midway could leave a partially
+# published set of artifacts, so those always run to completion even if another push
+# lands behind them.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
@@ -263,6 +278,40 @@ jobs:
         run: mvn --batch-mode --no-transfer-progress -P assembly -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -DskipTests -Dmaven.javadoc.skip=true package
       - uses: actions/upload-artifact@v7
         with: { name: jars, path: target/*.jar }
+      # A forked test JVM that aborts leaves an hs_err_pid log and a surefire
+      # dumpstream -- both otherwise ONLY inside the artifact uploaded below,
+      # which is unreachable from anywhere that cannot fetch from Azure Blob
+      # (a phone, a restricted network, an agent sandbox). Echo them here so the
+      # aborting frame is readable from the run page itself. See
+      # ../workspace/policies/ci-test-diagnostics.md section 3.1.
+      - name: Print crash logs (on failure)
+        if: failure()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          found=0
+          for f in hs_err_pid*.log; do
+            found=1
+            echo "===== $f (first 200 lines; full file in the uploaded artifact) ====="
+            sed -n '1,200p' "$f"
+          done
+          for f in target/surefire-reports/*.dumpstream target/surefire-reports/*.dump; do
+            found=1
+            echo "===== $f ====="
+            cat "$f"
+          done
+          if [ "$found" = 0 ]; then
+            echo "No hs_err_pid*.log and no surefire dump/dumpstream was written."
+            echo
+            echo "For an ordinary test failure that is EXPECTED, not a finding: this step runs on"
+            echo "any job failure, and an assertion failure, a timeout or a compile error writes no"
+            echo "crash log. Read the surefire output above for the real cause."
+            echo
+            echo "It points at a JVM-level abort only if the log ALSO shows a fork ending abnormally"
+            echo "-- 'The forked VM terminated without properly saying goodbye', or an exit with no"
+            echo "test results. In that case the abort bypassed the JVM error handler (a native"
+            echo "exit()/terminate() rather than a raised signal), which is why no file was written."
+          fi
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -297,6 +346,40 @@ jobs:
       - name: Test
         shell: bash
         run: mvn -e --batch-mode --no-transfer-progress -P jcstress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=${{ matrix.disable-lmdb }} --update-snapshots test jacoco:report
+      # A forked test JVM that aborts leaves an hs_err_pid log and a surefire
+      # dumpstream -- both otherwise ONLY inside the artifact uploaded below,
+      # which is unreachable from anywhere that cannot fetch from Azure Blob
+      # (a phone, a restricted network, an agent sandbox). Echo them here so the
+      # aborting frame is readable from the run page itself. See
+      # ../workspace/policies/ci-test-diagnostics.md section 3.1.
+      - name: Print crash logs (on failure)
+        if: failure()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          found=0
+          for f in hs_err_pid*.log; do
+            found=1
+            echo "===== $f (first 200 lines; full file in the uploaded artifact) ====="
+            sed -n '1,200p' "$f"
+          done
+          for f in target/surefire-reports/*.dumpstream target/surefire-reports/*.dump; do
+            found=1
+            echo "===== $f ====="
+            cat "$f"
+          done
+          if [ "$found" = 0 ]; then
+            echo "No hs_err_pid*.log and no surefire dump/dumpstream was written."
+            echo
+            echo "For an ordinary test failure that is EXPECTED, not a finding: this step runs on"
+            echo "any job failure, and an assertion failure, a timeout or a compile error writes no"
+            echo "crash log. Read the surefire output above for the real cause."
+            echo
+            echo "It points at a JVM-level abort only if the log ALSO shows a fork ending abnormally"
+            echo "-- 'The forked VM terminated without properly saying goodbye', or an exit with no"
+            echo "test results. In that case the abort bypassed the JVM error handler (a native"
+            echo "exit()/terminate() rather than a raised signal), which is why no file was written."
+          fi
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -445,10 +528,18 @@ jobs:
         run: |
           echo "===== free -m (post-failure) ====="; free -m || true
           echo "===== thread/process count (post-failure) ====="; ps -eL 2>/dev/null | wc -l || true
+          shopt -s nullglob
+          found=0
           echo "===== hs_err_pid*.log ====="
-          for f in hs_err_pid*.log; do [ -e "$f" ] && { echo "----- $f -----"; cat "$f"; }; done
+          # Truncated: an hs_err's tail is the memory map, which buries the job log.
+          for f in hs_err_pid*.log; do found=1; echo "----- $f (first 200 lines; full file in the artifact) -----"; sed -n '1,200p' "$f"; done
           echo "===== surefire dumpstream / dump ====="
-          for f in target/surefire-reports/*.dumpstream target/surefire-reports/*.dump; do [ -e "$f" ] && { echo "----- $f -----"; cat "$f"; }; done
+          for f in target/surefire-reports/*.dumpstream target/surefire-reports/*.dump; do found=1; echo "----- $f -----"; cat "$f"; done
+          if [ "$found" = 0 ]; then
+            echo "No hs_err_pid*.log and no surefire dump/dumpstream was written --"
+            echo "the fork died without the JVM writing a crash log (native exit()/terminate,"
+            echo "or the documented spawn failure that leaves no dump at all)."
+          fi
           echo "===== OpenCL surefire reports ====="
           for f in target/surefire-reports/*OpenCL*.txt; do [ -e "$f" ] && { echo "----- $f -----"; cat "$f"; }; done
       - uses: actions/upload-artifact@v7
