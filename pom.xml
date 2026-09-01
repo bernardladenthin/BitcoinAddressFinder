@@ -10,7 +10,7 @@ SPDX-License-Identifier: Apache-2.0
 
     <groupId>net.ladenthin</groupId>
     <artifactId>bitcoinaddressfinder</artifactId>
-    <version>1.8.0</version>
+    <version>1.9.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>bitcoinaddressfinder</name>
@@ -44,7 +44,7 @@ SPDX-License-Identifier: Apache-2.0
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <slf4j.version>2.0.18</slf4j.version>
         <logback.version>1.6.3</logback.version>
-        <project.build.outputTimestamp>${git.commit.time}</project.build.outputTimestamp>
+        <project.build.outputTimestamp>2026-09-01T07:58:47Z</project.build.outputTimestamp>
         <!-- Test JVM heap: -Xmx2g cap, no eager -Xms. With reuseForks=false a fresh JVM is
              spawned per test class (~180 sequential spawns); an eager -Xms1g committed 1 GB up
              front in every short-lived fork, inflating the spawn-time footprint and occasionally
