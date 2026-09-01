@@ -760,6 +760,34 @@ jobs:
         with:
           name: signed-snapshot-assets
           path: snapshot-assets/
+      - name: Report unsigned assets (does not block the upload)
+        # Deliberately NON-blocking, and deliberately BEFORE the upload. Both attach jobs run even
+        # when their publish job failed, because a Central publish-poll timeout must not cost the
+        # GitHub assets: if Central is unreachable these are the ONLY way to get the artifacts at
+        # all. Refusing to attach on a signing failure would defeat exactly that. So annotate here,
+        # upload regardless, and fail the job afterwards. Assets always land; an unsigned release is
+        # still loudly red rather than quietly wrong.
+        # See workspace/policies/fat-jar-release-assets.md, "Attach first, then go red".
+        id: signatures
+        run: |
+          set -uo pipefail
+          dir="snapshot-assets"
+          jars=$(find "$dir" -maxdepth 1 -name '*.jar' | sort)
+          if [ -z "$jars" ]; then
+            echo "::error::no jars in $dir -- the collection step produced nothing"
+            echo "missing=-1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          missing=0
+          for jar in $jars; do
+            if [ ! -e "$jar.asc" ]; then
+              echo "::error::unsigned: $(basename "$jar") has no detached .asc"
+              missing=$((missing + 1))
+            fi
+          done
+          echo "missing=$missing" >> "$GITHUB_OUTPUT"
+          [ "$missing" -eq 0 ] && echo "all $(echo "$jars" | wc -l) jar(s) signed"
+          exit 0
       - name: Update snapshot pre-release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -773,6 +801,12 @@ jobs:
           gh release upload snapshot snapshot-assets/* \
             --repo ${{ github.repository }} \
             --clobber
+      - name: Fail if anything was attached unsigned
+        # After the upload on purpose: the assets must exist even when the signature does not.
+        if: ${{ always() && steps.signatures.outputs.missing != '0' }}
+        run: |
+          echo "::error::${{ steps.signatures.outputs.missing }} asset(s) attached without a signature (-1 means none were collected at all)"
+          exit 1
 
   publish-release:
     name: Publish Release to Central
@@ -862,7 +896,41 @@ jobs:
         with:
           name: signed-release-assets
           path: release-assets/
+      - name: Report unsigned assets (does not block the upload)
+        # Deliberately NON-blocking, and deliberately BEFORE the upload. Both attach jobs run even
+        # when their publish job failed, because a Central publish-poll timeout must not cost the
+        # GitHub assets: if Central is unreachable these are the ONLY way to get the artifacts at
+        # all. Refusing to attach on a signing failure would defeat exactly that. So annotate here,
+        # upload regardless, and fail the job afterwards. Assets always land; an unsigned release is
+        # still loudly red rather than quietly wrong.
+        # See workspace/policies/fat-jar-release-assets.md, "Attach first, then go red".
+        id: signatures
+        run: |
+          set -uo pipefail
+          dir="release-assets"
+          jars=$(find "$dir" -maxdepth 1 -name '*.jar' | sort)
+          if [ -z "$jars" ]; then
+            echo "::error::no jars in $dir -- the collection step produced nothing"
+            echo "missing=-1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          missing=0
+          for jar in $jars; do
+            if [ ! -e "$jar.asc" ]; then
+              echo "::error::unsigned: $(basename "$jar") has no detached .asc"
+              missing=$((missing + 1))
+            fi
+          done
+          echo "missing=$missing" >> "$GITHUB_OUTPUT"
+          [ "$missing" -eq 0 ] && echo "all $(echo "$jars" | wc -l) jar(s) signed"
+          exit 0
       - name: Upload release assets
         uses: softprops/action-gh-release@v3
         with:
           files: release-assets/*
+      - name: Fail if anything was attached unsigned
+        # After the upload on purpose: the assets must exist even when the signature does not.
+        if: ${{ always() && steps.signatures.outputs.missing != '0' }}
+        run: |
+          echo "::error::${{ steps.signatures.outputs.missing }} asset(s) attached without a signature (-1 means none were collected at all)"
+          exit 1
