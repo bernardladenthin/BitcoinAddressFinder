@@ -598,6 +598,15 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: temurin
+      # Cross-repo shared gate (workspace/crossrepostatus.md checksum table). maven.compiler.release
+      # governs only the code we compile; a dependency built for a newer Java lands in the jar
+      # untouched and surfaces as UnsupportedClassVersionError on a consumer's JVM. Scans the whole
+      # artifact, so the library jar and the jar-with-dependencies are both covered.
+      #
+      # 65 = Java 21, this project's target -- deliberately NOT the 52 the Java 8 siblings use.
+      # That is why the ceiling is an argument: it belongs next to the release it describes.
+      - name: Verify Java 21 bytecode (no class newer than major 65)
+        run: .github/verify-bytecode-version.sh --max-major 65 fatjar
       - name: Run fat-jar smoke test
         run: |
           .github/smoke-fatjar-cli.sh fatjar 'bitcoinaddressfinder-*-jar-with-dependencies.jar' \
