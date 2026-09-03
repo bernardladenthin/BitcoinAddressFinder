@@ -684,6 +684,34 @@ See [`../workspace/policies/ci-test-diagnostics.md`](../workspace/policies/ci-te
 See [`../workspace/policies/pit-mutation-testing.md`](../workspace/policies/pit-mutation-testing.md).
 Run PIT with the lifecycle prefix — `mvn test-compile org.pitest:pitest-maven:mutationCoverage`.
 
+## Class-file floor on the built jars
+
+BAF targets **Java 21**, so every class a consumer's JVM can load must be class-file major **65**
+or lower. `maven.compiler.release`/`<target>` governs only the code *we* compile; a dependency
+built for a newer Java lands in the jar untouched and nothing in a normal build objects — the
+failure surfaces at a consumer's JVM as `UnsupportedClassVersionError`. The fat jar makes this
+BAF's problem specifically: `jar-with-dependencies` unpacks every runtime dependency into one
+artifact, so a single too-new transitive class ships as part of the release asset.
+
+**The gate: `.github/verify-bytecode-version.sh`.** Kept **byte-identical** across java-llama.cpp /
+BitcoinAddressFinder / streambuffer / srcmorph (checksum table in `workspace/crossrepostatus.md`).
+It opens every `.class` in every jar it is given and fails on any whose class-file major version
+exceeds `--max-major`:
+
+```bash
+.github/verify-bytecode-version.sh --max-major 65 [--allow '<jar>:<entry>']... <jar-or-dir>...
+```
+
+**The ceiling is an argument, not a constant in the script** — that is exactly why BAF can share one
+file with three Java 8 siblings: 65 here, 52 there, and the value lives next to the release it
+describes. Paths may be jars or directories (searched recursively for `*.jar`), so one invocation
+covers the whole downloaded artifact — library jar and fat jar both. `module-info.class` and
+`META-INF/versions/**` are skipped unconditionally: a classpath JVM never loads either, which is
+why the `release 9` `module-info.java` in `src/main/java9` is fine here. `--allow` is a repeatable
+glob matched against `<jar-basename>:<entry-path>` for anything else that must be tolerated. Exit
+codes: 0 clean, 1 violations, **2 nothing to scan** (an empty input is a failure, never a pass).
+Wired into the `smoke-fatjar` job, ahead of the smoke run itself.
+
 ## Fat-jar release assets
 
 The runnable fat jar (`bitcoinaddressfinder-<version>-jar-with-dependencies.jar`) is a
