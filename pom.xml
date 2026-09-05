@@ -42,7 +42,7 @@ SPDX-License-Identifier: Apache-2.0
     <properties>
         <sonar.organization>bernardladenthin</sonar.organization>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <slf4j.version>2.0.18</slf4j.version>
+        <slf4j.version>2.0.19</slf4j.version>
         <logback.version>1.6.3</logback.version>
         <project.build.outputTimestamp>2026-09-01T07:58:47Z</project.build.outputTimestamp>
         <!-- Test JVM heap: -Xmx2g cap, no eager -Xms. With reuseForks=false a fresh JVM is
@@ -66,16 +66,16 @@ SPDX-License-Identifier: Apache-2.0
              policy) for full context. -->
         <jqwik.version>1.9.3</jqwik.version>
         <archunit.version>1.5.0</archunit.version>
-        <spotbugs.version>4.10.4.0</spotbugs.version>
+        <spotbugs.version>4.10.4.1</spotbugs.version>
         <fb-contrib.version>7.7.4</fb-contrib.version>
         <findsecbugs.version>1.14.0</findsecbugs.version>
         <errorprone.version>2.50.0</errorprone.version>
         <nullaway.version>0.14.1</nullaway.version>
-        <checker.version>4.2.2</checker.version>
+        <checker.version>4.2.3</checker.version>
         <java-websocket.version>1.6.0</java-websocket.version>
         <jeromq.version>0.6.0</jeromq.version>
         <jspecify.version>1.0.1</jspecify.version>
-        <lombok.version>1.18.46</lombok.version>
+        <lombok.version>1.18.48</lombok.version>
         <bitcoinj.version>0.17.1</bitcoinj.version>
         <bcprov.version>1.85.2</bcprov.version>
         <protobuf.version>4.36.1</protobuf.version>
@@ -99,7 +99,7 @@ SPDX-License-Identifier: Apache-2.0
              newest patched stable so the alert clears; see the dependencyManagement entries. -->
         <log4j.version>2.26.1</log4j.version>
         <jmh.version>1.37</jmh.version>
-        <spotless.version>3.10.1</spotless.version>
+        <spotless.version>3.10.2</spotless.version>
         <palantir-java-format.version>2.97.0</palantir-java-format.version>
     </properties>
 
@@ -113,7 +113,7 @@ SPDX-License-Identifier: Apache-2.0
     <dependencyManagement>
         <dependencies>
             <!-- slf4j-api: bitcoinj brings 2.0.16, Java-WebSocket brings 2.0.13,
-                 logback-classic brings 2.0.17; we declare 2.0.18 directly. -->
+                 logback-classic brings 2.0.17; we declare 2.0.19 directly. -->
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
@@ -200,7 +200,7 @@ SPDX-License-Identifier: Apache-2.0
                 <plugin>
                     <groupId>io.github.git-commit-id</groupId>
                     <artifactId>git-commit-id-maven-plugin</artifactId>
-                    <version>10.0.0</version>
+                    <version>10.0.1</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
