@@ -92,11 +92,18 @@ SPDX-License-Identifier: Apache-2.0
         <hamcrest.version>3.0</hamcrest.version>
         <mockito.version>5.23.0</mockito.version>
         <logcaptor.version>2.12.7</logcaptor.version>
-        <!-- log4j-api / log4j-to-slf4j arrive ONLY as test-scope transitives of
-             io.github.hakky54:logcaptor, which requests 2.25.3. That version is affected by
-             CVE-2026-49844 (GHSA-qv9r-c865-cp47, moderate): MapMessage.asJson() emits bare
-             NaN/Infinity tokens for non-finite floats, producing non-RFC-8259 JSON. Pinned to the
-             newest patched stable so the alert clears; see the dependencyManagement entries. -->
+        <!-- FLOOR GUARD, no longer an active fix. log4j-api / log4j-to-slf4j arrive ONLY as
+             test-scope transitives of io.github.hakky54:logcaptor. When this pin was added,
+             logcaptor 2.12.6 requested log4j 2.25.3, affected by CVE-2026-49844
+             (GHSA-qv9r-c865-cp47, moderate): MapMessage.asJson() emits bare NaN/Infinity tokens
+             for non-finite floats, producing non-RFC-8259 JSON.
+             logcaptor 2.12.7 declares <version.log4j>2.26.1</version.log4j> itself, i.e. exactly
+             what this pin forces, so today it changes nothing about the resolved graph. It is kept
+             as a lower bound: if logcaptor ever falls back to an affected line, the pin holds the
+             version here instead of letting it regress silently.
+             Unrelated to the Java 8 class-file floor, which is a different change entirely
+             (slf4j-simple instead of logback, checker-qual at provided scope). Neither log4j
+             artifact reaches a published artifact at all; both are test scope. -->
         <log4j.version>2.26.1</log4j.version>
         <jmh.version>1.37</jmh.version>
         <spotless.version>3.10.2</spotless.version>
@@ -143,10 +150,11 @@ SPDX-License-Identifier: Apache-2.0
                 <artifactId>jspecify</artifactId>
                 <version>${jspecify.version}</version>
             </dependency>
-            <!-- log4j-api + log4j-to-slf4j: io.github.hakky54:logcaptor (test scope) brings 2.25.3,
-                 which is affected by CVE-2026-49844; we declare ${log4j.version} directly. Both are
-                 pinned together because log4j-to-slf4j depends on log4j-api of the same version and
-                 the two must not skew. Test-scope only — neither reaches a published artifact. -->
+            <!-- log4j-api + log4j-to-slf4j, pinned as a lower bound rather than as a fix: the
+                 logcaptor version in use already requests ${log4j.version} itself. Rationale and
+                 the CVE history are on the property declaration above. Both are pinned together
+                 because log4j-to-slf4j depends on log4j-api of the same version and the two must
+                 not skew. Test-scope only — neither reaches a published artifact. -->
             <dependency>
                 <groupId>org.apache.logging.log4j</groupId>
                 <artifactId>log4j-api</artifactId>
