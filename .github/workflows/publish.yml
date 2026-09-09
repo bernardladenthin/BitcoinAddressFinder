@@ -639,7 +639,11 @@ jobs:
       - uses: actions/download-artifact@v8
         with: { name: jacoco-report-opencl, path: target/site/jacoco/ }
         continue-on-error: true
+      # Submits the dependency graph to GitHub. Informational: it says nothing about whether the
+      # artifacts are correct, but it sits in the `report` job, which the release path needs -- so
+      # without this flag a third-party action having a bad day can block a publish.
       - uses: advanced-security/maven-dependency-submission-action@v6
+        continue-on-error: true
       - name: Coveralls
         uses: coverallsapp/github-action@v2
         with:
