@@ -534,6 +534,42 @@ Until the investigation settles on a toolkit, no UI code should be added to the 
   - **Scope: two _physical_ OpenCL devices** — e.g. a machine with two GPUs, or one GPU plus a CPU that exposes an OpenCL device. (Not two logical handles to the same device.) Each `producerOpenCL` targets a distinct `(platformIndex, deviceIndex)`.
   - Availability gate: the test must self-skip unless **≥ 2 distinct physical OpenCL devices** are enumerated (extend the `OpenCLPlatformAssume` pattern). Most CI has 0–1 device, so it will usually skip, like the existing OpenCL tests; it is meant to run on a real dual-device host.
 
+### jeromq 0.6.0 poller registration race (upstream bug, worked around in one test)
+
+- **File it upstream and drop the workaround when a fixed jeromq ships.** `zmq.poll.Poller.run`
+  registers new handles in one "retired" pass per loop iteration: for each handle it looks up
+  `handle.fd.keyFor(selector)`, registers the channel when the key is `null`, and updates
+  `interestOps` when the key is valid. A key that is *cancelled but not yet deregistered* (that
+  happens on the next `select`) hits neither branch. That is exactly the state after a connect
+  completes: `TcpConnecter.connectEvent` retires its handle and hands the channel to a new
+  `StreamEngine`, whose `plug` adds a handle for the **same channel** — when both land in the same
+  pass, the engine's handle keeps `ops` but never gets a selector key, `retired` is reset, and the
+  engine never sends its ZMTP greeting. The only built-in recovery is the handshake timer
+  (`ZMQ_HANDSHAKE_IVL`, default 30 s), after which jeromq reconnects and the second attempt
+  practically always succeeds. Measured with a standalone PUB/SUB reproducer (fresh JVM, bind,
+  connect, subscribe, publish every 100 ms): about 1 in 100 connections, every stall showing the
+  subscriber's engine handle in the poller's table with `keyFor == null` and no pending commands,
+  and every one healed by any later command on that IO thread (a `disconnect`/`connect`) or by
+  the handshake timer. Only the **connecting** side is affected; the accept path registers a fresh
+  channel and never races.
+  - `ZmqResultBroadcasterTest` caps the subscriber's handshake at 1 s
+    (`HANDSHAKE_IVL_MILLIS`, set **before** `connect` — later calls do not reach the engine), so a
+    stalled connection reconnects inside the 15 s budget. Before the cap the class failed about
+    once in twenty local runs on Linux (2/25 and 2/50 fresh Maven forks) and red the ubuntu
+    `test` / `test-opencl` jobs of run 35511514278 (2026-09-20) and a run on 2026-08-26, always
+    with nothing received in the full budget. The race is platform-independent (pure NIO
+    bookkeeping), so the other OS jobs were lucky, not immune.
+  - `KeyProducerJavaZmq` in `CONNECT` mode is exposed to the same stall in production: a hit
+    delays the first key by up to 30 s and then self-heals through jeromq's own reconnect; no
+    message is lost because `PUSH`/`PULL` queues rather than drops. Not changed — a production
+    `setHandshakeIvl` is a behavioural choice for the owner, and `PUSH`-side clients are outside
+    this repo. `KeyProducerJavaZmqTest` uses `timeoutMillis = -1` and the 240 s fork budget, so it
+    only slows down on a stall.
+  - When jeromq fixes the pass (registering a handle whose key is cancelled, or deferring it to
+    the next pass), bump `jeromq.version`, delete `HANDSHAKE_IVL_MILLIS` + the
+    `connectSubscriber` rationale, and re-run the class in a loop (≥ 100 fresh forks) before
+    calling it fixed — a single green run proves nothing at a 5 % rate.
+
 ## Open — cross-cutting (slice for this repo)
 
 - **jqwik pin policy** — see [`../workspace/policies/jqwik-prompt-injection.md`](../workspace/policies/jqwik-prompt-injection.md). `jqwik.version ≤ 1.9.3` is mandatory.
