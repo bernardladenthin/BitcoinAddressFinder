@@ -569,8 +569,8 @@ No other sibling repo has OpenCL code, so this distinction is BAF-only.
 | Dependency | Version | Purpose |
 |---|---|---|
 | `bitcoinj-core` | 0.17.1 | Bitcoin crypto, address derivation |
-| `bcprov-jdk15to18` | 1.85.2 | Bouncy Castle crypto provider (bitcoinj transitive; pinned to fix GHSA-c3fc-8qff-9hwx, GHSA-p93r-85wp-75v3) |
-| `protobuf-javalite` | 4.36.0 | Protocol Buffers (bitcoinj transitive; pinned to latest) |
+| `bcprov-jdk15to18` | 1.86 | Bouncy Castle crypto provider (bitcoinj transitive; pinned to fix GHSA-c3fc-8qff-9hwx, GHSA-p93r-85wp-75v3) |
+| `protobuf-javalite` | 4.36.2 | Protocol Buffers (bitcoinj transitive; pinned to latest) |
 | `jsr305` | 3.0.2 | Findbugs nullability annotations (bitcoinj transitive, runtime) |
 | `jcip-annotations` | 1.0 | JCIP concurrency annotations (bitcoinj transitive, runtime) |
 | `lmdbjava` | 0.9.3 | LMDB database bindings |
@@ -583,7 +583,7 @@ No other sibling repo has OpenCL code, so this distinction is BAF-only.
 | `Java-WebSocket` | 1.6.0 | WebSocket producer |
 | `jeromq` | 0.6.0 | ZeroMQ producer |
 | `jspecify` | 1.0.1 | Nullness annotations |
-| `slf4j-api` | 2.0.18 | Logging facade |
+| `slf4j-api` | 2.0.19 | Logging facade |
 | `logback-classic` | 1.6.3 | SLF4J implementation |
 
 Test-only:
