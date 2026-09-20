@@ -603,6 +603,26 @@ SPDX-License-Identifier: Apache-2.0
                     <execution>
                         <id>default-testCompile</id>
                         <configuration>
+                            <!-- Tests compile on the CLASSPATH, never on the module path, whatever
+                                 target/classes contains. maven-compiler-plugin auto-selects the
+                                 module path for testCompile as soon as target/classes/module-info.class
+                                 exists, patching the tests into the named module — where
+                                 java.lang.management (LmdbCrashReproDriverTest) is unreadable because
+                                 module-info.java declares no `requires`, and every test-scope
+                                 dependency would need a `requires` of its own. Within ONE invocation
+                                 the descriptor is absent at testCompile (module-info-compile is bound
+                                 to prepare-package, after test), so this looked harmless. It bit on
+                                 the SECOND invocation of a job sharing target/ (publish-snapshot /
+                                 publish-release: `mvn -P release deploy` then `mvn -P release,assembly
+                                 verify`, no clean): maven-compiler-plugin 3.16.0's output tracking
+                                 (MCOMPILER-578) recompiles the tests there — "Recompiling the module
+                                 because of changed dependency" — which 3.15.0 skipped as up to date,
+                                 and the leftover module-info.class flipped that recompile into module
+                                 mode (2026-09-20, run 35508164897). -DskipTests does not help: it skips
+                                 test EXECUTION, testCompile still runs. Same class as the javadoc
+                                 module-mode trap guarded by -Dmaven.javadoc.skip on those steps; see
+                                 ../workspace/policies/jpms-module-descriptor.md. -->
+                            <useModulePath>false</useModulePath>
                             <!--
                                 JMH annotation processor generates harness classes in net.ladenthin.*,
                                 which NullAway would then analyze and fail (generated code lacks @NonNull

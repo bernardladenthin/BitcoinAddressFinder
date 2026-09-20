@@ -89,7 +89,19 @@ deploy` invocation in the same job, with no `mvn clean` in between). The fat-jar
 [`../workspace/policies/jpms-module-descriptor.md`](../workspace/policies/jpms-module-descriptor.md)
 "A second trigger: multiple Maven invocations sharing `target/`" for the general mechanism
 (incident: 2026-08-02, CI run 30768800950, `error: No source files for package
-net.ladenthin.bitcoinaddressfinder.io`). The Java-8 siblings (java-llama.cpp, streambuffer,
+net.ladenthin.bitcoinaddressfinder.io`). **The javadoc flag covers only javadoc.** The same
+second invocation also re-runs `testCompile` (`-DskipTests` skips test *execution*, not test
+compilation), and with the leftover `module-info.class` in `target/classes` maven-compiler-plugin
+puts the tests on the module path — `package java.lang.management is not visible … module
+net.ladenthin.bitcoinaddressfinder does not read it` (`LmdbCrashReproDriverTest`). That stayed
+latent under compiler-plugin 3.15.0, which considered the tests up to date and skipped the
+recompile; **3.16.0's output tracking (MCOMPILER-578) recompiles them** ("Recompiling the module
+because of changed dependency"), and the first publish dispatch after that Dependabot bump went
+red in exactly this step (2026-09-20, run 35508164897; bisected locally: 3.15.0 passes, 3.16.0
+fails, 3.16.0 + the fix passes). The guard is `<useModulePath>false</useModulePath>` on the
+`default-testCompile` execution — tests compile on the classpath regardless of what `target/`
+holds, which is also the only mode they ever run in — not another CI flag, because the local-dev
+shape (`mvn test` after `mvn package`, no `clean`) hits it just the same. The Java-8 siblings (java-llama.cpp, streambuffer,
 srcmorph — all `<source>8>`) stay in classpath mode regardless and therefore carry **no** skip
 flag; the redundant/no-op flags they used to have were removed, and streambuffer/llamacpp let
 javadoc build during their `verify` test job so it is gated in PR CI. BAF cannot do the same
@@ -131,6 +143,15 @@ the `maven-javadoc-plugin` block — read those before touching any of it. Summa
   `maven-javadoc-plugin` block is declared before `maven-compiler-plugin` so it wins the
   same-phase ordering). Javadoc must see a module-descriptor-free `target/classes` so it stays
   in classpath mode — see the "Verifying Javadoc locally" section above.
+- **`default-testCompile` sets `<useModulePath>false</useModulePath>`.** The compiler plugin
+  otherwise auto-selects the module path for test compilation whenever
+  `target/classes/module-info.class` exists — the same presence-triggered flip as javadoc and
+  Surefire, arriving through a third plugin. Harmless within one clean invocation (the descriptor
+  is compiled after `test`), it fires on any later invocation over the same `target/`, and became
+  visible when maven-compiler-plugin 3.16.0 started recompiling tests there (see the fat-jar
+  paragraph under "Verifying Javadoc locally"). Tests are compiled and run on the classpath by
+  design, so pinning the compile mode removes the dependence on `target/`'s history instead of
+  adding a fourth place that has to remember to `clean`.
 - **The internal-JDK `--add-opens`/`--add-exports` are for lmdbjava, not project code.** The
   only former internal-JDK user, `ByteBufferUtility#freeByteBuffer`, was deleted (direct
   buffers are reclaimed by the JVM's built-in Cleaner); no project source imports
