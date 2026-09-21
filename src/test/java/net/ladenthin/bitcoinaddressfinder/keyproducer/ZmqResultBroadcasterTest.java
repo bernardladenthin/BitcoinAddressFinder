@@ -33,7 +33,9 @@ import org.zeromq.ZMQ;
  * ZMTP handshake at {@link #HANDSHAKE_IVL_MILLIS}. Without that cap the tests failed about once in
  * twenty runs (fresh Maven forks on Linux; the ubuntu CI jobs went red the same way), always with
  * the full {@link #AWAIT_MILLIS} elapsed and nothing received. See the helper for what stalls and
- * why the cap is the fix.
+ * why the cap is the fix; the deterministic reproduction and the full write-up are in
+ * {@link JeromqPollerHandOffRaceTest}, which goes red once a jeromq build fixes the race — that is
+ * the moment to delete the cap.
  */
 class ZmqResultBroadcasterTest {
 

@@ -565,9 +565,23 @@ Until the investigation settles on a toolkit, no UI code should be added to the 
     `setHandshakeIvl` is a behavioural choice for the owner, and `PUSH`-side clients are outside
     this repo. `KeyProducerJavaZmqTest` uses `timeoutMillis = -1` and the 240 s fork budget, so it
     only slows down on a stall.
-  - When jeromq fixes the pass (registering a handle whose key is cancelled, or deferring it to
-    the next pass), bump `jeromq.version`, delete `HANDSHAKE_IVL_MILLIS` + the
-    `connectSubscriber` rationale, and re-run the class in a loop (≥ 100 fresh forks) before
+  - **`JeromqPollerHandOffRaceTest` is the deterministic, socket-free reproduction and the
+    complete write-up** (mechanism, the real connecter-to-engine path, evidence, the shape of the
+    fix, the verification plan). It asserts the bug is *present* (20/20 stalls on 0.6.0) with a
+    control (same hand-off across two passes works) and the healing path (any later pass
+    registers the stuck handle — why the handshake cap works). It goes red on a fixed jeromq.
+  - Plan: fork `zeromq/jeromq` (`master`, code under `jeromq-core/`), apply the retire → flush →
+    register fix in `jeromq-core/src/main/java/zmq/poll/Poller.java`, port the reproduction
+    inverted into `jeromq-core/src/test/java/zmq/poll/` as the regression test, point BAF at the
+    fork (`jeromq.version`), and expect `JeromqPollerHandOffRaceTest` red and
+    `ZmqResultBroadcasterTest` green **without** `HANDSHAKE_IVL_MILLIS`; then PR upstream. The
+    fix was validated once in a local copy (50/50 deterministic, 300 fresh JVMs / 900 real
+    connections with zero stalls) but must be re-proven independently in the fork. Open detail:
+    what makes the mailbox readable in the same select as the connect completion is not
+    established (the signaler's write-then-count order was tested and is not it); irrelevant to
+    the fix, useful for the upstream issue text.
+  - When the fixed jeromq is in use, delete `HANDSHAKE_IVL_MILLIS` + the `connectSubscriber`
+    rationale and re-run `ZmqResultBroadcasterTest` in a loop (≥ 100 fresh forks) before
     calling it fixed — a single green run proves nothing at a 5 % rate.
 
 ## Open — cross-cutting (slice for this repo)
