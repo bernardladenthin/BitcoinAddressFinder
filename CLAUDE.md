@@ -337,7 +337,7 @@ See `examples/config_*.json` for all configuration variants.
 
 - **JUnit 6** (6.1.3) — `junit-jupiter` (JUnit Jupiter) for all tests
 - **Hamcrest** (3.0) — matchers
-- **Mockito** (5.23.0) — mocking
+- **Mockito** (5.24.0) — mocking
 
 ### Conventions
 
@@ -596,21 +596,21 @@ No other sibling repo has OpenCL code, so this distinction is BAF-only.
 | `jcip-annotations` | 1.0 | JCIP concurrency annotations (bitcoinj transitive, runtime) |
 | `lmdbjava` | 0.9.3 | LMDB database bindings |
 | `lwjgl` / `lwjgl-opencl` | 3.4.3 | Java OpenCL bindings (plus per-platform `natives-*` classifiers) |
-| `jackson-databind` | 2.22.2 | JSON config parsing |
-| `jackson-dataformat-yaml` | 2.22.2 | YAML config parsing |
+| `jackson-databind` | 2.22.3 | JSON config parsing |
+| `jackson-dataformat-yaml` | 2.22.3 | YAML config parsing |
 | `guava` | 33.7.1-jre | Google core utilities |
 | `commons-codec` | 1.22.1 | Base58, hex encoding |
 | `commons-io` | 2.22.0 | I/O utilities |
 | `Java-WebSocket` | 1.6.0 | WebSocket producer |
 | `jeromq` | 0.6.0 | ZeroMQ producer |
 | `jspecify` | 1.0.1 | Nullness annotations |
-| `slf4j-api` | 2.0.19 | Logging facade |
-| `logback-classic` | 1.6.3 | SLF4J implementation |
+| `slf4j-api` | 2.0.20 | Logging facade |
+| `logback-classic` | 1.6.4 | SLF4J implementation |
 
 Test-only:
 | `junit-jupiter` | 6.1.3 | JUnit 6 (Jupiter) test framework |
 | `hamcrest` | 3.0 | Assertion matchers |
-| `mockito-core` | 5.23.0 | Mocking |
+| `mockito-core` | 5.24.0 | Mocking |
 
 ---
 
