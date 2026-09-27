@@ -84,20 +84,15 @@ public class LMDBBase {
         LMDBPersistence lmdb = new LMDBPersistence(lmdbConfigurationReadOnly, persistenceUtils);
         lmdb.init();
 
-        AddressPresence lookup =
-                switch (backend) {
-                    case LMDB_ONLY -> lmdb;
-                    case BLOOM ->
-                        BloomFilterAccelerator.populateFrom(lmdb, lmdb, lmdbConfigurationReadOnly.bloomFilterFpp);
-                    case HASHSET -> HashSetAddressPresence.populateFrom(lmdb);
-                    case TRUNCATED_LONG_64 -> TruncatedLong64SortedArrayPresence.populateFrom(lmdb);
-                    case BINARY_FUSE_8 ->
-                        new BinaryFuseAccelerator(BinaryFuse8AddressPresence.populateFrom(lmdb), lmdb);
-                    case BINARY_FUSE_16 ->
-                        new BinaryFuseAccelerator(BinaryFuse16AddressPresence.populateFrom(lmdb), lmdb);
-                    case BLOCKED_BLOOM ->
-                        new BlockedBloomAccelerator(BlockedBloomAddressPresence.populateFrom(lmdb), lmdb);
-                };
+        AddressPresence lookup = switch (backend) {
+            case LMDB_ONLY -> lmdb;
+            case BLOOM -> BloomFilterAccelerator.populateFrom(lmdb, lmdb, lmdbConfigurationReadOnly.bloomFilterFpp);
+            case HASHSET -> HashSetAddressPresence.populateFrom(lmdb);
+            case TRUNCATED_LONG_64 -> TruncatedLong64SortedArrayPresence.populateFrom(lmdb);
+            case BINARY_FUSE_8 -> new BinaryFuseAccelerator(BinaryFuse8AddressPresence.populateFrom(lmdb), lmdb);
+            case BINARY_FUSE_16 -> new BinaryFuseAccelerator(BinaryFuse16AddressPresence.populateFrom(lmdb), lmdb);
+            case BLOCKED_BLOOM -> new BlockedBloomAccelerator(BlockedBloomAddressPresence.populateFrom(lmdb), lmdb);
+        };
 
         return new LMDBHandle(lmdb, lookup);
     }
