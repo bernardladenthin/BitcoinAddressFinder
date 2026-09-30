@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **CI: shared files and the release gate are checked.** The files kept byte-identical with the sibling
+  repositories are listed with their SHA-256 in `.github/shared-files.sha256`; a new `shared-files` job
+  fails on a copy changed here alone and warns on a sibling's differing copy. The same job runs the
+  shared build-check library's tests and `check-release-gate.py`: every job must gate both publish
+  jobs unless `.github/release-gate-exemptions.txt` says why (`vmlens` now gates). The crash-log step
+  and the signing-key preflight are shared scripts (`print-crash-logs.sh`, `verify-signing-key.sh`)
+  instead of copies pasted into the workflow.
+
 ## [1.8.0] - 2026-08-29
 
 ### Added

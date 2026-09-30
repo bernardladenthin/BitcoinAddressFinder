@@ -715,7 +715,7 @@ BAF's problem specifically: `jar-with-dependencies` unpacks every runtime depend
 artifact, so a single too-new transitive class ships as part of the release asset.
 
 **The gate: `.github/verify-bytecode-version.sh`.** Kept **byte-identical** across java-llama.cpp /
-BitcoinAddressFinder / streambuffer / srcmorph (checksum table in `workspace/crossrepostatus.md`).
+BitcoinAddressFinder / streambuffer / srcmorph (listed in `.github/shared-files.sha256`, checked by the `shared-files` job).
 It opens every `.class` in every jar it is given and fails on any whose class-file major version
 exceeds `--max-major`:
 
@@ -746,7 +746,7 @@ uploads it). The cross-repo convention + per-repo shapes are documented in
 **BAF-specific smoke.** The cross-repo rule "no release asset is attached that CI has not run" is
 implemented here by the `smoke-fatjar` job (`needs: [build]`, gates both publish jobs): it downloads
 the `jars` artifact and runs the **byte-identical shared** `.github/smoke-fatjar-cli.sh` (synced with
-srcmorph — see the checksum table in `crossrepostatus.md`) against
+srcmorph — listed in `.github/shared-files.sha256`) against
 `examples/config_AddressFilesToLMDB.json`, asserting exit 0 plus `Main#run end.` in the output. That
 config imports the bundled sample address files into a fresh LMDB under `examples/`, so it also
 exercises the **lmdbjava native library out of the fat jar** — the BAF analogue of what jllama's
@@ -762,6 +762,20 @@ depend on an ICD being installed.
 version mismatch in `dependencyManagement`, the `excludedScopes=[test,provided]` enforcer default
 gotcha, and merge-discipline guidance are in
 [`../workspace/policies/dependency-convergence-pinning.md`](../workspace/policies/dependency-convergence-pinning.md).
+
+## Shared files and the release gate (`shared-files` job)
+
+Files kept byte-identical with java-llama.cpp, BitcoinAddressFinder, srcmorph and streambuffer are
+listed with their SHA-256 in **`.github/shared-files.sha256`** — the reference for what must stay
+equal. The `shared-files` job of `publish.yml` (identical in all four repositories, gating both
+publish jobs) fails when a listed file changed here alone and warns when another repository's
+default branch lists it with a different hash. To change a shared file, change every copy, then run
+`python3 .github/check-shared-files.py --write` in each repository. The shared build-check library
+(`.github/buildcheck/`, stdlib-only Python with unit tests: `python3 -m unittest discover -s
+.github/buildcheck/tests -t .github`) also runs **`check-release-gate.py`**: every job must gate both
+publish jobs unless `.github/release-gate-exemptions.txt` names it with a reason. Details and the
+reasoning (copies with a checksum rather than a shared actions repository):
+[`../workspace/crossrepostatus.md`](../workspace/crossrepostatus.md), "Cross-repo byte-identical files".
 
 ## Open TODOs
 

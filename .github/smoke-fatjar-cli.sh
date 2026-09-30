@@ -4,8 +4,9 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-# Cross-repo shared script — kept BYTE-IDENTICAL in BitcoinAddressFinder and srcmorph (sync any
-# edit to both, and to the checksum table in workspace/crossrepostatus.md). Smoke-tests a runnable
+# Cross-repo shared script — kept BYTE-IDENTICAL in BitcoinAddressFinder and srcmorph (listed in
+# each repo's .github/shared-files.sha256: sync any edit to both, then `check-shared-files.py
+# --write`). Smoke-tests a runnable
 # fat jar (jar-with-dependencies) by actually launching it: `java -jar <jar> <args>` must exit 0
 # and print an expected success marker.
 #

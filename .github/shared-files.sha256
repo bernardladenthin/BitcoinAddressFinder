@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# The files this repository keeps BYTE-IDENTICAL with java-llama.cpp, BitcoinAddressFinder,
+# srcmorph and streambuffer (each lists the ones it carries). Checked by the `shared-files` job of
+# .github/workflows/publish.yml (.github/check-shared-files.py, see .github/buildcheck/sharedfiles.py):
+# a copy changed here alone fails it, a copy another repository lists with a different hash warns.
+# To change a shared file: change it in every repository listing it, then run
+# `python3 .github/check-shared-files.py --write` in each. `sha256sum -c` reads this file too.
+82171de97c6621b4c1f3e9cd66afd49990f6d31331857423b37f2b9a2f35fbc0  .github/buildcheck/__init__.py
+3d1a9f2e93709941261a9655bc19bf50d5becefd8f6a6c2f5564096a757996bb  .github/buildcheck/workflow.py
+5a70eee1bb8af180edfd2a4bae61be61fac15b409f5df6a8bb9869425d7fc381  .github/buildcheck/releasegate.py
+86545e924c95b69a16f4b9f759a38779b441aa04d8b635a52eb029a196e39a11  .github/buildcheck/sharedfiles.py
+0059120aab539c6ce8055675ae0d3b040097f80320051e40385072f68845ddb0  .github/buildcheck/tests/__init__.py
+561efd3f26d7728e475c8ce83c10b4761a6703b585b7b2a7ab052df10f73166c  .github/buildcheck/tests/helpers.py
+4985f25fa177bd79a79335742adfd0da0431e101124b4e7e214906b56ae903de  .github/buildcheck/tests/test_workflow.py
+cbe504ad081ba31ec16e11c11f879c64179ca7741bf0b1d1318a7fc969ed67dd  .github/buildcheck/tests/test_releasegate.py
+7cbef54c09c6612503da7bd3733b4ab51c6f34666ef062885a7586e075a907de  .github/buildcheck/tests/test_sharedfiles.py
+7fe208dd33184b4543328f97b339c95e23c408b120e6bfa6095de4182aeb9a19  .github/check-release-gate.py
+1604ccdea83998814a3c1f98f746272222039867b0c7d692355e61495c1c648b  .github/check-shared-files.py
+7da53fdb9537ccf7d3f3740be31f295bacb914fe186304b9ed8a65fd3d3d413e  .github/print-crash-logs.sh
+c8c02dc39aeacc154fad74071443c6513666aa94ca9f9c5fab49c5f39dea7ee6  .github/verify-signing-key.sh
+e0b2a4f331eae326b61c71f78d6272d06d99140a85dedb7710f93402de862466  .github/verify-bytecode-version.sh
+ab45f5c102b47dd16c325d4d9c283d158ba90c05f484eac45b2767885c4462f9  .github/signing-selftest/build.gradle.kts
+9b2ea5b5ff8d48607e26e4e211ad6d496f7660e71c84e42caaa82b84f7001710  .github/signing-selftest/settings.gradle.kts
+7232b092d3ba49b97bee7b539aaf6ee4c698e86bd3d4dd256e8ae2f85f653ee9  .github/ISSUE_TEMPLATE/bug_report.md
+0f08122e597f93dbbdc9c80e88984b4bf4738951d5902813df3d4640cdb11bac  .github/ISSUE_TEMPLATE/feature_request.md
+ebfcc0adf59f5858bbe4dc077c906304a197f72a55256f0d5aac669bee5e871f  .github/PULL_REQUEST_TEMPLATE.md
+abea5fb970a46ccf9ba9127d59abf304202efd13c2d6a28da2ff75da0c92a9b8  .github/smoke-fatjar-cli.sh
+42f1842270af691bdfe561355bee4eb9ae326383f1852db19763abb888d6b90e  lombok.config
