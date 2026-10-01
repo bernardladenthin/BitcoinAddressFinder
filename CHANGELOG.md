@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.github/shared-files.sha256` entry `.github/workflows/publish.yml#<job>` hashes one job (`startgate`,
   `shared-files`, `verify-signing-key`, `check-snapshot`, `check-tag`, and where present
   `verify-signing-key-gradle`, `github-snapshot`, `github-release`).
+- **Workflow run scripts are parsed in the `shared-files` job**: `check-run-scripts.py` runs `bash -n`
+  over every `run:` script of the workflows and composite actions that runs in bash (shell decided as
+  the runner does), so a broken script fails within minutes instead of in the job that runs it.
 - **Maven versions are compared with the sibling repositories**: `check-versions.py` (in the
   `shared-files` job) warns where a dependency or plugin -- incl. annotation-processor paths and the
   Spotless formatter version -- is used in another version than in a sibling's default branch.
