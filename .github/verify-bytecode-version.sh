@@ -5,8 +5,9 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
 # Cross-repo shared script — kept BYTE-IDENTICAL in java-llama.cpp, srcmorph,
-# BitcoinAddressFinder and streambuffer (sync any edit to all four, and to the checksum table in
-# workspace/crossrepostatus.md). Fails when a built jar contains a class file newer than the Java
+# BitcoinAddressFinder and streambuffer (listed in each repo's .github/shared-files.sha256, which
+# the `shared-files` job checks: sync any edit to all four, then `check-shared-files.py --write`).
+# Fails when a built jar contains a class file newer than the Java
 # release the artifact claims to support.
 #
 # Why: `maven.compiler.release` governs only the code WE compile. A dependency compiled for a newer

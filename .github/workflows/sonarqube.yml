@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
 #
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: MIT OR Apache-2.0
 
 name: SonarQube
 on:
@@ -20,7 +20,7 @@ jobs:
       - name: Set up JDK 21
         uses: actions/setup-java@v6
         with:
-          java-version: 21
+          java-version-file: .java-version
           distribution: 'zulu'
       - name: Cache SonarQube packages
         uses: actions/cache@v6

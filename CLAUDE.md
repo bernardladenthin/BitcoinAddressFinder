@@ -715,7 +715,7 @@ BAF's problem specifically: `jar-with-dependencies` unpacks every runtime depend
 artifact, so a single too-new transitive class ships as part of the release asset.
 
 **The gate: `.github/verify-bytecode-version.sh`.** Kept **byte-identical** across java-llama.cpp /
-BitcoinAddressFinder / streambuffer / srcmorph (checksum table in `workspace/crossrepostatus.md`).
+BitcoinAddressFinder / streambuffer / srcmorph (listed in `.github/shared-files.sha256`, checked by the `shared-files` job).
 It opens every `.class` in every jar it is given and fails on any whose class-file major version
 exceeds `--max-major`:
 
@@ -746,7 +746,7 @@ uploads it). The cross-repo convention + per-repo shapes are documented in
 **BAF-specific smoke.** The cross-repo rule "no release asset is attached that CI has not run" is
 implemented here by the `smoke-fatjar` job (`needs: [build]`, gates both publish jobs): it downloads
 the `jars` artifact and runs the **byte-identical shared** `.github/smoke-fatjar-cli.sh` (synced with
-srcmorph — see the checksum table in `crossrepostatus.md`) against
+srcmorph — listed in `.github/shared-files.sha256`) against
 `examples/config_AddressFilesToLMDB.json`, asserting exit 0 plus `Main#run end.` in the output. That
 config imports the bundled sample address files into a fresh LMDB under `examples/`, so it also
 exercises the **lmdbjava native library out of the fat jar** — the BAF analogue of what jllama's
@@ -762,6 +762,29 @@ depend on an ICD being installed.
 version mismatch in `dependencyManagement`, the `excludedScopes=[test,provided]` enforcer default
 gotcha, and merge-discipline guidance are in
 [`../workspace/policies/dependency-convergence-pinning.md`](../workspace/policies/dependency-convergence-pinning.md).
+
+## Shared files and the release gate (`shared-files` job)
+
+Files kept byte-identical with java-llama.cpp, BitcoinAddressFinder, srcmorph and streambuffer are
+listed with their SHA-256 in **`.github/shared-files.sha256`** — the reference for what must stay
+equal. An entry `.github/workflows/publish.yml#<job>` stands for one job of the workflow: the jobs kept
+identical across the repositories (`startgate`, `shared-files`, `verify-signing-key`, `check-snapshot`,
+`check-tag`, `verify-signing-key-gradle`, `github-snapshot`, `github-release`) are checked like files. An entry ending in `?repo` covers a file or job identical up to the
+repository's name (hashed with the name replaced by `{repo}`), e.g. `SUPPORT.md?repo`.
+The `shared-files` job of `publish.yml` (gating both publish jobs) fails when a listed file changed here alone and warns when another repository's
+default branch lists it with a different hash. To change a shared file, change every copy, then run
+`python3 .github/check-shared-files.py --write` in each repository. The shared build-check library
+(`.github/buildcheck/`, stdlib-only Python with unit tests: `python3 -m unittest discover -s
+.github/buildcheck/tests -t .github`) also runs **`check-release-gate.py`**: every job must gate both
+publish jobs unless `.github/release-gate-exemptions.txt` names it with a reason, and
+**`check-versions.py`**, which **warns** where a Maven dependency or plugin (incl. the Spotless
+formatter version) is used here in another version than in a sibling repository -- Dependabot bumps
+each repository on its own, so this is where the drift shows -- and **`check-run-scripts.py`**, which
+runs `bash -n` over every `run:` script of the workflows and composite actions that runs in bash, so
+a broken script (a lost line continuation, say) fails here instead of in the job running it. The JDK every
+workflow uses is `.java-version` (setup-java's `java-version-file`), the same shared file in all four. Details and the
+reasoning (copies with a checksum rather than a shared actions repository):
+[`../workspace/crossrepostatus.md`](../workspace/crossrepostatus.md), "Cross-repo byte-identical files".
 
 ## Open TODOs
 

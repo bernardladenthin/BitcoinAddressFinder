@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
 #
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: MIT OR Apache-2.0
 
 name: Publish
 on:
@@ -48,9 +48,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  JAVA_VERSION: '21'
-
 jobs:
   # ---------------------------------------------------------------------------
   # Start gate — single cancellable abort window before the pipeline starts.
@@ -63,6 +60,32 @@ jobs:
     environment: startgate
     steps:
       - run: echo "Start gate elapsed — proceeding with pipeline."
+
+  # ---------------------------------------------------------------------------
+  # Files kept byte-identical with the sibling repositories (java-llama.cpp,
+  # BitcoinAddressFinder, srcmorph, streambuffer), listed in .github/shared-files.sha256.
+  # A copy changed here alone fails; one the siblings list with another hash warns.
+  # Also runs the tests of the shared build checks and the release-gate check. This
+  # job is itself identical in all four repositories.
+  # ---------------------------------------------------------------------------
+  shared-files:
+    name: Shared files + build checks
+    needs: startgate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Shared files match .github/shared-files.sha256 (siblings compared, warnings only)
+        run: python3 .github/check-shared-files.py
+      - name: Build-check tests
+        run: python3 -m unittest discover -s .github/buildcheck/tests -t .github
+      - name: Release gate (every job gates both publish jobs, or release-gate-exemptions.txt says why)
+        run: python3 .github/check-release-gate.py
+      - name: Run scripts parse (bash -n over every bash run script of the workflows and actions)
+        run: python3 .github/check-run-scripts.py
+      - name: Maven versions (warns where a dependency or plugin differs from a sibling repository)
+        run: python3 .github/check-versions.py
 
   # ---------------------------------------------------------------------------
   # GPG signing-key preflight (standalone, no `needs:` — runs in parallel at the
@@ -88,94 +111,15 @@ jobs:
     runs-on: ubuntu-latest
     environment: maven-central
     steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Import key + run sign/verify self-test (prints only PUBLIC metadata)
-        shell: bash
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-        run: |
-          set -euo pipefail   # NOTE: deliberately NO `set -x` — it would echo the passphrase.
-
-          if [ -z "${GPG_PRIVATE_KEY:-}" ]; then
-            echo "::error::GPG_PRIVATE_KEY is empty for this run. Either the secret is not set, or it is scoped to a different environment/branch than 'maven-central' on this ref. Nothing to verify."
-            exit 1
-          fi
-          # Defensive: even though we never print it, register the passphrase as a
-          # masked value so any accidental echo downstream is redacted.
-          if [ -n "${GPG_PASSPHRASE:-}" ]; then echo "::add-mask::${GPG_PASSPHRASE}"; fi
-
-          echo "gpg: $(gpg --version | head -n1)"
-
-          # Ephemeral, private keyring; removed on exit.
-          export GNUPGHOME="$(mktemp -d)"
-          chmod 700 "$GNUPGHOME"
-          cleanup() { gpgconf --kill gpg-agent >/dev/null 2>&1 || true; rm -rf "$GNUPGHOME"; }
-          trap cleanup EXIT
-
-          echo "== Import private key into an ephemeral keyring (key via stdin, never argv) =="
-          printf '%s\n' "$GPG_PRIVATE_KEY" | gpg --batch --import
-
-          COLONS="$(gpg --list-secret-keys --with-colons --fixed-list-mode)"
-          SECCOUNT="$(printf '%s\n' "$COLONS" | awk -F: '$1=="sec"{n++} END{print n+0}')"
-          echo "Secret keys imported: $SECCOUNT"
-          if [ "$SECCOUNT" -lt 1 ]; then
-            echo "::error::No secret key was imported — GPG_PRIVATE_KEY is not a valid armored secret key (check that the secret contains the full -----BEGIN PGP PRIVATE KEY BLOCK----- with intact newlines)."
-            exit 1
-          fi
-
-          KEYID="$(printf '%s\n' "$COLONS"  | awk -F: '$1=="sec"{print $5; exit}')"
-          ALGO="$(printf '%s\n'  "$COLONS"  | awk -F: '$1=="sec"{print $4; exit}')"
-          CREATED="$(printf '%s\n' "$COLONS"| awk -F: '$1=="sec"{print $6; exit}')"
-          EXPIRES="$(printf '%s\n' "$COLONS"| awk -F: '$1=="sec"{print $7; exit}')"
-          FPR="$(printf '%s\n'   "$COLONS"  | awk -F: '$1=="fpr"{print $10; exit}')"
-
-          echo "== PUBLIC key metadata =="
-          echo "  Key ID (long):  $KEYID"
-          echo "  Fingerprint:    $FPR"
-          echo "  Pubkey algo id: $ALGO"
-          echo "  Created (UTC):  $(date -u -d "@$CREATED" 2>/dev/null || echo "$CREATED")"
-          echo "  Owner UID(s):"
-          printf '%s\n' "$COLONS" | awk -F: '$1=="uid"{print "    - " $10}'
-
-          # --- Expiration gate ---
-          NOW="$(date -u +%s)"
-          if [ -n "$EXPIRES" ]; then
-            echo "  Expires (UTC):  $(date -u -d "@$EXPIRES" 2>/dev/null || echo "$EXPIRES")"
-            if [ "$EXPIRES" -le "$NOW" ]; then
-              echo "::error::Signing key is EXPIRED — Maven Central will reject its signatures. Extend the key's expiry and update the GPG_PRIVATE_KEY secret."
-              exit 1
-            fi
-            echo "  Days to expiry: $(( (EXPIRES - NOW) / 86400 ))"
-            if [ "$(( (EXPIRES - NOW) / 86400 ))" -lt 30 ]; then
-              echo "::warning::Signing key expires in under 30 days — plan to rotate it."
-            fi
-          else
-            echo "  Expires (UTC):  never"
-          fi
-
-          # --- Signing-capability gate ---
-          if printf '%s\n' "$COLONS" | awk -F: '($1=="sec"||$1=="ssb"){print $12}' | grep -q 's'; then
-            echo "  Signing capability: present"
-          else
-            echo "::error::No signing-capable (sub)key found — this key cannot produce release signatures."
-            exit 1
-          fi
-
-          # --- Passphrase unlock + sign + verify roundtrip (the exact failure mode) ---
-          # Passphrase on fd 3 only. Payload is a throwaway nonce; only the signature's
-          # validity (exit codes) matters — no secret is ever emitted.
-          echo "== Passphrase unlock + detached-sign + verify self-test =="
-          WORK="$(mktemp -d)"
-          printf '%s' "ai-index signing-selftest" > "$WORK/payload.txt"
-          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 \
-              --local-user "$KEYID" \
-              --detach-sign --armor --output "$WORK/payload.txt.asc" "$WORK/payload.txt" \
-              3<<<"${GPG_PASSPHRASE:-}"
-          echo "  Signature produced: $(wc -c < "$WORK/payload.txt.asc") armored bytes"
-          gpg --batch --verify "$WORK/payload.txt.asc" "$WORK/payload.txt"
-          rm -rf "$WORK"
-
-          echo "RESULT: OK — key imports, is not expired, is signing-capable, and the passphrase successfully unlocked it to produce a VALID signature. maven-gpg-plugin will be able to sign with this key/passphrase."
+        # Shared, byte-identical in all four repos; the security notes are in the script.
+        run: bash .github/verify-signing-key.sh
 
   # ---------------------------------------------------------------------------
   # GPG signing-key preflight — GRADLE / BouncyCastle path.
@@ -205,11 +149,11 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: '21'
+          java-version-file: .java-version
           distribution: temurin
       - uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: "9.6.1"
+          gradle-version: "9.8.0"
       - name: Sign a throwaway artifact via useInMemoryPgpKeys (BouncyCastle)
         shell: bash
         env:
@@ -246,7 +190,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: '21'
+          java-version-file: .java-version
           distribution: temurin
       - name: Spotless check (fail fast on format violations)
         run: mvn -B --no-transfer-progress spotless:check
@@ -257,7 +201,7 @@ jobs:
         run: |
           mvn -B --no-transfer-progress -DskipTests -Denforcer.skip=true compile
           echo "=== internal package dependency graph (jdeps, bytecode) ==="
-          jdeps -verbose:package target/classes | grep 'net.ladenthin.bitcoinaddressfinder' || true
+          jdeps -verbose:package target/classes | grep 'net\.ladenthin\.' || true
 
   build:
     name: Build
@@ -267,7 +211,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
           cache: maven
       - name: Build
@@ -293,40 +237,11 @@ jobs:
         run: mvn --batch-mode --no-transfer-progress -P assembly -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -DskipTests -Dmaven.javadoc.skip=true package
       - uses: actions/upload-artifact@v7
         with: { name: jars, path: target/*.jar }
-      # A forked test JVM that aborts leaves an hs_err_pid log and a surefire
-      # dumpstream -- both otherwise ONLY inside the artifact uploaded below,
-      # which is unreachable from anywhere that cannot fetch from Azure Blob
-      # (a phone, a restricted network, an agent sandbox). Echo them here so the
-      # aborting frame is readable from the run page itself. See
-      # ../workspace/policies/ci-test-diagnostics.md section 3.1.
+      # Echo the crash logs into the job log (workspace/policies/ci-test-diagnostics.md 3.1).
       - name: Print crash logs (on failure)
         if: failure()
         shell: bash
-        run: |
-          shopt -s nullglob
-          found=0
-          for f in hs_err_pid*.log; do
-            found=1
-            echo "===== $f (first 200 lines; full file in the uploaded artifact) ====="
-            sed -n '1,200p' "$f"
-          done
-          for f in target/surefire-reports/*.dumpstream target/surefire-reports/*.dump; do
-            found=1
-            echo "===== $f ====="
-            cat "$f"
-          done
-          if [ "$found" = 0 ]; then
-            echo "No hs_err_pid*.log and no surefire dump/dumpstream was written."
-            echo
-            echo "For an ordinary test failure that is EXPECTED, not a finding: this step runs on"
-            echo "any job failure, and an assertion failure, a timeout or a compile error writes no"
-            echo "crash log. Read the surefire output above for the real cause."
-            echo
-            echo "It points at a JVM-level abort only if the log ALSO shows a fork ending abnormally"
-            echo "-- 'The forked VM terminated without properly saying goodbye', or an exit with no"
-            echo "test results. In that case the abort bypassed the JVM error handler (a native"
-            echo "exit()/terminate() rather than a raised signal), which is why no file was written."
-          fi
+        run: bash .github/print-crash-logs.sh .
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -352,7 +267,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
           cache: maven
       - name: Memory before tests
@@ -361,40 +276,11 @@ jobs:
       - name: Test
         shell: bash
         run: mvn -e --batch-mode --no-transfer-progress -P jcstress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=${{ matrix.disable-lmdb }} --update-snapshots test jacoco:report
-      # A forked test JVM that aborts leaves an hs_err_pid log and a surefire
-      # dumpstream -- both otherwise ONLY inside the artifact uploaded below,
-      # which is unreachable from anywhere that cannot fetch from Azure Blob
-      # (a phone, a restricted network, an agent sandbox). Echo them here so the
-      # aborting frame is readable from the run page itself. See
-      # ../workspace/policies/ci-test-diagnostics.md section 3.1.
+      # Echo the crash logs into the job log (workspace/policies/ci-test-diagnostics.md 3.1).
       - name: Print crash logs (on failure)
         if: failure()
         shell: bash
-        run: |
-          shopt -s nullglob
-          found=0
-          for f in hs_err_pid*.log; do
-            found=1
-            echo "===== $f (first 200 lines; full file in the uploaded artifact) ====="
-            sed -n '1,200p' "$f"
-          done
-          for f in target/surefire-reports/*.dumpstream target/surefire-reports/*.dump; do
-            found=1
-            echo "===== $f ====="
-            cat "$f"
-          done
-          if [ "$found" = 0 ]; then
-            echo "No hs_err_pid*.log and no surefire dump/dumpstream was written."
-            echo
-            echo "For an ordinary test failure that is EXPECTED, not a finding: this step runs on"
-            echo "any job failure, and an assertion failure, a timeout or a compile error writes no"
-            echo "crash log. Read the surefire output above for the real cause."
-            echo
-            echo "It points at a JVM-level abort only if the log ALSO shows a fork ending abnormally"
-            echo "-- 'The forked VM terminated without properly saying goodbye', or an exit with no"
-            echo "test results. In that case the abort bypassed the JVM error handler (a native"
-            echo "exit()/terminate() rather than a raised signal), which is why no file was written."
-          fi
+        run: bash .github/print-crash-logs.sh .
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -442,7 +328,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
           cache: maven
       - name: Test under vmlens (interleaving analysis)
@@ -504,7 +390,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
           cache: maven
       - name: Install pocl (CPU OpenCL 3.0 ICD)
@@ -543,18 +429,9 @@ jobs:
         run: |
           echo "===== free -m (post-failure) ====="; free -m || true
           echo "===== thread/process count (post-failure) ====="; ps -eL 2>/dev/null | wc -l || true
+          # hs_err + surefire dumps: the shared step of every other test job.
+          bash .github/print-crash-logs.sh
           shopt -s nullglob
-          found=0
-          echo "===== hs_err_pid*.log ====="
-          # Truncated: an hs_err's tail is the memory map, which buries the job log.
-          for f in hs_err_pid*.log; do found=1; echo "----- $f (first 200 lines; full file in the artifact) -----"; sed -n '1,200p' "$f"; done
-          echo "===== surefire dumpstream / dump ====="
-          for f in target/surefire-reports/*.dumpstream target/surefire-reports/*.dump; do found=1; echo "----- $f -----"; cat "$f"; done
-          if [ "$found" = 0 ]; then
-            echo "No hs_err_pid*.log and no surefire dump/dumpstream was written --"
-            echo "the fork died without the JVM writing a crash log (native exit()/terminate,"
-            echo "or the documented spawn failure that leaves no dump at all)."
-          fi
           echo "===== OpenCL surefire reports ====="
           for f in target/surefire-reports/*OpenCL*.txt; do [ -e "$f" ] && { echo "----- $f -----"; cat "$f"; }; done
       - uses: actions/upload-artifact@v7
@@ -596,7 +473,7 @@ jobs:
           path: fatjar/
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
       # Cross-repo shared gate (workspace/crossrepostatus.md checksum table). maven.compiler.release
       # governs only the code we compile; a dependency built for a newer Java lands in the jar
@@ -631,7 +508,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
       # Prefer coverage from the pocl job: it runs ALL tests including @OpenCLTest
       # (the ubuntu `test` matrix skips those because no ICD is installed there,
@@ -680,7 +557,7 @@ jobs:
 
   publish-snapshot:
     name: Publish Snapshot to Central
-    needs: [check-snapshot, code-style, smoke-fatjar]
+    needs: [check-snapshot, code-style, smoke-fatjar, shared-files, vmlens]
     if: needs.check-snapshot.result == 'success' && inputs.publish_to_central
     runs-on: ubuntu-latest
     environment: maven-central
@@ -688,7 +565,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
           cache: maven
           server-id: central
@@ -823,7 +700,7 @@ jobs:
 
   publish-release:
     name: Publish Release to Central
-    needs: [check-tag, code-style, smoke-fatjar]
+    needs: [check-tag, code-style, smoke-fatjar, shared-files, vmlens]
     if: needs.check-tag.result == 'success' && inputs.publish_to_central
     runs-on: ubuntu-latest
     environment: maven-central
@@ -833,7 +710,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
           cache: maven
           server-id: central

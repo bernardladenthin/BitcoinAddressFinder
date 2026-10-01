@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2017-2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
 #
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: MIT OR Apache-2.0
 """Render the measurement CSVs into plots and into the generated tables in docs/performance.md.
 
 The CSVs in this directory are the single source of truth. Markdown cannot import data, so the

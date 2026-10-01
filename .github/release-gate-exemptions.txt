@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Jobs of publish.yml that do not gate both publish jobs, each with the reason it may stay red.
+# Every other job must gate both; check-release-gate.py (shared-files job) fails on a job that does
+# not, and on a line here that names no job or a job that gates both after all.
+# Format: <job>: <reason>
+publish-snapshot: a publish job itself
+publish-release: a publish job itself
+check-snapshot: publish-snapshot's own precondition (the version is a SNAPSHOT)
+check-tag: publish-release's own precondition (the version matches the tag)
+github-snapshot: runs after publishing; attaches the assets to the rolling snapshot release
+github-release: runs after publishing; attaches the signed assets to the tag release
+verify-signing-key: red by design where the secret is withheld (forks, other contributors' branches); the publish jobs sign with the same key and fail on it themselves
+verify-signing-key-gradle: same as verify-signing-key, for the Gradle/BouncyCastle signing path

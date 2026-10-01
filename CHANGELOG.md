@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **CI: shared files and the release gate are checked.** The files kept byte-identical with the sibling
+  repositories are listed with their SHA-256 in `.github/shared-files.sha256`; a new `shared-files` job
+  fails on a copy changed here alone and warns on a sibling's differing copy. The same job runs the
+  shared build-check library's tests and `check-release-gate.py`: every job must gate both publish
+  jobs unless `.github/release-gate-exemptions.txt` says why (`vmlens` now gates). The crash-log step
+  and the signing-key preflight are shared scripts (`print-crash-logs.sh`, `verify-signing-key.sh`)
+  instead of copies pasted into the workflow.
+- **Workflow jobs kept identical across the repositories are checked too**: a
+  `.github/shared-files.sha256` entry `.github/workflows/publish.yml#<job>` hashes one job (`startgate`,
+  `shared-files`, `verify-signing-key`, `check-snapshot`, `check-tag`, and where present
+  `verify-signing-key-gradle`, `github-snapshot`, `github-release`).
+- **Own scripts are licensed `MIT OR Apache-2.0`** like the CI files: `examples/run_*`, `build.bat`,
+  `update.bat`, `testAddressTxtLineTest.bat`, `helper/` and `docs/measurements/` (the Java sources and
+  the rest of the project stay Apache-2.0).
+- **More shared files, and files identical up to the repository name**: a shared-files entry ending
+  in `?repo` is hashed with the repository's name replaced by `{repo}`. Added: `.editorconfig`,
+  `.gitattributes` (now with `*.gguf binary` everywhere), `FUNDING.yml`, `CODEOWNERS`, the license texts,
+  `SUPPORT.md`, `ISSUE_TEMPLATE/config.yml` and further files listed in `.github/shared-files.sha256`;
+  the signing self-test now runs on Gradle 9.8.0 in all four repositories.
+  `CODEOWNERS` lost a `/* ... */` license header -- not comment syntax there, so GitHub read its lines
+  as rules with invalid owners.
+- **The JDK is named once, in `.java-version`**: every workflow reads it through setup-java's
+  `java-version-file` (the `JAVA_VERSION` env and the literal `21`s are gone); `.java-version` and
+  `codeql.yml` are now byte-identical in all four sibling repositories and in the shared-files manifest.
+  `codeql.yml` is now the compact form the siblings use (same build, same queries).
+- **CI files are licensed `MIT OR Apache-2.0`**: every `.github` file carrying only the owner's
+  copyright now has the same license header in all four sibling repositories, so the shared ones are
+  byte-identical. `claude.yml`, `claude-code-review.yml`, `scorecard.yml`, `reuse.yml`,
+  `osv-scanner.yml`, `dependabot.yml` and `CODE_OF_CONDUCT.md` joined the shared-files manifest;
+  `osv-scanner.yml` now grants `contents: read` instead of `read-all` (as java-llama.cpp already did).
+- **Workflow run scripts are parsed in the `shared-files` job**: `check-run-scripts.py` runs `bash -n`
+  over every `run:` script of the workflows and composite actions that runs in bash (shell decided as
+  the runner does), so a broken script fails within minutes instead of in the job that runs it.
+- **Maven versions are compared with the sibling repositories**: `check-versions.py` (in the
+  `shared-files` job) warns where a dependency or plugin -- incl. annotation-processor paths and the
+  Spotless formatter version -- is used in another version than in a sibling's default branch.
+
 ## [1.8.0] - 2026-08-29
 
 ### Added
