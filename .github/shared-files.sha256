@@ -8,17 +8,18 @@
 # a copy changed here alone fails it, a copy another repository lists with a different hash warns.
 # To change a shared file: change it in every repository listing it, then run
 # `python3 .github/check-shared-files.py --write` in each. An entry `<workflow>#<job>` stands for one
-# job of a workflow (kept identical inside otherwise different workflows); `sha256sum -c` reads the
-# file entries only.
+# job of a workflow (kept identical inside otherwise different workflows); an entry ending in `?repo`
+# for a file or job identical up to the repository's name (hashed with that name replaced by
+# `{repo}`); `sha256sum -c` reads the plain file entries only.
 9ad21ea42bced35498c6fcaa533d9ba448af042497f923e60646a77cfbe0fc5f  .github/buildcheck/__init__.py
 3d1a9f2e93709941261a9655bc19bf50d5becefd8f6a6c2f5564096a757996bb  .github/buildcheck/workflow.py
 5a70eee1bb8af180edfd2a4bae61be61fac15b409f5df6a8bb9869425d7fc381  .github/buildcheck/releasegate.py
-95285b6e9fdd30a71e97aff236e4a23d42101bc182955cae7ca1e4993939321a  .github/buildcheck/sharedfiles.py
+ff2aaec95e53916ea340a0a291bf0f57e0011522aedb486622b1fb1cac136865  .github/buildcheck/sharedfiles.py
 0059120aab539c6ce8055675ae0d3b040097f80320051e40385072f68845ddb0  .github/buildcheck/tests/__init__.py
 561efd3f26d7728e475c8ce83c10b4761a6703b585b7b2a7ab052df10f73166c  .github/buildcheck/tests/helpers.py
 4985f25fa177bd79a79335742adfd0da0431e101124b4e7e214906b56ae903de  .github/buildcheck/tests/test_workflow.py
 cbe504ad081ba31ec16e11c11f879c64179ca7741bf0b1d1318a7fc969ed67dd  .github/buildcheck/tests/test_releasegate.py
-f040b63c801e1d8b1b27b0fe8ae733d6fb5cf1b166e79470a6c3e3282a1bcb50  .github/buildcheck/tests/test_sharedfiles.py
+3ae66ea309fcbceb809de21b5062a3b0eba5e192c69fbc02592accb05d3f400a  .github/buildcheck/tests/test_sharedfiles.py
 7fe208dd33184b4543328f97b339c95e23c408b120e6bfa6095de4182aeb9a19  .github/check-release-gate.py
 1604ccdea83998814a3c1f98f746272222039867b0c7d692355e61495c1c648b  .github/check-shared-files.py
 e5f1679dc7151b2676b2f587860bbaa17e1b89b44a5a4e9703eb3499248c4a06  .github/buildcheck/versions.py
@@ -36,6 +37,17 @@ ab45f5c102b47dd16c325d4d9c283d158ba90c05f484eac45b2767885c4462f9  .github/signin
 0f08122e597f93dbbdc9c80e88984b4bf4738951d5902813df3d4640cdb11bac  .github/ISSUE_TEMPLATE/feature_request.md
 ebfcc0adf59f5858bbe4dc077c906304a197f72a55256f0d5aac669bee5e871f  .github/PULL_REQUEST_TEMPLATE.md
 f2a516d98a4287486dac82fc2c1293d81e3a4a1087e3ace934da0af5caaeace5  CODE_OF_CONDUCT.md
+074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff  LICENSES/Apache-2.0.txt
+b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5  LICENSES/MIT.txt
+edc34bc287c32b4d7ff970c0dd7a25e7d724cdd2775ef2b65aaccccd49c733c8  .editorconfig
+1568baf866c5f6c40751acd1e3b6760cc5db563c7330b8f33073cf2a9561cd4b  .gitattributes
+c47fad91718bf42aac298f569dcb8d0e36c81987f8706952d0637fb34ec1a1b5  .github/FUNDING.yml
+684faa8cb817db46e066c93c742c314066bc3ae71214132b226015e1a65be672  .github/CODEOWNERS
+11f78c496af746d3d6bdeb32827705e99fcfe45cb85ae50da4943a514e85e675  SUPPORT.md?repo
+e8f444ef851bd134330f1505f52b4b0970ef9a62dd76e4c25829241814ba5c73  .github/ISSUE_TEMPLATE/config.yml?repo
+46fc025df0fd7b1bdbd84b875652ce9981aec87c2bb49b9263ae8c383cf7ce5a  .mvn/settings.xml
+8b8abf79508c4f53b2e765b78d6142655631d5ed69b59e95f234416a62e057b6  CITATION.cff?repo
+7ed2f843a5187d3cdc1ba9841cb737ecabfb86dea638a314f890c70409dfea96  .github/workflows/publish.yml#code-style
 6e2ae11dad0616f66bbb2b6e6556f580bb987fd911d7132aa6bee2bfc7cc7b52  .java-version
 71ec85b7a30e80b18a9ab1fac0199cc50d68548e6f00dd116ab0f904ad63aa50  .java-version.license
 bee58687456c0695990a925ac50a2c17b71768a8ef493b584d7ac679debed7b9  .github/workflows/claude.yml
@@ -52,6 +64,6 @@ f26d05f25a154b84d8f281bb92857811749e2225cdbc167362de930c48b532d1  .github/workfl
 fcb6cd0e2a71205b918f545f2680d378c790b774b9852129c5f9c7f3f8eb9860  .github/workflows/publish.yml#verify-signing-key
 09230b04c5f14bdda50a0c862152ff197a656cbc3fd0d110899c5f8150f8aa9a  .github/workflows/publish.yml#check-snapshot
 51e987d59efd9887b43e345edc0e0f3db21686879e3ca6ea9f0fdbc493d37121  .github/workflows/publish.yml#check-tag
-8b11220e206d877e06923e5613df3fa1c8c03be6f7596dcce82c42682007efd9  .github/workflows/publish.yml#verify-signing-key-gradle
+da8f26eaf73a7c1cb3842189a82576468e99c8d978b3742fde089cf771061555  .github/workflows/publish.yml#verify-signing-key-gradle
 de7ae553e6ac327094bcedf3acacd8b0c9e25607f9556c99419abf1dde405493  .github/workflows/publish.yml#github-snapshot
 4232da9e0a0742e21b78c971642d99805b7365a025771f48fa26118849500ee9  .github/workflows/publish.yml#github-release

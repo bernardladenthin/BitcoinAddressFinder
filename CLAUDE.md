@@ -769,7 +769,8 @@ Files kept byte-identical with java-llama.cpp, BitcoinAddressFinder, srcmorph an
 listed with their SHA-256 in **`.github/shared-files.sha256`** — the reference for what must stay
 equal. An entry `.github/workflows/publish.yml#<job>` stands for one job of the workflow: the jobs kept
 identical across the repositories (`startgate`, `shared-files`, `verify-signing-key`, `check-snapshot`,
-`check-tag`, `verify-signing-key-gradle`, `github-snapshot`, `github-release`) are checked like files.
+`check-tag`, `verify-signing-key-gradle`, `github-snapshot`, `github-release`) are checked like files. An entry ending in `?repo` covers a file or job identical up to the
+repository's name (hashed with the name replaced by `{repo}`), e.g. `SUPPORT.md?repo`.
 The `shared-files` job of `publish.yml` (gating both publish jobs) fails when a listed file changed here alone and warns when another repository's
 default branch lists it with a different hash. To change a shared file, change every copy, then run
 `python3 .github/check-shared-files.py --write` in each repository. The shared build-check library

@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Own scripts are licensed `MIT OR Apache-2.0`** like the CI files: `examples/run_*`, `build.bat`,
   `update.bat`, `testAddressTxtLineTest.bat`, `helper/` and `docs/measurements/` (the Java sources and
   the rest of the project stay Apache-2.0).
+- **More shared files, and files identical up to the repository name**: a shared-files entry ending
+  in `?repo` is hashed with the repository's name replaced by `{repo}`. Added: `.editorconfig`,
+  `.gitattributes` (now with `*.gguf binary` everywhere), `FUNDING.yml`, `CODEOWNERS`, the license texts,
+  `SUPPORT.md`, `ISSUE_TEMPLATE/config.yml` and further files listed in `.github/shared-files.sha256`;
+  the signing self-test now runs on Gradle 9.8.0 in all four repositories.
+  `CODEOWNERS` lost a `/* ... */` license header -- not comment syntax there, so GitHub read its lines
+  as rules with invalid owners.
 - **The JDK is named once, in `.java-version`**: every workflow reads it through setup-java's
   `java-version-file` (the `JAVA_VERSION` env and the literal `21`s are gone); `.java-version` and
   `codeql.yml` are now byte-identical in all four sibling repositories and in the shared-files manifest.

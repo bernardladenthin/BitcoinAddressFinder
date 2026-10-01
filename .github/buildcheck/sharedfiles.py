@@ -9,7 +9,10 @@ Each repository lists the shared files it carries, with their SHA-256, in
 `.github/workflows/publish.yml#startgate`: jobs such as `startgate` or `check-tag` are kept identical
 inside four otherwise different workflows, and a job entry hashes just that job's text (its header
 and body, without the comment lines between it and the next job, which belong to the next one).
-`sha256sum -c` reads the file entries only. The job
+An entry ending in `?repo` (`SUPPORT.md?repo`, `.github/workflows/publish.yml#code-style?repo`)
+stands for a file or job that is identical up to the repository's own name: it is hashed with every
+occurrence of that name replaced by `{repo}`, so a support page or a Sonar project key that names its
+repository can be shared too. `sha256sum -c` reads the plain file entries only. The job
   * fails when a listed file is missing or its content no longer matches its line: a shared file
     was edited here alone. Edit it in every repository that lists it, then update each manifest
     (`check-shared-files.py --write` rewrites the hashes of this repository's lines);
@@ -34,6 +37,8 @@ OWNER = "bernardladenthin"
 MANIFEST = ".github/shared-files.sha256"
 RAW_URL = "https://raw.githubusercontent.com/{owner}/{repo}/HEAD/" + MANIFEST
 LINE = re.compile(r"^([0-9a-f]{64}) [ *](.+)$")
+REPO_SUFFIX = "?repo"
+REPO_PLACEHOLDER = b"{repo}"
 
 
 def parse(text):
@@ -53,8 +58,12 @@ def parse(text):
 
 
 def content(root, entry):
-    """The bytes an entry stands for: a file, or for `<workflow>#<job>` that one job's text.
-    None when the file or the job does not exist."""
+    """The bytes an entry stands for: a file, or for `<workflow>#<job>` that one job's text; for an
+    entry ending in `?repo` with the repository's name replaced by `{repo}`. None when the file or
+    the job does not exist."""
+    if entry.endswith(REPO_SUFFIX):
+        data = content(root, entry[:-len(REPO_SUFFIX)])
+        return None if data is None else data.replace(current_repo(root).encode("utf-8"), REPO_PLACEHOLDER)
     path, _, job = entry.partition("#")
     full = os.path.join(root, path)
     if not os.path.isfile(full):

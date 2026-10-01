@@ -7,6 +7,7 @@ import io
 import os
 import tempfile
 import unittest
+from unittest import mock
 
 from buildcheck import sharedfiles
 from buildcheck.tests.helpers import REPO
@@ -137,6 +138,38 @@ class JobEntryTest(unittest.TestCase):
     def test_write_refuses_an_entry_that_does_not_exist(self):
         with self.assertRaises(ValueError):
             sharedfiles.rewrite(f"{A}  .github/workflows/w.yml#gone\n", self.root)
+
+
+class RepoEntryTest(unittest.TestCase):
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        os.makedirs(os.path.join(self.root, ".github", "workflows"))
+        self.write("SUPPORT.md", "Issues: https://github.com/o/streambuffer/issues\n")
+        self.write(".github/workflows/w.yml", WORKFLOW.replace("echo one", "echo streambuffer"))
+        patcher = mock.patch.object(sharedfiles, "current_repo", return_value="streambuffer")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def write(self, path, text):
+        with open(os.path.join(self.root, path), "w", encoding="utf-8") as f:
+            f.write(text)
+
+    def test_the_repository_name_is_replaced_by_a_placeholder(self):
+        self.assertEqual(sharedfiles.content(self.root, "SUPPORT.md?repo"), b"Issues: https://github.com/o/{repo}/issues\n")
+        self.assertEqual(sharedfiles.content(self.root, ".github/workflows/w.yml#first?repo"),
+                         FIRST.replace("echo one", "echo {repo}").encode())
+
+    def test_two_repositories_differing_only_in_their_name_hash_alike(self):
+        here = sharedfiles.sha256(self.root, "SUPPORT.md?repo")
+        with mock.patch.object(sharedfiles, "current_repo", return_value="srcmorph"):
+            self.write("SUPPORT.md", "Issues: https://github.com/o/srcmorph/issues\n")
+            self.assertEqual(sharedfiles.sha256(self.root, "SUPPORT.md?repo"), here)
+            self.write("SUPPORT.md", "Bugs: https://github.com/o/srcmorph/issues\n")
+            self.assertNotEqual(sharedfiles.sha256(self.root, "SUPPORT.md?repo"), here)
+
+    def test_a_missing_file_stays_missing(self):
+        self.assertIsNone(sharedfiles.content(self.root, "GONE.md?repo"))
 
 
 class CompareTest(unittest.TestCase):

@@ -153,7 +153,7 @@ jobs:
           distribution: temurin
       - uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: "9.6.1"
+          gradle-version: "9.8.0"
       - name: Sign a throwaway artifact via useInMemoryPgpKeys (BouncyCastle)
         shell: bash
         env:
@@ -201,7 +201,7 @@ jobs:
         run: |
           mvn -B --no-transfer-progress -DskipTests -Denforcer.skip=true compile
           echo "=== internal package dependency graph (jdeps, bytecode) ==="
-          jdeps -verbose:package target/classes | grep 'net.ladenthin.bitcoinaddressfinder' || true
+          jdeps -verbose:package target/classes | grep 'net\.ladenthin\.' || true
 
   build:
     name: Build
