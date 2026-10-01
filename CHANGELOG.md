@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.github/shared-files.sha256` entry `.github/workflows/publish.yml#<job>` hashes one job (`startgate`,
   `shared-files`, `verify-signing-key`, `check-snapshot`, `check-tag`, and where present
   `verify-signing-key-gradle`, `github-snapshot`, `github-release`).
+- **The JDK is named once, in `.java-version`**: every workflow reads it through setup-java's
+  `java-version-file` (the `JAVA_VERSION` env and the literal `21`s are gone); `.java-version` and
+  `codeql.yml` are now byte-identical in all four sibling repositories and in the shared-files manifest.
+  `codeql.yml` is now the compact form the siblings use (same build, same queries).
 - **CI files are licensed `MIT OR Apache-2.0`**: every `.github` file carrying only the owner's
   copyright now has the same license header in all four sibling repositories, so the shared ones are
   byte-identical. `claude.yml`, `claude-code-review.yml`, `scorecard.yml`, `reuse.yml`,

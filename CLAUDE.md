@@ -780,7 +780,8 @@ publish jobs unless `.github/release-gate-exemptions.txt` names it with a reason
 formatter version) is used here in another version than in a sibling repository -- Dependabot bumps
 each repository on its own, so this is where the drift shows -- and **`check-run-scripts.py`**, which
 runs `bash -n` over every `run:` script of the workflows and composite actions that runs in bash, so
-a broken script (a lost line continuation, say) fails here instead of in the job running it. Details and the
+a broken script (a lost line continuation, say) fails here instead of in the job running it. The JDK every
+workflow uses is `.java-version` (setup-java's `java-version-file`), the same shared file in all four. Details and the
 reasoning (copies with a checksum rather than a shared actions repository):
 [`../workspace/crossrepostatus.md`](../workspace/crossrepostatus.md), "Cross-repo byte-identical files".
 

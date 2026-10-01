@@ -48,9 +48,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  JAVA_VERSION: '21'
-
 jobs:
   # ---------------------------------------------------------------------------
   # Start gate — single cancellable abort window before the pipeline starts.
@@ -152,7 +149,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
       - uses: gradle/actions/setup-gradle@v6
         with:
@@ -193,7 +190,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
       - name: Spotless check (fail fast on format violations)
         run: mvn -B --no-transfer-progress spotless:check
@@ -214,7 +211,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
           cache: maven
       - name: Build
@@ -270,7 +267,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
           cache: maven
       - name: Memory before tests
@@ -331,7 +328,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
           cache: maven
       - name: Test under vmlens (interleaving analysis)
@@ -393,7 +390,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
           cache: maven
       - name: Install pocl (CPU OpenCL 3.0 ICD)
@@ -476,7 +473,7 @@ jobs:
           path: fatjar/
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
       # Cross-repo shared gate (workspace/crossrepostatus.md checksum table). maven.compiler.release
       # governs only the code we compile; a dependency built for a newer Java lands in the jar
@@ -511,7 +508,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
       # Prefer coverage from the pocl job: it runs ALL tests including @OpenCLTest
       # (the ubuntu `test` matrix skips those because no ICD is installed there,
@@ -568,7 +565,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
           cache: maven
           server-id: central
@@ -713,7 +710,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version-file: .java-version
           distribution: temurin
           cache: maven
           server-id: central
