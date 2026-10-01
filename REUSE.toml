@@ -135,3 +135,15 @@ SPDX-FileCopyrightText = [
     "2017 Stanislav V. Tretyakov <svtrostov@yandex.ru>",
 ]
 SPDX-License-Identifier = "AGPL-3.0-or-later"
+
+# The issue/PR templates are kept byte-identical in java-llama.cpp, BitcoinAddressFinder, srcmorph
+# and streambuffer (.github/shared-files.sha256) and carry the license of the other shared files.
+# Last in this file on purpose: of several matching annotations the last one applies.
+[[annotations]]
+path = [
+    ".github/ISSUE_TEMPLATE/bug_report.md",
+    ".github/ISSUE_TEMPLATE/feature_request.md",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+]
+SPDX-FileCopyrightText = "2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>"
+SPDX-License-Identifier = "MIT OR Apache-2.0"

@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Bernard Ladenthin <bernard.ladenthin@gmail.com>
 #
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: MIT OR Apache-2.0
 #
 # The files this repository keeps BYTE-IDENTICAL with java-llama.cpp, BitcoinAddressFinder,
 # srcmorph and streambuffer (each lists the ones it carries). Checked by the `shared-files` job of
@@ -35,6 +35,13 @@ ab45f5c102b47dd16c325d4d9c283d158ba90c05f484eac45b2767885c4462f9  .github/signin
 7232b092d3ba49b97bee7b539aaf6ee4c698e86bd3d4dd256e8ae2f85f653ee9  .github/ISSUE_TEMPLATE/bug_report.md
 0f08122e597f93dbbdc9c80e88984b4bf4738951d5902813df3d4640cdb11bac  .github/ISSUE_TEMPLATE/feature_request.md
 ebfcc0adf59f5858bbe4dc077c906304a197f72a55256f0d5aac669bee5e871f  .github/PULL_REQUEST_TEMPLATE.md
+f2a516d98a4287486dac82fc2c1293d81e3a4a1087e3ace934da0af5caaeace5  CODE_OF_CONDUCT.md
+bee58687456c0695990a925ac50a2c17b71768a8ef493b584d7ac679debed7b9  .github/workflows/claude.yml
+19ccc3d4f0aef292c19883d4766a0193e9a3e998514f461df6609ccf65a19492  .github/workflows/claude-code-review.yml
+13ada38d1cd8d06b5098aab0ee996429156a2251daa11fb331c02248b7e6a40e  .github/workflows/scorecard.yml
+c0e9885eaab7a660fe2c236e3f10df284a6b2f42dad9ce59084a2d7ab00aa9cf  .github/workflows/reuse.yml
+f3b1a0864200236c61a5807b1e59236d474431a27695cd9d977bc6636d582667  .github/workflows/osv-scanner.yml
+c9e757f2d0a2f456a08791697a94161c776d9b008a8aa75890da4133c81a99e9  .github/dependabot.yml
 abea5fb970a46ccf9ba9127d59abf304202efd13c2d6a28da2ff75da0c92a9b8  .github/smoke-fatjar-cli.sh
 42f1842270af691bdfe561355bee4eb9ae326383f1852db19763abb888d6b90e  lombok.config
 f26d05f25a154b84d8f281bb92857811749e2225cdbc167362de930c48b532d1  .github/workflows/publish.yml#startgate

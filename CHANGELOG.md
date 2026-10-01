@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.github/shared-files.sha256` entry `.github/workflows/publish.yml#<job>` hashes one job (`startgate`,
   `shared-files`, `verify-signing-key`, `check-snapshot`, `check-tag`, and where present
   `verify-signing-key-gradle`, `github-snapshot`, `github-release`).
+- **CI files are licensed `MIT OR Apache-2.0`**: every `.github` file carrying only the owner's
+  copyright now has the same license header in all four sibling repositories, so the shared ones are
+  byte-identical. `claude.yml`, `claude-code-review.yml`, `scorecard.yml`, `reuse.yml`,
+  `osv-scanner.yml`, `dependabot.yml` and `CODE_OF_CONDUCT.md` joined the shared-files manifest;
+  `osv-scanner.yml` now grants `contents: read` instead of `read-all` (as java-llama.cpp already did).
 - **Workflow run scripts are parsed in the `shared-files` job**: `check-run-scripts.py` runs `bash -n`
   over every `run:` script of the workflows and composite actions that runs in bash (shell decided as
   the runner does), so a broken script fails within minutes instead of in the job that runs it.
