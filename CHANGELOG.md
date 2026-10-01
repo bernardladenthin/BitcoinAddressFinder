@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.github/shared-files.sha256` entry `.github/workflows/publish.yml#<job>` hashes one job (`startgate`,
   `shared-files`, `verify-signing-key`, `check-snapshot`, `check-tag`, and where present
   `verify-signing-key-gradle`, `github-snapshot`, `github-release`).
+- **Own scripts are licensed `MIT OR Apache-2.0`** like the CI files: `examples/run_*`, `build.bat`,
+  `update.bat`, `testAddressTxtLineTest.bat`, `helper/` and `docs/measurements/` (the Java sources and
+  the rest of the project stay Apache-2.0).
 - **The JDK is named once, in `.java-version`**: every workflow reads it through setup-java's
   `java-version-file` (the `JAVA_VERSION` env and the literal `21`s are gone); `.java-version` and
   `codeql.yml` are now byte-identical in all four sibling repositories and in the shared-files manifest.
