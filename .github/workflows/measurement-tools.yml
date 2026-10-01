@@ -35,10 +35,10 @@ jobs:
       - uses: actions/checkout@v7
 
       # The version matters: register_machine.py is written for a contributor's own machine, so it
-      # must keep working on whatever Python a distribution ships, not only on the newest. 3.9 is the
-      # oldest still receiving security fixes; the type hints in the script use `X | None`, which
-      # needs `from __future__ import annotations` to parse there — this matrix is what keeps that
-      # true rather than assumed.
+      # must keep working on whatever Python a distribution ships, not only on the newest. The matrix
+      # runs the oldest Python still receiving security fixes (3.10 since 3.9 reached end of life in
+      # October 2025) and the newest stable one -- that is what keeps the script working on both
+      # ends rather than assumed. Move the lower bound up when it reaches end of life.
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v7
         with:
@@ -50,4 +50,4 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.13']
+        python-version: ['3.10', '3.14']

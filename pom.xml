@@ -43,7 +43,7 @@ SPDX-License-Identifier: Apache-2.0
         <sonar.organization>bernardladenthin</sonar.organization>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <slf4j.version>2.0.20</slf4j.version>
-        <logback.version>1.6.4</logback.version>
+        <logback.version>1.6.5</logback.version>
         <project.build.outputTimestamp>2026-09-01T07:58:47Z</project.build.outputTimestamp>
         <!-- Test JVM heap: -Xmx2g cap, no eager -Xms. With reuseForks=false a fresh JVM is
              spawned per test class (~180 sequential spawns); an eager -Xms1g committed 1 GB up
@@ -81,7 +81,7 @@ SPDX-License-Identifier: Apache-2.0
         <protobuf.version>4.36.2</protobuf.version>
         <jsr305.version>3.0.2</jsr305.version>
         <jcip-annotations.version>1.0</jcip-annotations.version>
-        <guava.version>33.7.1-jre</guava.version>
+        <guava.version>33.7.2-jre</guava.version>
         <jackson.version>2.22.3</jackson.version>
         <lmdbjava.version>0.9.3</lmdbjava.version>
         <lwjgl.version>3.4.3</lwjgl.version>
@@ -107,7 +107,7 @@ SPDX-License-Identifier: Apache-2.0
         <log4j.version>2.26.1</log4j.version>
         <jmh.version>1.37</jmh.version>
         <spotless.version>3.10.3</spotless.version>
-        <palantir-java-format.version>2.99.0</palantir-java-format.version>
+        <palantir-java-format.version>2.100.0</palantir-java-format.version>
     </properties>
 
     <!--
