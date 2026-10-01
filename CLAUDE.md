@@ -775,7 +775,10 @@ default branch lists it with a different hash. To change a shared file, change e
 `python3 .github/check-shared-files.py --write` in each repository. The shared build-check library
 (`.github/buildcheck/`, stdlib-only Python with unit tests: `python3 -m unittest discover -s
 .github/buildcheck/tests -t .github`) also runs **`check-release-gate.py`**: every job must gate both
-publish jobs unless `.github/release-gate-exemptions.txt` names it with a reason. Details and the
+publish jobs unless `.github/release-gate-exemptions.txt` names it with a reason, and
+**`check-versions.py`**, which **warns** where a Maven dependency or plugin (incl. the Spotless
+formatter version) is used here in another version than in a sibling repository -- Dependabot bumps
+each repository on its own, so this is where the drift shows. Details and the
 reasoning (copies with a checksum rather than a shared actions repository):
 [`../workspace/crossrepostatus.md`](../workspace/crossrepostatus.md), "Cross-repo byte-identical files".
 

@@ -85,6 +85,8 @@ jobs:
         run: python3 -m unittest discover -s .github/buildcheck/tests -t .github
       - name: Release gate (every job gates both publish jobs, or release-gate-exemptions.txt says why)
         run: python3 .github/check-release-gate.py
+      - name: Maven versions (warns where a dependency or plugin differs from a sibling repository)
+        run: python3 .github/check-versions.py
 
   # ---------------------------------------------------------------------------
   # GPG signing-key preflight (standalone, no `needs:` — runs in parallel at the

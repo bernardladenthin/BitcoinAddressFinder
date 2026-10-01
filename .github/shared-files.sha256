@@ -10,7 +10,7 @@
 # `python3 .github/check-shared-files.py --write` in each. An entry `<workflow>#<job>` stands for one
 # job of a workflow (kept identical inside otherwise different workflows); `sha256sum -c` reads the
 # file entries only.
-82171de97c6621b4c1f3e9cd66afd49990f6d31331857423b37f2b9a2f35fbc0  .github/buildcheck/__init__.py
+e43a52dd303a363512b43b13b2b941cba16ac4f039617c6e53810dd17eb4a4ca  .github/buildcheck/__init__.py
 3d1a9f2e93709941261a9655bc19bf50d5becefd8f6a6c2f5564096a757996bb  .github/buildcheck/workflow.py
 5a70eee1bb8af180edfd2a4bae61be61fac15b409f5df6a8bb9869425d7fc381  .github/buildcheck/releasegate.py
 95285b6e9fdd30a71e97aff236e4a23d42101bc182955cae7ca1e4993939321a  .github/buildcheck/sharedfiles.py
@@ -21,6 +21,9 @@ cbe504ad081ba31ec16e11c11f879c64179ca7741bf0b1d1318a7fc969ed67dd  .github/buildc
 f040b63c801e1d8b1b27b0fe8ae733d6fb5cf1b166e79470a6c3e3282a1bcb50  .github/buildcheck/tests/test_sharedfiles.py
 7fe208dd33184b4543328f97b339c95e23c408b120e6bfa6095de4182aeb9a19  .github/check-release-gate.py
 1604ccdea83998814a3c1f98f746272222039867b0c7d692355e61495c1c648b  .github/check-shared-files.py
+e5f1679dc7151b2676b2f587860bbaa17e1b89b44a5a4e9703eb3499248c4a06  .github/buildcheck/versions.py
+d454d33b61089b5f7bd6d439e3e5b58e01e7b01eeba6b4c2f7ed3360bbb158f0  .github/buildcheck/tests/test_versions.py
+0c78f43dd181f079d35edde7cbf25bb22eac92c907845d8dc8eec78e812aa097  .github/check-versions.py
 7da53fdb9537ccf7d3f3740be31f295bacb914fe186304b9ed8a65fd3d3d413e  .github/print-crash-logs.sh
 c8c02dc39aeacc154fad74071443c6513666aa94ca9f9c5fab49c5f39dea7ee6  .github/verify-signing-key.sh
 e0b2a4f331eae326b61c71f78d6272d06d99140a85dedb7710f93402de862466  .github/verify-bytecode-version.sh
@@ -32,7 +35,7 @@ ebfcc0adf59f5858bbe4dc077c906304a197f72a55256f0d5aac669bee5e871f  .github/PULL_R
 abea5fb970a46ccf9ba9127d59abf304202efd13c2d6a28da2ff75da0c92a9b8  .github/smoke-fatjar-cli.sh
 42f1842270af691bdfe561355bee4eb9ae326383f1852db19763abb888d6b90e  lombok.config
 f26d05f25a154b84d8f281bb92857811749e2225cdbc167362de930c48b532d1  .github/workflows/publish.yml#startgate
-14d4f71b0f60f64913413fbabbafd786672215f5baa5dc2f97c0877565b373a2  .github/workflows/publish.yml#shared-files
+068c3b1d9db88437927e5005eead1e1952fc611450dca705a213fd946e4547b4  .github/workflows/publish.yml#shared-files
 fcb6cd0e2a71205b918f545f2680d378c790b774b9852129c5f9c7f3f8eb9860  .github/workflows/publish.yml#verify-signing-key
 09230b04c5f14bdda50a0c862152ff197a656cbc3fd0d110899c5f8150f8aa9a  .github/workflows/publish.yml#check-snapshot
 51e987d59efd9887b43e345edc0e0f3db21686879e3ca6ea9f0fdbc493d37121  .github/workflows/publish.yml#check-tag
