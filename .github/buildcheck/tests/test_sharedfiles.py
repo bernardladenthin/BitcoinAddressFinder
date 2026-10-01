@@ -81,6 +81,64 @@ class TreeTest(unittest.TestCase):
         self.assertEqual(self.run_main("--nope")[0], 2)
 
 
+WORKFLOW = """name: t
+on:
+  push:
+jobs:
+  first:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo one
+
+  # a comment about the second job belongs to the second job
+  second:
+    needs: first
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo two
+"""
+FIRST = "  first:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo one\n"
+
+
+class JobEntryTest(unittest.TestCase):
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        os.makedirs(os.path.join(self.root, ".github", "workflows"))
+        self.write(WORKFLOW)
+
+    def write(self, text):
+        with open(os.path.join(self.root, ".github/workflows/w.yml"), "w", encoding="utf-8") as f:
+            f.write(text)
+
+    def test_a_job_entry_hashes_the_job_alone(self):
+        self.assertEqual(sharedfiles.content(self.root, ".github/workflows/w.yml#first"), FIRST.encode())
+        self.assertEqual(sharedfiles.sha256(self.root, ".github/workflows/w.yml#first"),
+                         hashlib.sha256(FIRST.encode()).hexdigest())
+
+    def test_the_comment_before_the_next_job_is_not_part_of_the_job(self):
+        self.write(WORKFLOW.replace("belongs to the second job", "was reworded"))
+        self.assertEqual(sharedfiles.content(self.root, ".github/workflows/w.yml#first"), FIRST.encode())
+
+    def test_a_change_inside_the_job_is_seen_and_one_elsewhere_is_not(self):
+        entry = ".github/workflows/w.yml#first"
+        entries = {entry: sharedfiles.sha256(self.root, entry)}
+        self.write(WORKFLOW.replace("echo two", "echo three"))
+        self.assertEqual(sharedfiles.verify(self.root, entries), [])
+        self.write(WORKFLOW.replace("echo one", "echo changed"))
+        self.assertIn("differs from its line", sharedfiles.verify(self.root, entries)[0])
+
+    def test_a_missing_job_or_workflow_is_reported(self):
+        entries = {".github/workflows/w.yml#gone": A, ".github/workflows/x.yml#first": A}
+        failures = sharedfiles.verify(self.root, entries)
+        self.assertEqual(len(failures), 2)
+        self.assertTrue(all("does not exist" in f for f in failures), failures)
+
+    def test_write_refuses_an_entry_that_does_not_exist(self):
+        with self.assertRaises(ValueError):
+            sharedfiles.rewrite(f"{A}  .github/workflows/w.yml#gone\n", self.root)
+
+
 class CompareTest(unittest.TestCase):
 
     def test_matches_by_path_then_by_a_unique_file_name(self):
@@ -104,7 +162,8 @@ class RepositoryTest(unittest.TestCase):
         with open(os.path.join(REPO, sharedfiles.MANIFEST), encoding="utf-8") as f:
             entries = sharedfiles.parse(f.read())
         for path in (".github/buildcheck/sharedfiles.py", ".github/check-shared-files.py",
-                     ".github/buildcheck/tests/test_sharedfiles.py"):
+                     ".github/buildcheck/tests/test_sharedfiles.py",
+                     ".github/workflows/publish.yml#shared-files"):
             self.assertIn(path, entries)
 
 

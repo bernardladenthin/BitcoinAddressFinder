@@ -767,8 +767,10 @@ gotcha, and merge-discipline guidance are in
 
 Files kept byte-identical with java-llama.cpp, BitcoinAddressFinder, srcmorph and streambuffer are
 listed with their SHA-256 in **`.github/shared-files.sha256`** — the reference for what must stay
-equal. The `shared-files` job of `publish.yml` (identical in all four repositories, gating both
-publish jobs) fails when a listed file changed here alone and warns when another repository's
+equal. An entry `.github/workflows/publish.yml#<job>` stands for one job of the workflow: the jobs kept
+identical across the repositories (`startgate`, `shared-files`, `verify-signing-key`, `check-snapshot`,
+`check-tag`, `verify-signing-key-gradle`, `github-snapshot`, `github-release`) are checked like files.
+The `shared-files` job of `publish.yml` (gating both publish jobs) fails when a listed file changed here alone and warns when another repository's
 default branch lists it with a different hash. To change a shared file, change every copy, then run
 `python3 .github/check-shared-files.py --write` in each repository. The shared build-check library
 (`.github/buildcheck/`, stdlib-only Python with unit tests: `python3 -m unittest discover -s

@@ -5,7 +5,11 @@
 streambuffer, checked by every repository's own `shared-files` job.
 
 Each repository lists the shared files it carries, with their SHA-256, in
-.github/shared-files.sha256 -- `sha256sum` format, so `sha256sum -c` reads it as well. The job
+.github/shared-files.sha256 -- `sha256sum` format. An entry can also name ONE JOB of a workflow,
+`.github/workflows/publish.yml#startgate`: jobs such as `startgate` or `check-tag` are kept identical
+inside four otherwise different workflows, and a job entry hashes just that job's text (its header
+and body, without the comment lines between it and the next job, which belong to the next one).
+`sha256sum -c` reads the file entries only. The job
   * fails when a listed file is missing or its content no longer matches its line: a shared file
     was edited here alone. Edit it in every repository that lists it, then update each manifest
     (`check-shared-files.py --write` rewrites the hashes of this repository's lines);
@@ -22,6 +26,8 @@ import os
 import re
 import sys
 import urllib.request
+
+from . import workflow
 
 REPOS = ("java-llama.cpp", "BitcoinAddressFinder", "srcmorph", "streambuffer")
 OWNER = "bernardladenthin"
@@ -46,19 +52,39 @@ def parse(text):
     return entries
 
 
-def sha256(path):
-    with open(path, "rb") as f:
-        return hashlib.sha256(f.read()).hexdigest()
+def content(root, entry):
+    """The bytes an entry stands for: a file, or for `<workflow>#<job>` that one job's text.
+    None when the file or the job does not exist."""
+    path, _, job = entry.partition("#")
+    full = os.path.join(root, path)
+    if not os.path.isfile(full):
+        return None
+    with open(full, "rb") as f:
+        data = f.read()
+    if not job:
+        return data
+    jobs = workflow.parse(data.decode("utf-8"))
+    if job not in jobs:
+        return None
+    lines = jobs[job].lines
+    while lines and (not lines[-1].strip() or lines[-1].startswith("  #")):
+        lines = lines[:-1]
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def sha256(root, entry):
+    data = content(root, entry)
+    return None if data is None else hashlib.sha256(data).hexdigest()
 
 
 def verify(root, entries):
-    """Failures: every listed file exists and still has its listed hash."""
+    """Failures: every listed file (or job) exists and still has its listed hash."""
     failures = []
     for path, digest in entries.items():
-        full = os.path.join(root, path)
-        if not os.path.isfile(full):
+        actual = sha256(root, path)
+        if actual is None:
             failures.append(f"{path} is listed in {MANIFEST} but does not exist")
-        elif sha256(full) != digest:
+        elif actual != digest:
             failures.append(f"{path} differs from its line in {MANIFEST}: a shared file was changed in "
                             f"this repository alone -- change every copy, then update every manifest")
     return failures
@@ -69,7 +95,13 @@ def rewrite(text, root):
     out = []
     for line in text.splitlines():
         match = LINE.match(line)
-        out.append(f"{sha256(os.path.join(root, match.group(2)))}  {match.group(2)}" if match else line)
+        if not match:
+            out.append(line)
+            continue
+        digest = sha256(root, match.group(2))
+        if digest is None:
+            raise ValueError(f"{match.group(2)} is listed in {MANIFEST} but does not exist")
+        out.append(f"{digest}  {match.group(2)}")
     return "\n".join(out) + "\n"
 
 

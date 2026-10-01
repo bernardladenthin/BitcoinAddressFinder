@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   jobs unless `.github/release-gate-exemptions.txt` says why (`vmlens` now gates). The crash-log step
   and the signing-key preflight are shared scripts (`print-crash-logs.sh`, `verify-signing-key.sh`)
   instead of copies pasted into the workflow.
+- **Workflow jobs kept identical across the repositories are checked too**: a
+  `.github/shared-files.sha256` entry `.github/workflows/publish.yml#<job>` hashes one job (`startgate`,
+  `shared-files`, `verify-signing-key`, `check-snapshot`, `check-tag`, and where present
+  `verify-signing-key-gradle`, `github-snapshot`, `github-release`).
 
 ## [1.8.0] - 2026-08-29
 

@@ -7,16 +7,18 @@
 # .github/workflows/publish.yml (.github/check-shared-files.py, see .github/buildcheck/sharedfiles.py):
 # a copy changed here alone fails it, a copy another repository lists with a different hash warns.
 # To change a shared file: change it in every repository listing it, then run
-# `python3 .github/check-shared-files.py --write` in each. `sha256sum -c` reads this file too.
+# `python3 .github/check-shared-files.py --write` in each. An entry `<workflow>#<job>` stands for one
+# job of a workflow (kept identical inside otherwise different workflows); `sha256sum -c` reads the
+# file entries only.
 82171de97c6621b4c1f3e9cd66afd49990f6d31331857423b37f2b9a2f35fbc0  .github/buildcheck/__init__.py
 3d1a9f2e93709941261a9655bc19bf50d5becefd8f6a6c2f5564096a757996bb  .github/buildcheck/workflow.py
 5a70eee1bb8af180edfd2a4bae61be61fac15b409f5df6a8bb9869425d7fc381  .github/buildcheck/releasegate.py
-86545e924c95b69a16f4b9f759a38779b441aa04d8b635a52eb029a196e39a11  .github/buildcheck/sharedfiles.py
+95285b6e9fdd30a71e97aff236e4a23d42101bc182955cae7ca1e4993939321a  .github/buildcheck/sharedfiles.py
 0059120aab539c6ce8055675ae0d3b040097f80320051e40385072f68845ddb0  .github/buildcheck/tests/__init__.py
 561efd3f26d7728e475c8ce83c10b4761a6703b585b7b2a7ab052df10f73166c  .github/buildcheck/tests/helpers.py
 4985f25fa177bd79a79335742adfd0da0431e101124b4e7e214906b56ae903de  .github/buildcheck/tests/test_workflow.py
 cbe504ad081ba31ec16e11c11f879c64179ca7741bf0b1d1318a7fc969ed67dd  .github/buildcheck/tests/test_releasegate.py
-7cbef54c09c6612503da7bd3733b4ab51c6f34666ef062885a7586e075a907de  .github/buildcheck/tests/test_sharedfiles.py
+f040b63c801e1d8b1b27b0fe8ae733d6fb5cf1b166e79470a6c3e3282a1bcb50  .github/buildcheck/tests/test_sharedfiles.py
 7fe208dd33184b4543328f97b339c95e23c408b120e6bfa6095de4182aeb9a19  .github/check-release-gate.py
 1604ccdea83998814a3c1f98f746272222039867b0c7d692355e61495c1c648b  .github/check-shared-files.py
 7da53fdb9537ccf7d3f3740be31f295bacb914fe186304b9ed8a65fd3d3d413e  .github/print-crash-logs.sh
@@ -29,3 +31,11 @@ ab45f5c102b47dd16c325d4d9c283d158ba90c05f484eac45b2767885c4462f9  .github/signin
 ebfcc0adf59f5858bbe4dc077c906304a197f72a55256f0d5aac669bee5e871f  .github/PULL_REQUEST_TEMPLATE.md
 abea5fb970a46ccf9ba9127d59abf304202efd13c2d6a28da2ff75da0c92a9b8  .github/smoke-fatjar-cli.sh
 42f1842270af691bdfe561355bee4eb9ae326383f1852db19763abb888d6b90e  lombok.config
+f26d05f25a154b84d8f281bb92857811749e2225cdbc167362de930c48b532d1  .github/workflows/publish.yml#startgate
+14d4f71b0f60f64913413fbabbafd786672215f5baa5dc2f97c0877565b373a2  .github/workflows/publish.yml#shared-files
+fcb6cd0e2a71205b918f545f2680d378c790b774b9852129c5f9c7f3f8eb9860  .github/workflows/publish.yml#verify-signing-key
+09230b04c5f14bdda50a0c862152ff197a656cbc3fd0d110899c5f8150f8aa9a  .github/workflows/publish.yml#check-snapshot
+51e987d59efd9887b43e345edc0e0f3db21686879e3ca6ea9f0fdbc493d37121  .github/workflows/publish.yml#check-tag
+3d028534dc2369e45d48272a71708c0c327eca998bec0dc4a80fe9c5a5a81e99  .github/workflows/publish.yml#verify-signing-key-gradle
+de7ae553e6ac327094bcedf3acacd8b0c9e25607f9556c99419abf1dde405493  .github/workflows/publish.yml#github-snapshot
+4232da9e0a0742e21b78c971642d99805b7365a025771f48fa26118849500ee9  .github/workflows/publish.yml#github-release
