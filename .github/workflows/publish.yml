@@ -153,7 +153,7 @@ jobs:
           distribution: temurin
       - uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: "9.8.0"
+          gradle-version: "9.8.1"
       - name: Sign a throwaway artifact via useInMemoryPgpKeys (BouncyCastle)
         shell: bash
         env:
