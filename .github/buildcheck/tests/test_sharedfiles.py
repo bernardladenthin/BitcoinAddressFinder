@@ -71,11 +71,16 @@ class TreeTest(unittest.TestCase):
     def test_sibling_differences_are_warnings_not_failures(self):
         self.manifest(f"{A}  one.sh\n")
         others = {"srcmorph": f"{B}  one.sh\n", "streambuffer": f"{A}  one.sh\n"}
-        code, err = self.run_main(others=others)
+        # Pinned: the repository being checked is never fetched, and unpinned it came from
+        # GITHUB_REPOSITORY -- so in BitcoinAddressFinder's own CI the unreachable sibling this
+        # test expects was skipped and the test failed there alone.
+        with mock.patch.object(sharedfiles, "current_repo", return_value="java-llama.cpp"):
+            code, err = self.run_main(others=others)
         self.assertEqual(code, 0)
         self.assertIn("::warning::one.sh differs from srcmorph's one.sh", err)
         self.assertNotIn("streambuffer's", err)
         self.assertIn("could not read BitcoinAddressFinder", err)
+        self.assertNotIn("java-llama.cpp", err)
 
     def test_unknown_arguments(self):
         self.manifest("")
