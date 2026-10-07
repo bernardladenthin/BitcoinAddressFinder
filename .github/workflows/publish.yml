@@ -587,8 +587,13 @@ jobs:
       # (waitUntil/waitMaxTime etc.) is visible for debugging.
       - name: Show effective POM (debug)
         run: mvn --batch-mode --no-transfer-progress -P release help:effective-pom
+      # -Dmaven.repository.credentialScope=id: Maven 3.10 (on the runners since 2026-10) sends a server's
+      # credentials only to its declared origins, and for the id `central` that is repo.maven.apache.org --
+      # an upload to central.sonatype.com then goes out anonymously and fails with HTTP 401.
+      # Restores id-only matching; replace with setup-java's `mvn-server-repository-origins:
+      # central:https://central.sonatype.com` once a release of setup-java ships that input.
       - name: Deploy snapshot
-        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release deploy -DskipTests
+        run: mvn --batch-mode --no-transfer-progress -Dmaven.repository.credentialScope=id -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release deploy -DskipTests
         env:
           MAVEN_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN }}
@@ -723,8 +728,9 @@ jobs:
       # (waitUntil/waitMaxTime etc.) is visible for debugging.
       - name: Show effective POM (debug)
         run: mvn --batch-mode --no-transfer-progress -P release help:effective-pom
+      # -Dmaven.repository.credentialScope=id: see the first deploy step of this file (Maven 3.10).
       - name: Deploy release
-        run: mvn --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release deploy -DskipTests
+        run: mvn --batch-mode --no-transfer-progress -Dmaven.repository.credentialScope=id -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -P release deploy -DskipTests
         env:
           MAVEN_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN }}

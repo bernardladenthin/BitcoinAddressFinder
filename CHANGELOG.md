@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **CI: snapshot deploy fails with HTTP 401 on Maven 3.10 (seen in java-llama.cpp).** The runners moved to Maven 3.10, which
+  sends a `<server>`'s credentials only to the origins declared for it; for the id `central` that is
+  `https://repo.maven.apache.org`, so the upload to `central.sonatype.com/repository/maven-snapshots/`
+  goes out without credentials ("Not using credentials of server 'central'"). Every `deploy` step now
+  passes `-Dmaven.repository.credentialScope=id`, Maven's own switch back to id-only matching, until a
+  setup-java release can write `<repositoryOrigins>` (`mvn-server-repository-origins`, merged upstream
+  but not yet released).
 - **CI: shared files and the release gate are checked.** The files kept byte-identical with the sibling
   repositories are listed with their SHA-256 in `.github/shared-files.sha256`; a new `shared-files` job
   fails on a copy changed here alone and warns on a sibling's differing copy. The same job runs the
