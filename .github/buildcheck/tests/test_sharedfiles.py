@@ -37,7 +37,7 @@ class TreeTest(unittest.TestCase):
             f.write(b"a")
 
     def manifest(self, text):
-        with open(os.path.join(self.root, sharedfiles.MANIFEST), "w", encoding="utf-8") as f:
+        with open(os.path.join(self.root, sharedfiles.MANIFEST), "w", encoding="utf-8", newline="") as f:
             f.write(text)
 
     def run_main(self, *args, others=None):
@@ -114,7 +114,7 @@ class JobEntryTest(unittest.TestCase):
         self.write(WORKFLOW)
 
     def write(self, text):
-        with open(os.path.join(self.root, ".github/workflows/w.yml"), "w", encoding="utf-8") as f:
+        with open(os.path.join(self.root, ".github/workflows/w.yml"), "w", encoding="utf-8", newline="") as f:
             f.write(text)
 
     def test_a_job_entry_hashes_the_job_alone(self):
@@ -157,7 +157,7 @@ class RepoEntryTest(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     def write(self, path, text):
-        with open(os.path.join(self.root, path), "w", encoding="utf-8") as f:
+        with open(os.path.join(self.root, path), "w", encoding="utf-8", newline="") as f:
             f.write(text)
 
     def test_the_repository_name_is_replaced_by_a_placeholder(self):
