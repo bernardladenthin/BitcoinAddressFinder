@@ -18,6 +18,3 @@ includes `bernardladenthin/workspace` and retry.
 
 This file exists so human readers and any future drift-detection tooling
 can see the dependency from this repo to the canonical skill.
-
-The BAF-specific `tdd` skill in `../tdd/SKILL.md` remains in this repo —
-it adds project-specific context on top of the canonical TDD workflow.
