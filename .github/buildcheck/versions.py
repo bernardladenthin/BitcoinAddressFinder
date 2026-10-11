@@ -12,12 +12,17 @@ annotation-processor path with its version, plus the formatter version Spotless 
 `${property}` references resolved -- not property
 names, which differ between repositories and include values that must differ (the Java release).
 
+It also compares the Kotlin the POMs use with every Kotlin Gradle plugin a `*.gradle.kts` of the
+repository pins: Dependabot's maven ecosystem bumps `kotlin.version` and never sees the Gradle files,
+which is how a Compose compiler plugin stayed one patch release behind the POMs.
+
 Warnings, never failures: a bump lands in four pull requests, and the first one merged would
 otherwise turn the other three repositories red. The repository's own artifacts
 (`net.ladenthin:*`) are left out: a sibling depends on the last RELEASE of java-llama.cpp while
 java-llama.cpp itself is at the next snapshot.
 """
 
+import os
 import re
 import sys
 import urllib.request
@@ -28,7 +33,7 @@ from .sharedfiles import OWNER, REPOS, current_repo
 NS = "{http://maven.apache.org/POM/4.0.0}"
 POMS = {
     "java-llama.cpp": ("pom.xml", "llama/pom.xml", "llama-langchain4j/pom.xml", "llama-kotlin/pom.xml",
-                       "llama-platform/pom.xml", "llama-atmosphere-agent/pom.xml"),
+                       "llama-platform/pom.xml", "llama-atmosphere-agent/pom.xml", "examples/server/pom.xml"),
     "BitcoinAddressFinder": ("pom.xml",),
     "srcmorph": ("pom.xml", "srcmorph/pom.xml", "srcmorph-cli/pom.xml", "srcmorph-maven-plugin/pom.xml"),
     "streambuffer": ("pom.xml",),
@@ -42,6 +47,11 @@ VERSIONED = ("plugin", "dependency", "path", "annotationProcessorPath")
 CONFIGURED = {"palantirJavaFormat": "com.palantir.javaformat:palantir-java-format"}
 RAW_URL = "https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{path}"
 PROPERTY = re.compile(r"\$\{([^}]+)\}")
+KOTLIN_GROUP = "org.jetbrains.kotlin"
+# `id("org.jetbrains.kotlin.plugin.compose") version "2.4.21"` and `kotlin("jvm") version "2.4.21"`
+GRADLE_KOTLIN = re.compile(
+    r'(?:id\("(org\.jetbrains\.kotlin(?:\.[A-Za-z.]+)?)"\)|kotlin\("([A-Za-z.]+)"\))\s+version\s+"([^"]+)"')
+SKIPPED_DIRS = {".git", ".gradle", ".idea", "build", "node_modules", "target"}
 
 
 def coordinates(pom_texts):
@@ -94,6 +104,38 @@ def compare(own, others):
     return warnings
 
 
+def gradle_kotlin_plugins(root):
+    """(path, plugin id, version) for every Kotlin Gradle plugin a `*.gradle.kts` below root pins, in
+    path order; build output and the tools' own directories are not searched."""
+    found = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(d for d in dirnames if d not in SKIPPED_DIRS)
+        for name in sorted(filenames):
+            if not name.endswith(".gradle.kts"):
+                continue
+            path = os.path.join(dirpath, name)
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            for match in GRADLE_KOTLIN.finditer(text):
+                plugin = match.group(1) or f"{KOTLIN_GROUP}.{match.group(2)}"
+                found.append((os.path.relpath(path, root).replace(os.sep, "/"), plugin, match.group(3)))
+    return found
+
+
+def compare_gradle_kotlin(own, plugins):
+    """Warnings for every Kotlin Gradle plugin whose version is not one the POMs use for
+    `org.jetbrains.kotlin:*`; nothing when the POMs use no Kotlin or no Gradle file pins a plugin."""
+    maven = set()
+    for coordinate, used in own.items():
+        if coordinate.startswith(KOTLIN_GROUP + ":"):
+            maven |= used
+    if not maven:
+        return []
+    return [f"{plugin} is {version} in {path} and the POMs use Kotlin {', '.join(sorted(maven))}: "
+            f"Dependabot bumps only the POMs, bump the Gradle plugin with them"
+            for path, plugin, version in plugins if version not in maven]
+
+
 def fetch(repo, path):
     with urllib.request.urlopen(RAW_URL.format(owner=OWNER, repo=repo, path=path), timeout=20) as response:
         return response.read().decode("utf-8")
@@ -129,7 +171,7 @@ def main(argv, root, fetcher=fetch, out=sys.stdout, err=sys.stderr):
                 print(f"::warning::could not read {sibling}'s {path}: {e}", file=err)
         if texts:
             others[sibling] = coordinates(texts)
-    warnings = compare(own, others)
+    warnings = compare(own, others) + compare_gradle_kotlin(own, gradle_kotlin_plugins(root))
     for warning in warnings:
         print(f"::warning::{warning}", file=err)
     shared = set(own).intersection(*others.values()) if others else set()
