@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Build and test tooling bumped in step with the sibling repositories: Spotless 3.10.4, Checker
+  Framework 4.3.1, `commons-codec` 1.23.0; the measurement-tools matrix runs Python 3.10 and 3.15
+  (3.15.0 final, from 3.14). The shared `check-versions.py` now also compares the Kotlin Gradle plugins
+  of a repository with its POMs' Kotlin (nothing to compare here) and reads java-llama.cpp's
+  `examples/server/pom.xml`.
+- **CI prints the runner's CPU** at the top of `test`, `test-opencl` and `vmlens`
+  (`.github/print-host-info.sh`, a shared file of the four repositories): pocl computes on the CPU, so a
+  throughput or a timing in those logs can be read against the hardware the job drew.
 - **CI: snapshot deploy fails with HTTP 401 on Maven 3.10 (seen in java-llama.cpp).** The runners moved to Maven 3.10, which
   sends a `<server>`'s credentials only to the origins declared for it; for the id `central` that is
   `https://repo.maven.apache.org`, so the upload to `central.sonatype.com/repository/maven-snapshots/`

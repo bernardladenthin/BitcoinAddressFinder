@@ -265,6 +265,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
+      - name: Display CPU Info
+        shell: bash
+        run: bash .github/print-host-info.sh
       - uses: actions/setup-java@v6
         with:
           java-version-file: .java-version
@@ -326,6 +329,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Display CPU Info
+        shell: bash
+        run: bash .github/print-host-info.sh
       - uses: actions/setup-java@v6
         with:
           java-version-file: .java-version
@@ -388,6 +394,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Display CPU Info
+        shell: bash
+        run: bash .github/print-host-info.sh
       - uses: actions/setup-java@v6
         with:
           java-version-file: .java-version

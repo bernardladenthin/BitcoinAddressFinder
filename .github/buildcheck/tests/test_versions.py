@@ -4,6 +4,7 @@
 
 import io
 import os
+import tempfile
 import unittest
 from unittest import mock
 
@@ -62,6 +63,33 @@ class CompareTest(unittest.TestCase):
                          ["s:p is 2 here and 9 in r1: bump it in every repository"])
 
 
+class GradleKotlinTest(unittest.TestCase):
+
+    def test_plugins_are_read_from_every_kts_file_outside_build_output(self):
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, "app", "build"))
+            with open(os.path.join(root, "app", "build.gradle.kts"), "w", encoding="utf-8") as f:
+                f.write('plugins {\n    id("com.android.application") version "9.4.0"\n'
+                        '    id("org.jetbrains.kotlin.plugin.compose") version "2.4.20"\n'
+                        '    kotlin("jvm") version "2.4.21"\n}\n')
+            with open(os.path.join(root, "app", "build", "stale.gradle.kts"), "w", encoding="utf-8") as f:
+                f.write('kotlin("jvm") version "1.0.0"\n')
+            self.assertEqual(versions.gradle_kotlin_plugins(root), [
+                ("app/build.gradle.kts", "org.jetbrains.kotlin.plugin.compose", "2.4.20"),
+                ("app/build.gradle.kts", "org.jetbrains.kotlin.jvm", "2.4.21"),
+            ])
+
+    def test_a_plugin_behind_the_poms_kotlin_is_a_warning_and_nothing_else_is(self):
+        own = {"org.jetbrains.kotlin:kotlin-stdlib": {"2.4.21"}, "org.jetbrains.kotlinx:kotlinx-coroutines-core": {"1.11.0"}}
+        plugins = [("app/build.gradle.kts", "org.jetbrains.kotlin.plugin.compose", "2.4.20"),
+                   ("app/build.gradle.kts", "org.jetbrains.kotlin.jvm", "2.4.21")]
+        self.assertEqual(versions.compare_gradle_kotlin(own, plugins), [
+            "org.jetbrains.kotlin.plugin.compose is 2.4.20 in app/build.gradle.kts and the POMs use Kotlin 2.4.21: "
+            "Dependabot bumps only the POMs, bump the Gradle plugin with them"])
+        self.assertEqual(versions.compare_gradle_kotlin({"a:b": {"1"}}, plugins), [])
+        self.assertEqual(versions.compare_gradle_kotlin(own, []), [])
+
+
 class MainTest(unittest.TestCase):
 
     def run_main(self, siblings):
@@ -86,6 +114,19 @@ class MainTest(unittest.TestCase):
         self.assertIn("could not read java-llama.cpp's pom.xml", err)
         self.assertNotIn("BitcoinAddressFinder:", err)
         self.assertIn("1 version differences", out)
+
+    def test_a_gradle_kotlin_plugin_behind_the_poms_is_reported_with_the_other_warnings(self):
+        kotlin = pom('<dependencies><dependency><groupId>org.jetbrains.kotlin</groupId>'
+                     '<artifactId>kotlin-stdlib</artifactId><version>2.4.21</version></dependency></dependencies>')
+        out, err = io.StringIO(), io.StringIO()
+        with mock.patch.object(versions, "current_repo", return_value="java-llama.cpp"), \
+                mock.patch.object(versions, "read_local", return_value=[kotlin]), \
+                mock.patch.object(versions, "gradle_kotlin_plugins", return_value=[
+                    ("android-llmservice/app/build.gradle.kts", "org.jetbrains.kotlin.plugin.compose", "2.4.20")]):
+            self.assertEqual(versions.main(["x"], "/nowhere", lambda repo, path: kotlin, out, err), 0)
+        self.assertIn("::warning::org.jetbrains.kotlin.plugin.compose is 2.4.20 in android-llmservice/app/build.gradle.kts "
+                      "and the POMs use Kotlin 2.4.21", err.getvalue())
+        self.assertIn("1 version differences", out.getvalue())
 
     def test_a_missing_pom_skips_that_file_not_the_repository(self):
         out, err = io.StringIO(), io.StringIO()
