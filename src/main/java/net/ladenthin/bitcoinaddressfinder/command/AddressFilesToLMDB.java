@@ -278,7 +278,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
                 if (!enqueue(lineQueue, line, failure)) {
                     return;
                 }
-                progress.onLineRead(file, charsRead, length, System.currentTimeMillis());
+                progress.onLineRead(file, charsRead, length, addressCounter.get(), System.currentTimeMillis());
             }
         }
     }
@@ -288,8 +288,16 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
      * reader thread ever calls into it, so no field is shared across threads and none needs
      * synchronization. Samples the running byte count (~1/s) into a trailing-rate window and, on the
      * throttled interval, logs overall percent plus an ETA derived from that rate.
+     *
+     * <p>Deliberately a {@code static} nested class that takes the written-address count as an
+     * argument instead of reading the outer counter: SpotBugs 4.10.5 treats a class as multi-threaded
+     * when it holds an atomic or volatile field, is a {@code Runnable}, or locks -- which the outer
+     * class is and does -- and extends that verdict to every inner class that carries an enclosing
+     * instance reference ({@code this$0}). It then reports the plain {@code +=} on the byte counter as
+     * {@code AT_NONATOMIC_OPERATIONS_ON_SHARED_VARIABLE}, a shared variable this class has none of.
+     * Without the reference the class is judged on its own, which is also the truthful description.
      */
-    private class ReaderProgress {
+    private static final class ReaderProgress {
 
         private final long totalBytes;
         private final SlidingWindowRate byteRate = new SlidingWindowRate(RATE_WINDOW_MILLIS);
@@ -309,7 +317,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
         }
 
         /** Per line: samples the byte rate (throttled) and emits the progress+ETA line (throttled). */
-        void onLineRead(File file, long charsRead, long fileLength, long nowMillis) {
+        void onLineRead(File file, long charsRead, long fileLength, long addressesWritten, long nowMillis) {
             long overallBytes = bytesReadInFinishedFiles + charsRead;
             if (nowMillis - lastSampleMillis >= SAMPLE_INTERVAL_MILLIS) {
                 lastSampleMillis = nowMillis;
@@ -327,7 +335,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
                         "reading %s: %.2f%% (%d written) | overall %.2f%% of %s, %s/s, ETA %s",
                         file.getName(),
                         filePercent,
-                        addressCounter.get(),
+                        addressesWritten,
                         overallPercent,
                         humanBytes(totalBytes),
                         humanBytes((long) bytesPerSecond),
@@ -338,7 +346,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     /** Formats a byte count as a human-readable KiB/MiB/GiB string. */
     @VisibleForTesting
-    String humanBytes(long bytes) {
+    static String humanBytes(long bytes) {
         if (bytes >= 1L << 30) {
             return String.format("%.1f GiB", bytes / (double) (1L << 30));
         }
@@ -353,7 +361,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     /** Formats a duration in seconds as a compact {@code Hh Mm} / {@code Mm Ss} / {@code Ss} string. */
     @VisibleForTesting
-    String formatDuration(long totalSeconds) {
+    static String formatDuration(long totalSeconds) {
         if (totalSeconds < 0L) {
             return "?";
         }
