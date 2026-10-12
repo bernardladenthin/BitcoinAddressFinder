@@ -60,6 +60,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `shared-files` job) warns where a dependency or plugin -- incl. annotation-processor paths and the
   Spotless formatter version -- is used in another version than in a sibling's default branch.
 
+### Fixed
+- **CI: the GitHub `snapshot` pre-release holds exactly the current build, and the release assets
+  include the pom.** `gh release upload --clobber` replaces same-named assets and never removes any
+  other, so the `snapshot` release accumulated: the six 1.8.0-SNAPSHOT jars next to the 1.9.0-SNAPSHOT ones, 6
+  of its 14 assets. `github-snapshot` now deletes every asset
+  the run did not upload, after the upload and each printed by name; versioned releases are never
+  pruned, and the next snapshot run clears the backlog by itself. The collect steps copy
+  `<artifactId>-<version>.pom` + `.pom.asc` as well (Central had them, the release did not), and
+  the signature check counts every attachable type (`*.jar`, `*.aar`, `*.pom`) instead of jars
+  alone. Shared job text with the two sibling repositories (`shared-files.sha256`), the convention
+  in `workspace/policies/fat-jar-release-assets.md`.
+
 ## [1.8.0] - 2026-08-29
 
 ### Added
