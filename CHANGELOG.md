@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Build tooling: spotbugs-maven-plugin 4.10.4.1 -> 4.10.5.0**, in step with the sibling repositories, and with it
+  **Lombok-generated code carries JSpecify nullness** (`lombok.addNullAnnotations = jspecify` in the
+  shared `lombok.config`): under `@NullMarked` a generated `equals(Object)` parameter read as non-null
+  while `Object.equals` accepts null, which SpotBugs 4.10.5 -- the first release that reads JSpecify --
+  reports as `NP_METHOD_PARAMETER_TIGHTENS_ANNOTATION` per class; Lombok now writes `@Nullable` there
+  (and `@NonNull` where a generated member cannot return or take null), so a consumer's nullness checker
+  sees the real contract too. The 27 findings here were all of that kind, plus one on the
+  importer: `AddressFilesToLMDB.ReaderProgress` is a `static` nested class now that takes the written-address
+  count as an argument -- SpotBugs 4.10.5 extends the outer class's multi-threaded verdict (atomic fields,
+  `Runnable`) to every inner class carrying an enclosing-instance reference and then reported the
+  reader-thread-only `+=` on its byte counter as `AT_NONATOMIC_OPERATIONS_ON_SHARED_VARIABLE`; judged on
+  its own, the class is what its Javadoc always said. `humanBytes` / `formatDuration` are static with it.
 - Build and test tooling bumped in step with the sibling repositories: Spotless 3.10.4, Checker
   Framework 4.3.1, `commons-codec` 1.23.0; the measurement-tools matrix runs Python 3.10 and 3.15
   (3.15.0 final, from 3.14). The shared `check-versions.py` now also compares the Kotlin Gradle plugins

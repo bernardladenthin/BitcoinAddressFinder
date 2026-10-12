@@ -66,7 +66,7 @@ SPDX-License-Identifier: Apache-2.0
              policy) for full context. -->
         <jqwik.version>1.9.3</jqwik.version>
         <archunit.version>1.5.1</archunit.version>
-        <spotbugs.version>4.10.4.1</spotbugs.version>
+        <spotbugs.version>4.10.5.0</spotbugs.version>
         <fb-contrib.version>7.7.4</fb-contrib.version>
         <findsecbugs.version>1.14.0</findsecbugs.version>
         <errorprone.version>2.50.0</errorprone.version>
