@@ -748,8 +748,10 @@ The attach jobs are shared text with the two sibling Maven-only repositories
 signature check counts every attachable type (`*.jar`, `*.aar`, `*.pom`), and `github-snapshot` ends
 by deleting every asset of the `snapshot` pre-release that the run did not upload, each printed by
 name -- `gh release upload --clobber` never removed anything, so the release accumulated every past
-version. Versioned releases are never pruned. See the policy's "Attach first, then go red" and "The
-`snapshot` pre-release holds exactly the current upload".
+version. The prune refuses an empty upload, treats an asset that is already gone as removed and
+fails only after trying every deletion; versioned releases are never pruned. See the policy's
+"Attach first, then go red" and "The `snapshot` pre-release holds exactly the current upload", which
+also records the delete-and-recreate form of this job (May 2026) and why it is gone.
 
 **BAF-specific smoke.** The cross-repo rule "no release asset is attached that CI has not run" is
 implemented here by the `smoke-fatjar` job (`needs: [build]`, gates both publish jobs): it downloads
