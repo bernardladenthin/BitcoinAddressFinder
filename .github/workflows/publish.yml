@@ -721,23 +721,58 @@ jobs:
         # upload on purpose: a failed upload must not leave the release emptier than it was. And only
         # here: a versioned v* release is history, github-release never deletes anything. Every
         # deletion is printed by name, so the job log is the audit trail.
+        #
+        # Asset by asset, never the release. The first form of this job (2026-05-07) deleted the whole
+        # `snapshot` release with its tag and recreated it; on 2026-05-10 the runs of several main
+        # pushes minutes apart deleted it under each other, and every job of each burst but the last
+        # failed in that step with its artifacts present. The job then went with the Central
+        # migration and came back as `view || create` + `upload --clobber` without any cleanup, which
+        # is how the backlog grew (workspace/policies/fat-jar-release-assets.md has the runs). Hence
+        # three guards: an empty upload is refused (every asset would count as stale; the download
+        # and upload steps above fail first, the guard keeps it so), an asset that is already gone
+        # counts as removed (two overlapping dispatches may both pick it), and a failed deletion is
+        # reported and the rest still tried -- the assets of this upload are on the release either
+        # way, so this is "attach first, then red" like the signature check.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           keep="$(ls -1 snapshot-assets | sort)"
-          current="$(gh release view snapshot --repo ${{ github.repository }} --json assets --jq '.assets[].name' | sort)"
+          if [ -z "$keep" ]; then
+            echo "::error::refusing to prune: this run uploaded nothing, so every asset of the release would count as stale"
+            exit 1
+          fi
+          list_assets() {
+            gh release view snapshot --repo ${{ github.repository }} --json assets --jq '.assets[].name' | sort
+          }
+          current="$(list_assets)"
           stale="$(comm -13 <(printf '%s\n' "$keep") <(printf '%s\n' "$current"))"
           if [ -z "$stale" ]; then
             echo "nothing to remove: the release holds exactly the $(printf '%s\n' "$keep" | wc -l) asset(s) of this upload"
             exit 0
           fi
           echo "removing $(printf '%s\n' "$stale" | wc -l) asset(s) that are not part of this upload:"
+          failed=0
           while IFS= read -r name; do
             [ -n "$name" ] || continue
             echo "  deleting $name"
-            gh release delete-asset snapshot "$name" --repo ${{ github.repository }} --yes
+            if gh release delete-asset snapshot "$name" --repo ${{ github.repository }} --yes; then
+              continue
+            fi
+            if ! remaining="$(list_assets)"; then
+              echo "::error::could not delete $name, and could not re-read the release to tell whether it is gone"
+              failed=$((failed + 1))
+            elif printf '%s\n' "$remaining" | grep -qxF -- "$name"; then
+              echo "::error::could not delete $name"
+              failed=$((failed + 1))
+            else
+              echo "  $name was already gone"
+            fi
           done <<< "$stale"
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::$failed asset(s) could not be removed; the $(printf '%s\n' "$keep" | wc -l) asset(s) of this upload are on the release"
+            exit 1
+          fi
           echo "kept the $(printf '%s\n' "$keep" | wc -l) asset(s) of this upload"
       - name: Fail if anything was attached unsigned
         # After the upload on purpose: the assets must exist even when the signature does not.
