@@ -29,6 +29,7 @@ That regenerates `plots/*.png` and the generated tables in one step.
 | `k_sweep.csv` | Blocked Bloom false-positive rate vs `k`, per bit density. |
 | `filter_sizing.csv` | Blocked Bloom FPR and speed vs filter size at fixed `k`. |
 | `tune_arms.csv`, `tuner_*.csv` | `TuneConfiguration` grid sweeps: one row per arm (`batchSizeInBits` × `keysPerWorkItem`), with the winner flagged — **per device**, so a multi-device file carries one `yes` per GPU. Raw data — not consumed by `plot.py`. |
+| `tuner_vast_2026-10-15.csv` | The same sweep on ten GPUs rented on Vast.ai (v1.8.0 release jar, 15 arms each). Its `vast-<gpu>-<instance>` machine ids are **not** in `machines.json`: each was a stranger's host, rented for minutes and destroyed, so there is nothing to register. Host details that matter (power limit, clock under load) are in the README's benchmark footnotes. |
 | `plot.py` | Reads all of the above **except the tuner sweeps**; writes `plots/*.png` and the generated tables. |
 
 > **Two sweeps of the same machine are not automatically comparable.** `tuner_ryzen9800x3d_gfx1100.csv`

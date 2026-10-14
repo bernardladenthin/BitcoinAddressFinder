@@ -528,6 +528,37 @@ BitcoinAddressFinder/
 
 Until the investigation settles on a toolkit, no UI code should be added to the existing modules. Record the toolkit decision and its rationale in `docs/gui-toolkit-decision.md` before starting implementation.
 
+### RTX 4090 (Ada, AD102) is not saturated — ~600 M keys/s at a third of its power
+
+Found by the rented-GPU benchmark of 2026-10-15 (README "Performance Benchmarks", raw data in
+[`docs/measurements/tuner_vast_2026-10-15.csv`](docs/measurements/tuner_vast_2026-10-15.csv)). Same
+v1.8.0 jar, same `TuneConfiguration` sweep, same kind of Vast.ai host for every card:
+
+| card | best arm | keys/s | power under load (limit) | M keys/s per SM·GHz |
+|---|---|--:|---|--:|
+| RTX 5090 | 24 / 512 | 1 593 M | up to ~565 W (575 W) | ~3.1 |
+| RTX 3090 | 24 / 1024 | 565 M | ~280 W (280 W) | ~3.9 |
+| **RTX 4090**, host A (driver 555.52) | 22 / 64 | **666 M** | ~80–310 W, median **117 W** (450 W) | **~1.9** |
+| **RTX 4090**, host B (driver 570.211) | 22 / 256 | **596 M** | ~70–280 W, median **142 W** (450 W) | **~1.7** |
+
+On compute alone a 4090 (128 SM at ~2.7 GHz) should land around 1.3 G keys/s, above the 3090. Two
+hosts with different drivers agree, and the curve is unusually **flat across the whole grid** (host B:
+517–596 M/s for every arm with `batchSizeInBits` ≥ 22), while `nvidia-smi` reports ~98 % utilisation
+at ~100–140 W — the card is *busy but stalled*, not idle. The small Ada part measured earlier (RTX 500
+Ada Laptop, `tuner_coreultra7155h.csv`) does not show this (~3.4 M per SM·GHz), so it may be specific
+to the big AD102 die rather than to Ada as a whole.
+
+Open questions, cheapest first (a 4090 rents for ~0.38–0.55 USD/h on Vast.ai, minutes are enough):
+- **Kernel or pipeline?** Run the kernel-only JMH benchmark (`GridSizeSweepBenchmark`) on a rented 4090.
+  If the kernel alone is fast, the limit is host-side; if it is ~600 M there too, it is the kernel on AD102.
+- **Register spills / occupancy.** Get the NVIDIA build log (`-cl-nv-verbose`) for the inlined kernel on
+  AD102 and compare registers per thread and spill stores with GA102 (3090) and GB202 (5090).
+- **Wider grid.** The sweep only tried `keysPerWorkItem` ≥ 64 and `batchSizeInBits` ≤ 24; the winner on
+  host A sat at the lower `keysPerWorkItem` edge. Try 16 / 32 and `batchSizeInBits` 25–26.
+- **Another AD102/AD103 card** (RTX 4080, RTX 6000 Ada, L40S) to tell "AD102" from "big Ada".
+
+Until this is understood the README lists the 4090 as a lower bound, not as the card's speed.
+
 ### OpenCL backend abstraction & multi-device coverage (migrated from GitHub issues)
 
 - **Add a test exercising two OpenCL devices simultaneously** (migrated from GitHub issue #6). Current OpenCL coverage drives a **single** device (`ProbeAddressesOpenCLTest`, gated by `OpenCLPlatformAssume`). Add a test that runs **two `producerOpenCL` instances concurrently** (the multi-device path the project supports via multiple `producerOpenCL` entries) and asserts both produce and feed the consumer correctly at the same time.
