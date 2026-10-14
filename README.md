@@ -1707,13 +1707,55 @@ For technical details, see:
 > addresses examined is twice this rate — see
 > [Keys versus addresses](#keys-versus-addresses).
 
-| GPU Model              | CPU                 | Key Range (Bits) | Grid Size (Bits) | keysPerWorkItem | Effective Keys/s (~)   |
-|------------------------|---------------------|------------------|------------------|-----------------|------------------------|
-| NVIDIA RTX 3070 Laptop | AMD Ryzen 7 5800H   | 256              | 22               | 256             | ~229,000,000 keys/s    |
-| NVIDIA RTX 3070 Laptop | AMD Ryzen 7 5800H   | 256              | 24               | 2048            | ~266,000,000 keys/s    |
-| AMD Radeon RX 7900 XTX | AMD Ryzen 7 9800X3D | 256              | 24               | 512             | ~670,000,000 keys/s    |
+| GPU Model                    | CPU / Host          | Key Range (Bits) | Grid Size (Bits) | keysPerWorkItem | Effective Keys/s (~)             | Vast.ai USD/h ¹ | USD per 10¹² keys ¹ |
+|------------------------------|---------------------|------------------|------------------|-----------------|----------------------------------|-----------------|---------------------|
+| NVIDIA RTX 5090              | Vast.ai (rented)    | 256              | 24               | 512             | ~1,593,000,000 keys/s            | 0.388           | ~0.068              |
+| AMD Radeon RX 7900 XTX       | AMD Ryzen 7 9800X3D | 256              | 24               | 512             | ~670,000,000 keys/s              | —               | —                   |
+| NVIDIA RTX 4090 ²            | Vast.ai (rented)    | 256              | 22               | 64 / 256        | ~596,000,000–666,000,000 keys/s  | 0.379           | ~0.16–0.18          |
+| NVIDIA RTX 3090              | Vast.ai (rented)    | 256              | 24               | 1024            | ~565,000,000 keys/s              | 0.121           | **~0.060**          |
+| NVIDIA RTX 5060 Ti           | Vast.ai (rented)    | 256              | 24               | 1024            | ~481,000,000 keys/s              | 0.127           | ~0.073              |
+| NVIDIA CMP 170HX ³           | Vast.ai (rented)    | 256              | 22               | 256             | ~349,000,000 keys/s              | 0.214           | ~0.170              |
+| NVIDIA Tesla V100 SXM2 16 GB | Vast.ai (rented)    | 256              | 24               | 1024            | ~310,000,000 keys/s              | 0.081           | ~0.073              |
+| NVIDIA RTX 3070 Laptop       | AMD Ryzen 7 5800H   | 256              | 24               | 2048            | ~266,000,000 keys/s              | —               | —                   |
+| NVIDIA RTX 3070 ⁴            | Vast.ai (rented)    | 256              | 24               | 512             | ~249,000,000 keys/s              | 0.094           | ~0.105              |
+| NVIDIA RTX 3070 Laptop       | AMD Ryzen 7 5800H   | 256              | 22               | 256             | ~229,000,000 keys/s              | —               | —                   |
+| NVIDIA RTX 2070 SUPER        | Vast.ai (rented)    | 256              | 24               | 512             | ~216,000,000 keys/s              | 0.068           | ~0.087              |
+| NVIDIA GTX 1080 Ti           | Vast.ai (rented)    | 256              | 24               | 512             | ~49,000,000 keys/s               | 0.041           | ~0.232              |
 
-> **Methodology.** Compact GPU-filter fast path, candidates/s = JMH ops/s × `2^batchSizeInBits`, all on
+> ¹ **Price, as of 2026-10-15.** The cheapest single-GPU **on-demand** offer on [Vast.ai](https://vast.ai)
+> for that model (hosts with reliability > 0.95, verified or not), queried on 2026-10-15. Marketplace prices
+> move by the hour — the median offer was 1.4–2.4× the cheapest that day, and interruptible (bid) instances
+> can be cheaper still. `USD per 10¹² keys` = `USD/h ÷ (keys/s × 3600 ÷ 10¹²)`, i.e. GPU rent only: no
+> storage, no traffic, no setup time. The rows marked — are the maintainers' own machines.
+>
+> ² **RTX 4090: not saturated — treat as a lower bound.** Measured on two different hosts (drivers 555.52
+> and 570.211): 666 M/s and 596 M/s, with the card drawing only **117–142 W of a 450 W limit** and a curve
+> that stays flat across every grid. The RTX 5090 and 3090 on the same software and the same kind of host
+> did saturate, so this looks like an Ada-specific limit in the pipeline rather than a host problem; it is
+> not yet understood. On compute alone a 4090 should land well above the 3090.
+>
+> ³ **CMP 170HX** (GA100 mining card, PCIe x4): its integer throughput is *not* crippled — ~3.5 M keys/s
+> per SM·GHz, on par with Ampere — but at 155 W and 1.41 GHz on this host, and at its price, it is not
+> worth renting for this workload. PCIe width itself does not matter here: the compact GPU-filter path
+> sends only filter survivors back to the host.
+>
+> ⁴ **This RTX 3070 host had its power limit cut to 100 W** (stock 220 W), so the card ran at ~1.5 GHz. A
+> rented card's power limit is invisible until you look (`nvidia-smi --query-gpu=power.limit`), and it
+> alone can cost a third of the throughput.
+
+> **Methodology — rented rows (Vast.ai, 2026-10-15).** Each card measured once with the `TuneConfiguration`
+> command of the signed **v1.8.0** release jar (kernel and tuner unchanged since), in a container on the
+> host's own NVIDIA OpenCL driver: 15 arms (`batchSizeInBits` 20 / 22 / 24 × `keysPerWorkItem` 64 / 256 /
+> 512 / 1024 / 2048), 5 s warm-up + 15 s measurement each, against a synthetic 141 M-entry pre-filter (no
+> database read). The figure is the winning arm's net end-to-end candidates/s — the same instrument a user
+> runs on their own machine, not the JMH benchmark used for the maintainers' rows. One run per card on one
+> stranger's host: power limits, clocks and co-tenancy are outside our control (see the footnotes), so read
+> these as *what renting that card typically gets you*, not as the card's ceiling. **Best settings:** on
+> every NVIDIA card except the RTX 4090 the winner was `batchSizeInBits = 24` with `keysPerWorkItem` 512
+> or 1024 — far above the default candidate list, which stops at 256. Raw data, all 150 arms:
+> [`tuner_vast_2026-10-15.csv`](docs/measurements/tuner_vast_2026-10-15.csv).
+>
+> **Methodology — own machines.** Compact GPU-filter fast path, candidates/s = JMH ops/s × `2^batchSizeInBits`, all on
 > the **inlined** kernel (the example configs now default to `noInlineHelpers: false`). Each device is
 > shown at its own tuned optimum — the grid optimum is device-specific: the RTX 3070 peaks at `kpwi=2048`,
 > the RX 7900 XTX at `kpwi=512` (`kpwi=2048` collapses to ~71 M/s on RDNA3 through under-occupancy). The
