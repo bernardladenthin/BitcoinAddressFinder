@@ -1,0 +1,15 @@
+{
+ "gpu_name": "Tesla V100",
+ "dph_total": 0.10898148148148148,
+ "cpu_name": "Xeon\u00ae Gold 6138 ",
+ "cpu_cores_effective": 20.0,
+ "cpu_ram": 44225,
+ "gpu_ram": 16384,
+ "driver_version": "560.35.03",
+ "cuda_max_good": 12.6,
+ "pcie_bw": 11.7,
+ "pci_gen": 3.0,
+ "reliability2": 0.9881309,
+ "geolocation": "Texas, US",
+ "inet_down": 823.1
+}

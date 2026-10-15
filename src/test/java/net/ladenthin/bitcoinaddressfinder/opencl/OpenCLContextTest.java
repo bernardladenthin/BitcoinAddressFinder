@@ -279,6 +279,39 @@ public class OpenCLContextTest {
         assertThat(
                 openCLContext.buildOptions(false), not(containsString(OpenCLContext.NO_INLINE_HELPERS_BUILD_OPTION)));
     }
+
+    @Test
+    public void buildOptions_extraBuildOptionsPropertySet_appendsItTrimmed() {
+        // arrange
+        OpenCLContext openCLContext = new OpenCLContext(new CProducerOpenCL(), bitHelper);
+        System.setProperty(OpenCLContext.EXTRA_BUILD_OPTIONS_PROPERTY, "  -D KEYS_BATCH_INV=8 -cl-nv-maxrregcount=96 ");
+        try {
+            // act
+            String options = openCLContext.buildOptions();
+
+            // assert
+            assertThat(options, endsWith(" -D KEYS_BATCH_INV=8 -cl-nv-maxrregcount=96"));
+        } finally {
+            System.clearProperty(OpenCLContext.EXTRA_BUILD_OPTIONS_PROPERTY);
+        }
+    }
+
+    @Test
+    public void buildOptions_extraBuildOptionsPropertyBlank_leavesOptionsUnchanged() {
+        // arrange
+        OpenCLContext openCLContext = new OpenCLContext(new CProducerOpenCL(), bitHelper);
+        String withoutProperty = openCLContext.buildOptions();
+        System.setProperty(OpenCLContext.EXTRA_BUILD_OPTIONS_PROPERTY, "   ");
+        try {
+            // act
+            String options = openCLContext.buildOptions();
+
+            // assert
+            assertThat(options, is(equalTo(withoutProperty)));
+        } finally {
+            System.clearProperty(OpenCLContext.EXTRA_BUILD_OPTIONS_PROPERTY);
+        }
+    }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="noInlineHelpers vendor auto-detect">

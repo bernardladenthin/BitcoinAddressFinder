@@ -1,0 +1,15 @@
+{
+ "gpu_name": "RTX 3090",
+ "dph_total": 0.20138888888888887,
+ "cpu_name": "AMD EPYC 7502 32-Core Processor",
+ "cpu_cores_effective": 9.142857142857142,
+ "cpu_ram": 32190,
+ "gpu_ram": 24576,
+ "driver_version": "580.173.02",
+ "cuda_max_good": 13.0,
+ "pcie_bw": 12.7,
+ "pci_gen": 4.0,
+ "reliability2": 0.9771193,
+ "geolocation": "Thailand, TH",
+ "inet_down": 860.1
+}

@@ -1,0 +1,144 @@
+[
+    {
+        "jmhVersion": "1.37",
+        "benchmark": "net.ladenthin.bitcoinaddressfinder.benchmark.GpuFuse8FilterBenchmark.oneKernelLaunch",
+        "mode": "thrpt",
+        "threads": 1,
+        "forks": 1,
+        "jvm": "<JAVA_HOME_TEMURIN>/bin/java",
+        "jvmArgs": [
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.io=ALL-UNNAMED",
+            "--add-opens=java.base/java.nio=ALL-UNNAMED",
+            "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
+            "--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED",
+            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+            "-Xmx20g",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.io=ALL-UNNAMED",
+            "--add-opens=java.base/java.nio=ALL-UNNAMED",
+            "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
+            "--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED",
+            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
+        ],
+        "jdkVersion": "21.0.12.1",
+        "vmName": "OpenJDK 64-Bit Server VM",
+        "vmVersion": "21.0.12.1+1-LTS",
+        "warmupIterations": 1,
+        "warmupTime": "10 s",
+        "warmupBatchSize": 1,
+        "measurementIterations": 2,
+        "measurementTime": "15 s",
+        "measurementBatchSize": 1,
+        "params": {
+            "batchSizeInBits": "22",
+            "filterEntries": "1048576",
+            "gpuFilter": "true",
+            "kernelProfileStage": "FULL",
+            "keysPerWorkItem": "256",
+            "noInlineHelpers": "false",
+            "profiling": "true",
+            "useReducedRadixField": "true",
+            "useSafeGcdInverse": "true"
+        },
+        "primaryMetric": {
+            "score": 58.90732621855674,
+            "scoreError": "NaN",
+            "scoreConfidence": [
+                "NaN",
+                "NaN"
+            ],
+            "scorePercentiles": {
+                "0.0": 58.76977372432436,
+                "50.0": 58.90732621855674,
+                "90.0": 59.04487871278912,
+                "95.0": 59.04487871278912,
+                "99.0": 59.04487871278912,
+                "99.9": 59.04487871278912,
+                "99.99": 59.04487871278912,
+                "99.999": 59.04487871278912,
+                "99.9999": 59.04487871278912,
+                "100.0": 59.04487871278912
+            },
+            "scoreUnit": "ops/s",
+            "rawData": [
+                [
+                    59.04487871278912,
+                    58.76977372432436
+                ]
+            ]
+        },
+        "secondaryMetrics": {}
+    },
+    {
+        "jmhVersion": "1.37",
+        "benchmark": "net.ladenthin.bitcoinaddressfinder.benchmark.GpuFuse8FilterBenchmark.oneKernelLaunch",
+        "mode": "thrpt",
+        "threads": 1,
+        "forks": 1,
+        "jvm": "<JAVA_HOME_TEMURIN>/bin/java",
+        "jvmArgs": [
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.io=ALL-UNNAMED",
+            "--add-opens=java.base/java.nio=ALL-UNNAMED",
+            "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
+            "--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED",
+            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+            "-Xmx20g",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.io=ALL-UNNAMED",
+            "--add-opens=java.base/java.nio=ALL-UNNAMED",
+            "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
+            "--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED",
+            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
+        ],
+        "jdkVersion": "21.0.12.1",
+        "vmName": "OpenJDK 64-Bit Server VM",
+        "vmVersion": "21.0.12.1+1-LTS",
+        "warmupIterations": 1,
+        "warmupTime": "10 s",
+        "warmupBatchSize": 1,
+        "measurementIterations": 2,
+        "measurementTime": "15 s",
+        "measurementBatchSize": 1,
+        "params": {
+            "batchSizeInBits": "22",
+            "filterEntries": "141045995",
+            "gpuFilter": "true",
+            "kernelProfileStage": "FULL",
+            "keysPerWorkItem": "256",
+            "noInlineHelpers": "false",
+            "profiling": "true",
+            "useReducedRadixField": "true",
+            "useSafeGcdInverse": "true"
+        },
+        "primaryMetric": {
+            "score": 59.19873576992801,
+            "scoreError": "NaN",
+            "scoreConfidence": [
+                "NaN",
+                "NaN"
+            ],
+            "scorePercentiles": {
+                "0.0": 58.664959323242094,
+                "50.0": 59.19873576992801,
+                "90.0": 59.73251221661393,
+                "95.0": 59.73251221661393,
+                "99.0": 59.73251221661393,
+                "99.9": 59.73251221661393,
+                "99.99": 59.73251221661393,
+                "99.999": 59.73251221661393,
+                "99.9999": 59.73251221661393,
+                "100.0": 59.73251221661393
+            },
+            "scoreUnit": "ops/s",
+            "rawData": [
+                [
+                    58.664959323242094,
+                    59.73251221661393
+                ]
+            ]
+        },
+        "secondaryMetrics": {}
+    }
+]

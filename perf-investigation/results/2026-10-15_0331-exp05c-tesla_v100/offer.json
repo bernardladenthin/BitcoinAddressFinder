@@ -1,0 +1,15 @@
+{
+ "gpu_name": "Tesla V100",
+ "dph_total": 0.08185185185185186,
+ "cpu_name": "Xeon\u00ae E5-2682 v4 ",
+ "cpu_cores_effective": 32.0,
+ "cpu_ram": 32078,
+ "gpu_ram": 16384,
+ "driver_version": "580.178.04",
+ "cuda_max_good": 13.0,
+ "pcie_bw": 9.8,
+ "pci_gen": 3.0,
+ "reliability2": 0.9792093,
+ "geolocation": "California, US",
+ "inet_down": 697.3
+}

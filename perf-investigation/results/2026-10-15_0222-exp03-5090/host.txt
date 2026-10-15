@@ -1,0 +1,7 @@
+46
+               total        used        free      shared  buff/cache   available
+Mem:             755         355          94          14         327         399
+Swap:              1           1           0
+6.8.0-90-generic
+name, driver_version, vbios_version, pcie.link.gen.max, pcie.link.width.max, power.limit [W], power.default_limit [W], power.max_limit [W], enforced.power.limit [W], clocks.max.sm [MHz], clocks.max.memory [MHz], clocks.applications.graphics [MHz], clocks.default_applications.graphics [MHz], persistence_mode, compute_mode
+NVIDIA GeForce RTX 5090, 580.82.09, 98.02.2E.00.AF, 5, 16, 575.00 W, 575.00 W, 600.00 W, 575.00 W, 3105 MHz, 14001 MHz, [N/A], [N/A], Enabled, Default

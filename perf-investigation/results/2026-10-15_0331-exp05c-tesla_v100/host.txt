@@ -1,0 +1,7 @@
+31
+               total        used        free      shared  buff/cache   available
+Mem:              62           2          30           0          29          59
+Swap:              7           0           7
+6.8.0-142-generic
+name, driver_version, vbios_version, pcie.link.gen.max, pcie.link.width.max, power.limit [W], power.default_limit [W], power.max_limit [W], enforced.power.limit [W], clocks.max.sm [MHz], clocks.max.memory [MHz], clocks.applications.graphics [MHz], clocks.default_applications.graphics [MHz], persistence_mode, compute_mode
+Tesla V100-SXM2-16GB, 580.178.04, 88.00.4F.00.09, 3, 16, 300.00 W, 300.00 W, 300.00 W, 300.00 W, 1530 MHz, 877 MHz, 1312 MHz, 1312 MHz, Enabled, Default

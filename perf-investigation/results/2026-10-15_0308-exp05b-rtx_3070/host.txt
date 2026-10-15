@@ -1,0 +1,7 @@
+31
+               total        used        free      shared  buff/cache   available
+Mem:             503          37         311           0         158         465
+Swap:              7           0           7
+6.8.0-146-generic
+name, driver_version, vbios_version, pcie.link.gen.max, pcie.link.width.max, power.limit [W], power.default_limit [W], power.max_limit [W], enforced.power.limit [W], clocks.max.sm [MHz], clocks.max.memory [MHz], clocks.applications.graphics [MHz], clocks.default_applications.graphics [MHz], persistence_mode, compute_mode
+NVIDIA GeForce RTX 3070, 595.71.05, 94.04.46.80.15, 4, 16, 220.00 W, 220.00 W, 242.00 W, 220.00 W, 2100 MHz, 7001 MHz, [Requested functionality has been deprecated], [Requested functionality has been deprecated], Enabled, Default

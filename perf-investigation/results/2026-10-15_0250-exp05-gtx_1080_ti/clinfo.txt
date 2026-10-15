@@ -1,0 +1,2 @@
+Platform #0: NVIDIA CUDA
+ `-- Device #0: NVIDIA GeForce GTX 1080 Ti

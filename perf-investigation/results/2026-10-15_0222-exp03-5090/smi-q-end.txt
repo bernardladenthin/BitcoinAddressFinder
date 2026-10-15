@@ -1,0 +1,88 @@
+
+==============NVSMI LOG==============
+
+Timestamp                                 : Thu Oct 15 00:27:41 2026
+Driver Version                            : 580.82.09
+CUDA Version                              : 13.0
+
+Attached GPUs                             : 1
+GPU 00000000:01:00.0
+    Performance State                     : P0
+    Clocks Event Reasons
+        Idle                              : Not Active
+        Applications Clocks Setting       : Not Active
+        SW Power Cap                      : Not Active
+        HW Slowdown                       : Not Active
+            HW Thermal Slowdown           : Not Active
+            HW Power Brake Slowdown       : Not Active
+        Sync Boost                        : Not Active
+        SW Thermal Slowdown               : Not Active
+        Display Clock Setting             : Not Active
+    Clocks Event Reasons Counters
+        SW Power Capping                  : 48832396208 us
+        Sync Boost                        : 0 us
+        SW Thermal Slowdown               : 0 us
+        HW Thermal Slowdown               : 0 us
+        HW Power Braking                  : 0 us
+    Sparse Operation Mode                 : N/A
+    GPU Power Readings
+        Average Power Draw                : 86.12 W
+        Instantaneous Power Draw          : 84.75 W
+        Current Power Limit               : 575.00 W
+        Requested Power Limit             : 575.00 W
+        Default Power Limit               : 575.00 W
+        Min Power Limit                   : 400.00 W
+        Max Power Limit                   : 600.00 W
+    Power Samples
+        Duration                          : 2.36 sec
+        Number of Samples                 : 119
+        Max                               : 407.47 W
+        Min                               : 84.42 W
+        Avg                               : 175.99 W
+    GPU Memory Power Readings 
+        Average Power Draw                : N/A
+        Instantaneous Power Draw          : N/A
+    Module Power Readings
+        Average Power Draw                : N/A
+        Instantaneous Power Draw          : N/A
+        Current Power Limit               : N/A
+        Requested Power Limit             : N/A
+        Default Power Limit               : N/A
+        Min Power Limit                   : N/A
+        Max Power Limit                   : N/A
+    Clocks
+        Graphics                          : 2925 MHz
+        SM                                : 2925 MHz
+        Memory                            : 14001 MHz
+        Video                             : 2355 MHz
+    Applications Clocks
+        Graphics                          : N/A
+        Memory                            : N/A
+    Default Applications Clocks
+        Graphics                          : N/A
+        Memory                            : N/A
+    Deferred Clocks
+        Memory                            : N/A
+    Max Clocks
+        Graphics                          : 3105 MHz
+        SM                                : 3105 MHz
+        Memory                            : 14001 MHz
+        Video                             : 3090 MHz
+    Max Customer Boost Clocks
+        Graphics                          : N/A
+    SM Clock Samples
+        Duration                          : N/A
+        Number of Samples                 : N/A
+        Max                               : N/A
+        Min                               : N/A
+        Avg                               : N/A
+    Memory Clock Samples
+        Duration                          : N/A
+        Number of Samples                 : N/A
+        Max                               : N/A
+        Min                               : N/A
+        Avg                               : N/A
+    Clock Policy
+        Auto Boost                        : N/A
+        Auto Boost Default                : N/A
+

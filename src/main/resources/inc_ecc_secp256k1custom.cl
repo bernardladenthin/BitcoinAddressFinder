@@ -846,9 +846,12 @@ __kernel void benchmarkFilterBlockedBloom(
  * compile-time constants. It therefore cannot be a runtime kernel argument like keysPerWorkItem
  * (which is just a loop count); it is baked into the program at clBuildProgram time. To make it
  * host-configurable, prepend a "#define KEYS_BATCH_INV <n>" line to the program source before the
- * build (host side) rather than passing it as an argument.
+ * build (host side) rather than passing it as an argument. A "-D KEYS_BATCH_INV=<n>" build option
+ * (e.g. through OpenCLContext.EXTRA_BUILD_OPTIONS_PROPERTY) overrides the default for experiments.
  */
+#ifndef KEYS_BATCH_INV
 #define KEYS_BATCH_INV 16
+#endif
 
 /**
  * @brief Copies word_count u32 values from one __private array to another.

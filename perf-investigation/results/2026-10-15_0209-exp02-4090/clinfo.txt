@@ -1,0 +1,2 @@
+Platform #0: NVIDIA CUDA
+ `-- Device #0: NVIDIA GeForce RTX 4090

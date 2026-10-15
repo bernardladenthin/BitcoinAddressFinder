@@ -1,0 +1,15 @@
+{
+ "gpu_name": "GTX 1080 Ti",
+ "dph_total": 0.0649814814814815,
+ "cpu_name": "Core\u2122 i7-6700 ",
+ "cpu_cores_effective": 8.0,
+ "cpu_ram": 32032,
+ "gpu_ram": 11264,
+ "driver_version": "535.309.01",
+ "cuda_max_good": 12.2,
+ "pcie_bw": 10.6,
+ "pci_gen": 3.0,
+ "reliability2": 0.9981232,
+ "geolocation": "South Korea, KR",
+ "inet_down": 597.2
+}

@@ -1,0 +1,15 @@
+{
+ "gpu_name": "RTX 3070",
+ "dph_total": 0.1489814814814815,
+ "cpu_name": "AMD EPYC 7B13 64-Core Processor",
+ "cpu_cores_effective": 32.0,
+ "cpu_ram": 128899,
+ "gpu_ram": 8192,
+ "driver_version": "595.71.05",
+ "cuda_max_good": 13.2,
+ "pcie_bw": 24.0,
+ "pci_gen": 4.0,
+ "reliability2": 0.9837386,
+ "geolocation": "Norway, NO",
+ "inet_down": 8098.9
+}

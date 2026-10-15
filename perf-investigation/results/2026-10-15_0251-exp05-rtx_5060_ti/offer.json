@@ -1,0 +1,15 @@
+{
+ "gpu_name": "RTX 5060 Ti",
+ "dph_total": 0.1413888888888889,
+ "cpu_name": "Xeon\u00ae E5-2667 v4 ",
+ "cpu_cores_effective": 8.0,
+ "cpu_ram": 48328,
+ "gpu_ram": 16311,
+ "driver_version": "595.91.07",
+ "cuda_max_good": 13.2,
+ "pcie_bw": 6.6,
+ "pci_gen": 3.0,
+ "reliability2": 0.9935334,
+ "geolocation": "Switzerland, CH",
+ "inet_down": 1187.9
+}

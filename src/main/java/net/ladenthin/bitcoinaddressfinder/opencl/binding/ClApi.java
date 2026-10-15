@@ -165,6 +165,16 @@ public interface ClApi {
     String getProgramBuildLog(ClProgram program, ClDeviceId device);
 
     /**
+     * Returns the device binary of a program built for exactly one device ({@code
+     * CL_PROGRAM_BINARIES}). On NVIDIA this is the PTX text the driver compiled the OpenCL source to,
+     * which {@code ptxas -v} can turn into register/spill statistics the build log no longer shows.
+     *
+     * @param program the built program
+     * @return the binary, empty if the implementation reports none
+     */
+    byte[] getProgramBinary(ClProgram program);
+
+    /**
      * Creates a kernel from a built program.
      *
      * @param program    the built program

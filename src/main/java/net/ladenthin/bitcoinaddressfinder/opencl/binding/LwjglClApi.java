@@ -299,6 +299,33 @@ public class LwjglClApi implements ClApi {
     }
 
     @Override
+    public byte[] getProgramBinary(ClProgram program) {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            final PointerBuffer sizes = stack.mallocPointer(1);
+            errorChecker.checkSuccess(
+                    CL10.clGetProgramInfo(program.handle(), CL10.CL_PROGRAM_BINARY_SIZES, sizes, null),
+                    "clGetProgramInfo");
+            final int byteCount = (int) sizes.get(0);
+            if (byteCount <= 0) {
+                return new byte[0];
+            }
+            final ByteBuffer binary = MemoryUtil.memAlloc(byteCount);
+            try {
+                final PointerBuffer pointers = stack.mallocPointer(1);
+                pointers.put(0, binary);
+                errorChecker.checkSuccess(
+                        CL10.clGetProgramInfo(program.handle(), CL10.CL_PROGRAM_BINARIES, pointers, null),
+                        "clGetProgramInfo");
+                final byte[] result = new byte[byteCount];
+                binary.get(0, result);
+                return result;
+            } finally {
+                MemoryUtil.memFree(binary);
+            }
+        }
+    }
+
+    @Override
     public String getProgramBuildLog(ClProgram program, ClDeviceId device) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             final PointerBuffer logSize = stack.mallocPointer(1);

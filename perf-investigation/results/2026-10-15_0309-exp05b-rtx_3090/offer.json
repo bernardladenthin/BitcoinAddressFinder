@@ -1,0 +1,15 @@
+{
+ "gpu_name": "RTX 3090",
+ "dph_total": 0.1660185185185185,
+ "cpu_name": "AMD EPYC 7532 32-Core Processor",
+ "cpu_cores_effective": 16.0,
+ "cpu_ram": 32219,
+ "gpu_ram": 24576,
+ "driver_version": "580.178.04",
+ "cuda_max_good": 13.0,
+ "pcie_bw": 19.1,
+ "pci_gen": 4.0,
+ "reliability2": 0.9924376,
+ "geolocation": "California, US",
+ "inet_down": 514.8
+}

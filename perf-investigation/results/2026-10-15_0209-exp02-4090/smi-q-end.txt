@@ -1,0 +1,82 @@
+
+==============NVSMI LOG==============
+
+Timestamp                                 : Thu Oct 15 00:19:51 2026
+Driver Version                            : 570.211.01
+CUDA Version                              : 12.8
+
+Attached GPUs                             : 1
+GPU 00000000:61:00.0
+    Performance State                     : P0
+    Clocks Event Reasons
+        Idle                              : Not Active
+        Applications Clocks Setting       : Not Active
+        SW Power Cap                      : Not Active
+        HW Slowdown                       : Not Active
+            HW Thermal Slowdown           : Not Active
+            HW Power Brake Slowdown       : Not Active
+        Sync Boost                        : Not Active
+        SW Thermal Slowdown               : Not Active
+        Display Clock Setting             : Not Active
+    Sparse Operation Mode                 : N/A
+    GPU Power Readings
+        Average Power Draw                : 61.22 W
+        Instantaneous Power Draw          : 54.63 W
+        Current Power Limit               : 450.00 W
+        Requested Power Limit             : 450.00 W
+        Default Power Limit               : 450.00 W
+        Min Power Limit                   : 150.00 W
+        Max Power Limit                   : 600.00 W
+    Power Samples
+        Duration                          : 2.78 sec
+        Number of Samples                 : 119
+        Max                               : 350.69 W
+        Min                               : 54.10 W
+        Avg                               : 122.04 W
+    GPU Memory Power Readings 
+        Average Power Draw                : N/A
+        Instantaneous Power Draw          : N/A
+    Module Power Readings
+        Average Power Draw                : N/A
+        Instantaneous Power Draw          : N/A
+        Current Power Limit               : N/A
+        Requested Power Limit             : N/A
+        Default Power Limit               : N/A
+        Min Power Limit                   : N/A
+        Max Power Limit                   : N/A
+    Clocks
+        Graphics                          : 2730 MHz
+        SM                                : 2730 MHz
+        Memory                            : 10501 MHz
+        Video                             : 2070 MHz
+    Applications Clocks
+        Graphics                          : N/A
+        Memory                            : N/A
+    Default Applications Clocks
+        Graphics                          : N/A
+        Memory                            : N/A
+    Deferred Clocks
+        Memory                            : N/A
+    Max Clocks
+        Graphics                          : 3150 MHz
+        SM                                : 3150 MHz
+        Memory                            : 10501 MHz
+        Video                             : 2415 MHz
+    Max Customer Boost Clocks
+        Graphics                          : N/A
+    SM Clock Samples
+        Duration                          : Not Found
+        Number of Samples                 : Not Found
+        Max                               : Not Found
+        Min                               : Not Found
+        Avg                               : Not Found
+    Memory Clock Samples
+        Duration                          : Not Found
+        Number of Samples                 : Not Found
+        Max                               : Not Found
+        Min                               : Not Found
+        Avg                               : Not Found
+    Clock Policy
+        Auto Boost                        : N/A
+        Auto Boost Default                : N/A
+

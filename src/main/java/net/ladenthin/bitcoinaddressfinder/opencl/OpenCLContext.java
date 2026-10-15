@@ -292,6 +292,10 @@ public class OpenCLContext implements ReleaseCLObject {
         if (effectiveNoInlineHelpers) {
             options.append(' ').append(NO_INLINE_HELPERS_BUILD_OPTION);
         }
+        final String extra = System.getProperty(EXTRA_BUILD_OPTIONS_PROPERTY);
+        if (extra != null && !extra.isBlank()) {
+            options.append(' ').append(extra.trim());
+        }
         return options.toString();
     }
 
@@ -529,6 +533,7 @@ public class OpenCLContext implements ReleaseCLObject {
 
         if (producerOpenCL.logGpuDiagnostics) {
             logProgramBuildLog(device);
+            dumpProgramBinary(device);
         }
 
         // Create the kernel
@@ -594,6 +599,48 @@ public class OpenCLContext implements ReleaseCLObject {
     private void logProgramBuildLog(OpenCLDevice device) {
         final ClProgram localProgram = Objects.requireNonNull(program);
         LOGGER.info("GPU program build log:\n{}", clApi.getProgramBuildLog(localProgram, device.device()));
+    }
+
+    /**
+     * System property whose value is appended verbatim to the {@code clBuildProgram} options, e.g.
+     * {@code -D KEYS_BATCH_INV=8} or {@code -cl-nv-maxrregcount=96}. A diagnostic lever for kernel
+     * experiments without a rebuild; unset or blank means no change.
+     */
+    public static final String EXTRA_BUILD_OPTIONS_PROPERTY = "net.ladenthin.bitcoinaddressfinder.extraBuildOptions";
+
+    /**
+     * System property naming a directory into which {@link #dumpProgramBinary} writes the built
+     * program's device binary (PTX on NVIDIA). Diagnostic only; unset means no file is written.
+     */
+    public static final String DUMP_PROGRAM_BINARY_DIR_PROPERTY =
+            "net.ladenthin.bitcoinaddressfinder.dumpProgramBinaryDir";
+
+    /**
+     * Writes the built program's device binary to {@link #DUMP_PROGRAM_BINARY_DIR_PROPERTY}, if set.
+     * Recent NVIDIA drivers no longer print ptxas statistics into the build log even with {@code
+     * -cl-nv-verbose}; the PTX itself, run through {@code ptxas -v --gpu-name sm_XX}, recovers the
+     * register count and spill stores per architecture.
+     *
+     * @param device the device the program was built for
+     */
+    private void dumpProgramBinary(OpenCLDevice device) {
+        final String dir = System.getProperty(DUMP_PROGRAM_BINARY_DIR_PROPERTY);
+        if (dir == null || dir.isEmpty()) {
+            return;
+        }
+        final ClProgram localProgram = Objects.requireNonNull(program);
+        final byte[] binary = clApi.getProgramBinary(localProgram);
+        final String name = device.deviceName().replaceAll("[^A-Za-z0-9]+", "_") + "-"
+                + Integer.toHexString(producerOpenCL.toString().hashCode()) + ".ptx";
+        final java.nio.file.Path directory = java.nio.file.Path.of(dir);
+        final java.nio.file.Path target = directory.resolve(name);
+        try {
+            java.nio.file.Files.createDirectories(directory);
+            java.nio.file.Files.write(target, binary);
+            LOGGER.info("Program binary ({} bytes) written to {}", binary.length, target);
+        } catch (java.io.IOException e) {
+            LOGGER.warn("Could not write the program binary to {}: {}", target, e.toString());
+        }
     }
 
     /**

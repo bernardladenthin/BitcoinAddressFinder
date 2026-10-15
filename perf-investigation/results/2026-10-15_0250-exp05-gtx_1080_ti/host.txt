@@ -1,0 +1,7 @@
+8
+               total        used        free      shared  buff/cache   available
+Mem:              31           2           5           0          24          29
+Swap:              7           0           7
+6.8.0-138-generic
+name, driver_version, vbios_version, pcie.link.gen.max, pcie.link.width.max, power.limit [W], power.default_limit [W], power.max_limit [W], enforced.power.limit [W], clocks.max.sm [MHz], clocks.max.memory [MHz], clocks.applications.graphics [MHz], clocks.default_applications.graphics [MHz], persistence_mode, compute_mode
+NVIDIA GeForce GTX 1080 Ti, 535.309.01, 86.02.39.00.01, 3, 16, 250.00 W, 250.00 W, 300.00 W, 250.00 W, 1911 MHz, 5505 MHz, [N/A], [N/A], Enabled, Default

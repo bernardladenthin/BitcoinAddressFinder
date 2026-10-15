@@ -1,0 +1,15 @@
+{
+ "gpu_name": "RTX 5090",
+ "dph_total": 0.7356481481481482,
+ "cpu_name": "AMD EPYC 9J14 96-Core Processor",
+ "cpu_cores_effective": 48.0,
+ "cpu_ram": 96695,
+ "gpu_ram": 32607,
+ "driver_version": "580.82.09",
+ "cuda_max_good": 13.0,
+ "pcie_bw": 54.2,
+ "pci_gen": 5.0,
+ "reliability2": 0.997047,
+ "geolocation": "Washington, US",
+ "inet_down": 4824.5
+}

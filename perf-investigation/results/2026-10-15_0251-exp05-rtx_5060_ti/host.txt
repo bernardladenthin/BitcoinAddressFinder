@@ -1,0 +1,7 @@
+8
+               total        used        free      shared  buff/cache   available
+Mem:             188          53          38           0          97         135
+Swap:              7           0           7
+7.0.0-34-generic
+name, driver_version, vbios_version, pcie.link.gen.max, pcie.link.width.max, power.limit [W], power.default_limit [W], power.max_limit [W], enforced.power.limit [W], clocks.max.sm [MHz], clocks.max.memory [MHz], clocks.applications.graphics [MHz], clocks.default_applications.graphics [MHz], persistence_mode, compute_mode
+NVIDIA GeForce RTX 5060 Ti, 595.91.07, 98.06.39.40.B2, 3, 16, 180.00 W, 180.00 W, 198.00 W, 180.00 W, 3090 MHz, 14001 MHz, [Requested functionality has been deprecated], [Requested functionality has been deprecated], Enabled, Default

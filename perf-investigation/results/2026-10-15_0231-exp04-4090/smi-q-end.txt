@@ -1,0 +1,88 @@
+
+==============NVSMI LOG==============
+
+Timestamp                                              : Thu Oct 15 00:46:07 2026
+Driver Version                                         : 580.159.03
+CUDA Version                                           : 13.0
+
+Attached GPUs                                          : 1
+GPU 00000000:C1:00.0
+    Performance State                                  : P0
+    Clocks Event Reasons
+        Idle                                           : Not Active
+        Applications Clocks Setting                    : Not Active
+        SW Power Cap                                   : Not Active
+        HW Slowdown                                    : Not Active
+            HW Thermal Slowdown                        : Not Active
+            HW Power Brake Slowdown                    : Not Active
+        Sync Boost                                     : Not Active
+        SW Thermal Slowdown                            : Not Active
+        Display Clock Setting                          : Not Active
+    Clocks Event Reasons Counters
+        SW Power Capping                               : 1199964444314 us
+        Sync Boost                                     : 0 us
+        SW Thermal Slowdown                            : 0 us
+        HW Thermal Slowdown                            : 0 us
+        HW Power Braking                               : 0 us
+    Sparse Operation Mode                              : N/A
+    GPU Power Readings
+        Average Power Draw                             : 187.83 W
+        Instantaneous Power Draw                       : 77.04 W
+        Current Power Limit                            : 350.00 W
+        Requested Power Limit                          : 350.00 W
+        Default Power Limit                            : 450.00 W
+        Min Power Limit                                : 150.00 W
+        Max Power Limit                                : 450.00 W
+    Power Samples
+        Duration                                       : 2.38 sec
+        Number of Samples                              : 119
+        Max                                            : 359.84 W
+        Min                                            : 76.68 W
+        Avg                                            : 255.68 W
+    GPU Memory Power Readings 
+        Average Power Draw                             : N/A
+        Instantaneous Power Draw                       : N/A
+    Module Power Readings
+        Average Power Draw                             : N/A
+        Instantaneous Power Draw                       : N/A
+        Current Power Limit                            : N/A
+        Requested Power Limit                          : N/A
+        Default Power Limit                            : N/A
+        Min Power Limit                                : N/A
+        Max Power Limit                                : N/A
+    Clocks
+        Graphics                                       : 2715 MHz
+        SM                                             : 2715 MHz
+        Memory                                         : 10501 MHz
+        Video                                          : 2100 MHz
+    Applications Clocks
+        Graphics                                       : N/A
+        Memory                                         : N/A
+    Default Applications Clocks
+        Graphics                                       : N/A
+        Memory                                         : N/A
+    Deferred Clocks
+        Memory                                         : N/A
+    Max Clocks
+        Graphics                                       : 3105 MHz
+        SM                                             : 3105 MHz
+        Memory                                         : 10501 MHz
+        Video                                          : 2415 MHz
+    Max Customer Boost Clocks
+        Graphics                                       : N/A
+    SM Clock Samples
+        Duration                                       : Not Found
+        Number of Samples                              : Not Found
+        Max                                            : Not Found
+        Min                                            : Not Found
+        Avg                                            : Not Found
+    Memory Clock Samples
+        Duration                                       : Not Found
+        Number of Samples                              : Not Found
+        Max                                            : Not Found
+        Min                                            : Not Found
+        Avg                                            : Not Found
+    Clock Policy
+        Auto Boost                                     : N/A
+        Auto Boost Default                             : N/A
+

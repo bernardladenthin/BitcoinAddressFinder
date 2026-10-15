@@ -1,0 +1,74 @@
+[
+    {
+        "jmhVersion": "1.37",
+        "benchmark": "net.ladenthin.bitcoinaddressfinder.benchmark.GpuFuse8FilterBenchmark.oneKernelLaunch",
+        "mode": "thrpt",
+        "threads": 1,
+        "forks": 1,
+        "jvm": "<JAVA_HOME_TEMURIN>/bin/java",
+        "jvmArgs": [
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.io=ALL-UNNAMED",
+            "--add-opens=java.base/java.nio=ALL-UNNAMED",
+            "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
+            "--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED",
+            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+            "-Xmx20g",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.io=ALL-UNNAMED",
+            "--add-opens=java.base/java.nio=ALL-UNNAMED",
+            "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
+            "--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED",
+            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+            "-Dnet.ladenthin.bitcoinaddressfinder.extraBuildOptions=-DKEYS_BATCH_INV=4"
+        ],
+        "jdkVersion": "21.0.12.1",
+        "vmName": "OpenJDK 64-Bit Server VM",
+        "vmVersion": "21.0.12.1+1-LTS",
+        "warmupIterations": 1,
+        "warmupTime": "8 s",
+        "warmupBatchSize": 1,
+        "measurementIterations": 2,
+        "measurementTime": "12 s",
+        "measurementBatchSize": 1,
+        "params": {
+            "batchSizeInBits": "24",
+            "filterEntries": "1048576",
+            "gpuFilter": "true",
+            "kernelProfileStage": "FULL",
+            "keysPerWorkItem": "512",
+            "noInlineHelpers": "false",
+            "profiling": "true",
+            "useReducedRadixField": "true",
+            "useSafeGcdInverse": "true"
+        },
+        "primaryMetric": {
+            "score": 12.51203071140517,
+            "scoreError": "NaN",
+            "scoreConfidence": [
+                "NaN",
+                "NaN"
+            ],
+            "scorePercentiles": {
+                "0.0": 12.50543831283848,
+                "50.0": 12.51203071140517,
+                "90.0": 12.518623109971859,
+                "95.0": 12.518623109971859,
+                "99.0": 12.518623109971859,
+                "99.9": 12.518623109971859,
+                "99.99": 12.518623109971859,
+                "99.999": 12.518623109971859,
+                "99.9999": 12.518623109971859,
+                "100.0": 12.518623109971859
+            },
+            "scoreUnit": "ops/s",
+            "rawData": [
+                [
+                    12.518623109971859,
+                    12.50543831283848
+                ]
+            ]
+        },
+        "secondaryMetrics": {}
+    }
+]

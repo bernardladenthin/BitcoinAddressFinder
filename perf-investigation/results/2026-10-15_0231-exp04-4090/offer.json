@@ -1,0 +1,15 @@
+{
+ "gpu_name": "RTX 4090",
+ "dph_total": 0.3660185185185186,
+ "cpu_name": "AMD EPYC 7542 32-Core Processor",
+ "cpu_cores_effective": 16.0,
+ "cpu_ram": 32219,
+ "gpu_ram": 24564,
+ "driver_version": "580.159.03",
+ "cuda_max_good": 13.0,
+ "pcie_bw": 18.4,
+ "pci_gen": 4.0,
+ "reliability2": 0.9951498,
+ "geolocation": "United States, US",
+ "inet_down": 223.3
+}

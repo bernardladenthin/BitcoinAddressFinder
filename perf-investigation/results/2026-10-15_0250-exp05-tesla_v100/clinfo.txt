@@ -1,0 +1,2 @@
+Platform #0: NVIDIA CUDA
+ `-- Device #0: Tesla V100-SXM2-16GB

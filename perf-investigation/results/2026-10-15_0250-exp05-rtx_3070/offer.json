@@ -1,0 +1,15 @@
+{
+ "gpu_name": "RTX 3070",
+ "dph_total": 0.26805555555555555,
+ "cpu_name": "Genuine ",
+ "cpu_cores_effective": 16.0,
+ "cpu_ram": 64139,
+ "gpu_ram": 8192,
+ "driver_version": "595.91.07",
+ "cuda_max_good": 13.2,
+ "pcie_bw": 12.0,
+ "pci_gen": 3.0,
+ "reliability2": 0.9954773,
+ "geolocation": "Japan, JP",
+ "inet_down": 675.9
+}

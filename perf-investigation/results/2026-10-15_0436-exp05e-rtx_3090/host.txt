@@ -1,0 +1,7 @@
+15
+               total        used        free      shared  buff/cache   available
+Mem:             251           9         232           0          11         241
+Swap:              7           0           7
+6.8.0-138-generic
+name, driver_version, vbios_version, pcie.link.gen.max, pcie.link.width.max, power.limit [W], power.default_limit [W], power.max_limit [W], enforced.power.limit [W], clocks.max.sm [MHz], clocks.max.memory [MHz], clocks.applications.graphics [MHz], clocks.default_applications.graphics [MHz], persistence_mode, compute_mode
+NVIDIA GeForce RTX 3090, 580.126.20, 94.02.59.00.D6, 4, 16, 350.00 W, 350.00 W, 350.00 W, 350.00 W, 2100 MHz, 9751 MHz, [N/A], [N/A], Enabled, Default

@@ -70,6 +70,8 @@ path = [
     "docs/measurements/**.csv",
     "docs/measurements/**.json",
     "docs/measurements/plots/**.png",
+    # Raw output of the GPU throughput investigation (logs, CSV, JSON, gzipped PTX) -- no comment syntax.
+    "perf-investigation/results/**",
     # JVM config (plain flags file, no comment syntax)
     ".mvn/jvm.config",
     # simplelogger.properties uses Java properties syntax (# comments supported but tool may not recognize)

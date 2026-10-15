@@ -1,0 +1,7 @@
+15
+               total        used        free      shared  buff/cache   available
+Mem:             503          25         184           0         296         478
+Swap:            519           0         519
+5.15.0-131-generic
+name, driver_version, vbios_version, pcie.link.gen.max, pcie.link.width.max, power.limit [W], power.default_limit [W], power.max_limit [W], enforced.power.limit [W], clocks.max.sm [MHz], clocks.max.memory [MHz], clocks.applications.graphics [MHz], clocks.default_applications.graphics [MHz], persistence_mode, compute_mode
+NVIDIA GeForce RTX 4090, 570.211.01, 95.02.3C.40.FA, 4, 16, 450.00 W, 450.00 W, 600.00 W, 450.00 W, 3150 MHz, 10501 MHz, [N/A], [N/A], Enabled, Default

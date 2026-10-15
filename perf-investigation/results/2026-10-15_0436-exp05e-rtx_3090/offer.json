@@ -1,0 +1,15 @@
+{
+ "gpu_name": "RTX 3090",
+ "dph_total": 0.1511851851851852,
+ "cpu_name": "AMD EPYC 7552 48-Core Processor",
+ "cpu_cores_effective": 16.0,
+ "cpu_ram": 42929,
+ "gpu_ram": 24576,
+ "driver_version": "580.126.20",
+ "cuda_max_good": 13.0,
+ "pcie_bw": 25.0,
+ "pci_gen": 4.0,
+ "reliability2": 0.9755152,
+ "geolocation": "Czechia, CZ",
+ "inet_down": 503.1
+}
