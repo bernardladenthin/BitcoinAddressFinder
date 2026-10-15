@@ -21,6 +21,7 @@ def workflow_text(jobs):
     return "\n".join(lines) + "\n"
 
 
-def upload(artifact, path="x/"):
-    return ["      - uses: actions/upload-artifact@v7", "        with:", f"          name: {artifact}",
-            f"          path: {path}"]
+def upload(artifact, path="x/", overwrite=False):
+    lines = ["      - uses: actions/upload-artifact@v7", "        with:", f"          name: {artifact}",
+             f"          path: {path}"]
+    return lines + ["          overwrite: true"] if overwrite else lines
