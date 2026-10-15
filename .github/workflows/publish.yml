@@ -73,7 +73,7 @@ jobs:
     needs: startgate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Shared files match .github/shared-files.sha256 (siblings compared, warnings only)
@@ -111,7 +111,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: maven-central
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Import key + run sign/verify self-test (prints only PUBLIC metadata)
@@ -146,12 +146,12 @@ jobs:
     runs-on: ubuntu-latest
     environment: maven-central
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
           distribution: temurin
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
         with:
           gradle-version: "9.8.1"
       - name: Sign a throwaway artifact via useInMemoryPgpKeys (BouncyCastle)
@@ -187,8 +187,8 @@ jobs:
     needs: startgate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
           distribution: temurin
@@ -208,8 +208,8 @@ jobs:
     needs: startgate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
           distribution: temurin
@@ -235,14 +235,14 @@ jobs:
         # is produced+signed independently by the publish-release / publish-snapshot jobs (their
         # "Build & sign fat jar" step), not taken from this build job's upload-artifact.
         run: mvn --batch-mode --no-transfer-progress -P assembly -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true -DskipTests -Dmaven.javadoc.skip=true package
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with: { name: jars, path: target/*.jar }
       # Echo the crash logs into the job log (workspace/policies/ci-test-diagnostics.md 3.1).
       - name: Print crash logs (on failure)
         if: failure()
         shell: bash
         run: bash .github/print-crash-logs.sh .
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: build-surefire
@@ -264,11 +264,11 @@ jobs:
             disable-lmdb: false
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Display CPU Info
         shell: bash
         run: bash .github/print-host-info.sh
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
           distribution: temurin
@@ -284,7 +284,7 @@ jobs:
         if: failure()
         shell: bash
         run: bash .github/print-crash-logs.sh .
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: surefire-and-crash-logs-${{ matrix.os }}
@@ -295,7 +295,7 @@ jobs:
       - name: Memory after tests
         if: always() && runner.os == 'Linux'
         run: free -h
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: matrix.os == 'ubuntu-latest'
         with:
           name: jacoco-report
@@ -315,7 +315,7 @@ jobs:
               echo ""
             fi
           done
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always() && matrix.os == 'ubuntu-latest'
         with: { name: pit-reports, path: target/pit-reports/ }
 
@@ -328,11 +328,11 @@ jobs:
     needs: [build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Display CPU Info
         shell: bash
         run: bash .github/print-host-info.sh
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
           distribution: temurin
@@ -346,7 +346,7 @@ jobs:
           -Dtest=VmlensInterleavingSmokeTest,KeyProducerQueueBufferedInterleavingTest
           -DfailIfNoTests=false
           -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: vmlens-report
@@ -393,11 +393,11 @@ jobs:
     needs: [build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Display CPU Info
         shell: bash
         run: bash .github/print-host-info.sh
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
           distribution: temurin
@@ -423,7 +423,7 @@ jobs:
       - name: All tests including OpenCL (pocl) + JaCoCo coverage
         shell: bash
         run: mvn -e --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true --update-snapshots test jacoco:report
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: jacoco-report-opencl
           path: target/site/jacoco/jacoco.xml
@@ -443,7 +443,7 @@ jobs:
           shopt -s nullglob
           echo "===== OpenCL surefire reports ====="
           for f in target/surefire-reports/*OpenCL*.txt; do [ -e "$f" ] && { echo "----- $f -----"; cat "$f"; }; done
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: surefire-and-crash-logs-opencl
@@ -475,12 +475,12 @@ jobs:
     needs: [build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: jars
           path: fatjar/
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
           distribution: temurin
@@ -499,7 +499,7 @@ jobs:
             examples 'Main#run end\.' config_AddressFilesToLMDB.json
       - name: Upload smoke logs
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: smoke-fatjar-logs
           path: |
@@ -514,31 +514,31 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
           distribution: temurin
       # Prefer coverage from the pocl job: it runs ALL tests including @OpenCLTest
       # (the ubuntu `test` matrix skips those because no ICD is installed there,
       # so its jacoco-report shows 0% for the entire OpenCL pipeline).
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with: { name: jacoco-report-opencl, path: target/site/jacoco/ }
         continue-on-error: true
       # Submits the dependency graph to GitHub. Informational: it says nothing about whether the
       # artifacts are correct, but it sits in the `report` job, which the release path needs -- so
       # without this flag a third-party action having a bad day can block a publish.
-      - uses: advanced-security/maven-dependency-submission-action@v6
+      - uses: advanced-security/maven-dependency-submission-action@a64327a7329c9939cf675e458452febe1894a70c # v6
         continue-on-error: true
       - name: Coveralls
-        uses: coverallsapp/github-action@v2
+        uses: coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329 # v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           file: target/site/jacoco/jacoco.xml
           format: jacoco
         continue-on-error: true
       - name: Codecov
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: target/site/jacoco/jacoco.xml
@@ -571,8 +571,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: maven-central
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
           distribution: temurin
@@ -646,7 +646,7 @@ jobs:
           # maven-gpg writes target/<artifactId>-<version>.pom next to its .pom.asc; Central has both.
           cp target/*.pom signed-snapshot-assets/ 2>/dev/null || true
           cp target/*.pom.asc signed-snapshot-assets/ 2>/dev/null || true
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ !cancelled() }}
         with:
           name: signed-snapshot-assets
@@ -663,7 +663,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: signed-snapshot-assets
           path: snapshot-assets/
@@ -790,8 +790,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version-file: .java-version
           distribution: temurin
@@ -852,7 +852,7 @@ jobs:
           # maven-gpg writes target/<artifactId>-<version>.pom next to its .pom.asc; Central has both.
           cp target/*.pom signed-release-assets/ 2>/dev/null || true
           cp target/*.pom.asc signed-release-assets/ 2>/dev/null || true
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ !cancelled() }}
         with:
           name: signed-release-assets
@@ -869,7 +869,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: signed-release-assets
           path: release-assets/
@@ -904,7 +904,7 @@ jobs:
           [ "$missing" -eq 0 ] && echo "all $(echo "$artifacts" | wc -l) artifact(s) signed"
           exit 0
       - name: Upload release assets
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           files: release-assets/*
       - name: Fail if anything was attached unsigned
