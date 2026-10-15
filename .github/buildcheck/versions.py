@@ -32,7 +32,7 @@ from .sharedfiles import OWNER, REPOS, current_repo
 
 NS = "{http://maven.apache.org/POM/4.0.0}"
 POMS = {
-    "java-llama.cpp": ("pom.xml", "llama/pom.xml", "llama-langchain4j/pom.xml", "llama-kotlin/pom.xml",
+    "java-llama.cpp": ("pom.xml", "llama/pom.xml", "llama-langchain4j/pom.xml", "llama-kotlin/pom.xml", "llama-ffm/pom.xml",
                        "llama-platform/pom.xml", "llama-atmosphere-agent/pom.xml", "examples/server/pom.xml"),
     "BitcoinAddressFinder": ("pom.xml",),
     "srcmorph": ("pom.xml", "srcmorph/pom.xml", "srcmorph-cli/pom.xml", "srcmorph-maven-plugin/pom.xml"),
