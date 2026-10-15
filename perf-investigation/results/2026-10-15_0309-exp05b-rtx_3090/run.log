@@ -1,0 +1,4 @@
+=== common: 2026-10-15T01:10:11Z
+dependencies: 91 of 91 jars
+!!! POWER CAPPED: enforced 220.00 W < default 390.00 W
+!!! ABORT (set ALLOW_CAPPED=1 to measure anyway)

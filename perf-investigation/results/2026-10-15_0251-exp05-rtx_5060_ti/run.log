@@ -1,0 +1,32 @@
+=== common: 2026-10-15T00:51:11Z
+dependencies: 91 of 91 jars
+=== baf tune-FUSE16-t4
+2026-10-15 00:52:45,541 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_ERROR_CORRECTION_SUPPORT:    no
+2026-10-15 00:53:26,325 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - Kernel resource usage: kernelMaxWorkGroupSize=256 workGroupSizeMultiple=32 privateMemBytes=1568 localMemBytes=1
+2026-10-15 00:53:46,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Arm 1/6: batchSizeInBits=22 keysPerWorkItem=256 -> 461,086,634.22 candidates/s (28,245.56 addresses checked/s over 15.00 s)
+2026-10-15 00:53:46,695 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_ERROR_CORRECTION_SUPPORT:    no
+2026-10-15 00:53:46,929 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - Kernel resource usage: kernelMaxWorkGroupSize=256 workGroupSizeMultiple=32 privateMemBytes=1568 localMemBytes=1
+2026-10-15 00:54:07,246 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Arm 2/6: batchSizeInBits=22 keysPerWorkItem=512 -> 448,504,203.91 candidates/s (27,515.59 addresses checked/s over 15.00 s)
+2026-10-15 00:54:07,251 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_ERROR_CORRECTION_SUPPORT:    no
+2026-10-15 00:54:07,493 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - Kernel resource usage: kernelMaxWorkGroupSize=256 workGroupSizeMultiple=32 privateMemBytes=1568 localMemBytes=1
+2026-10-15 00:54:27,876 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Arm 3/6: batchSizeInBits=22 keysPerWorkItem=1024 -> 282,133,705.63 candidates/s (17,139.94 addresses checked/s over 15.00 s)
+2026-10-15 00:54:27,881 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_ERROR_CORRECTION_SUPPORT:    no
+2026-10-15 00:54:28,121 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - Kernel resource usage: kernelMaxWorkGroupSize=256 workGroupSizeMultiple=32 privateMemBytes=1568 localMemBytes=1
+2026-10-15 00:54:48,519 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Arm 4/6: batchSizeInBits=24 keysPerWorkItem=256 -> 459,689,555.31 candidates/s (28,048.29 addresses checked/s over 15.00 s)
+2026-10-15 00:54:48,523 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_ERROR_CORRECTION_SUPPORT:    no
+2026-10-15 00:54:48,747 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - Kernel resource usage: kernelMaxWorkGroupSize=256 workGroupSizeMultiple=32 privateMemBytes=1568 localMemBytes=1
+2026-10-15 00:55:09,435 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Arm 5/6: batchSizeInBits=24 keysPerWorkItem=512 -> 480,938,869.34 candidates/s (29,277.38 addresses checked/s over 15.00 s)
+2026-10-15 00:55:09,441 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_ERROR_CORRECTION_SUPPORT:    no
+2026-10-15 00:55:09,890 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - Kernel resource usage: kernelMaxWorkGroupSize=256 workGroupSizeMultiple=32 privateMemBytes=1568 localMemBytes=1
+2026-10-15 00:55:30,512 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Arm 6/6: batchSizeInBits=24 keysPerWorkItem=1024 -> 501,074,865.09 candidates/s (30,522.12 addresses checked/s over 15.00 s)
+2026-10-15 00:55:30,543 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   batchSizeInBits  keysPerWorkItem        candidates/s addresses checked/s
+2026-10-15 00:55:30,543 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Winner (MEASURED): batchSizeInBits=24 keysPerWorkItem=1024 at 501,074,865.09 candidates/s.
+2026-10-15 00:55:30,544 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "printStatisticsEveryNSeconds" : 10,
+=== baf tune-FUSE8-t4-24-512
+2026-10-15 00:56:55,897 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_ERROR_CORRECTION_SUPPORT:    no
+2026-10-15 00:56:56,373 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - Kernel resource usage: kernelMaxWorkGroupSize=256 workGroupSizeMultiple=32 privateMemBytes=1568 localMemBytes=1
+2026-10-15 00:57:16,664 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Arm 1/1: batchSizeInBits=24 keysPerWorkItem=512 -> 455,215,023.23 candidates/s (7,095,694.06 addresses checked/s over 15.00 s)
+2026-10-15 00:57:16,677 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   batchSizeInBits  keysPerWorkItem        candidates/s addresses checked/s
+2026-10-15 00:57:16,677 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Winner (MEASURED): batchSizeInBits=24 keysPerWorkItem=512 at 455,215,023.23 candidates/s.
+2026-10-15 00:57:16,678 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "printStatisticsEveryNSeconds" : 10,
+=== exp05 done 2026-10-15T00:57:17Z

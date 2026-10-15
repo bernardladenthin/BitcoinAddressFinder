@@ -1,0 +1,28 @@
+=== common: 2026-10-15T01:59:08Z
+dependencies: 91 of 91 jars
+=== baf tune-FUSE16-t4
+java.lang.IllegalArgumentException: Invalid platform index: 0
+2026-10-15 02:00:32,525 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Arm 1/6: batchSizeInBits=22 keysPerWorkItem=256 FAILED: IllegalArgumentException: Invalid platform index: 0
+java.lang.IllegalArgumentException: Invalid platform index: 0
+2026-10-15 02:00:32,525 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Arm 2/6: batchSizeInBits=22 keysPerWorkItem=512 FAILED: IllegalArgumentException: Invalid platform index: 0
+java.lang.IllegalArgumentException: Invalid platform index: 0
+2026-10-15 02:00:32,526 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Arm 3/6: batchSizeInBits=22 keysPerWorkItem=1024 FAILED: IllegalArgumentException: Invalid platform index: 0
+java.lang.IllegalArgumentException: Invalid platform index: 0
+2026-10-15 02:00:32,526 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Arm 4/6: batchSizeInBits=24 keysPerWorkItem=256 FAILED: IllegalArgumentException: Invalid platform index: 0
+java.lang.IllegalArgumentException: Invalid platform index: 0
+2026-10-15 02:00:32,526 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Arm 5/6: batchSizeInBits=24 keysPerWorkItem=512 FAILED: IllegalArgumentException: Invalid platform index: 0
+java.lang.IllegalArgumentException: Invalid platform index: 0
+2026-10-15 02:00:32,526 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Arm 6/6: batchSizeInBits=24 keysPerWorkItem=1024 FAILED: IllegalArgumentException: Invalid platform index: 0
+2026-10-15 02:00:32,530 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   batchSizeInBits  keysPerWorkItem        candidates/s addresses checked/s
+2026-10-15 02:00:32,530 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   22               256                            0.00               0.00   FAILED: IllegalArgumentException: Invalid platform index: 0
+2026-10-15 02:00:32,530 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   22               512                            0.00               0.00   FAILED: IllegalArgumentException: Invalid platform index: 0
+2026-10-15 02:00:32,530 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   22               1024                           0.00               0.00   FAILED: IllegalArgumentException: Invalid platform index: 0
+2026-10-15 02:00:32,530 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   24               256                            0.00               0.00   FAILED: IllegalArgumentException: Invalid platform index: 0
+2026-10-15 02:00:32,530 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   24               512                            0.00               0.00   FAILED: IllegalArgumentException: Invalid platform index: 0
+2026-10-15 02:00:32,530 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   24               1024                           0.00               0.00   FAILED: IllegalArgumentException: Invalid platform index: 0
+=== baf tune-FUSE8-t4-24-512
+java.lang.IllegalArgumentException: Invalid platform index: 0
+2026-10-15 02:01:50,140 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Arm 1/1: batchSizeInBits=24 keysPerWorkItem=512 FAILED: IllegalArgumentException: Invalid platform index: 0
+2026-10-15 02:01:50,143 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   batchSizeInBits  keysPerWorkItem        candidates/s addresses checked/s
+2026-10-15 02:01:50,143 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   24               512                            0.00               0.00   FAILED: IllegalArgumentException: Invalid platform index: 0
+=== exp05 done 2026-10-15T02:01:50Z

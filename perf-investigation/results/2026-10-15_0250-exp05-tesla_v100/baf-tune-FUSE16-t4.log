@@ -1,0 +1,2 @@
+Error: Could not find or load main class net.ladenthin.bitcoinaddressfinder.cli.Main
+Caused by: java.lang.ClassNotFoundException: net.ladenthin.bitcoinaddressfinder.cli.Main

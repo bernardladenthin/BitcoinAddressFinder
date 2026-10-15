@@ -1,0 +1,366 @@
+2026-10-15 01:38:54,161 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - Please review the transformed configuration to ensure it aligns with your expectations and requirements before proceeding.:
+2026-10-15 01:38:54,165 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - ########## BEGIN transformed JSON configuration ##########
+2026-10-15 01:38:54,165 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - {
+2026-10-15 01:38:54,165 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   "command" : "TuneConfiguration",
+2026-10-15 01:38:54,165 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   "lmdbToAddressFile" : null,
+2026-10-15 01:38:54,165 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   "addressFilesToLMDB" : null,
+2026-10-15 01:38:54,166 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   "finder" : null,
+2026-10-15 01:38:54,166 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   "tuneConfiguration" : {
+2026-10-15 01:38:54,166 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     "finder" : {
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       "keyProducerJavaRandom" : [ {
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "keyProducerId" : "r",
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "privateKeyMaxNumBits" : 256,
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "maxWorkSize" : 16777216,
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "randomAlgorithm" : "SECURE_RANDOM",
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "customSeed" : 0
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       } ],
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       "keyProducerJavaBip39" : [ ],
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       "keyProducerJavaIncremental" : [ ],
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       "keyProducerJavaSocket" : [ ],
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       "keyProducerJavaWebSocket" : [ ],
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       "keyProducerJavaZmq" : [ ],
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       "consumerJava" : {
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "lmdbConfigurationReadOnly" : {
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -           "lmdbDirectory" : "lmdb",
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -           "useProxyOptimal" : true,
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -           "useNoReadAhead" : false,
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -           "logStatsOnInit" : false,
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -           "logStatsOnClose" : false,
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -           "addressLookupBackend" : "LMDB_ONLY",
+2026-10-15 01:38:54,167 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -           "bloomFilterFpp" : 0.1,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -           "blockedBloomBitsPerEntry" : 0,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -           "blockedBloomK" : 0,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -           "disableAddressLookup" : false
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         },
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "printStatisticsEveryNSeconds" : 10,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "statisticsRateWindowSeconds" : 60,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "threads" : 4,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "queuePollTimeoutMillis" : 50,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "queueSize" : 4,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "awaitQueueEmptySeconds" : 60,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "runtimePublicKeyCalculationCheck" : false,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "enableVanity" : false,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "vanityPattern" : null
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       },
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       "awaitTerminateSeconds" : 31536000000,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       "producerJava" : [ ],
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       "producerJavaSecretsFiles" : [ ],
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       "producerOpenCL" : [ {
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "keyProducerId" : "r",
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "batchSizeInBits" : 22,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "batchUsePrivateKeyIncrement" : true,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "logSecretBase" : false,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "runOnce" : false,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "shutdownTimeoutSeconds" : 300,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "platformIndex" : 0,
+2026-10-15 01:38:54,168 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "deviceType" : -1,
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "deviceIndex" : 0,
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "maxResultReaderThreads" : 4,
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "keysPerWorkItem" : 256,
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "enableGpuFilter" : true,
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "transferAll" : false,
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "gpuFilterType" : "FUSE_16",
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "useSafeGcdInverse" : true,
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "kernelProfileStage" : "FULL",
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "enableProfiling" : false,
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "logGpuDiagnostics" : false,
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "useReducedRadixField" : true,
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         "noInlineHelpers" : null
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       } ]
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     },
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     "secondsPerArm" : 20,
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     "warmupSecondsPerArm" : 5,
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     "targetDatabaseEntries" : 141045995,
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     "batchSizeInBitsCandidates" : [ 24 ],
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     "keysPerWorkItemCandidates" : [ 512 ],
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     "extendSweepWhenWinnerIsAtTheEdge" : false,
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     "maxExtensionArms" : 4,
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     "sweepFilterTypes" : false,
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     "verificationCostSamples" : 2000
+2026-10-15 01:38:54,169 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   },
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   "compactLMDB" : null,
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   "lmdbDelta" : null
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - }
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - ########## END   transformed JSON configuration ##########
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - 
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - ########## BEGIN transformed YAML configuration ##########
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - ---
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - command: "TuneConfiguration"
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - lmdbToAddressFile: null
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - addressFilesToLMDB: null
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - finder: null
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - tuneConfiguration:
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   finder:
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     keyProducerJavaRandom:
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     - keyProducerId: "r"
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       privateKeyMaxNumBits: 256
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       maxWorkSize: 16777216
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       randomAlgorithm: "SECURE_RANDOM"
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       customSeed: 0
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     keyProducerJavaBip39: []
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     keyProducerJavaIncremental: []
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     keyProducerJavaSocket: []
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     keyProducerJavaWebSocket: []
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     keyProducerJavaZmq: []
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     consumerJava:
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       lmdbConfigurationReadOnly:
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         lmdbDirectory: "lmdb"
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         useProxyOptimal: true
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         useNoReadAhead: false
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         logStatsOnInit: false
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         logStatsOnClose: false
+2026-10-15 01:38:54,170 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         addressLookupBackend: "LMDB_ONLY"
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         bloomFilterFpp: 0.1
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         blockedBloomBitsPerEntry: 0
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         blockedBloomK: 0
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -         disableAddressLookup: false
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       printStatisticsEveryNSeconds: 10
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       statisticsRateWindowSeconds: 60
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       threads: 4
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       queuePollTimeoutMillis: 50
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       queueSize: 4
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       awaitQueueEmptySeconds: 60
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       runtimePublicKeyCalculationCheck: false
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       enableVanity: false
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       vanityPattern: null
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     awaitTerminateSeconds: 31536000000
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     producerJava: []
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     producerJavaSecretsFiles: []
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     producerOpenCL:
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -     - keyProducerId: "r"
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       batchSizeInBits: 22
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       batchUsePrivateKeyIncrement: true
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       logSecretBase: false
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       runOnce: false
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       shutdownTimeoutSeconds: 300
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       platformIndex: 0
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       deviceType: -1
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       deviceIndex: 0
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       maxResultReaderThreads: 4
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       keysPerWorkItem: 256
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       enableGpuFilter: true
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       transferAll: false
+2026-10-15 01:38:54,171 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       gpuFilterType: "FUSE_16"
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       useSafeGcdInverse: true
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       kernelProfileStage: "FULL"
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       enableProfiling: false
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       logGpuDiagnostics: false
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       useReducedRadixField: true
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -       noInlineHelpers: null
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   secondsPerArm: 20
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   warmupSecondsPerArm: 5
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   targetDatabaseEntries: 141045995
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   batchSizeInBitsCandidates:
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   - 24
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   keysPerWorkItemCandidates:
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   - 512
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   extendSweepWhenWinnerIsAtTheEdge: false
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   maxExtensionArms: 4
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   sweepFilterTypes: false
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main -   verificationCostSamples: 2000
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - compactLMDB: null
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - lmdbDelta: null
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - 
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - ########## END   transformed YAML configuration ##########
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - 
+2026-10-15 01:38:54,173 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - TuneConfiguration
+2026-10-15 01:38:54,178 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - No LMDB database configured (lmdbDirectory='lmdb'), skipping the verification-cost measurement. The filter recommendation will use the documented values instead and the report will mark them as ESTIMATED.
+2026-10-15 01:38:54,396 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - 1 producerOpenCL entries configured, but 2 GPUs are present. Only the configured ones are swept. Remove the producerOpenCL entries entirely to have every GPU measured.
+2026-10-15 01:38:54,422 [pool-2-thread-1] INFO  net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava - start consumeKeysRunner
+2026-10-15 01:38:54,422 [pool-2-thread-3] INFO  net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava - start consumeKeysRunner
+2026-10-15 01:38:54,422 [pool-2-thread-2] INFO  net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava - start consumeKeysRunner
+2026-10-15 01:38:54,422 [pool-2-thread-4] INFO  net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava - start consumeKeysRunner
+2026-10-15 01:38:54,425 [main] INFO  net.ladenthin.bitcoinaddressfinder.engine.Finder - startKeyProducer
+2026-10-15 01:38:54,456 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Building a synthetic FUSE_16 pre-filter for 141045995 entries (no database is read) ...
+2026-10-15 01:38:54,458 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: reading 141045995 addresses from the source ...
+2026-10-15 01:38:54,945 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: reading addresses: 9% (14104599/141045995), 40.7M/s, ETA 3s, elapsed 0s.
+2026-10-15 01:38:55,123 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: reading addresses: 19% (28209198/141045995), 78.3M/s, ETA 1s, elapsed 0s.
+2026-10-15 01:38:55,499 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: reading addresses: 29% (42313797/141045995), 37.5M/s, ETA 2s, elapsed 0s.
+2026-10-15 01:38:55,859 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: reading addresses: 39% (56418396/141045995), 39.2M/s, ETA 2s, elapsed 1s.
+2026-10-15 01:38:56,218 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: reading addresses: 49% (70522995/141045995), 39.3M/s, ETA 1s, elapsed 1s.
+2026-10-15 01:38:56,679 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: reading addresses: 59% (84627594/141045995), 30.5M/s, ETA 1s, elapsed 2s.
+2026-10-15 01:38:57,133 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: reading addresses: 69% (98732193/141045995), 31.1M/s, ETA 1s, elapsed 2s.
+2026-10-15 01:38:57,581 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: reading addresses: 79% (112836792/141045995), 31.5M/s, ETA 0s, elapsed 2s.
+2026-10-15 01:38:58,014 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: reading addresses: 89% (126941391/141045995), 32.6M/s, ETA 0s, elapsed 3s.
+2026-10-15 01:38:58,468 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: reading addresses: 99% (141045990/141045995), 31.1M/s, ETA 0s, elapsed 3s.
+2026-10-15 01:39:16,743 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: indexing: 9% (14104599/141045995), 8.2M/s, ETA 15s, elapsed 1s.
+2026-10-15 01:39:18,240 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: indexing: 19% (28209198/141045995), 9.4M/s, ETA 11s, elapsed 3s.
+2026-10-15 01:39:19,788 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: indexing: 29% (42313797/141045995), 9.1M/s, ETA 10s, elapsed 4s.
+2026-10-15 01:39:21,395 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: indexing: 39% (56418396/141045995), 8.8M/s, ETA 9s, elapsed 6s.
+2026-10-15 01:39:22,963 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: indexing: 49% (70522995/141045995), 9.0M/s, ETA 7s, elapsed 7s.
+2026-10-15 01:39:24,561 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: indexing: 59% (84627594/141045995), 8.8M/s, ETA 6s, elapsed 9s.
+2026-10-15 01:39:26,110 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: indexing: 69% (98732193/141045995), 9.1M/s, ETA 4s, elapsed 11s.
+2026-10-15 01:39:27,680 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: indexing: 79% (112836792/141045995), 9.0M/s, ETA 3s, elapsed 12s.
+2026-10-15 01:39:29,180 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: indexing: 89% (126941391/141045995), 9.4M/s, ETA 1s, elapsed 14s.
+2026-10-15 01:39:30,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: indexing: 99% (141045990/141045995), 9.3M/s, ETA 0s, elapsed 15s.
+2026-10-15 01:39:34,759 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: peeling: 9% (14104599/141045995), 4.3M/s, ETA 29s, elapsed 3s.
+2026-10-15 01:39:38,049 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: peeling: 19% (28209198/141045995), 4.3M/s, ETA 26s, elapsed 6s.
+2026-10-15 01:39:42,597 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: peeling: 29% (42313797/141045995), 3.1M/s, ETA 31s, elapsed 11s.
+2026-10-15 01:39:47,280 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: peeling: 39% (56418396/141045995), 3.0M/s, ETA 28s, elapsed 15s.
+2026-10-15 01:39:51,884 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: peeling: 49% (70522995/141045995), 3.1M/s, ETA 23s, elapsed 20s.
+2026-10-15 01:39:56,478 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: peeling: 59% (84627594/141045995), 3.1M/s, ETA 18s, elapsed 24s.
+2026-10-15 01:40:01,063 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: peeling: 69% (98732193/141045995), 3.1M/s, ETA 13s, elapsed 29s.
+2026-10-15 01:40:05,697 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: peeling: 79% (112836792/141045995), 3.0M/s, ETA 9s, elapsed 34s.
+2026-10-15 01:40:10,371 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: peeling: 89% (126941391/141045995), 3.0M/s, ETA 4s, elapsed 38s.
+2026-10-15 01:40:15,317 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: peeling: 99% (141045990/141045995), 2.9M/s, ETA 0s, elapsed 43s.
+2026-10-15 01:40:17,008 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: assigning: 9% (14104599/141045995), 8.4M/s, ETA 15s, elapsed 1s.
+2026-10-15 01:40:18,579 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: assigning: 19% (28209198/141045995), 9.0M/s, ETA 12s, elapsed 3s.
+2026-10-15 01:40:20,205 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: assigning: 29% (42313797/141045995), 8.7M/s, ETA 11s, elapsed 4s.
+2026-10-15 01:40:21,857 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: assigning: 39% (56418396/141045995), 8.5M/s, ETA 9s, elapsed 6s.
+2026-10-15 01:40:23,430 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: assigning: 49% (70522995/141045995), 9.0M/s, ETA 7s, elapsed 8s.
+2026-10-15 01:40:25,115 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: assigning: 59% (84627594/141045995), 8.4M/s, ETA 6s, elapsed 9s.
+2026-10-15 01:40:26,979 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: assigning: 69% (98732193/141045995), 7.6M/s, ETA 5s, elapsed 11s.
+2026-10-15 01:40:28,622 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: assigning: 79% (112836792/141045995), 8.6M/s, ETA 3s, elapsed 13s.
+2026-10-15 01:40:30,108 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: assigning: 89% (126941391/141045995), 9.5M/s, ETA 1s, elapsed 14s.
+2026-10-15 01:40:31,669 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: assigning: 99% (141045990/141045995), 9.0M/s, ETA 0s, elapsed 16s.
+2026-10-15 01:40:31,669 [main] INFO  net.ladenthin.bitcoinaddressfinder.persistence.inmemory.BinaryFuse16AddressPresence - Binary Fuse16 filter: ready (141045995 addresses, 158728192 fingerprint slots).
+2026-10-15 01:40:31,670 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - ... filter built in 97.21 s.
+2026-10-15 01:40:31,670 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Sweeping 1 arms (1 batchSizeInBits × 1 keysPerWorkItem), 5 s warmup + 20 s measurement each.
+2026-10-15 01:40:31,674 [main] INFO  net.ladenthin.bitcoinaddressfinder.producer.AbstractProducer - Init producer.
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - Selected OpenCL device:
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - --- Info for OpenCL device: NVIDIA GeForce RTX 3070 Laptop GPU ---
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - cl_device_id:                          cl_device_id[0x1d0978d0b70]
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_NAME:                        NVIDIA GeForce RTX 3070 Laptop GPU
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_VENDOR:                      NVIDIA Corporation
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DRIVER_VERSION:                     581.83
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_PROFILE:                     FULL_PROFILE
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_VERSION:                     OpenCL 3.0 CUDA
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_EXTENSIONS:                  cl_khr_global_int32_base_atomics cl_khr_global_int32_extended_atomics cl_khr_local_int32_base_atomics cl_khr_local_int32_extended_atomics cl_khr_fp64 cl_khr_3d_image_writes cl_khr_byte_addressable_store cl_khr_icd cl_khr_gl_sharing cl_nv_compiler_options cl_nv_device_attribute_query cl_nv_pragma_unroll cl_nv_d3d10_sharing cl_khr_d3d10_sharing cl_nv_d3d11_sharing cl_nv_copy_opts cl_nv_create_buffer cl_khr_int64_base_atomics cl_khr_int64_extended_atomics cl_khr_device_uuid cl_khr_pci_bus_info cl_khr_external_semaphore cl_khr_external_memory cl_khr_external_semaphore_win32 cl_khr_external_memory_win32 cl_khr_semaphore
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_TYPE:                        CL_DEVICE_TYPE_GPU 
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_ENDIAN_LITTLE:               true
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_MAX_COMPUTE_UNITS:           40
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS:    3
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_MAX_WORK_ITEM_SIZES:         1024 / 1024 / 64
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_MAX_WORK_GROUP_SIZE:         1024
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_MAX_CLOCK_FREQUENCY:         1290 MHz
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_ADDRESS_BITS:                64
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_MAX_MEM_ALLOC_SIZE:          2047 MByte
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_GLOBAL_MEM_SIZE:             8191 MByte
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_ERROR_CORRECTION_SUPPORT:    no
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_LOCAL_MEM_TYPE:              CL_LOCAL
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_LOCAL_MEM_SIZE:              48 KByte
+2026-10-15 01:40:31,690 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE:    64 KByte
+2026-10-15 01:40:31,692 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_QUEUE_PROPERTIES:            CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE CL_QUEUE_PROFILING_ENABLE 
+2026-10-15 01:40:31,692 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_IMAGE_SUPPORT:               1
+2026-10-15 01:40:31,692 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_MAX_READ_IMAGE_ARGS:         256
+2026-10-15 01:40:31,692 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_MAX_WRITE_IMAGE_ARGS:        32
+2026-10-15 01:40:31,692 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_SINGLE_FP_CONFIG:            CL_FP_DENORM CL_FP_INF_NAN CL_FP_ROUND_TO_NEAREST CL_FP_ROUND_TO_ZERO CL_FP_ROUND_TO_INF CL_FP_FMA CL_FP_CORRECTLY_ROUNDED_DIVIDE_SQRT 
+2026-10-15 01:40:31,692 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_IMAGE2D_MAX_WIDTH:           32768
+2026-10-15 01:40:31,692 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_IMAGE2D_MAX_HEIGHT:          32768
+2026-10-15 01:40:31,692 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_IMAGE3D_MAX_WIDTH:           16384
+2026-10-15 01:40:31,692 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_IMAGE3D_MAX_HEIGHT:          16384
+2026-10-15 01:40:31,692 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_IMAGE3D_MAX_DEPTH:           16384
+2026-10-15 01:40:31,692 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - CL_DEVICE_PREFERRED_VECTOR_WIDTHS:     CHAR 1, SHORT 1, INT 1, LONG 1, FLOAT 1, DOUBLE 1
+2026-10-15 01:40:31,692 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - SUGGESTED START CONFIG (heuristic from the info above; sweep keysPerWorkItem to confirm):
+2026-10-15 01:40:31,692 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext -     producerOpenCL.batchSizeInBits = 21
+2026-10-15 01:40:31,692 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext -     producerOpenCL.keysPerWorkItem = 256
+2026-10-15 01:40:31,692 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - 
+2026-10-15 01:40:31,943 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - noInlineHelpers -> INLINED kernel on non-AMD device 'NVIDIA GeForce RTX 3070 Laptop GPU' (vendor 'NVIDIA Corporation', source: auto) for full throughput; compiles quickly on this vendor.
+2026-10-15 01:40:32,089 [main] INFO  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - Kernel resource usage: kernelMaxWorkGroupSize=256 workGroupSizeMultiple=32 privateMemBytes=1536 localMemBytes=1
+2026-10-15 01:40:57,349 [main] INFO  net.ladenthin.bitcoinaddressfinder.producer.AbstractProducer - Release producer.
+2026-10-15 01:40:57,402 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Arm 1/1: batchSizeInBits=24 keysPerWorkItem=512 -> 260,857,639.21 candidates/s (15,948.68 addresses checked/s over 20.00 s)
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - 
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - ########## BEGIN TuneConfiguration report ##########
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Arms (all figures MEASURED on this machine):
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   batchSizeInBits  keysPerWorkItem        candidates/s addresses checked/s
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   24               512                  260,857,639.21          15,948.68
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - 
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Winner (MEASURED): batchSizeInBits=24 keysPerWorkItem=512 at 260,857,639.21 candidates/s.
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   batchSizeInBits=24 is the framework maximum (BIT_COUNT_FOR_MAX_CHUNKS_ARRAY), so this axis had no room left to explore.
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - 
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Filter choice - total = probe + fpr x verification:
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   verification cost   4.10 us   ESTIMATED (documented warm value; no database was
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -                                     configured to measure. The documented cold value is
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -                                     292.70 us - a 70x spread, so measure it if the
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -                                     filter choice matters to you.)
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   FUSE_8              probe 76.70 ns, fpr 0.003874   DOCUMENTED constants -> total 92.58 ns
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   FUSE_16             probe 80.40 ns, fpr 0.000016   DOCUMENTED constants -> total 80.47 ns
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   Recommended: FUSE_16   (DERIVED, not measured)
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - 
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - Paste-ready configuration:
+2026-10-15 01:40:57,415 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - {
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   "command" : "Find",
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   "lmdbToAddressFile" : null,
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   "addressFilesToLMDB" : null,
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   "finder" : {
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -     "keyProducerJavaRandom" : [ {
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "keyProducerId" : "r",
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "privateKeyMaxNumBits" : 256,
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "maxWorkSize" : 16777216,
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "randomAlgorithm" : "SECURE_RANDOM",
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "customSeed" : 0
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -     } ],
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -     "keyProducerJavaBip39" : [ ],
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -     "keyProducerJavaIncremental" : [ ],
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -     "keyProducerJavaSocket" : [ ],
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -     "keyProducerJavaWebSocket" : [ ],
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -     "keyProducerJavaZmq" : [ ],
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -     "consumerJava" : {
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "lmdbConfigurationReadOnly" : {
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -         "lmdbDirectory" : "lmdb",
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -         "useProxyOptimal" : true,
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -         "useNoReadAhead" : false,
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -         "logStatsOnInit" : false,
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -         "logStatsOnClose" : false,
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -         "addressLookupBackend" : "LMDB_ONLY",
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -         "bloomFilterFpp" : 0.1,
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -         "blockedBloomBitsPerEntry" : 0,
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -         "blockedBloomK" : 0,
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -         "disableAddressLookup" : false
+2026-10-15 01:40:57,416 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       },
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "printStatisticsEveryNSeconds" : 10,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "statisticsRateWindowSeconds" : 60,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "threads" : 4,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "queuePollTimeoutMillis" : 50,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "queueSize" : 4,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "awaitQueueEmptySeconds" : 60,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "runtimePublicKeyCalculationCheck" : false,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "enableVanity" : false,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "vanityPattern" : null
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -     },
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -     "awaitTerminateSeconds" : 31536000000,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -     "producerJava" : [ ],
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -     "producerJavaSecretsFiles" : [ ],
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -     "producerOpenCL" : [ {
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "keyProducerId" : "r",
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "batchSizeInBits" : 24,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "batchUsePrivateKeyIncrement" : true,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "logSecretBase" : false,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "runOnce" : false,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "shutdownTimeoutSeconds" : 300,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "platformIndex" : 0,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "deviceType" : -1,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "deviceIndex" : 0,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "maxResultReaderThreads" : 4,
+2026-10-15 01:40:57,417 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "keysPerWorkItem" : 512,
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "enableGpuFilter" : true,
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "transferAll" : false,
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "gpuFilterType" : "FUSE_16",
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "useSafeGcdInverse" : true,
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "kernelProfileStage" : "FULL",
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "enableProfiling" : false,
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "logGpuDiagnostics" : false,
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "useReducedRadixField" : true,
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -       "noInlineHelpers" : null
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -     } ]
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   },
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   "tuneConfiguration" : null,
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   "compactLMDB" : null,
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration -   "lmdbDelta" : null
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - }
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - ########## END TuneConfiguration report ##########
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - 
+2026-10-15 01:40:57,418 [main] INFO  net.ladenthin.bitcoinaddressfinder.engine.Finder - interrupt called: delegate interrupt to all keyProducers and producers
+2026-10-15 01:40:57,446 [main] INFO  net.ladenthin.bitcoinaddressfinder.engine.Finder - Interrupt KeyProducer: KeyProducerJavaRandom(super=KeyProducerJava(cKeyProducerJava=CKeyProducerJavaRandom(super=CKeyProducerJava(keyProducerId=r, privateKeyMaxNumBits=256, maxWorkSize=16777216), randomAlgorithm=SECURE_RANDOM, customSeed=0)), keyUtility=KeyUtility[network=mainnet, byteBufferUtility=ByteBufferUtility(allocateDirect=false, useXorSwap=false)], randomSupplier=RandomSecretSupplier(random=PRNG))
+2026-10-15 01:40:57,446 [main] INFO  net.ladenthin.bitcoinaddressfinder.engine.Finder - All producers released and freed.
+2026-10-15 01:40:57,446 [main] INFO  net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava - Interrupt initiated: stopping consumer execution...
+2026-10-15 01:40:57,446 [main] INFO  net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava - Waiting for termination of 4 consumer threads (timeout: 60 seconds)...
+2026-10-15 01:40:57,460 [pool-2-thread-2] INFO  net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava - end consumeKeysRunner
+2026-10-15 01:40:57,460 [pool-2-thread-4] INFO  net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava - end consumeKeysRunner
+2026-10-15 01:40:57,460 [pool-2-thread-3] INFO  net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava - end consumeKeysRunner
+2026-10-15 01:40:57,476 [pool-2-thread-1] INFO  net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava - end consumeKeysRunner
+2026-10-15 01:40:57,476 [main] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - Main#run end.
+2026-10-15 01:40:57,477 [Thread-0] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - Shutdown received via hook.
+2026-10-15 01:40:57,477 [Thread-0] INFO  net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration - interrupt called: stopping the tuning sweep.
+2026-10-15 01:40:57,477 [Thread-0] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - runLatch await
+2026-10-15 01:40:57,477 [Thread-0] INFO  net.ladenthin.bitcoinaddressfinder.cli.Main - Finish shutdown hook.
