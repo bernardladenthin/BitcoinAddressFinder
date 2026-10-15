@@ -30,6 +30,7 @@ That regenerates `plots/*.png` and the generated tables in one step.
 | `filter_sizing.csv` | Blocked Bloom FPR and speed vs filter size at fixed `k`. |
 | `tune_arms.csv`, `tuner_*.csv` | `TuneConfiguration` grid sweeps: one row per arm (`batchSizeInBits` × `keysPerWorkItem`), with the winner flagged — **per device**, so a multi-device file carries one `yes` per GPU. Raw data — not consumed by `plot.py`. |
 | `tuner_vast_2026-10-15.csv` | The same sweep on ten GPUs rented on Vast.ai (v1.8.0 release jar, 15 arms each). Its `vast-<gpu>-<instance>` machine ids are **not** in `machines.json`: each was a stranger's host, rented for minutes and destroyed, so there is nothing to register. Host details that matter (power limit, clock under load) are in the README's benchmark footnotes. |
+| `tuner_vast_fuse16_2026-10-15.csv` | Re-measurement of seven of those cards with `gpuFilterType = FUSE_16` (1.9.0-SNAPSHOT, same kernel and tuner, 4 consumer threads), on hosts whose power limit was the card's default; each host also has its `FUSE_8` arms for the same-host comparison (`gpu_filter_type` column; `power_limit_w` is the enforced limit). `vast-<gpu>-fuse16run` ids, not in `machines.json`, for the same reason. |
 | `plot.py` | Reads all of the above **except the tuner sweeps**; writes `plots/*.png` and the generated tables. |
 
 > **Two sweeps of the same machine are not automatically comparable.** `tuner_ryzen9800x3d_gfx1100.csv`

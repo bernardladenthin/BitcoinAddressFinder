@@ -528,36 +528,36 @@ BitcoinAddressFinder/
 
 Until the investigation settles on a toolkit, no UI code should be added to the existing modules. Record the toolkit decision and its rationale in `docs/gui-toolkit-decision.md` before starting implementation.
 
-### RTX 4090 (Ada, AD102) is not saturated — ~600 M keys/s at a third of its power
+### `TuneConfiguration` sweeps under `FUSE_8` and recommends `FUSE_16` with the `FUSE_8` winner arm
 
-Found by the rented-GPU benchmark of 2026-10-15 (README "Performance Benchmarks", raw data in
-[`docs/measurements/tuner_vast_2026-10-15.csv`](docs/measurements/tuner_vast_2026-10-15.csv)). Same
-v1.8.0 jar, same `TuneConfiguration` sweep, same kind of Vast.ai host for every card:
+Found while explaining why the RTX 4090 looked "not saturated" in the rented-GPU benchmark of
+2026-10-15. The card was fine: under `gpuFilterType = FUSE_8` ~0.78 % of all candidates survive the
+GPU filter, and a rented host's CPU absorbs only ~7–25 M of them per second, which caps any card at
+~0.5–0.7 G keys/s. With `FUSE_16` the 4090 runs at 1.03 G keys/s (97 % of its device-timed kernel
+rate), the 5090 at 1.90 G (README "Performance Benchmarks", raw data in
+[`docs/measurements/tuner_vast_fuse16_2026-10-15.csv`](docs/measurements/tuner_vast_fuse16_2026-10-15.csv)).
+Ruled out along the way: provider throttling, filter size vs L2, register spills (126–128 registers,
+no spill, 1.5 KB stack on sm_86/89/120), a different EC/hash mix on Ada, wrong statistics, kernel build
+options (`KEYS_BATCH_INV`, `-cl-nv-maxrregcount`: within ±1.3 %).
 
-| card | best arm | keys/s | power under load (limit) | M keys/s per SM·GHz |
-|---|---|--:|---|--:|
-| RTX 5090 | 24 / 512 | 1 593 M | up to ~565 W (575 W) | ~3.1 |
-| RTX 3090 | 24 / 1024 | 565 M | ~280 W (280 W) | ~3.9 |
-| **RTX 4090**, host A (driver 555.52) | 22 / 64 | **666 M** | ~80–310 W, median **117 W** (450 W) | **~1.9** |
-| **RTX 4090**, host B (driver 570.211) | 22 / 256 | **596 M** | ~70–280 W, median **142 W** (450 W) | **~1.7** |
+What is left is a tuner design gap:
+- **Every arm is measured with the template's `gpuFilterType`** — `FUSE_8` unless configured
+  (`CProducerOpenCL` default). Only after the sweep does `resolveFilterType` / `deriveFilterType` pick
+  the width to recommend, from `probe + fpr × verificationCost`.
+- **The cost model has no host-throughput term.** It weighs a false positive by one LMDB verification,
+  not by the CPU that has to receive, parse and queue every survivor — the binding limit on fast cards.
+  It already prefers `FUSE_16`, but by ~13 % instead of the real +73 % (4090) / +190 % (5090).
+- **The recommended arm is the `FUSE_8` winner, emitted with `FUSE_16`.** On the 4090 the `FUSE_8`
+  sweep picks 22/256; under `FUSE_16` the best arm is 24/512, so the paste-ready config loses ~18 %.
 
-On compute alone a 4090 (128 SM at ~2.7 GHz) should land around 1.3 G keys/s, above the 3090. Two
-hosts with different drivers agree, and the curve is unusually **flat across the whole grid** (host B:
-517–596 M/s for every arm with `batchSizeInBits` ≥ 22), while `nvidia-smi` reports ~98 % utilisation
-at ~100–140 W — the card is *busy but stalled*, not idle. The small Ada part measured earlier (RTX 500
-Ada Laptop, `tuner_coreultra7155h.csv`) does not show this (~3.4 M per SM·GHz), so it may be specific
-to the big AD102 die rather than to Ada as a whole.
+Options: (a) resolve the filter type **before** the sweep and measure the arms with it — cheapest,
+fixes the arm; (b) add a host term to the cost model (`survivors/s = candidates/s × 2 × fpr` against
+a measured host capacity); (c) default `CProducerOpenCL.gpuFilterType` to `FUSE_16` where
+`CL_DEVICE_MAX_MEM_ALLOC_SIZE` allows (its Javadoc already says to prefer it).
 
-Open questions, cheapest first (a 4090 rents for ~0.38–0.55 USD/h on Vast.ai, minutes are enough):
-- **Kernel or pipeline?** Run the kernel-only JMH benchmark (`GridSizeSweepBenchmark`) on a rented 4090.
-  If the kernel alone is fast, the limit is host-side; if it is ~600 M there too, it is the kernel on AD102.
-- **Register spills / occupancy.** Get the NVIDIA build log (`-cl-nv-verbose`) for the inlined kernel on
-  AD102 and compare registers per thread and spill stores with GA102 (3090) and GB202 (5090).
-- **Wider grid.** The sweep only tried `keysPerWorkItem` ≥ 64 and `batchSizeInBits` ≤ 24; the winner on
-  host A sat at the lower `keysPerWorkItem` edge. Try 16 / 32 and `batchSizeInBits` 25–26.
-- **Another AD102/AD103 card** (RTX 4080, RTX 6000 Ada, L40S) to tell "AD102" from "big Ada".
-
-Until this is understood the README lists the 4090 as a lower bound, not as the card's speed.
+Also correct `docs/performance.md`: its "≈255 registers with spilling" reading of
+`kernelMaxWorkGroupSize = 256` is wrong — the driver's PTX assembles to 126–128 registers with no
+spill, and the 256 cap stays even at `-cl-nv-maxrregcount=96`.
 
 ### OpenCL backend abstraction & multi-device coverage (migrated from GitHub issues)
 

@@ -1709,17 +1709,17 @@ For technical details, see:
 
 | GPU Model                    | CPU / Host          | Key Range (Bits) | Grid Size (Bits) | keysPerWorkItem | Effective Keys/s (~)             | Vast.ai USD/h ¹ | USD per 10¹² keys ¹ |
 |------------------------------|---------------------|------------------|------------------|-----------------|----------------------------------|-----------------|---------------------|
-| NVIDIA RTX 5090              | Vast.ai (rented)    | 256              | 24               | 512             | ~1,593,000,000 keys/s            | 0.388           | ~0.068              |
+| NVIDIA RTX 5090              | Vast.ai (rented)    | 256              | 24               | 512             | ~1,897,000,000 keys/s            | 0.388           | ~0.057              |
+| NVIDIA RTX 4090 ²            | Vast.ai (rented)    | 256              | 24               | 512             | ~1,029,000,000 keys/s            | 0.379           | ~0.102              |
 | AMD Radeon RX 7900 XTX       | AMD Ryzen 7 9800X3D | 256              | 24               | 512             | ~670,000,000 keys/s              | —               | —                   |
-| NVIDIA RTX 4090 ²            | Vast.ai (rented)    | 256              | 22               | 64 / 256        | ~596,000,000–666,000,000 keys/s  | 0.379           | ~0.16–0.18          |
-| NVIDIA RTX 3090              | Vast.ai (rented)    | 256              | 24               | 1024            | ~565,000,000 keys/s              | 0.121           | **~0.060**          |
-| NVIDIA RTX 5060 Ti           | Vast.ai (rented)    | 256              | 24               | 1024            | ~481,000,000 keys/s              | 0.127           | ~0.073              |
-| NVIDIA CMP 170HX ³           | Vast.ai (rented)    | 256              | 22               | 256             | ~349,000,000 keys/s              | 0.214           | ~0.170              |
-| NVIDIA Tesla V100 SXM2 16 GB | Vast.ai (rented)    | 256              | 24               | 1024            | ~310,000,000 keys/s              | 0.081           | ~0.073              |
+| NVIDIA RTX 3090 ⁴            | Vast.ai (rented)    | 256              | 24               | 1024            | ~612,000,000 keys/s              | 0.121           | **~0.055**          |
+| NVIDIA RTX 5060 Ti           | Vast.ai (rented)    | 256              | 24               | 1024            | ~501,000,000 keys/s              | 0.127           | ~0.070              |
+| NVIDIA Tesla V100 SXM2 16 GB | Vast.ai (rented)    | 256              | 24               | 1024            | ~377,000,000 keys/s              | 0.081           | ~0.060              |
+| NVIDIA RTX 3070 ⁴            | Vast.ai (rented)    | 256              | 24               | 512             | ~357,000,000 keys/s              | 0.094           | ~0.073              |
+| NVIDIA CMP 170HX ³ ⁵         | Vast.ai (rented)    | 256              | 22               | 256             | ~349,000,000 keys/s              | 0.214           | ~0.170              |
 | NVIDIA RTX 3070 Laptop       | AMD Ryzen 7 5800H   | 256              | 24               | 2048            | ~266,000,000 keys/s              | —               | —                   |
-| NVIDIA RTX 3070 ⁴            | Vast.ai (rented)    | 256              | 24               | 512             | ~249,000,000 keys/s              | 0.094           | ~0.105              |
 | NVIDIA RTX 3070 Laptop       | AMD Ryzen 7 5800H   | 256              | 22               | 256             | ~229,000,000 keys/s              | —               | —                   |
-| NVIDIA RTX 2070 SUPER        | Vast.ai (rented)    | 256              | 24               | 512             | ~216,000,000 keys/s              | 0.068           | ~0.087              |
+| NVIDIA RTX 2070 SUPER ⁵      | Vast.ai (rented)    | 256              | 24               | 512             | ~216,000,000 keys/s              | 0.068           | ~0.087              |
 | NVIDIA GTX 1080 Ti           | Vast.ai (rented)    | 256              | 24               | 512             | ~49,000,000 keys/s               | 0.041           | ~0.232              |
 
 > ¹ **Price, as of 2026-10-15.** The cheapest single-GPU **on-demand** offer on [Vast.ai](https://vast.ai)
@@ -1728,32 +1728,62 @@ For technical details, see:
 > can be cheaper still. `USD per 10¹² keys` = `USD/h ÷ (keys/s × 3600 ÷ 10¹²)`, i.e. GPU rent only: no
 > storage, no traffic, no setup time. The rows marked — are the maintainers' own machines.
 >
-> ² **RTX 4090: not saturated — treat as a lower bound.** Measured on two different hosts (drivers 555.52
-> and 570.211): 666 M/s and 596 M/s, with the card drawing only **117–142 W of a 450 W limit** and a curve
-> that stays flat across every grid. The RTX 5090 and 3090 on the same software and the same kind of host
-> did saturate, so this looks like an Ada-specific limit in the pipeline rather than a host problem; it is
-> not yet understood. On compute alone a 4090 should land well above the 3090.
+> ² **RTX 4090: 1.03 G keys/s with `FUSE_16`.** A first pass with the tuner's default `FUSE_8` filter gave
+> only 596–666 M/s on two hosts, at 117–142 W of a 450 W limit, and the card looked *not saturated*. The
+> card was fine: the host's CPU was the limit (see *Why `FUSE_16` matters most on fast cards* below). With `FUSE_16` the same arm runs
+> at **97 % of the kernel's own device-timed rate** (1.06 G keys/s), so nothing else of size remains between
+> kernel and counter.
 >
 > ³ **CMP 170HX** (GA100 mining card, PCIe x4): its integer throughput is *not* crippled — ~3.5 M keys/s
 > per SM·GHz, on par with Ampere — but at 155 W and 1.41 GHz on this host, and at its price, it is not
 > worth renting for this workload. PCIe width itself does not matter here: the compact GPU-filter path
 > sends only filter survivors back to the host.
 >
-> ⁴ **This RTX 3070 host had its power limit cut to 100 W** (stock 220 W), so the card ran at ~1.5 GHz. A
-> rented card's power limit is invisible until you look (`nvidia-smi --query-gpu=power.limit`), and it
-> alone can cost a third of the throughput.
+> ⁴ **Power-capped hosts.** The first RTX 3070 host had its power limit cut to 100 W (stock 220 W) and gave
+> 249 M/s; on a full-power host the same card does 357 M/s. The first RTX 3090 ran at 280 W (stock 350 W)
+> and gave 565 M/s; other 3090 hosts were capped at 200–220 W. A rented card's power limit is invisible
+> until you look — compare `nvidia-smi --query-gpu=enforced.power.limit,power.default_limit` right after
+> start — and it alone can cost a third of the throughput. Both rows above are from full-power hosts.
+>
+> ⁵ **Measured with `FUSE_8` only** (first pass, not re-measured). At this speed `FUSE_8` costs little or
+> nothing (see the table below), so these two rows are close to what `FUSE_16` would give.
 
-> **Methodology — rented rows (Vast.ai, 2026-10-15).** Each card measured once with the `TuneConfiguration`
-> command of the signed **v1.8.0** release jar (kernel and tuner unchanged since), in a container on the
-> host's own NVIDIA OpenCL driver: 15 arms (`batchSizeInBits` 20 / 22 / 24 × `keysPerWorkItem` 64 / 256 /
-> 512 / 1024 / 2048), 5 s warm-up + 15 s measurement each, against a synthetic 141 M-entry pre-filter (no
-> database read). The figure is the winning arm's net end-to-end candidates/s — the same instrument a user
-> runs on their own machine, not the JMH benchmark used for the maintainers' rows. One run per card on one
-> stranger's host: power limits, clocks and co-tenancy are outside our control (see the footnotes), so read
-> these as *what renting that card typically gets you*, not as the card's ceiling. **Best settings:** on
-> every NVIDIA card except the RTX 4090 the winner was `batchSizeInBits = 24` with `keysPerWorkItem` 512
-> or 1024 — far above the default candidate list, which stops at 256. Raw data, all 150 arms:
-> [`tuner_vast_2026-10-15.csv`](docs/measurements/tuner_vast_2026-10-15.csv).
+> **Methodology — rented rows (Vast.ai, 2026-10-15).** Each card measured with the `TuneConfiguration`
+> command in a container on the host's own NVIDIA OpenCL driver, 5 s warm-up + 15 s measurement per arm,
+> against a synthetic 141 M-entry pre-filter (no database read), 4 consumer threads. The figure is the
+> winning arm's net end-to-end candidates/s — the same instrument a user runs on their own machine, not the
+> JMH benchmark used for the maintainers' rows. The first pass used the signed **v1.8.0** release jar with
+> 15 arms (`batchSizeInBits` 20 / 22 / 24 × `keysPerWorkItem` 64 / 256 / 512 / 1024 / 2048) and the
+> tuner's default `gpuFilterType = FUSE_8`; the rows without ⁵ were re-measured the same day with
+> **`gpuFilterType = FUSE_16`** (the recommended GPU filter, see [Which filter to pick](#which-filter-to-pick)) on a
+> 1.9.0-SNAPSHOT build with the same kernel and tuner, `batchSizeInBits` 22 / 24 × `keysPerWorkItem` 256 /
+> 512 / 1024, on hosts whose power limit was checked to be the card's default. One run per card on one
+> stranger's host: clocks and co-tenancy are outside our control, so read these as *what renting that card
+> typically gets you*. **Best settings:** on every NVIDIA card the winner was `batchSizeInBits = 24` with
+> `keysPerWorkItem` 512 or 1024 — far above the default candidate list, which stops at 256. Raw data:
+> [`tuner_vast_fuse16_2026-10-15.csv`](docs/measurements/tuner_vast_fuse16_2026-10-15.csv) (`FUSE_16`
+> re-measurement, with the `FUSE_8` arms of the same hosts) and
+> [`tuner_vast_2026-10-15.csv`](docs/measurements/tuner_vast_2026-10-15.csv) (first pass, all 150 arms).
+>
+> **Why `FUSE_16` matters most on fast cards.** With `FUSE_8` about 0.78 % of all candidates (two addresses
+> per key × ~0.39 % false-positive rate) survive the GPU filter and must be parsed and checked by the host
+> CPU. A rented host absorbs ~7–25 M of them per second, depending on its CPU, which caps the pipeline at
+> ~0.5–0.7 G keys/s whatever the GPU. `FUSE_16` hands the host ~256× fewer survivors and removes the cap.
+> Same host, same tuner, `FUSE_8` (best of the measured arms) against `FUSE_16`:
+>
+> | card | `FUSE_8` | `FUSE_16` | gain |
+> |---|--:|--:|--:|
+> | RTX 5090 | 654 M | 1 897 M | +190 % |
+> | RTX 4090 | 594 M | 1 029 M | +73 % |
+> | RTX 3090 | 436 M | 612 M | +40 % |
+> | Tesla V100 | 294 M | 377 M | +28 % |
+> | RTX 5060 Ti | 455 M | 501 M | +10 % |
+> | RTX 3070 | 356 M | 357 M | ±0 |
+> | GTX 1080 Ti | 48 M | 49 M | ±0 |
+>
+> Below ~300 M keys/s a typical host keeps up with `FUSE_8`; above it, use `FUSE_16`. Note that
+> `TuneConfiguration` itself measures with the template's `gpuFilterType` (default `FUSE_8`), so on a fast
+> card set `gpuFilterType: FUSE_16` in the tuner template to get comparable numbers and the right arm.
 >
 > **Methodology — own machines.** Compact GPU-filter fast path, candidates/s = JMH ops/s × `2^batchSizeInBits`, all on
 > the **inlined** kernel (the example configs now default to `noInlineHelpers: false`). Each device is
