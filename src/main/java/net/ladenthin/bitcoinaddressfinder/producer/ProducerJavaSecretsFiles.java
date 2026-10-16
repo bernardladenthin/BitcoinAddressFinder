@@ -5,7 +5,6 @@ package net.ladenthin.bitcoinaddressfinder.producer;
 
 import java.io.File;
 import java.io.IOException;
-import java.math.BigInteger;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
@@ -85,11 +84,6 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
             logProgress();
         }
         LOGGER.info("All secrets files processed.");
-    }
-
-    @Override
-    public void processSecrets(BigInteger[] secrets) {
-        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     private void logProgress() {
