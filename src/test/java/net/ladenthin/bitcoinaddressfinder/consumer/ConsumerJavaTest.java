@@ -446,6 +446,55 @@ public class ConsumerJavaTest {
 
     // windowed-rate math moved to SlidingWindowRate; see SlidingWindowRateTest.
 
+    @Test
+    public void interrupt_batchesStillQueued_areCheckedBeforeTheConsumerStops() throws Exception {
+        // The producers stop first, then ConsumerJava.interrupt() waits awaitQueueEmptySeconds "for
+        // the worker pool to drain the keys queue". The worker loop ended on shouldRun=false without
+        // draining, so whatever was still queued -- the end of a finite range, the last lines of a
+        // secrets file -- was never checked, and a hit in it was lost.
+        new LMDBPlatformAssume().assumeLMDBExecution();
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+        TestAddressesFiles testAddresses = new TestAddressesFiles(false);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
+
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.threads = 1;
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        java.util.concurrent.CountDownLatch firstBatchEntered = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch releaseFirstBatch = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger checkedBatches = new java.util.concurrent.atomic.AtomicInteger();
+        net.ladenthin.bitcoinaddressfinder.core.ResultListener blockingListener = batchResult -> {
+            checkedBatches.incrementAndGet();
+            firstBatchEntered.countDown();
+            try {
+                releaseFirstBatch.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        };
+        ConsumerJava consumerJava =
+                new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils, java.util.List.of(blockingListener));
+        consumerJava.initLMDB();
+        consumerJava.startConsumer();
+
+        // the worker takes the first batch and stays inside it until released
+        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), null);
+        assertThat(firstBatchEntered.await(10, java.util.concurrent.TimeUnit.SECONDS), is(true));
+        // the second batch is still queued when the shutdown begins
+        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), null);
+        Thread interrupter = new Thread(consumerJava::interrupt);
+        interrupter.start();
+        while (consumerJava.shouldRun()) {
+            Thread.onSpinWait();
+        }
+        releaseFirstBatch.countDown();
+        interrupter.join(30_000L);
+
+        assertThat(checkedBatches.get(), is(equalTo(2)));
+        assertThat(consumerJava.keysQueueSize(), is(equalTo(0)));
+    }
+
     @AwaitTimeTest
     @Test
     public void interrupt_keysQueueNotEmpty_consumerNotRunningWaitedInternallyForTheDuration() throws Exception {
