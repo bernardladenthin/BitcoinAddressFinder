@@ -201,6 +201,40 @@ public class ProducerJavaSecretsFilesTest {
                 mockConsumer.publicKeyBytesArrayList.get(5)[0],
                 is(equalTo(PrivateKey.WITH_SPECIAL_CHARACTER.getPublicKeyBytes())));
     }
+
+    @ParameterizedTest
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_CSECRET_FORMAT)
+    public void produceKeys_filesConfiguredWithoutPrivateKeyIncrement_keysCreated(CSecretFormat cSecretFormat)
+            throws Exception {
+        // arrange — without batchUsePrivateKeyIncrement every secret goes through processSecrets
+        CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
+        List<File> secretsFiles = createSecretsFiles(cSecretFormat);
+        cProducerJavaSecretsFiles.secretsFiles =
+                secretsFiles.stream().map(file -> file.getAbsolutePath()).collect(Collectors.toList());
+        cProducerJavaSecretsFiles.secretFormat = cSecretFormat;
+        cProducerJavaSecretsFiles.batchSizeInBits = 0;
+        cProducerJavaSecretsFiles.batchUsePrivateKeyIncrement = false;
+
+        MockConsumer mockConsumer = new MockConsumer();
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, new Random(1));
+        ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(
+                cProducerJavaSecretsFiles,
+                mockConsumer,
+                keyUtility,
+                mockKeyProducer,
+                bitHelper,
+                new RuntimeStatistics());
+
+        // act
+        producerJavaSecretsFiles.produceKeys();
+
+        // assert
+        assertThat(mockConsumer.publicKeyBytesArrayList.size(), is(equalTo(6)));
+        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[0], is(equalTo(PrivateKey.TEST.getPublicKeyBytes())));
+        assertThat(
+                mockConsumer.publicKeyBytesArrayList.get(5)[0],
+                is(equalTo(PrivateKey.WITH_SPECIAL_CHARACTER.getPublicKeyBytes())));
+    }
     // </editor-fold>
 
     private List<File> createSecretsFiles(CSecretFormat secretFormat) throws IOException {
