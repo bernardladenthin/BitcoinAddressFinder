@@ -237,6 +237,35 @@ public class AbstractKeyProducerQueueBufferedTest {
     }
 
     @Test
+    public void interrupt_unblocksEveryBlockedConsumer_negativeTimeout() throws Exception {
+        // arrange — several producers may share one key producer (the same keyProducerId); with
+        // timeoutMillis -1 each of them blocks in take(), and interrupt() must release all of them,
+        // not just the one that happens to take the single shutdown sentinel.
+        CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
+        TestKeyProducer producer = createTestKeyProducer(config);
+        producer.setReadTimeoutMs(-1);
+        java.util.concurrent.Callable<BigInteger[]> call = () -> {
+            try {
+                return producer.createSecrets(1, true);
+            } catch (NoMoreSecretsAvailableException e) {
+                return null;
+            }
+        };
+
+        // act
+        Future<BigInteger[]> first = executorService.submit(call);
+        Future<BigInteger[]> second = executorService.submit(call);
+        Thread.sleep(TestTimeProvider.DEFAULT_DELAY);
+        assertThat("both callers must be blocked before interrupt()", first.isDone() || second.isDone(), is(false));
+
+        producer.interrupt();
+
+        // assert
+        assertThat(first.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS), is((BigInteger[]) null));
+        assertThat(second.get(TestTimeProvider.DEFAULT_SOCKET_TIMEOUT, TimeUnit.MILLISECONDS), is((BigInteger[]) null));
+    }
+
+    @Test
     public void interrupt_unblocksBlockedConsumer_positiveTimeout() throws Exception {
         // arrange
         // With a positive but long timeout, interrupt() should still wake the
