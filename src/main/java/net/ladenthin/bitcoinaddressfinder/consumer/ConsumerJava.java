@@ -766,6 +766,16 @@ public class ConsumerJava implements Consumer {
             }
         }
 
+        // The producers stop before the consumer does, so what is still queued is the last of the
+        // work -- the end of a finite range, the last lines of a secrets file. interrupt() waits
+        // awaitQueueEmptySeconds for exactly this drain; leaving the loop without it dropped those
+        // batches unchecked.
+        try {
+            consumeKeys(threadLocalReuseableByteBuffer);
+        } catch (Exception e) {
+            LOGGER.error("Error while draining the keys queue at shutdown.", e);
+        }
+
         LOGGER.info("end consumeKeysRunner");
     }
 
