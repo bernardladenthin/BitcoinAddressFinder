@@ -18,10 +18,13 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
 import net.ladenthin.bitcoinaddressfinder.secret.BIP39Wordlist;
 import net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableException;
 import org.apache.commons.codec.binary.Hex;
+import org.bitcoinj.crypto.ChildNumber;
 import org.bitcoinj.crypto.DeterministicKey;
 import org.bitcoinj.crypto.HDKeyDerivation;
+import org.bitcoinj.crypto.HDPath;
 import org.bitcoinj.crypto.MnemonicCode;
 import org.bitcoinj.params.MainNetParams;
+import org.bitcoinj.wallet.DeterministicKeyChain;
 import org.bitcoinj.wallet.DeterministicSeed;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -177,6 +180,37 @@ public class BIP39KeyProducerTest {
 
         // This call should overflow and throw NoMoreSecretsAvailableException
         assertThrows(NoMoreSecretsAvailableException.class, () -> producer.nextKey());
+    }
+
+    @Test
+    public void nextKey_matchesTheKeyChainDerivation_forPlainAndHardenedChildren() {
+        String mnemonic =
+                "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        String bip32Path = "M/44H/0H/0H/0";
+        DeterministicKeyChain reference = DeterministicKeyChain.builder()
+                .seed(DeterministicSeed.ofMnemonic(mnemonic, "", Instant.ofEpochSecond(0)))
+                .build();
+        for (boolean hardened : new boolean[] {false, true}) {
+            BIP39KeyProducer producer =
+                    new BIP39KeyProducer(mnemonic, "", bip32Path, Instant.ofEpochSecond(0), hardened);
+            for (int index = 0; index < 5; index++) {
+                DeterministicKey expected = reference.getKeyByPath(
+                        BIP39KeyProducer.append(HDPath.parsePath(bip32Path), new ChildNumber(index, hardened)), true);
+                DeterministicKey actual = producer.nextKey();
+                assertThat(actual.getPrivateKeyAsHex(), is(expected.getPrivateKeyAsHex()));
+                assertThat(actual.getPathAsString(), is(expected.getPathAsString()));
+            }
+        }
+    }
+
+    @Test
+    public void producer_keepsNoKeyChainThatCachesEveryDerivedKey() {
+        // DeterministicKeyChain.getKeyByPath(path, true) stores every derived key in the chain's
+        // hierarchy for good (measured: ~540 bytes per key), so a long BIP39 run grew the heap by
+        // one entry per candidate until it ran out of memory. Only the parent key is needed.
+        for (java.lang.reflect.Field field : BIP39KeyProducer.class.getDeclaredFields()) {
+            assertThat(field.getName(), field.getType() == DeterministicKeyChain.class, is(false));
+        }
     }
 
     @Test
