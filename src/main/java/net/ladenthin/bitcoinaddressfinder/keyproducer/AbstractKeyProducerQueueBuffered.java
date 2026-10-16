@@ -97,6 +97,12 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
                 }
 
                 if (isShutdownSentinel(secret)) {
+                    // Put it back for the next caller: several producers can share this key producer,
+                    // and each one blocked in take() needs its own wake-up -- signalShutdown() enqueues
+                    // the sentinel only once.
+                    if (!secretQueue.offer(SHUTDOWN_SENTINEL)) {
+                        LOGGER.trace("Shutdown sentinel not re-enqueued (queue full); other callers see shouldStop.");
+                    }
                     throw new NoMoreSecretsAvailableException(
                             "Shutdown sentinel received while waiting for secret at iteration " + i + "/" + length);
                 }
