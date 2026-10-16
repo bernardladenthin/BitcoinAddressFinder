@@ -13,6 +13,7 @@ import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableException;
 import org.bitcoinj.crypto.ChildNumber;
 import org.bitcoinj.crypto.DeterministicKey;
+import org.bitcoinj.crypto.HDKeyDerivation;
 import org.bitcoinj.crypto.HDPath;
 import org.bitcoinj.wallet.DeterministicKeyChain;
 import org.bitcoinj.wallet.DeterministicSeed;
@@ -22,8 +23,9 @@ import org.bitcoinj.wallet.DeterministicSeed;
  * Allows sequential derivation of keys like Random.next() from a fixed HD wallet seed.
  *
  * <h2>toString contract — security-sensitive exclusion</h2>
- * <p>The {@code keyChain} field holds the {@link DeterministicKeyChain} seeded from the
- * mnemonic — printing it to logs would leak derivable key material. It is excluded
+ * <p>The {@code parentKey} field holds the private key at the base path of the
+ * {@link DeterministicKeyChain} seeded from the mnemonic — printing it to logs would leak
+ * derivable key material. It is excluded
  * from {@link ToString} unconditionally. callSuper is also off because the parent
  * {@link java.util.Random} produces an identity-style toString that adds noise without
  * value. The included fields ({@code basePath}, {@code hardened}, {@code counter})
@@ -35,27 +37,31 @@ public class BIP39KeyProducer extends java.util.Random {
     private static final long serialVersionUID = 1L;
 
     /**
-     * Underlying deterministic key chain seeded from the mnemonic.
+     * Private key at the base path, the parent of every key {@link #nextKey()} derives.
      * <p>
-     * Marked transient because {@link DeterministicKeyChain} is not Serializable.
+     * Only this key is kept, not the {@link DeterministicKeyChain} it comes from: the chain's
+     * {@code getKeyByPath(path, true)} stores every derived key in its hierarchy for good, which
+     * made a long BIP39 run grow the heap by one key (~540 bytes) per candidate.
+     * <p>
+     * Marked transient because {@link DeterministicKey} is not Serializable.
      * Serialization is inherited from {@link java.util.Random} as a side effect
      * of using Random as a façade for this deterministic producer; it is not a
      * supported operation. A deserialised instance will have a {@code null}
-     * keyChain and NPE on first use, which is the intended fail-fast. The
+     * parentKey and NPE on first use, which is the intended fail-fast. The
      * field cannot be declared {@code final} together with {@code transient}
      * because spotbugs NFF_NON_FUNCTIONAL_FIELD flags the combination
      * (a {@code final transient} field can never be restored on
      * deserialisation); the field is in practice immutable since it is only
      * assigned by the constructor.
      */
-    // SECURITY: DeterministicKeyChain toString can leak derivable key material. NEVER include
-    // in logs — see class-level Javadoc for the toString contract.
+    // SECURITY: a private DeterministicKey's toString can leak derivable key material. NEVER
+    // include in logs — see class-level Javadoc for the toString contract.
     @ToString.Exclude
-    private transient DeterministicKeyChain keyChain;
+    private transient DeterministicKey parentKey;
     /**
      * Parsed BIP44 base derivation path.
      * <p>
-     * Marked transient for the same reason as {@link #keyChain}.
+     * Marked transient for the same reason as {@link #parentKey}.
      */
     private transient List<ChildNumber> basePath;
     /** Whether derived child indices are hardened. */
@@ -101,8 +107,8 @@ public class BIP39KeyProducer extends java.util.Random {
             boolean hardened,
             int startingIndex) {
         DeterministicSeed seed = DeterministicSeed.ofMnemonic(mnemonic, passphrase, creationTime);
-        this.keyChain = DeterministicKeyChain.builder().seed(seed).build();
         this.basePath = HDPath.parsePath(bip44BasePath); // e.g., "M/44H/0H/0H/0"
+        this.parentKey = DeterministicKeyChain.builder().seed(seed).build().getKeyByPath(basePath, true);
         this.hardened = hardened;
         this.counter = new AtomicInteger(startingIndex);
     }
@@ -121,8 +127,7 @@ public class BIP39KeyProducer extends java.util.Random {
                             + " (observed wrapped index=" + index + ", basePath=" + basePath
                             + ", hardened=" + hardened + ")");
         }
-        List<ChildNumber> path = append(basePath, new ChildNumber(index, hardened));
-        return keyChain.getKeyByPath(path, true);
+        return HDKeyDerivation.deriveChildKey(parentKey, new ChildNumber(index, hardened));
     }
 
     /**
