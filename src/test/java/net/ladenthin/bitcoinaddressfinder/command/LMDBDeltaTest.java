@@ -5,9 +5,13 @@ package net.ladenthin.bitcoinaddressfinder.command;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.startsWith;
 
 import java.io.File;
 import java.io.IOException;
@@ -24,6 +28,7 @@ import net.ladenthin.bitcoinaddressfinder.persistence.AddressIterable;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
+import nl.altindag.log.LogCaptor;
 import org.bitcoinj.base.Coin;
 import org.junit.jupiter.api.Test;
 
@@ -276,6 +281,29 @@ public class LMDBDeltaTest extends LMDBBase {
 
         // Only hC is in the other database but not the reference.
         assertThat(Files.readAllLines(deltaFile.toPath()), contains(keyUtility.toBase58(hC)));
+    }
+
+    /** A delta stopped by {@code interrupt()} is incomplete and must not be reported as done. */
+    @Test
+    public void run_interruptedBeforeTheDelta_doesNotReportTheDeltaAsDone() throws Exception {
+        File referenceDir = writeLmdb("reference-interrupted", List.of(hash160(1)));
+        File otherDir = writeLmdb("other-interrupted", List.of(hash160(2)));
+        CLMDBDelta config = new CLMDBDelta();
+        config.referenceLmdbConfigurationReadOnly.lmdbDirectory = referenceDir.getAbsolutePath();
+        CLMDBConfigurationReadOnly other = new CLMDBConfigurationReadOnly();
+        other.lmdbDirectory = otherDir.getAbsolutePath();
+        config.lmdbConfigurationReadOnlyList.add(other);
+        config.deltaAddressesFile =
+                folder.resolve("delta-interrupted.txt").toFile().getAbsolutePath();
+        LMDBDelta delta = new LMDBDelta(config);
+        delta.interrupt();
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(LMDBDelta.class)) {
+            delta.run();
+
+            assertThat(logCaptor.getInfoLogs(), not(hasItem(startsWith("... delta done"))));
+            assertThat(logCaptor.getWarnLogs(), hasItem(containsString("interrupted")));
+        }
     }
 
     // </editor-fold>
