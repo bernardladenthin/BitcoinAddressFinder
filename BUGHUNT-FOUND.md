@@ -202,7 +202,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `FinderTest#interrupt_calledFromTwoThreadsAtOnce_neitherFails` (ein ZMQ-Broadcaster auf `inproc://`, dessen erstes `close()` festgehalten wird, per Reflection in die private Liste gelegt)
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is null but: was <java.util.ConcurrentModificationException>“), mit Fix grün, `FinderTest` 22/22, `BitcoinAddressFinderArchitectureTest` 17/17; Gegenprobe per `git stash` rot, nach `stash pop` grün. `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** siehe Git-Log („Serialize Finder.interrupt() between the shutdown hook and the main thread“)
+- **Commit:** BAF `cf46353`
 
 ## Offene Verdachte ohne Fund-ID
 
