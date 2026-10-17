@@ -174,7 +174,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `LMDBCompactTest#compactLMDB_interruptedBeforeRun_writesNothing`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <false> but: was <true>“: Zielverzeichnis angelegt), mit Fix grün 4/4 (skipped 0), Gegenprobe per `git stash` rot, nach `stash pop` wieder grün 4/4.
 - **Status:** gefixt
-- **Commit:** siehe Git-Log dieser Datei (Commit „Honour an interrupt of LMDBCompact that arrives before the run“)
+- **Commit:** BAF `833b879`
 
 ## Offene Verdachte ohne Fund-ID
 
