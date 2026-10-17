@@ -7,8 +7,12 @@ import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.BIG
 import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.SHA256;
 import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.STRING_SHA256;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.startsWith;
 
 import com.google.common.hash.Hashing;
 import java.io.File;
@@ -21,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
 import net.ladenthin.bitcoinaddressfinder.MockConsumer;
@@ -34,10 +39,12 @@ import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
+import nl.altindag.log.LogCaptor;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.FileUtils;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -148,6 +155,42 @@ public class ProducerJavaSecretsFilesTest {
 
         // assert
         assertThat(mockConsumer.publicKeyBytesArrayList.size(), is(equalTo(0)));
+    }
+
+    /** A file whose reading {@code interrupt()} stopped part way is not processed and must not be reported so. */
+    @Test
+    public void produceKeys_interruptedWhileReadingAFile_doesNotReportTheFileOrTheRunAsProcessed() throws Exception {
+        File secretsFile = folder.resolve("secrets.txt").toFile();
+        Files.writeString(secretsFile.toPath(), "one\ntwo\nthree\n", StandardCharsets.UTF_8);
+        CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
+        cProducerJavaSecretsFiles.secretsFiles = List.of(secretsFile.getAbsolutePath());
+        cProducerJavaSecretsFiles.secretFormat = STRING_SHA256;
+        cProducerJavaSecretsFiles.batchSizeInBits = 0;
+        AtomicReference<ProducerJavaSecretsFiles> producer = new AtomicReference<>();
+        MockConsumer interruptingConsumer = new MockConsumer() {
+            @Override
+            public void consumeKeys(PublicKeyBytes[] publicKeyBytes, @Nullable BigInteger secretBase)
+                    throws InterruptedException {
+                super.consumeKeys(publicKeyBytes, secretBase);
+                producer.get().interrupt();
+            }
+        };
+        producer.set(new ProducerJavaSecretsFiles(
+                cProducerJavaSecretsFiles,
+                interruptingConsumer,
+                keyUtility,
+                new MockKeyProducer(keyUtility, new Random(1)),
+                bitHelper,
+                new RuntimeStatistics()));
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(ProducerJavaSecretsFiles.class)) {
+            producer.get().produceKeys();
+
+            assertThat(interruptingConsumer.publicKeyBytesArrayList.size(), is(equalTo(1)));
+            assertThat(logCaptor.getInfoLogs(), not(hasItem(startsWith("Finished processing"))));
+            assertThat(logCaptor.getInfoLogs(), not(hasItem("All secrets files processed.")));
+            assertThat(logCaptor.getWarnLogs(), hasItem(containsString("interrupted")));
+        }
     }
 
     @ParameterizedTest

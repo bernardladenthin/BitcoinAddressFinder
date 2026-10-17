@@ -34,6 +34,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F46](#f46) — niedrig — *gefixt*
 - [F47](#f47) — niedrig — *gefixt*
 - [F48](#f48) — niedrig — *gefixt*
+- [F49](#f49) — niedrig — *gefixt*
 
 ## Funde
 
@@ -334,8 +335,20 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** BAF `20dde71`
 
+<a id="f49"></a>
+### F49 – BAF: unterbrochener Secrets-Datei-Producer meldet „Finished processing“ und „All secrets files processed.“
+- **Zeit:** 2026-10-17 19:55 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/producer/ProducerJavaSecretsFiles.java:82` (`produceKeys`)
+- **Schwere:** niedrig
+- **Beschreibung:** Musterdurchsicht nach F46–F48. `interrupt()` stoppt auch die laufende `SecretsFile`, deren `readFile` dann mitten in der Datei zurückkehrt. `produceKeys` meldete die Datei trotzdem als „Finished processing“ und am Ende „All secrets files processed.“ – im Test nach 28 % der Datei. Wer danach im Log nachsieht, welche Secrets geprüft wurden, hält die Datei für vollständig.
+- **Fix:** Nach `readFile` bei gelöschtem Flag WARN „Secrets file processing interrupted in: <Datei>“ mit Fortschrittszeile und Rückkehr; die Schlussmeldung unterscheidet zwischen fertig und abgebrochen.
+- **Reproduktion:** `ProducerJavaSecretsFilesTest#produceKeys_interruptedWhileReadingAFile_doesNotReportTheFileOrTheRunAsProcessed` (ein Consumer ruft nach dem ersten Schlüssel `interrupt()`)
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected: not a collection containing a string starting with "Finished processing" but: was <[…, Finished processing: …/secrets.txt, Progress: … Current File progress: 28.…]>“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `ProducerJavaSecretsFilesTest` 12/12, `AbstractProducerTest` 20/20, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** –
+
 ## Offene Verdachte ohne Fund-ID
 
-- **Gleiches Muster wie F46–F48, noch offen (2026-10-17):** `producer/ProducerJavaSecretsFiles.java:82/86` meldet „Finished processing“ und „All secrets files processed.“, auch wenn `SecretsFile.readFile` auf `interrupt()` hin mitten in der Datei aufhörte. (`LMDBDelta` ist F48; `LMDBCompact` ist sauber.)
+- **`ProducerJavaSecretsFiles.interrupt()` kann die nächste Datei verpassen (2026-10-17, beim Lesen für F49 aufgefallen):** `produceKeys` prüft das Flag am Schleifenanfang und setzt danach `currentSecretsFile`; kommt `interrupt()` genau dazwischen, findet es noch keine Datei zum Stoppen, und die neue `SecretsFile` (mit eigenem, gesetztem Flag) wird vollständig gelesen. Das Fenster ist ein paar Anweisungen breit; die Lösung wäre ein erneutes Prüfen des Flags nach `currentSecretsFile.set`. Für einen Rot-Grün-Nachweis braucht es eine Naht, die genau zwischen Prüfung und Setzen anhält.
 - **`PrivateKeyValidator.getMaxPrivateKeyForBatchSize` lässt n im GPU-Raster zu (2026-10-17, Folge von F45):** `maxSafeKey = n − 2^b + 1` sichert nur `base + 2^b − 1 ≤ n`, das letzte zulässige OpenCL-Raster endet also auf n. Dort stürzt nichts ab (der Kernel liefert für n·G Koordinaten, die zu keinem Eintrag passen), es wird nur ein sinnloser Schlüssel geprüft. Die Korrektur auf `n − 2^b` ändert drei Tests von `getMaxPrivateKeyForBatchSize` und die Grenze von `PrivateKeyTooLargeException` – erst mit Rückmeldung des Nutzers, da kein Fehlverhalten außer einem verschwendeten Rasterplatz.
 - **`KeyProducerJavaIncremental`, Teilbatch am Bereichsende (2026-10-17):** `endPrivateKey` heißt in `CKeyProducerJavaIncremental` „inclusive upper bound“, aber mit `returnStartSecretOnly=false` wirft der letzte, nur teilweise in den Bereich passende Batch und die bis zu `overallWorkSize-1` Schlüssel davor werden nie geprüft; mit `returnStartSecretOnly=true` (OpenCL) läuft der Batch dagegen über das Ende hinaus. Beides legen die Tests ausdrücklich fest (Fälle 3, 5, 8, 9 der Tabelle in `KeyProducerJavaIncrementalTest`), also eine Designentscheidung – für den Nutzer zur Entscheidung, nicht angefasst.
