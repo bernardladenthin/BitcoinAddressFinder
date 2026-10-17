@@ -93,7 +93,10 @@ public class ConsumerJava implements Consumer {
     private final KeyUtility keyUtility;
     /** Total number of address lookups performed. */
     protected final AtomicLong checkedKeys = new AtomicLong();
-    /** Cumulative time spent inside the persistence's {@code containsAddress} calls (ms). */
+    /**
+     * Cumulative time spent inside the persistence's {@code containsAddress} calls, in nanoseconds: a
+     * lookup takes micro- to nanoseconds, so a millisecond clock measured almost every one as 0.
+     */
     protected final AtomicLong checkedKeysSumOfTimeToCheckContains = new AtomicLong();
     /**
      * Number of consume cycles in which the consumer found no work and was therefore ready
@@ -1014,13 +1017,13 @@ public class ConsumerJava implements Consumer {
     }
 
     private boolean containsAddress(ByteBuffer hash160AsByteBuffer) {
-        long timeBefore = System.currentTimeMillis();
+        long timeBefore = System.nanoTime();
         if (LOGGER.isTraceEnabled()) {
             LOGGER.trace("Time before lookup.containsAddress: " + timeBefore);
         }
         AddressPresence localLookup = Objects.requireNonNull(lookup);
         boolean containsAddress = localLookup.containsAddress(hash160AsByteBuffer);
-        long timeAfter = System.currentTimeMillis();
+        long timeAfter = System.nanoTime();
         long timeDelta = timeAfter - timeBefore;
         checkedKeys.incrementAndGet();
         checkedKeysSumOfTimeToCheckContains.addAndGet(timeDelta);

@@ -1876,7 +1876,7 @@ are fully configurable (see [Customizing Log Output](#customizing-log-output)).
 A statistics line looks like this:
 
 ```
-Statistics: [uptime 43 min] [Generated 128.0 M/s (333258 M total)] [-> LMDB 2.000 M/s (5196 M lookups total), 99.22% pre-filtered] [rate window 60s] [Keys per producer: exampleKeyProducerSecureRandomId (Random, GPU)=333.3 G (100.0%)] [Producers running: 1] [Consumers running: 8] [Consumer ready for work (queue empty): 167939] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]
+Statistics: [uptime 43 min] [Generated 128.0 M/s (333258 M total)] [-> LMDB 2.000 M/s (5196 M lookups total), 99.22% pre-filtered] [rate window 60s] [Keys per producer: exampleKeyProducerSecureRandomId (Random, GPU)=333.3 G (100.0%)] [Producers running: 1] [Consumers running: 8] [Consumer ready for work (queue empty): 167939] [Producer blocked (queue full): 0] [Average contains time: 0 ns] [keys queue size: 0] [Hits: 0]
 ```
 
 | Field | Meaning |
@@ -1890,7 +1890,7 @@ Statistics: [uptime 43 min] [Generated 128.0 M/s (333258 M total)] [-> LMDB 2.00
 | `Consumers running: N` | Number of consumer worker threads currently running (≤ `consumerJava.threads`). |
 | `Consumer ready for work (queue empty): N` | **Runtime health counter — rising is normal/healthy.** Consume cycles that found the queue empty and waited. An empty queue is the *desired* state: it means the CPU drains everything the producers generate and has headroom. See below. |
 | `Producer blocked (queue full): N` | **Runtime health counter — rising is the warning sign.** Times a producer hit a full queue and had to wait, i.e. the CPU can't keep up (CPU-bound). See below. |
-| `Average contains time: N ms` | Mean time spent per address-presence lookup. Large values point at a slow lookup backend (see [Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend)). |
+| `Average contains time: N ns` | Mean time spent per address-presence lookup. Large values point at a slow lookup backend (see [Address Lookup Backends](#-pluggable-address-lookup-backends-addresslookupbackend)). |
 | `keys queue size: N` | Instantaneous depth of the producer→consumer queue (bounded by `consumerJava.queueSize`). |
 | `Hits: N` | Number of address matches found so far (see [Hit Logging](#hit-logging)). |
 

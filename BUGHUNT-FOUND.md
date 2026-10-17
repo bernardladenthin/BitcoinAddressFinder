@@ -11,7 +11,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F04](#f04) — niedrig — *gefixt*
 - [F08](#f08) — hoch — *gefixt*
 - [F10](#f10) — mittel — *gefixt*
-- [F11](#f11) — niedrig — *nur beschrieben*
+- [F11](#f11) — niedrig — *gefixt*
 - [F14](#f14) — hoch — *gefixt*
 - [F15](#f15) — hoch — *gefixt*
 - [F19](#f19) — hoch — *gefixt*
@@ -68,9 +68,11 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Schwere:** niedrig (falsche Kennzahl, kein Funktionsfehler)
 - **Beschreibung:** Jede einzelne Adressabfrage wird mit Millisekunden-Auflösung umklammert. Eine LMDB-/Filter-Abfrage dauert Mikro- bis Nanosekunden, das Delta ist daher fast immer 0 (gelegentlich 1 durch einen Millisekunden-Wechsel). Die Summe geteilt durch die Abfragen ergibt dauerhaft „Average contains time: 0 ms“. Die Statistikzeile zeigt also eine Größe, die nichts misst. Fix wäre `System.nanoTime()` plus Ausgabe in µs/ns – das ändert das Log-Format und den Hot Path, deshalb nicht angefasst.
 - **Nebenbei (kosmetisch):** `Statistics.withSignificantDigits` rundet an der Einheitengrenze über: 999 960/s → „1000.0 k/s“ statt „1.000 M/s“.
-- **Reproduktion:** keine (Messauflösung, aus dem Code ersichtlich)
-- **Status:** nur beschrieben
-- **Commit:** –
+- **Reproduktion:** `ConsumerJavaTest#containsAddress_lookupsFasterThanAMillisecond_sumOfTimeIsStillMeasured` (eine Abfrage, die 200 µs aktiv wartet, fünfmal)
+- **Fix:** `containsAddress` misst mit `System.nanoTime()` und summiert Nanosekunden; die Statistikzeile meldet „Average contains time: N ns“. README-Beispiel und -Tabelle sowie die erwarteten Zeichenketten in `ConsumerJavaTest`/`StatisticsTest` angepasst. Achtung, sichtbare Formatänderung: Wer die Logzeile maschinell liest, sieht jetzt `ns` statt `ms`.
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is a value equal to or greater than <1000000L> but: <1L> was less than <1000000L>“), mit Fix grün; `ConsumerJavaTest` 35/35, `StatisticsTest` 11/11 (skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** siehe Git-Log („Measure the address lookup time in nanoseconds“)
 
 <a id="f14"></a>
 ### F14 – BAF: BIP39-Producer hält jeden abgeleiteten Schlüssel im Speicher → OutOfMemory bei langen Läufen

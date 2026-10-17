@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder.consumer;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.core.StringStartsWith.startsWith;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
@@ -20,6 +21,7 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.AwaitTimeTest;
 import net.ladenthin.bitcoinaddressfinder.AwaitTimeTests;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
@@ -32,6 +34,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOn
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerJava;
@@ -109,6 +112,40 @@ public class ConsumerJavaTest {
         boolean present =
                 consumerJava.containsAddress(reuseable, new byte[OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES]);
         assertThat(present, is(false));
+    }
+
+    @Test
+    public void containsAddress_lookupsFasterThanAMillisecond_sumOfTimeIsStillMeasured() {
+        // arrange: a lookup that takes 200 µs, far below the millisecond clock's resolution
+        final long lookupNanos = TimeUnit.MICROSECONDS.toNanos(200);
+        final int lookups = 5;
+        ConsumerJava consumerJava = new ConsumerJava(new CConsumerJava(), keyUtility, persistenceUtils);
+        consumerJava.initWithLookup(new AddressPresence() {
+            @Override
+            public boolean containsAddress(ByteBuffer hash160) {
+                final long end = System.nanoTime() + lookupNanos;
+                while (System.nanoTime() < end) {
+                    Thread.onSpinWait();
+                }
+                return false;
+            }
+
+            @Override
+            public boolean requiresBackend() {
+                return false;
+            }
+        });
+        ByteBuffer reuseable = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
+
+        // act
+        for (int i = 0; i < lookups; i++) {
+            consumerJava.containsAddress(reuseable, new byte[OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES]);
+        }
+
+        // assert: every lookup took at least lookupNanos, and the sum is kept in nanoseconds
+        assertThat(
+                consumerJava.checkedKeysSumOfTimeToCheckContains.get(),
+                is(greaterThanOrEqualTo(lookups * lookupNanos)));
     }
 
     @Test
@@ -421,7 +458,7 @@ public class ConsumerJavaTest {
                     arguments,
                     hasItem(
                             equalTo(
-                                    "Statistics: [uptime 0 min] [Generated 0/s (0 M total)] [-> LMDB 0/s (0 M lookups total)] [rate window 60s] [Keys per producer: none] [Producers running: 0] [Consumers running: 0] [Consumer ready for work (queue empty): 0] [Producer blocked (queue full): 0] [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
+                                    "Statistics: [uptime 0 min] [Generated 0/s (0 M total)] [-> LMDB 0/s (0 M lookups total)] [rate window 60s] [Keys per producer: none] [Producers running: 0] [Consumers running: 0] [Consumer ready for work (queue empty): 0] [Producer blocked (queue full): 0] [Average contains time: 0 ns] [keys queue size: 0] [Hits: 0]")));
         }
     }
 

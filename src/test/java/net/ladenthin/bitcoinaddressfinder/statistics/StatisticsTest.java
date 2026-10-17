@@ -58,7 +58,7 @@ public class StatisticsTest {
                         + " exampleRandom (Random, CPU)=900.0 M (23.1%)]"
                         + " [Producers running: 2] [Consumers running: 4]"
                         + " [Consumer ready for work (queue empty): 4567]"
-                        + " [Producer blocked (queue full): 1234] [Average contains time: 3 ms]"
+                        + " [Producer blocked (queue full): 1234] [Average contains time: 3 ns]"
                         + " [keys queue size: 5678] [Hits: 6789]")));
     }
 
@@ -96,7 +96,7 @@ public class StatisticsTest {
                         + " [-> LMDB 200.0 M/s (400 M lookups total)] [rate window 60s]"
                         + " [Keys per producer: none] [Producers running: 0] [Consumers running: 0]"
                         + " [Consumer ready for work (queue empty): 0] [Producer blocked (queue full): 0]"
-                        + " [Average contains time: 0 ms] [keys queue size: 0] [Hits: 0]")));
+                        + " [Average contains time: 0 ns] [keys queue size: 0] [Hits: 0]")));
     }
     // </editor-fold>
 
