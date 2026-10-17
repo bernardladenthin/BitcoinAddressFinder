@@ -332,7 +332,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `LMDBDeltaTest#run_interruptedBeforeTheDelta_doesNotReportTheDeltaAsDone`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: not a collection containing a string starting with "... delta done" but: was <[…, ... delta done: 0 address(es) written to …]>“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `LMDBDeltaTest` 13/13, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** –
+- **Commit:** BAF `20dde71`
 
 ## Offene Verdachte ohne Fund-ID
 
