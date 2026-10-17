@@ -79,4 +79,21 @@ public class LMDBCompactTest extends LMDBBase {
 
         assertThrows(IllegalArgumentException.class, () -> new LMDBCompact(config).run());
     }
+
+    /** A target that names the source through another spelling must be refused before anything is deleted. */
+    @Test
+    public void compactLMDB_targetIsSourceSpelledDifferently_throwsAndKeepsTheSourceDatabase() throws Exception {
+        StaticAddressesFiles staticAddressesFiles = new StaticAddressesFiles();
+        File sourceDirectory = new TestAddressesLMDB().createTestLMDB(folder, staticAddressesFiles, true, false);
+        File sourceDataFile = new File(sourceDirectory, "data.mdb");
+        long sourceBytes = sourceDataFile.length();
+
+        CCompactLMDB config = new CCompactLMDB();
+        config.lmdbConfigurationReadOnly.lmdbDirectory = sourceDirectory.getAbsolutePath();
+        config.targetDirectory = new File(sourceDirectory, ".").getPath();
+
+        assertThrows(IllegalArgumentException.class, () -> new LMDBCompact(config).run());
+        assertThat(sourceDataFile.exists(), is(true));
+        assertThat(sourceDataFile.length(), is(equalTo(sourceBytes)));
+    }
 }

@@ -4,6 +4,8 @@
 package net.ladenthin.bitcoinaddressfinder.command;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CCompactLMDB;
@@ -55,7 +57,9 @@ public class LMDBCompact implements Runnable, Interruptable {
         String sourceDirectory = compactLMDB.lmdbConfigurationReadOnly.lmdbDirectory;
         File targetDirectory = new File(compactLMDB.targetDirectory);
 
-        if (targetDirectory.getAbsolutePath().equals(new File(sourceDirectory).getAbsolutePath())) {
+        // canonical, not absolute: "<source>/." or a symlink to the source would otherwise pass, and the
+        // delete below would remove the source database itself
+        if (canonical(targetDirectory).equals(canonical(new File(sourceDirectory)))) {
             throw new IllegalArgumentException(
                     "targetDirectory must differ from the source lmdbDirectory: " + targetDirectory);
         }
@@ -100,6 +104,14 @@ public class LMDBCompact implements Runnable, Interruptable {
                 LOGGER.warn("Compaction entry-count MISMATCH for " + targetDataFile + ": source " + sourceEntries
                         + " vs compacted " + compactedEntries + " — do NOT use this copy.");
             }
+        }
+    }
+
+    private static File canonical(File file) {
+        try {
+            return file.getCanonicalFile();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Cannot resolve the path " + file, e);
         }
     }
 
