@@ -4,8 +4,11 @@
 package net.ladenthin.bitcoinaddressfinder.command;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 
 import java.io.File;
 import java.io.IOException;
@@ -19,9 +22,13 @@ import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
 import net.ladenthin.bitcoinaddressfinder.LMDBBase;
 import net.ladenthin.bitcoinaddressfinder.LMDBHandle;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFileOutputFormat;
+import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBToAddressFile;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
+import nl.altindag.log.LogCaptor;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -29,6 +36,28 @@ public class LMDBToAddressFileTest extends LMDBBase {
 
     @BeforeEach
     public void init() throws IOException {}
+
+    /** An export stopped by {@code interrupt()} is incomplete and must not be reported as done. */
+    @Test
+    public void run_interruptedBeforeTheExport_doesNotReportTheExportAsDone() throws Exception {
+        // arrange
+        File lmdbDirectory =
+                new TestAddressesLMDB().createTestLMDB(folder, new TestAddressesFiles(false), false, false);
+        CLMDBToAddressFile configuration = new CLMDBToAddressFile();
+        configuration.lmdbConfigurationReadOnly.lmdbDirectory = lmdbDirectory.getAbsolutePath();
+        configuration.addressesFile = folder.resolve("export.txt").toFile().getAbsolutePath();
+        LMDBToAddressFile lmdbToAddressFile = new LMDBToAddressFile(configuration);
+        lmdbToAddressFile.interrupt();
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(LMDBToAddressFile.class)) {
+            // act
+            lmdbToAddressFile.run();
+
+            // assert
+            assertThat(logCaptor.getInfoLogs(), not(hasItem("writeAllAmounts done")));
+            assertThat(logCaptor.getWarnLogs(), hasItem(containsString("interrupted")));
+        }
+    }
 
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_COMPRESSED_AND_STATIC_AMOUNT)
