@@ -227,7 +227,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `AbstractPlaintextFileTest#readFile_moreFailingLinesThanKept_keepsTheFirstLinesAndCountsAll`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: a collection with size <100> but: collection size was <105>“), mit Fix grün 11/11 (skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `ReadStatisticTest` 15/15, `SecretsFileTest` 10/10, `AddressFileTest` 11/11, `ProducerJavaSecretsFilesTest` 11/11, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün. `AddressFilesToLMDB` führt eine eigene Fehlerliste, die es im Abschluss Zeile für Zeile ausgibt; die ist ebenfalls unbegrenzt, wird aber tatsächlich benutzt und bleibt unverändert.
 - **Status:** gefixt
-- **Commit:** siehe Git-Log („Bound the failed lines a plaintext file keeps“)
+- **Commit:** BAF `be8ff36`
 
 ## Offene Verdachte ohne Fund-ID
 
