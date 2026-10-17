@@ -30,6 +30,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F42](#f42) — mittel — *gefixt*
 - [F43](#f43) — mittel — *gefixt*
 - [F44](#f44) — niedrig — *gefixt*
+- [F45](#f45) — mittel — *gefixt*
 
 ## Funde
 
@@ -282,6 +283,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** BAF `b94d720`
 
+<a id="f45"></a>
+### F45 – BAF: die Gruppenordnung n gilt als gültiger privater Schlüssel – der CPU-Producer stürzt ab, wenn ein Raster n erreicht
+- **Zeit:** 2026-10-17 18:55 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/util/PrivateKeyValidator.java:88` (`isOutsidePrivateKeyRange`), `constants/Secp256k1Constants.java:76` (Javadoc), `producer/ProducerJava.java:89` (`createGrid`)
+- **Schwere:** mittel
+- **Beschreibung:** `MAX_PRIVATE_KEY` ist die Gruppenordnung n (`…D0364141`), seine Javadoc nannte sie aber den „maximum valid private key“, und `isOutsidePrivateKeyRange` ließ n durch (`compareTo(n) > 0`). Gültige Schlüssel sind 1 bis n−1 (SEC 2; das Bitcoin-Wiki, das die Javadoc von `Producer.produceKeys` wiedergibt, nennt als Obergrenze `…4140` = n−1): n·G ist der Punkt im Unendlichen. bitcoinj liefert dafür einen 1-Byte-Public-Key, und `PublicKeyBytes.fromPrivate(n)` wirft `ArrayIndexOutOfBoundsException`. `ProducerJava.createGrid` prüft jeden Rasterschlüssel mit genau diesem Validator; ein Raster, das n erreicht, beendet also den Producer mit einer Exception – zum Beispiel der inkrementelle Producer, dessen voreingestelltes Bereichsende `MAX_PRIVATE_KEY_HEX` ist, wenn er das Ende erreicht. `AbstractProducer.replaceInvalidPrivateKeys` und der Consumer ließen n ebenso durch.
+- **Fix:** Die Obergrenze ist exklusiv (`compareTo(n) >= 0` → außerhalb). Javadoc von `MAX_PRIVATE_KEY`/`MAX_PRIVATE_KEY_HEX`, `PrivateKeyValidator.isOutsidePrivateKeyRange` und `Producer.produceKeys` korrigiert. Zwei Tests, die n ausdrücklich als gültig festschrieben (`isOutsidePrivateKeyRange_maxPrivateKey_returnsFalse`, `replaceInvalidPrivateKeys_allValidKeys_keepsOriginalValues`), prüfen jetzt n−1 als gültig und n als ungültig. Der Konstantenname bleibt.
+- **Reproduktion:** `ProducerJavaTest#createGrid_gridReachesTheGroupOrder_marksItInvalidAndKeepsTheKeyBelow` (Raster n−1, n, n+1, n+2 mit `batchSizeInBits` 2), dazu `PrivateKeyValidatorTest#isOutsidePrivateKeyRange_groupOrder_returnsTrue`.
+- **Rot-Grün-Nachweis:** ohne Fix rot (`java.lang.ArrayIndexOutOfBoundsException: Index 64 out of bounds for length 1` aus `PublicKeyBytes.fromPrivate`), mit Fix grün; Gegenprobe per `git stash` des Validators rot mit derselben Exception, nach `stash pop` grün. Breit: `PrivateKeyValidatorTest` 22/22, `ProducerJavaTest` 9/9, `AbstractProducerTest` 20/20, `PublicKeyBytesTest` 32/32, `KeyUtilityTest` 58 (1 seit langem `@Disabled`), `ConsumerJavaTest` 35 (8 LMDB/OpenCL-abhängig übersprungen), `KeyProducerJavaIncrementalTest` 10/10, `PrivateKeyTooLargeExceptionTest` 11/11, `CKeyProducerJavaIncrementalTest` 9/9, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** –
+
 ## Offene Verdachte ohne Fund-ID
 
+- **`PrivateKeyValidator.getMaxPrivateKeyForBatchSize` lässt n im GPU-Raster zu (2026-10-17, Folge von F45):** `maxSafeKey = n − 2^b + 1` sichert nur `base + 2^b − 1 ≤ n`, das letzte zulässige OpenCL-Raster endet also auf n. Dort stürzt nichts ab (der Kernel liefert für n·G Koordinaten, die zu keinem Eintrag passen), es wird nur ein sinnloser Schlüssel geprüft. Die Korrektur auf `n − 2^b` ändert drei Tests von `getMaxPrivateKeyForBatchSize` und die Grenze von `PrivateKeyTooLargeException` – erst mit Rückmeldung des Nutzers, da kein Fehlverhalten außer einem verschwendeten Rasterplatz.
 - **`KeyProducerJavaIncremental`, Teilbatch am Bereichsende (2026-10-17):** `endPrivateKey` heißt in `CKeyProducerJavaIncremental` „inclusive upper bound“, aber mit `returnStartSecretOnly=false` wirft der letzte, nur teilweise in den Bereich passende Batch und die bis zu `overallWorkSize-1` Schlüssel davor werden nie geprüft; mit `returnStartSecretOnly=true` (OpenCL) läuft der Batch dagegen über das Ende hinaus. Beides legen die Tests ausdrücklich fest (Fälle 3, 5, 8, 9 der Tabelle in `KeyProducerJavaIncrementalTest`), also eine Designentscheidung – für den Nutzer zur Entscheidung, nicht angefasst.
