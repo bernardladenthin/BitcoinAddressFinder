@@ -45,7 +45,9 @@ public class CLMDBConfigurationWrite extends CLMDBConfigurationReadOnly {
     public boolean increaseMapAutomatically = true;
 
     /**
-     * LMDB site increase in MiB (e.g. 1024). Attention: If the value is too low, the increase for a full db was not enough and a {@link org.lmdbjava.Env.MapFullException} will be thrown.
+     * LMDB size increase step in MiB (e.g. 1024). A write that does not fit grows the map by this step
+     * as often as needed, so a small value costs more remaps but never fails the write; {@code 0}
+     * disables growth like {@link #increaseMapAutomatically} {@code = false}.
      */
     public long increaseSizeInMiB = 8;
 }
