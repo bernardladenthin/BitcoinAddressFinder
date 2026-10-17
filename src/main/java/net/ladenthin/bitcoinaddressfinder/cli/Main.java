@@ -77,6 +77,9 @@ public class Main implements Runnable, Interruptable {
     /** SLF4J logger for the CLI entry point. */
     private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
 
+    /** The UTF-8 byte order mark as a decoded character; Windows editors write it at the start of a file. */
+    private static final char BYTE_ORDER_MARK = '\uFEFF';
+
     // List of registered Interruptables — mutable list of stateful coordinators, recursive/heavy.
     @ToString.Exclude
     private final List<Interruptable> interruptables = new ArrayList<>();
@@ -110,14 +113,19 @@ public class Main implements Runnable, Interruptable {
     }
 
     /**
-     * Reads the entire contents of {@code path} as a string using UTF-8.
+     * Reads the entire contents of {@code path} as a string using UTF-8, without a leading byte
+     * order mark. Windows editors write one, and Jackson's JSON parser rejects it.
      *
      * @param path the file to read
      * @return the file contents
      * @throws IOException if the file cannot be read
      */
     public static String readString(Path path) throws IOException {
-        return Files.readString(path, StandardCharsets.UTF_8);
+        String content = Files.readString(path, StandardCharsets.UTF_8);
+        if (!content.isEmpty() && content.charAt(0) == BYTE_ORDER_MARK) {
+            return content.substring(1);
+        }
+        return content;
     }
 
     /**

@@ -29,6 +29,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F41](#f41) — niedrig — *gefixt*
 - [F42](#f42) — mittel — *gefixt*
 - [F43](#f43) — mittel — *gefixt*
+- [F44](#f44) — niedrig — *gefixt*
 
 ## Funde
 
@@ -269,7 +270,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** BAF `fa1d418`
 
+<a id="f44"></a>
+### F44 – BAF: JSON-Konfiguration mit UTF-8-BOM lässt sich nicht laden
+- **Zeit:** 2026-10-17 18:35 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/cli/Main.java:119` (`readString`)
+- **Schwere:** niedrig
+- **Beschreibung:** Musterdurchsicht nach F42/F43. `readString` gibt den Dateiinhalt unverändert an Jackson; `ObjectMapper` lehnt ein führendes U+FEFF ab, `YAMLMapper` überspringt es. Eine im Windows-Editor gespeicherte `.json`/`.js`-Konfiguration bricht den Start deshalb mit `JsonParseException` ab. Laut und mit klarer Meldung, aber ohne Grund.
+- **Fix:** `readString` entfernt ein führendes U+FEFF; Javadoc ergänzt.
+- **Reproduktion:** `MainTest#loadConfiguration_jsonFileWithUtf8ByteOrderMark_returnsExpectedConfiguration`
+- **Rot-Grün-Nachweis:** ohne Fix rot („JsonParse Unexpected character ('?' (code 65279 / 0xfeff)): expected a valid value“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `MainTest` 18 Tests (6 OpenCL-Tests überspringen sich ohne Gerät, wie zuvor), `ConfigFixturesParseTest` 3/3, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** –
+
 ## Offene Verdachte ohne Fund-ID
 
-- **JSON-Konfiguration mit UTF-8-BOM (2026-10-17):** `cli/Main.readString` reicht den Dateiinhalt unverändert an Jackson; `ObjectMapper` lehnt ein führendes U+FEFF ab („Unexpected character (code 65279 / 0xfeff)“), `YAMLMapper` überspringt es (in der Sandbox geprüft). Eine mit BOM gespeicherte `.json`-Konfiguration startet also nicht – laut, mit klarer Meldung, aber vermeidbar. Kandidat für die nächste Runde.
 - **`KeyProducerJavaIncremental`, Teilbatch am Bereichsende (2026-10-17):** `endPrivateKey` heißt in `CKeyProducerJavaIncremental` „inclusive upper bound“, aber mit `returnStartSecretOnly=false` wirft der letzte, nur teilweise in den Bereich passende Batch und die bis zu `overallWorkSize-1` Schlüssel davor werden nie geprüft; mit `returnStartSecretOnly=true` (OpenCL) läuft der Batch dagegen über das Ende hinaus. Beides legen die Tests ausdrücklich fest (Fälle 3, 5, 8, 9 der Tabelle in `KeyProducerJavaIncrementalTest`), also eine Designentscheidung – für den Nutzer zur Entscheidung, nicht angefasst.

@@ -208,6 +208,20 @@ public class MainTest {
         Main.main(new String[] {config_OpenCLInfo_yml.toAbsolutePath().toString()});
     }
 
+    /** Windows editors write UTF-8 with a leading byte order mark; a JSON configuration must still load. */
+    @Test
+    public void loadConfiguration_jsonFileWithUtf8ByteOrderMark_returnsExpectedConfiguration() throws IOException {
+        // arrange
+        Path configurationPath = folder.resolve("config.json");
+        Files.writeString(configurationPath, "\uFEFF" + OPEN_CL_INFO_JSON_STRING, StandardCharsets.UTF_8);
+
+        // act
+        CConfiguration configuration = Main.loadConfiguration(configurationPath);
+
+        // assert
+        assertThat(configuration.command, is(equalTo(CCommand.OpenCLInfo)));
+    }
+
     @Test
     public void main_unknownExtensionPath_throwsIllegalArgumentException() throws IOException {
         // arrange
