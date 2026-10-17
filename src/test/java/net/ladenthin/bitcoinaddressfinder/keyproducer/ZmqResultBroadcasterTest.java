@@ -13,6 +13,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.util.List;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.core.BatchResult;
 import net.ladenthin.bitcoinaddressfinder.core.Hit;
 import org.junit.jupiter.api.Test;
@@ -73,6 +78,50 @@ class ZmqResultBroadcasterTest {
             assertThat(message.get("secretBase").asText(), is(equalTo("4000")));
             assertThat(message.get("checkedCount").asInt(), is(equalTo(4096)));
         } finally {
+            broadcaster.close();
+        }
+    }
+
+    @Test
+    void onBatchChecked_calledFromSeveralConsumerThreads_everyCallReturns() throws Exception {
+        // arrange: ConsumerJava notifies its listeners from consumerJava.threads worker threads,
+        // and a ZeroMQ socket is not thread-safe. Unserialised, concurrent sends corrupted jeromq's
+        // pipe state (IndexOutOfBoundsException inside the send path) and left the senders spinning
+        // forever, i.e. the consumer threads stopped checking keys.
+        final String address = "tcp://127.0.0.1:" + freePort();
+        final ZmqResultBroadcaster broadcaster = new ZmqResultBroadcaster(address);
+        final int threads = 8;
+        final int callsPerThread = 200;
+        final ExecutorService executor = Executors.newFixedThreadPool(threads);
+        try (ZContext context = new ZContext()) {
+            final ZMQ.Socket subscriber = connectSubscriber(context, address);
+            assertThat(
+                    receiveWhilePublishing(
+                            subscriber,
+                            () -> broadcaster.onBatchChecked(new BatchResult(BigInteger.ONE, 1, List.of()))),
+                    is(notNullValue()));
+            final CyclicBarrier start = new CyclicBarrier(threads);
+
+            // act
+            for (int t = 0; t < threads; t++) {
+                executor.execute(() -> {
+                    try {
+                        start.await();
+                    } catch (InterruptedException | BrokenBarrierException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                    for (int i = 0; i < callsPerThread; i++) {
+                        broadcaster.onBatchChecked(new BatchResult(BigInteger.valueOf(i), 1, List.of()));
+                    }
+                });
+            }
+            executor.shutdown();
+
+            // assert
+            assertThat(executor.awaitTermination(AWAIT_MILLIS, TimeUnit.MILLISECONDS), is(true));
+        } finally {
+            executor.shutdownNow();
             broadcaster.close();
         }
     }

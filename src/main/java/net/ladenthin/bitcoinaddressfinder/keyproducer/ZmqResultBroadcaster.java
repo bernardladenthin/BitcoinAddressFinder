@@ -82,6 +82,19 @@ public class ZmqResultBroadcaster implements ResultListener, AutoCloseable {
     private final AtomicInteger batchesSinceConfigRepublish = new AtomicInteger();
 
     /**
+     * Serialises every use of {@link #publisher}. A ZeroMQ socket is not thread-safe, and
+     * {@link #onBatchChecked(BatchResult)} is called from all of the consumer's worker threads
+     * while {@link #close()} comes from the shutdown path: unserialised, concurrent sends corrupted
+     * jeromq's pipe state and left the sending consumer threads spinning forever.
+     */
+    @ToString.Exclude
+    private final Object socketLock = new Object();
+
+    /** Set by {@link #close()} under {@link #socketLock}; a send after it is skipped. */
+    @ToString.Exclude
+    private boolean closed;
+
+    /**
      * Creates a publisher bound to the given address.
      *
      * @param publishAddress the ZeroMQ address to bind the {@code PUB} socket to
@@ -161,8 +174,14 @@ public class ZmqResultBroadcaster implements ResultListener, AutoCloseable {
      * @param message the message to publish
      */
     private void send(String message) {
+        final byte[] bytes = message.getBytes(StandardCharsets.UTF_8);
         try {
-            publisher.send(message.getBytes(StandardCharsets.UTF_8), ZMQ.DONTWAIT);
+            synchronized (socketLock) {
+                if (closed) {
+                    return;
+                }
+                publisher.send(bytes, ZMQ.DONTWAIT);
+            }
         } catch (RuntimeException e) {
             // Called from the consumer's worker threads: a transport failure must not disturb the scan.
             LOGGER.warn("Publishing a result failed; continuing.", e);
@@ -171,7 +190,13 @@ public class ZmqResultBroadcaster implements ResultListener, AutoCloseable {
 
     @Override
     public void close() {
-        publisher.close();
-        context.close();
+        synchronized (socketLock) {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            publisher.close();
+            context.close();
+        }
     }
 }
