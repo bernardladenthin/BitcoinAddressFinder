@@ -45,7 +45,14 @@ public class OpenClLibraryLoader {
     private final ClLibraryInitializer libraryInitializer;
 
     /** Guards against repeating the load once it has succeeded through this loader. */
-    private boolean loaded = false;
+    private volatile boolean loaded = false;
+
+    /**
+     * Serializes {@link #ensureLoaded()}: two threads making their first OpenCL call at once would
+     * otherwise both initialize, and LWJGL refuses a second {@code CL.create()}.
+     */
+    @ToString.Exclude
+    private final Object loadLock = new Object();
 
     /**
      * Creates a new loader.
@@ -72,36 +79,38 @@ public class OpenClLibraryLoader {
      * @throws OpenClLibraryUnavailableException if no candidate could be loaded
      */
     public void ensureLoaded() {
-        if (loaded || libraryInitializer.isCreated()) {
-            return;
-        }
+        synchronized (loadLock) {
+            if (loaded || libraryInitializer.isCreated()) {
+                return;
+            }
 
-        @Nullable UnsatisfiedLinkError lastFailure = null;
-        try {
-            libraryInitializer.create();
-            loaded = true;
-            return;
-        } catch (UnsatisfiedLinkError e) {
-            lastFailure = e;
-            LOGGER.debug("Default OpenCL library name did not resolve, trying fallback names", e);
-        }
-
-        for (String libraryName : FALLBACK_LIBRARY_NAMES) {
+            @Nullable UnsatisfiedLinkError lastFailure = null;
             try {
-                libraryInitializer.create(libraryName);
+                libraryInitializer.create();
                 loaded = true;
-                LOGGER.info("Loaded the OpenCL library under the fallback name {}", libraryName);
                 return;
             } catch (UnsatisfiedLinkError e) {
                 lastFailure = e;
-                LOGGER.debug("OpenCL library name {} did not resolve", libraryName, e);
+                LOGGER.debug("Default OpenCL library name did not resolve, trying fallback names", e);
             }
-        }
 
-        throw new OpenClLibraryUnavailableException(
-                "Unable to load the native OpenCL library. Tried the default name and " + FALLBACK_LIBRARY_NAMES
-                        + ". Install an OpenCL driver (ICD) for your device.",
-                lastFailure);
+            for (String libraryName : FALLBACK_LIBRARY_NAMES) {
+                try {
+                    libraryInitializer.create(libraryName);
+                    loaded = true;
+                    LOGGER.info("Loaded the OpenCL library under the fallback name {}", libraryName);
+                    return;
+                } catch (UnsatisfiedLinkError e) {
+                    lastFailure = e;
+                    LOGGER.debug("OpenCL library name {} did not resolve", libraryName, e);
+                }
+            }
+
+            throw new OpenClLibraryUnavailableException(
+                    "Unable to load the native OpenCL library. Tried the default name and " + FALLBACK_LIBRARY_NAMES
+                            + ". Install an OpenCL driver (ICD) for your device.",
+                    lastFailure);
+        }
     }
 
     /**
