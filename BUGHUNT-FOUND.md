@@ -384,7 +384,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `ProducerReleaserTest#release_firstProducerFailsToRelease_releasesTheOthersAndRethrows`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <1> but: was <0>“ – der zweite Producer wurde nie freigegeben), mit Fix grün; Gegenprobe per `git stash` rot, nach `stash pop` grün. `ProducerReleaserTest` 4/4, `FinderTest` 22/22, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün (nach Aufnahme in die Unterdrückung; der Lauf davor war rot und wurde nicht gepusht).
 - **Status:** gefixt
-- **Commit:** –
+- **Commit:** BAF `338ec00`
 
 ## Offene Verdachte ohne Fund-ID
 
