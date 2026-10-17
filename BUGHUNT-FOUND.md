@@ -24,6 +24,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F32](#f32) — niedrig — *gefixt*
 - [F33](#f33) — niedrig — *gefixt*
 - [F34](#f34) — mittel — *gefixt*
+- [F35](#f35) — niedrig — *nur beschrieben*
 
 ## Funde
 
@@ -203,6 +204,16 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is null but: was <java.util.ConcurrentModificationException>“), mit Fix grün, `FinderTest` 22/22, `BitcoinAddressFinderArchitectureTest` 17/17; Gegenprobe per `git stash` rot, nach `stash pop` grün. `spotbugs:check` grün.
 - **Status:** gefixt
 - **Commit:** BAF `cf46353`
+
+<a id="f35"></a>
+### F35 – BAF: Javadoc begründet den GC vor dem GPU-Filter-Upload mit `CL_MEM_COPY_HOST_PTR`, das der Code nicht mehr nutzt
+- **Zeit:** 2026-10-17 16:24 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/opencl/GcTrigger.java:15` (Klassen-Javadoc „Why this exists in the upload path“), `opencl/OpenCLContext.java:466` (`reclaimHeapBeforeUpload`), `opencl/OpenCLContext.java:683` (`uploadGpuFilter`: „Two CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR buffers“)
+- **Schwere:** niedrig (nur Dokumentation)
+- **Beschreibung:** Die drei Javadocs begründen den GC vor dem Filter-Upload damit, dass der Treiber für `CL_MEM_COPY_HOST_PTR` einen Host-Staging-Bereich anheften muss. Der Code nutzt `CL_MEM_COPY_HOST_PTR` nicht mehr: Die Puffer werden mit `ClBufferFlags.READ_ONLY` angelegt und über `ClApi.writeBufferChunked` in Scheiben durch einen kleinen wiederverwendeten Staging-Puffer beschrieben (so auch CLAUDE.md, Abschnitt „OpenCL / GPU Code“). Die Doku beschreibt damit einen Mechanismus, den es nicht mehr gibt; ob der GC mit dem gestückelten Upload überhaupt noch nötig ist, ist offen (er ist harmlos, kostet einmalig Millisekunden). Verhalten korrekt: `reclaimHeapBeforeUpload()` läuft in `allocateFilterBuffers` unmittelbar vor `createBuffer`.
+- **Reproduktion:** keine – reine Dokumentationsabweichung, kein Verhalten, das ein Test rot machen könnte.
+- **Status:** nur beschrieben (Doku-Korrektur braucht nach der Loop-Regel „ohne roten Test kein Fix“ die Freigabe des Nutzers)
+- **Commit:** –
 
 ## Offene Verdachte ohne Fund-ID
 
