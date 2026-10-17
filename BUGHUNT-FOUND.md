@@ -28,6 +28,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F40](#f40) — mittel — *gefixt*
 - [F41](#f41) — niedrig — *gefixt*
 - [F42](#f42) — mittel — *gefixt*
+- [F43](#f43) — mittel — *gefixt*
 
 ## Funde
 
@@ -256,6 +257,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** BAF `b068ef1`
 
+<a id="f43"></a>
+### F43 – BAF: Adressimport (`AddressFilesToLMDB`) verliert die erste Adresse einer Datei mit UTF-8-BOM
+- **Zeit:** 2026-10-17 18:25 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/command/AddressFilesToLMDB.java:276` (`readFileLines`)
+- **Schwere:** mittel
+- **Beschreibung:** Musterdurchsicht nach F42. Der produktive Import liest Adressdateien nicht über `AbstractPlaintextFile` (dessen `AddressFile` nur in Tests benutzt wird), sondern mit einem eigenen `BufferedReader`. `InputStreamReader` mit UTF-8 entfernt eine Byte-Order-Mark nicht, die erste Zeile beginnt mit U+FEFF, wird als Format nicht erkannt und landet nur im „unsupported“-Zähler. Die erste Adresse einer mit BOM gespeicherten Datei fehlt also in der Datenbank – ein Treffer auf genau diese Adresse würde nie gemeldet.
+- **Fix:** Die erste Zeile jeder Datei verliert ein führendes U+FEFF, bevor sie in die Zeilen-Queue geht (wie F42). Die Fortschrittszählung `charsRead` bleibt auf der ungekürzten Zeile.
+- **Reproduktion:** `AddressFilesToLMDBTest#addressFilesToLMDB_fileWithUtf8ByteOrderMark_importsTheFirstAddress`
+- **Rot-Grün-Nachweis:** ohne Fix rot („the first address after the byte order mark was not imported – Expected: is <true> but: was <false>“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. Ganze Klasse `AddressFilesToLMDBTest` 25/25, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** –
+
 ## Offene Verdachte ohne Fund-ID
 
+- **JSON-Konfiguration mit UTF-8-BOM (2026-10-17):** `cli/Main.readString` reicht den Dateiinhalt unverändert an Jackson; `ObjectMapper` lehnt ein führendes U+FEFF ab („Unexpected character (code 65279 / 0xfeff)“), `YAMLMapper` überspringt es (in der Sandbox geprüft). Eine mit BOM gespeicherte `.json`-Konfiguration startet also nicht – laut, mit klarer Meldung, aber vermeidbar. Kandidat für die nächste Runde.
 - **`KeyProducerJavaIncremental`, Teilbatch am Bereichsende (2026-10-17):** `endPrivateKey` heißt in `CKeyProducerJavaIncremental` „inclusive upper bound“, aber mit `returnStartSecretOnly=false` wirft der letzte, nur teilweise in den Bereich passende Batch und die bis zu `overallWorkSize-1` Schlüssel davor werden nie geprüft; mit `returnStartSecretOnly=true` (OpenCL) läuft der Batch dagegen über das Ende hinaus. Beides legen die Tests ausdrücklich fest (Fälle 3, 5, 8, 9 der Tabelle in `KeyProducerJavaIncrementalTest`), also eine Designentscheidung – für den Nutzer zur Entscheidung, nicht angefasst.

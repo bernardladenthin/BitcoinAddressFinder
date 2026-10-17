@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
@@ -275,6 +276,32 @@ public class AddressFilesToLMDBTest extends LMDBBase {
             for (P2PKH staticTestAddress : P2PKH.values()) {
                 assertThat(lmdb.containsAddress(staticTestAddress.getPublicKeyHashAsByteBuffer()), is(true));
             }
+        } finally {
+            lmdb.close();
+        }
+    }
+
+    /** Windows editors write UTF-8 with a leading byte order mark; the first address must still be imported. */
+    @Test
+    public void addressFilesToLMDB_fileWithUtf8ByteOrderMark_importsTheFirstAddress() throws Exception {
+        List<String> addresses = base58P2PKHAddresses();
+        File file = folder.resolve("bom.txt").toFile();
+        byte[] bom = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+        byte[] body = String.join("\n", addresses).getBytes(StandardCharsets.UTF_8);
+        byte[] content = new byte[bom.length + body.length];
+        System.arraycopy(bom, 0, content, 0, bom.length);
+        System.arraycopy(body, 0, content, bom.length, body.length);
+        Files.write(file.toPath(), content);
+
+        File lmdbDir = runImport(1, true, List.of(file.getAbsolutePath()), "bom");
+
+        LMDBPersistence lmdb = openReadOnly(lmdbDir);
+        try {
+            assertThat(
+                    "the first address after the byte order mark was not imported",
+                    lmdb.containsAddress(P2PKH.values()[0].getPublicKeyHashAsByteBuffer()),
+                    is(true));
+            assertThat(lmdb.count(), is(equalTo((long) addresses.size())));
         } finally {
             lmdb.close();
         }
