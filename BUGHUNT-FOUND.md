@@ -36,6 +36,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F48](#f48) — niedrig — *gefixt*
 - [F49](#f49) — niedrig — *gefixt*
 - [F50](#f50) — niedrig — *gefixt*
+- [F51](#f51) — niedrig — *gefixt*
 
 ## Funde
 
@@ -359,6 +360,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** mit Naht, ohne Fix rot („Expected: is <0> but: was <3>“ – alle drei Secrets gelesen), die übrigen 12 Tests der Klasse grün (Naht verhaltensneutral); mit Fix grün; Gegenprobe (nur die Nachprüfung entfernt, Naht behalten) wieder rot, danach grün. `ProducerJavaSecretsFilesTest` 13/13, `AbstractProducerTest` 20/20, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
 - **Commit:** BAF `e245947`
+
+<a id="f51"></a>
+### F51 – BAF: BIP39-Producer kürzt die abgeleiteten Schlüssel, wenn `privateKeyMaxNumBits` < 256
+- **Zeit:** 2026-10-17 20:30 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/KeyProducerJavaBip39.java:33` (Konstruktor), Ursache in `secret/RandomSecretSupplier` + `BIP39KeyProducer.nextBytes`
+- **Schwere:** niedrig
+- **Beschreibung:** `KeyProducerJavaBip39` erbt `privateKeyMaxNumBits` aus `CKeyProducerJava` (dort für den Zufallsproducer gedacht, z. B. Puzzle-Bereiche) und reicht es an `new BigInteger(bits, BIP39KeyProducer)` weiter. `BigInteger` holt sich dafür `ceil(bits / 8)` Bytes und maskiert das oberste; `BIP39KeyProducer.nextBytes` liefert die führenden Bytes des nächsten abgeleiteten Schlüssels. Mit 64 Bit war das erste Secret `e284129cc0922579` statt des abgeleiteten Schlüssels `e284129c…222cc372` (in der Sandbox geprüft) – also weder ein BIP39-Schlüssel noch ein gleichverteilter Zufallswert, ohne jeden Hinweis. Die README listet das Feld beim BIP39-Producer nicht.
+- **Fix:** Der Konstruktor lehnt `privateKeyMaxNumBits ≠ 256` mit `IllegalArgumentException` ab, die Feld und Wert nennt. Die Prüfung steht in einer statischen Methode im `super(...)`-Argument (sonst `CT_CONSTRUCTOR_THROW`), also noch vor der teuren Seed-Ableitung.
+- **Reproduktion:** `KeyProducerJavaBip39Test#constructor_privateKeyMaxNumBitsBelowFullKeySize_throwsIllegalArgumentException`
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected java.lang.IllegalArgumentException to be thrown, but nothing was thrown.“), mit Fix grün; Gegenprobe per `git stash` rot, nach `stash pop` grün. `KeyProducerJavaBip39Test` 2/2, `BIP39KeyProducerTest` 296/296, `KeyProducerJavaTest` 156/156, `FinderTest` 22/22, `ConfigFixturesParseTest` 3/3, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün (der erste Fix-Versuch mit der Prüfung im Konstruktorrumpf war es nicht und wurde nicht gepusht). Die Beispielkonfigurationen setzen für BIP39 kein abweichendes `privateKeyMaxNumBits`.
+- **Status:** gefixt
+- **Commit:** –
 
 ## Offene Verdachte ohne Fund-ID
 
