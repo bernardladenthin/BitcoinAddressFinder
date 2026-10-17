@@ -4,8 +4,10 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigInteger;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
@@ -41,6 +43,22 @@ public class KeyProducerJavaBip39Test {
 
         KeyProducerJavaBip39 producer = createKeyProducerJavaBip39(config);
         return producer.createSecrets(bitHelper.convertBitsToSize(0), true);
+    }
+
+    /**
+     * The derived BIP39 keys are full 256-bit keys. A lower {@code privateKeyMaxNumBits} (inherited from the
+     * random producer's configuration) would hand out only the masked top bytes of each derived key -- values
+     * that are no BIP39 key at all -- so the configuration is rejected instead.
+     */
+    @Test
+    public void constructor_privateKeyMaxNumBitsBelowFullKeySize_throwsIllegalArgumentException() {
+        CKeyProducerJavaBip39 config = new CKeyProducerJavaBip39();
+        config.keyProducerId = keyProducerId;
+        config.privateKeyMaxNumBits = 64;
+
+        IllegalArgumentException e =
+                assertThrows(IllegalArgumentException.class, () -> createKeyProducerJavaBip39(config));
+        assertThat(e.getMessage(), containsString("privateKeyMaxNumBits"));
     }
 
     @Test
