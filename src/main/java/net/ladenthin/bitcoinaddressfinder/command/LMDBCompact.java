@@ -63,7 +63,14 @@ public class LMDBCompact implements Runnable, Interruptable {
 
         // canonical, not absolute: "<source>/." or a symlink to the source would otherwise pass, and the
         // delete below would remove the source database itself
-        if (canonical(targetDirectory).equals(canonical(new File(sourceDirectory)))) {
+        final boolean targetIsSource;
+        try {
+            targetIsSource = canonical(targetDirectory).equals(canonical(new File(sourceDirectory)));
+        } catch (IOException e) {
+            throw new UncheckedIOException(
+                    "Cannot resolve the source " + sourceDirectory + " or the target " + targetDirectory, e);
+        }
+        if (targetIsSource) {
             throw new IllegalArgumentException(
                     "targetDirectory must differ from the source lmdbDirectory: " + targetDirectory);
         }
@@ -111,12 +118,8 @@ public class LMDBCompact implements Runnable, Interruptable {
         }
     }
 
-    private static File canonical(File file) {
-        try {
-            return file.getCanonicalFile();
-        } catch (IOException e) {
-            throw new UncheckedIOException("Cannot resolve the path " + file, e);
-        }
+    private static File canonical(File file) throws IOException {
+        return file.getCanonicalFile();
     }
 
     private static String mib(long bytes) {

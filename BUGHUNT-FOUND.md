@@ -186,7 +186,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `OpenClLibraryLoaderTest#ensureLoaded_calledFromTwoThreadsAtOnce_initializesOnlyOnce` (der Fake hält den ersten `create()` fest, bis der zweite Thread `ensureLoaded()` betreten hat)
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <1> but: was <2>“), mit Fix grün 9/9 (skipped 0), Gegenprobe per `git stash` rot, nach `stash pop` grün 9/9.
 - **Status:** gefixt
-- **Commit:** siehe Git-Log („Serialize the first OpenCL library load“)
+- **Commit:** BAF `4328bde`
 
 ## Offene Verdachte ohne Fund-ID
 
