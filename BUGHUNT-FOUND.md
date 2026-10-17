@@ -267,7 +267,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `AddressFilesToLMDBTest#addressFilesToLMDB_fileWithUtf8ByteOrderMark_importsTheFirstAddress`
 - **Rot-Grün-Nachweis:** ohne Fix rot („the first address after the byte order mark was not imported – Expected: is <true> but: was <false>“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. Ganze Klasse `AddressFilesToLMDBTest` 25/25, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** –
+- **Commit:** BAF `fa1d418`
 
 ## Offene Verdachte ohne Fund-ID
 
