@@ -79,11 +79,20 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
             currentSecretsFile.set(secretsFile);
             secretsFile.readFile();
             currentSecretsFile.set(null);
+            if (!shouldRun.get()) {
+                LOGGER.warn("Secrets file processing interrupted in: {}", file);
+                logProgress();
+                return;
+            }
             LOGGER.info("Finished processing: {}", file);
 
             logProgress();
         }
-        LOGGER.info("All secrets files processed.");
+        if (shouldRun.get()) {
+            LOGGER.info("All secrets files processed.");
+        } else {
+            LOGGER.warn("Secrets file processing interrupted; not every file was processed.");
+        }
     }
 
     private void logProgress() {
