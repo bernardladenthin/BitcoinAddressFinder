@@ -22,6 +22,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F27](#f27) — mittel — *gefixt*
 - [F31](#f31) — hoch — *gefixt*
 - [F32](#f32) — niedrig — *gefixt*
+- [F33](#f33) — niedrig — *gefixt*
 
 ## Funde
 
@@ -176,7 +177,17 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** BAF `833b879`
 
+<a id="f33"></a>
+### F33 – BAF: `OpenClLibraryLoader.ensureLoaded()` initialisiert OpenCL bei gleichzeitigem Erstaufruf zweimal
+- **Zeit:** 2026-10-17 10:25 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/opencl/binding/OpenClLibraryLoader.java:82`
+- **Schwere:** niedrig
+- **Beschreibung:** `ensureLoaded()` war ein Check-then-act ohne Synchronisation, `loaded` nicht `volatile`. Zwei Threads, die gleichzeitig den ersten OpenCL-Aufruf machen, riefen beide `libraryInitializer.create()`; LWJGLs zweites `CL.create()` wirft eine `IllegalStateException`, die hier niemand fängt. Im Programm selbst werden die OpenCL-Producer nacheinander initialisiert, daher niedrig. Fix: privates `loadLock` um den Rumpf, `loaded` `volatile` (für `isLoaded()`).
+- **Reproduktion:** `OpenClLibraryLoaderTest#ensureLoaded_calledFromTwoThreadsAtOnce_initializesOnlyOnce` (der Fake hält den ersten `create()` fest, bis der zweite Thread `ensureLoaded()` betreten hat)
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <1> but: was <2>“), mit Fix grün 9/9 (skipped 0), Gegenprobe per `git stash` rot, nach `stash pop` grün 9/9.
+- **Status:** gefixt
+- **Commit:** siehe Git-Log („Serialize the first OpenCL library load“)
+
 ## Offene Verdachte ohne Fund-ID
 
 - *(unsicher, nur beschrieben, 06:05 UTC)* BAF `cli/Main` + `engine/Finder.interrupt`: Bei Ctrl-C ruft der Shutdown-Hook-Thread `finder.interrupt()`; dadurch enden die Producer, `producerExecutorService.awaitTermination` im Main-Thread kehrt zurück und `shutdownAndAwaitTermination` ruft **gleichzeitig** ein zweites `interrupt()`. `Finder.interrupt` ist nicht synchronisiert und arbeitet auf `HashMap`/`ArrayList` (`keyProducers.clear()`, `getAllProducers()` kopiert per `addAll`, `freeAllProducers()` leert), ebenso iteriert der Hook `Main.interruptables` (`ArrayList`), die der Main-Thread befüllt. Mögliche Folgen: `ConcurrentModificationException` im Hook, doppelt geschlossene Broadcaster/Producer. Nicht deterministisch reproduzierbar in der verbleibenden Zeit; Fix-Vorschlag: `Finder.interrupt()` (und die Liste in `Main`) synchronisieren bzw. idempotent über ein `AtomicBoolean` machen. Schwere: niedrig–mittel. Kein Commit.
-- *(unsicher/niedrig, nur beschrieben, 06:47 UTC)* BAF `opencl/binding/OpenClLibraryLoader.java` `ensureLoaded`: Check-then-act ohne Synchronisation, `loaded` ist nicht `volatile`. Rufen zwei Threads den ersten `LwjglClApi`-Aufruf gleichzeitig auf, können beide `libraryInitializer.create()` ausführen; LWJGL wirft beim zweiten `CL.create()` eine `IllegalStateException` („already created“), die hier nicht gefangen wird. Die OpenCL-Producer werden aber in `Finder.configureProducer` nacheinander initialisiert, ein paralleler Erstaufruf ist im Programm kaum erreichbar. Fix-Vorschlag: `ensureLoaded` `synchronized` (privates Lock-Objekt wegen USO_UNSAFE_METHOD_SYNCHRONIZATION). Wegen Zeitende kein Test, kein Commit.
