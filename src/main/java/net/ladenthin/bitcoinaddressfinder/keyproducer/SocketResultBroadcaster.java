@@ -10,10 +10,10 @@ import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import lombok.ToString;
@@ -77,7 +77,7 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
     private final BatchResultJsonFormatter formatter;
 
     @ToString.Exclude
-    private final List<Client> clients = new CopyOnWriteArrayList<>();
+    private final Set<Client> clients = new CopyOnWriteArraySet<>();
 
     @ToString.Exclude
     private final ExecutorService acceptExecutor = Executors.newSingleThreadExecutor();
@@ -139,7 +139,8 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
                     // greeting is the first line it receives.
                     final String greeting = configurationMessage;
                     if (greeting != null) {
-                        client.queue.offer(greeting);
+                        // the queue is still empty, so this cannot exceed its capacity
+                        client.queue().add(greeting);
                     }
                     clients.add(client);
                     startWriter(client);
@@ -214,10 +215,10 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
      */
     private void broadcast(String message) {
         for (Client client : clients) {
-            if (!client.queue.offer(message)) {
+            if (!client.queue().offer(message)) {
                 LOGGER.warn(
                         "Result listener {} fell behind by {} messages; dropping it.",
-                        String.valueOf(client.socket.getRemoteSocketAddress()),
+                        String.valueOf(client.socket().getRemoteSocketAddress()),
                         CLIENT_QUEUE_CAPACITY);
                 drop(client);
             }
@@ -235,7 +236,7 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
         Object unused = writerExecutor.submit(() -> {
             try {
                 while (!shouldStop && clients.contains(client)) {
-                    if (!writeTo(client.socket, client.queue.take())) {
+                    if (!writeTo(client.socket(), client.queue().take())) {
                         drop(client);
                         return;
                     }
@@ -253,7 +254,7 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
      */
     private void drop(Client client) {
         clients.remove(client);
-        closeQuietly(client.socket);
+        closeQuietly(client.socket());
     }
 
     /**
@@ -300,7 +301,7 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
             }
         }
         for (Client client : clients) {
-            closeQuietly(client.socket);
+            closeQuietly(client.socket());
         }
         clients.clear();
         acceptExecutor.shutdownNow();
@@ -316,6 +317,14 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
 
         private Client(Socket socket) {
             this.socket = socket;
+        }
+
+        private Socket socket() {
+            return socket;
+        }
+
+        private BlockingQueue<String> queue() {
+            return queue;
         }
     }
 }

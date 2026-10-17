@@ -1188,6 +1188,15 @@ SPDX-License-Identifier: Apache-2.0
         <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
     </Match>
 
+    <!-- Style nag: BIP39KeyProducer is a stateful key generator (a java.util.Random facade with a
+         derivation counter), not a value object; equals/hashCode would be meaningless and would also
+         have to touch the private parent key. Identity equality is correct. Surfaced once the field
+         changed from DeterministicKeyChain to DeterministicKey (F14, the key cache fix). -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.BIP39KeyProducer"/>
+        <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
+    </Match>
+
     <!-- The constructor fail-fast validates windowMillis and the class is intentionally non-final (so it
          can be subclassed / mocked in tests). SpotBugs then warns about a finalizer attack on the
          partially-constructed object, but that vector is obsolete: finalize() is deprecated since Java 9,
