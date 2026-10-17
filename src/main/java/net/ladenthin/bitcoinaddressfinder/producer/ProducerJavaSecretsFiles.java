@@ -72,11 +72,14 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
                 LOGGER.info("Key production stopped by flag.");
                 break;
             }
-            SecretsFile secretsFile = new SecretsFile(
-                    network, file, producerJavaSecretsFiles.secretFormat, readStatistic, this::consumeSecrets);
+            SecretsFile secretsFile = createSecretsFile(file);
 
             LOGGER.info("Processing secrets file: {}", file);
             currentSecretsFile.set(secretsFile);
+            // interrupt() may have run after the flag check above, while no reader was registered to stop
+            if (!shouldRun.get()) {
+                secretsFile.interrupt();
+            }
             secretsFile.readFile();
             currentSecretsFile.set(null);
             if (!shouldRun.get()) {
@@ -93,6 +96,18 @@ public class ProducerJavaSecretsFiles extends ProducerJava {
         } else {
             LOGGER.warn("Secrets file processing interrupted; not every file was processed.");
         }
+    }
+
+    /**
+     * Creates the reader for one secrets file. A seam for tests, which can act between the flag check at
+     * the top of the file loop and the reader becoming visible to {@link #interrupt()}.
+     *
+     * @param file the secrets file to read
+     * @return the reader for {@code file}
+     */
+    SecretsFile createSecretsFile(File file) {
+        return new SecretsFile(
+                network, file, producerJavaSecretsFiles.secretFormat, readStatistic, this::consumeSecrets);
     }
 
     private void logProgress() {
