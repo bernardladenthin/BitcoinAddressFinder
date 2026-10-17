@@ -33,6 +33,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F45](#f45) — mittel — *gefixt*
 - [F46](#f46) — niedrig — *gefixt*
 - [F47](#f47) — niedrig — *gefixt*
+- [F48](#f48) — niedrig — *gefixt*
 
 ## Funde
 
@@ -321,8 +322,20 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** BAF `396b967`
 
+<a id="f48"></a>
+### F48 – BAF: abgebrochenes LMDB-Delta meldet „... delta done“
+- **Zeit:** 2026-10-17 19:40 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/command/LMDBDelta.java:115` (`run`)
+- **Schwere:** niedrig
+- **Beschreibung:** Musterdurchsicht nach F46/F47. `writeDelta` verlässt seine Merge-Schleife, sobald `interrupt()` das Flag löscht, und `run` meldete danach „... delta done: N address(es) written“ – die Delta-Datei enthält dann nur einen Teil der Adressen, die in den anderen Datenbanken, aber nicht in der Referenz stehen.
+- **Fix:** Bei gelöschtem Flag WARN „... delta interrupted after N address(es); <Datei> is incomplete.“ statt der Fertigmeldung.
+- **Reproduktion:** `LMDBDeltaTest#run_interruptedBeforeTheDelta_doesNotReportTheDeltaAsDone`
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected: not a collection containing a string starting with "... delta done" but: was <[…, ... delta done: 0 address(es) written to …]>“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `LMDBDeltaTest` 13/13, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** –
+
 ## Offene Verdachte ohne Fund-ID
 
-- **Gleiches Muster wie F46/F47, noch offen (2026-10-17):** `command/LMDBDelta.java:115` meldet „... delta done: N address(es) written“ auch, wenn die Schleife ab Zeile 164 durch `interrupt()` endete; `producer/ProducerJavaSecretsFiles.java:82/86` meldet „Finished processing“ und „All secrets files processed.“, auch wenn `SecretsFile.readFile` auf `interrupt()` hin mitten in der Datei aufhörte. `LMDBCompact` ist sauber (prüft das Flag vor dem Start, die Kompaktierung selbst ist ein nicht unterbrechbarer Aufruf). Kandidaten für die nächsten Runden.
+- **Gleiches Muster wie F46–F48, noch offen (2026-10-17):** `producer/ProducerJavaSecretsFiles.java:82/86` meldet „Finished processing“ und „All secrets files processed.“, auch wenn `SecretsFile.readFile` auf `interrupt()` hin mitten in der Datei aufhörte. (`LMDBDelta` ist F48; `LMDBCompact` ist sauber.)
 - **`PrivateKeyValidator.getMaxPrivateKeyForBatchSize` lässt n im GPU-Raster zu (2026-10-17, Folge von F45):** `maxSafeKey = n − 2^b + 1` sichert nur `base + 2^b − 1 ≤ n`, das letzte zulässige OpenCL-Raster endet also auf n. Dort stürzt nichts ab (der Kernel liefert für n·G Koordinaten, die zu keinem Eintrag passen), es wird nur ein sinnloser Schlüssel geprüft. Die Korrektur auf `n − 2^b` ändert drei Tests von `getMaxPrivateKeyForBatchSize` und die Grenze von `PrivateKeyTooLargeException` – erst mit Rückmeldung des Nutzers, da kein Fehlverhalten außer einem verschwendeten Rasterplatz.
 - **`KeyProducerJavaIncremental`, Teilbatch am Bereichsende (2026-10-17):** `endPrivateKey` heißt in `CKeyProducerJavaIncremental` „inclusive upper bound“, aber mit `returnStartSecretOnly=false` wirft der letzte, nur teilweise in den Bereich passende Batch und die bis zu `overallWorkSize-1` Schlüssel davor werden nie geprüft; mit `returnStartSecretOnly=true` (OpenCL) läuft der Batch dagegen über das Ende hinaus. Beides legen die Tests ausdrücklich fest (Fälle 3, 5, 8, 9 der Tabelle in `KeyProducerJavaIncrementalTest`), also eine Designentscheidung – für den Nutzer zur Entscheidung, nicht angefasst.
