@@ -254,7 +254,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `SecretsFileTest#readFile_stringDoSha256FormatWithUtf8ByteOrderMark_firstLineIsHashedWithoutTheMark`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <72155939…63272> but: was <26164307…44373>“ – SHA256 von „U+FEFF test“ statt „test“), mit Fix grün 11/11 (skipped 0); Gegenprobe per `git stash` rot (1 Failure), nach `stash pop` grün. `AbstractPlaintextFileTest` 11/11, `AddressFileTest` 11/11, `ProducerJavaSecretsFilesTest` 11/11, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** –
+- **Commit:** BAF `b068ef1`
 
 ## Offene Verdachte ohne Fund-ID
 
