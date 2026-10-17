@@ -84,7 +84,10 @@ public abstract class AbstractPlaintextFile implements Interruptable {
                     throw e;
                 } catch (Exception e) {
                     LOGGER.error("Error in line: {}", utf8, e);
-                    readStatistic.errors.add(utf8);
+                    readStatistic.errorCount++;
+                    if (readStatistic.errors.size() < ReadStatistic.MAX_STORED_ERRORS) {
+                        readStatistic.errors.add(utf8);
+                    }
                 }
             }
         }

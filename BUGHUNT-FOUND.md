@@ -25,6 +25,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F33](#f33) — niedrig — *gefixt*
 - [F34](#f34) — mittel — *gefixt*
 - [F35](#f35) — niedrig — *nur beschrieben*
+- [F40](#f40) — mittel — *gefixt*
 
 ## Funde
 
@@ -215,6 +216,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** keine – reine Dokumentationsabweichung, kein Verhalten, das ein Test rot machen könnte.
 - **Status:** nur beschrieben (Doku-Korrektur braucht nach der Loop-Regel „ohne roten Test kein Fix“ die Freigabe des Nutzers)
 - **Commit:** –
+
+<a id="f40"></a>
+### F40 – BAF: Secrets-Datei im falschen Format hält jede Zeile in `ReadStatistic.errors` → OutOfMemory
+- **Zeit:** 2026-10-17 17:30 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/io/AbstractPlaintextFile.java:87` (`readFile`), `statistics/ReadStatistic.java` (`errors`), `producer/ProducerJavaSecretsFiles.java` (`logProgress`)
+- **Schwere:** mittel
+- **Beschreibung:** Jede Zeile, deren Verarbeitung scheiterte, wurde in `ReadStatistic.errors` gespeichert, ohne Grenze. Der Secrets-Datei-Producer liest davon nur `errors.size()`. Eine Secrets-Datei im falschen Format (etwa `secretFormat` passt nicht zum Inhalt, oder eine riesige Wortliste) scheitert an jeder Zeile, und der Producer hielt damit jede Zeile der Datei im Speicher, bis zum OutOfMemoryError – dieselbe Klasse wie F14. Die gespeicherten Zeilen sind dort zudem Secrets, und `ReadStatistic.toString()` (Lombok) gibt sie vollständig aus.
+- **Fix:** `errors` behält nur die ersten `ReadStatistic.MAX_STORED_ERRORS` (100) Zeilen zur Diagnose, das neue Feld `errorCount` zählt alle; `ProducerJavaSecretsFiles` protokolliert `errorCount`. Das Feld wurde zuerst verhaltensneutral eingezogen (toString-Test angepasst), dann der rote Test geschrieben.
+- **Reproduktion:** `AbstractPlaintextFileTest#readFile_moreFailingLinesThanKept_keepsTheFirstLinesAndCountsAll`
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected: a collection with size <100> but: collection size was <105>“), mit Fix grün 11/11 (skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `ReadStatisticTest` 15/15, `SecretsFileTest` 10/10, `AddressFileTest` 11/11, `ProducerJavaSecretsFilesTest` 11/11, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün. `AddressFilesToLMDB` führt eine eigene Fehlerliste, die es im Abschluss Zeile für Zeile ausgibt; die ist ebenfalls unbegrenzt, wird aber tatsächlich benutzt und bleibt unverändert.
+- **Status:** gefixt
+- **Commit:** siehe Git-Log („Bound the failed lines a plaintext file keeps“)
 
 ## Offene Verdachte ohne Fund-ID
 

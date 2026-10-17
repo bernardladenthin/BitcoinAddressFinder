@@ -33,6 +33,12 @@ import net.ladenthin.bitcoinaddressfinder.io.AddressFormatNotAcceptedException;
 @ToString
 public class ReadStatistic {
 
+    /**
+     * How many of the failed lines {@link #errors} keeps. A file in the wrong format fails on every
+     * line, and only the count is needed beyond the first few examples.
+     */
+    public static final int MAX_STORED_ERRORS = 100;
+
     /** Creates a new {@link ReadStatistic}. */
     public ReadStatistic() {}
 
@@ -45,8 +51,11 @@ public class ReadStatistic {
      */
     public double currentFileProgress;
 
-    /** Lines that failed to parse with a logged error. */
+    /** The first {@link #MAX_STORED_ERRORS} lines that failed to parse with a logged error. */
     public final List<String> errors = new ArrayList<>();
+
+    /** Number of lines that failed to parse, including those {@link #errors} no longer keeps. */
+    public long errorCount;
 
     /**
      * Increments the counter for the given unsupported reason by one.
