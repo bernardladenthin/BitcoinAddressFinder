@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 import lombok.ToString;
@@ -167,7 +168,12 @@ public class WebSocketEndpoint {
 
         @FireAndForget("lifecycle via stop()")
         @SuppressWarnings("FutureReturnValueIgnored")
-        Object unused = Executors.newSingleThreadExecutor().submit(localServer::start);
+        // WebSocketServer.start() returns at once, the server runs on threads of its own. Shut the
+        // executor down right away (the submitted start still runs): its idle worker thread is not a
+        // daemon and would otherwise keep the JVM alive after stop().
+        final ExecutorService startExecutor = Executors.newSingleThreadExecutor();
+        Object unused = startExecutor.submit(localServer::start);
+        startExecutor.shutdown();
     }
 
     /**
