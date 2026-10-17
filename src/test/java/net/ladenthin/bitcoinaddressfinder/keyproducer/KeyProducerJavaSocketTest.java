@@ -349,6 +349,40 @@ public class KeyProducerJavaSocketTest {
     }
 
     @Test
+    public void createSecrets_peerReconnectsMoreOftenThanTheRetryCount_keepsReading() throws Exception {
+        // connectRetryCount bounds the attempts to (re)establish a connection. It must not be a
+        // lifetime budget: a feed that disconnects and reconnects more often than that, each time
+        // after a successful connection, must keep being read.
+        final int connections = 4;
+        int port = findFreePort();
+        ServerSocket serverSocket = new ServerSocket(port);
+        Future<Void> serverFuture = executorService.submit(() -> {
+            for (int i = 0; i < connections; i++) {
+                try (Socket s = serverSocket.accept();
+                        DataOutputStream dos = new DataOutputStream(s.getOutputStream())) {
+                    dos.write(new KeyProducerTestUtility().createFilledSecret((byte) (i + 1)));
+                    dos.flush();
+                }
+            }
+            return null;
+        });
+
+        CKeyProducerJavaSocket clientConfig = createClientConfig("localhost", port);
+        clientConfig.connectRetryCount = 2;
+        clientConfig.connectRetryDelayMillis = TestTimeProvider.SHORT_DELAY;
+        KeyProducerJavaSocket client = new KeyProducerJavaSocket(clientConfig, keyUtility, bitHelper);
+        client.start();
+
+        // act, assert: one secret per connection, more connections than connectRetryCount
+        for (int i = 0; i < connections; i++) {
+            BigInteger[] secrets = client.createSecrets(1, true);
+            assertThat(secrets.length, is(1));
+        }
+
+        cleanup(client, serverFuture, serverSocket);
+    }
+
+    @Test
     public void createSecrets_afterClose_reconnectsAndReadsSuccessfully() throws Exception {
         int port = findFreePort();
 
