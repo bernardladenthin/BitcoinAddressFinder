@@ -306,7 +306,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `LMDBToAddressFileTest#run_interruptedBeforeTheExport_doesNotReportTheExportAsDone`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: not a collection containing "writeAllAmounts done" but: was <[writeAllAmounts ..., writeAllAmounts done]>“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `LMDBToAddressFileTest` 13/13, `MainTest` 18 (6 OpenCL übersprungen), `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** –
+- **Commit:** BAF `61d9cc2`
 
 ## Offene Verdachte ohne Fund-ID
 
