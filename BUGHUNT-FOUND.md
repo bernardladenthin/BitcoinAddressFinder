@@ -319,7 +319,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `AddressFilesToLMDBTest#addressFilesToLMDB_interruptedBeforeTheImport_doesNotReportTheImportAsDone`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: not a collection containing "... import done." but: was <[…, Import summary: 0 written, 0 parsed, 0 unsupported, 0 error(s)., ... import done.]>“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `AddressFilesToLMDBTest` 26/26, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** –
+- **Commit:** BAF `396b967`
 
 ## Offene Verdachte ohne Fund-ID
 
