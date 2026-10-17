@@ -54,6 +54,10 @@ public class LMDBCompact implements Runnable, Interruptable {
 
     @Override
     public void run() {
+        if (!shouldRun.get()) {
+            LOGGER.info("Compaction interrupted before it started; nothing written.");
+            return;
+        }
         String sourceDirectory = compactLMDB.lmdbConfigurationReadOnly.lmdbDirectory;
         File targetDirectory = new File(compactLMDB.targetDirectory);
 

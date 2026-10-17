@@ -96,4 +96,22 @@ public class LMDBCompactTest extends LMDBBase {
         assertThat(sourceDataFile.exists(), is(true));
         assertThat(sourceDataFile.length(), is(equalTo(sourceBytes)));
     }
+
+    /** An interrupt before the run starts must stop it before anything is created or deleted. */
+    @Test
+    public void compactLMDB_interruptedBeforeRun_writesNothing() throws Exception {
+        StaticAddressesFiles staticAddressesFiles = new StaticAddressesFiles();
+        File sourceDirectory = new TestAddressesLMDB().createTestLMDB(folder, staticAddressesFiles, true, false);
+        File targetDirectory = folder.resolve("lmdb_compact_interrupted").toFile();
+
+        CCompactLMDB config = new CCompactLMDB();
+        config.lmdbConfigurationReadOnly.lmdbDirectory = sourceDirectory.getAbsolutePath();
+        config.targetDirectory = targetDirectory.getAbsolutePath();
+
+        LMDBCompact compact = new LMDBCompact(config);
+        compact.interrupt();
+        compact.run();
+
+        assertThat(targetDirectory.exists(), is(false));
+    }
 }

@@ -21,6 +21,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F23](#f23) — niedrig — *gefixt*
 - [F27](#f27) — mittel — *gefixt*
 - [F31](#f31) — hoch — *gefixt*
+- [F32](#f32) — niedrig — *gefixt*
 
 ## Funde
 
@@ -163,6 +164,17 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `LMDBCompactTest#compactLMDB_targetIsSourceSpelledDifferently_throwsAndKeepsTheSourceDatabase` (ohne Fix: Quelle gelöscht, `LmdbNativeException`; mit Fix 3/3 grün)
 - **Status:** gefixt
 - **Commit:** 0535ba6
+
+<a id="f32"></a>
+### F32 – BAF: `LMDBCompact.interrupt()` ist wirkungslos – ein vor dem Start unterbrochener Lauf löscht und kopiert trotzdem
+- **Zeit:** 2026-10-17 10:08 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/command/LMDBCompact.java:57`
+- **Schwere:** niedrig
+- **Beschreibung:** `interrupt()` setzte `shouldRun` auf `false`, aber `run()` las das Feld nie, obwohl der Kommentar sagt, es verhindere einen noch nicht gestarteten Lauf. Ein vor dem Start unterbrochener Compact-Befehl legte trotzdem das Zielverzeichnis an, löschte eine frühere Kompaktierung (`data.mdb` im Ziel) und kopierte die ganze Datenbank. Nebenbefund aus F31. Fix: `run()` prüft `shouldRun` zuerst und kehrt ohne Schreibzugriff zurück.
+- **Reproduktion:** `LMDBCompactTest#compactLMDB_interruptedBeforeRun_writesNothing`
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <false> but: was <true>“: Zielverzeichnis angelegt), mit Fix grün 4/4 (skipped 0), Gegenprobe per `git stash` rot, nach `stash pop` wieder grün 4/4.
+- **Status:** gefixt
+- **Commit:** siehe Git-Log dieser Datei (Commit „Honour an interrupt of LMDBCompact that arrives before the run“)
 
 ## Offene Verdachte ohne Fund-ID
 
