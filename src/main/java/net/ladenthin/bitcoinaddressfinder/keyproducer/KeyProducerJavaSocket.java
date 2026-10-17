@@ -102,6 +102,10 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
                     Socket localSocket = Objects.requireNonNull(socket);
                     localSocket.setSoTimeout(cKeyProducerJava.timeoutMillis);
                     inputStream = new DataInputStream(localSocket.getInputStream());
+                    // connectRetryCount bounds the attempts to establish one connection, not the
+                    // reconnects over the producer's lifetime: a peer that disconnects after a
+                    // successful connection gets the full retry budget again.
+                    attempts = 0;
 
                     byte[] buffer = new byte[OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES];
                     while (!shouldStop) {
