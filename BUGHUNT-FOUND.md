@@ -37,6 +37,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F49](#f49) — niedrig — *gefixt*
 - [F50](#f50) — niedrig — *gefixt*
 - [F51](#f51) — niedrig — *gefixt*
+- [F52](#f52) — mittel — *gefixt*
 
 ## Funde
 
@@ -372,6 +373,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected java.lang.IllegalArgumentException to be thrown, but nothing was thrown.“), mit Fix grün; Gegenprobe per `git stash` rot, nach `stash pop` grün. `KeyProducerJavaBip39Test` 2/2, `BIP39KeyProducerTest` 296/296, `KeyProducerJavaTest` 156/156, `FinderTest` 22/22, `ConfigFixturesParseTest` 3/3, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün (der erste Fix-Versuch mit der Prüfung im Konstruktorrumpf war es nicht und wurde nicht gepusht). Die Beispielkonfigurationen setzen für BIP39 kein abweichendes `privateKeyMaxNumBits`.
 - **Status:** gefixt
 - **Commit:** BAF `d871b31`
+
+<a id="f52"></a>
+### F52 – BAF: ein Producer, dessen Freigabe fehlschlägt, lässt alle folgenden weiterlaufen
+- **Zeit:** 2026-10-17 20:45 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/producer/ProducerReleaser.java:60` (`release`)
+- **Schwere:** mittel
+- **Beschreibung:** `release` unterbricht, erwartet und gibt die Producer nacheinander frei, ohne Fehlerbehandlung. `ProducerOpenCL.releaseProducer` schließt den `OpenCLContext`, dessen `clRelease*`-Aufrufe über `ClErrorChecker` bei jedem OpenCL-Fehlercode `OpenClCallFailedException` werfen (etwa nach einem Treiberfehler). Wirft ein Producer, endet die Schleife: alle Producer dahinter werden weder unterbrochen noch freigegeben, laufen also weiter, und `Finder.interrupt()` (Shutdown-Hook) kehrt mit der Exception zurück. Bei einer gemischten Konfiguration (eine OpenCL-Karte plus CPU-Producer) hängt so der Shutdown an weiterlaufenden CPU-Producern. Der fehlgeschlagene Producer steht zudem schon in `released` und wird bei einem zweiten Aufruf übersprungen.
+- **Fix:** Jeder Producer wird in einem eigenen `try` behandelt; ein Fehler wird geloggt, die übrigen werden weiter unterbrochen und freigegeben, und erst danach wird die erste Exception unverändert geworfen (weitere als `suppressed`). Javadoc ergänzt. Die SpotBugs-Meldung `THROWS_METHOD_THROWS_RUNTIMEEXCEPTION` für das unverändert weitergeworfene Original ist in die bestehende, begründete Einzelfall-Unterdrückung (spotbugs#3918) aufgenommen – Verpacken lehnt die dortige Begründung ausdrücklich ab.
+- **Reproduktion:** `ProducerReleaserTest#release_firstProducerFailsToRelease_releasesTheOthersAndRethrows`
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <1> but: was <0>“ – der zweite Producer wurde nie freigegeben), mit Fix grün; Gegenprobe per `git stash` rot, nach `stash pop` grün. `ProducerReleaserTest` 4/4, `FinderTest` 22/22, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün (nach Aufnahme in die Unterdrückung; der Lauf davor war rot und wurde nicht gepusht).
+- **Status:** gefixt
+- **Commit:** –
 
 ## Offene Verdachte ohne Fund-ID
 
