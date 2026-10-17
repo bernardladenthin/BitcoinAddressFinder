@@ -23,6 +23,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F31](#f31) — hoch — *gefixt*
 - [F32](#f32) — niedrig — *gefixt*
 - [F33](#f33) — niedrig — *gefixt*
+- [F34](#f34) — mittel — *gefixt*
 
 ## Funde
 
@@ -192,6 +193,17 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** BAF `4328bde`
 
+<a id="f34"></a>
+### F34 – BAF: `Finder.interrupt()` aus Shutdown-Hook und Main-Thread gleichzeitig → `ConcurrentModificationException` im Shutdown
+- **Zeit:** 2026-10-17 10:52 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/engine/Finder.java:724` (`interrupt`), Aufrufer `cli/Main` (Shutdown-Hook) und `Finder.shutdownAndAwaitTermination`
+- **Schwere:** mittel
+- **Beschreibung:** Bei Ctrl-C ruft der Shutdown-Hook `Main.interrupt()` → `finder.interrupt()`. Dadurch enden die Producer, `awaitTermination` im Main-Thread kehrt zurück, und `shutdownAndAwaitTermination()` ruft **gleichzeitig** ein zweites `interrupt()`. Beide Aufrufe liefen über dieselben `ArrayList`s (`zmqBroadcasters`, `socketBroadcasters`) und leerten sie; der eine `clear()`te, während der andere noch iterierte → `ConcurrentModificationException` im Shutdown, die übrigen Broadcaster und Producer wurden in diesem Thread nicht mehr freigegeben. (Schlüssel-Producer und Producer laufen über Kopien, `ProducerReleaser` gibt jeden genau einmal frei – die Broadcaster-Listen waren die Lücke.) Fix: privates `interruptLock` serialisiert `interrupt()`; der zweite Aufruf findet die Listen leer.
+- **Reproduktion:** `FinderTest#interrupt_calledFromTwoThreadsAtOnce_neitherFails` (ein ZMQ-Broadcaster auf `inproc://`, dessen erstes `close()` festgehalten wird, per Reflection in die private Liste gelegt)
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is null but: was <java.util.ConcurrentModificationException>“), mit Fix grün, `FinderTest` 22/22, `BitcoinAddressFinderArchitectureTest` 17/17; Gegenprobe per `git stash` rot, nach `stash pop` grün. `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** siehe Git-Log („Serialize Finder.interrupt() between the shutdown hook and the main thread“)
+
 ## Offene Verdachte ohne Fund-ID
 
-- *(unsicher, nur beschrieben, 06:05 UTC)* BAF `cli/Main` + `engine/Finder.interrupt`: Bei Ctrl-C ruft der Shutdown-Hook-Thread `finder.interrupt()`; dadurch enden die Producer, `producerExecutorService.awaitTermination` im Main-Thread kehrt zurück und `shutdownAndAwaitTermination` ruft **gleichzeitig** ein zweites `interrupt()`. `Finder.interrupt` ist nicht synchronisiert und arbeitet auf `HashMap`/`ArrayList` (`keyProducers.clear()`, `getAllProducers()` kopiert per `addAll`, `freeAllProducers()` leert), ebenso iteriert der Hook `Main.interruptables` (`ArrayList`), die der Main-Thread befüllt. Mögliche Folgen: `ConcurrentModificationException` im Hook, doppelt geschlossene Broadcaster/Producer. Nicht deterministisch reproduzierbar in der verbleibenden Zeit; Fix-Vorschlag: `Finder.interrupt()` (und die Liste in `Main`) synchronisieren bzw. idempotent über ein `AtomicBoolean` machen. Schwere: niedrig–mittel. Kein Commit.
+- keine

@@ -72,6 +72,71 @@ public class FinderTest {
         // assert
     }
 
+    /** A ZeroMQ broadcaster whose first close() is held until released. */
+    private static final class HeldCloseZmqBroadcaster extends ZmqResultBroadcaster {
+        private final java.util.concurrent.CountDownLatch closeEntered = new java.util.concurrent.CountDownLatch(1);
+        private final java.util.concurrent.CountDownLatch releaseClose = new java.util.concurrent.CountDownLatch(1);
+        private final java.util.concurrent.atomic.AtomicBoolean held = new java.util.concurrent.atomic.AtomicBoolean();
+
+        private HeldCloseZmqBroadcaster(String publishAddress) {
+            super(publishAddress);
+        }
+
+        @Override
+        public void close() {
+            if (held.compareAndSet(false, true)) {
+                closeEntered.countDown();
+                try {
+                    releaseClose.await(5, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            super.close();
+        }
+    }
+
+    @Test
+    public void interrupt_calledFromTwoThreadsAtOnce_neitherFails() throws Exception {
+        // arrange: the shutdown hook and the main thread's shutdownAndAwaitTermination() both call
+        // interrupt(); the first is held inside a broadcaster's close() while the second runs
+        Finder finder = new Finder(new CFinder());
+        HeldCloseZmqBroadcaster held = new HeldCloseZmqBroadcaster("inproc://finder-test-held");
+        ZmqResultBroadcaster other = new ZmqResultBroadcaster("inproc://finder-test-other");
+        java.lang.reflect.Field field = Finder.class.getDeclaredField("zmqBroadcasters");
+        field.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        List<ZmqResultBroadcaster> broadcasters = (List<ZmqResultBroadcaster>) field.get(finder);
+        broadcasters.add(held);
+        broadcasters.add(other);
+        java.util.concurrent.atomic.AtomicReference<Throwable> failure =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        Runnable interrupt = () -> {
+            try {
+                finder.interrupt();
+            } catch (Throwable t) {
+                failure.compareAndSet(null, t);
+            }
+        };
+
+        // act
+        Thread first = new Thread(interrupt, "first");
+        first.start();
+        assertThat(held.closeEntered.await(5, java.util.concurrent.TimeUnit.SECONDS), is(true));
+        Thread second = new Thread(interrupt, "second");
+        second.start();
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        while (second.isAlive() && second.getState() != Thread.State.BLOCKED && System.nanoTime() < deadline) {
+            second.join(10);
+        }
+        held.releaseClose.countDown();
+        first.join(5_000);
+        second.join(5_000);
+
+        // assert
+        assertThat(failure.get(), is(nullValue()));
+    }
+
     @Test
     public void interrupt_producersSetAndNotInitialized_noExceptionThrown() throws Exception {
         // arrange

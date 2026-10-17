@@ -114,6 +114,13 @@ public class Finder implements Interruptable {
     /** Guarantees each producer is released exactly once, even when two teardowns overlap. */
     private final ProducerReleaser producerReleaser = new ProducerReleaser();
 
+    /**
+     * Serializes {@link #interrupt()}: the JVM shutdown hook and {@link #shutdownAndAwaitTermination()}
+     * both call it, at the same time after a Ctrl-C, and it walks and clears plain lists.
+     */
+    @ToString.Exclude
+    private final Object interruptLock = new Object();
+
     private final KeyUtility keyUtility;
     private final PersistenceUtils persistenceUtils;
     private final BitHelper bitHelper = new BitHelper();
@@ -714,36 +721,38 @@ public class Finder implements Interruptable {
      */
     @Override
     public void interrupt() {
-        LOGGER.info("interrupt called: delegate interrupt to all keyProducers and producers");
+        synchronized (interruptLock) {
+            LOGGER.info("interrupt called: delegate interrupt to all keyProducers and producers");
 
-        // Key producers first. A producer waiting for its next secret is parked inside the key
-        // producer, and a key producer configured to block indefinitely (timeoutMillis < 0, which is
-        // what an interactively driven source wants) only releases that wait when it is interrupted.
-        // Waiting for the producers first would therefore wait for something that cannot happen
-        // until after the wait — the producer would sit there until its shutdownTimeoutSeconds ran
-        // out, turning every shutdown into a multi-minute stall.
-        for (KeyProducer keyProducer : getKeyProducers().values()) {
-            LOGGER.info("Interrupt KeyProducer: " + keyProducer.toString());
-            keyProducer.interrupt();
+            // Key producers first. A producer waiting for its next secret is parked inside the key
+            // producer, and a key producer configured to block indefinitely (timeoutMillis < 0, which is
+            // what an interactively driven source wants) only releases that wait when it is interrupted.
+            // Waiting for the producers first would therefore wait for something that cannot happen
+            // until after the wait — the producer would sit there until its shutdownTimeoutSeconds ran
+            // out, turning every shutdown into a multi-minute stall.
+            for (KeyProducer keyProducer : getKeyProducers().values()) {
+                LOGGER.info("Interrupt KeyProducer: " + keyProducer.toString());
+                keyProducer.interrupt();
+            }
+            freeAllKeyProducers();
+
+            // Broadcasters own sockets of their own; releasing them here keeps the process able to exit.
+            for (ZmqResultBroadcaster broadcaster : zmqBroadcasters) {
+                broadcaster.close();
+            }
+            zmqBroadcasters.clear();
+            for (SocketResultBroadcaster broadcaster : socketBroadcasters) {
+                broadcaster.close();
+            }
+            socketBroadcasters.clear();
+            resultBroadcasters.clear();
+
+            // Interrupt and release all Producers, each exactly once even under a concurrent teardown.
+            producerReleaser.release(getAllProducers());
+            freeAllProducers();
+
+            LOGGER.info("All producers released and freed.");
         }
-        freeAllKeyProducers();
-
-        // Broadcasters own sockets of their own; releasing them here keeps the process able to exit.
-        for (ZmqResultBroadcaster broadcaster : zmqBroadcasters) {
-            broadcaster.close();
-        }
-        zmqBroadcasters.clear();
-        for (SocketResultBroadcaster broadcaster : socketBroadcasters) {
-            broadcaster.close();
-        }
-        socketBroadcasters.clear();
-        resultBroadcasters.clear();
-
-        // Interrupt and release all Producers, each exactly once even under a concurrent teardown.
-        producerReleaser.release(getAllProducers());
-        freeAllProducers();
-
-        LOGGER.info("All producers released and freed.");
     }
 
     /**
