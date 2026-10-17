@@ -231,6 +231,13 @@ public class ConsumerJava implements Consumer {
     private final AtomicBoolean shouldRun = new AtomicBoolean(true);
 
     /**
+     * Set by {@link #interrupt()} before it closes the persistence. A lookup on a closed persistence
+     * answers "absent", so a batch a worker finishes after this point was not really checked.
+     */
+    @ToString.Exclude
+    private final AtomicBoolean persistenceClosed = new AtomicBoolean(false);
+
+    /**
      * Returns the current value of the cancellation flag — {@code true} as long as no
      * one has asked this consumer to stop, {@code false} after {@link #interrupt()}.
      *
@@ -930,6 +937,17 @@ public class ConsumerJava implements Consumer {
             }
         }
 
+        // A worker still busy when interrupt() gave up waiting ran (part of) these lookups against
+        // the closed persistence, which answers "absent": the batch was not checked.
+        if (persistenceClosed.get()) {
+            LOGGER.warn(
+                    "Batch of {} keys (secret base {}) was checked after the persistence was closed at shutdown"
+                            + " and is not reported as checked.",
+                    publicKeyBytesArray.length,
+                    String.valueOf(queuedBatch.secretBase()));
+            return;
+        }
+
         // One event per batch, emitted after the checks so it is exact. Reported even when
         // nothing was found: a client sweeping a range needs 'checked, empty' to be
         // distinguishable from 'never checked'.
@@ -1092,6 +1110,8 @@ public class ConsumerJava implements Consumer {
         }
         try {
             if (persistence != null) {
+                // Before the close, so a worker that is still running sees it after its lookups.
+                persistenceClosed.set(true);
                 Persistence localPersistence = Objects.requireNonNull(persistence);
                 localPersistence.close();
                 persistence = null;

@@ -532,6 +532,69 @@ public class ConsumerJavaTest {
         assertThat(consumerJava.keysQueueSize(), is(equalTo(0)));
     }
 
+    @Test
+    public void interrupt_awaitTimesOut_batchCheckedAfterThePersistenceClosedIsNotReportedAsChecked() throws Exception {
+        // When awaitQueueEmptySeconds runs out, interrupt() closes the persistence while a worker is
+        // still busy. A lookup on a closed LMDB answers "absent", so every batch the worker checks
+        // afterwards was reported as "checked, nothing found" -- a hit in it was lost, and a client
+        // sweeping a range took it as done.
+        new LMDBPlatformAssume().assumeLMDBExecution();
+        TestAddressesLMDB testAddressesLMDB = new TestAddressesLMDB();
+        TestAddressesFiles testAddresses = new TestAddressesFiles(false);
+        File lmdbFolderPath = testAddressesLMDB.createTestLMDB(folder, testAddresses, true, true);
+
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.threads = 1;
+        cConsumerJava.awaitQueueEmptySeconds = 1L;
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        java.util.concurrent.CountDownLatch firstBatchEntered = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch releaseFirstBatch = new java.util.concurrent.CountDownLatch(1);
+        java.util.List<net.ladenthin.bitcoinaddressfinder.core.BatchResult> reported =
+                new java.util.concurrent.CopyOnWriteArrayList<>();
+        net.ladenthin.bitcoinaddressfinder.core.ResultListener blockingListener = batchResult -> {
+            reported.add(batchResult);
+            firstBatchEntered.countDown();
+            try {
+                releaseFirstBatch.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        };
+        ConsumerJava consumerJava =
+                new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils, java.util.List.of(blockingListener));
+        consumerJava.initLMDB();
+        consumerJava.startConsumer();
+
+        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), BigInteger.ONE);
+        assertThat(firstBatchEntered.await(10, java.util.concurrent.TimeUnit.SECONDS), is(true));
+        // the second batch holds an address of the database and is still queued
+        ECKey keyInDatabase = new TestAddresses42(1, false).getECKeys().get(0);
+        PublicKeyBytes[] batchWithHit = {PublicKeyBytes.fromPrivate(keyInDatabase.getPrivKey())};
+        consumerJava.consumeKeys(batchWithHit, BigInteger.TWO);
+
+        // the worker is still inside batch 1, so the await times out and the persistence is closed
+        consumerJava.interrupt();
+        releaseFirstBatch.countDown();
+        // wait until the worker has drained batch 2 and ended
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+        while (consumerJava.runningConsumerCount() > 0 && System.nanoTime() < deadline) {
+            Thread.onSpinWait();
+        }
+        assertThat(consumerJava.runningConsumerCount(), is(equalTo(0L)));
+        assertThat(consumerJava.keysQueueSize(), is(equalTo(0)));
+
+        // batch 1 was checked before the close; batch 2 must not be claimed as "checked, nothing found"
+        java.util.List<String> emptyBatch2 = new java.util.ArrayList<>();
+        for (net.ladenthin.bitcoinaddressfinder.core.BatchResult batchResult : reported) {
+            if (BigInteger.TWO.equals(batchResult.secretBase())
+                    && batchResult.hits().isEmpty()) {
+                emptyBatch2.add(batchResult.toString());
+            }
+        }
+        assertThat(emptyBatch2, is(equalTo(java.util.List.of())));
+    }
+
     @AwaitTimeTest
     @Test
     public void interrupt_keysQueueNotEmpty_consumerNotRunningWaitedInternallyForTheDuration() throws Exception {
