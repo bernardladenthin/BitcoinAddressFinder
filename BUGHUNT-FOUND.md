@@ -31,6 +31,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F43](#f43) — mittel — *gefixt*
 - [F44](#f44) — niedrig — *gefixt*
 - [F45](#f45) — mittel — *gefixt*
+- [F46](#f46) — niedrig — *gefixt*
 
 ## Funde
 
@@ -294,6 +295,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix rot (`java.lang.ArrayIndexOutOfBoundsException: Index 64 out of bounds for length 1` aus `PublicKeyBytes.fromPrivate`), mit Fix grün; Gegenprobe per `git stash` des Validators rot mit derselben Exception, nach `stash pop` grün. Breit: `PrivateKeyValidatorTest` 22/22, `ProducerJavaTest` 9/9, `AbstractProducerTest` 20/20, `PublicKeyBytesTest` 32/32, `KeyUtilityTest` 58 (1 seit langem `@Disabled`), `ConsumerJavaTest` 35 (8 LMDB/OpenCL-abhängig übersprungen), `KeyProducerJavaIncrementalTest` 10/10, `PrivateKeyTooLargeExceptionTest` 11/11, `CKeyProducerJavaIncrementalTest` 9/9, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
 - **Commit:** BAF `2d7c23c`
+
+<a id="f46"></a>
+### F46 – BAF: abgebrochener LMDB-Export meldet „writeAllAmounts done“
+- **Zeit:** 2026-10-17 19:10 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/command/LMDBToAddressFile.java:58` (`run`)
+- **Schwere:** niedrig
+- **Beschreibung:** `LMDBPersistence.writeAllAmountsToAddressFile` kehrt bei gelöschtem `shouldRun` (über `interrupt()`, etwa durch den Shutdown-Hook) still zurück und lässt eine angefangene Datei zurück. `LMDBToAddressFile.run` meldete danach trotzdem „writeAllAmounts done“; wer die Datei später wieder importiert, verliert ohne Hinweis alle Adressen hinter dem Abbruch.
+- **Fix:** Nach dem Export unterscheidet `run` zwischen fertig („writeAllAmounts done“, INFO) und abgebrochen (WARN „writeAllAmounts interrupted; <Datei> is incomplete“). Ein `interrupt()`, das erst nach der letzten Zeile ankommt, meldet ebenfalls „incomplete“ – konservativ und ohne Änderung des `Persistence`-Interfaces.
+- **Reproduktion:** `LMDBToAddressFileTest#run_interruptedBeforeTheExport_doesNotReportTheExportAsDone`
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected: not a collection containing "writeAllAmounts done" but: was <[writeAllAmounts ..., writeAllAmounts done]>“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `LMDBToAddressFileTest` 13/13, `MainTest` 18 (6 OpenCL übersprungen), `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** –
 
 ## Offene Verdachte ohne Fund-ID
 

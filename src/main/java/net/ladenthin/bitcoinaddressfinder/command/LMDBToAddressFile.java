@@ -57,7 +57,11 @@ public class LMDBToAddressFile implements Runnable, Interruptable {
             }
             persistence.writeAllAmountsToAddressFile(
                     addressesFile, lmdbToAddressFile.addressFileOutputFormat, shouldRun);
-            LOGGER.info("writeAllAmounts done");
+            if (shouldRun.get()) {
+                LOGGER.info("writeAllAmounts done");
+            } else {
+                LOGGER.warn("writeAllAmounts interrupted; {} is incomplete", addressesFile);
+            }
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to write LMDB dump to " + lmdbToAddressFile.addressesFile, e);
         }
