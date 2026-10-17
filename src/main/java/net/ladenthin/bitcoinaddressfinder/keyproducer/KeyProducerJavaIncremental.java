@@ -39,7 +39,7 @@ public class KeyProducerJavaIncremental extends KeyProducerJava<CKeyProducerJava
         verifyWorkSize(overallWorkSize, cKeyProducerJava.maxWorkSize);
         final BigInteger endPrivateKey = cKeyProducerJava.getEndPrivateKey();
         if (currentValue.compareTo(endPrivateKey) > 0) {
-            throw new NoMoreSecretsAvailableException(currentValue + " exceeds ");
+            throw new NoMoreSecretsAvailableException(currentValue + " exceeds end private key " + endPrivateKey);
         }
 
         int length = returnStartSecretOnly ? 1 : overallWorkSize;
