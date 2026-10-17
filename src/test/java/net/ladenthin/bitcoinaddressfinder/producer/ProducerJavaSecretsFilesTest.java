@@ -33,6 +33,7 @@ import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
 import net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat;
 import net.ladenthin.bitcoinaddressfinder.configuration.UnknownSecretFormatException;
+import net.ladenthin.bitcoinaddressfinder.io.SecretsFile;
 import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
@@ -191,6 +192,40 @@ public class ProducerJavaSecretsFilesTest {
             assertThat(logCaptor.getInfoLogs(), not(hasItem("All secrets files processed.")));
             assertThat(logCaptor.getWarnLogs(), hasItem(containsString("interrupted")));
         }
+    }
+
+    /**
+     * An {@code interrupt()} that arrives after the loop checked the flag but before the next file's reader
+     * is registered must still stop that file: it is not read at all.
+     */
+    @Test
+    public void produceKeys_interruptBetweenFlagCheckAndReaderRegistration_doesNotReadTheFile() throws Exception {
+        File secretsFile = folder.resolve("secrets.txt").toFile();
+        Files.writeString(secretsFile.toPath(), "one\ntwo\nthree\n", StandardCharsets.UTF_8);
+        CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
+        cProducerJavaSecretsFiles.secretsFiles = List.of(secretsFile.getAbsolutePath());
+        cProducerJavaSecretsFiles.secretFormat = STRING_SHA256;
+        cProducerJavaSecretsFiles.batchSizeInBits = 0;
+        MockConsumer mockConsumer = new MockConsumer();
+        ProducerJavaSecretsFiles producer =
+                new ProducerJavaSecretsFiles(
+                        cProducerJavaSecretsFiles,
+                        mockConsumer,
+                        keyUtility,
+                        new MockKeyProducer(keyUtility, new Random(1)),
+                        bitHelper,
+                        new RuntimeStatistics()) {
+                    @Override
+                    SecretsFile createSecretsFile(File file) {
+                        // interrupt() lands after the flag check, while no reader is registered yet
+                        interrupt();
+                        return super.createSecretsFile(file);
+                    }
+                };
+
+        producer.produceKeys();
+
+        assertThat(mockConsumer.publicKeyBytesArrayList.size(), is(equalTo(0)));
     }
 
     @ParameterizedTest

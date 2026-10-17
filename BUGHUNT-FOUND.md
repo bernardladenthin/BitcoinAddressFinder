@@ -35,6 +35,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F47](#f47) — niedrig — *gefixt*
 - [F48](#f48) — niedrig — *gefixt*
 - [F49](#f49) — niedrig — *gefixt*
+- [F50](#f50) — niedrig — *gefixt*
 
 ## Funde
 
@@ -347,8 +348,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** BAF `1a957de`
 
+<a id="f50"></a>
+### F50 – BAF: `ProducerJavaSecretsFiles.interrupt()` zwischen Flagprüfung und Dateistart wird übersehen
+- **Zeit:** 2026-10-17 20:10 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/producer/ProducerJavaSecretsFiles.java:79` (`produceKeys`)
+- **Schwere:** niedrig
+- **Beschreibung:** `produceKeys` prüft das Flag am Anfang jeder Datei, legt dann die `SecretsFile` an und registriert sie erst danach in `currentSecretsFile`. `interrupt()` setzt das Flag und stoppt die registrierte Datei; kam es genau dazwischen, war keine registriert, und die neue `SecretsFile` (mit eigenem, noch gesetztem Flag) las die ganze Datei, obwohl der Producer schon beendet werden sollte – bei großen Wortlisten Minuten bis Stunden, auf die ein Shutdown wartet.
+- **Fix:** Nach dem Registrieren das Flag erneut prüfen und die Datei gegebenenfalls sofort stoppen. Dazu verhaltensneutral die Naht `createSecretsFile(File)` eingezogen (Erzeugung der `SecretsFile` in eine paketinterne Methode verschoben), damit ein Test genau im Fenster `interrupt()` aufrufen kann.
+- **Reproduktion:** `ProducerJavaSecretsFilesTest#produceKeys_interruptBetweenFlagCheckAndReaderRegistration_doesNotReadTheFile`
+- **Rot-Grün-Nachweis:** mit Naht, ohne Fix rot („Expected: is <0> but: was <3>“ – alle drei Secrets gelesen), die übrigen 12 Tests der Klasse grün (Naht verhaltensneutral); mit Fix grün; Gegenprobe (nur die Nachprüfung entfernt, Naht behalten) wieder rot, danach grün. `ProducerJavaSecretsFilesTest` 13/13, `AbstractProducerTest` 20/20, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** –
+
 ## Offene Verdachte ohne Fund-ID
 
-- **`ProducerJavaSecretsFiles.interrupt()` kann die nächste Datei verpassen (2026-10-17, beim Lesen für F49 aufgefallen):** `produceKeys` prüft das Flag am Schleifenanfang und setzt danach `currentSecretsFile`; kommt `interrupt()` genau dazwischen, findet es noch keine Datei zum Stoppen, und die neue `SecretsFile` (mit eigenem, gesetztem Flag) wird vollständig gelesen. Das Fenster ist ein paar Anweisungen breit; die Lösung wäre ein erneutes Prüfen des Flags nach `currentSecretsFile.set`. Für einen Rot-Grün-Nachweis braucht es eine Naht, die genau zwischen Prüfung und Setzen anhält.
 - **`PrivateKeyValidator.getMaxPrivateKeyForBatchSize` lässt n im GPU-Raster zu (2026-10-17, Folge von F45):** `maxSafeKey = n − 2^b + 1` sichert nur `base + 2^b − 1 ≤ n`, das letzte zulässige OpenCL-Raster endet also auf n. Dort stürzt nichts ab (der Kernel liefert für n·G Koordinaten, die zu keinem Eintrag passen), es wird nur ein sinnloser Schlüssel geprüft. Die Korrektur auf `n − 2^b` ändert drei Tests von `getMaxPrivateKeyForBatchSize` und die Grenze von `PrivateKeyTooLargeException` – erst mit Rückmeldung des Nutzers, da kein Fehlverhalten außer einem verschwendeten Rasterplatz.
 - **`KeyProducerJavaIncremental`, Teilbatch am Bereichsende (2026-10-17):** `endPrivateKey` heißt in `CKeyProducerJavaIncremental` „inclusive upper bound“, aber mit `returnStartSecretOnly=false` wirft der letzte, nur teilweise in den Bereich passende Batch und die bis zu `overallWorkSize-1` Schlüssel davor werden nie geprüft; mit `returnStartSecretOnly=true` (OpenCL) läuft der Batch dagegen über das Ende hinaus. Beides legen die Tests ausdrücklich fest (Fälle 3, 5, 8, 9 der Tabelle in `KeyProducerJavaIncrementalTest`), also eine Designentscheidung – für den Nutzer zur Entscheidung, nicht angefasst.
