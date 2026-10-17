@@ -39,6 +39,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F51](#f51) — niedrig — *gefixt*
 - [F52](#f52) — mittel — *gefixt*
 - [F58](#f58) — niedrig — *gefixt*
+- [F66](#f66) — mittel — *gefixt*
 
 ## Funde
 
@@ -398,6 +399,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix rot (beide: „Expected java.lang.NumberFormatException to be thrown, but nothing was thrown.“, 16 Tests, 2 Fehlschläge), mit Fix grün 16/16; Gegenprobe per `git stash` rot (2 Fehlschläge), nach `stash pop` grün. `AddressTxtLineTest` 291/291, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `3c355ee`
+
+<a id="f66"></a>
+### F66 – BAF: Nach dem Shutdown-Timeout werden Batches gegen die geschlossene Datenbank als „geprüft, nichts gefunden“ gemeldet
+- **Zeit:** 2026-10-17 23:25 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/consumer/ConsumerJava.java` (`interrupt`, `processBatch`)
+- **Schwere:** mittel
+- **Beschreibung:** `interrupt()` wartet `awaitQueueEmptySeconds` (Standard 60 s) auf die Worker und schließt danach die Persistenz, auch wenn die Wartezeit abgelaufen ist und ein Worker noch arbeitet (nur „Timeout reached“ wird gewarnt). Seit dem Schutz gegen das Lesen nach dem Schließen antwortet `LMDBPersistence.containsAddress` dann „nicht vorhanden“. Der Worker arbeitet weiter (seit F15 leert er die Queue vor dem Ende) und meldet jeden danach fertigen Batch an die Result-Listener als geprüft, ohne Treffer. Ein Treffer darin geht verloren, ohne Treffer-Log, und ein Client, der einen Bereich abfährt, hält ihn für erledigt – genau die Verwechslung „geprüft, leer“ gegen „nie geprüft“, die der Broadcast laut CLAUDE.md ausschließen soll. Erreichbar, wenn die Queue länger als die Wartezeit zum Leeren braucht (10 Batches à `2^batchSizeInBits`).
+- **Fix:** `interrupt()` setzt vor dem Schließen ein Flag; `processBatch` prüft es nach den Abfragen und meldet einen danach fertigen Batch nicht, sondern loggt eine Warnung mit Größe und Secret-Basis.
+- **Reproduktion:** `ConsumerJavaTest#interrupt_awaitTimesOut_batchCheckedAfterThePersistenceClosedIsNotReportedAsChecked` (Listener hält Batch 1 fest, Batch 2 mit einer Adresse der Test-DB liegt in der Queue, `awaitQueueEmptySeconds = 1`)
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <[]> but: was <[BatchResult[secretBase=2, checkedCount=1, hits=[]]]>“), mit Fix grün, `ConsumerJavaTest` 36/36; Gegenprobe per `git stash` rot, nach `stash pop` grün. Vorprobe: bei offener Datenbank (Freigabe vor `interrupt()`) meldet derselbe Aufbau Batch 2 mit seinem Treffer – der leere Bericht ist also ein verlorener Treffer. `FinderTest` 22/22, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** BitcoinAddressFinder `6c94e19`
 
 ## Offene Verdachte ohne Fund-ID
 
