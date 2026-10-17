@@ -39,7 +39,7 @@ public class Statistics {
      * @param windowGeneratedPerSecond     current candidate-generation throughput in keys/second,
      *                                     averaged over the same trailing window
      * @param rateWindowSeconds            the trailing window (seconds) the rate is averaged over
-     * @param keysSumOfTimeToCheckContains cumulative time (ms) spent in presence lookups
+     * @param keysSumOfTimeToCheckContains cumulative time (ns) spent in presence lookups
      * @param generatedKeysByProducer      generated-candidate counts keyed by producer label
      *                                     ({@code "<keyProducerId> (<Strategy>, <CPU|GPU>)"}); lets
      *                                     concurrently running producers be told apart, and be
@@ -93,7 +93,7 @@ public class Statistics {
                 + "] [Producers running: " + producersRunning + "] [Consumers running: " + consumersRunning
                 + "] [Consumer ready for work (queue empty): " + consumerReady
                 + "] [Producer blocked (queue full): " + producerBlocked + "] [Average contains time: "
-                + averageContainsTime + " ms] [keys queue size: " + keysQueueSize + "] [Hits: " + hits + "]";
+                + averageContainsTime + " ns] [keys queue size: " + keysQueueSize + "] [Hits: " + hits + "]";
     }
 
     /**
