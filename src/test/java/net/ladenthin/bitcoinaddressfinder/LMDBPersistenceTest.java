@@ -127,6 +127,42 @@ public class LMDBPersistenceTest {
         }
     }
 
+    /**
+     * A single batch may need more room than one increase step: AddressFilesToLMDB writes 32 768
+     * entries per transaction, and random keys into a large database dirty a page each. The map must
+     * keep growing until the batch fits; growing it once and giving up aborted the import.
+     */
+    @Test
+    public void putNewAmounts_batchLargerThanOneIncreaseStep_mapGrowsUntilTheBatchFits() throws IOException {
+        // arrange
+        File lmdbFolder = Files.createDirectory(folder.resolve("lmdb")).toFile();
+
+        CLMDBConfigurationWrite cLMDBConfigurationWrite = new CLMDBConfigurationWrite();
+        cLMDBConfigurationWrite.initialMapSizeInMiB = 1;
+        cLMDBConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
+        cLMDBConfigurationWrite.increaseMapAutomatically = true;
+        cLMDBConfigurationWrite.increaseSizeInMiB = 1;
+
+        try (LMDBPersistence lmdbPersistence = new LMDBPersistence(cLMDBConfigurationWrite, persistenceUtils)) {
+            lmdbPersistence.init();
+
+            List<ByteBuffer> hash160s = new ArrayList<>(TOO_MUCH_KEYS_FOR_1MiB);
+            List<Coin> amounts = new ArrayList<>(TOO_MUCH_KEYS_FOR_1MiB);
+            for (int i = 0; i < TOO_MUCH_KEYS_FOR_1MiB; i++) {
+                byte[] hash160 = new byte[20];
+                random.nextBytes(hash160);
+                hash160s.add(byteBufferUtility.byteArrayToByteBuffer(hash160));
+                amounts.add(Coin.valueOf(i + 1L));
+            }
+
+            // act — one transaction that needs several MiB, with 1 MiB increase steps
+            lmdbPersistence.putNewAmounts(hash160s, amounts);
+
+            // assert
+            assertThat(lmdbPersistence.count(), is(equalTo((long) TOO_MUCH_KEYS_FOR_1MiB)));
+        }
+    }
+
     /** The two parallel lists must be the same length; otherwise the pairing is undefined. */
     @Test
     public void putNewAmounts_mismatchedListSizes_throwsIllegalArgumentException() throws IOException {
