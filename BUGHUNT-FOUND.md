@@ -32,6 +32,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F44](#f44) — niedrig — *gefixt*
 - [F45](#f45) — mittel — *gefixt*
 - [F46](#f46) — niedrig — *gefixt*
+- [F47](#f47) — niedrig — *gefixt*
 
 ## Funde
 
@@ -308,7 +309,20 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** BAF `61d9cc2`
 
+<a id="f47"></a>
+### F47 – BAF: abgebrochener Adressimport meldet „... import done.“ und „finished“ für halb gelesene Dateien
+- **Zeit:** 2026-10-17 19:25 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/command/AddressFilesToLMDB.java:165` (`run`), `:251` (`readAllFiles`)
+- **Schwere:** niedrig
+- **Beschreibung:** Musterdurchsicht nach F46. Nach `interrupt()` endet `readFileLines` mitten in der Datei; `readAllFiles` meldete die Datei trotzdem als „finished (n/N files)“, und `run` schloss mit „... import done.“ – obwohl die LMDB nur einen Teil der Adressen enthält. Ein späterer Find-Lauf gegen diese Datenbank übersieht die fehlenden Adressen ohne Hinweis.
+- **Fix:** `readAllFiles` meldet einen beim Lesen unterbrochenen Lauf als „interrupted while reading <Datei>“ und hört auf; `run` meldet bei gelöschtem Flag WARN „... import interrupted; the LMDB in <Verzeichnis> is incomplete.“ statt „... import done.“.
+- **Reproduktion:** `AddressFilesToLMDBTest#addressFilesToLMDB_interruptedBeforeTheImport_doesNotReportTheImportAsDone`
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected: not a collection containing "... import done." but: was <[…, Import summary: 0 written, 0 parsed, 0 unsupported, 0 error(s)., ... import done.]>“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `AddressFilesToLMDBTest` 26/26, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** –
+
 ## Offene Verdachte ohne Fund-ID
 
+- **Gleiches Muster wie F46/F47, noch offen (2026-10-17):** `command/LMDBDelta.java:115` meldet „... delta done: N address(es) written“ auch, wenn die Schleife ab Zeile 164 durch `interrupt()` endete; `producer/ProducerJavaSecretsFiles.java:82/86` meldet „Finished processing“ und „All secrets files processed.“, auch wenn `SecretsFile.readFile` auf `interrupt()` hin mitten in der Datei aufhörte. `LMDBCompact` ist sauber (prüft das Flag vor dem Start, die Kompaktierung selbst ist ein nicht unterbrechbarer Aufruf). Kandidaten für die nächsten Runden.
 - **`PrivateKeyValidator.getMaxPrivateKeyForBatchSize` lässt n im GPU-Raster zu (2026-10-17, Folge von F45):** `maxSafeKey = n − 2^b + 1` sichert nur `base + 2^b − 1 ≤ n`, das letzte zulässige OpenCL-Raster endet also auf n. Dort stürzt nichts ab (der Kernel liefert für n·G Koordinaten, die zu keinem Eintrag passen), es wird nur ein sinnloser Schlüssel geprüft. Die Korrektur auf `n − 2^b` ändert drei Tests von `getMaxPrivateKeyForBatchSize` und die Grenze von `PrivateKeyTooLargeException` – erst mit Rückmeldung des Nutzers, da kein Fehlverhalten außer einem verschwendeten Rasterplatz.
 - **`KeyProducerJavaIncremental`, Teilbatch am Bereichsende (2026-10-17):** `endPrivateKey` heißt in `CKeyProducerJavaIncremental` „inclusive upper bound“, aber mit `returnStartSecretOnly=false` wirft der letzte, nur teilweise in den Bereich passende Batch und die bis zu `overallWorkSize-1` Schlüssel davor werden nie geprüft; mit `returnStartSecretOnly=true` (OpenCL) läuft der Batch dagegen über das Ende hinaus. Beides legen die Tests ausdrücklich fest (Fälle 3, 5, 8, 9 der Tabelle in `KeyProducerJavaIncrementalTest`), also eine Designentscheidung – für den Nutzer zur Entscheidung, nicht angefasst.

@@ -162,7 +162,13 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
                         + "batched writes of " + writeBatchSize + ", queue capacity " + queueCapacity + " ...");
                 importFiles(network, persistence, files, threads, writeBatchSize, queueCapacity);
                 logSummary();
-                LOGGER.info("... import done.");
+                if (shouldRun.get()) {
+                    LOGGER.info("... import done.");
+                } else {
+                    LOGGER.warn(
+                            "... import interrupted; the LMDB in {} is incomplete.",
+                            lmdbConfigurationWrite.lmdbDirectory);
+                }
             } catch (IOException e) {
                 throw new UncheckedIOException(
                         "Failed to import " + addressFilesToLMDB.addressesFiles.size() + " address file(s)", e);
@@ -249,6 +255,10 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
             String path = file.getAbsolutePath();
             LOGGER.info("process " + path);
             readFileLines(file, lineQueue, failure, progress);
+            if (!shouldRun.get()) {
+                LOGGER.warn("interrupted while reading " + path);
+                break;
+            }
             progress.fileFinished(file.length());
             LOGGER.info("finished (" + filesProcessed.incrementAndGet() + "/" + totalFiles + " files): " + path);
         }
