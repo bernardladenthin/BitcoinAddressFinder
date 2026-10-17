@@ -280,7 +280,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `MainTest#loadConfiguration_jsonFileWithUtf8ByteOrderMark_returnsExpectedConfiguration`
 - **Rot-Grün-Nachweis:** ohne Fix rot („JsonParse Unexpected character ('?' (code 65279 / 0xfeff)): expected a valid value“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `MainTest` 18 Tests (6 OpenCL-Tests überspringen sich ohne Gerät, wie zuvor), `ConfigFixturesParseTest` 3/3, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** –
+- **Commit:** BAF `b94d720`
 
 ## Offene Verdachte ohne Fund-ID
 
