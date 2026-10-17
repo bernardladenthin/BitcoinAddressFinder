@@ -293,7 +293,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `ProducerJavaTest#createGrid_gridReachesTheGroupOrder_marksItInvalidAndKeepsTheKeyBelow` (Raster n−1, n, n+1, n+2 mit `batchSizeInBits` 2), dazu `PrivateKeyValidatorTest#isOutsidePrivateKeyRange_groupOrder_returnsTrue`.
 - **Rot-Grün-Nachweis:** ohne Fix rot (`java.lang.ArrayIndexOutOfBoundsException: Index 64 out of bounds for length 1` aus `PublicKeyBytes.fromPrivate`), mit Fix grün; Gegenprobe per `git stash` des Validators rot mit derselben Exception, nach `stash pop` grün. Breit: `PrivateKeyValidatorTest` 22/22, `ProducerJavaTest` 9/9, `AbstractProducerTest` 20/20, `PublicKeyBytesTest` 32/32, `KeyUtilityTest` 58 (1 seit langem `@Disabled`), `ConsumerJavaTest` 35 (8 LMDB/OpenCL-abhängig übersprungen), `KeyProducerJavaIncrementalTest` 10/10, `PrivateKeyTooLargeExceptionTest` 11/11, `CKeyProducerJavaIncrementalTest` 9/9, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** –
+- **Commit:** BAF `2d7c23c`
 
 ## Offene Verdachte ohne Fund-ID
 
