@@ -13,10 +13,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.math.BigInteger;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.core.BatchResult;
 import net.ladenthin.bitcoinaddressfinder.core.Hit;
 import org.junit.jupiter.api.Test;
@@ -34,6 +39,12 @@ class SocketResultBroadcasterTest {
 
     /** Upper bound for every read; exceeding it is a failure, not a slow machine. */
     private static final int AWAIT_MILLIS = 15_000;
+
+    /** Receive buffer of a client that never reads; small so its buffers fill quickly. */
+    private static final int STALLED_RECEIVE_BUFFER_BYTES = 4096;
+
+    /** About 10 MB of batch messages: far more than any loopback socket buffers hold. */
+    private static final int CALLS_TO_FILL_THE_BUFFERS = 100_000;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -123,6 +134,40 @@ class SocketResultBroadcasterTest {
                 assertThat(stayingReader.readLine(), is(notNullValue()));
             }
         } finally {
+            broadcaster.close();
+        }
+    }
+
+    @Test
+    void onBatchChecked_clientConnectedButNeverReading_doesNotBlockTheCaller() throws Exception {
+        // onBatchChecked runs on the consumer's worker threads. A client that connects and never
+        // reads fills its TCP buffers; a blocking write to it then stalls every consumer thread,
+        // i.e. the scan, for as long as the client stays connected.
+
+        // arrange
+        final int port = freePort();
+        final SocketResultBroadcaster broadcaster = new SocketResultBroadcaster(port);
+        final ExecutorService caller = Executors.newSingleThreadExecutor();
+        try {
+            broadcaster.start();
+            ConnectionUtils.waitUntilTcpPortOpen("127.0.0.1", port, AWAIT_MILLIS);
+            try (Socket stalled = new Socket()) {
+                stalled.setReceiveBufferSize(STALLED_RECEIVE_BUFFER_BYTES);
+                stalled.connect(new InetSocketAddress("127.0.0.1", port));
+                broadcaster.awaitClientCount(1, AWAIT_MILLIS);
+
+                // act
+                final Future<?> calls = caller.submit(() -> {
+                    for (int i = 0; i < CALLS_TO_FILL_THE_BUFFERS; i++) {
+                        broadcaster.onBatchChecked(new BatchResult(BigInteger.valueOf(i), 1, List.of()));
+                    }
+                });
+
+                // assert
+                calls.get(AWAIT_MILLIS, TimeUnit.MILLISECONDS);
+            }
+        } finally {
+            caller.shutdownNow();
             broadcaster.close();
         }
     }
