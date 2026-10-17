@@ -8,7 +8,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 
 ## Übersicht
 
-- [F04](#f04) — niedrig — *unsicher / nur beschrieben*
+- [F04](#f04) — niedrig — *gefixt*
 - [F08](#f08) — hoch — *gefixt*
 - [F10](#f10) — mittel — *gefixt*
 - [F11](#f11) — niedrig — *nur beschrieben*
@@ -33,9 +33,11 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Schwere:** niedrig
 - **Beschreibung:** Der Puffer für `CL_DEVICE_MAX_WORK_ITEM_SIZES` ist fest 3×`size_t` groß. Meldet ein Gerät `CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS > 3` (Spezifikation erlaubt das, Minimum ist 3), verlangt `clGetDeviceInfo` einen größeren Puffer und liefert `CL_INVALID_VALUE` → `OpenClCallFailedException` → `build()` scheitert für **alle** Plattformen, auch `OpenCLInfo`. Die Dimension wird im selben Konstruktoraufruf bereits abgefragt und könnte als Anzahl dienen. Alle gängigen Treiber (NVIDIA, AMD, Intel, PoCL) melden 3, daher theoretisch.
 - **Nebenbei geprüft, widerlegt:** `getComparableVersionFromDeviceVersion` mit realen Strings (`OpenCL 2.0 AMD-APP (3513.0)`, `OpenCL 3.0 PoCL HSTR: …`, `OpenCL 1.2 Apple`, `OpenCL 3.0 Mesa 24.0.5`, …) gegen `ComparableVersion("2.0")` – alle korrekt eingeordnet.
-- **Reproduktion:** keine (braucht ein Gerät mit >3 Dimensionen; ein Fake-`ClApi` bildet die native Puffergrößenprüfung nicht ab).
-- **Status:** unsicher / nur beschrieben
-- **Commit:** –
+- **Reproduktion:** `OpenCLBuilderTest#build_deviceWithMoreThanThreeWorkItemDimensions_readsEverySize` (Mockito-`ClApi`, das wie `clGetDeviceInfo` einen zu kleinen Puffer für `CL_DEVICE_MAX_WORK_ITEM_SIZES` mit `CL_INVALID_VALUE` ablehnt)
+- **Fix:** `createOpenCLDevice` fragt `CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS` zuerst ab und dimensioniert damit die Abfrage der Größen; die feste Konstante `MAX_WORK_ITEM_SIZE_DIMENSIONS = 3` entfällt.
+- **Rot-Grün-Nachweis:** ohne Fix rot 1/4 („Unexpected exception thrown: IllegalStateException: clGetDeviceInfo: CL_INVALID_VALUE“), mit Fix grün 4/4 (1 übersprungen: der vorhandene Test für ein echtes OpenCL-Gerät, das hier fehlt), Gegenprobe per `git stash` rot, nach `stash pop` grün. `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** siehe Git-Log („Size the work-item-sizes query by the reported dimension count“)
 
 <a id="f08"></a>
 ### F08 – BAF: Secrets-Datei mit `batchUsePrivateKeyIncrement=false` prüft kein einziges Secret
