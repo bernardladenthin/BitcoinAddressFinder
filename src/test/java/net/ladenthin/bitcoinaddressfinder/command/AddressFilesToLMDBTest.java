@@ -307,6 +307,27 @@ public class AddressFilesToLMDBTest extends LMDBBase {
         }
     }
 
+    /** An import stopped by {@code interrupt()} leaves an incomplete database and must not be reported as done. */
+    @Test
+    public void addressFilesToLMDB_interruptedBeforeTheImport_doesNotReportTheImportAsDone() throws Exception {
+        List<String> files = writeAddressFilesRoundRobin(base58P2PKHAddresses(), 2, "interrupted");
+        CAddressFilesToLMDB config = new CAddressFilesToLMDB();
+        config.addressesFiles.addAll(files);
+        config.lmdbConfigurationWrite = new CLMDBConfigurationWrite();
+        File lmdbFolder =
+                Files.createDirectory(folder.resolve("lmdb-interrupted")).toFile();
+        config.lmdbConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
+        AddressFilesToLMDB importer = new AddressFilesToLMDB(config);
+        importer.interrupt();
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(AddressFilesToLMDB.class)) {
+            importer.run();
+
+            assertThat(logCaptor.getInfoLogs(), not(hasItem("... import done.")));
+            assertThat(logCaptor.getWarnLogs(), hasItem(containsString("interrupted")));
+        }
+    }
+
     private List<String> base58P2PKHAddresses() {
         List<String> addresses = new ArrayList<>();
         for (P2PKH staticTestAddress : P2PKH.values()) {
