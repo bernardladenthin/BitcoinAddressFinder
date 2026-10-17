@@ -131,3 +131,18 @@ Ergebnisse: `kein Fund`, `widerlegt` (Verdacht geprüft, Code korrekt), `unsiche
 - `src/main/java/net/ladenthin/bitcoinaddressfinder/configuration/CKeyProducerJavaRandom.java` · `875affe` · 2026-10-17 · kein Fund — Standard `SECURE_RANDOM`, `customSeed` optional, wie dokumentiert.
 - `src/main/java/net/ladenthin/bitcoinaddressfinder/configuration/CCompactLMDB.java` · `a2f7ce7` · 2026-10-17 · kein Fund — „Muss sich vom Quellverzeichnis unterscheiden“ prüft `LMDBCompact` über kanonische Pfade (Zeile 68), Zielverzeichnis wird angelegt.
 - `src/main/java/net/ladenthin/bitcoinaddressfinder/configuration/GpuFilterType.java` · `8126996` · 2026-10-17 · kein Fund — Werte 0/1 stimmen mit `GPU_FILTER_TYPE_FUSE8`/`FUSE16` in `inc_ecc_secp256k1custom.cl` überein.
+- `src/main/java/net/ladenthin/bitcoinaddressfinder/constants/AddressConstants.java` · `eb1e8b7` · 2026-10-17 · kein Fund — Reine Konstanten.
+- `src/main/java/net/ladenthin/bitcoinaddressfinder/opencl/binding/ClBufferFlags.java` · `60c6051` · 2026-10-17 · kein Fund — Spiegelt die vier LWJGL-`CL_MEM_*`-Flags.
+- `src/main/java/net/ladenthin/bitcoinaddressfinder/constants/Radix.java` · `419f216` · 2026-10-17 · kein Fund — Eine Konstante (16).
+- `src/main/java/net/ladenthin/bitcoinaddressfinder/core/BatchResult.java` · `5cf1809` · 2026-10-17 · kein Fund — `hits` per `List.copyOf` unveränderlich kopiert (wirft bei null-Elementen, die der Consumer nie erzeugt).
+- `src/main/java/net/ladenthin/bitcoinaddressfinder/core/Hit.java` · `4c2df29` · 2026-10-17 · kein Fund — Record mit JDK-Typen, wie die Schicht verlangt.
+- `src/main/java/net/ladenthin/bitcoinaddressfinder/opencl/OpenCLPlatform.java` · `22cb9ff` · 2026-10-17 · kein Fund — Unveränderlicher Record mit `ImmutableList`.
+- `src/main/java/net/ladenthin/bitcoinaddressfinder/opencl/binding/OpenClBinding.java` · `065838e` · 2026-10-17 · kein Fund — Verdrahtet `LwjglClApi` mit Fehlerprüfer und Lader.
+- `src/main/java/net/ladenthin/bitcoinaddressfinder/opencl/ReleaseCLObject.java` · `75fb0b8` · 2026-10-17 · kein Fund — Schnittstelle, `close()` ohne checked Exception.
+- `src/main/java/net/ladenthin/bitcoinaddressfinder/opencl/binding/ClHandle.java` · `ba03e5b` · 2026-10-17 · kein Fund — Versiegelte Schnittstelle über die acht Handle-Records.
+- `src/main/java/net/ladenthin/bitcoinaddressfinder/configuration/CCommand.java` · `36957d1` · 2026-10-17 · kein Fund — Alle sieben Befehle haben einen Zweig in `Main` (Zeilen 279–325).
+- `src/main/java/net/ladenthin/bitcoinaddressfinder/configuration/CSecretFormat.java` · `f6c6c5f` · 2026-10-17 · kein Fund — Alle vier Formate werden in `SecretsFile.processLine` behandelt.
+- `src/main/java/net/ladenthin/bitcoinaddressfinder/configuration/CKeyProducerJavaRandomAlgorithm.java` · `3227b2f` · 2026-10-17 · kein Fund — Alle vier Algorithmen werden in `KeyProducerJavaRandom` behandelt.
+- `src/main/java/net/ladenthin/bitcoinaddressfinder/configuration/KernelProfileStage.java` · `689c481` · 2026-10-17 · kein Fund — Drei Profilstufen, reiner Schalter.
+- `src/main/java/net/ladenthin/bitcoinaddressfinder/configuration/CAddressFileOutputFormat.java` · `7168040` · 2026-10-17 · kein Fund — Alle drei Formate werden in `LMDBPersistence` (Zeilen 439–442) behandelt.
+- `src/main/java/net/ladenthin/bitcoinaddressfinder/model/AddressType.java` · `055eb20` · 2026-10-17 · kein Fund — Zwei Typen, reiner Marker.
