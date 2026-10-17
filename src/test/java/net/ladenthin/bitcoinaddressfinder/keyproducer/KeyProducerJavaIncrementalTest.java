@@ -191,6 +191,16 @@ public class KeyProducerJavaIncrementalTest {
         assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(1, true));
     }
 
+    @Test
+    public void createSecrets_startExceedsEnd_messageNamesTheEndPrivateKey() throws Exception {
+        KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
+                "0000000000000000000000000000000000000000000000000000000000000010",
+                "0000000000000000000000000000000000000000000000000000000000000005");
+        NoMoreSecretsAvailableException e =
+                assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(1, true));
+        assertThat(e.getMessage(), is(equalTo("16 exceeds end private key 5")));
+    }
+
     /**
      * Tests that requesting a batch larger than the available keys before the end address
      * causes a NoMoreSecretsAvailableException to be thrown.

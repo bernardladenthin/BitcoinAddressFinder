@@ -26,6 +26,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F34](#f34) — mittel — *gefixt*
 - [F35](#f35) — niedrig — *nur beschrieben*
 - [F40](#f40) — mittel — *gefixt*
+- [F41](#f41) — niedrig — *gefixt*
 
 ## Funde
 
@@ -230,6 +231,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** BAF `be8ff36`
 
+<a id="f41"></a>
+### F41 – BAF: abgeschnittene Meldung, wenn der inkrementelle Producer schon hinter dem Bereichsende steht
+- **Zeit:** 2026-10-17 17:45 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/KeyProducerJavaIncremental.java:42` (`createSecrets`)
+- **Schwere:** niedrig
+- **Beschreibung:** Steht `currentValue` bereits hinter `endPrivateKey` (Bereich erschöpft oder Start > Ende konfiguriert), wirft `createSecrets` `NoMoreSecretsAvailableException` mit der Meldung `"<wert> exceeds "` – der Satz bricht ab, das Bereichsende fehlt. Die zweite Prüfung in der Schleife derselben Methode nennt es („exceeds end private key …“). Seit der Einführung der Datei so (`git log -L`).
+- **Fix:** Die Meldung nennt das Ende wie die Schleifenprüfung: `currentValue + " exceeds end private key " + endPrivateKey`.
+- **Reproduktion:** `KeyProducerJavaIncrementalTest#createSecrets_startExceedsEnd_messageNamesTheEndPrivateKey`
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is "16 exceeds end private key 5" but: was "16 exceeds "“), mit Fix grün 10/10 (skipped 0); Gegenprobe per `git stash` rot (10 Tests, 1 Failure), nach `stash pop` grün. `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** –
+
 ## Offene Verdachte ohne Fund-ID
 
-- keine
+- **`KeyProducerJavaIncremental`, Teilbatch am Bereichsende (2026-10-17):** `endPrivateKey` heißt in `CKeyProducerJavaIncremental` „inclusive upper bound“, aber mit `returnStartSecretOnly=false` wirft der letzte, nur teilweise in den Bereich passende Batch und die bis zu `overallWorkSize-1` Schlüssel davor werden nie geprüft; mit `returnStartSecretOnly=true` (OpenCL) läuft der Batch dagegen über das Ende hinaus. Beides legen die Tests ausdrücklich fest (Fälle 3, 5, 8, 9 der Tabelle in `KeyProducerJavaIncrementalTest`), also eine Designentscheidung – für den Nutzer zur Entscheidung, nicht angefasst.
