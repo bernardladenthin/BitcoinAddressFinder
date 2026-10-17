@@ -27,6 +27,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F35](#f35) — niedrig — *nur beschrieben*
 - [F40](#f40) — mittel — *gefixt*
 - [F41](#f41) — niedrig — *gefixt*
+- [F42](#f42) — mittel — *gefixt*
 
 ## Funde
 
@@ -242,6 +243,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is "16 exceeds end private key 5" but: was "16 exceeds "“), mit Fix grün 10/10 (skipped 0); Gegenprobe per `git stash` rot (10 Tests, 1 Failure), nach `stash pop` grün. `spotbugs:check` grün.
 - **Status:** gefixt
 - **Commit:** BAF `767708a`
+
+<a id="f42"></a>
+### F42 – BAF: UTF-8-BOM am Dateianfang bleibt in der ersten Zeile – erstes Brainwallet-Secret falsch, erste Adresse unlesbar
+- **Zeit:** 2026-10-17 18:10 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/io/AbstractPlaintextFile.java:73` (`readFile`)
+- **Schwere:** mittel
+- **Beschreibung:** `readFile` dekodiert jede Zeile als UTF-8, entfernt aber eine Byte-Order-Mark (EF BB BF) am Dateianfang nicht; Windows-Editoren schreiben UTF-8 oft so. Die erste Zeile beginnt dann mit U+FEFF. Bei `secretFormat` `STRING_SHA256` wird die erste Passphrase mitsamt BOM gehasht: ein falsches Secret, ohne Fehler und ohne Zählung – die gemeinte Brainwallet wird nie geprüft. Bei `BIG_INTEGER`, `SHA256` und `DUMPED_PRIVATE_KEY` scheitert die erste Zeile, bei Adressdateien (`AddressFile`, `AddressFilesToLMDB` über dieselbe Basis) ist die erste Adresse „unsupported“.
+- **Fix:** Die erste Zeile verliert ein führendes U+FEFF, bevor sie an `processLine` geht; alle weiteren Zeilen bleiben unverändert.
+- **Reproduktion:** `SecretsFileTest#readFile_stringDoSha256FormatWithUtf8ByteOrderMark_firstLineIsHashedWithoutTheMark`
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <72155939…63272> but: was <26164307…44373>“ – SHA256 von „U+FEFF test“ statt „test“), mit Fix grün 11/11 (skipped 0); Gegenprobe per `git stash` rot (1 Failure), nach `stash pop` grün. `AbstractPlaintextFileTest` 11/11, `AddressFileTest` 11/11, `ProducerJavaSecretsFilesTest` 11/11, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** –
 
 ## Offene Verdachte ohne Fund-ID
 

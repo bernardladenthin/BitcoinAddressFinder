@@ -25,6 +25,9 @@ public abstract class AbstractPlaintextFile implements Interruptable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractPlaintextFile.class);
 
+    /** The UTF-8 byte order mark as a decoded character; Windows editors write it at the start of a file. */
+    private static final char BYTE_ORDER_MARK = '\uFEFF';
+
     /** The file being read. */
     protected final @NonNull File file;
     /** Statistic updated while the file is being processed. */
@@ -70,12 +73,19 @@ public abstract class AbstractPlaintextFile implements Interruptable {
      */
     public void readFile() throws IOException {
         try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+            boolean firstLine = true;
             while (shouldRun.get()) {
                 String line = raf.readLine();
                 if (line == null) {
                     return;
                 }
                 String utf8 = new String(line.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
+                if (firstLine) {
+                    firstLine = false;
+                    if (!utf8.isEmpty() && utf8.charAt(0) == BYTE_ORDER_MARK) {
+                        utf8 = utf8.substring(1);
+                    }
+                }
                 readStatistic.currentFileProgress = calculateFileProgress(raf);
                 try {
                     processLine(utf8);
