@@ -38,6 +38,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F50](#f50) — niedrig — *gefixt*
 - [F51](#f51) — niedrig — *gefixt*
 - [F52](#f52) — mittel — *gefixt*
+- [F58](#f58) — niedrig — *gefixt*
 
 ## Funde
 
@@ -385,6 +386,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <1> but: was <0>“ – der zweite Producer wurde nie freigegeben), mit Fix grün; Gegenprobe per `git stash` rot, nach `stash pop` grün. `ProducerReleaserTest` 4/4, `FinderTest` 22/22, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün (nach Aufnahme in die Unterdrückung; der Lauf davor war rot und wurde nicht gepusht).
 - **Status:** gefixt
 - **Commit:** BAF `338ec00`
+
+<a id="f58"></a>
+### F58 – BitcoinAddressFinder: vorzeichenbehafteter Base36-Hash wird als Zweierkomplement importiert
+- **Zeit:** 2026-10-17 21:15 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/util/Base36Decoder.java:31` (`decodeBase36ToFixedLengthBytes`)
+- **Schwere:** niedrig
+- **Beschreibung:** Die Javadoc verspricht eine `NumberFormatException` für Eingaben, die kein gültiges Base36 sind. `new BigInteger(s, 36)` akzeptiert aber ein führendes `-` oder `+`. Eine BitCore-Adresszeile wie `wkh_-1` (Aufrufer `AddressTxtLine.fromLine`) wurde so zu den Zweierkomplement-Bytes von −1 dekodiert und als Hash in die LMDB übernommen, statt als fehlerhafte Zeile gezählt zu werden (der Import fängt die `NumberFormatException` und zählt sie).
+- **Fix:** Ein führendes Vorzeichen wirft dieselbe `NumberFormatException` wie jede andere ungültige Ziffer.
+- **Reproduktion:** `Base36DecoderTest#decodeBase36ToFixedLengthBytes_leadingMinus_throwsNumberFormatException`, `…_leadingPlus_throwsNumberFormatException`
+- **Rot-Grün-Nachweis:** ohne Fix rot (beide: „Expected java.lang.NumberFormatException to be thrown, but nothing was thrown.“, 16 Tests, 2 Fehlschläge), mit Fix grün 16/16; Gegenprobe per `git stash` rot (2 Fehlschläge), nach `stash pop` grün. `AddressTxtLineTest` 291/291, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** BitcoinAddressFinder `3c355ee`
 
 ## Offene Verdachte ohne Fund-ID
 
