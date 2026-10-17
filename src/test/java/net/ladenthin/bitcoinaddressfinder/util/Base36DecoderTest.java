@@ -235,5 +235,20 @@ public class Base36DecoderTest {
         // assert
         assertThat(reencoded, is(equalTo(encoded)));
     }
+
+    /**
+     * Base36 has no sign. {@code BigInteger(String, 36)} accepts a leading {@code -} or {@code +},
+     * so without a check a line such as {@code wkh_-1} decoded to the two's-complement bytes of -1
+     * and was imported as a hash instead of being rejected as malformed.
+     */
+    @Test
+    public void decodeBase36ToFixedLengthBytes_leadingMinus_throwsNumberFormatException() {
+        assertThrows(NumberFormatException.class, () -> decoder.decodeBase36ToFixedLengthBytes("-1", 20));
+    }
+
+    @Test
+    public void decodeBase36ToFixedLengthBytes_leadingPlus_throwsNumberFormatException() {
+        assertThrows(NumberFormatException.class, () -> decoder.decodeBase36ToFixedLengthBytes("+1", 20));
+    }
     // </editor-fold>
 }
