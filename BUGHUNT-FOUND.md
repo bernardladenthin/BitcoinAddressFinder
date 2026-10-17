@@ -241,7 +241,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `KeyProducerJavaIncrementalTest#createSecrets_startExceedsEnd_messageNamesTheEndPrivateKey`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is "16 exceeds end private key 5" but: was "16 exceeds "“), mit Fix grün 10/10 (skipped 0); Gegenprobe per `git stash` rot (10 Tests, 1 Failure), nach `stash pop` grün. `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** –
+- **Commit:** BAF `767708a`
 
 ## Offene Verdachte ohne Fund-ID
 
