@@ -345,7 +345,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `ProducerJavaSecretsFilesTest#produceKeys_interruptedWhileReadingAFile_doesNotReportTheFileOrTheRunAsProcessed` (ein Consumer ruft nach dem ersten Schlüssel `interrupt()`)
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: not a collection containing a string starting with "Finished processing" but: was <[…, Finished processing: …/secrets.txt, Progress: … Current File progress: 28.…]>“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `ProducerJavaSecretsFilesTest` 12/12, `AbstractProducerTest` 20/20, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** –
+- **Commit:** BAF `1a957de`
 
 ## Offene Verdachte ohne Fund-ID
 
