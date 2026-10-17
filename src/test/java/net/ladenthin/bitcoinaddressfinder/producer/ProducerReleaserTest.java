@@ -6,6 +6,8 @@ package net.ladenthin.bitcoinaddressfinder.producer;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.sameInstance;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -16,6 +18,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -55,6 +58,29 @@ class ProducerReleaserTest {
         releaser.release(List.copyOf(producers));
 
         // assert
+        for (CountingProducer producer : producers) {
+            assertThat(producer.releaseCount(), is(equalTo(1)));
+        }
+    }
+
+    /**
+     * A producer whose release fails (an OpenCL release call raises on a driver error) must not keep the
+     * producers after it from being interrupted and released; the failure is still reported afterwards.
+     */
+    @Test
+    void release_firstProducerFailsToRelease_releasesTheOthersAndRethrows() {
+        // arrange
+        final ProducerReleaser releaser = new ProducerReleaser();
+        final List<CountingProducer> producers = createProducers();
+        final IllegalStateException failure = new IllegalStateException("clReleaseContext failed");
+        producers.get(0).failOnRelease(failure);
+
+        // act
+        IllegalStateException thrown =
+                assertThrows(IllegalStateException.class, () -> releaser.release(List.copyOf(producers)));
+
+        // assert
+        assertThat(thrown, is(sameInstance(failure)));
         for (CountingProducer producer : producers) {
             assertThat(producer.releaseCount(), is(equalTo(1)));
         }
@@ -143,9 +169,24 @@ class ProducerReleaserTest {
 
         private final AtomicInteger releaseCount = new AtomicInteger();
 
+        private @Nullable RuntimeException releaseFailure;
+
+        /**
+         * Makes {@link #releaseProducer()} throw {@code failure} after counting the call.
+         *
+         * @param failure the exception to throw on release
+         */
+        void failOnRelease(RuntimeException failure) {
+            this.releaseFailure = failure;
+        }
+
         @Override
         public void releaseProducer() {
             releaseCount.incrementAndGet();
+            RuntimeException localFailure = releaseFailure;
+            if (localFailure != null) {
+                throw localFailure;
+            }
         }
 
         /**

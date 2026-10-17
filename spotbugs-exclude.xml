@@ -743,6 +743,15 @@ SPDX-License-Identifier: Apache-2.0
                 <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext"/>
                 <Method name="allocateFilterBuffers"/>
             </And>
+            <And>
+                <!--
+                    ProducerReleaser.release keeps releasing the remaining producers when one teardown
+                    throws (F52), then rethrows that first caught exception unchanged (later ones as
+                    suppressed). Same caught-and-rethrown pattern, deferred until the loop is done.
+                -->
+                <Class name="net.ladenthin.bitcoinaddressfinder.producer.ProducerReleaser"/>
+                <Method name="release"/>
+            </And>
         </Or>
         <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
     </Match>
