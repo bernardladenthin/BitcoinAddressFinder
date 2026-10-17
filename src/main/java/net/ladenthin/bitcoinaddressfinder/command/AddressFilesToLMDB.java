@@ -87,6 +87,9 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
     /** Trailing window over which the read throughput (for the ETA) is averaged. */
     private static final long RATE_WINDOW_MILLIS = 60_000L;
 
+    /** The UTF-8 byte order mark as a decoded character; Windows editors write it at the start of a file. */
+    private static final char BYTE_ORDER_MARK = '\uFEFF';
+
     private static final Logger LOGGER = LoggerFactory.getLogger(AddressFilesToLMDB.class);
 
     private final @NonNull CAddressFilesToLMDB addressFilesToLMDB;
@@ -272,9 +275,16 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(Files.newInputStream(file.toPath()), StandardCharsets.UTF_8))) {
             long charsRead = 0;
+            boolean firstLine = true;
             String line;
             while (shouldRun.get() && failure.get() == null && (line = reader.readLine()) != null) {
                 charsRead += line.length() + 1L;
+                if (firstLine) {
+                    firstLine = false;
+                    if (!line.isEmpty() && line.charAt(0) == BYTE_ORDER_MARK) {
+                        line = line.substring(1);
+                    }
+                }
                 if (!enqueue(lineQueue, line, failure)) {
                     return;
                 }
