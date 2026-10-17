@@ -72,7 +72,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Fix:** `containsAddress` misst mit `System.nanoTime()` und summiert Nanosekunden; die Statistikzeile meldet „Average contains time: N ns“. README-Beispiel und -Tabelle sowie die erwarteten Zeichenketten in `ConsumerJavaTest`/`StatisticsTest` angepasst. Achtung, sichtbare Formatänderung: Wer die Logzeile maschinell liest, sieht jetzt `ns` statt `ms`.
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is a value equal to or greater than <1000000L> but: <1L> was less than <1000000L>“), mit Fix grün; `ConsumerJavaTest` 35/35, `StatisticsTest` 11/11 (skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** siehe Git-Log („Measure the address lookup time in nanoseconds“)
+- **Commit:** BAF `43ebd7a`
 
 <a id="f14"></a>
 ### F14 – BAF: BIP39-Producer hält jeden abgeleiteten Schlüssel im Speicher → OutOfMemory bei langen Läufen
