@@ -132,12 +132,22 @@ public class PrivateKeyValidatorTest {
     }
 
     @Test
-    public void isOutsidePrivateKeyRange_maxPrivateKey_returnsFalse() {
+    public void isOutsidePrivateKeyRange_keyBelowTheGroupOrder_returnsFalse() {
+        // act
+        boolean result =
+                validator.isOutsidePrivateKeyRange(Secp256k1Constants.MAX_PRIVATE_KEY.subtract(BigInteger.ONE));
+
+        // assert
+        assertThat(result, is(false));
+    }
+
+    @Test
+    public void isOutsidePrivateKeyRange_groupOrder_returnsTrue() {
         // act
         boolean result = validator.isOutsidePrivateKeyRange(Secp256k1Constants.MAX_PRIVATE_KEY);
 
         // assert
-        assertThat(result, is(false));
+        assertThat(result, is(true));
     }
 
     @Test
@@ -236,7 +246,7 @@ public class PrivateKeyValidatorTest {
         // arrange
         BigInteger[] secrets = new BigInteger[] {
             Secp256k1Constants.MIN_VALID_PRIVATE_KEY,
-            Secp256k1Constants.MAX_PRIVATE_KEY,
+            Secp256k1Constants.MAX_PRIVATE_KEY.subtract(BigInteger.ONE),
             Secp256k1Constants.MIN_VALID_PRIVATE_KEY.add(BigInteger.ONE)
         };
         BigInteger[] expectedCopy = secrets.clone();

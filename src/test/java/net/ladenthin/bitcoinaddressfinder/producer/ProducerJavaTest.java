@@ -15,6 +15,7 @@ import net.ladenthin.bitcoinaddressfinder.MockConsumer;
 import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
 import net.ladenthin.bitcoinaddressfinder.ToStringTest;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
@@ -83,6 +84,31 @@ public class ProducerJavaTest {
                 cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         AbstractProducerTest.verifyReleaseProducer(producerJava);
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="createGrid">
+    /**
+     * The secp256k1 group order n is not a private key: n·G is the point at infinity, which has no
+     * public key. A grid that reaches n must mark it invalid instead of deriving a key from it.
+     */
+    @Test
+    public void createGrid_gridReachesTheGroupOrder_marksItInvalidAndKeepsTheKeyBelow() {
+        CProducerJava cProducerJava = new CProducerJava();
+        cProducerJava.batchSizeInBits = 2;
+        MockConsumer mockConsumer = new MockConsumer();
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, new Random(1));
+        ProducerJava producerJava = new ProducerJava(
+                cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
+        // n ends in 0x41, so n - 1 is aligned to the 4-key grid: n - 1, n, n + 1, n + 2
+        BigInteger groupOrderMinusOne = Secp256k1Constants.MAX_PRIVATE_KEY.subtract(BigInteger.ONE);
+
+        PublicKeyBytes[] grid = producerJava.createGrid(groupOrderMinusOne);
+
+        assertThat(grid[0], is(equalTo(PublicKeyBytes.fromPrivate(groupOrderMinusOne))));
+        assertThat(grid[1], is(equalTo(PublicKeyBytes.INVALID_KEY_ONE)));
+        assertThat(grid[2], is(equalTo(PublicKeyBytes.INVALID_KEY_ONE)));
+        assertThat(grid[3], is(equalTo(PublicKeyBytes.INVALID_KEY_ONE)));
     }
     // </editor-fold>
 

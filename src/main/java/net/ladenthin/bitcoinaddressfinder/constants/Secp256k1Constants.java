@@ -63,8 +63,8 @@ public final class Secp256k1Constants {
             MIN_VALID_PRIVATE_KEY.toString(Radix.HEX).toUpperCase(Locale.ROOT);
 
     /**
-     * Uppercase hexadecimal representation of the secp256k1 group order
-     * (the maximum valid private key).
+     * Uppercase hexadecimal representation of the secp256k1 group order {@code n},
+     * the exclusive upper bound of the private keys.
      *
      * <p>This is the public curve parameter {@code n} from
      * <a href="https://www.secg.org/sec2-v2.pdf">SEC 2 v2</a>, &sect;2.4.1
@@ -76,8 +76,9 @@ public final class Secp256k1Constants {
     public static final String MAX_PRIVATE_KEY_HEX = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141";
 
     /**
-     * The maximum valid private key according to the secp256k1
-     * specification &mdash; the group order of the curve.
+     * The secp256k1 group order {@code n}, the exclusive upper bound of the private keys:
+     * valid keys are below it, and {@code n} itself is not one ({@code n·G} is the point at
+     * infinity, which has no public key).
      *
      * <p>Parsed from {@link #MAX_PRIVATE_KEY_HEX} via {@link Radix#HEX} so
      * the "16" radix is named at the single source of truth in the same

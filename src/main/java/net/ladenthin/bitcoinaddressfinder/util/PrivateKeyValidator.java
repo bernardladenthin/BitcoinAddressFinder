@@ -78,14 +78,16 @@ public class PrivateKeyValidator {
     /**
      * Checks whether a private key falls outside the valid range for secp256k1.
      * <p>
-     * Valid private keys are in the range [{@link Secp256k1Constants#MIN_VALID_PRIVATE_KEY}, {@link Secp256k1Constants#MAX_PRIVATE_KEY}].
+     * Valid private keys are in the range [{@link Secp256k1Constants#MIN_VALID_PRIVATE_KEY},
+     * {@link Secp256k1Constants#MAX_PRIVATE_KEY}). The upper bound is the group order {@code n}
+     * and is exclusive: {@code n·G} is the point at infinity, which has no public key.
      *
      * @param secret the private key to check
      * @return true if the key is outside the valid range; false otherwise
      */
     public boolean isOutsidePrivateKeyRange(@NonNull BigInteger secret) {
         return secret.compareTo(Secp256k1Constants.MIN_VALID_PRIVATE_KEY) < 0
-                || secret.compareTo(Secp256k1Constants.MAX_PRIVATE_KEY) > 0;
+                || secret.compareTo(Secp256k1Constants.MAX_PRIVATE_KEY) >= 0;
     }
 
     /**

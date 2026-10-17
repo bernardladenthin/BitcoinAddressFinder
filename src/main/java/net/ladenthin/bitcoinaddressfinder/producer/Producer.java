@@ -30,7 +30,7 @@ public interface Producer extends Runnable, Interruptable, ProducerStateProvider
      * Create multiple keys for a specific bit length using {@link Random} and
      * push them to the {@link Consumer}.
      *
-     * Specifically, any 256-bit number between {@code 0x1} and
+     * Specifically, any 256-bit number from {@code 0x1} up to, but excluding, the group order
      * {@link net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants#MAX_PRIVATE_KEY} is a valid private key.
      *
      * @throws Exception if key production fails for any reason
