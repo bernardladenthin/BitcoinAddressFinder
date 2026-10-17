@@ -113,6 +113,9 @@ public class AddressTxtLine {
         if (line.trim().startsWith(IGNORE_LINE_PREFIX)) {
             throw new AddressFormatNotAcceptedException(REASON_IGNORE_PREFIX, line);
         }
+        // Trimmed before splitting: space and tab are separators, so a leading one would produce an
+        // empty first token and an indented line would be rejected as having no address.
+        line = line.trim();
         // Remove the Bitcoin Cash prefix (which includes a colon) to avoid incorrect splitting.
         // This ensures the address is recognized properly and not misinterpreted during parsing.
         if (line.contains(BITCOIN_CASH_PREFIX)) {

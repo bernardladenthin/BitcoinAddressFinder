@@ -90,6 +90,23 @@ public class AddressTxtLineTest {
     }
 
     @Test
+    public void fromLine_addressWithLeadingWhitespace_returnHash160AndAmount()
+            throws AddressFormatNotAcceptedException {
+        // The address column is trimmed, so a line indented by a space or a tab (aligned columns,
+        // hand-edited lists) must parse like the unindented one. Splitting on the whitespace
+        // separators first produced an empty leading token, and the line was rejected as empty.
+        for (String indent : new String[] {" ", "\t", "  "}) {
+            // act
+            AddressToCoin addressToCoin =
+                    new AddressTxtLine().fromLine(indent + staticKey.publicKeyCompressed + ",123", keyUtility);
+
+            // assert
+            assertThat(addressToCoin.hash160(), is(equalTo(staticKey.byteBufferPublicKeyCompressed)));
+            assertThat(addressToCoin.coin(), is(equalTo(Coin.valueOf(123))));
+        }
+    }
+
+    @Test
     public void fromLine_compressedBitcoinAddressGiven_returnHash160AndDefaultCoin()
             throws AddressFormatNotAcceptedException {
         // act
