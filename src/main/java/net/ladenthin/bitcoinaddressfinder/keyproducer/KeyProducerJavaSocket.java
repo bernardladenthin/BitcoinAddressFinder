@@ -62,9 +62,28 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
      * @param config      the socket configuration
      * @param keyUtility  cryptographic helper
      * @param bitHelper   bit/batch-size helper (unused but kept for symmetry)
+     * @throws IllegalArgumentException if {@code config.timeoutMillis} is negative
      */
     public KeyProducerJavaSocket(CKeyProducerJavaSocket config, KeyUtility keyUtility, BitHelper bitHelper) {
-        super(config, keyUtility);
+        super(requireNonNegativeTimeout(config), keyUtility);
+    }
+
+    /**
+     * Rejects a negative {@code timeoutMillis}. {@code java.net} throws {@code IllegalArgumentException}
+     * for a negative SO_TIMEOUT, but inside the reader future nothing would see it: the reader would die
+     * silently and {@link #createSecrets} would block forever. Checked before {@code super(...)} so no
+     * partially constructed producer exists when it throws.
+     *
+     * @param config the socket configuration
+     * @return {@code config}, unchanged
+     * @throws IllegalArgumentException if {@code timeoutMillis} is negative
+     */
+    private static CKeyProducerJavaSocket requireNonNegativeTimeout(CKeyProducerJavaSocket config) {
+        if (config.timeoutMillis < 0) {
+            throw new IllegalArgumentException(
+                    "timeoutMillis must not be negative for the socket key producer, but was " + config.timeoutMillis);
+        }
+        return config;
     }
 
     /**

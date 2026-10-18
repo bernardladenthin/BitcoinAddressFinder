@@ -717,6 +717,20 @@ public class KeyProducerJavaSocketTest {
     }
 
     @Test
+    public void constructor_negativeTimeout_isRejectedInsteadOfHangingSilently() {
+        // java.net rejects a negative SO_TIMEOUT with IllegalArgumentException. Thrown inside the reader
+        // future, nothing ever saw it: the reader died without a log line and createSecrets blocked in
+        // take() forever (a negative timeout means "block" there). The configuration documents that a
+        // negative value prevents the producer from initialising.
+        CKeyProducerJavaSocket config = createServerConfig(findFreePort());
+        config.timeoutMillis = -1;
+
+        IllegalArgumentException e = assertThrows(
+                IllegalArgumentException.class, () -> new KeyProducerJavaSocket(config, keyUtility, bitHelper));
+        assertThat(e.getMessage(), containsString("-1"));
+    }
+
+    @Test
     @Timeout(value = 5000, unit = TimeUnit.MILLISECONDS)
     public void serverAcceptTimesOut_whenNoClientConnects() throws Exception {
         int port = findFreePort();

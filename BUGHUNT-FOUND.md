@@ -40,6 +40,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F52](#f52) — mittel — *gefixt*
 - [F58](#f58) — niedrig — *gefixt*
 - [F66](#f66) — mittel — *gefixt*
+- [F100](#f100) — niedrig — *gefixt*
 
 ## Funde
 
@@ -411,6 +412,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <[]> but: was <[BatchResult[secretBase=2, checkedCount=1, hits=[]]]>“), mit Fix grün, `ConsumerJavaTest` 36/36; Gegenprobe per `git stash` rot, nach `stash pop` grün. Vorprobe: bei offener Datenbank (Freigabe vor `interrupt()`) meldet derselbe Aufbau Batch 2 mit seinem Treffer – der leere Bericht ist also ein verlorener Treffer. `FinderTest` 22/22, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `6c94e19`
+
+### F100 – BAF: Socket-Key-Producer mit negativem `timeoutMillis` hängt still statt beim Start zu scheitern
+- **Zeit:** 2026-10-18 06:50 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/KeyProducerJavaSocket.java:68` (Konstruktor, `requireNonNegativeTimeout` neu)
+- **Schwere:** niedrig
+- **Beschreibung:** Vergleich der drei Netzwerk-Key-Producer (Socket, WebSocket, ZeroMQ). WebSocket und ZeroMQ erlauben `timeoutMillis: -1` (blockieren), die CLAUDE.md empfiehlt das für interaktive Läufe. `CKeyProducerJavaSocket` dokumentiert, dass ein negativer Wert hier nicht unterstützt wird und den Start des Producers verhindert. Tatsächlich verhinderte er nichts: `ServerSocket.setSoTimeout(-1)`/`Socket.connect(addr, -1)` werfen `IllegalArgumentException` im Reader-Runnable, dessen `Future` niemand ausliest – keine Logzeile, der Reader ist tot, und `createSecrets` blockiert bei negativem Timeout in `take()` für immer. Wer die WebSocket-Einstellung auf den Socket-Producer überträgt, sieht einen hängenden Lauf ohne Fehlermeldung.
+- **Fix:** Der Konstruktor prüft `timeoutMillis` vor `super(...)` (Muster aus F51/BIP39) und wirft eine `IllegalArgumentException` mit dem Wert, wie die Konfiguration es verspricht.
+- **Reproduktion:** `KeyProducerJavaSocketTest#constructor_negativeTimeout_isRejectedInsteadOfHangingSilently`
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected java.lang.IllegalArgumentException to be thrown, but nothing was thrown.“), mit Fix grün (19/19 der Klasse, skipped 0); Gegenprobe per `git stash` rot (1), nach `pop` grün. `FinderTest` 22/22, `AbstractKeyProducerQueueBufferedTest` 11/11, `ConfigFixturesParseTest` 3/3, `BitcoinAddressFinderArchitectureTest` 17/17, `spotless:apply` und `spotbugs:check` grün. Kein Beispiel unter `examples/` nutzt einen negativen Socket-Timeout.
+- **Nebenbefund (nicht geändert):** Auch die `IllegalStateException` „Unable to establish socket connection … after N attempts“ am Ende des Readers geht im unbeobachteten `Future` verloren; der Nutzer sieht nur die einzelnen „Connection attempt N failed“-Warnungen und danach eine `NoMoreSecretsAvailableException` mit „Timeout while waiting for secret“.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 
