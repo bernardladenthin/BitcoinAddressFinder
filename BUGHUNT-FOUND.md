@@ -450,7 +450,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `SocketResultBroadcasterTest#announceConfiguration_whileAClientIsBeingRegistered_theClientStillReceivesIt` – über die neue, verhaltensneutrale Naht `setBeforeClientRegistered` läuft die Ankündigung auf einem zweiten Thread genau im Fenster, bis sie endet oder auf das Lock wartet (`Thread.State.BLOCKED`).
 - **Rot-Grün-Nachweis:** gegen den Naht-Stand ohne Fix rot („Expected: is not null but: was null“, kein `config` binnen 3 s), mit Fix grün (7/7 der Klasse, skipped 0); Gegenprobe durch Zurückkopieren des Naht-Stands rot (1), danach wieder grün. Breite Liste (alle drei Broadcaster, `KeyProducerJavaSocketTest`, `FinderTest`, `BitcoinAddressFinderArchitectureTest`) grün, `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** BitcoinAddressFinder `59dfecf`
 
 ## Offene Verdachte ohne Fund-ID
 
