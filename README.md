@@ -796,6 +796,9 @@ In addition to standard script types, the importer also recognizes and supports 
 * **Riecoin P2SH as ScriptPubKey**  
   Riecoin P2SH addresses are provided as raw ScriptPubKey hex (starting with `76a914...`).
 
+* **Bare hash160 in hex**  
+  A line of exactly 40 hex characters (case-insensitive), optionally followed by a separator and an amount, is read as the hash160 itself. This is the line format of the `HexHash` export, so an exported file can be imported again.
+
 ---
 
 > **Legend:**  
@@ -986,7 +989,7 @@ though a hash that originally came from a P2SH/bech32/altcoin address is written
 The exporter provides various output formats for Bitcoin and altcoin address data:
 
 * **HexHash**  
-  Exports addresses as raw `hash160` (RIPEMD-160 of the SHA-256 of the public key), encoded in hexadecimal. No version byte or checksum is included. Ideal for advanced usage and low-level comparison. Best viewed in fixed-width hex viewers (e.g., HxD).
+  Exports addresses as raw `hash160` (RIPEMD-160 of the SHA-256 of the public key), encoded in hexadecimal. No version byte or checksum is included. Ideal for advanced usage and low-level comparison. Best viewed in fixed-width hex viewers (e.g., HxD). The import reads such lines back (see "Bare hash160 in hex" under the import formats); the origin of a hash (P2PKH, P2SH, P2WPKH) and its amount are not part of this format.
 
 * **FixedWidthBase58BitcoinAddress**  
   Exports Base58Check-encoded addresses (e.g., legacy `P2PKH`) in a fixed-width format for consistent alignment. No amount is included. Suitable for hex/byte-aligned visual inspection and batch comparison.

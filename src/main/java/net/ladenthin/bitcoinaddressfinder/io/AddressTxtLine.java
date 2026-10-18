@@ -53,6 +53,13 @@ public class AddressTxtLine {
     /** A CashAddr in uppercase: version character {@code Q} or {@code P} and 41 characters of the charset. */
     private static final Pattern UPPERCASE_CASH_ADDR = Pattern.compile("[QP][QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L]{41}");
 
+    /**
+     * A bare hash160 in hex, as the {@code HexHash} export writes it (case-insensitive). No other
+     * accepted format is 40 characters of hex only: Base58 addresses are at most 35 characters, a
+     * CashAddr is 42, the Riecoin script 46, and Bech32 carries characters outside hex.
+     */
+    private static final Pattern HEX_HASH160 = Pattern.compile("[0-9a-fA-F]{40}");
+
     /** Creates a new {@link AddressTxtLine}. */
     public AddressTxtLine() {}
 
@@ -166,6 +173,13 @@ public class AddressTxtLine {
                 final ByteBuffer hash160 = keyUtility.byteBufferUtility().getByteBufferFromHex(hash160Hex);
                 return new AddressToCoin(hash160, amount, AddressType.P2PKH_OR_P2SH);
             }
+        }
+
+        // Bare hash160 in hex: the HexHash export format (LMDBToAddressFile). The origin of the hash
+        // (P2PKH, P2SH, P2WPKH) is not part of it.
+        if (HEX_HASH160.matcher(address).matches()) {
+            final ByteBuffer hash160 = keyUtility.byteBufferUtility().getByteBufferFromHex(address);
+            return new AddressToCoin(hash160, amount, AddressType.P2PKH_OR_P2SH);
         }
 
         // Blockchair Multisig (P2MS) format is not supported

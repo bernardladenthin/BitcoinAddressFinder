@@ -8,6 +8,7 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.util.Locale;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
 import net.ladenthin.bitcoinaddressfinder.constants.AddressConstants;
 import net.ladenthin.bitcoinaddressfinder.model.AddressToCoin;
@@ -27,6 +28,7 @@ import org.bouncycastle.util.encoders.Hex;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class AddressTxtLineTest {
 
@@ -40,6 +42,30 @@ public class AddressTxtLineTest {
     }
 
     // <editor-fold defaultstate="collapsed" desc="fromLine">
+    /**
+     * The {@code HexHash} export writes one bare hash160 in hex per line. It is read back as that
+     * hash160, whatever its digits and case: a line without a {@code 0} used to fall through to the
+     * Base58 decoder and import a different hash160, and one with a {@code 0} was rejected.
+     */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "1111111111111111111111111111111111111111",
+                "6623791143505099d01f49706aa85d86839a3fb8",
+                "6623791143505099D01F49706AA85D86839A3FB8",
+                "6623791143505099d01f49706aa85d86839a3fb8,123"
+            })
+    public void fromLine_hexHash160_isImportedAsThatHash160(String line) throws AddressFormatNotAcceptedException {
+        // act
+        AddressToCoin addressToCoin = new AddressTxtLine().fromLine(line, keyUtility);
+
+        // assert
+        String expected = line.split(",")[0].toLowerCase(Locale.ROOT);
+        assertThat(
+                Hex.toHexString(keyUtility.byteBufferUtility().byteBufferToBytes(addressToCoin.hash160())),
+                is(equalTo(expected)));
+    }
+
     @Test
     public void fromLine_addressLineIsEmpty_throwsAddressFormatNotAcceptedException() {
         // act
