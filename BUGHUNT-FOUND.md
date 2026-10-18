@@ -754,7 +754,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **CI-Bedarf:** der `test-opencl`-Job mit dem neuen `LD_PRELOAD`; Messung auf echten GPU-Treibern laut `TODO.md`.
 - **Rot-Grün-Nachweis:** siehe Tests.
 - **Status:** gefixt
-- **Commit:** –
+- **Commit:** 5c8833c
 
 ## Offene Verdachte ohne Fund-ID
 
