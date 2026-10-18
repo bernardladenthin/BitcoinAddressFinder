@@ -1538,7 +1538,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
             if (doubled <= (1L << winner.batchSizeInBits())) {
                 return new SweepExtension(winner.batchSizeInBits(), (int) doubled, "keysPerWorkItem");
             }
-            return null;
+            // the grid is full; a winner on the largest swept batchSizeInBits can still grow that axis
         }
         if (winner.batchSizeInBits() == largestSweptBatchSizeInBits
                 && winner.batchSizeInBits() < OpenClKernelConstants.BIT_COUNT_FOR_MAX_CHUNKS_ARRAY) {

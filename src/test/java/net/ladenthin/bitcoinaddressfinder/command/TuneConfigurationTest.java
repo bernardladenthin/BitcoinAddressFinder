@@ -692,6 +692,22 @@ public class TuneConfigurationTest extends LMDBBase {
         assertThat(TuneConfiguration.nextExtensionArm(winner, 16, 5, true), is(nullValue()));
     }
 
+    /**
+     * A {@code keysPerWorkItem} that cannot double inside the grid does not end the extension when
+     * the winner also sits on the largest swept {@code batchSizeInBits}: one more bit is still a valid
+     * arm, and the next one that grid makes room for the doubling.
+     */
+    @Test
+    public void nextExtensionArm_keysPerWorkItemFillsTheGridAtTheLargestBatchSize_continuesByOneBit() {
+        TuneConfiguration.ArmResult winner = new TuneConfiguration.ArmResult(8, 256, 1_000.0d, 10.0d, 20.0d, null);
+
+        TuneConfiguration.SweepExtension next = TuneConfiguration.nextExtensionArm(winner, 256, 8, true);
+
+        assertThat(next, is(notNullValue()));
+        assertThat(next.batchSizeInBits(), is(equalTo(9)));
+        assertThat(next.keysPerWorkItem(), is(equalTo(256)));
+    }
+
     @Test
     public void nextExtensionArm_winnerAtTheLargestSweptBatchSizeBelowTheCap_continuesByOneBit() {
         TuneConfiguration.ArmResult winner = new TuneConfiguration.ArmResult(20, 64, 60_076_715.26d, 1.0d, 20.0d, null);
