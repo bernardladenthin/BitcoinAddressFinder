@@ -42,6 +42,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F66](#f66) — mittel — *gefixt*
 - [F100](#f100) — niedrig — *gefixt*
 - [F101](#f101) — niedrig — *gefixt*
+- [F119](#f119) — niedrig — *gefixt*
 
 ## Funde
 
@@ -438,6 +439,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: a collection containing a string containing "Unable to establish socket connection" but: was empty“), mit Fix grün (20/20 der Klasse, skipped 0); Gegenprobe per `git stash` rot (1), nach `pop` grün. `FinderTest` 22/22, `AbstractKeyProducerQueueBufferedTest` 11/11, `ConfigFixturesParseTest` 3/3, `BitcoinAddressFinderArchitectureTest` 17/17, `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `eb3ee16`
+
+<a id="f119"></a>
+### F119 – BitcoinAddressFinder: Ein Client, der während der Gitter-Ankündigung verbindet, erfährt das Gitter nie
+- **Zeit:** 2026-10-18 12:20 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/SocketResultBroadcaster.java:154` (Accept-Schleife, `announceConfiguration`)
+- **Schwere:** niedrig
+- **Beschreibung:** Die Accept-Schleife las `configurationMessage` (noch `null`) und registrierte den Client erst danach in `clients`. Lief `announceConfiguration` von `Finder.configureProducer` genau dazwischen, traf ihr `broadcast` den Client nicht (noch nicht registriert) und sein Gruß enthielt sie auch nicht (schon gelesen). Der TCP-Transport wiederholt die Konfiguration nicht (anders als ZeroMQ), der Client erhält `batchSizeInBits` also nie und kann den Schritt nicht kennen – laut CLAUDE.md sendet er dann still falsch ausgerichtete Bereiche. Das Fenster liegt genau dort, wo Clients typischerweise verbinden: kurz nach `startKeyProducer()`, vor dem Ende von `configureProducer()`. Der WebSocket-Weg hat das Problem nicht: Java-WebSocket trägt die Verbindung vor `onOpen` in die Menge ein, `greetAll` erreicht sie also.
+- **Fix:** Ein Lock ordnet beides: Gruß lesen und Client registrieren geschehen unter `registrationLock`, ebenso Setzen und Senden der Ankündigung. Eine Ankündigung liegt damit entweder vor der Registrierung (der Gruß trägt sie) oder danach (ihr `broadcast` erreicht den Client). `broadcast` ruft nur `offer`, blockiert unter dem Lock also nicht.
+- **Reproduktion:** `SocketResultBroadcasterTest#announceConfiguration_whileAClientIsBeingRegistered_theClientStillReceivesIt` – über die neue, verhaltensneutrale Naht `setBeforeClientRegistered` läuft die Ankündigung auf einem zweiten Thread genau im Fenster, bis sie endet oder auf das Lock wartet (`Thread.State.BLOCKED`).
+- **Rot-Grün-Nachweis:** gegen den Naht-Stand ohne Fix rot („Expected: is not null but: was null“, kein `config` binnen 3 s), mit Fix grün (7/7 der Klasse, skipped 0); Gegenprobe durch Zurückkopieren des Naht-Stands rot (1), danach wieder grün. Breite Liste (alle drei Broadcaster, `KeyProducerJavaSocketTest`, `FinderTest`, `BitcoinAddressFinderArchitectureTest`) grün, `spotless:apply` und `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 

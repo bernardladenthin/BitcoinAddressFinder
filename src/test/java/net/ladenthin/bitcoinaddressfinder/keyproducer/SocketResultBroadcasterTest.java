@@ -16,14 +16,17 @@ import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import net.ladenthin.bitcoinaddressfinder.core.BatchResult;
 import net.ladenthin.bitcoinaddressfinder.core.Hit;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -39,6 +42,9 @@ class SocketResultBroadcasterTest {
 
     /** Upper bound for every read; exceeding it is a failure, not a slow machine. */
     private static final int AWAIT_MILLIS = 15_000;
+
+    /** Read timeout for a message that, when it is sent at all, is sent at once. */
+    private static final int SHORT_READ_MILLIS = 3_000;
 
     /** Receive buffer of a client that never reads; small so its buffers fill quickly. */
     private static final int STALLED_RECEIVE_BUFFER_BYTES = 4096;
@@ -221,7 +227,63 @@ class SocketResultBroadcasterTest {
             broadcaster.close();
         }
     }
+
+    @Test
+    void announceConfiguration_whileAClientIsBeingRegistered_theClientStillReceivesIt() throws Exception {
+        // arrange: the announcement runs on another thread exactly while the accept loop has decided
+        // the new client's greeting but not yet registered it; the hook lets it run until it either
+        // finishes or has to wait for the registration
+        final int port = freePort();
+        final SocketResultBroadcaster broadcaster = new SocketResultBroadcaster(port);
+        final ExecutorService announcer = Executors.newSingleThreadExecutor();
+        try {
+            broadcaster.setBeforeClientRegistered(() -> {
+                final AtomicReference<@Nullable Thread> announcing = new AtomicReference<>();
+                final Future<?> announcement = announcer.submit(() -> {
+                    announcing.set(Thread.currentThread());
+                    broadcaster.announceConfiguration(18, true);
+                });
+                final long deadline = System.currentTimeMillis() + AWAIT_MILLIS;
+                while (!announcement.isDone() && System.currentTimeMillis() < deadline) {
+                    final Thread thread = announcing.get();
+                    if (thread != null && thread.getState() == Thread.State.BLOCKED) {
+                        return;
+                    }
+                    Thread.onSpinWait();
+                }
+            });
+            broadcaster.start();
+
+            // act
+            try (Socket client = connect(port)) {
+                client.setSoTimeout(SHORT_READ_MILLIS);
+                final String line = readLineOrNull(reader(client));
+
+                // assert
+                assertThat(line, is(notNullValue()));
+                assertThat(objectMapper.readTree(line).get("type").asText(), is(equalTo("config")));
+            }
+        } finally {
+            broadcaster.close();
+            announcer.shutdownNow();
+        }
+    }
     // </editor-fold>
+
+    /**
+     * Reads one line, treating a read timeout as "nothing arrived".
+     *
+     * @param clientReader the reader to read from
+     * @return the line, or {@code null} if none arrived in time
+     * @throws Exception if the read fails for another reason
+     */
+    private static @Nullable String readLineOrNull(BufferedReader clientReader) throws Exception {
+        try {
+            return clientReader.readLine();
+        } catch (SocketTimeoutException e) {
+            return null;
+        }
+    }
 
     /**
      * Opens a client connection with a bounded read timeout.

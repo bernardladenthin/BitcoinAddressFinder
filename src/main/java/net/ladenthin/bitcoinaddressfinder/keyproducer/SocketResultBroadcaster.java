@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -79,6 +80,10 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
     @ToString.Exclude
     private final Set<Client> clients = new CopyOnWriteArraySet<>();
 
+    /** Orders an announcement against the registration of a new client; see the accept loop. */
+    @ToString.Exclude
+    private final Object registrationLock = new Object();
+
     @ToString.Exclude
     private final ExecutorService acceptExecutor = Executors.newSingleThreadExecutor();
 
@@ -94,6 +99,13 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
     /** The greeting, once the producer configuration it describes is known. */
     @ToString.Exclude
     private volatile @Nullable String configurationMessage;
+
+    /**
+     * Runs on the accept thread after a new client's greeting is decided and before the client is
+     * registered. A no-op outside tests, which use it to interleave an announcement with a connect.
+     */
+    @ToString.Exclude
+    private volatile Runnable beforeClientRegistered = () -> {};
 
     /**
      * Creates a broadcaster serving on the given port. The server is not started here.
@@ -136,13 +148,18 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
                     LOGGER.info("Result listener connected: {}", String.valueOf(socket.getRemoteSocketAddress()));
                     // A client that arrives after the grid is known must not have to wait for the
                     // next republication to learn it. Queued before the client is registered, so the
-                    // greeting is the first line it receives.
-                    final String greeting = configurationMessage;
-                    if (greeting != null) {
-                        // the queue is still empty, so this cannot exceed its capacity
-                        client.queue().add(greeting);
+                    // greeting is the first line it receives. Under the lock an announcement either
+                    // happened before (the greeting carries it) or happens after the registration
+                    // (its broadcast reaches the client); without it, one in between reached neither.
+                    synchronized (registrationLock) {
+                        final String greeting = configurationMessage;
+                        if (greeting != null) {
+                            // the queue is still empty, so this cannot exceed its capacity
+                            client.queue().add(greeting);
+                        }
+                        beforeClientRegistered.run();
+                        clients.add(client);
                     }
-                    clients.add(client);
                     startWriter(client);
                 } catch (java.net.SocketTimeoutException e) {
                     // expected: the timeout exists so the loop can observe shouldStop
@@ -169,8 +186,10 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
             LOGGER.error("Could not serialise the grid configuration; clients will not receive it.", e);
             return;
         }
-        configurationMessage = message;
-        broadcast(message);
+        synchronized (registrationLock) {
+            configurationMessage = message;
+            broadcast(message);
+        }
     }
 
     @Override
@@ -184,6 +203,16 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
             return;
         }
         broadcast(message);
+    }
+
+    /**
+     * Installs the hook that runs between deciding a new client's greeting and registering it.
+     *
+     * @param hook the code to run on the accept thread
+     */
+    @VisibleForTesting
+    void setBeforeClientRegistered(Runnable hook) {
+        this.beforeClientRegistered = hook;
     }
 
     /**
