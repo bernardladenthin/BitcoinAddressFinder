@@ -485,10 +485,10 @@ public class LMDBPersistence implements Persistence, AddressIterable {
      * <p>If {@link org.lmdbjava.Env.MapFullException} occurs and
      * {@link CLMDBConfigurationWrite#increaseMapAutomatically} is enabled,
      * the map size is increased by {@link CLMDBConfigurationWrite#increaseSizeInMiB}
-     * and the insert is retried once.
+     * and the insert is retried, as often as needed until it fits (see {@code growMapOrRethrow}).
      *
-     * <p>If the second attempt also fails, the configured increase size is too small.
-     * If automatic growth is disabled, the original exception is rethrown.
+     * <p>If automatic growth is disabled or {@code increaseSizeInMiB} is {@code 0} or less,
+     * the original exception is rethrown without resizing the map.
      */
     private void putNewAmountWithAutoIncrease(ByteBuffer hash160, Coin amount) {
         CLMDBConfigurationWrite localLmdbConfigurationWrite = Objects.requireNonNull(lmdbConfigurationWrite);

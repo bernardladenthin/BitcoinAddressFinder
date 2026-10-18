@@ -58,7 +58,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F139](#f139) — mittel — *gefixt*
 - [F140](#f140) — mittel — *gefixt*
 - [F141](#f141) — niedrig — *gefixt (Doku)*
-- [F142](#f142) — niedrig — *nur beschrieben*
+- [F142](#f142) — niedrig — *gefixt (Doku)*
 - [F144](#f144) — niedrig — *gefixt (Doku)*
 - [F145](#f145) — niedrig — *gefixt (Doku)*
 - [F146](#f146) — niedrig — *gefixt (Doku)*
@@ -199,6 +199,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `LMDBPersistenceTest#putNewAmounts_batchLargerThanOneIncreaseStep_mapGrowsUntilTheBatchFits` (128 Ki Einträge in einer Transaktion bei 1 MiB Schrittweite; vorher `MapFullException: Environment mapsize reached`, nachher grün). `LMDBPersistenceTest` 50/50 (inkl. der bestehenden Tests zur genauen Anzahl der Vergrößerungen), `AddressFilesToLMDBTest` 24/24 grün.
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `ccdb3cf`
+- **Nachtrag:** die private Javadoc von `putNewAmountWithAutoIncrease` wurde dabei übersehen, siehe [F142](#f142).
 
 <a id="f31"></a>
 ### F31 – BAF: `LMDBCompact` löscht die Quell-Datenbank, wenn das Ziel die Quelle unter anderer Schreibweise ist
@@ -674,10 +675,14 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/persistence/lmdb/LMDBPersistence.java:483` (Javadoc von `putNewAmountWithAutoIncrease`)
 - **Schwere:** niedrig
 - **Beschreibung:** Die Javadoc sagt, nach `MapFullException` werde die Map um `increaseSizeInMiB` vergrößert „and the insert is retried once“, und „if the second attempt also fails, the configured increase size is too small“. Seit F27 wächst die Map in einer Schleife über `growMapOrRethrow`, bis der Eintrag passt; geworfen wird nur noch bei `increaseMapAutomatically = false` oder `increaseSizeInMiB <= 0`. Ende zu Ende bestätigt: Import von 50 000 Adressen mit `initialMapSizeInMiB` 1 und `increaseSizeInMiB` 1 läuft durch (Exit 0, „50000 written“, `data.mdb` auf 5 MiB gewachsen). Reine Doku-Abweichung, das Verhalten ist das bessere.
-- **Fix:** keiner – nach der Regel vom 17. ohne Test keine Änderung; für eine Javadoc gibt es keinen roten Test. Der Satz wäre an die Javadoc von `putNewAmounts`/`growMapOrRethrow` anzugleichen.
-- **Reproduktion:** Lesen gegen `putNewAmountWithAutoIncrease` (Schleife `while (true)` um `growMapOrRethrow`).
-- **Rot-Grün-Nachweis:** – (nicht gefixt)
-- **Status:** nur beschrieben
+- **Historie:** Die Javadoc kam mit `b46c6ca` (2025-11-23) und stimmte damals: einmal vergrößern, einmal wiederholen, beim zweiten `MapFullException` ein Konfigurationsproblem. Veraltet ist sie durch meinen eigenen F27-Fix `ccdb3cf` (2026-10-17), der beide Pfade auf die Schleife über `growMapOrRethrow` umgestellt und die Javadoc von `CLMDBConfigurationWrite.increaseSizeInMiB` angepasst, diese private Javadoc aber übersehen hat. Fließtext außerhalb des Codes (README, docs) beschreibt das Wachstum nicht; `examples/config_AddressFilesToLMDB.json` (`increaseSizeInMiB: 1`) passt.
+- **Auswirkung:** keine für Nutzer. Die Methode ist `private`, ihre Javadoc steht nicht in der veröffentlichten API; die öffentliche Konfigurations-Javadoc ist richtig.
+- **Fix:** Javadoc beschreibt die Wiederholung „as often as needed“ und das Werfen ohne Vergrößerung bei `increaseMapAutomatically = false` oder `increaseSizeInMiB <= 0`.
+- **Lücke geschlossen:** Der dokumentierte Vertrag „`0` disables growth“ hatte keinen Test. Neu: `LMDBPersistenceTest#putNewAmount_increaseSizeZero_fullMapThrowsWithoutResizing` und `#putNewAmounts_increaseSizeZero_fullMapThrowsWithoutResizing` (`MapFullException`, `getIncreasedCounter() == 0`, Map bleibt 1 MiB, Timeout 20 s).
+- **Gegenprobe:** `|| config.increaseSizeInMiB <= 0` testweise aus `growMapOrRethrow` entfernt → beide Tests rot (Endlosschleife, Timeout); zurückgesetzt. Die Prüfung trägt also das Verhalten.
+- **Bestehend abgedeckt:** `#putNewAmounts_batchLargerThanOneIncreaseStep_mapGrowsUntilTheBatchFits` (Schleife, Batch), `#putNewAmount_initialLMDBSetTo1MiB_fillWithTooMuchValues_increaseDatabaseSizeAndNoExceptionThrown` (Wachstum, Einzelpfad), `#putNewAmount_initialLMDBSetTo1MiB_fillWithTooMuchValues_exceptionThrown` (`increaseMapAutomatically = false`).
+- **Rot-Grün-Nachweis:** – (Doku-Korrektur; die neuen Tests halten den Vertrag fest)
+- **Status:** gefixt (Doku)
 - **Commit:** –
 
 <a id="f144"></a>
