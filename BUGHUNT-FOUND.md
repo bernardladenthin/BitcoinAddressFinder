@@ -46,6 +46,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F120](#f120) — mittel — *gefixt*
 - [F121](#f121) — niedrig — *gefixt*
 - [F122](#f122) — niedrig — *gefixt*
+- [F124](#f124) — niedrig — *gefixt*
 
 ## Funde
 
@@ -490,6 +491,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is "751e76e8199196d454941c45d1b3a323f1433bd6" but: was "21e32e15ba0d03cb848d066dccdb18df5745ef83"“), mit Fix grün (294/294 der Klasse, skipped 0); Gegenprobe per `git stash` rot (1), nach `pop` grün. Breite Liste wie F121 grün, `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `1107caf`
+
+<a id="f124"></a>
+### F124 – BitcoinAddressFinder: Strg-C während des Datenbankladens meldet „Key producer id is unknown“
+- **Zeit:** 2026-10-18 15:10 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/engine/Finder.java:463` (`configureProducer`), `:243` (`startConsumer`), Aufrufer `cli/Main.run` (Startphasen) und der Shutdown-Hook
+- **Schwere:** niedrig
+- **Beschreibung:** `Main.run` startet nacheinander Key-Producer, Consumer (lädt die LMDB, der lange Schritt) und Producer. Ein Strg-C ruft aus dem Shutdown-Hook `Finder.interrupt()` auf, das die Key-Producer unterbricht und die Map leert (`freeAllKeyProducers`). Der Main-Thread läuft danach weiter: `configureProducer` sucht die Key-Producer-ID und wirft `KeyProducerIdUnknownException`, `Main` loggt „Fatal error during Main.run“ samt Stacktrace und meldet so einen Konfigurationsfehler, den es nicht gibt. Fällt das Strg-C in den Key-Producer-Start, lädt `startConsumer` die ganze Datenbank noch, obwohl nichts sie mehr nutzt. Es fehlte ein Merker, den die späteren Startschritte prüfen (Muster wie F50).
+- **Fix:** `interrupt()` setzt unter dem `interruptLock` ein `volatile`-Flag; `startConsumer` und `configureProducer` kehren dann mit einer Info-Zeile zurück. `initProducer`/`startProducer` finden danach keine Producer.
+- **Reproduktion:** `FinderTest#configureProducer_interruptedWhileConsumerStarted_doesNotReportUnknownKeyProducer`, `FinderTest#startConsumer_interruptedBefore_consumerNotStarted`
+- **Rot-Grün-Nachweis:** ohne Fix beide rot („Unexpected exception thrown: …KeyProducerIdUnknownException: Key producer id is unknown: exampleId“ bzw. „Expected: is an empty collection but: <[ConsumerJava(…)]>“), mit Fix grün (2/2, skipped 0); Gegenprobe per `git stash` rot (2), nach `pop` grün. Breite Liste: `FinderTest` 24/24, `MainTest` 18 (6 OpenCL übersprungen wie zuvor), `ConsumerJavaTest` 36/36, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 

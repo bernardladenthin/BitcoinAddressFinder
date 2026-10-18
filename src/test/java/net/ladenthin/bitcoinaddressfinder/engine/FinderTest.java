@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder.engine;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
@@ -168,6 +169,56 @@ public class FinderTest {
         finder.interrupt();
         finder.shutdownAndAwaitTermination();
         // assert
+    }
+
+    /**
+     * A {@code Ctrl+C} while the consumer loads its database is the common case: that load is the
+     * long step of the startup. The interrupt frees the key producers, and the startup that resumes
+     * afterwards must not report their absence as a configuration error.
+     */
+    @Test
+    public void configureProducer_interruptedWhileConsumerStarted_doesNotReportUnknownKeyProducer() throws Exception {
+        // arrange
+        CFinder cFinder = new CFinder();
+        String keyProducerId = "exampleId";
+        final CProducerJava cProducerJava = new CProducerJava();
+        cProducerJava.keyProducerId = keyProducerId;
+        cFinder.producerJava.add(cProducerJava);
+        configureKeyProducerJavaRandom(keyProducerId, cFinder);
+        configureConsumerJava(cFinder);
+
+        Finder finder = new Finder(cFinder);
+        finder.startKeyProducer();
+        finder.startConsumer();
+        finder.interrupt();
+
+        // act
+        assertDoesNotThrow(finder::configureProducer);
+
+        // assert
+        assertThat(finder.getAllProducers(), is(empty()));
+        finder.shutdownAndAwaitTermination();
+    }
+
+    /**
+     * An interrupt that lands before the consumer started must keep the consumer from starting: its
+     * database load is the longest step of the startup, and nothing would ever use the result.
+     */
+    @Test
+    public void startConsumer_interruptedBefore_consumerNotStarted() throws Exception {
+        // arrange
+        CFinder cFinder = new CFinder();
+        configureConsumerJava(cFinder);
+        Finder finder = new Finder(cFinder);
+        finder.startKeyProducer();
+        finder.interrupt();
+
+        // act
+        finder.startConsumer();
+
+        // assert
+        assertThat(finder.getAllConsumers(), is(empty()));
+        finder.shutdownAndAwaitTermination();
     }
     // </editor-fold>
 

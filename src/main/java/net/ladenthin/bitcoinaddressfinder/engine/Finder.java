@@ -121,6 +121,14 @@ public class Finder implements Interruptable {
     @ToString.Exclude
     private final Object interruptLock = new Object();
 
+    /**
+     * Set by {@link #interrupt()}. A {@code Ctrl+C} usually lands while the startup is still running,
+     * most often while the consumer loads its database; the interrupt then releases what exists so
+     * far, and the startup steps that follow check this flag instead of building on the released
+     * state (a freed key producer would otherwise surface as an unknown key producer id).
+     */
+    private volatile boolean interrupted;
+
     private final KeyUtility keyUtility;
     private final PersistenceUtils persistenceUtils;
     private final BitHelper bitHelper = new BitHelper();
@@ -225,13 +233,17 @@ public class Finder implements Interruptable {
     }
 
     /**
-     * Initialises and starts the {@link ConsumerJava}.
+     * Initialises and starts the {@link ConsumerJava}; does nothing once {@link #interrupt()} ran.
      *
      * @throws Exception if the consumer's LMDB layer cannot be opened or the
      *     accelerator snapshot cannot be built
      */
     public void startConsumer() throws Exception {
         LOGGER.info("startConsumer");
+        if (interrupted) {
+            LOGGER.info("startConsumer skipped: interrupted");
+            return;
+        }
         CConsumerJava localCConsumerJava = Objects.requireNonNull(finder.consumerJava);
 
         final ConsumerJava localConsumerJava = new ConsumerJava(
@@ -444,10 +456,15 @@ public class Finder implements Interruptable {
     }
 
     /**
-     * Builds the configured producers and binds them to their key producer and consumer.
+     * Builds the configured producers and binds them to their key producer and consumer; does nothing
+     * once {@link #interrupt()} ran, which has already released the key producers.
      */
     public void configureProducer() {
         LOGGER.info("configureProducer");
+        if (interrupted) {
+            LOGGER.info("configureProducer skipped: interrupted");
+            return;
+        }
         var localConsumerJava = Objects.requireNonNull(consumerJava);
         processProducers(
                 finder.producerJava,
@@ -722,6 +739,7 @@ public class Finder implements Interruptable {
     @Override
     public void interrupt() {
         synchronized (interruptLock) {
+            interrupted = true;
             LOGGER.info("interrupt called: delegate interrupt to all keyProducers and producers");
 
             // Key producers first. A producer waiting for its next secret is parked inside the key
