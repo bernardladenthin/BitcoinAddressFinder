@@ -13,6 +13,8 @@ import static net.ladenthin.bitcoinaddressfinder.constants.AddressConstants.WITN
 import com.google.common.hash.Hashing;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Locale;
+import java.util.regex.Pattern;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.model.AddressToCoin;
@@ -44,6 +46,12 @@ import org.slf4j.LoggerFactory;
 public class AddressTxtLine {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AddressTxtLine.class);
+
+    /** The Bitcoin Cash prefix as an uppercase CashAddr carries it. */
+    private static final String BITCOIN_CASH_PREFIX_UPPERCASE = "BITCOINCASH:";
+
+    /** A CashAddr in uppercase: version character {@code Q} or {@code P} and 41 characters of the charset. */
+    private static final Pattern UPPERCASE_CASH_ADDR = Pattern.compile("[QP][QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L]{41}");
 
     /** Creates a new {@link AddressTxtLine}. */
     public AddressTxtLine() {}
@@ -116,6 +124,11 @@ public class AddressTxtLine {
         // Trimmed before splitting: space and tab are separators, so a leading one would produce an
         // empty first token and an indented line would be rejected as having no address.
         line = line.trim();
+        // CashAddr is case-insensitive and QR codes write it in uppercase; the prefix check below and
+        // the decoder only know the lowercase form.
+        if (line.contains(BITCOIN_CASH_PREFIX_UPPERCASE)) {
+            line = line.replace(BITCOIN_CASH_PREFIX_UPPERCASE, BITCOIN_CASH_PREFIX);
+        }
         // Remove the Bitcoin Cash prefix (which includes a colon) to avoid incorrect splitting.
         // This ensures the address is recognized properly and not misinterpreted during parsing.
         if (line.contains(BITCOIN_CASH_PREFIX)) {
@@ -125,6 +138,11 @@ public class AddressTxtLine {
         String address = lineSplitted[COLUMN_ADDRESS];
         Coin amount = getCoinIfPossible(lineSplitted, DEFAULT_COIN);
         address = address.trim();
+        // An all-uppercase CashAddr would otherwise reach the Base58 fallback and decode to a wrong
+        // hash160. No Base58 address is 42 characters long, so the pattern cannot claim one.
+        if (UPPERCASE_CASH_ADDR.matcher(address).matches()) {
+            address = address.toLowerCase(Locale.ROOT);
+        }
         if (address.isEmpty()) {
             throw new AddressFormatNotAcceptedException(REASON_EMPTY, line);
         }

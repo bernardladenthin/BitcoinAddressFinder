@@ -44,6 +44,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F101](#f101) — niedrig — *gefixt*
 - [F119](#f119) — niedrig — *gefixt*
 - [F120](#f120) — mittel — *gefixt*
+- [F121](#f121) — niedrig — *gefixt*
 
 ## Funde
 
@@ -464,6 +465,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix rot in 142 Fällen (24 japanische Vektoren wie geschrieben, 118 zusammengesetzte: Französisch 19, Japanisch 24, Koreanisch 24, Russisch 13, Spanisch 20, Türkisch 18), z. B. „Expected: is "8041a494…" but: was "de26cfef…"“; mit Fix grün (872/872 der Klasse, skipped 0); Gegenprobe per `git stash` rot (142), nach `pop` grün. Breite Liste (`BIP39WordlistTest`, `KeyProducerJavaBip39Test`, `KeyUtilityTest`, `ConfigFixturesParseTest`, `BitcoinAddressFinderArchitectureTest`) grün, `spotless:apply` grün, `spotbugs:check` grün nach der Unterdrückung.
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `6cb074f`
+
+<a id="f121"></a>
+### F121 – BitcoinAddressFinder: CashAddr in Großbuchstaben wird abgelehnt oder als falscher Hash importiert
+- **Zeit:** 2026-10-18 13:40 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/io/AddressTxtLine.java:143` (`fromLine`)
+- **Schwere:** niedrig
+- **Beschreibung:** Die CashAddr-Spezifikation erlaubt Klein- oder Großschreibung (nicht gemischt), QR-Codes tragen sie groß. `fromLine` kannte nur die Kleinschreibung: Mit Präfix (`BITCOINCASH:QPM2…`) wurde das Präfix nicht entfernt, die Zeile am Doppelpunkt geteilt und `BITCOINCASH` als Base58 abgelehnt; ohne Präfix (`QPM2…`) verfehlte die Adresse den `q`-Zweig und landete im Base58-Rückfall, der sie – wenn sie zufällig nur Base58-Zeichen enthält, also kein `0`/`l` – **still als falschen hash160 importierte** (`7119debe…` statt `76a04053…` für das Spezifikationsbeispiel). Großgeschriebenes Bech32 (`BC1Q…`) war nicht betroffen, bitcoinj `Bech32.decode` behandelt es selbst.
+- **Fix:** Das großgeschriebene Präfix wird vor dem Entfernen auf die Kleinform gebracht, und eine Adresse, die ganz aus CashAddr-Zeichen in Großschreibung besteht und 42 Zeichen lang ist (`[QP]` + 41), wird kleingeschrieben; keine Base58-Adresse ist so lang, Qtum-Adressen mit `Q` (34 Zeichen) bleiben unberührt. Nicht Teil des Fixes und unverändert: CashAddr-`p`-Adressen (P2SH) gehen weiter in den ZCash-Zweig (im Code als „does not work“ vermerkt), und die CashAddr-Prüfsumme wird nicht geprüft.
+- **Reproduktion:** `AddressTxtLineTest#fromLine_uppercaseCashAddrWithPrefix_returnsTheHash160OfTheLowercaseForm`, `#fromLine_uppercaseCashAddrWithoutPrefix_returnsTheHash160OfTheLowercaseForm` (Beispiel der Spezifikation, hash160 von `1BpEi6DfDAUFd7GtittLSdBeYJvcoaVggu`)
+- **Rot-Grün-Nachweis:** ohne Fix beide rot („Unexpected exception thrown: … invalid Base58 address (input: BITCOINCASH)“ bzw. „Expected: is "76a04053bda0a88bda5177b86a15c3b29f559873" but: was "7119debe7d4714d8bb5357c7f28d4d00f5c8f9a6"“), mit Fix grün (293/293 der Klasse, skipped 0); Gegenprobe per `git stash` rot (2), nach `pop` grün. Breite Liste (`Bech32HelperTest`, `AddressFilesToLMDBTest`, `SeparatorFormatTest`, `BitcoinAddressFinderArchitectureTest`) grün, `spotless:apply` und `spotbugs:check` grün (das großgeschriebene Präfix ist ein Literal, `toUpperCase` auf einem Literal meldet `SPP_CONVERSION_OF_STRING_LITERAL`).
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 

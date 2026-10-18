@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder.io;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
@@ -104,6 +105,37 @@ public class AddressTxtLineTest {
             assertThat(addressToCoin.hash160(), is(equalTo(staticKey.byteBufferPublicKeyCompressed)));
             assertThat(addressToCoin.coin(), is(equalTo(Coin.valueOf(123))));
         }
+    }
+
+    // CashAddr is case-insensitive ("lowercase or uppercase, but not mixed"); QR codes carry it in
+    // uppercase. The spec's example 'bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a' encodes
+    // the hash160 of 1BpEi6DfDAUFd7GtittLSdBeYJvcoaVggu.
+    private static final String CASH_ADDR_EXAMPLE_HASH160 = "76a04053bda0a88bda5177b86a15c3b29f559873";
+
+    @Test
+    public void fromLine_uppercaseCashAddrWithPrefix_returnsTheHash160OfTheLowercaseForm()
+            throws AddressFormatNotAcceptedException {
+        // act
+        AddressToCoin addressToCoin = assertDoesNotThrow(() ->
+                new AddressTxtLine().fromLine("BITCOINCASH:QPM2QSZNHKS23Z7629MMS6S4CWEF74VCWVY22GDX6A", keyUtility));
+
+        // assert
+        assertThat(
+                Hex.toHexString(keyUtility.byteBufferUtility().byteBufferToBytes(addressToCoin.hash160())),
+                is(equalTo(CASH_ADDR_EXAMPLE_HASH160)));
+    }
+
+    @Test
+    public void fromLine_uppercaseCashAddrWithoutPrefix_returnsTheHash160OfTheLowercaseForm()
+            throws AddressFormatNotAcceptedException {
+        // act
+        AddressToCoin addressToCoin =
+                new AddressTxtLine().fromLine("QPM2QSZNHKS23Z7629MMS6S4CWEF74VCWVY22GDX6A", keyUtility);
+
+        // assert
+        assertThat(
+                Hex.toHexString(keyUtility.byteBufferUtility().byteBufferToBytes(addressToCoin.hash160())),
+                is(equalTo(CASH_ADDR_EXAMPLE_HASH160)));
     }
 
     @Test
