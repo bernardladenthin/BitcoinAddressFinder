@@ -528,7 +528,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `ConfigFixturesParseTest#secretsFileExample_everyProducerNamesAConfiguredKeyProducer` (lädt die mitgelieferte Datei und ruft `Finder.startKeyProducer`)
 - **Rot-Grün-Nachweis:** ohne Fix rot („Unexpected exception thrown: …KeyProducerIdUnknownException: Key producer id is unknown: null“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` der Beispieldatei rot (1), nach `pop` grün. `ConfigFixturesParseTest` 4/4, `BitcoinAddressFinderArchitectureTest` 17/17, `spotless:apply` ohne weiteren Diff; kein Produktionscode geändert.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** BitcoinAddressFinder `c5dd4d2`
 
 ## Offene Verdachte ohne Fund-ID
 
