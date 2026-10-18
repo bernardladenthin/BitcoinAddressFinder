@@ -24,7 +24,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F32](#f32) — niedrig — *gefixt*
 - [F33](#f33) — niedrig — *gefixt*
 - [F34](#f34) — mittel — *gefixt*
-- [F35](#f35) — niedrig — *nur beschrieben*
+- [F35](#f35) — niedrig — *gefixt (Doku)*
 - [F40](#f40) — mittel — *gefixt*
 - [F41](#f41) — niedrig — *gefixt*
 - [F42](#f42) — mittel — *gefixt*
@@ -251,8 +251,11 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Schwere:** niedrig (nur Dokumentation)
 - **Beschreibung:** Die drei Javadocs begründen den GC vor dem Filter-Upload damit, dass der Treiber für `CL_MEM_COPY_HOST_PTR` einen Host-Staging-Bereich anheften muss. Der Code nutzt `CL_MEM_COPY_HOST_PTR` nicht mehr: Die Puffer werden mit `ClBufferFlags.READ_ONLY` angelegt und über `ClApi.writeBufferChunked` in Scheiben durch einen kleinen wiederverwendeten Staging-Puffer beschrieben (so auch CLAUDE.md, Abschnitt „OpenCL / GPU Code“). Die Doku beschreibt damit einen Mechanismus, den es nicht mehr gibt; ob der GC mit dem gestückelten Upload überhaupt noch nötig ist, ist offen (er ist harmlos, kostet einmalig Millisekunden). Verhalten korrekt: `reclaimHeapBeforeUpload()` läuft in `allocateFilterBuffers` unmittelbar vor `createBuffer`.
 - **Weitere Doku-Abweichung derselben Art (2026-10-17):** `persistence/AddressLookup.java:25` zeigt im Beispiel `consumerJava.useLookup(lookup)`; diese Methode gibt es nicht, sie heißt `ConsumerJava.initWithLookup(AddressPresence)`.
-- **Reproduktion:** keine – reine Dokumentationsabweichung, kein Verhalten, das ein Test rot machen könnte.
-- **Status:** nur beschrieben (Nutzerregel vom 2026-10-17: gefixt und committet wird nur mit Test; eine reine Doku-Abweichung hat keinen, bleibt also unverändert)
+- **Historie:** Der GC kam mit `e3f3e72` (2026-07-20, RDNA3: `clCreateBuffer` für den 3,1-GB-Fuse-16-Puffer scheiterte bei 33,9 GiB lebendem Heap, nach einer Collection nicht mehr), verifiziert in `3a2cfba` (gleicher Befehl gestern rot, mit Fix grün). Damals JOCL mit `CL_MEM_COPY_HOST_PTR`. `5479507` (2026-08-02, LWJGL) stellte auf `CL_MEM_READ_ONLY` plus `writeBufferChunked` um und ließ die drei Javadocs stehen. Das `AddressLookup`-Beispiel stammt aus `f9af746` (2026-05-29) mit einem geplanten `useLookup`, das nie gebaut wurde; die Kette baut seit `ba51113` `ConsumerJava.initLMDB()`, und „SortedArray“ wurde in `5b4aa76` entfernt.
+- **Fix:** Entscheidung des Nutzers (Variante B). `GcTrigger` beschreibt die Messung, dass sie vom alten Upload-Weg stammt und auf dem gestückelten Upload nicht nachgemessen ist; `reclaimHeapBeforeUpload` ohne „few milliseconds“ und `CL_MEM_COPY_HOST_PTR`; `uploadGpuFilter` nennt `CL_MEM_READ_ONLY` + `writeBufferChunked`; `AddressLookup` zeigt eine echte Kette und die tatsächliche Verdrahtung. Neuer `TODO.md`-Eintrag „Re-measure the heap reclaim before the GPU filter upload on the chunked LWJGL upload“ (AMD-Karte, no-op-`GcTrigger` gegen `GcTrigger.SYSTEM`, Dauer der Collection) – CI-/Hardware-Bedarf.
+- **Reproduktion:** keine – reine Dokumentationsabweichung; `OpenCLContextGpuFilterWidthTest#reclaimHeapBeforeUpload_invokesTheTrigger` prüft weiterhin, dass die Collection läuft.
+- **Rot-Grün-Nachweis:** – (Doku-Korrektur, Freigabe des Nutzers für Doku ohne roten Test)
+- **Status:** gefixt (Doku)
 - **Commit:** –
 
 <a id="f40"></a>

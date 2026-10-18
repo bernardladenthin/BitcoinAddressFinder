@@ -462,13 +462,12 @@ public class OpenCLContext implements ReleaseCLObject {
     }
 
     /**
-     * Reclaims the JVM heap right before a fingerprint buffer is created, so the driver can pin the
-     * host staging region {@code CL_MEM_COPY_HOST_PTR} needs. A filter is uploaded once, at startup,
-     * immediately after its build — no size gate is worth its complexity: the collection is a
-     * one-time cost of a few milliseconds, and skipping it risks the
-     * {@code CL_MEM_OBJECT_ALLOCATION_FAILURE} measured on RDNA3 when the build's ~40&nbsp;GB of
-     * transient garbage still occupies the heap. See {@link GcTrigger} for the cause and the JDK
-     * precedent.
+     * Reclaims the JVM heap right before a fingerprint buffer is created. A filter is uploaded once,
+     * at startup, immediately after its build, whose transient garbage (~40&nbsp;GB at the Full DB
+     * tier) may still occupy the heap; collecting it first is what removed the
+     * {@code CL_MEM_OBJECT_ALLOCATION_FAILURE} measured on RDNA3. No size gate: the collection runs
+     * once per upload. See {@link GcTrigger} for the measurement, which predates the chunked upload,
+     * and the JDK precedent.
      */
     @VisibleForTesting
     void reclaimHeapBeforeUpload() {
@@ -680,8 +679,8 @@ public class OpenCLContext implements ReleaseCLObject {
      * {@code ProducerOpenCL}, fed by the engine) decomposes the filter's public payload into
      * the fingerprint byte array and the five metadata integers before invoking this method.
      *
-     * <p>Two {@code CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR} buffers are allocated and retained
-     * for later kernel-argument binding: the fingerprint slot array and a 5-int metadata buffer
+     * <p>Two {@code CL_MEM_READ_ONLY} buffers are allocated, filled through
+     * {@code ClApi.writeBufferChunked} and retained for later kernel-argument binding: the fingerprint slot array and a 5-int metadata buffer
      * {@code [seedLo, seedHi, segLen, segLenMask, segCountLen]}. An empty filter
      * ({@code fingerprints.length == 0}, i.e. {@code segCountLen == 0}) still allocates a
      * one-byte placeholder fingerprint buffer (zero-size device buffers are invalid); the kernel
