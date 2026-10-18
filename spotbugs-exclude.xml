@@ -10,6 +10,18 @@ SPDX-License-Identifier: Apache-2.0
     xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/4.8.6/spotbugs/etc/findbugsfilter.xsd">
 
     <!--
+        BIP39 defines the seed over the NFKD form of the mnemonic and the passphrase, and bitcoinj
+        hashes them as given, so the key producer has to normalize (F120). FindSecBugs'
+        IMPROPER_UNICODE warns about normalizing *after* a security check; here nothing is checked
+        before or after, the normalized string is the input the standard prescribes.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.BIP39KeyProducer"/>
+        <Method name="&lt;init&gt;"/>
+        <Bug pattern="IMPROPER_UNICODE"/>
+    </Match>
+
+    <!--
         PREDICTABLE_RANDOM and DMI_RANDOM_USED_ONLY_ONCE are by design:
 
         KeyProducerJavaRandom.java:54,57 (PREDICTABLE_RANDOM) — the

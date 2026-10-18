@@ -43,6 +43,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F100](#f100) — niedrig — *gefixt*
 - [F101](#f101) — niedrig — *gefixt*
 - [F119](#f119) — niedrig — *gefixt*
+- [F120](#f120) — mittel — *gefixt*
 
 ## Funde
 
@@ -451,6 +452,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** gegen den Naht-Stand ohne Fix rot („Expected: is not null but: was null“, kein `config` binnen 3 s), mit Fix grün (7/7 der Klasse, skipped 0); Gegenprobe durch Zurückkopieren des Naht-Stands rot (1), danach wieder grün. Breite Liste (alle drei Broadcaster, `KeyProducerJavaSocketTest`, `FinderTest`, `BitcoinAddressFinderArchitectureTest`) grün, `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `59dfecf`
+
+<a id="f120"></a>
+### F120 – BitcoinAddressFinder: BIP39-Mnemonics ohne NFKD-Normalisierung ergeben für nicht-englische Sprachen falsche Schlüssel
+- **Zeit:** 2026-10-18 13:10 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/BIP39KeyProducer.java:112` (Konstruktor)
+- **Schwere:** mittel
+- **Beschreibung:** BIP39 berechnet den Seed per PBKDF2 aus der **NFKD-Form** von Mnemonic und Passphrase. bitcoinj 0.17.1 normalisiert nicht (`DeterministicSeed.ofMnemonic` → `MnemonicCode.toSeed` → `PBKDF2SHA512.derive`, per `javap` geprüft: kein `Normalizer`), und `BIP39KeyProducer` reichte die konfigurierte Zeichenkette unverändert weiter. Damit leitete `KeyProducerJavaBip39` für jede Mnemonic, deren Text nicht schon NFKD ist, andere Schlüssel ab als jede Standard-Wallet – der Scan prüfte also die falschen Adressen, ohne Fehlermeldung. Betroffen: jede japanische Mnemonic (zusammengesetzte Kana, ideografisches Leerzeichen), jede koreanische (Hangul wird praktisch immer zusammengesetzt geschrieben) und jede eingefügte NFC-Mnemonic mit Akzenten (Französisch, Spanisch, Tschechisch, Portugiesisch, Türkisch) oder kyrillischem `й` (Russisch); ebenso eine Passphrase mit solchen Zeichen. Der bestehende Vektortest normalisierte vor dem Aufruf von bitcoinj selbst und verdeckte die Lücke im Produktionscode.
+- **Fix:** Mnemonic und Passphrase werden vor `DeterministicSeed.ofMnemonic` mit `Normalizer.Form.NFKD` normalisiert. SpotBugs meldet dafür `IMPROPER_UNICODE` (FindSecBugs warnt vor Normalisieren nach einer Sicherheitsprüfung); methodengenau in `spotbugs-exclude.xml` unterdrückt, mit Begründung.
+- **Reproduktion:** `BIP39KeyProducerTest#nextKey_givenTheVectorMnemonicAsWritten_derivesTheKeyOfTheStandardSeed` und `#nextKey_givenTheVectorMnemonicComposed_derivesTheKeyOfTheStandardSeed` (je über alle 288 Trezor-Vektoren in zwölf Sprachen; Erwartung: der Schlüssel `M/44H/0H/0H/0/0` aus dem Vektor-Seed)
+- **Rot-Grün-Nachweis:** ohne Fix rot in 142 Fällen (24 japanische Vektoren wie geschrieben, 118 zusammengesetzte: Französisch 19, Japanisch 24, Koreanisch 24, Russisch 13, Spanisch 20, Türkisch 18), z. B. „Expected: is "8041a494…" but: was "de26cfef…"“; mit Fix grün (872/872 der Klasse, skipped 0); Gegenprobe per `git stash` rot (142), nach `pop` grün. Breite Liste (`BIP39WordlistTest`, `KeyProducerJavaBip39Test`, `KeyUtilityTest`, `ConfigFixturesParseTest`, `BitcoinAddressFinderArchitectureTest`) grün, `spotless:apply` grün, `spotbugs:check` grün nach der Unterdrückung.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 

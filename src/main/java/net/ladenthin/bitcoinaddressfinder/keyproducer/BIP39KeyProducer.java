@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.text.Normalizer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -106,7 +107,12 @@ public class BIP39KeyProducer extends java.util.Random {
             Instant creationTime,
             boolean hardened,
             int startingIndex) {
-        DeterministicSeed seed = DeterministicSeed.ofMnemonic(mnemonic, passphrase, creationTime);
+        // BIP39 derives the seed from the NFKD form of both strings; bitcoinj hashes them as given,
+        // so a mnemonic in its usual composed form (Korean, Japanese, accented Latin) needs it here.
+        DeterministicSeed seed = DeterministicSeed.ofMnemonic(
+                Normalizer.normalize(mnemonic, Normalizer.Form.NFKD),
+                Normalizer.normalize(passphrase, Normalizer.Form.NFKD),
+                creationTime);
         this.basePath = HDPath.parsePath(bip44BasePath); // e.g., "M/44H/0H/0H/0"
         this.parentKey = DeterministicKeyChain.builder().seed(seed).build().getKeyByPath(basePath, true);
         this.hardened = hardened;
