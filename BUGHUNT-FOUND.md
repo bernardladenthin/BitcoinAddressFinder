@@ -57,6 +57,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F136](#f136) — mittel — *gefixt*
 - [F139](#f139) — mittel — *gefixt*
 - [F140](#f140) — mittel — *gefixt*
+- [F141](#f141) — niedrig — *nur beschrieben*
 
 ## Funde
 
@@ -635,6 +636,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is an empty collection but: <[Thread[#27,pool-3-thread-1,5,main]]>“), mit Fix grün; Gegenprobe per `git stash` rot, danach wieder grün. `TuneConfigurationTest` 52 Tests, 0 Fehler (1 übersprungen, wie zuvor), `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:check` und `spotbugs:check` grün. Ende zu Ende mit Fix: Exit 1 nach 2 s.
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `b124070`
+
+<a id="f141"></a>
+### F141 – BitcoinAddressFinder: `TRUNCATED_LONG_64` meldet Kollisionen als Treffer; die versprochene Auflösung über LMDB gibt es nicht
+- **Zeit:** 2026-10-19 00:10 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/persistence/inmemory/TruncatedLong64SortedArrayPresence.java` (Klassen-Javadoc, `requiresBackend()`), `configuration/AddressLookupBackend.java` (Javadoc zu `TRUNCATED_LONG_64`), Verdrahtung in `consumer/ConsumerJava.java:657` und `:460`
+- **Schwere:** niedrig
+- **Beschreibung:** Die Klasse speichert je Adresse nur Byte 0 (Bucket) und die Bytes 1–8 (72 Bit). Beide Javadocs versprechen, eine Kollision werde „disambiguated by the LMDB backend that this lookup sits in front of“ bzw. „the enclosing chain must fall through to the LMDB delegate“. Der Code tut das Gegenteil: `requiresBackend()` ist `false`, `ConsumerJava` verdrahtet die Klasse ohne Accelerator (anders als Bloom/Fuse) und schließt LMDB nach dem Aufbau. Eine Adresse, die in den ersten 9 Byte mit einem Eintrag übereinstimmt, gilt als Treffer und wird als „hit: Found the address“ gemeldet. Gemessen mit einer Probe: ein Eintrag, Abfrage mit geänderten Bytes 12 und 19 → `containsNonMember=true`, `requiresBackend=false`. Dazu sind die genannten Wahrscheinlichkeiten widersprüchlich: Klasse „N / 2^64“ (≈ 7,5·10⁻¹¹), Enum „N/2⁴⁴“ und „~10⁻¹¹“; bei 72 Bit wären es N/2⁷² ≈ 3·10⁻¹³ je Abfrage bei 1,47 Mrd. Einträgen. Praktisch selten, aber ein falscher Treffer meldet einen Schlüssel als Fund, der keine Adresse der Datenbank besitzt.
+- **Fix:** keiner. Zwei Richtungen, die der Nutzer entscheidet: (a) die Javadocs an den Code anpassen (Kollisionen werden als Treffer gemeldet, richtige Rate N/2⁷²); (b) einen Treffer gegen LMDB prüfen wie bei Bloom/Fuse (`requiresBackend()` true, LMDB bleibt offen – das hebt den dokumentierten Vorteil „self-contained, LMDB schließen“ auf). Für (a) gibt es keinen roten Test (reine Doku), für (b) wäre `TruncatedLong64SortedArrayPresence`/`ConsumerJava` umzubauen.
+- **Reproduktion:** Probe im Scratchpad (`trunc/T.java`): `populateFrom` mit einem 20-Byte-Eintrag, `containsAddress` mit einer nur nach Byte 8 abweichenden Adresse.
+- **Rot-Grün-Nachweis:** – (nicht gefixt)
+- **Status:** nur beschrieben
+- **Commit:** –
 
 ## Offene Verdachte ohne Fund-ID
 
