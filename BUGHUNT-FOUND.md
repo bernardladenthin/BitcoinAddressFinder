@@ -634,7 +634,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `TuneConfigurationTest#run_unknownKeyProducerId_leavesNoNonDaemonThreadBehind`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is an empty collection but: <[Thread[#27,pool-3-thread-1,5,main]]>“), mit Fix grün; Gegenprobe per `git stash` rot, danach wieder grün. `TuneConfigurationTest` 52 Tests, 0 Fehler (1 übersprungen, wie zuvor), `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:check` und `spotbugs:check` grün. Ende zu Ende mit Fix: Exit 1 nach 2 s.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** BitcoinAddressFinder `b124070`
 
 ## Offene Verdachte ohne Fund-ID
 
