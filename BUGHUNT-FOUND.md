@@ -476,7 +476,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `AddressTxtLineTest#fromLine_uppercaseCashAddrWithPrefix_returnsTheHash160OfTheLowercaseForm`, `#fromLine_uppercaseCashAddrWithoutPrefix_returnsTheHash160OfTheLowercaseForm` (Beispiel der Spezifikation, hash160 von `1BpEi6DfDAUFd7GtittLSdBeYJvcoaVggu`)
 - **Rot-Grün-Nachweis:** ohne Fix beide rot („Unexpected exception thrown: … invalid Base58 address (input: BITCOINCASH)“ bzw. „Expected: is "76a04053bda0a88bda5177b86a15c3b29f559873" but: was "7119debe7d4714d8bb5357c7f28d4d00f5c8f9a6"“), mit Fix grün (293/293 der Klasse, skipped 0); Gegenprobe per `git stash` rot (2), nach `pop` grün. Breite Liste (`Bech32HelperTest`, `AddressFilesToLMDBTest`, `SeparatorFormatTest`, `BitcoinAddressFinderArchitectureTest`) grün, `spotless:apply` und `spotbugs:check` grün (das großgeschriebene Präfix ist ein Literal, `toUpperCase` auf einem Literal meldet `SPP_CONVERSION_OF_STRING_LITERAL`).
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** BitcoinAddressFinder `8abd2d0`
 
 ## Offene Verdachte ohne Fund-ID
 
