@@ -162,7 +162,11 @@ public class Finder implements Interruptable {
     }
 
     /**
-     * Instantiates and registers every configured key producer.
+     * Instantiates and registers every configured key producer, then checks that every configured
+     * producer names one of them and has a valid batch size.
+     *
+     * @throws KeyProducerIdUnknownException if a producer names no configured key producer
+     * @throws IllegalArgumentException if a producer's {@code batchSizeInBits} is out of range
      */
     public void startKeyProducer() {
         LOGGER.info("startKeyProducer");
@@ -203,6 +207,29 @@ public class Finder implements Interruptable {
                 cKeyProducerJavaZmq -> new KeyProducerJavaZmq(cKeyProducerJavaZmq, keyUtility, bitHelper),
                 cKeyProducerJavaZmq -> cKeyProducerJavaZmq.keyProducerId,
                 keyProducers);
+
+        validateProducerConfiguration();
+    }
+
+    /**
+     * Checks what {@link #configureProducer()} will check, while it is still cheap to fail.
+     *
+     * <p>The consumer starts between the two, and its database load is the long step of the startup:
+     * a typo in a producer's {@code keyProducerId} or an out-of-range {@code batchSizeInBits} would
+     * otherwise surface only after it.
+     *
+     * @throws KeyProducerIdUnknownException if a producer names no configured key producer
+     * @throws IllegalArgumentException if a producer's {@code batchSizeInBits} is out of range
+     */
+    private void validateProducerConfiguration() {
+        final List<CProducer> producerConfigurations = new ArrayList<>();
+        producerConfigurations.addAll(finder.producerJava);
+        producerConfigurations.addAll(finder.producerJavaSecretsFiles);
+        producerConfigurations.addAll(finder.producerOpenCL);
+        for (CProducer cProducer : producerConfigurations) {
+            bitHelper.assertBatchSizeInBitsIsInRange(cProducer.batchSizeInBits);
+            getKeyProducer(cProducer);
+        }
     }
 
     private <T, K> void processKeyProducers(

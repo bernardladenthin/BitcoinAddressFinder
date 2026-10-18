@@ -402,8 +402,13 @@ public class FinderTest {
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="configureProducer">
+    /**
+     * The consumer's database load is the long step of the startup, so a producer that names no
+     * configured key producer must fail before it, not after: {@code Main} starts the key producers,
+     * then the consumer, then the producers.
+     */
     @Test
-    public void configureProducer_keyProducerIdIsUnknown_ExceptionThrown() throws Exception {
+    public void startKeyProducer_producerKeyProducerIdIsNull_ExceptionThrown() throws Exception {
         // arrange
         CFinder cFinder = new CFinder();
         final CProducerJava cProducerJava = new CProducerJava();
@@ -412,15 +417,44 @@ public class FinderTest {
         cProducerJava.keyProducerId = null;
         cFinder.producerJava.add(cProducerJava);
         configureKeyProducerJavaRandom("unknownId", cFinder);
-        configureConsumerJava(cFinder);
 
         Finder finder = new Finder(cFinder);
 
-        finder.startConsumer();
-        finder.startKeyProducer();
+        // act
+        assertThrows(KeyProducerIdUnknownException.class, finder::startKeyProducer);
+        finder.shutdownAndAwaitTermination();
+    }
+
+    @Test
+    public void startKeyProducer_producerKeyProducerIdHasATypo_ExceptionThrown() throws Exception {
+        // arrange
+        CFinder cFinder = new CFinder();
+        final CProducerJava cProducerJava = new CProducerJava();
+        cProducerJava.keyProducerId = "exampleld";
+        cFinder.producerJava.add(cProducerJava);
+        configureKeyProducerJavaRandom("exampleId", cFinder);
+
+        Finder finder = new Finder(cFinder);
 
         // act
-        assertThrows(KeyProducerIdUnknownException.class, () -> finder.configureProducer());
+        assertThrows(KeyProducerIdUnknownException.class, finder::startKeyProducer);
+        finder.shutdownAndAwaitTermination();
+    }
+
+    @Test
+    public void startKeyProducer_producerBatchSizeOutOfRange_ExceptionThrown() throws Exception {
+        // arrange
+        CFinder cFinder = new CFinder();
+        final CProducerJava cProducerJava = new CProducerJava();
+        cProducerJava.keyProducerId = "exampleId";
+        cProducerJava.batchSizeInBits = -1;
+        cFinder.producerJava.add(cProducerJava);
+        configureKeyProducerJavaRandom("exampleId", cFinder);
+
+        Finder finder = new Finder(cFinder);
+
+        // act
+        assertThrows(IllegalArgumentException.class, finder::startKeyProducer);
         finder.shutdownAndAwaitTermination();
     }
     // </editor-fold>

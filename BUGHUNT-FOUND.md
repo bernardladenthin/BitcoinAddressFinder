@@ -47,6 +47,8 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F121](#f121) — niedrig — *gefixt*
 - [F122](#f122) — niedrig — *gefixt*
 - [F124](#f124) — niedrig — *gefixt*
+- [F126](#f126) — niedrig — *gefixt*
+- [F127](#f127) — mittel — *nur beschrieben*
 
 ## Funde
 
@@ -503,6 +505,30 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix beide rot („Unexpected exception thrown: …KeyProducerIdUnknownException: Key producer id is unknown: exampleId“ bzw. „Expected: is an empty collection but: <[ConsumerJava(…)]>“), mit Fix grün (2/2, skipped 0); Gegenprobe per `git stash` rot (2), nach `pop` grün. Breite Liste: `FinderTest` 24/24, `MainTest` 18 (6 OpenCL übersprungen wie zuvor), `ConsumerJavaTest` 36/36, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `279f8de`
+
+<a id="f126"></a>
+### F126 – BitcoinAddressFinder: Ein Tippfehler in der `keyProducerId` eines Producers fällt erst nach dem Datenbankladen auf
+- **Zeit:** 2026-10-18 16:20 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/engine/Finder.java:159` (`startKeyProducer`), geprüft wurde bisher erst in `configureProducer`
+- **Schwere:** niedrig
+- **Beschreibung:** `Main.run` startet Key-Producer, dann den Consumer (`initLMDB`: Bloom-/In-Memory-Backend und GPU-Filter bauen sich hier auf, bei großen Datenbanken Minuten), dann die Producer. Ob ein Producer auf einen konfigurierten Key-Producer verweist und ob sein `batchSizeInBits` im Bereich liegt, prüfte erst `configureProducer` – ein Tippfehler in der ID oder `batchSizeInBits: -1` kostete also das ganze Laden, bevor die Meldung kam. Gleiches Muster wie F125.
+- **Fix:** `startKeyProducer` prüft nach dem Anlegen der Key-Producer jeden Producer mit denselben Prüfungen wie `configureProducer` (`validateProducerConfiguration`). Der bisherige Test `configureProducer_keyProducerIdIsUnknown_ExceptionThrown` (Consumer vor den Key-Producern gestartet, Fehler erst beim Konfigurieren) ist in `startKeyProducer_producerKeyProducerIdIsNull_ExceptionThrown` aufgegangen.
+- **Reproduktion:** `FinderTest#startKeyProducer_producerKeyProducerIdIsNull_ExceptionThrown`, `#startKeyProducer_producerKeyProducerIdHasATypo_ExceptionThrown`, `#startKeyProducer_producerBatchSizeOutOfRange_ExceptionThrown`
+- **Rot-Grün-Nachweis:** ohne Fix alle drei rot („Expected …KeyProducerIdUnknownException to be thrown, but nothing was thrown.“ bzw. „Expected java.lang.IllegalArgumentException …“), mit Fix grün (3/3, skipped 0); Gegenprobe per `git stash` rot (3), nach `pop` grün. Breite Liste: `FinderTest` 26/26, `MainTest` 18 (6 OpenCL übersprungen wie zuvor), `ConfigFixturesParseTest` 3/3, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün. Alle `examples/config_Find*.json` außer dem Secrets-Datei-Beispiel bestehen die neue Prüfung (Skript über die JSON-Dateien); zu diesem siehe F127.
+- **Status:** gefixt
+- **Commit:** (folgt)
+
+<a id="f127"></a>
+### F127 – BitcoinAddressFinder: Das mitgelieferte Secrets-Datei-Beispiel läuft nicht; der Producer verlangt einen Key-Producer, den er nicht benutzt
+- **Zeit:** 2026-10-18 16:20 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/engine/Finder.java` (`configureProducer`, `processProducers` mit `getKeyProducer` auch für `producerJavaSecretsFiles`), `examples/config_Find_SecretsFile.json`, `README.md` (Abschnitt „Secrets File Producer“)
+- **Schwere:** mittel
+- **Beschreibung:** `ProducerJavaSecretsFiles` liest seine Secrets selbst aus den Dateien; sein Konstruktor nimmt einen `KeyProducer`, die Javadoc sagt „unused in this producer“. `configureProducer` löst ihn trotzdem über `getKeyProducer` auf und wirft `KeyProducerIdUnknownException` bei fehlender oder unbekannter ID. Das Beispiel `examples/config_Find_SecretsFile.json` (und `run_Find_SecretsFile.sh/.bat`) setzt für keinen seiner vier Producer eine `keyProducerId` und konfiguriert keinen Key-Producer: es scheitert mit „Key producer id is unknown: null“ – vor F126 nach dem BLOOM-Laden, jetzt sofort. Unbemerkt, weil `MainTest` eine eigene Kopie unter `src/test/resources/testRoundtrip/` benutzt, die einen Zufalls-Key-Producer als Platzhalter trägt. Die README beschreibt `keyProducerId` dort als „Unique identifier for this producer“ und zeigt ein Beispiel mit einer ID ohne passenden Key-Producer.
+- **Fix:** offen, nächste Runde. Möglich: Secrets-Datei-Producer ohne Key-Producer zulassen (die ID dient dann nur als Bezeichnung in der Statistik, `AbstractProducer` liest `keyProducer` nur für den Strategienamen), dazu `validateProducerConfiguration` aus F126 angleichen; oder Beispiel und README korrigieren. Test: das Beispiel selbst gegen `configureProducer` laufen lassen.
+- **Reproduktion:** —
+- **Rot-Grün-Nachweis:** —
+- **Status:** nur beschrieben
+- **Commit:** —
 
 ## Offene Verdachte ohne Fund-ID
 
