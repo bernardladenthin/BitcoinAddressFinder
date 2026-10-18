@@ -562,7 +562,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Regression:** alle OpenCL-nahen Tests auf pocl (`*OpenCL*`, `Probe*`, `ProducerOpenCLTest`, `TuneConfigurationTest`, `FinderGpuFilterTypeTest`): 22 Klassen, 262 Tests, 0 Fehler; 23 übersprungen aus bestehenden Gründen (`@Disabled`, Rastergröße über dem pocl-Gerät, Annahme eines GPU-Geräts).
 - **CI-Bedarf:** der `test-opencl`-Job (pocl) und eine Laufzeitmessung des Kernels auf echter GPU (erwartet: nicht messbar).
 - **Status:** gefixt
-- **Commit:** –
+- **Commit:** 1a7b264
 
 <a id="f130"></a>
 ### F130 – BitcoinAddressFinder: `SocketResultBroadcaster.close()` verwirft Ergebnisse, die schon für einen verbundenen Client bereitliegen
