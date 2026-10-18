@@ -16,6 +16,7 @@ import static org.hamcrest.Matchers.isIn;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.File;
@@ -706,6 +707,25 @@ public class TuneConfigurationTest extends LMDBBase {
         assertThat(next, is(notNullValue()));
         assertThat(next.batchSizeInBits(), is(equalTo(9)));
         assertThat(next.keysPerWorkItem(), is(equalTo(256)));
+    }
+
+    /**
+     * The filter widths are measured on the first device, so they must be measured at that device's
+     * own winning grid. The global winner belongs to whichever device was fastest, and measuring at
+     * it also writes its values into the first device's producer, which the emitted configuration
+     * then carries.
+     */
+    @Test
+    public void filterSweepArm_twoDevices_usesTheFirstDevicesOwnWinner() {
+        TuneConfiguration.ArmResult firstDeviceWinner =
+                new TuneConfiguration.ArmResult(22, 256, 50_000_000.0d, 1.0d, 20.0d, null);
+        TuneConfiguration.ArmResult secondDeviceWinner =
+                new TuneConfiguration.ArmResult(24, 2048, 110_000_000.0d, 1.0d, 20.0d, null);
+        List<TuneConfiguration.DeviceSweep> deviceSweeps = List.of(
+                new TuneConfiguration.DeviceSweep("first", List.of(firstDeviceWinner), firstDeviceWinner),
+                new TuneConfiguration.DeviceSweep("second", List.of(secondDeviceWinner), secondDeviceWinner));
+
+        assertThat(TuneConfiguration.filterSweepArm(deviceSweeps), is(sameInstance(firstDeviceWinner)));
     }
 
     @Test

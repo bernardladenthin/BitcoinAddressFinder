@@ -54,6 +54,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F131](#f131) — mittel — *gefixt*
 - [F132](#f132) — mittel — *gefixt*
 - [F135](#f135) — niedrig — *gefixt*
+- [F136](#f136) — mittel — *gefixt*
 
 ## Funde
 
@@ -596,6 +597,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `275fc61`
 
+<a id="f136"></a>
+### F136 – BitcoinAddressFinder: `TuneConfiguration` misst mit `sweepFilterTypes` auf dem ersten Gerät das Raster des globalen Gewinners und schreibt es in dessen Producer
+- **Zeit:** 2026-10-18 22:05 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/command/TuneConfiguration.java` (`resolveFilterType` → `measureFilterType(templates.get(0), …, winner)`)
+- **Schwere:** mittel
+- **Beschreibung:** Nach dem Sweep bekommt jedes Gerät seinen eigenen Gewinner (`applyWinnerTo`, mit dem Kommentar, ein gemeinsamer Gewinner gäbe der langsameren Karte die Werte der schnelleren). Mit `sweepFilterTypes` misst `measureFilterType` die beiden Filterbreiten aber auf dem Producer des ersten Geräts mit dem globalen Gewinner (`winner` = schnellster Arm über alle Geräte). `runArm` schreibt dessen `batchSizeInBits`/`keysPerWorkItem` in den Producer des ersten Geräts, und die ausgegebene Konfiguration trägt für dieses Gerät dann das Raster eines anderen Geräts – genau der Fehler, den `applyWinnerTo` verhindern soll; zudem wird die Filterbreite an einem Raster gemessen, das auf diesem Gerät nie gewann oder gar scheiterte. Nur mit mehreren Geräten und `sweepFilterTypes`.
+- **Fix:** Die Filterbreiten werden am eigenen Gewinner des ersten Geräts gemessen (`filterSweepArm`); hat es keinen, wird die Breite abgeleitet. Die Naht `filterSweepArm` wurde zuerst verhaltensneutral eingezogen (globaler Gewinner über alle Geräte-Arme, wie `pickWinner(results)`).
+- **Reproduktion:** `TuneConfigurationTest#filterSweepArm_twoDevices_usesTheFirstDevicesOwnWinner`
+- **Rot-Grün-Nachweis:** gegen den Naht-Stand rot („Expected: is sameInstance(<ArmResult[batchSizeInBits=22, keysPerWorkItem=256, …]>) but: was <ArmResult[batchSizeInBits=24, keysPerWorkItem=2048, …]>“, die übrigen Tests der Klasse grün), mit Fix 51 Tests, 0 Fehler (1 übersprungen, in beiden Ständen), Gegenprobe durch Zurückkopieren des Naht-Stands rot, danach wieder grün. Ende zu Ende über die CLI auf pocl mit `sweepFilterTypes` (ein Gerät): beide Filterarme laufen am Gewinner (10, 4), Empfehlung „MEASURED empirically“. `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:check` und `spotbugs:check` grün.
+- **CI-Bedarf:** Ein Lauf mit zwei echten Geräten ist hier nicht möglich (pocl stellt eines).
+- **Status:** gefixt
+- **Commit:** (folgt)
+
 ## Offene Verdachte ohne Fund-ID
 
 - **`PrivateKeyValidator.getMaxPrivateKeyForBatchSize` lässt n im GPU-Raster zu (2026-10-17, Folge von F45):** `maxSafeKey = n − 2^b + 1` sichert nur `base + 2^b − 1 ≤ n`, das letzte zulässige OpenCL-Raster endet also auf n. Dort stürzt nichts ab (der Kernel liefert für n·G Koordinaten, die zu keinem Eintrag passen), es wird nur ein sinnloser Schlüssel geprüft. Die Korrektur auf `n − 2^b` ändert drei Tests von `getMaxPrivateKeyForBatchSize` und die Grenze von `PrivateKeyTooLargeException` – erst mit Rückmeldung des Nutzers, da kein Fehlverhalten außer einem verschwendeten Rasterplatz.
@@ -609,3 +623,4 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - *(niedrig, nur beschrieben, 2026-10-18)* BitcoinAddressFinder `io/AddressTxtLine.java:331` (`getCoinIfPossible`), per Probe-Klasse gemessen: Eine Betragsspalte, die `Long.parseLong` nicht versteht, wird still zu `DEFAULT_COIN` (1) – ein Dezimalbetrag in BTC (`1.5`), Text (`abc`), ein Wert über `Long.MAX_VALUE` und eine leere zweite Spalte (`A,,5`) ergeben alle `coin=1`, ohne Warnung; ein negativer Betrag (`-5`) wird übernommen. Die README sagt nur „optionally include an associated coin amount“, Einheit und Fehlerverhalten sind nicht festgelegt, und der Betrag ist für die Suche nur Begleitinformation, daher kein Fix ohne Entscheidung (Vorschlag: bei unlesbarem Betrag einmal je Datei warnen, negative ablehnen). Ebenfalls gemessen und unauffällig: Groß-Bech32 inklusive `LTC1…`; eine Base58-Adresse mit falscher Prüfsumme wird ohne Prüfung importiert (gewollt, mehrere Altcoins rechnen sie anders), P2SH-CashAddr (`p…`) wird abgelehnt (README: BCH P2SH ❌).
 - *(Designfrage, Entscheidung des Nutzers, niedrig, 2026-10-18)* BAF `ZmqResultBroadcaster`: Linger 0 verwirft beim Schließen, was der `PUB`-Socket noch nicht gesendet hat. Lokal gemessen geht nichts verloren (3 von 3 Läufen vollständig), über ein langsames Netz könnten die letzten Batches – das Abschlusssignal – fehlen. Der Socket-Broadcaster liefert seit F130 bis zu 2 s nach; ein gleicher begrenzter Linger (etwa 2000 ms) würde beide Kanäle angleichen, kostet aber genau die Verzögerung, die die Javadoc ausschließen will.
 - **Designfrage `TuneConfiguration.extendSweepBeyondTheCandidates` (2026-10-18, neben F135):** Die Erweiterung endet beim ersten Arm, der den Gewinner nicht schlägt, und meldet dann „The optimum was inside range.“ Liegt der Gewinner auf beiden Rändern (Ende zu Ende: Listen [8, 10] × [1, 4], Gewinner (10, 4)), misst sie nur `keysPerWorkItem`=8; scheitert der, bleibt die Achse `batchSizeInBits` unerweitert, obwohl der Gewinner dort am Rand liegt – die Meldung stimmt dann für diese Achse nicht. Der nächste Aufruf von `nextExtensionArm` würde genau diesen Bit-Arm liefern. Ob nach einem gescheiterten Arm der andere Rand noch probiert werden soll (ein Arm mehr) oder nur die Meldung anzupassen ist, entscheidet der Nutzer.
+- **`TuneConfiguration`: Gerät ohne erfolgreichen Arm behält die Werte des letzten Arms (2026-10-18, neben F136):** `runArm` schreibt jedes Arm-Raster in den Producer, `applyWinnerTo(template, null)` tut nichts. Scheitern auf einem Gerät alle Arme, während ein anderes gewinnt, enthält die ausgegebene Konfiguration für das gescheiterte Gerät das zuletzt gemessene (meist größte, gescheiterte) Raster statt der Werte, die der Nutzer angegeben hatte. Was dort stehen soll (ursprüngliche Werte, Gerät weglassen, Hinweis), ist eine Entscheidung des Nutzers.

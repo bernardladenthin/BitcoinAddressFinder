@@ -870,9 +870,10 @@ public class TuneConfiguration implements Runnable, Interruptable {
             ExecutorService producerExecutor,
             KeyUtility keyUtility,
             BitHelper bitHelper) {
+        ArmResult filterArm = filterSweepArm(deviceSweeps);
         if (cTuneConfiguration.sweepFilterTypes
                 && template instanceof CProducerOpenCL cProducerOpenCL
-                && winner != null
+                && filterArm != null
                 && shouldRun.get()) {
             return measureFilterType(
                     cProducerOpenCL,
@@ -882,9 +883,26 @@ public class TuneConfiguration implements Runnable, Interruptable {
                     producerExecutor,
                     keyUtility,
                     bitHelper,
-                    Objects.requireNonNull(winner));
+                    filterArm);
         }
         return deriveFilterType(effectiveVerificationCostMicros());
+    }
+
+    /**
+     * The grid the filter widths are measured at: the first swept device's own winner, because the
+     * measurement runs on that device's producer.
+     *
+     * <p>Not the global winner: on a multi-device machine that belongs to whichever device was
+     * fastest, and measuring at it would also write its values into the first device's producer, so
+     * the emitted configuration would hand that device another device's grid.
+     *
+     * @param deviceSweeps the per-device breakdown, in sweep order
+     * @return the arm to measure the filter widths with, or {@code null} when the first device has
+     *     no successful arm or nothing was swept
+     */
+    @VisibleForTesting
+    static @Nullable ArmResult filterSweepArm(List<DeviceSweep> deviceSweeps) {
+        return deviceSweeps.isEmpty() ? null : deviceSweeps.get(0).winner();
     }
 
     /**
