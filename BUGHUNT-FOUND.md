@@ -489,7 +489,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `AddressTxtLineTest#fromLine_uppercaseRiecoinScriptPubKey_returnsTheHash160OfTheLowercaseForm`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is "751e76e8199196d454941c45d1b3a323f1433bd6" but: was "21e32e15ba0d03cb848d066dccdb18df5745ef83"“), mit Fix grün (294/294 der Klasse, skipped 0); Gegenprobe per `git stash` rot (1), nach `pop` grün. Breite Liste wie F121 grün, `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** BitcoinAddressFinder `1107caf`
 
 ## Offene Verdachte ohne Fund-ID
 
