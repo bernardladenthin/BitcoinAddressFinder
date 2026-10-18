@@ -1442,6 +1442,9 @@ public class TuneConfiguration implements Runnable, Interruptable {
      * Builds one independent producer template per device, each addressing its own device and
      * carrying every other setting from the prototype.
      *
+     * <p>A template addresses its device with {@code CL_DEVICE_TYPE_ALL}, whatever mask the prototype
+     * carries: a detected device's index is its position among all devices of its platform.
+     *
      * <p>The copy is a JSON round-trip rather than field-by-field assignment. {@code CProducerOpenCL}
      * has upwards of fifteen settings and gains more over time; a hand-written copy silently drops
      * whichever one was added last, and the failure would be a device measured under settings the
@@ -1470,6 +1473,9 @@ public class TuneConfiguration implements Runnable, Interruptable {
                 CProducerOpenCL copy = mapper.readValue(serialisedPrototype, CProducerOpenCL.class);
                 copy.platformIndex = device.platformIndex();
                 copy.deviceIndex = device.deviceIndex();
+                // The detected index counts every device of the platform; a narrower mask inherited
+                // from the prototype would resolve it among the matching devices only.
+                copy.deviceType = CL10.CL_DEVICE_TYPE_ALL;
                 templates.add(copy);
             } catch (JsonProcessingException e) {
                 throw new IllegalStateException(

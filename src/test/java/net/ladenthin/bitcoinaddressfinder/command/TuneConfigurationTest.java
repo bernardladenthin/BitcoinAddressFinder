@@ -19,7 +19,10 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.util.HashSet;
 import java.util.List;
@@ -39,6 +42,11 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.configuration.CTuneConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.GpuFilterType;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdUnknownException;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDevice;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDeviceSelection;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatformSelector;
+import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClPlatformId;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import nl.altindag.log.LogCaptor;
@@ -601,6 +609,32 @@ public class TuneConfigurationTest extends LMDBBase {
         assertThat(templates.get(0).deviceIndex, is(equalTo(0)));
         assertThat(templates.get(1).platformIndex, is(equalTo(1)));
         assertThat(templates.get(1).deviceIndex, is(equalTo(0)));
+    }
+
+    /**
+     * A detected device's index is its position among <em>all</em> devices of its platform, because
+     * detection enumerates them all. A template that kept the prototype's device-type mask would be
+     * resolved among the matching devices only, and on a platform listing a CPU before the GPU (pocl
+     * next to a GPU driver) the index would address a device that is not there.
+     */
+    @Test
+    public void templatesForDevices_prototypeWithGpuMask_templateSelectsTheDetectedDevice() {
+        OpenCLDevice cpu = mock(OpenCLDevice.class);
+        when(cpu.deviceType()).thenReturn(CL10.CL_DEVICE_TYPE_CPU);
+        OpenCLDevice gpu = mock(OpenCLDevice.class);
+        when(gpu.deviceType()).thenReturn(CL10.CL_DEVICE_TYPE_GPU);
+        OpenCLPlatform platform = new OpenCLPlatform(new ClPlatformId(1L), "Platform0", ImmutableList.of(cpu, gpu));
+        CProducerOpenCL prototype = new CProducerOpenCL();
+        prototype.deviceType = CL10.CL_DEVICE_TYPE_GPU;
+        List<TuneConfiguration.DetectedDevice> devices =
+                List.of(new TuneConfiguration.DetectedDevice(0, 1, "GPU", CL10.CL_DEVICE_TYPE_GPU));
+
+        CProducerOpenCL template =
+                TuneConfiguration.templatesForDevices(devices, prototype).get(0);
+        OpenCLDeviceSelection selection = new OpenCLPlatformSelector()
+                .select(List.of(platform), template.platformIndex, template.deviceType, template.deviceIndex);
+
+        assertThat(selection.device(), is(sameInstance(gpu)));
     }
 
     /**
