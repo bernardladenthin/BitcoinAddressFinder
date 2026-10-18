@@ -662,7 +662,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Gegenprobe:** `TRUNCATED_LONG_64` testweise auf `HashSetAddressPresence` verdrahtet → der Consumer-Test wird rot (`Expected: is <1L> but: was <0L>`); zurückgesetzt.
 - **Rot-Grün-Nachweis:** – (Doku-Korrektur; Tests halten das Verhalten fest, Freigabe des Nutzers für Doku ohne roten Test)
 - **Status:** gefixt (Doku)
-- **Commit:** –
+- **Commit:** ba6f610
 
 <a id="f142"></a>
 ### F142 – BitcoinAddressFinder: Javadoc von `putNewAmountWithAutoIncrease` beschreibt noch den Zustand vor F27
