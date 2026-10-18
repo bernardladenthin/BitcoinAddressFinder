@@ -33,7 +33,9 @@ public class PrivateKeyValidator {
      * for grid-based key generation without exceeding the secp256k1 private key limit.
      * <p>
      * This is necessary for chunked or grid-based generation where the base key is incremented
-     * by up to 2^batchSizeInBits - 1.
+     * by up to 2^batchSizeInBits - 1. The result is {@code n − 2^batchSizeInBits}, where {@code n}
+     * is {@link Secp256k1Constants#MAX_PRIVATE_KEY}: the grid starting there ends on {@code n − 1},
+     * the largest valid private key.
      *
      * @param batchSizeInBits The number of bits used for batch size (i.e., the number of keys generated in one grid chunk).
      *                        Must be in the range [0, {@link Secp256k1Constants#PRIVATE_KEY_MAX_NUM_BITS}].
@@ -50,9 +52,9 @@ public class PrivateKeyValidator {
         // 2^batchSizeInBits represents the maximum offset (grid size)
         BigInteger maxOffset = BigInteger.ONE.shiftLeft(batchSizeInBits);
 
-        // Subtract maxOffset - 1 to ensure that baseKey + (2^bits - 1) ≤ MAX_PRIVATE_KEY
-        BigInteger maxSafeKey =
-                Secp256k1Constants.MAX_PRIVATE_KEY.subtract(maxOffset).add(BigInteger.ONE);
+        // MAX_PRIVATE_KEY is the group order n and itself invalid, so the last key of the grid,
+        // baseKey + (2^bits - 1), must not exceed n - 1: baseKey <= n - 2^bits.
+        BigInteger maxSafeKey = Secp256k1Constants.MAX_PRIVATE_KEY.subtract(maxOffset);
 
         if (maxSafeKey.signum() < 0) {
             throw new IllegalStateException("batchSizeInBits=" + batchSizeInBits

@@ -367,6 +367,29 @@ public class ProbeAddressesOpenCLTest {
         }
     }
 
+    /**
+     * A base one above the last allowed one starts a grid whose last key is the group order {@code n},
+     * which has no public key; it must be rejected, while the base below it is accepted.
+     */
+    @OpenCLTest
+    @Test
+    public void setSrcPrivateKeyChunk_gridWouldReachTheGroupOrder_throwsException() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.batchSizeInBits = 8;
+        BigInteger lastBase = Secp256k1Constants.MAX_PRIVATE_KEY.subtract(BigInteger.ONE.shiftLeft(8));
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+            openCLContext.init();
+            OpenClTask openClTask = openCLContext.getOpenClTask().orElseThrow();
+
+            openClTask.setSrcPrivateKeyChunk(lastBase);
+            assertThrows(
+                    PrivateKeyTooLargeException.class,
+                    () -> openClTask.setSrcPrivateKeyChunk(lastBase.add(BigInteger.ONE)));
+        }
+    }
+
     @ParameterizedTest
     @OpenCLTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_32_BYTE_REQUIRING_STRIP)

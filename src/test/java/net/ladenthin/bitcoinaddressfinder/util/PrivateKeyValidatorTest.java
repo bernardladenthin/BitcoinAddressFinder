@@ -14,6 +14,7 @@ import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class PrivateKeyValidatorTest {
 
@@ -21,7 +22,7 @@ public class PrivateKeyValidatorTest {
 
     // <editor-fold defaultstate="collapsed" desc="getMaxPrivateKeyForBatchSize">
     @Test
-    public void getMaxPrivateKeyForBatchSize_batchSize0_returnsMaxPrivateKey() {
+    public void getMaxPrivateKeyForBatchSize_batchSize0_returnsTheLastValidKey() {
         // arrange
         int batchSizeInBits = 0;
 
@@ -29,11 +30,11 @@ public class PrivateKeyValidatorTest {
         BigInteger result = validator.getMaxPrivateKeyForBatchSize(batchSizeInBits);
 
         // assert
-        assertThat(result, is(equalTo(Secp256k1Constants.MAX_PRIVATE_KEY)));
+        assertThat(result, is(equalTo(Secp256k1Constants.MAX_PRIVATE_KEY.subtract(BigInteger.ONE))));
     }
 
     @Test
-    public void getMaxPrivateKeyForBatchSize_batchSize1_returnsMaxMinus1() {
+    public void getMaxPrivateKeyForBatchSize_batchSize1_returnsMaxMinus2() {
         // arrange
         int batchSizeInBits = 1;
 
@@ -41,7 +42,7 @@ public class PrivateKeyValidatorTest {
         BigInteger result = validator.getMaxPrivateKeyForBatchSize(batchSizeInBits);
 
         // assert
-        assertThat(result.add(BigInteger.ONE), is(equalTo(Secp256k1Constants.MAX_PRIVATE_KEY)));
+        assertThat(result.add(BigInteger.TWO), is(equalTo(Secp256k1Constants.MAX_PRIVATE_KEY)));
     }
 
     @Test
@@ -54,9 +55,27 @@ public class PrivateKeyValidatorTest {
 
         // assert
         BigInteger offset = BigInteger.ONE.shiftLeft(batchSizeInBits);
-        BigInteger expected =
-                Secp256k1Constants.MAX_PRIVATE_KEY.subtract(offset).add(BigInteger.ONE);
+        BigInteger expected = Secp256k1Constants.MAX_PRIVATE_KEY.subtract(offset);
         assertThat(result, is(equalTo(expected)));
+    }
+
+    /**
+     * The last grid a base may start is the one whose last key is {@code n − 1}: every key of it is a
+     * valid private key, and one more would be the group order {@code n}.
+     */
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1, 2, 8, 20, Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS - 1})
+    public void getMaxPrivateKeyForBatchSize_gridFromTheMaximum_endsOnTheLastValidKey(int batchSizeInBits) {
+        // arrange
+        BigInteger maxBase = validator.getMaxPrivateKeyForBatchSize(batchSizeInBits);
+
+        // act
+        BigInteger lastKeyOfTheGrid =
+                maxBase.add(BigInteger.ONE.shiftLeft(batchSizeInBits)).subtract(BigInteger.ONE);
+
+        // assert
+        assertThat(lastKeyOfTheGrid, is(equalTo(Secp256k1Constants.MAX_PRIVATE_KEY.subtract(BigInteger.ONE))));
+        assertThat(validator.isOutsidePrivateKeyRange(lastKeyOfTheGrid), is(false));
     }
 
     @Test

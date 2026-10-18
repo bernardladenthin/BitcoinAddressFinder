@@ -40,7 +40,7 @@ public final class Secp256k1Constants {
      * implementation.
      *
      * <p>While the secp256k1 specification allows private keys in the range
-     * {@code [0x1, MAX_PRIVATE_KEY]} (i.e. including {@code 1}), this
+     * {@code [0x1, MAX_PRIVATE_KEY)} (i.e. including {@code 1}), this
      * implementation deliberately excludes {@code 1}. The exclusion avoids
      * edge cases in downstream libraries (notably
      * {@link org.bitcoinj.crypto.ECKey#fromPrivate(java.math.BigInteger, boolean)})
