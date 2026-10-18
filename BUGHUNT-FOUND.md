@@ -516,7 +516,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `FinderTest#startKeyProducer_producerKeyProducerIdIsNull_ExceptionThrown`, `#startKeyProducer_producerKeyProducerIdHasATypo_ExceptionThrown`, `#startKeyProducer_producerBatchSizeOutOfRange_ExceptionThrown`
 - **Rot-Grün-Nachweis:** ohne Fix alle drei rot („Expected …KeyProducerIdUnknownException to be thrown, but nothing was thrown.“ bzw. „Expected java.lang.IllegalArgumentException …“), mit Fix grün (3/3, skipped 0); Gegenprobe per `git stash` rot (3), nach `pop` grün. Breite Liste: `FinderTest` 26/26, `MainTest` 18 (6 OpenCL übersprungen wie zuvor), `ConfigFixturesParseTest` 3/3, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün. Alle `examples/config_Find*.json` außer dem Secrets-Datei-Beispiel bestehen die neue Prüfung (Skript über die JSON-Dateien); zu diesem siehe F127.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** BitcoinAddressFinder `b230cfa`
 
 <a id="f127"></a>
 ### F127 – BitcoinAddressFinder: Das mitgelieferte Secrets-Datei-Beispiel läuft nicht; der Producer verlangt einen Key-Producer, den er nicht benutzt
