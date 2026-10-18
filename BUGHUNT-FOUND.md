@@ -766,7 +766,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion / Tests:** `LMDBToAddressFileTest#exportThenImport_everyFormat_roundTripsTheHash160Set` (neu, über alle drei Exportformate: Export einer Datenbank, Import der Datei in eine neue, Vergleich der hash160-Mengen, beim Format mit Betrag auch der Beträge) – der erste Round-Trip-Test des Exports. `AddressTxtLineTest#fromLine_hexHash160_isImportedAsThatHash160` (4 Zeilen: 40 Einsen – die Base58-fähige Zeile, die vorher zu einem falschen Hash wurde –, eine echte Hash-Zeile klein und groß, mit Betrag).
 - **Rot-Grün-Nachweis:** ohne Fix rot: Round-Trip für `HexHash` „but: was <[]>“ (die beiden Base58-Formate grün), Hex-Zeilen 4/4 rot („1111…“ → „but: was "0000…"“, die übrigen „invalid Base58 address“). Mit Fix grün; Gegenprobe per `git stash` der Produktionsdatei wieder rot, danach grün. Breit: `AddressTxtLineTest` 298/298, `LMDBToAddressFileTest` 16/16, `AddressFilesToLMDBTest` 26/26, `SeparatorFormatTest` 83/83, `BitcoinAddressFinderArchitectureTest` 17/17, `MainTest` 18/18 einzeln je Methode (die OpenCL-Roundtrip-Methode mit `POCL_MAX_WORK_GROUP_SIZE=256`, siehe die pocl-Beobachtung in `BUGHUNT-CHECKED.md`); `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** e81b8e2
 
 ## Offene Verdachte ohne Fund-ID
 
