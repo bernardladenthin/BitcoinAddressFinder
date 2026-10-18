@@ -568,7 +568,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `FinderTest#shutdownAndAwaitTermination_consumerStillDraining_everyBatchIsReportedBeforeTheBroadcastersClose` – vier Producer mit je einem Batch, ein Consumer-Thread, ein Test-Listener hält jeden Batch 200 ms; die Naht hält fest, wie viele Batches beim Schließen der Broadcaster schon gemeldet waren.
 - **Rot-Grün-Nachweis:** gegen den Naht-Stand ohne Fix rot („Expected: is <4> but: was <0>“, die übrigen 26 Tests der Klasse grün), mit Fix grün in 3 von 3 Läufen; Gegenprobe durch Zurückkopieren des Naht-Stands rot („but: was <0>“), danach wieder grün. Breite Liste: `FinderTest` 27/27, `ConsumerJavaTest` 36/36, die drei Broadcaster-Tests, `ConfigFixturesParseTest` 4/4, `BitcoinAddressFinderArchitectureTest` 17/17; `MainTest` 18/18 mit `POCL_MAX_WORK_GROUP_SIZE=256` (ohne die Variable stirbt seine OpenCL-Roundtrip-Fork auf pocl, auch gegen den unveränderten Stand – siehe die pocl-Beobachtung in BUGHUNT-CHECKED.md); `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** BitcoinAddressFinder `035f2ac`
 
 ## Offene Verdachte ohne Fund-ID
 
