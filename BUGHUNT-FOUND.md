@@ -838,7 +838,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion / Tests:** `ProducerReleaserTest#release_producerStillRunningAfterTheWait_isNotReleasedAndTheOthersAre` (Testdouble, das nach dem Warten `RUNNING` meldet: keine Freigabe, die beiden anderen je einmal, ERROR-Log). Den Schaden selbst (Freigabe im laufenden Kernel) zeigt kein Mock; der Test belegt die Reihenfolge, die ihn ausschließt.
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <0> but: was <1>“), mit Fix grün; Gegenprobe per `git stash` der Produktionsdatei wieder rot, danach grün. Breit: `ProducerReleaserTest` 5/5, `FinderTest` 29/29, `ProducerOpenCLTest` 11/11, `ProducerJavaTest` 9/9, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply`, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** af5bb59
 
 ## Offene Verdachte ohne Fund-ID
 
