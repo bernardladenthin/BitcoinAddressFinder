@@ -851,7 +851,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion / Tests:** `KeyProducerJavaSocketTest#start_serverPortHeldByAnotherProcess_failsTheStartInsteadOfEndingWithoutAKey` (ein `ServerSocket` hält den Port). Ende zu Ende über die CLI, Port 5591 von einem Python-Prozess gehalten: mit Fix Exit 1 nach 1 s, „The socket key producer s cannot listen on port 5591: Address already in use“.
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected java.lang.IllegalStateException to be thrown, but nothing was thrown“), mit Fix grün; Gegenprobe per `git stash` der Produktionsdatei wieder rot, danach grün. Breit: `KeyProducerJavaSocketTest` 23/23, `FinderTest` 29/29, `SocketResultBroadcasterTest` 8/8, `BitcoinAddressFinderArchitectureTest`, `ConfigFixturesParseTest` grün; `spotless:apply`, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** bf140a6
 
 ## Offene Verdachte ohne Fund-ID
 
