@@ -778,7 +778,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion / Tests:** `PrivateKeyValidatorTest#getMaxPrivateKeyForBatchSize_gridFromTheMaximum_endsOnTheLastValidKey` (b = 0, 1, 2, 8, 20, 255: letzter Schlüssel des Rasters ab dem Maximum ist n−1 und gültig); `ProbeAddressesOpenCLTest#setSrcPrivateKeyChunk_gridWouldReachTheGroupOrder_throwsException` (pocl, b = 8: Basis n − 2^8 angenommen, n − 2^8 + 1 abgelehnt).
 - **Rot-Grün-Nachweis:** ohne Fix rot: der neue Validator-Test 6/6 („Expected: is <…494336> but: was <…494337>“, also n statt n−1), der OpenCL-Test „Expected PrivateKeyTooLargeException to be thrown, but nothing was thrown“. Mit Fix grün; Gegenprobe per `git stash` des Validators: 9 Validator-Tests (6 neue + 3 angepasste) und der OpenCL-Test wieder rot, danach grün. Breit: `PrivateKeyValidatorTest` 28/28, `PrivateKeyTooLargeExceptionTest` 11/11, `ProducerOpenCLTest` 11/11, `KeyProducerJavaIncrementalTest`, `ProducerJavaTest`, `BitcoinAddressFinderArchitectureTest` grün; `spotless:apply`, `spotbugs:check`, Release-Javadoc grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 039f598
 
 ## Offene Verdachte ohne Fund-ID
 
