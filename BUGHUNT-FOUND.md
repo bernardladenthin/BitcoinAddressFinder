@@ -63,7 +63,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F145](#f145) — niedrig — *gefixt (Doku)*
 - [F146](#f146) — niedrig — *gefixt (Doku)*
 - [F147](#f147) — niedrig — *gefixt (Doku)*
-- [F148](#f148) — mittel — *nur beschrieben* (Entscheidung des Nutzers)
+- [F148](#f148) — mittel — *gefixt*
 
 ## Funde
 
@@ -748,9 +748,12 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Beschreibung:** Beim Bau des Kernels lädt pocl 5.0 `libLLVM-16.so.1`, das die Handler für SIGSEGV, SIGBUS, SIGFPE und SIGILL durch eigene ersetzt (`-Xcheck:jni`: „SIGSEGV handler modified!“, Handler `in libLLVM-16.so.1`, Flags `SA_ONSTACK|SA_RESETHAND|SA_NODEFER`). HotSpot braucht SIGSEGV selbst (implizite Null-Prüfungen, Safepoint-Polls kompilierter Schleifen über eine geschützte Seite). Ein einzelnes solches Signal geht gut: LLVMs Handler setzt die alten Handler zurück, das Signal kommt erneut und landet bei der JVM (100 provozierte NPEs nach dem Kernel-Bau überlebt). Faulten aber mehrere Threads gleichzeitig, trifft der zweite wegen `SA_RESETHAND` den Default-Handler, bevor LLVM zurückgesetzt hat, und der Prozess stirbt mit SIGSEGV (Exit 139), ohne `hs_err` (die JVM sieht das Signal nie). Genau das war der eine Absturz bei F129: 8 Consumer-Threads mitten in der Trefferverarbeitung, als `Finder.interrupt()` den Abbau begann.
 - **Reproduktion:** Probe `SigProbe3` (Scratchpad `sigprobe/`): 8 Threads in heißen Schleifen, danach 2000-mal `System.gc()` + `Thread.getAllStackTraces()` (gleichzeitige Safepoints). Ohne Kernel-Bau 5/5 überlebt, nach `OpenCLContext.init()` auf pocl 5/5 SIGSEGV, mit `LD_PRELOAD=$JAVA_HOME/lib/libjsig.so` (Signalverkettung des JDK) 5/5 überlebt. Normale `Find`-Läufe treffen das Fenster selten: 1 von 70 (danach 60 in Folge sauber).
 - **Nicht geprüft:** echte GPU-Treiber. Ob NVIDIA/AMD/Intel-Treiber ebenfalls Handler setzen, ist offen; AMDs OpenCL nutzt LLVM (comgr) im Prozess und ist ein Kandidat. Windows ist nicht betroffen (keine POSIX-Signale), macOS hätte `libjsig.dylib`.
-- **Fix:** offen, Entscheidung des Nutzers. Möglich: `libjsig` in den Linux-Startskripten und im CI-Job vorladen; eine Warnung beim OpenCL-Start, wenn auf Linux `libjsig` nicht geladen ist; Dokumentation; Meldung an pocl.
-- **Rot-Grün-Nachweis:** – (nicht gefixt)
-- **Status:** nur beschrieben
+- **Fix:** Entscheidung des Nutzers (Variante A). Die drei Linux-Startskripte für OpenCL (`run_Find_1OpenCLDevice.sh`, `run_Find_1OpenCLDeviceAnd2CPUProducer.sh`, `run_OpenCLInfo.sh`) laden `libjsig.so` des verwendeten JDK vor, wenn es existiert; der CI-Job `test-opencl` setzt `LD_PRELOAD=$JAVA_HOME/lib/libjsig.so` (geerbt von den Surefire-Forks) und prüft, dass die Datei da ist; `OpenCLContext.init()` warnt vor dem Kernel-Bau auf Linux, wenn `libjsig` nicht vorgeladen ist (`SignalChainingCheck`, reine Entscheidung über `os.name`, `LD_PRELOAD`, `java.home`); README „Known Issues → OpenCL on Linux: signal chaining (`libjsig`)“. Nebenbei korrigiert: der CI-Kommentar „the known pocl SIGSEGV in the secp256k1 kernel“ meinte den in `bc9d922` behobenen Lesezugriff. `TODO.md`: „Check whether GPU OpenCL drivers replace the JVM's signal handlers (pocl does)“.
+- **Reproduktion / Tests:** `SignalChainingCheckTest` (5: Linux ohne/mit fremdem/mit `libjsig`-Preload, Windows, macOS). Vorher rot (Klasse fehlt); Gegenprobe über die Logik: `libjsig`-Prüfung entfernt → `warning_linuxWithLibjsigPreloaded_isEmpty` rot. PIT gezielt: 4/4 Mutanten getötet. Ende zu Ende: `Find` ohne Preload loggt die Warnung einmal, mit Preload nicht, beide 682/682 Treffer; die Probe mit dem `LD_PRELOAD`, das der Skript-Block setzt, 3/3 überlebt.
+- **Regression:** OpenCL-nahe Tests mit vorgeladenem `libjsig` auf pocl: 289 Tests, 0 Fehler (23 übersprungen aus bestehenden Gründen); Architektur-, `JvmModuleFlagConsistencyTest`, `ExampleRunScriptJarVersionTest`, SpotBugs, Release-Javadoc grün; `check-run-scripts.py`, `check-shared-files.py` und YAML-Prüfung der Workflows grün.
+- **CI-Bedarf:** der `test-opencl`-Job mit dem neuen `LD_PRELOAD`; Messung auf echten GPU-Treibern laut `TODO.md`.
+- **Rot-Grün-Nachweis:** siehe Tests.
+- **Status:** gefixt
 - **Commit:** –
 
 ## Offene Verdachte ohne Fund-ID

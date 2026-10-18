@@ -420,17 +420,24 @@ jobs:
           echo "===== ulimit -a ====="; ulimit -a || true
           echo "===== vm.max_map_count ====="; cat /proc/sys/vm/max_map_count || true
           echo "===== vm.overcommit_memory ====="; cat /proc/sys/vm/overcommit_memory || true
+      # pocl compiles kernels with an in-process LLVM that replaces the JVM's SIGSEGV handler;
+      # concurrent safepoints in a forked test JVM can then kill it without an hs_err file.
+      # Preloading the JDK's signal chaining keeps the JVM's handlers in front (inherited by
+      # the Surefire forks). See SignalChainingCheck and README "OpenCL on Linux: signal chaining".
       - name: All tests including OpenCL (pocl) + JaCoCo coverage
         shell: bash
-        run: mvn -e --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true --update-snapshots test jacoco:report
+        run: |
+          test -f "$JAVA_HOME/lib/libjsig.so"
+          export LD_PRELOAD="$JAVA_HOME/lib/libjsig.so"
+          mvn -e --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true --update-snapshots test jacoco:report
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: jacoco-report-opencl
           path: target/site/jacoco/jacoco.xml
           if-no-files-found: warn
-      # A forked test JVM that aborts (the known pocl SIGSEGV in the secp256k1
-      # kernel) leaves an hs_err_pid log + a surefire dumpstream that are
-      # otherwise only inside the uploaded artifact. Echo them into the job log
+      # A forked test JVM that aborts natively (e.g. the pocl out-of-bounds read in
+      # the secp256k1 kernel, fixed in bc9d922) leaves an hs_err_pid log + a surefire
+      # dumpstream that are otherwise only inside the uploaded artifact. Echo them into the job log
       # on failure so the native frame is readable directly.
       - name: Dump native crash logs (on failure)
         if: ${{ failure() }}

@@ -107,6 +107,7 @@ using the assigned ID:
   - [Deep Learning Private Key Prediction](#deep-learning-private-key-prediction)
 - [Known Issues](#known-issues)
   - [Hybrid Graphics Performance (Low Throughput)](#hybrid-graphics-performance-low-throughput)
+  - [OpenCL on Linux: signal chaining (`libjsig`)](#opencl-on-linux-signal-chaining-libjsig)
 - [Future Improvements](#future-improvements)
   - [KeyProvider](#keyprovider)
 - [Acknowledgements](#acknowledgements)
@@ -2182,6 +2183,26 @@ Laptops with hybrid graphics—using both integrated (iGPU) and discrete (dGPU) 
 | **Apple (Intel)**  | MacBook Pro (pre-2021 with dual GPUs)            | macOS → Disable *Automatic Graphics Switching* in Energy Preferences |
 
 > If your laptop uses hybrid graphics, always ensure that the **discrete GPU** is explicitly selected for OpenCL workloads to avoid severe performance bottlenecks.
+
+### OpenCL on Linux: signal chaining (`libjsig`)
+
+An OpenCL driver that compiles kernels inside the Java process with LLVM can take over the JVM's
+`SIGSEGV`, `SIGBUS`, `SIGFPE` and `SIGILL` handlers. Measured with **pocl 5.0** (the CPU OpenCL
+device, also used in CI): its `libLLVM-16.so.1` installs its own handlers while the kernel is built.
+HotSpot raises `SIGSEGV` on purpose (implicit null checks, safepoint polls), so when several threads
+fault at once — at a safepoint, typically while the finder shuts down — the JVM can die with
+`Segmentation fault` (exit code 139) and **without** an `hs_err` file. Whether GPU drivers do the same
+has not been measured yet (AMD's OpenCL also runs LLVM in-process).
+
+The JDK ships the fix: preload its signal-chaining library, which keeps the JVM's handlers in front and
+forwards to the driver's:
+
+```bash
+LD_PRELOAD="$JAVA_HOME/lib/libjsig.so" java ... -jar bitcoinaddressfinder-<version>-jar-with-dependencies.jar config.json
+```
+
+The OpenCL launchers in `examples/` (`run_*OpenCL*.sh`) do this already, and the finder logs a warning
+when it builds an OpenCL kernel on Linux without it. Windows is not affected.
 
 ### Contributors: do not upgrade jqwik past 1.9.3
 

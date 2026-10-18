@@ -524,6 +524,13 @@ public class OpenCLContext implements ReleaseCLObject {
         // only; logged) — see resolveEffectiveNoInlineHelpers.
         final boolean effectiveNoInlineHelpers =
                 resolveEffectiveNoInlineHelpers(device.deviceName(), device.deviceVendor());
+        // The build is where an in-process LLVM takes over the JVM's signal handlers (see SignalChainingCheck).
+        new SignalChainingCheck()
+                .warning(
+                        System.getProperty("os.name", ""),
+                        System.getenv("LD_PRELOAD"),
+                        System.getProperty("java.home", ""))
+                .ifPresent(LOGGER::warn);
         clApi.buildProgram(localProgram, device.device(), buildOptions(effectiveNoInlineHelpers));
 
         if (producerOpenCL.logGpuDiagnostics) {

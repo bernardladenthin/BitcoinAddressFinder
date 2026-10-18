@@ -580,6 +580,36 @@ Then either keep the collection with the measured reason and cost in the `GcTrig
 remove it together with `GcTrigger` and its test in `OpenCLContextGpuFilterWidthTest`. An NVIDIA card
 cannot answer this: the RTX 3070 never reproduced the original failure.
 
+### Check whether GPU OpenCL drivers replace the JVM's signal handlers (pocl does)
+
+pocl 5.0 builds kernels with an in-process `libLLVM-16.so.1` that replaces the JVM's `SIGSEGV`,
+`SIGBUS`, `SIGFPE` and `SIGILL` handlers (`SA_RESETHAND`); concurrent faults, as at a safepoint, then
+kill the JVM with exit code 139 and no `hs_err` file. Measured on pocl only (2026-10-18): a probe with 8
+threads in hot compiled loops plus 2000 forced safepoints (`System.gc()` + `Thread.getAllStackTraces()`)
+after `OpenCLContext.init()` crashed 5/5, without the kernel build 0/5, with
+`LD_PRELOAD=$JAVA_HOME/lib/libjsig.so` 0/5. The launchers, the `test-opencl` job and a startup warning
+(`SignalChainingCheck`) now preload or ask for `libjsig` on Linux.
+
+Open: the GPU drivers users actually run. On Linux, per driver (AMD ROCm/Adrenalin OpenCL, which runs
+LLVM/comgr in-process, is the likeliest; NVIDIA; Intel):
+1. Start any `Find` with `-Xcheck:jni` and an OpenCL producer; look for `SIGSEGV handler modified!` and
+   the library named under "Signal Handlers:".
+2. If it is modified, run the probe (8 hot threads, 2000 safepoints after the kernel build) without and
+   with `libjsig` preloaded.
+
+If no GPU driver is affected, the warning could be narrowed to pocl (platform name "Portable Computing
+Language"); until then it stays on for every Linux start.
+
+### Measure the zero-anchor branch of the key kernel on a real GPU
+
+`generateKeysKernel_grid` gained a branch for the work-item whose anchor scalar is 0 (the first
+work-item of a grid with base 0, fixed 2026-10-18, `OpenCLZeroAnchorTest`): one OR over the eight
+scalar words per work-item, and a branch that is false for every other work-item. Expected cost: not
+measurable. Confirm with the `GridSizeSweepBenchmark` / tuner arm of the device's sweet spot
+(`batchSizeInBits` 24, `keysPerWorkItem` 512 on the rented NVIDIA cards), the commit before against the
+commit with the branch, both orderings to defeat thermal bias, for the 2^32 and the
+`useReducedRadixField` walk.
+
 ### OpenCL backend abstraction & multi-device coverage (migrated from GitHub issues)
 
 - **Add a test exercising two OpenCL devices simultaneously** (migrated from GitHub issue #6). Current OpenCL coverage drives a **single** device (`ProbeAddressesOpenCLTest`, gated by `OpenCLPlatformAssume`). Add a test that runs **two `producerOpenCL` instances concurrently** (the multi-device path the project supports via multiple `producerOpenCL` entries) and asserts both produce and feed the consumer correctly at the same time.
