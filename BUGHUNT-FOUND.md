@@ -862,7 +862,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Fix:** Entscheidung des Nutzers. „To“ wird mit dem neuen `alignUp` aufgerundet; für ausgerichtete Werte (auch den Standardwert) ändert sich nichts.
 - **Reproduktion / Tests:** Kein Java-Code, kein Testrahmen für die Seite; mit Node nachgerechnet (Raster 16, From 0x10, To 0x35): vorher letzter geprüfter Schlüssel 0x2f (0x30 … 0x34 fehlen), nachher 0x3f; From 0x10, To 0x40: gleiche Blockzahl wie vorher.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** cf67ad3
 
 ## Offene Verdachte ohne Fund-ID
 
