@@ -45,7 +45,10 @@ public class CKeyProducerJavaSocket extends CKeyProducerJavaReceiver {
      */
     public boolean broadcastResults = false;
 
-    /** TCP port the result server binds to, used only when {@link #broadcastResults} is set. */
+    /**
+     * TCP port the result server binds to, used only when {@link #broadcastResults} is set. In
+     * {@link Mode#SERVER} it must differ from {@link #port}; the key producer refuses to start otherwise.
+     */
     public int resultPort = 5556;
 
     /** Operating mode: client or server */

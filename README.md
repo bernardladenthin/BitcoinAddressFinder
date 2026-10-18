@@ -1363,7 +1363,7 @@ Useful for piping externally generated secrets (e.g., from Python, Go, etc.) dir
 | `logReceivedSecret`           | boolean                          | `false`       | Whether to log each received private key as a hex string                            |
 | `connectRetryCount`           | number                           | `5`           | Number of times to retry establishing a socket connection (client mode)             |
 | `broadcastResults`            | boolean                          | `false`       | Serve the outcome of every checked batch on `resultPort` (see below)                |
-| `resultPort`                  | number                           | `5556`        | TCP port the result server binds to, used only when `broadcastResults` is set       |
+| `resultPort`                  | number                           | `5556`        | TCP port the result server binds to, used only when `broadcastResults` is set; must differ from `port` in server mode (the start is refused otherwise) |
 | `connectRetryDelayMillis`     | number                           | `1000`        | Delay between connection retry attempts (in milliseconds)                           |
 | `maxWorkSize`                 | number                           | `16777216`    | Maximum number of secrets to request in a single call                               |
 

@@ -757,6 +757,33 @@ public class KeyProducerJavaSocketTest {
     }
 
     @Test
+    public void constructor_serverPortIsTheResultPort_isRejectedInsteadOfEndingWithoutAKey() {
+        // In server mode the key producer listens on port and the result server on resultPort. With
+        // the same number the result server, started first, takes the port, every accept attempt
+        // fails with "Address already in use", and once timeoutMillis passed without a secret the run
+        // ended as a regular one with exit 0 - without a single key checked.
+        CKeyProducerJavaSocket config = createServerConfig(findFreePort());
+        config.broadcastResults = true;
+        config.resultPort = config.port;
+
+        IllegalArgumentException e = assertThrows(
+                IllegalArgumentException.class, () -> new KeyProducerJavaSocket(config, keyUtility, bitHelper));
+        assertThat(e.getMessage(), containsString("resultPort"));
+        assertThat(e.getMessage(), containsString(String.valueOf(config.port)));
+    }
+
+    @Test
+    public void constructor_serverPortIsTheResultPortWithoutBroadcast_isAccepted() {
+        // resultPort is not bound when nothing is broadcast, so the same number does not collide.
+        CKeyProducerJavaSocket config = createServerConfig(findFreePort());
+        config.broadcastResults = false;
+        config.resultPort = config.port;
+
+        KeyProducerJavaSocket producer = new KeyProducerJavaSocket(config, keyUtility, bitHelper);
+        producer.interrupt();
+    }
+
+    @Test
     @Timeout(value = 5000, unit = TimeUnit.MILLISECONDS)
     public void serverAcceptTimesOut_whenNoClientConnects() throws Exception {
         int port = findFreePort();

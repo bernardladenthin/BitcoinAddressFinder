@@ -62,10 +62,33 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
      * @param config      the socket configuration
      * @param keyUtility  cryptographic helper
      * @param bitHelper   bit/batch-size helper (unused but kept for symmetry)
-     * @throws IllegalArgumentException if {@code config.timeoutMillis} is negative
+     * @throws IllegalArgumentException if {@code config.timeoutMillis} is negative, or if in server
+     *     mode {@code config.port} is the {@code resultPort} results are broadcast on
      */
     public KeyProducerJavaSocket(CKeyProducerJavaSocket config, KeyUtility keyUtility, BitHelper bitHelper) {
-        super(requireNonNegativeTimeout(config), keyUtility);
+        super(requireDistinctResultPort(requireNonNegativeTimeout(config)), keyUtility);
+    }
+
+    /**
+     * Rejects a server whose port is the one results are broadcast on. The result server is started
+     * first and takes the port, every accept attempt then fails with "Address already in use", and once
+     * {@code timeoutMillis} passed without a secret the run ended as a regular one, without a single key
+     * checked. Checked before {@code super(...)} so no partially constructed producer exists when it
+     * throws.
+     *
+     * @param config the socket configuration
+     * @return {@code config}, unchanged
+     * @throws IllegalArgumentException if the two ports collide
+     */
+    private static CKeyProducerJavaSocket requireDistinctResultPort(CKeyProducerJavaSocket config) {
+        if (config.mode == CKeyProducerJavaSocket.Mode.SERVER
+                && config.broadcastResults
+                && config.port == config.resultPort) {
+            throw new IllegalArgumentException("port and resultPort of the socket key producer "
+                    + config.keyProducerId + " must differ in server mode while broadcastResults is set, but"
+                    + " both are " + config.port);
+        }
+        return config;
     }
 
     /**
