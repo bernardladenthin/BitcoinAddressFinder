@@ -1598,7 +1598,7 @@ format is selected with `secretFormat`. See [`config_Find_SecretsFile.json`](exa
 
 | JSON field      | Type                  | Default          | Description                                              |
 |-----------------|-----------------------|------------------|----------------------------------------------------------|
-| `keyProducerId` | string                | —                | Unique identifier for this producer                      |
+| `keyProducerId` | string                | —                | Id of a configured key producer (required like for every producer, although this one reads its secrets from the files) |
 | `secretsFiles`  | array of string       | `[]`             | Paths of the files to read (relative to the working dir) |
 | `secretFormat`  | string enum           | `STRING_SHA256`  | Line format of every file (see below)                    |
 
@@ -1613,6 +1613,9 @@ Supported `secretFormat` values:
 
 ```jsonc
 // ...
+"keyProducerJavaRandom": [
+    { "keyProducerId": "exampleKeyProducerId", "randomAlgorithm": "SECURE_RANDOM" }
+],
 "producerJavaSecretsFiles": [
     {
         "keyProducerId": "exampleKeyProducerId",

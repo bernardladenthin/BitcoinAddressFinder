@@ -48,7 +48,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F122](#f122) — niedrig — *gefixt*
 - [F124](#f124) — niedrig — *gefixt*
 - [F126](#f126) — niedrig — *gefixt*
-- [F127](#f127) — mittel — *nur beschrieben*
+- [F127](#f127) — mittel — *gefixt*
 
 ## Funde
 
@@ -524,11 +524,11 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/engine/Finder.java` (`configureProducer`, `processProducers` mit `getKeyProducer` auch für `producerJavaSecretsFiles`), `examples/config_Find_SecretsFile.json`, `README.md` (Abschnitt „Secrets File Producer“)
 - **Schwere:** mittel
 - **Beschreibung:** `ProducerJavaSecretsFiles` liest seine Secrets selbst aus den Dateien; sein Konstruktor nimmt einen `KeyProducer`, die Javadoc sagt „unused in this producer“. `configureProducer` löst ihn trotzdem über `getKeyProducer` auf und wirft `KeyProducerIdUnknownException` bei fehlender oder unbekannter ID. Das Beispiel `examples/config_Find_SecretsFile.json` (und `run_Find_SecretsFile.sh/.bat`) setzt für keinen seiner vier Producer eine `keyProducerId` und konfiguriert keinen Key-Producer: es scheitert mit „Key producer id is unknown: null“ – vor F126 nach dem BLOOM-Laden, jetzt sofort. Unbemerkt, weil `MainTest` eine eigene Kopie unter `src/test/resources/testRoundtrip/` benutzt, die einen Zufalls-Key-Producer als Platzhalter trägt. Die README beschreibt `keyProducerId` dort als „Unique identifier for this producer“ und zeigt ein Beispiel mit einer ID ohne passenden Key-Producer.
-- **Fix:** offen, nächste Runde. Möglich: Secrets-Datei-Producer ohne Key-Producer zulassen (die ID dient dann nur als Bezeichnung in der Statistik, `AbstractProducer` liest `keyProducer` nur für den Strategienamen), dazu `validateProducerConfiguration` aus F126 angleichen; oder Beispiel und README korrigieren. Test: das Beispiel selbst gegen `configureProducer` laufen lassen.
-- **Reproduktion:** —
-- **Rot-Grün-Nachweis:** —
-- **Status:** nur beschrieben
-- **Commit:** —
+- **Fix:** Beispiel und README an den Vertrag des Codes angeglichen: `examples/config_Find_SecretsFile.json` bekommt einen Zufalls-Key-Producer und jeder der vier Producer dessen `keyProducerId` (wie die Testkopie); die README beschreibt `keyProducerId` als Verweis auf einen konfigurierten Key-Producer und zeigt ihn im Beispiel. Offene Designfrage für den Nutzer: Secrets-Datei-Producer ganz ohne Key-Producer zulassen (die ID diente dann nur als Bezeichnung in der Statistik; `AbstractProducer` liest `keyProducer` dort für den Strategienamen, `validateProducerConfiguration` aus F126 müsste folgen).
+- **Reproduktion:** `ConfigFixturesParseTest#secretsFileExample_everyProducerNamesAConfiguredKeyProducer` (lädt die mitgelieferte Datei und ruft `Finder.startKeyProducer`)
+- **Rot-Grün-Nachweis:** ohne Fix rot („Unexpected exception thrown: …KeyProducerIdUnknownException: Key producer id is unknown: null“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` der Beispieldatei rot (1), nach `pop` grün. `ConfigFixturesParseTest` 4/4, `BitcoinAddressFinderArchitectureTest` 17/17, `spotless:apply` ohne weiteren Diff; kein Produktionscode geändert.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 
