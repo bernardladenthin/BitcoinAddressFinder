@@ -11,6 +11,65 @@ so everything below is genuinely still open.
 
 ## Open — BAF-specific
 
+### Open points from the bug hunt of 2026-10-16 … 19 (details: `BUGHUNT-FOUND.md`)
+
+Everything the bug hunt left open, so nothing is lost when the session ends. The ledger entry
+named in each item holds the analysis, the history and the reproduction; delete an item here when
+it is done, as for every other item in this file.
+
+**Decided by the owner, still to be implemented** (each with a test red without the fix):
+
+- **Incremental producer, last partial batch** (ledger: open suspicion "`KeyProducerJavaIncremental`,
+  Teilbatch am Bereichsende"). `endPrivateKey` is documented as an inclusive upper bound, but with
+  `returnStartSecretOnly=false` the last batch that only partly fits throws, and up to
+  `overallWorkSize - 1` keys before the end are never checked; with `returnStartSecretOnly=true`
+  (OpenCL) the batch runs past the end. Decision: (b) check that last partial batch completely on the
+  CPU. Cases 3, 5, 8 and 9 of the table in `KeyProducerJavaIncrementalTest` pin today's behaviour and
+  change with it.
+- **`WebSocketEndpoint.greetingSupplier` → `volatile`** (ledger: open suspicion, `WebSocketEndpoint.java:54`).
+  Written after the server started, read in `onOpen` on Java-WebSocket's worker thread, with no
+  happens-before edge. The owner allowed this one without a red test: the visibility gap cannot be
+  produced deterministically on HotSpot/x86.
+- **Amount column of address files** (ledger: open suspicion, `AddressTxtLine.java:331`
+  `getCoinIfPossible`). An amount `Long.parseLong` cannot read (`1.5`, `abc`, above `Long.MAX_VALUE`,
+  an empty second column) silently becomes 1, a negative one is taken over. Decision: warn once per
+  file about unreadable amounts, reject negative ones.
+- **ZeroMQ result broadcaster linger** (ledger: open suspicion, `ZmqResultBroadcaster`). Linger 0
+  drops what the `PUB` socket has not sent yet on close, possibly the last batches. Decision: a
+  bounded linger of 2000 ms, like the socket broadcaster's drain since F130.
+- **Tuner sweep extension tries the other edge too** (ledger: open suspicion
+  "`TuneConfiguration.extendSweepBeyondTheCandidates`"). The extension stops at the first arm that
+  does not beat the winner and reports "The optimum was inside range." even when the winner sits on
+  the edge of the other axis. Decision: after a failed arm on one axis, also try the other edge.
+
+**Waiting for the owner's decision:**
+
+- **`TuneConfiguration.runArm` releases a producer that may still run** (ledger: open suspicion,
+  pattern review after F156). Same shape as F156 before its fix: `interrupt()`,
+  `waitTillProducerNotRunning()`, then `releaseProducer()` without looking at the state. Possible
+  fix: release the arm's producer through a `ProducerReleaser`. A red test needs a producer inside an
+  arm that ignores the interrupt, i.e. a seam around `createProducer`.
+- **`ProbeAddressesOpenCLTest#setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException`** (ledger:
+  open suspicion). Both cases fail before the assertion with `CL_INVALID_BUFFER_SIZE` in
+  `OpenCLContext.init()`: the test builds the context with `batchSizeInBits` 24, and pocl on a
+  4-core/15 GB machine allows 1024 MB per allocation. Unrelated to F151. Possible fix: use a small
+  grid for the rejection (the bound does not depend on the grid size, see F151's 8-bit test).
+
+**CI and hardware runs** (the owner runs these together; the three hardware measurements have their
+own items below: heap reclaim, signal handlers of GPU drivers, zero-anchor branch):
+
+- The full `mvn test` once (the bug hunt ran only the affected test classes).
+- The `test-opencl` job (pocl), which now runs with `LD_PRELOAD=$JAVA_HOME/lib/libjsig.so` (F148)
+  and the new OpenCL tests: `OpenCLZeroAnchorTest` (F129),
+  `ProbeAddressesOpenCLTest#setSrcPrivateKeyChunk_gridWouldReachTheGroupOrder_throwsException` (F151),
+  `TuneConfigurationTest#run_noArmSucceedsOnOneDevice_emittedConfigurationKeepsThatDevicesConfiguredValues`
+  (F154). Two things to watch there: the `privateKeyTooLarge` test above, and
+  `MainTest#testRoundtripOpenCLProducer_*`, which locally dies with SIGSEGV unless
+  `POCL_MAX_WORK_GROUP_SIZE=256` is set (pocl picks work-group size 4096 and overflows its 8 MB
+  thread stack, `BUGHUNT-CHECKED.md`); the job does not set the variable.
+- F136 with two real OpenCL devices (pocl offers one): `sweepFilterTypes` must measure each device's
+  own winner.
+
 ### Persistence backends (genuinely open work)
 
 Implementation of `BLOOM` / `HASHSET` / `TRUNCATED_LONG_64` /
