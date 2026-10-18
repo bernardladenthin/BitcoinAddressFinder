@@ -58,6 +58,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F139](#f139) — mittel — *gefixt*
 - [F140](#f140) — mittel — *gefixt*
 - [F141](#f141) — niedrig — *nur beschrieben*
+- [F142](#f142) — niedrig — *nur beschrieben*
 
 ## Funde
 
@@ -645,6 +646,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Beschreibung:** Die Klasse speichert je Adresse nur Byte 0 (Bucket) und die Bytes 1–8 (72 Bit). Beide Javadocs versprechen, eine Kollision werde „disambiguated by the LMDB backend that this lookup sits in front of“ bzw. „the enclosing chain must fall through to the LMDB delegate“. Der Code tut das Gegenteil: `requiresBackend()` ist `false`, `ConsumerJava` verdrahtet die Klasse ohne Accelerator (anders als Bloom/Fuse) und schließt LMDB nach dem Aufbau. Eine Adresse, die in den ersten 9 Byte mit einem Eintrag übereinstimmt, gilt als Treffer und wird als „hit: Found the address“ gemeldet. Gemessen mit einer Probe: ein Eintrag, Abfrage mit geänderten Bytes 12 und 19 → `containsNonMember=true`, `requiresBackend=false`. Dazu sind die genannten Wahrscheinlichkeiten widersprüchlich: Klasse „N / 2^64“ (≈ 7,5·10⁻¹¹), Enum „N/2⁴⁴“ und „~10⁻¹¹“; bei 72 Bit wären es N/2⁷² ≈ 3·10⁻¹³ je Abfrage bei 1,47 Mrd. Einträgen. Praktisch selten, aber ein falscher Treffer meldet einen Schlüssel als Fund, der keine Adresse der Datenbank besitzt.
 - **Fix:** keiner. Zwei Richtungen, die der Nutzer entscheidet: (a) die Javadocs an den Code anpassen (Kollisionen werden als Treffer gemeldet, richtige Rate N/2⁷²); (b) einen Treffer gegen LMDB prüfen wie bei Bloom/Fuse (`requiresBackend()` true, LMDB bleibt offen – das hebt den dokumentierten Vorteil „self-contained, LMDB schließen“ auf). Für (a) gibt es keinen roten Test (reine Doku), für (b) wäre `TruncatedLong64SortedArrayPresence`/`ConsumerJava` umzubauen.
 - **Reproduktion:** Probe im Scratchpad (`trunc/T.java`): `populateFrom` mit einem 20-Byte-Eintrag, `containsAddress` mit einer nur nach Byte 8 abweichenden Adresse.
+- **Rot-Grün-Nachweis:** – (nicht gefixt)
+- **Status:** nur beschrieben
+- **Commit:** –
+
+<a id="f142"></a>
+### F142 – BitcoinAddressFinder: Javadoc von `putNewAmountWithAutoIncrease` beschreibt noch den Zustand vor F27
+- **Zeit:** 2026-10-19 00:40 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/persistence/lmdb/LMDBPersistence.java:483` (Javadoc von `putNewAmountWithAutoIncrease`)
+- **Schwere:** niedrig
+- **Beschreibung:** Die Javadoc sagt, nach `MapFullException` werde die Map um `increaseSizeInMiB` vergrößert „and the insert is retried once“, und „if the second attempt also fails, the configured increase size is too small“. Seit F27 wächst die Map in einer Schleife über `growMapOrRethrow`, bis der Eintrag passt; geworfen wird nur noch bei `increaseMapAutomatically = false` oder `increaseSizeInMiB <= 0`. Ende zu Ende bestätigt: Import von 50 000 Adressen mit `initialMapSizeInMiB` 1 und `increaseSizeInMiB` 1 läuft durch (Exit 0, „50000 written“, `data.mdb` auf 5 MiB gewachsen). Reine Doku-Abweichung, das Verhalten ist das bessere.
+- **Fix:** keiner – nach der Regel vom 17. ohne Test keine Änderung; für eine Javadoc gibt es keinen roten Test. Der Satz wäre an die Javadoc von `putNewAmounts`/`growMapOrRethrow` anzugleichen.
+- **Reproduktion:** Lesen gegen `putNewAmountWithAutoIncrease` (Schleife `while (true)` um `growMapOrRethrow`).
 - **Rot-Grün-Nachweis:** – (nicht gefixt)
 - **Status:** nur beschrieben
 - **Commit:** –
