@@ -414,6 +414,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `6c94e19`
 
+<a id="f100"></a>
 ### F100 – BAF: Socket-Key-Producer mit negativem `timeoutMillis` hängt still statt beim Start zu scheitern
 - **Zeit:** 2026-10-18 06:50 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/KeyProducerJavaSocket.java:68` (Konstruktor, `requireNonNegativeTimeout` neu)
@@ -426,6 +427,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `9d66eb7`
 
+<a id="f101"></a>
 ### F101 – BAF: Endgültiger Verbindungsfehler des Socket-Key-Producers geht im unbeobachteten `Future` verloren
 - **Zeit:** 2026-10-18 07:05 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/KeyProducerJavaSocket.java:156` (`start`, Ende des Reader-Runnables)
