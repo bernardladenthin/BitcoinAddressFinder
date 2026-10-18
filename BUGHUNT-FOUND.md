@@ -556,7 +556,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `SocketResultBroadcasterTest#close_batchesStillQueued_aConnectedClientReceivesAllOfThem` – der Writer wird vor dem ersten Schreiben festgehalten, bis `close()` den Stopp angefordert hat; zehn Batches liegen dann sicher in der Warteschlange.
 - **Rot-Grün-Nachweis:** gegen den Naht-Stand ohne Fix rot (dreimal „Expected: is <10> but: was <0>“, die übrigen 7 Tests der Klasse grün), mit Fix grün in 3 von 3 Läufen (8/8 der Klasse, skipped 0); Gegenprobe durch Zurückkopieren des Naht-Stands rot („but: was <1>“), danach wieder grün. Breite Liste: `WebSocketResultBroadcasterTest` 4/4, `ZmqResultBroadcasterTest` 4/4, `KeyProducerJavaSocketTest` 20/20, `FinderTest` 26/26, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün. Zwei Vorfassungen des Tests ohne Naht waren nicht deterministisch (439/500 nur im ersten von drei Läufen, mit 4000 Nachrichten rot in 4 von 5) und wurden nicht übernommen.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** BitcoinAddressFinder `68a80f9`
 
 <a id="f131"></a>
 ### F131 – BitcoinAddressFinder: `Finder.shutdownAndAwaitTermination` schließt die Result-Broadcaster, bevor der Consumer die letzten Batches geprüft hat
