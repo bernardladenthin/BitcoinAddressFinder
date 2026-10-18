@@ -139,6 +139,21 @@ public class AddressTxtLineTest {
     }
 
     @Test
+    public void fromLine_uppercaseRiecoinScriptPubKey_returnsTheHash160OfTheLowercaseForm()
+            throws AddressFormatNotAcceptedException {
+        // Hex is case-insensitive; an uppercase script used to miss the "76a914" prefix check and
+        // reach the Base58 fallback, which imported a wrong hash160 without a word.
+        // act
+        AddressToCoin addressToCoin =
+                new AddressTxtLine().fromLine("76A914751E76E8199196D454941C45D1B3A323F1433BD688AC", keyUtility);
+
+        // assert
+        assertThat(
+                Hex.toHexString(keyUtility.byteBufferUtility().byteBufferToBytes(addressToCoin.hash160())),
+                is(equalTo("751e76e8199196d454941c45d1b3a323f1433bd6")));
+    }
+
+    @Test
     public void fromLine_compressedBitcoinAddressGiven_returnHash160AndDefaultCoin()
             throws AddressFormatNotAcceptedException {
         // act

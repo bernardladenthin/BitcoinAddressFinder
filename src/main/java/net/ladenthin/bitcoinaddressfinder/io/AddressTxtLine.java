@@ -158,7 +158,9 @@ public class AddressTxtLine {
             final int length20Bytes = OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES;
             final String riecoinP2SHPrefix = OP_DUP + OP_HASH160 + OP_PUSH_20_BYTES;
             final int riecoinScriptPubKeyLengthHex = length20Bytes * 2 + riecoinP2SHPrefix.length();
-            if (address.length() >= riecoinScriptPubKeyLengthHex && address.startsWith(riecoinP2SHPrefix)) {
+            // hex is case-insensitive; an uppercase script would otherwise reach the Base58 fallback
+            if (address.length() >= riecoinScriptPubKeyLengthHex
+                    && address.regionMatches(true, 0, riecoinP2SHPrefix, 0, riecoinP2SHPrefix.length())) {
                 final String hash160Hex =
                         address.substring(riecoinP2SHPrefix.length(), length20Bytes * 2 + riecoinP2SHPrefix.length());
                 final ByteBuffer hash160 = keyUtility.byteBufferUtility().getByteBufferFromHex(hash160Hex);

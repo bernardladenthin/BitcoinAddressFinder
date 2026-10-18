@@ -45,6 +45,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F119](#f119) — niedrig — *gefixt*
 - [F120](#f120) — mittel — *gefixt*
 - [F121](#f121) — niedrig — *gefixt*
+- [F122](#f122) — niedrig — *gefixt*
 
 ## Funde
 
@@ -477,6 +478,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix beide rot („Unexpected exception thrown: … invalid Base58 address (input: BITCOINCASH)“ bzw. „Expected: is "76a04053bda0a88bda5177b86a15c3b29f559873" but: was "7119debe7d4714d8bb5357c7f28d4d00f5c8f9a6"“), mit Fix grün (293/293 der Klasse, skipped 0); Gegenprobe per `git stash` rot (2), nach `pop` grün. Breite Liste (`Bech32HelperTest`, `AddressFilesToLMDBTest`, `SeparatorFormatTest`, `BitcoinAddressFinderArchitectureTest`) grün, `spotless:apply` und `spotbugs:check` grün (das großgeschriebene Präfix ist ein Literal, `toUpperCase` auf einem Literal meldet `SPP_CONVERSION_OF_STRING_LITERAL`).
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `8abd2d0`
+
+<a id="f122"></a>
+### F122 – BitcoinAddressFinder: Riecoin-ScriptPubKey in Großbuchstaben wird als falscher Hash importiert
+- **Zeit:** 2026-10-18 14:05 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/io/AddressTxtLine.java:163` (`fromLine`, Riecoin-Zweig)
+- **Schwere:** niedrig
+- **Beschreibung:** Der Riecoin-Zweig erkennt eine ScriptPubKey-Zeile an `startsWith("76a914")` – nur in Kleinschreibung. Hex ist aber üblicherweise unabhängig von der Schreibweise (die Hex-Dekodierung danach akzeptiert beide). Ein großgeschriebenes Skript (`76A914…88AC`) verfehlte den Zweig und landete im Base58-Rückfall; enthält es kein `0`, ist es dort gültig und ergab **still einen falschen hash160** (`21e32e15…` statt `751e76e8…`). Gefunden mit der Probe-Klasse aus F121 (Schreibweisen gültiger Eingaben). Ebenfalls gemessen: `WKH_…` mit großem Präfix wird abgelehnt (laut, nicht falsch; das Präfix ist BitCores Kleinschreibung), Base36-Nutzdaten in beiden Schreibweisen richtig.
+- **Fix:** Präfixvergleich mit `regionMatches(true, …)`.
+- **Reproduktion:** `AddressTxtLineTest#fromLine_uppercaseRiecoinScriptPubKey_returnsTheHash160OfTheLowercaseForm`
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is "751e76e8199196d454941c45d1b3a323f1433bd6" but: was "21e32e15ba0d03cb848d066dccdb18df5745ef83"“), mit Fix grün (294/294 der Klasse, skipped 0); Gegenprobe per `git stash` rot (1), nach `pop` grün. Breite Liste wie F121 grün, `spotless:apply` und `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 
