@@ -608,7 +608,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** gegen den Naht-Stand rot („Expected: is sameInstance(<ArmResult[batchSizeInBits=22, keysPerWorkItem=256, …]>) but: was <ArmResult[batchSizeInBits=24, keysPerWorkItem=2048, …]>“, die übrigen Tests der Klasse grün), mit Fix 51 Tests, 0 Fehler (1 übersprungen, in beiden Ständen), Gegenprobe durch Zurückkopieren des Naht-Stands rot, danach wieder grün. Ende zu Ende über die CLI auf pocl mit `sweepFilterTypes` (ein Gerät): beide Filterarme laufen am Gewinner (10, 4), Empfehlung „MEASURED empirically“. `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:check` und `spotbugs:check` grün.
 - **CI-Bedarf:** Ein Lauf mit zwei echten Geräten ist hier nicht möglich (pocl stellt eines).
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** BitcoinAddressFinder `9e317c5`
 
 ## Offene Verdachte ohne Fund-ID
 
