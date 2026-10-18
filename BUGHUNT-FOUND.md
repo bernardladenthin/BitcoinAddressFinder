@@ -581,7 +581,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `LMDBCompactTest#compactLMDB_targetHoldsAnotherDatabase_keepsItsDataFile` – das Ziel erhält `data.mdb` und `lock.mdb` der Testdatenbank; erwartet wird, dass `data.mdb` danach unverändert vorhanden ist.
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <true> but: was <false>“, die übrigen 5 Tests der Klasse grün), mit Fix 6/6 (skipped 0). Der Schutztest `compactLMDB_targetHoldsAPreviousCompaction_isReplaced` (zweiter Lauf auf dasselbe Ziel) ist in beiden Ständen grün. `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:check` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** BitcoinAddressFinder `2c6841a`
 
 ## Offene Verdachte ohne Fund-ID
 
