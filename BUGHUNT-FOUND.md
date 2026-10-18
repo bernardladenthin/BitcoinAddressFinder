@@ -790,7 +790,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion / Tests:** `TuneConfigurationTest#templatesForDevices_prototypeWithGpuMask_templateSelectsTheDetectedDevice` (Plattform [CPU, GPU] aus Mockito-Geräten, Prototyp mit GPU-Maske, erkannte GPU an Index 1; die Vorlage wird durch den echten `OpenCLPlatformSelector` aufgelöst, wie `OpenCLContext` es tut).
 - **Rot-Grün-Nachweis:** ohne Fix rot (`IllegalArgumentException: Invalid device index: 1 for deviceType: 4`), mit Fix grün; Gegenprobe per `git stash` der Produktionsdatei wieder rot, danach grün. Breit: `TuneConfigurationTest` 53 (1 übersprungen, bestehend), `OpenCLPlatformSelectorTest`, `BitcoinAddressFinderArchitectureTest` grün; `spotless:apply`, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 686a346
 
 ## Offene Verdachte ohne Fund-ID
 
