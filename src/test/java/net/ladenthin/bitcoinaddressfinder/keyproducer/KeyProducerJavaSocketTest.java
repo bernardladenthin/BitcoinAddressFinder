@@ -773,6 +773,23 @@ public class KeyProducerJavaSocketTest {
     }
 
     @Test
+    public void start_serverPortHeldByAnotherProcess_failsTheStartInsteadOfEndingWithoutAKey() throws Exception {
+        // A port held by someone else is not a transient failure. Retrying it in the reader only
+        // logged warnings, and once timeoutMillis passed without a secret the run ended as a regular
+        // one with exit 0. Like other servers (Apache, Spring Boot), the start itself fails now.
+        try (ServerSocket occupant = new ServerSocket(findFreePort())) {
+            CKeyProducerJavaSocket config = createServerConfig(occupant.getLocalPort());
+            KeyProducerJavaSocket producer = new KeyProducerJavaSocket(config, keyUtility, bitHelper);
+            try {
+                IllegalStateException e = assertThrows(IllegalStateException.class, producer::start);
+                assertThat(e.getMessage(), containsString(String.valueOf(occupant.getLocalPort())));
+            } finally {
+                producer.interrupt();
+            }
+        }
+    }
+
+    @Test
     public void constructor_serverPortIsTheResultPortWithoutBroadcast_isAccepted() {
         // resultPort is not bound when nothing is broadcast, so the same number does not collide.
         CKeyProducerJavaSocket config = createServerConfig(findFreePort());

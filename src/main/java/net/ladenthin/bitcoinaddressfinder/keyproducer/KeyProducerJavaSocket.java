@@ -116,9 +116,20 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
      * the same single-thread executor, which will sit queued behind the first.
      * The intended usage is a single invocation right after construction; tests
      * and the production caller (Finder) do exactly one call.
+     *
+     * <p>In server mode the port is bound here, on the calling thread, before the reader is
+     * submitted. A port that cannot be bound (held by another process, or not permitted) is a
+     * configuration error, not a transient one, so the start fails like any server's would: retried
+     * in the reader, it only produced warnings until {@code timeoutMillis} ended the run as a
+     * regular one, without a single key checked.
+     *
+     * @throws IllegalStateException if the server port cannot be bound
      */
     @Override
     public void start() {
+        if (cKeyProducerJava.mode == CKeyProducerJavaSocket.Mode.SERVER) {
+            serverSocket = bindServerSocket();
+        }
         readerFuture = readerExecutor.submit(() -> {
             int attempts = 0;
             Exception lastException = null;
@@ -180,6 +191,30 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
                 throw failure;
             }
         });
+    }
+
+    /**
+     * Binds the server port with the configured accept timeout.
+     *
+     * @return the bound server socket
+     * @throws IllegalStateException if the port cannot be bound
+     */
+    private ServerSocket bindServerSocket() {
+        try {
+            ServerSocket bound = new ServerSocket(cKeyProducerJava.getPort());
+            try {
+                bound.setSoTimeout(cKeyProducerJava.timeoutMillis);
+            } catch (IOException e) {
+                bound.close();
+                throw e;
+            }
+            return bound;
+        } catch (IOException e) {
+            throw new IllegalStateException(
+                    "The socket key producer " + cKeyProducerJava.keyProducerId + " cannot listen on port "
+                            + cKeyProducerJava.getPort() + ": " + e.getMessage(),
+                    e);
+        }
     }
 
     // Best-effort cleanup of the three socket-side resources. Each close() can

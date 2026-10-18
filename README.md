@@ -1358,7 +1358,7 @@ Useful for piping externally generated secrets (e.g., from Python, Go, etc.) dir
 | `keyProducerId`               | string                           | —             | Unique identifier for this key producer                                             |
 | `mode`                        | string enum (`CLIENT`, `SERVER`) | `"SERVER"`    | Whether to connect to a remote socket (`CLIENT`) or wait for connections (`SERVER`) |
 | `host`                        | string                           | `"localhost"` | Remote host to connect to (used only in `CLIENT` mode)                              |
-| `port`                        | number                           | `12345`       | TCP port to connect to or bind on                                                   |
+| `port`                        | number                           | `12345`       | TCP port to connect to or bind on; in `SERVER` mode a port that cannot be bound (e.g. already in use) fails the start |
 | `timeoutMillis`               | number                           | `3000`        | Socket timeout in milliseconds, applied to accept (server), connect (client) and per-read. Must be non-negative |
 | `logReceivedSecret`           | boolean                          | `false`       | Whether to log each received private key as a hex string                            |
 | `connectRetryCount`           | number                           | `5`           | Number of times to retry establishing a socket connection (client mode)             |

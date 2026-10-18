@@ -255,6 +255,21 @@ SPDX-License-Identifier: Apache-2.0
 
     <!--
         EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
+        KeyProducerJavaSocket.bindServerSocket: the server port is bound
+        in start(), whose contract (core.Startable#start) declares no
+        checked exception for every key producer. A port that cannot be
+        bound must fail the start, so the IOException is rethrown as an
+        IllegalStateException naming the key producer and the port,
+        with the original as its cause.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocket"/>
+        <Method name="bindServerSocket"/>
+        <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
+    </Match>
+
+    <!--
+        EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
         KeyProducerJavaRandom constructor (3 sites). Same
         "this cannot happen if invariants hold" idiom we suppress
         elsewhere:
