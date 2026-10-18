@@ -63,6 +63,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F145](#f145) — niedrig — *gefixt (Doku)*
 - [F146](#f146) — niedrig — *gefixt (Doku)*
 - [F147](#f147) — niedrig — *gefixt (Doku)*
+- [F148](#f148) — mittel — *nur beschrieben* (Entscheidung des Nutzers)
 
 ## Funde
 
@@ -739,9 +740,21 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt (Doku)
 - **Commit:** 681b98e
 
+<a id="f148"></a>
+### F148 – BitcoinAddressFinder: Nach dem Kernel-Bau mit pocl gehört der SIGSEGV-Handler LLVM; gleichzeitige Safepoints töten die JVM ohne `hs_err`
+- **Zeit:** 2026-10-18 19:20 UTC
+- **Datei:** keine im Projekt; betroffen sind alle Starts mit `producerOpenCL` auf pocl (`examples/run_Find_1OpenCLDevice.sh`, `run_Find_1OpenCLDeviceAnd2CPUProducer.sh`, `run_OpenCLInfo.sh`, der CI-Job `test-opencl`)
+- **Schwere:** mittel (Absturz der JVM ohne Diagnose; ausgelöst durch Laufzeitverhalten, nicht durch Eingaben)
+- **Beschreibung:** Beim Bau des Kernels lädt pocl 5.0 `libLLVM-16.so.1`, das die Handler für SIGSEGV, SIGBUS, SIGFPE und SIGILL durch eigene ersetzt (`-Xcheck:jni`: „SIGSEGV handler modified!“, Handler `in libLLVM-16.so.1`, Flags `SA_ONSTACK|SA_RESETHAND|SA_NODEFER`). HotSpot braucht SIGSEGV selbst (implizite Null-Prüfungen, Safepoint-Polls kompilierter Schleifen über eine geschützte Seite). Ein einzelnes solches Signal geht gut: LLVMs Handler setzt die alten Handler zurück, das Signal kommt erneut und landet bei der JVM (100 provozierte NPEs nach dem Kernel-Bau überlebt). Faulten aber mehrere Threads gleichzeitig, trifft der zweite wegen `SA_RESETHAND` den Default-Handler, bevor LLVM zurückgesetzt hat, und der Prozess stirbt mit SIGSEGV (Exit 139), ohne `hs_err` (die JVM sieht das Signal nie). Genau das war der eine Absturz bei F129: 8 Consumer-Threads mitten in der Trefferverarbeitung, als `Finder.interrupt()` den Abbau begann.
+- **Reproduktion:** Probe `SigProbe3` (Scratchpad `sigprobe/`): 8 Threads in heißen Schleifen, danach 2000-mal `System.gc()` + `Thread.getAllStackTraces()` (gleichzeitige Safepoints). Ohne Kernel-Bau 5/5 überlebt, nach `OpenCLContext.init()` auf pocl 5/5 SIGSEGV, mit `LD_PRELOAD=$JAVA_HOME/lib/libjsig.so` (Signalverkettung des JDK) 5/5 überlebt. Normale `Find`-Läufe treffen das Fenster selten: 1 von 70 (danach 60 in Folge sauber).
+- **Nicht geprüft:** echte GPU-Treiber. Ob NVIDIA/AMD/Intel-Treiber ebenfalls Handler setzen, ist offen; AMDs OpenCL nutzt LLVM (comgr) im Prozess und ist ein Kandidat. Windows ist nicht betroffen (keine POSIX-Signale), macOS hätte `libjsig.dylib`.
+- **Fix:** offen, Entscheidung des Nutzers. Möglich: `libjsig` in den Linux-Startskripten und im CI-Job vorladen; eine Warnung beim OpenCL-Start, wenn auf Linux `libjsig` nicht geladen ist; Dokumentation; Meldung an pocl.
+- **Rot-Grün-Nachweis:** – (nicht gefixt)
+- **Status:** nur beschrieben
+- **Commit:** –
+
 ## Offene Verdachte ohne Fund-ID
 
-- 2026-10-18 – BAF: Ein `Find` mit `producerOpenCL` (`keysPerWorkItem` 16, volle Übertragung, pocl, 8 Consumer-Threads, LMDB_ONLY) endete einmal mit SIGSEGV (Exit 139), etwa 0,1 s nach „Interrupt initiated … Waiting for termination of 8 consumer threads“, also vor dem Schließen von LMDB; 8 Treffer standen schon als `hit: safe log`, keiner als `hit: Found the address`, keine `hs_err`-Datei. Nicht reproduziert: danach 9 Läufe mit dem F129-Fix und 3 mit dem alten Kernel sauber. Kandidaten: Abbau des OpenCL-Kontexts beim Producer-Ende, während Consumer noch Ergebnisse aus dessen Puffern lesen. Für eine Klärung: Läufe in Schleife mit `-XX:ErrorFile` und einem `hs_err`.
 
 - **`PrivateKeyValidator.getMaxPrivateKeyForBatchSize` lässt n im GPU-Raster zu (2026-10-17, Folge von F45):** `maxSafeKey = n − 2^b + 1` sichert nur `base + 2^b − 1 ≤ n`, das letzte zulässige OpenCL-Raster endet also auf n. Dort stürzt nichts ab (der Kernel liefert für n·G Koordinaten, die zu keinem Eintrag passen), es wird nur ein sinnloser Schlüssel geprüft. Die Korrektur auf `n − 2^b` ändert drei Tests von `getMaxPrivateKeyForBatchSize` und die Grenze von `PrivateKeyTooLargeException` – erst mit Rückmeldung des Nutzers, da kein Fehlverhalten außer einem verschwendeten Rasterplatz.
 - **`KeyProducerJavaIncremental`, Teilbatch am Bereichsende (2026-10-17):** `endPrivateKey` heißt in `CKeyProducerJavaIncremental` „inclusive upper bound“, aber mit `returnStartSecretOnly=false` wirft der letzte, nur teilweise in den Bereich passende Batch und die bis zu `overallWorkSize-1` Schlüssel davor werden nie geprüft; mit `returnStartSecretOnly=true` (OpenCL) läuft der Batch dagegen über das Ende hinaus. Beides legen die Tests ausdrücklich fest (Fälle 3, 5, 8, 9 der Tabelle in `KeyProducerJavaIncrementalTest`), also eine Designentscheidung – für den Nutzer zur Entscheidung, nicht angefasst.
