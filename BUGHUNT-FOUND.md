@@ -435,7 +435,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `KeyProducerJavaSocketTest#start_noPeerAfterAllRetries_logsTheFailureInsteadOfLosingItInTheFuture` (Client auf einen freien Port, ein Versuch, LogCaptor)
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: a collection containing a string containing "Unable to establish socket connection" but: was empty“), mit Fix grün (20/20 der Klasse, skipped 0); Gegenprobe per `git stash` rot (1), nach `pop` grün. `FinderTest` 22/22, `AbstractKeyProducerQueueBufferedTest` 11/11, `ConfigFixturesParseTest` 3/3, `BitcoinAddressFinderArchitectureTest` 17/17, `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** BitcoinAddressFinder `eb3ee16`
 
 ## Offene Verdachte ohne Fund-ID
 
