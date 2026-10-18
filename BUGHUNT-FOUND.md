@@ -683,7 +683,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Bestehend abgedeckt:** `#putNewAmounts_batchLargerThanOneIncreaseStep_mapGrowsUntilTheBatchFits` (Schleife, Batch), `#putNewAmount_initialLMDBSetTo1MiB_fillWithTooMuchValues_increaseDatabaseSizeAndNoExceptionThrown` (Wachstum, Einzelpfad), `#putNewAmount_initialLMDBSetTo1MiB_fillWithTooMuchValues_exceptionThrown` (`increaseMapAutomatically = false`).
 - **Rot-Grün-Nachweis:** – (Doku-Korrektur; die neuen Tests halten den Vertrag fest)
 - **Status:** gefixt (Doku)
-- **Commit:** –
+- **Commit:** 7aaabbe
 
 <a id="f144"></a>
 ### F144 – BitcoinAddressFinder: Javadoc von `CProducerOpenCL.enableGpuFilter` bindet den GPU-Filter noch an `BINARY_FUSE_8`
