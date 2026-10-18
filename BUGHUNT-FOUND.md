@@ -57,7 +57,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F136](#f136) — mittel — *gefixt*
 - [F139](#f139) — mittel — *gefixt*
 - [F140](#f140) — mittel — *gefixt*
-- [F141](#f141) — niedrig — *nur beschrieben*
+- [F141](#f141) — niedrig — *gefixt (Doku)*
 - [F142](#f142) — niedrig — *nur beschrieben*
 
 ## Funde
@@ -644,10 +644,24 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/persistence/inmemory/TruncatedLong64SortedArrayPresence.java` (Klassen-Javadoc, `requiresBackend()`), `configuration/AddressLookupBackend.java` (Javadoc zu `TRUNCATED_LONG_64`), Verdrahtung in `consumer/ConsumerJava.java:657` und `:460`
 - **Schwere:** niedrig
 - **Beschreibung:** Die Klasse speichert je Adresse nur Byte 0 (Bucket) und die Bytes 1–8 (72 Bit). Beide Javadocs versprechen, eine Kollision werde „disambiguated by the LMDB backend that this lookup sits in front of“ bzw. „the enclosing chain must fall through to the LMDB delegate“. Der Code tut das Gegenteil: `requiresBackend()` ist `false`, `ConsumerJava` verdrahtet die Klasse ohne Accelerator (anders als Bloom/Fuse) und schließt LMDB nach dem Aufbau. Eine Adresse, die in den ersten 9 Byte mit einem Eintrag übereinstimmt, gilt als Treffer und wird als „hit: Found the address“ gemeldet. Gemessen mit einer Probe: ein Eintrag, Abfrage mit geänderten Bytes 12 und 19 → `containsNonMember=true`, `requiresBackend=false`. Dazu sind die genannten Wahrscheinlichkeiten widersprüchlich: Klasse „N / 2^64“ (≈ 7,5·10⁻¹¹), Enum „N/2⁴⁴“ und „~10⁻¹¹“; bei 72 Bit wären es N/2⁷² ≈ 3·10⁻¹³ je Abfrage bei 1,47 Mrd. Einträgen. Praktisch selten, aber ein falscher Treffer meldet einen Schlüssel als Fund, der keine Adresse der Datenbank besitzt.
-- **Fix:** keiner. Zwei Richtungen, die der Nutzer entscheidet: (a) die Javadocs an den Code anpassen (Kollisionen werden als Treffer gemeldet, richtige Rate N/2⁷²); (b) einen Treffer gegen LMDB prüfen wie bei Bloom/Fuse (`requiresBackend()` true, LMDB bleibt offen – das hebt den dokumentierten Vorteil „self-contained, LMDB schließen“ auf). Für (a) gibt es keinen roten Test (reine Doku), für (b) wäre `TruncatedLong64SortedArrayPresence`/`ConsumerJava` umzubauen.
-- **Reproduktion:** Probe im Scratchpad (`trunc/T.java`): `populateFrom` mit einem 20-Byte-Eintrag, `containsAddress` mit einer nur nach Byte 8 abweichenden Adresse.
-- **Rot-Grün-Nachweis:** – (nicht gefixt)
-- **Status:** nur beschrieben
+- **Historie (vollständig, nach `git fetch --unshallow`):**
+  - `78e4d7c` (2026-05-29 21:43) führt `requiresBackend()` ein: Decorators (Bloom) `true`, Ersatz-Backends (HashSet, SortedArray) `false`, damit der Orchestrator LMDB schließen kann.
+  - `ba51113` (23:06) verdrahtet das in `ConsumerJava`: `if (!chain.requiresBackend()) lmdb.close()`.
+  - `7edcb25` (23:52) fügt `TRUNCATED_LONG_64` als Ersatz-Backend hinzu, `requiresBackend()` von Anfang an `false`, im README-Tabelle „LMDB stays open? **no**“. Im selben Commit behaupten aber Klassen-Javadoc, Enum-Javadoc, README-Absatz und Commit-Nachricht „any collision falls through to the LMDB delegate“; die Rate steht als N/2⁶⁴ (≈7,5·10⁻¹¹) neben „72 effective bits“, das Enum zusätzlich als N/2⁴⁴. Das Verhalten (ungeprüfter Treffer) gab es also vom ersten Commit an, der Widerspruch auch.
+  - `2befeed` (2026-06-15) korrigiert das README („surfacing such a collision as an unverified hit is harmless (LMDB is closed after population)“) und die Javadocs von Fuse-8/-16, übersieht aber die Javadocs von `TruncatedLong64SortedArrayPresence` und `AddressLookupBackend`; die Rate N/2⁶⁴ bleibt.
+  - `b4f7a2f` (2026-06-15) macht Fuse zum prüfenden Decorator und hält ausdrücklich fest: „keeping the TRUNCATED_LONG_64 wording, which IS legitimately self-contained“. Damit ist Richtung (a) die dokumentierte Entscheidung.
+  - Seitdem hat kein Commit die beiden Javadoc-Sätze berührt.
+- **Fix:** Richtung (a), Doku an das gewollte Verhalten angepasst: Klassen-Javadoc (neuer Abschnitt „False positives are reported as hits“), Enum-Liste und Enum-Konstante, README-Absatz und `TODO.md` nennen jetzt N/2⁷² ≈ 3·10⁻¹³ je Abfrage und sagen, dass eine Kollision ungeprüft als Treffer gemeldet wird. `BloomFilterAccelerator` (N/2⁶⁴) ist richtig, dort sind es 8 Byte.
+- **Reproduktion / Verhaltenstests (grün, halten das Verhalten fest):**
+  - `TruncatedLong64SortedArrayPresenceTest#nonMemberDifferingInOneOfTheFirstNineBytes_isAbsent` (Byte 0–8, je ein Fall)
+  - `…#nonMemberDifferingOnlyAfterByteEight_isReportedAsPresent` (Byte 9–19, je ein Fall)
+  - `…#nonMemberDifferingInEveryByteAfterByteEight_isReportedAsPresent`
+  - `ConsumerJavaTest#consumeOneCycle_addressCollidingInTheFirst72Bits_isAnUnverifiedHitForTruncatedLong64` (LMDB geschlossen, `hits=1`)
+  - `ConsumerJavaTest#consumeOneCycle_addressCollidingInTheFirst72Bits_isNoHitForAnExactBackend` (LMDB_ONLY, BLOOM, HASHSET, BINARY_FUSE_8/16, BLOCKED_BLOOM: `hits=0`)
+  - End to End vorab über die CLI: Datenbank mit einer konstruierten Adresse (`12vieiAHxBe4qH5DDVbEKgPV6EQ8NsJjxi`, gleiche 9 Byte wie die Adresse von Schlüssel 12345) → `LMDB_ONLY` `hits=0`, `TRUNCATED_LONG_64` `hits=1` mit „hit: Found the address … 12vieiAHxBe4qCUrwvfb2kRkDuc8kQ2VZ2“.
+- **Gegenprobe:** `TRUNCATED_LONG_64` testweise auf `HashSetAddressPresence` verdrahtet → der Consumer-Test wird rot (`Expected: is <1L> but: was <0L>`); zurückgesetzt.
+- **Rot-Grün-Nachweis:** – (Doku-Korrektur; Tests halten das Verhalten fest, Freigabe des Nutzers für Doku ohne roten Test)
+- **Status:** gefixt (Doku)
 - **Commit:** –
 
 <a id="f142"></a>

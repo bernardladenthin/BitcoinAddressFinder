@@ -29,14 +29,17 @@ import net.ladenthin.bitcoinaddressfinder.LMDBPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.ManualDebugConstants;
 import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
 import net.ladenthin.bitcoinaddressfinder.ToStringTest;
+import net.ladenthin.bitcoinaddressfinder.configuration.AddressLookupBackend;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
+import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationWrite;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.persistence.AddressPresence;
 import net.ladenthin.bitcoinaddressfinder.persistence.Persistence;
 import net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils;
+import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerJava;
 import net.ladenthin.bitcoinaddressfinder.secret.BIP39Wordlist;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddresses1337;
@@ -50,11 +53,13 @@ import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
 import nl.altindag.log.LogCaptor;
 import org.apache.commons.codec.binary.Hex;
+import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.crypto.ECKey;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 public class ConsumerJavaTest {
@@ -205,6 +210,71 @@ public class ConsumerJavaTest {
             ByteBuffer buffer = ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES);
             consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), null);
             consumerJava.consumeOneCycle(buffer);
+        } finally {
+            consumerJava.interrupt();
+        }
+    }
+
+    /**
+     * Writes an LMDB holding a single address that is <em>not</em> the compressed address of private key 73
+     * but shares its first nine bytes (bytes 9&#x2013;19 inverted), so it collides with it in the 72 bits
+     * {@link AddressLookupBackend#TRUNCATED_LONG_64} compares.
+     */
+    private File createLmdbWithA72BitCollisionOfPrivateKey73() throws Exception {
+        File lmdbFolder =
+                Files.createDirectory(folder.resolve("lmdb-72-bit-collision")).toFile();
+        byte[] collision = createExamplePublicKeyBytesfromPrivateKey73()[0].getCompressedKeyHash();
+        for (int i = 9; i < collision.length; i++) {
+            collision[i] = (byte) ~collision[i];
+        }
+        CLMDBConfigurationWrite write = new CLMDBConfigurationWrite();
+        write.initialMapSizeInMiB = 1;
+        write.lmdbDirectory = lmdbFolder.getAbsolutePath();
+        try (LMDBPersistence lmdb = new LMDBPersistence(write, persistenceUtils)) {
+            lmdb.init();
+            lmdb.putNewAmount(new ByteBufferUtility(true).byteArrayToByteBuffer(collision), Coin.ZERO);
+        }
+        return lmdbFolder;
+    }
+
+    private ConsumerJava consumePrivateKey73Against(File lmdbFolder, AddressLookupBackend backend) throws Exception {
+        CConsumerJava cConsumerJava = new CConsumerJava();
+        cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
+        cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolder.getAbsolutePath();
+        cConsumerJava.lmdbConfigurationReadOnly.addressLookupBackend = backend;
+        ConsumerJava consumerJava = new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils);
+        consumerJava.initLMDB();
+        consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), null);
+        consumerJava.consumeOneCycle(ByteBuffer.allocateDirect(OpenClKernelConstants.RIPEMD160_HASH_NUM_BYTES));
+        return consumerJava;
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = AddressLookupBackend.class,
+            names = {"LMDB_ONLY", "BLOOM", "HASHSET", "BINARY_FUSE_8", "BINARY_FUSE_16", "BLOCKED_BLOOM"})
+    public void consumeOneCycle_addressCollidingInTheFirst72Bits_isNoHitForAnExactBackend(AddressLookupBackend backend)
+            throws Exception {
+        new LMDBPlatformAssume().assumeLMDBExecution();
+        ConsumerJava consumerJava = consumePrivateKey73Against(createLmdbWithA72BitCollisionOfPrivateKey73(), backend);
+        try {
+            assertThat(consumerJava.hits.get(), is(equalTo(0L)));
+        } finally {
+            consumerJava.interrupt();
+        }
+    }
+
+    @Test
+    public void consumeOneCycle_addressCollidingInTheFirst72Bits_isAnUnverifiedHitForTruncatedLong64()
+            throws Exception {
+        // TRUNCATED_LONG_64 is self-contained by design: it compares only the first 72 bits and LMDB is
+        // closed after the snapshot is built, so a collision is reported as a hit and never verified.
+        new LMDBPlatformAssume().assumeLMDBExecution();
+        ConsumerJava consumerJava = consumePrivateKey73Against(
+                createLmdbWithA72BitCollisionOfPrivateKey73(), AddressLookupBackend.TRUNCATED_LONG_64);
+        try {
+            assertThat(consumerJava.persistence, is(nullValue()));
+            assertThat(consumerJava.hits.get(), is(equalTo(1L)));
         } finally {
             consumerJava.interrupt();
         }

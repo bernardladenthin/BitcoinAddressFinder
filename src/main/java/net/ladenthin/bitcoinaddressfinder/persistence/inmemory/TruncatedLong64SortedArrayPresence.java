@@ -24,10 +24,19 @@ import org.slf4j.LoggerFactory;
  * cryptographically uniform, so any subset of the bits is also uniform. The bucket
  * index encodes the first 8 bits and each stored {@code long} encodes the next 64
  * bits, giving 72 effective bits of resolution. The probability that a random query
- * collides with one of {@code N} stored entries is {@code N / 2^64}; for the
- * project's "Full database" tier of ~1.4 billion entries that is ~7.5 &#x00d7; 10
- * <sup>&#x2212;11</sup> per query, and any such collision is disambiguated by the
- * LMDB backend that this lookup sits in front of.
+ * collides with one of {@code N} stored entries is {@code N / 2^72}; for the
+ * project's "Full database" tier of ~1.4 billion entries that is ~3 &#x00d7; 10
+ * <sup>&#x2212;13</sup> per query (each key is queried twice, compressed and
+ * uncompressed).
+ *
+ * <h2>False positives are reported as hits</h2>
+ * A collision is <em>not</em> verified: this class is a self-contained replacement,
+ * not a decorator in front of LMDB, so LMDB is closed once the snapshot is built and
+ * a query that matches a stored entry in its first 72 bits is answered {@code true}.
+ * The consumer then logs it as a hit for an address the database does not contain.
+ * There are no false negatives. Where a spurious hit is not acceptable, use an exact
+ * backend ({@code LMDB_ONLY}, {@code HASHSET}) or one that verifies its hits against
+ * LMDB ({@code BLOOM}, {@code BINARY_FUSE_8}/{@code 16}, {@code BLOCKED_BLOOM}).
  *
  * <h2>Memory cost</h2>
  * Exactly 8 bytes per entry plus 256 array headers - no per-entry object overhead.
