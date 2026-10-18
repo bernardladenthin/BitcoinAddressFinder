@@ -184,6 +184,52 @@ public class TuneConfigurationTest extends LMDBBase {
     }
 
     /**
+     * Every arm writes its grid into the producer before it runs. A device on which no arm succeeds
+     * has no values of its own to report, so its entry in the emitted configuration keeps what the
+     * operator configured — not the grid of its last arm, which is the one that failed. The other
+     * device wins, which is what makes a configuration be emitted at all.
+     */
+    @OpenCLTest
+    @Test
+    public void run_noArmSucceedsOnOneDevice_emittedConfigurationKeepsThatDevicesConfiguredValues() throws Exception {
+        // arrange
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        int gridBits = Math.min(4, new OpenCLPlatformAssume().maxGridBitsForAvailableDevice());
+        CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();
+        cTuneConfiguration.finder.producerJava.clear();
+        CProducerOpenCL working = new CProducerOpenCL();
+        working.keyProducerId = "tuneKeyProducer";
+        working.enableGpuFilter = false;
+        cTuneConfiguration.finder.producerOpenCL.add(working);
+        CProducerOpenCL failing = new CProducerOpenCL();
+        failing.keyProducerId = "tuneKeyProducer";
+        failing.enableGpuFilter = false;
+        // No platform has a hundredth device, so every arm of this one fails.
+        failing.deviceIndex = 99;
+        failing.batchSizeInBits = 3;
+        failing.keysPerWorkItem = 2;
+        cTuneConfiguration.finder.producerOpenCL.add(failing);
+        cTuneConfiguration.batchSizeInBitsCandidates = List.of(gridBits);
+        cTuneConfiguration.keysPerWorkItemCandidates = List.of(1);
+        cTuneConfiguration.extendSweepWhenWinnerIsAtTheEdge = false;
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(TuneConfiguration.class)) {
+            // act
+            TuneConfiguration tuneConfiguration = new TuneConfiguration(cTuneConfiguration);
+            tuneConfiguration.run();
+            CConfiguration parsed = Main.fromJson(tuneConfiguration.getRecommendedConfigurationJson());
+
+            // assert
+            assertThat(tuneConfiguration.getWinner(), is(notNullValue()));
+            CProducerOpenCL emitted = parsed.finder.producerOpenCL.get(1);
+            assertThat(emitted.deviceIndex, is(equalTo(99)));
+            assertThat(emitted.batchSizeInBits, is(equalTo(3)));
+            assertThat(emitted.keysPerWorkItem, is(equalTo(2)));
+            assertThat(logCaptor.getWarnLogs(), hasItem(containsString("No arm succeeded")));
+        }
+    }
+
+    /**
      * An empty producer list used to be an error. It is instead the state most first runs are in —
      * the operator does not yet know what to write — so the tuner enumerates the machine's GPUs and
      * measures each. Being told "configure a producer first" is of no use to someone who ran the
@@ -369,20 +415,28 @@ public class TuneConfigurationTest extends LMDBBase {
         CProducerOpenCL producer = new CProducerOpenCL();
 
         TuneConfiguration.applyWinnerTo(
-                producer, new TuneConfiguration.ArmResult(23, 2048, 36_481_091.96d, 1.0d, 20.0d, null));
+                producer,
+                new TuneConfiguration.ArmResult(23, 2048, 36_481_091.96d, 1.0d, 20.0d, null),
+                TuneConfiguration.ConfiguredGrid.of(producer));
 
         assertThat(producer.batchSizeInBits, is(equalTo(23)));
         assertThat(producer.keysPerWorkItem, is(equalTo(2048)));
     }
 
     @Test
-    public void applyWinnerTo_deviceWithoutAUsableArm_leavesTheProducerUntouched() {
+    public void applyWinnerTo_deviceWithoutAUsableArm_restoresTheConfiguredGrid() {
         CProducerOpenCL producer = new CProducerOpenCL();
-        int originalBatchSizeInBits = producer.batchSizeInBits;
+        producer.batchSizeInBits = 3;
+        producer.keysPerWorkItem = 2;
+        TuneConfiguration.ConfiguredGrid configured = TuneConfiguration.ConfiguredGrid.of(producer);
+        // What the sweep's last, failed arm left behind.
+        producer.batchSizeInBits = 20;
+        producer.keysPerWorkItem = 256;
 
-        TuneConfiguration.applyWinnerTo(producer, null);
+        TuneConfiguration.applyWinnerTo(producer, null, configured);
 
-        assertThat(producer.batchSizeInBits, is(equalTo(originalBatchSizeInBits)));
+        assertThat(producer.batchSizeInBits, is(equalTo(3)));
+        assertThat(producer.keysPerWorkItem, is(equalTo(2)));
     }
 
     // </editor-fold>

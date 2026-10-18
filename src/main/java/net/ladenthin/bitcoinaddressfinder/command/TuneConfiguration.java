@@ -418,6 +418,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
                     break;
                 }
                 int armsBefore = results.size();
+                ConfiguredGrid configured = ConfiguredGrid.of(template);
                 sweepGrid(
                         template,
                         finder,
@@ -433,7 +434,7 @@ public class TuneConfiguration implements Runnable, Interruptable {
                 // Each device keeps its own optimum. Picking one winner across devices would hand the
                 // slower card the faster card's settings — on a contributor's laptop that would have
                 // been 24/2048 for a device whose own optimum was 23/2048.
-                applyWinnerTo(template, deviceWinner);
+                applyWinnerTo(template, deviceWinner, configured);
             }
             winner = pickWinner(results);
             recommendedFilterType = resolveFilterType(
@@ -1639,15 +1640,53 @@ public class TuneConfiguration implements Runnable, Interruptable {
     }
 
     /**
+     * The grid a producer was configured with, taken before its sweep writes each arm's grid into it.
+     *
+     * @param batchSizeInBits the configured {@code batchSizeInBits}
+     * @param keysPerWorkItem the configured {@code keysPerWorkItem}; {@code 0} for a CPU producer,
+     *                        which has none
+     */
+    @VisibleForTesting
+    record ConfiguredGrid(int batchSizeInBits, int keysPerWorkItem) {
+
+        /**
+         * Takes the grid a producer carries now.
+         *
+         * @param template the producer
+         * @return its grid
+         */
+        static ConfiguredGrid of(CProducer template) {
+            int keysPerWorkItem =
+                    template instanceof CProducerOpenCL cProducerOpenCL ? cProducerOpenCL.keysPerWorkItem : 0;
+            return new ConfiguredGrid(template.batchSizeInBits, keysPerWorkItem);
+        }
+    }
+
+    /**
      * Writes a device's own winning values back into its producer, so the emitted configuration
      * describes what was measured on that device rather than on another one.
      *
-     * @param template the producer to update
-     * @param winner   that device's winning arm, or {@code null} if it produced none
+     * <p>A device on which no arm succeeded has no values of its own. Its producer still carries the
+     * grid of its last arm, written by the sweep, so the configured grid is put back and a warning
+     * says why the device's entry was not measured.
+     *
+     * @param template   the producer to update
+     * @param winner     that device's winning arm, or {@code null} if it produced none
+     * @param configured the grid the producer was configured with before its sweep
      */
     @VisibleForTesting
-    static void applyWinnerTo(CProducer template, @Nullable ArmResult winner) {
+    static void applyWinnerTo(CProducer template, @Nullable ArmResult winner, ConfiguredGrid configured) {
         if (winner == null) {
+            template.batchSizeInBits = configured.batchSizeInBits();
+            if (template instanceof CProducerOpenCL cProducerOpenCL) {
+                cProducerOpenCL.keysPerWorkItem = configured.keysPerWorkItem();
+            }
+            LOGGER.warn(
+                    "No arm succeeded on {}; its entry in the recommended configuration keeps the configured"
+                            + " values (batchSizeInBits={}, keysPerWorkItem={}), which were not measured.",
+                    describeTemplateDevice(template),
+                    configured.batchSizeInBits(),
+                    configured.keysPerWorkItem());
             return;
         }
         template.batchSizeInBits = winner.batchSizeInBits();
