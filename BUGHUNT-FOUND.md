@@ -463,7 +463,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `BIP39KeyProducerTest#nextKey_givenTheVectorMnemonicAsWritten_derivesTheKeyOfTheStandardSeed` und `#nextKey_givenTheVectorMnemonicComposed_derivesTheKeyOfTheStandardSeed` (je über alle 288 Trezor-Vektoren in zwölf Sprachen; Erwartung: der Schlüssel `M/44H/0H/0H/0/0` aus dem Vektor-Seed)
 - **Rot-Grün-Nachweis:** ohne Fix rot in 142 Fällen (24 japanische Vektoren wie geschrieben, 118 zusammengesetzte: Französisch 19, Japanisch 24, Koreanisch 24, Russisch 13, Spanisch 20, Türkisch 18), z. B. „Expected: is "8041a494…" but: was "de26cfef…"“; mit Fix grün (872/872 der Klasse, skipped 0); Gegenprobe per `git stash` rot (142), nach `pop` grün. Breite Liste (`BIP39WordlistTest`, `KeyProducerJavaBip39Test`, `KeyUtilityTest`, `ConfigFixturesParseTest`, `BitcoinAddressFinderArchitectureTest`) grün, `spotless:apply` grün, `spotbugs:check` grün nach der Unterdrückung.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** BitcoinAddressFinder `6cb074f`
 
 ## Offene Verdachte ohne Fund-ID
 
