@@ -594,7 +594,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `TuneConfigurationTest#nextExtensionArm_keysPerWorkItemFillsTheGridAtTheLargestBatchSize_continuesByOneBit`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is not null but: was null“, die übrigen Tests der Klasse grün), mit Fix 50 Tests, 0 Fehler (1 übersprungen: `run_noProducerConfiguredButGpuPresent_sweepsTheDetectedDevices`, in beiden Ständen), Gegenprobe per `git stash` rot, danach wieder grün; `nextExtensionArm_doublingWouldExceedTheGrid_doesNotContinue` (Gewinner nicht am Bit-Rand) bleibt grün. `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:check` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** BitcoinAddressFinder `275fc61`
 
 ## Offene Verdachte ohne Fund-ID
 
