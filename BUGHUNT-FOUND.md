@@ -41,6 +41,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F58](#f58) — niedrig — *gefixt*
 - [F66](#f66) — mittel — *gefixt*
 - [F100](#f100) — niedrig — *gefixt*
+- [F101](#f101) — niedrig — *gefixt*
 
 ## Funde
 
@@ -421,9 +422,20 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Fix:** Der Konstruktor prüft `timeoutMillis` vor `super(...)` (Muster aus F51/BIP39) und wirft eine `IllegalArgumentException` mit dem Wert, wie die Konfiguration es verspricht.
 - **Reproduktion:** `KeyProducerJavaSocketTest#constructor_negativeTimeout_isRejectedInsteadOfHangingSilently`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected java.lang.IllegalArgumentException to be thrown, but nothing was thrown.“), mit Fix grün (19/19 der Klasse, skipped 0); Gegenprobe per `git stash` rot (1), nach `pop` grün. `FinderTest` 22/22, `AbstractKeyProducerQueueBufferedTest` 11/11, `ConfigFixturesParseTest` 3/3, `BitcoinAddressFinderArchitectureTest` 17/17, `spotless:apply` und `spotbugs:check` grün. Kein Beispiel unter `examples/` nutzt einen negativen Socket-Timeout.
-- **Nebenbefund (nicht geändert):** Auch die `IllegalStateException` „Unable to establish socket connection … after N attempts“ am Ende des Readers geht im unbeobachteten `Future` verloren; der Nutzer sieht nur die einzelnen „Connection attempt N failed“-Warnungen und danach eine `NoMoreSecretsAvailableException` mit „Timeout while waiting for secret“.
+- **Nebenbefund (gefixt als F101):** Auch die `IllegalStateException` „Unable to establish socket connection … after N attempts“ am Ende des Readers geht im unbeobachteten `Future` verloren; der Nutzer sieht nur die einzelnen „Connection attempt N failed“-Warnungen und danach eine `NoMoreSecretsAvailableException` mit „Timeout while waiting for secret“.
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `9d66eb7`
+
+### F101 – BAF: Endgültiger Verbindungsfehler des Socket-Key-Producers geht im unbeobachteten `Future` verloren
+- **Zeit:** 2026-10-18 07:05 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/KeyProducerJavaSocket.java:156` (`start`, Ende des Reader-Runnables)
+- **Schwere:** niedrig
+- **Beschreibung:** Nebenbefund aus F100. Scheitern alle `connectRetryCount` Verbindungsversuche, wirft das Reader-Runnable `IllegalStateException` „Unable to establish socket connection to host:port after N attempts“ mit dem letzten `IOException` als Ursache – in den `Future`, den nur `interrupt()` (zum Abbrechen) anfasst. Die Meldung erschien nirgends; der Nutzer sah nur die einzelnen „Connection attempt N failed“-Warnungen und dann eine `NoMoreSecretsAvailableException` mit „Timeout while waiting for secret“, die den Grund nicht nennt.
+- **Fix:** Vor dem Werfen wird die Meldung samt Ursache als ERROR geloggt.
+- **Reproduktion:** `KeyProducerJavaSocketTest#start_noPeerAfterAllRetries_logsTheFailureInsteadOfLosingItInTheFuture` (Client auf einen freien Port, ein Versuch, LogCaptor)
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected: a collection containing a string containing "Unable to establish socket connection" but: was empty“), mit Fix grün (20/20 der Klasse, skipped 0); Gegenprobe per `git stash` rot (1), nach `pop` grün. `FinderTest` 22/22, `AbstractKeyProducerQueueBufferedTest` 11/11, `ConfigFixturesParseTest` 3/3, `BitcoinAddressFinderArchitectureTest` 17/17, `spotless:apply` und `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 

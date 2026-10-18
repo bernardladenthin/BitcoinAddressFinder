@@ -147,11 +147,14 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
             }
 
             if (!shouldStop && socket == null) {
-                throw new IllegalStateException(
+                IllegalStateException failure = new IllegalStateException(
                         "Unable to establish socket connection to "
                                 + cKeyProducerJava.getHost() + ":" + cKeyProducerJava.getPort()
                                 + " after " + attempts + " attempts",
                         lastException);
+                // Nobody reads the reader's future, so the failure must reach the log here.
+                LOGGER.error(failure.getMessage(), lastException);
+                throw failure;
             }
         });
     }

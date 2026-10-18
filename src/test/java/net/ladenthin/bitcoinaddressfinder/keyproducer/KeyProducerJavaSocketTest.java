@@ -25,6 +25,7 @@ import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
+import nl.altindag.log.LogCaptor;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -714,6 +715,31 @@ public class KeyProducerJavaSocketTest {
 
         assertThat("Thread exited without triggering interrupt", state.get(), is(not(STATE_UNEXPECTED_SUCCESS)));
         assertThat("Expected interrupt to cause shutdown", state.get(), is(STATE_INTERRUPTED_EXIT));
+    }
+
+    @Test
+    @Timeout(value = 10000, unit = TimeUnit.MILLISECONDS)
+    public void start_noPeerAfterAllRetries_logsTheFailureInsteadOfLosingItInTheFuture() throws Exception {
+        // The reader ends with "Unable to establish socket connection ... after N attempts", thrown inside
+        // a future nobody reads; without a log line the user only ever saw the single attempt warnings.
+        CKeyProducerJavaSocket config = createClientConfig("localhost", findFreePort());
+        config.timeoutMillis = TestTimeProvider.SOCKET_ACCEPT_TIMEOUT;
+        config.connectRetryCount = 1;
+        config.connectRetryDelayMillis = 0;
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(KeyProducerJavaSocket.class)) {
+            KeyProducerJavaSocket client = new KeyProducerJavaSocket(config, keyUtility, bitHelper);
+            try {
+                client.start();
+                long deadline = System.currentTimeMillis() + 5000;
+                while (logCaptor.getErrorLogs().isEmpty() && System.currentTimeMillis() < deadline) {
+                    Thread.sleep(20);
+                }
+                assertThat(logCaptor.getErrorLogs(), hasItem(containsString("Unable to establish socket connection")));
+            } finally {
+                client.interrupt();
+            }
+        }
     }
 
     @Test
