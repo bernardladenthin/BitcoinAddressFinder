@@ -826,7 +826,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion / Tests:** `KeyProducerJavaSocketTest#constructor_serverPortIsTheResultPort_isRejectedInsteadOfEndingWithoutAKey`, Gegenstück `…WithoutBroadcast_isAccepted`. Ende zu Ende mit Fix: dieselbe CLI-Konfiguration endet nach 1 s mit Exit 1 und „port and resultPort of the socket key producer s must differ in server mode while broadcastResults is set, but both are 5591“.
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected java.lang.IllegalArgumentException to be thrown, but nothing was thrown“), das Gegenstück grün; mit Fix beide grün; Gegenprobe per `git stash` der Produktionsdatei wieder rot, danach grün. Breit: `KeyProducerJavaSocketTest` 22/22, `SocketResultBroadcasterTest` 8/8, `FinderTest` 29/29; `spotless:apply`, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 9a28130
 
 ## Offene Verdachte ohne Fund-ID
 
