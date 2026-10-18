@@ -19,6 +19,7 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -84,6 +85,58 @@ class SocketResultBroadcasterTest {
             }
         } finally {
             broadcaster.close();
+        }
+    }
+
+    /**
+     * The last batches of a finite range are reported right before the finder shuts down; they are
+     * the completion signal a client waits for. Closing must deliver what is already queued for a
+     * connected client instead of discarding it with the socket. The writer is held before its
+     * first write until the stop has been requested, so the queue is guaranteed to be non-empty
+     * when {@code close()} runs.
+     */
+    @Test
+    void close_batchesStillQueued_aConnectedClientReceivesAllOfThem() throws Exception {
+        // arrange
+        final int port = freePort();
+        final int batches = 10;
+        final SocketResultBroadcaster broadcaster = new SocketResultBroadcaster(port);
+        final CountDownLatch stopRequested = new CountDownLatch(1);
+        broadcaster.setBeforeWrite(() -> {
+            try {
+                stopRequested.await(AWAIT_MILLIS, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        broadcaster.setAfterStopRequested(stopRequested::countDown);
+        final ExecutorService readerExecutor = Executors.newSingleThreadExecutor();
+        try {
+            broadcaster.start();
+            ConnectionUtils.waitUntilTcpPortOpen("127.0.0.1", port, AWAIT_MILLIS);
+            try (Socket client = connect(port)) {
+                final BufferedReader clientReader = reader(client);
+                broadcaster.awaitClientCount(1, AWAIT_MILLIS);
+                final Future<Integer> received = readerExecutor.submit(() -> {
+                    int lines = 0;
+                    while (readLineOrNull(clientReader) != null) {
+                        lines++;
+                    }
+                    return lines;
+                });
+                for (int i = 0; i < batches; i++) {
+                    broadcaster.onBatchChecked(new BatchResult(BigInteger.valueOf(i), 1, List.of()));
+                }
+
+                // act
+                broadcaster.close();
+
+                // assert
+                assertThat(received.get(AWAIT_MILLIS, TimeUnit.MILLISECONDS), is(equalTo(batches)));
+            }
+        } finally {
+            broadcaster.close();
+            readerExecutor.shutdownNow();
         }
     }
 

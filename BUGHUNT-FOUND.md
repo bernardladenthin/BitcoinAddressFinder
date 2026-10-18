@@ -50,6 +50,8 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F126](#f126) — niedrig — *gefixt*
 - [F127](#f127) — mittel — *gefixt*
 - [F129](#f129) — niedrig — *nur beschrieben*
+- [F130](#f130) — mittel — *gefixt*
+- [F131](#f131) — mittel — *nur beschrieben*
 
 ## Funde
 
@@ -541,6 +543,30 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** Ende zu Ende über die CLI mit pocl (`apt-get install pocl-opencl-icd`): Datenbank mit 682 Zieladressen (jeder dritte Schlüssel 3…2046) plus 5000 Rauschadressen, inkrementeller Key-Producer 2…0x7ff, `producerOpenCL` mit `batchSizeInBits` 8. Mit `keysPerWorkItem` 16: 677 Treffer, es fehlen genau 3, 6, 9, 12, 15 – gleich in voller Übertragung, mit FUSE_8 und mit FUSE_16. Mit `keysPerWorkItem` 1: alle 682. Der CPU-Producer findet in derselben Lage alle 682 (siehe BUGHUNT-CHECKED.md, Lookup-Backends). Ein `@OpenCLTest`, der für Basis 0 und `keysPerWorkItem` 16 die Hashes der Einträge 2…15 mit `PublicKeyBytes.fromPrivate` vergleicht, wäre rot; er wurde nicht eingecheckt, weil er ohne Fix den `test-opencl`-Job rot machte.
 - **Rot-Grün-Nachweis:** —
 - **CI-Bedarf:** Ein Fix braucht den `test-opencl`-Job (pocl) und eine Messung der Kernel-Laufzeit auf echter GPU.
+- **Status:** nur beschrieben
+- **Commit:** —
+
+<a id="f130"></a>
+### F130 – BitcoinAddressFinder: `SocketResultBroadcaster.close()` verwirft Ergebnisse, die schon für einen verbundenen Client bereitliegen
+- **Zeit:** 2026-10-18 19:20 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/SocketResultBroadcaster.java` (`close`, Writer in `startWriter`)
+- **Schwere:** mittel
+- **Beschreibung:** Jeder Client hat eine Warteschlange und einen Writer-Thread. `close()` setzte `shouldStop`, schloss sofort die Client-Sockets und rief `writerExecutor.shutdownNow()`; der Writer prüfte `shouldStop` vor jeder Nachricht. Was beim Schließen noch in der Warteschlange stand, ging verloren. Genau dann stehen dort die letzten Batches eines endlichen Laufs: der Finder schließt die Broadcaster unmittelbar nach dem Scan, und das Ergebnis je Batch ist laut Entwurf das Abschlusssignal für den Client („range checked, nothing there“). Ende zu Ende über die CLI gemessen: ein TCP-Client, die ganze Zeit verbunden, bekam von 8 Batches (2..0x7ff, `batchSizeInBits` 8) nur 2; der Consumer hatte alle 8 vor dem Schließen geprüft.
+- **Fix:** Der Writer liest mit `poll(50 ms)` und hört nach einem Stopp erst auf, wenn seine Warteschlange leer ist; `close()` schließt den Server, wartet bis zu `CLOSE_DRAIN_MILLIS` (2 s) auf die Writer und schließt erst danach die Client-Sockets. Ein Client, der nicht mehr liest, hält den Shutdown höchstens diese Frist auf. Dazu zwei paketinterne Nähte (`setBeforeWrite`, `setAfterStopRequested`), verhaltensneutral.
+- **Reproduktion:** `SocketResultBroadcasterTest#close_batchesStillQueued_aConnectedClientReceivesAllOfThem` – der Writer wird vor dem ersten Schreiben festgehalten, bis `close()` den Stopp angefordert hat; zehn Batches liegen dann sicher in der Warteschlange.
+- **Rot-Grün-Nachweis:** gegen den Naht-Stand ohne Fix rot (dreimal „Expected: is <10> but: was <0>“, die übrigen 7 Tests der Klasse grün), mit Fix grün in 3 von 3 Läufen (8/8 der Klasse, skipped 0); Gegenprobe durch Zurückkopieren des Naht-Stands rot („but: was <1>“), danach wieder grün. Breite Liste: `WebSocketResultBroadcasterTest` 4/4, `ZmqResultBroadcasterTest` 4/4, `KeyProducerJavaSocketTest` 20/20, `FinderTest` 26/26, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün. Zwei Vorfassungen des Tests ohne Naht waren nicht deterministisch (439/500 nur im ersten von drei Läufen, mit 4000 Nachrichten rot in 4 von 5) und wurden nicht übernommen.
+- **Status:** gefixt
+- **Commit:** (folgt)
+
+<a id="f131"></a>
+### F131 – BitcoinAddressFinder: `Finder.shutdownAndAwaitTermination` schließt die Result-Broadcaster, bevor der Consumer die letzten Batches geprüft hat
+- **Zeit:** 2026-10-18 19:20 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/engine/Finder.java` (`shutdownAndAwaitTermination`: erst `interrupt()`, dann `consumerJava.interrupt()`)
+- **Schwere:** mittel
+- **Beschreibung:** Nach dem Ende der Producer ruft `shutdownAndAwaitTermination` zuerst `interrupt()`, das die Key-Producer unterbricht (beim WebSocket-Key-Producer mit `endpoint.stop()` auch dessen Broadcast-Server) und die ZeroMQ- und Socket-Broadcaster schließt, und erst danach `consumerJava.interrupt()`, das die noch eingereihten Batches prüft (Drain in `consumeKeysRunner`). Was der Consumer in diesem Fenster prüft, meldet er an geschlossene Broadcaster – die Ergebnisse dieser Batches erreichen keinen Client, auch nach F130. Ende zu Ende gemessen (Socket-Broadcaster, Logging der 682 Treffer verlangsamt den Consumer): `interrupt called` bei 51,425 s, der Consumer prüfte noch bis 52,587 s; der Client erhielt 2 von 8 Batches.
+- **Fix:** offen, nächste Runde: den Consumer vor `interrupt()` leeren lassen (Reihenfolge tauschen), mit einem deterministischen Test über eine Naht zwischen Producer-Ende und Broadcaster-Schließen.
+- **Reproduktion:** Ende zu Ende über die CLI (siehe F130), noch ohne Unit-Test.
+- **Rot-Grün-Nachweis:** —
 - **Status:** nur beschrieben
 - **Commit:** —
 

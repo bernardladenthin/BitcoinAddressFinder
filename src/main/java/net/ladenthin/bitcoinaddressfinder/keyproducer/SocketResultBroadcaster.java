@@ -17,6 +17,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.core.BatchResult;
 import net.ladenthin.bitcoinaddressfinder.core.FireAndForget;
@@ -51,7 +52,10 @@ import org.slf4j.LoggerFactory;
  * fails is dropped, and one slow client cannot be allowed to stall the scan. A blocking socket write
  * does not fail when the peer stops reading, it waits forever once the buffers are full — so each
  * client has its own writer thread and a bounded queue, and a client that falls
- * {@link #CLIENT_QUEUE_CAPACITY} messages behind is dropped instead of blocking the consumer.
+ * {@link #CLIENT_QUEUE_CAPACITY} messages behind is dropped instead of blocking the consumer. What is
+ * already queued for a connected client when the broadcaster closes is still delivered, for at most
+ * {@link #CLOSE_DRAIN_MILLIS}: the last batches of a finite run are reported right before the
+ * shutdown and are the completion signal a client waits for.
  */
 @ToString
 public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
@@ -73,6 +77,15 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
      * messages and never blocks the consumer threads that call {@link #onBatchChecked(BatchResult)}.
      */
     private static final int CLIENT_QUEUE_CAPACITY = 4096;
+
+    /**
+     * How long {@link #close()} lets the writers deliver what is already queued. Bounded, so a client
+     * that stopped reading cannot hold the shutdown up.
+     */
+    private static final int CLOSE_DRAIN_MILLIS = 2_000;
+
+    /** How often an idle writer looks at the stop flag, so it can leave once its queue is empty. */
+    private static final int WRITER_POLL_MILLIS = 50;
 
     private final int port;
     private final BatchResultJsonFormatter formatter;
@@ -106,6 +119,14 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
      */
     @ToString.Exclude
     private volatile Runnable beforeClientRegistered = () -> {};
+
+    /** Test seam: runs in a writer thread right before a queued message is written. */
+    @ToString.Exclude
+    private volatile Runnable beforeWrite = () -> {};
+
+    /** Test seam: runs in {@link #close()} right after the stop has been requested. */
+    @ToString.Exclude
+    private volatile Runnable afterStopRequested = () -> {};
 
     /**
      * Creates a broadcaster serving on the given port. The server is not started here.
@@ -216,6 +237,26 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
     }
 
     /**
+     * Installs the hook that runs in a writer thread right before a queued message is written.
+     *
+     * @param hook the code to run on the writer thread
+     */
+    @VisibleForTesting
+    void setBeforeWrite(Runnable hook) {
+        this.beforeWrite = hook;
+    }
+
+    /**
+     * Installs the hook that runs in {@link #close()} right after the stop has been requested.
+     *
+     * @param hook the code to run on the closing thread
+     */
+    @VisibleForTesting
+    void setAfterStopRequested(Runnable hook) {
+        this.afterStopRequested = hook;
+    }
+
+    /**
      * Blocks until the expected number of clients is connected.
      *
      * <p>Exists for tests: a client's socket is connected before the accept loop has registered it,
@@ -255,7 +296,8 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
     }
 
     /**
-     * Starts the writer that drains one client's queue onto its socket until the client is dropped.
+     * Starts the writer that drains one client's queue onto its socket until the client is dropped, or
+     * until a stop has been requested and the queue is empty.
      *
      * @param client the client to serve
      */
@@ -264,8 +306,18 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
     private void startWriter(Client client) {
         Object unused = writerExecutor.submit(() -> {
             try {
-                while (!shouldStop && clients.contains(client)) {
-                    if (!writeTo(client.socket(), client.queue().take())) {
+                // After a stop the writer keeps going until its queue is empty: the last batches of a
+                // run are its completion signal, and close() waits for exactly this drain.
+                while (clients.contains(client)) {
+                    final String message = client.queue().poll(WRITER_POLL_MILLIS, TimeUnit.MILLISECONDS);
+                    if (message == null) {
+                        if (shouldStop) {
+                            return;
+                        }
+                        continue;
+                    }
+                    beforeWrite.run();
+                    if (!writeTo(client.socket(), message)) {
                         drop(client);
                         return;
                     }
@@ -318,9 +370,14 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
         }
     }
 
+    /**
+     * Stops accepting, lets every writer deliver what is already queued (for at most
+     * {@link #CLOSE_DRAIN_MILLIS}), then closes the client connections.
+     */
     @Override
     public void close() {
         shouldStop = true;
+        afterStopRequested.run();
         final ServerSocket localServerSocket = serverSocket;
         if (localServerSocket != null) {
             try {
@@ -329,11 +386,19 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
                 // best-effort during shutdown
             }
         }
+        acceptExecutor.shutdownNow();
+        writerExecutor.shutdown();
+        try {
+            if (!writerExecutor.awaitTermination(CLOSE_DRAIN_MILLIS, TimeUnit.MILLISECONDS)) {
+                LOGGER.warn("Result listeners did not take all queued results within {} ms.", CLOSE_DRAIN_MILLIS);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
         for (Client client : clients) {
             closeQuietly(client.socket());
         }
         clients.clear();
-        acceptExecutor.shutdownNow();
         writerExecutor.shutdownNow();
     }
 
