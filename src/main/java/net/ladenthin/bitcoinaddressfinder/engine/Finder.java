@@ -129,6 +129,14 @@ public class Finder implements Interruptable {
      */
     private volatile boolean interrupted;
 
+    /** Test seam: listeners added to the consumer's result listeners next to the broadcasters. */
+    @ToString.Exclude
+    private final List<ResultListener> additionalResultListeners = new ArrayList<>();
+
+    /** Test seam: runs in {@link #interrupt()} right before the key producers and broadcasters close. */
+    @ToString.Exclude
+    private volatile Runnable beforeResultBroadcastersClosed = () -> {};
+
     private final KeyUtility keyUtility;
     private final PersistenceUtils persistenceUtils;
     private final BitHelper bitHelper = new BitHelper();
@@ -299,7 +307,30 @@ public class Finder implements Interruptable {
         addWebSocketBroadcasters(listeners);
         addZmqBroadcasters(listeners);
         addSocketBroadcasters(listeners);
+        listeners.addAll(additionalResultListeners);
         return listeners;
+    }
+
+    /**
+     * Adds a listener the consumer notifies next to the configured broadcasters; must be called
+     * before {@link #startConsumer()}.
+     *
+     * @param listener the listener to add
+     */
+    @VisibleForTesting
+    void addResultListener(ResultListener listener) {
+        additionalResultListeners.add(listener);
+    }
+
+    /**
+     * Installs the hook that runs in {@link #interrupt()} right before the key producers and the
+     * result broadcasters are closed.
+     *
+     * @param hook the code to run
+     */
+    @VisibleForTesting
+    void setBeforeResultBroadcastersClosed(Runnable hook) {
+        this.beforeResultBroadcastersClosed = hook;
     }
 
     /**
@@ -719,7 +750,8 @@ public class Finder implements Interruptable {
     }
 
     /**
-     * Shuts down the producer executor and interrupts the consumer once producers have stopped.
+     * Shuts down the producer executor, lets the consumer check what the producers queued, then
+     * releases the key producers, broadcasters and producers.
      *
      * @throws InterruptedException if the calling thread is interrupted while awaiting termination;
      *                              callers are responsible for restoring the interrupt flag or
@@ -728,7 +760,8 @@ public class Finder implements Interruptable {
     public void shutdownAndAwaitTermination() throws InterruptedException {
         LOGGER.info("shutdownAndAwaitTermination");
         producerExecutorService.shutdown();
-        producerExecutorService.awaitTermination(finder.awaitTerminateSeconds, TimeUnit.SECONDS);
+        final boolean producersTerminated =
+                producerExecutorService.awaitTermination(finder.awaitTerminateSeconds, TimeUnit.SECONDS);
 
         // The producers have stopped, but stopping them does not release what they own: a
         // ProducerOpenCL still holds its result-reader pool, and the key producers still hold the
@@ -741,9 +774,24 @@ public class Finder implements Interruptable {
         // already ended, so the release that would end them would never be reached. The teardown
         // therefore belongs here, on the completion path itself. interrupt() is idempotent (it frees
         // the collections it walks), so the hook calling it again later is harmless.
-        interrupt();
+        //
+        // When the producers have ended, the consumer goes first: it may still be checking what they
+        // queued, and it reports every checked batch to the result broadcasters that interrupt()
+        // closes. Closed first, the last batches of a run -- the completion signal a client waits
+        // for -- reached nobody. When the wait timed out instead, producers are still running and
+        // filling the queue; they have to be stopped first, or a producer blocked on the full queue
+        // of a stopped consumer would hold interrupt() for its whole shutdownTimeoutSeconds.
+        if (producersTerminated) {
+            releaseConsumer();
+            interrupt();
+        } else {
+            interrupt();
+            releaseConsumer();
+        }
+    }
 
-        // no producers are running anymore, the consumer can be interrupted
+    /** Interrupts the consumer, which checks what is still queued before it stops, and forgets it. */
+    private void releaseConsumer() {
         final ConsumerJava localConsumerJava = consumerJava;
         if (localConsumerJava != null) {
             LOGGER.info("Interrupt: " + localConsumerJava);
@@ -768,6 +816,7 @@ public class Finder implements Interruptable {
         synchronized (interruptLock) {
             interrupted = true;
             LOGGER.info("interrupt called: delegate interrupt to all keyProducers and producers");
+            beforeResultBroadcastersClosed.run();
 
             // Key producers first. A producer waiting for its next secret is parked inside the key
             // producer, and a key producer configured to block indefinitely (timeoutMillis < 0, which is

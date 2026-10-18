@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.ladenthin.bitcoinaddressfinder.AwaitTimeTest;
 import net.ladenthin.bitcoinaddressfinder.AwaitTimeTests;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
@@ -58,6 +59,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 public class FinderTest {
+
+    /** How long the slow test listener holds the consumer per batch. */
+    private static final long SLOW_LISTENER_MILLIS = 200;
 
     @TempDir
     public Path folder;
@@ -309,6 +313,55 @@ public class FinderTest {
      * the observable proxy for "the JVM can now exit" in a test that must not depend on a GPU or on
      * counting live threads.
      */
+    /**
+     * The result of every checked batch must reach the broadcasters before they close: the last
+     * batches of a finite run are the completion signal a client waits for. The consumer is slowed
+     * down by a listener, so it is still draining its queue when the producers are done.
+     */
+    @Test
+    public void shutdownAndAwaitTermination_consumerStillDraining_everyBatchIsReportedBeforeTheBroadcastersClose()
+            throws Exception {
+        // arrange
+        final int producers = 4;
+        CFinder cFinder = new CFinder();
+        String keyProducerId = "exampleId";
+        for (int i = 0; i < producers; i++) {
+            final CProducerJava cProducerJava = new CProducerJava();
+            cProducerJava.keyProducerId = keyProducerId;
+            // One batch per producer, then the producer ends by itself.
+            cProducerJava.runOnce = true;
+            cFinder.producerJava.add(cProducerJava);
+        }
+        configureKeyProducerJavaRandom(keyProducerId, cFinder);
+        configureConsumerJava(cFinder);
+        Objects.requireNonNull(cFinder.consumerJava).threads = 1;
+
+        Finder finder = new Finder(cFinder);
+        final AtomicInteger reported = new AtomicInteger();
+        final AtomicInteger reportedWhenClosing = new AtomicInteger(-1);
+        finder.addResultListener(batchResult -> {
+            try {
+                Thread.sleep(SLOW_LISTENER_MILLIS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            reported.incrementAndGet();
+        });
+        finder.setBeforeResultBroadcastersClosed(() -> reportedWhenClosing.compareAndSet(-1, reported.get()));
+        finder.startKeyProducer();
+        finder.startConsumer();
+        finder.configureProducer();
+        finder.initProducer();
+        finder.startProducer();
+
+        // act
+        finder.shutdownAndAwaitTermination();
+
+        // assert
+        assertThat(reported.get(), is(equalTo(producers)));
+        assertThat(reportedWhenClosing.get(), is(equalTo(producers)));
+    }
+
     @Test
     public void shutdownAndAwaitTermination_producerFinished_producersAndKeyProducersReleased() throws Exception {
         // arrange

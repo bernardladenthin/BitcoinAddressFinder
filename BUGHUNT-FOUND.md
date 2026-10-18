@@ -51,7 +51,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F127](#f127) — mittel — *gefixt*
 - [F129](#f129) — niedrig — *nur beschrieben*
 - [F130](#f130) — mittel — *gefixt*
-- [F131](#f131) — mittel — *nur beschrieben*
+- [F131](#f131) — mittel — *gefixt*
 
 ## Funde
 
@@ -564,11 +564,11 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/engine/Finder.java` (`shutdownAndAwaitTermination`: erst `interrupt()`, dann `consumerJava.interrupt()`)
 - **Schwere:** mittel
 - **Beschreibung:** Nach dem Ende der Producer ruft `shutdownAndAwaitTermination` zuerst `interrupt()`, das die Key-Producer unterbricht (beim WebSocket-Key-Producer mit `endpoint.stop()` auch dessen Broadcast-Server) und die ZeroMQ- und Socket-Broadcaster schließt, und erst danach `consumerJava.interrupt()`, das die noch eingereihten Batches prüft (Drain in `consumeKeysRunner`). Was der Consumer in diesem Fenster prüft, meldet er an geschlossene Broadcaster – die Ergebnisse dieser Batches erreichen keinen Client, auch nach F130. Ende zu Ende gemessen (Socket-Broadcaster, Logging der 682 Treffer verlangsamt den Consumer): `interrupt called` bei 51,425 s, der Consumer prüfte noch bis 52,587 s; der Client erhielt 2 von 8 Batches.
-- **Fix:** offen, nächste Runde: den Consumer vor `interrupt()` leeren lassen (Reihenfolge tauschen), mit einem deterministischen Test über eine Naht zwischen Producer-Ende und Broadcaster-Schließen.
-- **Reproduktion:** Ende zu Ende über die CLI (siehe F130), noch ohne Unit-Test.
-- **Rot-Grün-Nachweis:** —
-- **Status:** nur beschrieben
-- **Commit:** —
+- **Fix:** Sind die Producer beendet, lässt `shutdownAndAwaitTermination` zuerst den Consumer leeren (`releaseConsumer`) und ruft danach `interrupt()`. Läuft die Wartezeit `awaitTerminateSeconds` dagegen ab, bleibt die alte Reihenfolge: dann laufen Producer noch und füllen die Warteschlange; ein zuerst gestoppter Consumer ließe sie an der vollen Warteschlange hängen, und `interrupt()` wartete deren ganze `shutdownTimeoutSeconds` (so lief der erste Fix-Versuch in den Fork-Timeout von `FinderTest`, über `shutdownAndAwaitTermination_producersSetAndInitialized_shutdownCalledAndAwaitTermination`; nicht gepusht). Dazu zwei paketinterne Nähte im Finder (`addResultListener`, `setBeforeResultBroadcastersClosed`), verhaltensneutral.
+- **Reproduktion:** `FinderTest#shutdownAndAwaitTermination_consumerStillDraining_everyBatchIsReportedBeforeTheBroadcastersClose` – vier Producer mit je einem Batch, ein Consumer-Thread, ein Test-Listener hält jeden Batch 200 ms; die Naht hält fest, wie viele Batches beim Schließen der Broadcaster schon gemeldet waren.
+- **Rot-Grün-Nachweis:** gegen den Naht-Stand ohne Fix rot („Expected: is <4> but: was <0>“, die übrigen 26 Tests der Klasse grün), mit Fix grün in 3 von 3 Läufen; Gegenprobe durch Zurückkopieren des Naht-Stands rot („but: was <0>“), danach wieder grün. Breite Liste: `FinderTest` 27/27, `ConsumerJavaTest` 36/36, die drei Broadcaster-Tests, `ConfigFixturesParseTest` 4/4, `BitcoinAddressFinderArchitectureTest` 17/17; `MainTest` 18/18 mit `POCL_MAX_WORK_GROUP_SIZE=256` (ohne die Variable stirbt seine OpenCL-Roundtrip-Fork auf pocl, auch gegen den unveränderten Stand – siehe die pocl-Beobachtung in BUGHUNT-CHECKED.md); `spotless:apply` und `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 
