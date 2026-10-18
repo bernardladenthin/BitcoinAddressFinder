@@ -423,7 +423,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected java.lang.IllegalArgumentException to be thrown, but nothing was thrown.“), mit Fix grün (19/19 der Klasse, skipped 0); Gegenprobe per `git stash` rot (1), nach `pop` grün. `FinderTest` 22/22, `AbstractKeyProducerQueueBufferedTest` 11/11, `ConfigFixturesParseTest` 3/3, `BitcoinAddressFinderArchitectureTest` 17/17, `spotless:apply` und `spotbugs:check` grün. Kein Beispiel unter `examples/` nutzt einen negativen Socket-Timeout.
 - **Nebenbefund (nicht geändert):** Auch die `IllegalStateException` „Unable to establish socket connection … after N attempts“ am Ende des Readers geht im unbeobachteten `Future` verloren; der Nutzer sieht nur die einzelnen „Connection attempt N failed“-Warnungen und danach eine `NoMoreSecretsAvailableException` mit „Timeout while waiting for secret“.
 - **Status:** gefixt
-- **Commit:** BAF `9d66eb7`
+- **Commit:** BitcoinAddressFinder `9d66eb7`
 
 ## Offene Verdachte ohne Fund-ID
 
