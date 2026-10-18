@@ -77,7 +77,19 @@ public class LMDBCompact implements Runnable, Interruptable {
         if (!targetDirectory.mkdirs() && !targetDirectory.isDirectory()) {
             throw new IllegalStateException("Failed to create target directory: " + targetDirectory);
         }
-        // MDB_CP_COMPACT writes data.mdb and fails if it already exists; replace a previous compaction.
+        // MDB_CP_COMPACT needs a directory without files. A previous compaction is a lone data.mdb (the
+        // read-only open that verifies it writes no lock file) and is replaced; anything else — another
+        // database with its lock.mdb, say — is refused before its data file is deleted.
+        String[] targetFiles = targetDirectory.list();
+        if (targetFiles == null) {
+            throw new IllegalStateException("Cannot list target directory: " + targetDirectory);
+        }
+        for (String name : targetFiles) {
+            if (!LMDB_DATA_FILE.equals(name)) {
+                throw new IllegalStateException("targetDirectory must be empty or hold only a previous compaction ("
+                        + LMDB_DATA_FILE + "), but contains " + name + ": " + targetDirectory);
+            }
+        }
         File targetDataFile = new File(targetDirectory, LMDB_DATA_FILE);
         if (targetDataFile.exists() && !targetDataFile.delete()) {
             throw new IllegalStateException("Failed to delete existing compacted database: " + targetDataFile);

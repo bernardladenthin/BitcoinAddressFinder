@@ -965,7 +965,8 @@ parser threads is enough to keep it fed.
 copy with the `CompactLMDB` command (LMDB `MDB_CP_COMPACT`; see
 [`examples/config_CompactLMDB.json`](examples/config_CompactLMDB.json)). It opens the source
 read-only, writes `data.mdb` into a separate target directory, and verifies the copy's entry count
-against the source. The read benefit is largest when the database exceeds RAM (a smaller file raises
+against the source. The target directory must be empty or hold only an earlier compaction, which is
+replaced; any other file there (another database's `lock.mdb`, say) stops the run before anything is deleted. The read benefit is largest when the database exceeds RAM (a smaller file raises
 the OS page-cache hit rate); for a database that fits in RAM the gain is marginal.
 
 **Optional — extract what a newer database adds over a reference.** The `LMDBDelta` command
