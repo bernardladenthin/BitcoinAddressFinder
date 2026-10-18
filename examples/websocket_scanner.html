@@ -155,6 +155,14 @@ function alignDown(value) {
   return step === 0n ? value : (value / step) * step;
 }
 
+/**
+ * The end of the range is exclusive and rounded up, not down: rounded down, the keys between the
+ * last full block and "To" were never sent, and "Range complete." was reported anyway.
+ */
+function alignUp(value) {
+  return step === 0n ? value : ((value + step - 1n) / step) * step;
+}
+
 function buildMap() {
   const map = $("map");
   map.innerHTML = "";
@@ -289,7 +297,7 @@ function connect() {
 function start() {
   if (!config) { log("No server configuration yet."); return; }
   fromBase = alignDown(BigInt("0x" + $("fromHex").value.trim().replace(/^0x/, "")));
-  toBase   = alignDown(BigInt("0x" + $("toHex").value.trim().replace(/^0x/, "")));
+  toBase   = alignUp(BigInt("0x" + $("toHex").value.trim().replace(/^0x/, "")));
   nextBase = fromBase;
   sent = checked = hits = keys = 0; inFlight = 0;
   $("statSent").textContent = $("statChecked").textContent = $("statHits").textContent = $("statKeys").textContent = 0;
