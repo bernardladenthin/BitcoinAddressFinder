@@ -73,7 +73,8 @@ public class CLMDBConfigurationReadOnly {
      * {@link AddressLookupBackend#LMDB_ONLY}: no in-RAM filter, LMDB stays open and answers
      * every lookup exactly. This is the safest default — an exact backend can never report a
      * false positive as a hit — and the in-RAM filters ({@code BLOOM}, {@code BINARY_FUSE_8},
-     * the exact snapshots) are opt-in latency optimisations. The GPU pre-filter
+     * the in-RAM snapshots {@code HASHSET} and {@code TRUNCATED_LONG_64}) are opt-in latency
+     * optimisations. The GPU pre-filter
      * ({@code producerOpenCL.enableGpuFilter}) is independent of this setting and works with the
      * {@code LMDB_ONLY} default.
      */

@@ -68,7 +68,8 @@ filter's own work rather than a delegate's.
 | `TRUNCATED_LONG_64` | 337.3 ± 13.4 | 635.5 ± 30.6 | 1061.7 ± 15.7 |
 
 `TRUNCATED_LONG_64` is Pareto-dominated by an order of magnitude at seven times the memory. It
-remains in the table only as the reference point for exact in-RAM storage.
+remains in the table only as the reference point for in-RAM storage of the hash160 itself (72 of its
+160 bits, so not exact: a collision is reported as an unverified hit, see `TruncatedLong64SortedArrayPresence`).
 
 ---
 

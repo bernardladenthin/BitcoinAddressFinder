@@ -59,6 +59,10 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F140](#f140) — mittel — *gefixt*
 - [F141](#f141) — niedrig — *gefixt (Doku)*
 - [F142](#f142) — niedrig — *nur beschrieben*
+- [F144](#f144) — niedrig — *gefixt (Doku)*
+- [F145](#f145) — niedrig — *gefixt (Doku)*
+- [F146](#f146) — niedrig — *gefixt (Doku)*
+- [F147](#f147) — niedrig — *gefixt (Doku)*
 
 ## Funde
 
@@ -674,6 +678,54 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** Lesen gegen `putNewAmountWithAutoIncrease` (Schleife `while (true)` um `growMapOrRethrow`).
 - **Rot-Grün-Nachweis:** – (nicht gefixt)
 - **Status:** nur beschrieben
+- **Commit:** –
+
+<a id="f144"></a>
+### F144 – BitcoinAddressFinder: Javadoc von `CProducerOpenCL.enableGpuFilter` bindet den GPU-Filter noch an `BINARY_FUSE_8`
+- **Zeit:** 2026-10-18 18:30 UTC
+- **Schwere:** niedrig
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/configuration/CProducerOpenCL.java` (Javadoc von `enableGpuFilter`)
+- **Beschreibung:** Die Javadoc sagt, der Filter werde nur hochgeladen, „when … the consumer's address-lookup backend is `BINARY_FUSE_8`“, und nennt nur Fuse-8. Das stammt aus `e720fb9` (2026-06-11). Seit `5323c04` (2026-06-15, „decouple the GPU pre-filter from the CPU lookup“) baut `ConsumerJava.initLMDB()` den Filter für jedes Backend aus dem offenen LMDB (`Finder.isGpuFilterRequested()` prüft nur `enableGpuFilter && !transferAll` und Vanity), und seit `2bb0a0b` gibt es Fuse-16. README Zeile 672 und `CLMDBConfigurationReadOnly` sagen es richtig.
+- **Fix:** Javadoc beschreibt Breite über `gpuFilterType`, Unabhängigkeit vom Backend und dass die Überlebenden vom Backend des Consumers geprüft werden.
+- **Reproduktion:** Lesen gegen `Finder.isGpuFilterRequested`, `ConsumerJava.initLMDB`; bestehend abgedeckt durch `ConsumerJavaTest#gpuFilter_selfContainedBackend_builtBeforeLmdbClosed` (HASHSET) und die LMDB_ONLY-Fälle.
+- **Rot-Grün-Nachweis:** – (Doku-Korrektur, Freigabe des Nutzers für Doku ohne roten Test)
+- **Status:** gefixt (Doku)
+- **Commit:** –
+
+<a id="f145"></a>
+### F145 – BitcoinAddressFinder: README nennt die Empfehlung „Defaults“
+- **Zeit:** 2026-10-18 18:30 UTC
+- **Schwere:** niedrig
+- **Datei:** `README.md` („Which filter to pick“ und die Log-Erklärung zu `gpuFilterType`)
+- **Beschreibung:** „There are two independent knobs, and the defaults are:“ leitet eine Tabelle mit der Spalte „Recommended“ ein (`FUSE_16` + `BINARY_FUSE_8`); fünf Zeilen davor sagt das README selbst, der Default sei `LMDB_ONLY`. Ebenso „the recommended default `FUSE_16`“. Im Code: `enableGpuFilter = false`, `gpuFilterType = FUSE_8`, `addressLookupBackend = LMDB_ONLY`. Wer die Tabelle als Defaults liest, glaubt, ohne Konfiguration mit `FUSE_16` zu laufen, und bleibt auf schnellen Karten bei der FUSE_8-Grenze (~0,5–0,7 G Schlüssel/s auf gemieteten Hosts). Den Default selbst auf `FUSE_16` zu ändern ist eine offene Entscheidung in `TODO.md` (Option c des Tuner-Eintrags), hier nicht angefasst.
+- **Fix:** beide Sätze nennen die Code-Defaults und die Empfehlung getrennt.
+- **Reproduktion:** Lesen gegen `CProducerOpenCL` und `CLMDBConfigurationReadOnly`.
+- **Rot-Grün-Nachweis:** – (Doku-Korrektur, Freigabe des Nutzers für Doku ohne roten Test)
+- **Status:** gefixt (Doku)
+- **Commit:** –
+
+<a id="f146"></a>
+### F146 – BitcoinAddressFinder: `TRUNCATED_LONG_64` wird an vier Stellen „exakt“ genannt
+- **Zeit:** 2026-10-18 18:30 UTC
+- **Schwere:** niedrig
+- **Datei:** Javadoc von `BinaryFuse8AddressPresence` und `BinaryFuse16AddressPresence` („Unlike the exact snapshots (`HASHSET`, `TRUNCATED_LONG_64`)“), `CLMDBConfigurationReadOnly.addressLookupBackend` („the exact snapshots“), `docs/filter-selection.md` („reference point for exact in-RAM storage“)
+- **Beschreibung:** `TRUNCATED_LONG_64` vergleicht 72 von 160 Bit und meldet Kollisionen ungeprüft (F141); exakt ist unter den Snapshots nur `HASHSET`. Gemeint war an allen Stellen „self-contained“ (LMDB geschlossen).
+- **Fix:** „self-contained snapshots“ bzw. „in-RAM snapshots `HASHSET` and `TRUNCATED_LONG_64`“; in `filter-selection.md` „72 of its 160 bits, so not exact“.
+- **Reproduktion:** die Verhaltenstests von F141.
+- **Rot-Grün-Nachweis:** – (Doku-Korrektur, Freigabe des Nutzers für Doku ohne roten Test)
+- **Status:** gefixt (Doku)
+- **Commit:** –
+
+<a id="f147"></a>
+### F147 – BitcoinAddressFinder: GPU-Eintrag in `TODO.md` empfiehlt noch `TRUNCATED_LONG_64` als ersten GPU-Filter
+- **Zeit:** 2026-10-18 18:30 UTC
+- **Schwere:** niedrig
+- **Datei:** `TODO.md` („GPU-side no-false-negatives address filter with per-variant flag bitmask“)
+- **Beschreibung:** Der Eintrag (aus `7bf7e74`/`5758808`, 2026-05-30) beschreibt die sortierten TRUNCATED-Buckets im GPU-Speicher, „Today the GPU kernel returns raw hash160 bytes for every candidate“, und empfiehlt „use TRUNCATED_LONG_64 … for the first GPU implementation“. Gebaut wurde stattdessen Binary Fuse: Fuse-8-Kernel mit Compact-Ausgabe `62f831d` (2026-06-11), Fuse-16 `2bb0a0b` (2026-07-19), entkoppelt vom CPU-Backend `5323c04`. TRUNCATED wurde nie auf die GPU gebracht, das Flags-Byte je Variante nicht gebaut (der Kernel verknüpft beide Lookups mit ODER).
+- **Fix:** Status-Hinweis am Anfang des Eintrags (was wirklich gebaut ist, Verweis auf den offenen Tuner-Eintrag) und der Empfehlungs-Punkt als „Decision (taken differently)“; der übrige Entwurf bleibt als Aufzeichnung.
+- **Reproduktion:** `src/main/resources/inc_ecc_secp256k1custom.cl` (`fuse8_contains`/`fuse16_contains`, kein Truncated-Probe), echte Kernel-Tests `OpenCLFilterHitSetIntegrationTest` und `OpenCLCompactOutputIntegrationTest` auf pocl grün.
+- **Rot-Grün-Nachweis:** – (Doku-Korrektur, Freigabe des Nutzers für Doku ohne roten Test)
+- **Status:** gefixt (Doku)
 - **Commit:** –
 
 ## Offene Verdachte ohne Fund-ID

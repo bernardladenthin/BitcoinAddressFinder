@@ -192,7 +192,7 @@ What to look for:
 * **The four build phases run once, at startup** (a few seconds each per 100 M addresses). This is the filter being built from your database — it is normal for the tool to sit here briefly before the first `Statistics` line, with no keys scanned yet.
 * **`ready (… addresses, … fingerprint slots)`** means the filter is built and scanning is about to start.
 * **`Statistics: … [Generated N/s …] [-> LMDB M/s …, NN.NN% pre-filtered] … [Hits: 0]`** is the running heartbeat. `Generated` is the raw key rate; `-> LMDB` is how many candidates survive the GPU pre-filter and reach the database; `pre-filtered` is the share the filter eliminated (so the CPU/LMDB never sees them). `Hits: 0` is expected — a hit means a funded address was actually found.
-* The filter is named after your `gpuFilterType`: the excerpt above is a `FUSE_8` run, whereas the recommended default `FUSE_16` logs `Binary Fuse16 filter: …` and drives the `pre-filtered` share even higher (fewer survivors reach LMDB). See [docs/filter-selection.md](docs/filter-selection.md) for the trade-off.
+* The filter is named after your `gpuFilterType`: the excerpt above is a `FUSE_8` run (the code default), whereas the recommended `FUSE_16` logs `Binary Fuse16 filter: …` and drives the `pre-filtered` share even higher (fewer survivors reach LMDB). See [docs/filter-selection.md](docs/filter-selection.md) for the trade-off.
 
 ### Tune the configuration for your own machine
 
@@ -329,7 +329,7 @@ As of version 1.6.0, the address presence check is decoupled from the on-disk LM
 
 **Most users should just run the shipped example
 [`examples/config_Find_GPU_Fuse16Cascade.json`](examples/config_Find_GPU_Fuse16Cascade.json)** — it
-is already set to the recommended combination. There are two independent knobs, and the defaults are:
+is already set to the recommended combination. There are two independent knobs; the code defaults are `gpuFilterType: FUSE_8` (with `enableGpuFilter: false`) and `addressLookupBackend: LMDB_ONLY`, and the recommendation is:
 
 | Knob | Recommended | Why |
 |---|---|---|
