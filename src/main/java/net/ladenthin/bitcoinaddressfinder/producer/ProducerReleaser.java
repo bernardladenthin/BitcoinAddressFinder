@@ -50,7 +50,10 @@ public class ProducerReleaser {
      * Stops and releases every producer that this releaser has not released before.
      *
      * <p>Each producer is interrupted, awaited and then released, in that order: releasing the
-     * resources of a producer that is still running would pull them out from under it.
+     * resources of a producer that is still running would pull them out from under it. A producer
+     * that is still running once the wait returns (it timed out after
+     * {@code shutdownTimeoutSeconds}, or was interrupted) is therefore not released at all; an error
+     * is logged and its resources are left to the process exit.
      *
      * <p>A producer whose teardown throws does not stop the others: every producer is handled, and
      * then the first failure is rethrown with later ones attached as suppressed exceptions.
@@ -72,6 +75,14 @@ public class ProducerReleaser {
                 producer.interrupt();
                 LOGGER.info("waitTillProducerNotRunning ...");
                 producer.waitTillProducerNotRunning();
+                if (producer.getState() == ProducerState.RUNNING) {
+                    // The wait timed out or was interrupted. Its resources (an OpenCL kernel, queue,
+                    // buffers) would be freed while the producer may still use them inside the driver;
+                    // leaking them at shutdown is the lesser harm.
+                    LOGGER.error(
+                            "Producer is still running after the wait; its resources are not released: {}", producer);
+                    continue;
+                }
                 producer.releaseProducer();
             } catch (RuntimeException e) {
                 LOGGER.error("Releasing producer failed, releasing the others: " + producer, e);
