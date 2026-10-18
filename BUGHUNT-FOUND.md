@@ -256,7 +256,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** keine – reine Dokumentationsabweichung; `OpenCLContextGpuFilterWidthTest#reclaimHeapBeforeUpload_invokesTheTrigger` prüft weiterhin, dass die Collection läuft.
 - **Rot-Grün-Nachweis:** – (Doku-Korrektur, Freigabe des Nutzers für Doku ohne roten Test)
 - **Status:** gefixt (Doku)
-- **Commit:** –
+- **Commit:** 0060d6b
 
 <a id="f40"></a>
 ### F40 – BAF: Secrets-Datei im falschen Format hält jede Zeile in `ReadStatistic.errors` → OutOfMemory
