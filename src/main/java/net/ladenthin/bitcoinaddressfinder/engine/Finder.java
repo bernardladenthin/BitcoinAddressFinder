@@ -790,6 +790,20 @@ public class Finder implements Interruptable {
         }
     }
 
+    /**
+     * Tears down a run whose start failed part-way: stops whatever already started, the consumer
+     * last.
+     *
+     * <p>{@link #interrupt()} alone leaves the consumer running, because on the completion path
+     * {@link #shutdownAndAwaitTermination()} releases it. A start that fails after
+     * {@link #startConsumer()} never reaches that path, and the consumer's non-daemon threads then
+     * keep the JVM alive after the error has been reported.
+     */
+    public void abortStart() {
+        interrupt();
+        releaseConsumer();
+    }
+
     /** Interrupts the consumer, which checks what is still queued before it stops, and forgets it. */
     private void releaseConsumer() {
         final ConsumerJava localConsumerJava = consumerJava;

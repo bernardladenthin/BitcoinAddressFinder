@@ -55,6 +55,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F132](#f132) — mittel — *gefixt*
 - [F135](#f135) — niedrig — *gefixt*
 - [F136](#f136) — mittel — *gefixt*
+- [F139](#f139) — mittel — *gefixt*
 
 ## Funde
 
@@ -609,6 +610,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **CI-Bedarf:** Ein Lauf mit zwei echten Geräten ist hier nicht möglich (pocl stellt eines).
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `9e317c5`
+
+<a id="f139"></a>
+### F139 – BitcoinAddressFinder: Scheitert der Find-Start nach dem Consumer-Start, beendet sich die JVM nie
+- **Zeit:** 2026-10-18 23:20 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/cli/Main.java` (`run`, Fall `Find`), `src/main/java/net/ladenthin/bitcoinaddressfinder/engine/Finder.java` (`interrupt` gibt den Consumer nicht frei)
+- **Schwere:** mittel
+- **Beschreibung:** `Main.run` startet Key-Producer, Consumer (LMDB laden, Consumer-Threads, Statistik-Timer) und dann die Producer. Wirft ein Schritt nach `consumerJava.startConsumer()`, ruft der Fehlerpfad nur `interrupt()` auf, und `Finder.interrupt()` gibt Key-Producer, Broadcaster und Producer frei, nicht den Consumer – das geschieht sonst in `shutdownAndAwaitTermination`, das dieser Pfad nie erreicht. Die Consumer-Threads (Nicht-Daemon, fester Pool) laufen weiter, und da `Main` kein `System.exit` ruft, hängt der Prozess nach der Fehlermeldung unbegrenzt. Ende zu Ende über die CLI gemessen, je 60–120 s bis zum Timeout-Abbruch: `producerOpenCL` mit `deviceIndex` 5 („Invalid device index: 5“, aus `configureProducer`) und `printStatisticsEveryNSeconds` 0 (aus `startStatisticsTimer`, nach `startConsumer`). Skripte und Dienste, die auf das Prozessende warten, hängen damit bei jedem Konfigurations- oder Gerätefehler dieser Phase.
+- **Fix:** `Main` fängt einen Fehler der Startschritte ab, ruft das neue `Finder.abortStart()` (erst `interrupt()`, dann der Consumer – dieselbe Reihenfolge wie bei abgelaufener Wartezeit in `shutdownAndAwaitTermination`) und wirft weiter; der äußere Fehlerpfad bleibt unverändert.
+- **Reproduktion:** `MainTest#run_findStartFailsAfterTheConsumerStarted_leavesNoNonDaemonThreadBehind` (Find mit Test-LMDB und `printStatisticsEveryNSeconds` 0; danach darf binnen 10 s kein neuer Nicht-Daemon-Thread mehr leben)
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is an empty collection but: <[Thread[#33,pool-6-thread-2,5,main], Thread[#32,pool-6-thread-1,5,main]]>“), mit Fix grün; Gegenprobe per `git stash` beider Produktionsdateien rot, danach wieder grün. Breit: `MainTest` 19/19 (mit pocl und `POCL_MAX_WORK_GROUP_SIZE=256`, 0 übersprungen), `FinderTest` 27/27, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:check` und `spotbugs:check` grün. Ende zu Ende mit Fix: beide CLI-Fälle enden nach 1–2 s mit Exit 1.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 

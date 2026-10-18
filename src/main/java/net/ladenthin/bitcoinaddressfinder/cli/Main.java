@@ -280,16 +280,22 @@ public class Main implements Runnable, Interruptable {
                     CFinder cFinder = Objects.requireNonNull(configuration.finder);
                     Finder finder = new Finder(cFinder);
                     interruptables.add(finder);
-                    // key producer first
-                    finder.startKeyProducer();
+                    try {
+                        // key producer first
+                        finder.startKeyProducer();
 
-                    // consumer second
-                    finder.startConsumer();
+                        // consumer second
+                        finder.startConsumer();
 
-                    // producer last
-                    finder.configureProducer();
-                    finder.initProducer();
-                    finder.startProducer();
+                        // producer last
+                        finder.configureProducer();
+                        finder.initProducer();
+                        finder.startProducer();
+                    } catch (Exception e) {
+                        // the consumer threads may already run; left alone they keep the JVM alive
+                        finder.abortStart();
+                        throw e;
+                    }
                     finder.shutdownAndAwaitTermination();
                 }
                 case LMDBToAddressFile -> {

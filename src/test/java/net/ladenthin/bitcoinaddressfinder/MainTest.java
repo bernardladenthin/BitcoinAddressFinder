@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder;
 import static net.ladenthin.bitcoinaddressfinder.cli.Main.printAllStackTracesWithDelay;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
@@ -19,15 +20,22 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.cli.Main;
 import net.ladenthin.bitcoinaddressfinder.configuration.CCommand;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
+import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaRandom;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticAddressesFiles;
+import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import nl.altindag.log.LogCaptor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -70,6 +78,68 @@ public class MainTest {
                 delaySeconds,
                 TimeUnit.SECONDS);
     }
+
+    // <editor-fold defaultstate="collapsed" desc="failed Find start">
+    /**
+     * A Find run whose start fails after the consumer threads started must not leave them running:
+     * Main never calls {@code System.exit}, so a non-daemon thread left behind keeps the JVM alive
+     * after the error is logged. Measured end to end over the CLI with a wrong OpenCL
+     * {@code deviceIndex} and with {@code printStatisticsEveryNSeconds} 0, the failure used here.
+     */
+    @Test
+    public void run_findStartFailsAfterTheConsumerStarted_leavesNoNonDaemonThreadBehind() throws Exception {
+        // arrange
+        File lmdbDirectory = new TestAddressesLMDB().createTestLMDB(folder, new StaticAddressesFiles(), true, false);
+        CConfiguration configuration = new CConfiguration();
+        configuration.command = CCommand.Find;
+        CFinder cFinder = new CFinder();
+        CKeyProducerJavaRandom keyProducer = new CKeyProducerJavaRandom();
+        keyProducer.keyProducerId = "random";
+        cFinder.keyProducerJavaRandom.add(keyProducer);
+        CProducerJava producer = new CProducerJava();
+        producer.keyProducerId = "random";
+        cFinder.producerJava.add(producer);
+        CConsumerJava consumer = new CConsumerJava();
+        consumer.lmdbConfigurationReadOnly.lmdbDirectory = lmdbDirectory.getAbsolutePath();
+        consumer.threads = 2;
+        consumer.printStatisticsEveryNSeconds = 0;
+        cFinder.consumerJava = consumer;
+        configuration.finder = cFinder;
+        Main main = new Main(configuration);
+        Set<Thread> before = liveNonDaemonThreads();
+
+        // act
+        assertThrows(IllegalStateException.class, main::run);
+
+        // assert
+        long deadline = System.currentTimeMillis() + LEFT_OVER_THREAD_WAIT_MILLIS;
+        Set<Thread> leftOver = leftOver(before);
+        while (!leftOver.isEmpty() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(LEFT_OVER_THREAD_POLL_MILLIS);
+            leftOver = leftOver(before);
+        }
+        assertThat(leftOver, is(empty()));
+    }
+
+    private static final long LEFT_OVER_THREAD_WAIT_MILLIS = 10_000L;
+    private static final long LEFT_OVER_THREAD_POLL_MILLIS = 50L;
+
+    private static Set<Thread> liveNonDaemonThreads() {
+        Set<Thread> threads = new HashSet<>();
+        for (Thread thread : Thread.getAllStackTraces().keySet()) {
+            if (thread.isAlive() && !thread.isDaemon()) {
+                threads.add(thread);
+            }
+        }
+        return threads;
+    }
+
+    private static Set<Thread> leftOver(Set<Thread> before) {
+        Set<Thread> now = liveNonDaemonThreads();
+        now.removeAll(before);
+        return now;
+    }
+    // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="testRoundtrip">
     @Test
