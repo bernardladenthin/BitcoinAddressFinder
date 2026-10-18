@@ -690,7 +690,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** Lesen gegen `Finder.isGpuFilterRequested`, `ConsumerJava.initLMDB`; bestehend abgedeckt durch `ConsumerJavaTest#gpuFilter_selfContainedBackend_builtBeforeLmdbClosed` (HASHSET) und die LMDB_ONLY-Fälle.
 - **Rot-Grün-Nachweis:** – (Doku-Korrektur, Freigabe des Nutzers für Doku ohne roten Test)
 - **Status:** gefixt (Doku)
-- **Commit:** –
+- **Commit:** 681b98e
 
 <a id="f145"></a>
 ### F145 – BitcoinAddressFinder: README nennt die Empfehlung „Defaults“
@@ -702,7 +702,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** Lesen gegen `CProducerOpenCL` und `CLMDBConfigurationReadOnly`.
 - **Rot-Grün-Nachweis:** – (Doku-Korrektur, Freigabe des Nutzers für Doku ohne roten Test)
 - **Status:** gefixt (Doku)
-- **Commit:** –
+- **Commit:** 681b98e
 
 <a id="f146"></a>
 ### F146 – BitcoinAddressFinder: `TRUNCATED_LONG_64` wird an vier Stellen „exakt“ genannt
@@ -714,7 +714,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** die Verhaltenstests von F141.
 - **Rot-Grün-Nachweis:** – (Doku-Korrektur, Freigabe des Nutzers für Doku ohne roten Test)
 - **Status:** gefixt (Doku)
-- **Commit:** –
+- **Commit:** 681b98e
 
 <a id="f147"></a>
 ### F147 – BitcoinAddressFinder: GPU-Eintrag in `TODO.md` empfiehlt noch `TRUNCATED_LONG_64` als ersten GPU-Filter
@@ -726,7 +726,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `src/main/resources/inc_ecc_secp256k1custom.cl` (`fuse8_contains`/`fuse16_contains`, kein Truncated-Probe), echte Kernel-Tests `OpenCLFilterHitSetIntegrationTest` und `OpenCLCompactOutputIntegrationTest` auf pocl grün.
 - **Rot-Grün-Nachweis:** – (Doku-Korrektur, Freigabe des Nutzers für Doku ohne roten Test)
 - **Status:** gefixt (Doku)
-- **Commit:** –
+- **Commit:** 681b98e
 
 ## Offene Verdachte ohne Fund-ID
 
