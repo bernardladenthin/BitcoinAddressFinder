@@ -814,7 +814,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion / Tests:** `TuneConfigurationTest#run_noArmSucceedsOnOneDevice_emittedConfigurationKeepsThatDevicesConfiguredValues` (pocl, Ende zu Ende: zwei OpenCL-Producer, der zweite mit `deviceIndex` 99, `batchSizeInBits` 3, `keysPerWorkItem` 2; die ausgegebene Konfiguration wird mit `Main.fromJson` zurückgelesen); der bisherige Einheitstest heißt jetzt `applyWinnerTo_deviceWithoutAUsableArm_restoresTheConfiguredGrid` und verändert den Producer vorher wie die Schleife.
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <3> but: was <4>“: das Raster des gescheiterten Arms). Mit Fix grün; Gegenprobe durch Entfernen nur der Rückschreibung: beide Tests rot („was <4>“, „was <20>“), danach grün. Breit: `TuneConfigurationTest` 54 (1 übersprungen, bestehend); `spotless:apply`, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 1b6782e
 
 ## Offene Verdachte ohne Fund-ID
 
