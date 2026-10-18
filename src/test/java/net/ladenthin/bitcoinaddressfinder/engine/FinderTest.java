@@ -8,14 +8,19 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.ladenthin.bitcoinaddressfinder.AwaitTimeTest;
 import net.ladenthin.bitcoinaddressfinder.AwaitTimeTests;
@@ -52,10 +57,13 @@ import net.ladenthin.bitcoinaddressfinder.producer.ProducerState;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerStateProvider;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.handshake.ServerHandshake;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 public class FinderTest {
@@ -140,6 +148,96 @@ public class FinderTest {
 
         // assert
         assertThat(failure.get(), is(nullValue()));
+    }
+
+    /** Collects everything a WebSocket server sends, in order. */
+    private static final class RecordingWebSocketClient extends WebSocketClient {
+
+        private final LinkedBlockingQueue<String> messages = new LinkedBlockingQueue<>();
+
+        RecordingWebSocketClient(URI uri) {
+            super(uri);
+        }
+
+        @Override
+        public void onOpen(ServerHandshake handshake) {
+            // nothing to do
+        }
+
+        @Override
+        public void onMessage(String message) {
+            messages.add(message);
+        }
+
+        @Override
+        public void onClose(int code, String reason, boolean remote) {
+            // nothing to do
+        }
+
+        @Override
+        public void onError(Exception ex) {
+            // recorded through the absence of expected messages
+        }
+
+        @Nullable
+        String awaitMessage() throws InterruptedException {
+            return messages.poll(15, TimeUnit.SECONDS);
+        }
+    }
+
+    /**
+     * A client of a WebSocket key producer steps by the grid it is told. Only the producers that key
+     * producer feeds expand its bases, so only their grid counts: a producer on another key producer
+     * must not change it, and among producers of different grids on the same key producer the smallest
+     * is the step that leaves no gap (each base goes to one producer, and a larger grid aligns the base
+     * down over the block, so the smaller step only checks blocks twice).
+     */
+    @ParameterizedTest
+    @CsvSource({"random, 4", "ws, 4"})
+    public void configureProducer_producersWithDifferentGrids_webSocketAnnouncesTheGridItsBasesAreExpandedTo(
+            String keyProducerIdOfTheSecondProducer, int expectedBatchSizeInBits) throws Exception {
+        // arrange
+        CFinder cFinder = new CFinder();
+        CKeyProducerJavaWebSocket webSocket = new CKeyProducerJavaWebSocket();
+        webSocket.port = KeyProducerJavaSocketTest.findFreePort();
+        webSocket.timeoutMillis = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
+        webSocket.keyProducerId = "ws";
+        webSocket.broadcastResults = true;
+        cFinder.keyProducerJavaWebSocket.add(webSocket);
+        configureKeyProducerJavaRandom("random", cFinder);
+
+        CProducerJava fedByTheWebSocket = new CProducerJava();
+        fedByTheWebSocket.keyProducerId = "ws";
+        fedByTheWebSocket.batchSizeInBits = 4;
+        cFinder.producerJava.add(fedByTheWebSocket);
+        CProducerJava second = new CProducerJava();
+        second.keyProducerId = keyProducerIdOfTheSecondProducer;
+        second.batchSizeInBits = 8;
+        cFinder.producerJava.add(second);
+        configureConsumerJava(cFinder);
+
+        Finder finder = new Finder(cFinder);
+        RecordingWebSocketClient client = new RecordingWebSocketClient(URI.create("ws://127.0.0.1:" + webSocket.port));
+        try {
+            finder.startKeyProducer();
+            finder.startConsumer();
+            finder.configureProducer();
+            ConnectionUtils.waitUntilTcpPortOpen("127.0.0.1", webSocket.port, 15_000);
+
+            // act
+            assertThat(client.connectBlocking(15, TimeUnit.SECONDS), is(true));
+            String greeting = client.awaitMessage();
+
+            // assert
+            assertThat(greeting, is(notNullValue()));
+            JsonNode config = new ObjectMapper().readTree(greeting);
+            assertThat(config.get("type").asText(), is(equalTo("config")));
+            assertThat(config.get("batchSizeInBits").asInt(), is(equalTo(expectedBatchSizeInBits)));
+        } finally {
+            client.closeBlocking();
+            finder.interrupt();
+            finder.shutdownAndAwaitTermination();
+        }
     }
 
     @Test

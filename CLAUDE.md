@@ -528,8 +528,11 @@ its step: the server aligns every incoming base down to a multiple of `2^batchSi
 client stepping by less resubmits one block forever while the rest of its range is never touched —
 silently, since nothing rejects a misaligned base. But the servers accept connections in
 `startKeyProducer()`, before `configureProducer()` exists to say what the grid is. Each transport
-therefore catches up as best it can (see the table below). When producers disagree on
-`batchSizeInBits`, the largest is announced — the only value that cannot make ranges overlap.
+therefore catches up as best it can (see the table below). Each broadcaster announces the grid of
+the producers its own key producer feeds (a producer on another key producer never sees its bases).
+When those disagree on `batchSizeInBits`, the smallest is announced, with a warning: each base goes
+to one producer, so a larger step would leave gaps in the blocks of the producers with the smaller
+grid, while the smaller step only makes the others, which align the base down, check a block twice.
 
 ### What each transport can and cannot promise
 

@@ -97,11 +97,20 @@ public class Finder implements Interruptable {
     private final ExecutorService producerExecutorService;
 
     /**
-     * Result broadcasters built from the configured key producers, kept so the grid configuration
-     * can be announced to them once the producers are known and so they can be closed on shutdown.
+     * Result broadcasters built from the configured key producers, each with the id of the key
+     * producer it belongs to, kept so the grid configuration can be announced to them once the
+     * producers are known.
      */
     @ToString.Exclude
-    private final List<ResultBroadcaster> resultBroadcasters = new ArrayList<>();
+    private final List<KeyedResultBroadcaster> resultBroadcasters = new ArrayList<>();
+
+    /**
+     * A result broadcaster and the key producer whose clients it serves.
+     *
+     * @param keyProducerId the id of the key producer the broadcaster's clients send bases to
+     * @param broadcaster   the broadcaster
+     */
+    private record KeyedResultBroadcaster(String keyProducerId, ResultBroadcaster broadcaster) {}
 
     /** ZeroMQ publishers, kept so their context can be closed on shutdown. */
     @ToString.Exclude
@@ -360,7 +369,7 @@ public class Finder implements Interruptable {
             }
             final WebSocketResultBroadcaster broadcaster =
                     new WebSocketResultBroadcaster(webSocketKeyProducer.getEndpoint());
-            resultBroadcasters.add(broadcaster::announceConfiguration);
+            resultBroadcasters.add(new KeyedResultBroadcaster(keyProducerId, broadcaster::announceConfiguration));
             listeners.add(broadcaster);
             LOGGER.info("Broadcasting results on the WebSocket of keyProducerId {}", keyProducerId);
         }
@@ -379,7 +388,7 @@ public class Finder implements Interruptable {
                 continue;
             }
             final ZmqResultBroadcaster broadcaster = new ZmqResultBroadcaster(config.publishAddress);
-            resultBroadcasters.add(broadcaster::announceConfiguration);
+            addForAnnouncement(config.keyProducerId, broadcaster::announceConfiguration);
             zmqBroadcasters.add(broadcaster);
             listeners.add(broadcaster);
             LOGGER.info("Publishing results on {}", config.publishAddress);
@@ -406,9 +415,22 @@ public class Finder implements Interruptable {
                 LOGGER.error("Could not serve results on port {}; continuing without it.", config.resultPort, e);
                 continue;
             }
-            resultBroadcasters.add(broadcaster::announceConfiguration);
+            addForAnnouncement(config.keyProducerId, broadcaster::announceConfiguration);
             socketBroadcasters.add(broadcaster);
             listeners.add(broadcaster);
+        }
+    }
+
+    /**
+     * Keeps a broadcaster for the grid announcement.
+     *
+     * @param keyProducerId the id of the key producer the broadcaster belongs to; {@code null} never
+     *                      started a key producer ({@link #startKeyProducer()} rejects it)
+     * @param broadcaster   the broadcaster
+     */
+    private void addForAnnouncement(@Nullable String keyProducerId, ResultBroadcaster broadcaster) {
+        if (keyProducerId != null) {
+            resultBroadcasters.add(new KeyedResultBroadcaster(keyProducerId, broadcaster));
         }
     }
 
@@ -420,8 +442,11 @@ public class Finder implements Interruptable {
      * incoming base is aligned down to a multiple of {@code 2^batchSizeInBits}, so a client stepping
      * by less would resubmit the same block and never cover the rest of its range.
      *
-     * <p>When producers disagree on the grid size the largest is announced, which is the only choice
-     * that cannot make ranges overlap.
+     * <p>Each broadcaster is told the grid of the producers its own key producer feeds; producers on
+     * other key producers never see its bases. When those producers disagree, the smallest grid is
+     * announced: each base goes to one of them, so a larger step would leave the rest of the block
+     * unchecked by a producer with a smaller grid, while a smaller step only makes a producer with a
+     * larger grid, which aligns the base down, check its block more than once.
      */
     private void announceGridConfigurationToBroadcasters() {
         if (resultBroadcasters.isEmpty()) {
@@ -431,14 +456,31 @@ public class Finder implements Interruptable {
         if (allProducers.isEmpty()) {
             return;
         }
-        int batchSizeInBits = 0;
-        boolean batchUsePrivateKeyIncrement = true;
-        for (CProducer cProducer : configuredProducerConfigs()) {
-            batchSizeInBits = Math.max(batchSizeInBits, cProducer.batchSizeInBits);
-            batchUsePrivateKeyIncrement &= cProducer.batchUsePrivateKeyIncrement;
-        }
-        for (ResultBroadcaster broadcaster : resultBroadcasters) {
-            broadcaster.announceConfiguration(batchSizeInBits, batchUsePrivateKeyIncrement);
+        for (KeyedResultBroadcaster entry : resultBroadcasters) {
+            final SortedSet<Integer> gridSizes = new TreeSet<>();
+            boolean batchUsePrivateKeyIncrement = true;
+            for (CProducer cProducer : configuredProducerConfigs()) {
+                if (entry.keyProducerId().equals(cProducer.keyProducerId)) {
+                    gridSizes.add(cProducer.batchSizeInBits);
+                    batchUsePrivateKeyIncrement &= cProducer.batchUsePrivateKeyIncrement;
+                }
+            }
+            if (gridSizes.isEmpty()) {
+                LOGGER.warn(
+                        "Results are broadcast for keyProducerId {}, but no producer draws from it;"
+                                + " no grid is announced.",
+                        entry.keyProducerId());
+                continue;
+            }
+            if (gridSizes.size() > 1) {
+                LOGGER.warn(
+                        "The producers fed by keyProducerId {} use different grids (batchSizeInBits {});"
+                                + " announcing the smallest, so the producers with a larger grid check"
+                                + " their blocks more than once.",
+                        entry.keyProducerId(),
+                        gridSizes);
+            }
+            entry.broadcaster().announceConfiguration(gridSizes.first(), batchUsePrivateKeyIncrement);
         }
     }
 
