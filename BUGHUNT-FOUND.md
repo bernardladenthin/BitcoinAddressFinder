@@ -802,7 +802,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion / Tests:** `FinderTest#configureProducer_producersWithDifferentGrids_webSocketAnnouncesTheGridItsBasesAreExpandedTo` (Ende zu Ende: echter WebSocket-Key-Producer mit `broadcastResults`, LMDB-Testdatenbank, `startKeyProducer` → `startConsumer` → `configureProducer`, dann ein echter WebSocket-Client, der den Gruß liest; Fälle: zweiter Producer mit 8 Bit an `keyProducerJavaRandom` bzw. am selben WebSocket-Key-Producer, erwartet jeweils 4).
 - **Rot-Grün-Nachweis:** ohne Fix rot in beiden Fällen („Expected: is <4> but: was <8>“), mit Fix grün; Gegenprobe per `git stash` von `Finder.java` wieder 2/2 rot, danach grün. Breit: `FinderTest` 29/29, `WebSocketResultBroadcasterTest` 4/4, `ZmqResultBroadcasterTest` 4/4, `SocketResultBroadcasterTest` 8/8, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply`, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 703819a
 
 ## Offene Verdachte ohne Fund-ID
 
