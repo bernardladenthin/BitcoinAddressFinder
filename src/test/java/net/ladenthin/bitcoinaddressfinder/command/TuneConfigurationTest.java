@@ -17,10 +17,13 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.File;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import net.ladenthin.bitcoinaddressfinder.LMDBBase;
 import net.ladenthin.bitcoinaddressfinder.LMDBPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.OpenCLPlatformAssume;
@@ -35,6 +38,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.configuration.CTuneConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.GpuFilterType;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerIdUnknownException;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import nl.altindag.log.LogCaptor;
@@ -72,6 +76,50 @@ public class TuneConfigurationTest extends LMDBBase {
     public TuneConfigurationTest() {}
 
     // <editor-fold desc="grid sweep mechanism">
+
+    /**
+     * A key producer id that names nothing fails the run in {@code Finder.startKeyProducer}, after
+     * the consumer threads have started. Left running, those non-daemon threads keep the JVM alive
+     * after the error is reported — measured end to end over the CLI.
+     */
+    @Test
+    public void run_unknownKeyProducerId_leavesNoNonDaemonThreadBehind() throws Exception {
+        // arrange
+        CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();
+        cTuneConfiguration.finder.producerJava.get(0).keyProducerId = "typo";
+        Set<Thread> before = liveNonDaemonThreads();
+
+        // act
+        assertThrows(KeyProducerIdUnknownException.class, () -> new TuneConfiguration(cTuneConfiguration).run());
+
+        // assert
+        long deadline = System.currentTimeMillis() + LEFT_OVER_THREAD_WAIT_MILLIS;
+        Set<Thread> leftOver = leftOver(before);
+        while (!leftOver.isEmpty() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(LEFT_OVER_THREAD_POLL_MILLIS);
+            leftOver = leftOver(before);
+        }
+        assertThat(leftOver, is(empty()));
+    }
+
+    private static final long LEFT_OVER_THREAD_WAIT_MILLIS = 10_000L;
+    private static final long LEFT_OVER_THREAD_POLL_MILLIS = 50L;
+
+    private static Set<Thread> liveNonDaemonThreads() {
+        Set<Thread> threads = new HashSet<>();
+        for (Thread thread : Thread.getAllStackTraces().keySet()) {
+            if (thread.isAlive() && !thread.isDaemon()) {
+                threads.add(thread);
+            }
+        }
+        return threads;
+    }
+
+    private static Set<Thread> leftOver(Set<Thread> before) {
+        Set<Thread> now = liveNonDaemonThreads();
+        now.removeAll(before);
+        return now;
+    }
 
     @Test
     public void run_cpuProducerWithoutDatabase_producesOneArmPerCandidatePair() {

@@ -381,7 +381,6 @@ public class TuneConfiguration implements Runnable, Interruptable {
                 runtimeStatistics);
         // The scan hot path needs *a* lookup, but not a truthful one — see NEVER_PRESENT.
         consumer.initWithLookup(NEVER_PRESENT);
-        consumer.startConsumer();
 
         // Finder is used for exactly one thing: instantiating and registering the configured key
         // producers. Its consumer/producer lifecycle is not reusable here (startConsumer() is bound
@@ -389,10 +388,13 @@ public class TuneConfiguration implements Runnable, Interruptable {
         // producer generation), but the key-producer wiring is, and duplicating that six-strategy
         // dispatch would be the one part of this command guaranteed to drift out of sync.
         Finder finder = new Finder(cFinder);
-        finder.startKeyProducer();
 
         ExecutorService producerExecutor = Executors.newCachedThreadPool();
         try {
+            // Inside the try: the consumer's threads are non-daemon, and startKeyProducer validates
+            // the key producer ids, so a failure there must still reach the teardown below.
+            consumer.startConsumer();
+            finder.startKeyProducer();
             // Built once and reused across every device: the filter is the expensive part (~44 s per
             // 100 M entries), the sweep is the part that has to be repeated per device.
             FilterPayload payload = buildFilterPayload(templates.get(0));

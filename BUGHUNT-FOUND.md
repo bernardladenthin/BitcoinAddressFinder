@@ -56,6 +56,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F135](#f135) — niedrig — *gefixt*
 - [F136](#f136) — mittel — *gefixt*
 - [F139](#f139) — mittel — *gefixt*
+- [F140](#f140) — mittel — *gefixt*
 
 ## Funde
 
@@ -622,6 +623,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is an empty collection but: <[Thread[#33,pool-6-thread-2,5,main], Thread[#32,pool-6-thread-1,5,main]]>“), mit Fix grün; Gegenprobe per `git stash` beider Produktionsdateien rot, danach wieder grün. Breit: `MainTest` 19/19 (mit pocl und `POCL_MAX_WORK_GROUP_SIZE=256`, 0 übersprungen), `FinderTest` 27/27, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:check` und `spotbugs:check` grün. Ende zu Ende mit Fix: beide CLI-Fälle enden nach 1–2 s mit Exit 1.
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `4264e7a`
+
+<a id="f140"></a>
+### F140 – BitcoinAddressFinder: `TuneConfiguration` hängt nach einer unbekannten Key-Producer-ID (Folge von F126)
+- **Zeit:** 2026-10-18 23:45 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/command/TuneConfiguration.java` (`run`: `consumer.startConsumer()` und `finder.startKeyProducer()` vor dem `try`)
+- **Schwere:** mittel
+- **Beschreibung:** `run()` startete die Consumer-Threads und `finder.startKeyProducer()` vor dem `try`, dessen `finally` Finder, Consumer und Producer-Executor abräumt. Seit F126 prüft `startKeyProducer` die Key-Producer-IDs und `batchSizeInBits` aller Producer und wirft dabei; vorher scheiterte eine falsche ID erst im einzelnen Arm (innerhalb des `try`, als gescheiterter Arm berichtet). Jetzt endet `run()` mit `KeyProducerIdUnknownException`, ohne den Consumer zu stoppen, und dessen Nicht-Daemon-Thread hält die JVM am Leben. Ende zu Ende über die CLI auf pocl: `producerOpenCL.keyProducerId` „typo“ → Fehlermeldung, dann hängt der Prozess bis zum Timeout-Abbruch (60 s). Dasselbe Muster wie F139, hier durch den eigenen Fix F126 ausgelöst.
+- **Fix:** `consumer.startConsumer()` und `finder.startKeyProducer()` laufen im `try`, sodass das vorhandene `finally` auch diesen Fehler abräumt.
+- **Reproduktion:** `TuneConfigurationTest#run_unknownKeyProducerId_leavesNoNonDaemonThreadBehind`
+- **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is an empty collection but: <[Thread[#27,pool-3-thread-1,5,main]]>“), mit Fix grün; Gegenprobe per `git stash` rot, danach wieder grün. `TuneConfigurationTest` 52 Tests, 0 Fehler (1 übersprungen, wie zuvor), `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:check` und `spotbugs:check` grün. Ende zu Ende mit Fix: Exit 1 nach 2 s.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 
