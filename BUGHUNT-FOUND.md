@@ -49,6 +49,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F124](#f124) — niedrig — *gefixt*
 - [F126](#f126) — niedrig — *gefixt*
 - [F127](#f127) — mittel — *gefixt*
+- [F129](#f129) — niedrig — *nur beschrieben*
 
 ## Funde
 
@@ -529,6 +530,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix rot („Unexpected exception thrown: …KeyProducerIdUnknownException: Key producer id is unknown: null“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` der Beispieldatei rot (1), nach `pop` grün. `ConfigFixturesParseTest` 4/4, `BitcoinAddressFinderArchitectureTest` 17/17, `spotless:apply` ohne weiteren Diff; kein Produktionscode geändert.
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `c5dd4d2`
+
+<a id="f129"></a>
+### F129 – BitcoinAddressFinder: Der OpenCL-Producer verfehlt die Schlüssel 2 … keysPerWorkItem−1, weil das erste Work-Item der Basis 0 bei 0·G verankert ist
+- **Zeit:** 2026-10-18 18:10 UTC
+- **Datei:** `src/main/resources/inc_ecc_secp256k1custom.cl:1058` (Anker `P0 = (baseK0 | base_offset)·G` per `point_mul_xy_comb`, Kommentar „Degenerate case … impossible for the supported aligned sequential / random ranges“ darüber), Aufrufer `producer/ProducerOpenCL`, Auswertung `opencl/OpenCLGridResult.readEntry`
+- **Schwere:** niedrig
+- **Beschreibung:** Jedes Work-Item berechnet seine `keysPerWorkItem` Schlüssel als `P0 + m·G` aus einem gemeinsamen affinen Anker `P0`. Für das erste Work-Item eines Rasters mit Basis 0 ist der Anker der Skalar 0, also der Punkt im Unendlichen, der affin nicht darstellbar ist: alle Schlüssel dieses Work-Items werden falsch berechnet. `OpenCLGridResult.readEntry` ersetzt nur den Schlüssel 0 selbst durch `INVALID_KEY_ONE`, die übrigen Einträge 2 … keysPerWorkItem−1 tragen falsche Koordinaten und Hashes; im kompakten Filtermodus verwirft schon der GPU-Filter sie. Basis 0 ist kein Sonderfall: der inkrementelle Key-Producer beginnt standardmäßig bei `MIN_VALID_PRIVATE_KEY` = 2, und das Raster wird auf 0 abgerundet – jeder solche Scan auf der GPU überspringt still die kleinsten Schlüssel, die der CPU-Pfad findet. Derselbe Kommentar übersieht auch das andere Ende: ein Anker `k0` mit `k0 + m ≡ 0 (mod n)` für `m < keysPerWorkItem` (das Work-Item unmittelbar vor n) ergibt `dx = 0`. Praktisch betroffen sind nur winzige bzw. n-nahe Schlüssel (die Puzzles 2–4 liegen unter 16, sind aber längst gelöst).
+- **Fix:** offen, Entscheidung des Nutzers, weil der Kernel leistungskritisch ist. Möglich: im Kernel für einen Anker 0 (bzw. `k0 + m ≡ 0`) auf einen anderen Anker ausweichen (etwa `P0 = 1·G` und `m` um eins verschoben), oder auf dem Host das erste Work-Item eines Rasters mit Basis 0 auf der CPU nachrechnen (hilft nur ohne GPU-Filter). Der Kernel-Kommentar zum „unmöglichen“ Entartungsfall ist in jedem Fall falsch.
+- **Reproduktion:** Ende zu Ende über die CLI mit pocl (`apt-get install pocl-opencl-icd`): Datenbank mit 682 Zieladressen (jeder dritte Schlüssel 3…2046) plus 5000 Rauschadressen, inkrementeller Key-Producer 2…0x7ff, `producerOpenCL` mit `batchSizeInBits` 8. Mit `keysPerWorkItem` 16: 677 Treffer, es fehlen genau 3, 6, 9, 12, 15 – gleich in voller Übertragung, mit FUSE_8 und mit FUSE_16. Mit `keysPerWorkItem` 1: alle 682. Der CPU-Producer findet in derselben Lage alle 682 (siehe BUGHUNT-CHECKED.md, Lookup-Backends). Ein `@OpenCLTest`, der für Basis 0 und `keysPerWorkItem` 16 die Hashes der Einträge 2…15 mit `PublicKeyBytes.fromPrivate` vergleicht, wäre rot; er wurde nicht eingecheckt, weil er ohne Fix den `test-opencl`-Job rot machte.
+- **Rot-Grün-Nachweis:** —
+- **CI-Bedarf:** Ein Fix braucht den `test-opencl`-Job (pocl) und eine Messung der Kernel-Laufzeit auf echter GPU.
+- **Status:** nur beschrieben
+- **Commit:** —
 
 ## Offene Verdachte ohne Fund-ID
 
