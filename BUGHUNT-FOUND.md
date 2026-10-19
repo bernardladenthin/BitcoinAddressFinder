@@ -896,7 +896,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `AddressTxtLineTest#fromLine_unusableAmount_takesTheDefaultAndReportsTheLine` (5 Fälle), `#fromLine_validAmountOrNone_isNotReported`, `AddressFilesToLMDBTest#addressFilesToLMDB_unusableAmounts_warnsOnceAndStoresTheDefault`.
 - **Rot-Grün-Nachweis:** mit der alten Auswertung rot (`AddressTxtLineTest` 5 von 6, `AddressFilesToLMDBTest` 1 von 1), mit dem Fix grün (304 + 27, `LMDBToAddressFileTest` 16).
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** a2bbe09
 
 ## Offene Verdachte ohne Fund-ID
 
