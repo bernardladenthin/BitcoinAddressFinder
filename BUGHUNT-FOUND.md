@@ -932,7 +932,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `CKeyProducerJavaIncrementalTest#getEndPrivateKey_defaultEndAddress_returnsTheLastValidPrivateKey` (ersetzt `…_returnsMaxPrivateKey`, das die alte Vorgabe festschrieb): Vorgabe = n − 1, gültig, und n − 1 + 1 ungültig.
 - **Rot-Grün-Nachweis:** mit der alten Vorgabe rot (1 von 9), mit der neuen grün; dazu `KeyProducerJavaIncrementalTest`, `ConfigFixturesParseTest`, `BitcoinAddressFinderArchitectureTest` grün (40 Tests).
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** d185aed
 
 ## Offene Verdachte ohne Fund-ID
 
