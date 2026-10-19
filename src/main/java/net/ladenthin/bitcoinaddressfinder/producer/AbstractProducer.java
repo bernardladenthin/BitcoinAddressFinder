@@ -228,9 +228,10 @@ public abstract class AbstractProducer implements Producer {
                             + " but cProducer.batchUsePrivateKeyIncrement=true requires exactly 1");
                 }
             } else {
-                if (secrets.length != cProducer.getOverallWorkSize()) {
+                // A key producer may return a shorter last batch (an incremental range that ends inside it).
+                if (secrets.length < 1 || secrets.length > cProducer.getOverallWorkSize()) {
                     throw new IllegalStateException("secrets.length=" + secrets.length
-                            + " != cProducer.getOverallWorkSize()=" + cProducer.getOverallWorkSize());
+                            + " is not in [1, cProducer.getOverallWorkSize()=" + cProducer.getOverallWorkSize() + "]");
                 }
             }
             privateKeyValidator.replaceInvalidPrivateKeys(secrets);

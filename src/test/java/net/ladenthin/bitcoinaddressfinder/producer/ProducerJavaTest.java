@@ -10,12 +10,16 @@ import static org.hamcrest.Matchers.*;
 
 import java.math.BigInteger;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import net.ladenthin.bitcoinaddressfinder.MockConsumer;
 import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
 import net.ladenthin.bitcoinaddressfinder.ToStringTest;
+import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaIncremental;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaIncremental;
 import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
@@ -46,6 +50,55 @@ public class ProducerJavaTest {
                 cProducerJava, mockConsumer, keyUtility, mockKeyProducer, bitHelper, new RuntimeStatistics());
 
         AbstractProducerTest.verifyInitProducer(producerJava);
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="produceKeys">
+    /**
+     * With explicit keys ({@code batchUsePrivateKeyIncrement=false}) an incremental range whose end
+     * falls inside a batch is checked up to and including {@code endPrivateKey}: the last batch is
+     * shorter instead of failing, which used to leave up to {@code overallWorkSize - 1} keys of the
+     * range unchecked.
+     */
+    @Test
+    public void produceKeys_incrementalRangeEndingInsideABatch_checksEveryKeyUpToTheEnd() throws Exception {
+        // arrange
+        CProducerJava cProducerJava = new CProducerJava();
+        cProducerJava.batchSizeInBits = 2;
+        cProducerJava.batchUsePrivateKeyIncrement = false;
+        CKeyProducerJavaIncremental cKeyProducer = new CKeyProducerJavaIncremental();
+        cKeyProducer.startPrivateKey = "2";
+        cKeyProducer.endPrivateKey = "7";
+        MockConsumer mockConsumer = new MockConsumer();
+        ProducerJava producerJava = new ProducerJava(
+                cProducerJava,
+                mockConsumer,
+                keyUtility,
+                new KeyProducerJavaIncremental(cKeyProducer, keyUtility, bitHelper),
+                bitHelper,
+                new RuntimeStatistics());
+
+        // act: [2, 3, 4, 5], then the rest [6, 7], then the range is exhausted
+        producerJava.produceKeys();
+        producerJava.produceKeys();
+        producerJava.produceKeys();
+
+        // assert
+        List<BigInteger> checked = new ArrayList<>();
+        for (PublicKeyBytes[] batch : mockConsumer.publicKeyBytesArrayList) {
+            for (PublicKeyBytes publicKeyBytes : batch) {
+                checked.add(publicKeyBytes.getSecretKey());
+            }
+        }
+        assertThat(
+                checked,
+                contains(
+                        BigInteger.valueOf(2),
+                        BigInteger.valueOf(3),
+                        BigInteger.valueOf(4),
+                        BigInteger.valueOf(5),
+                        BigInteger.valueOf(6),
+                        BigInteger.valueOf(7)));
     }
     // </editor-fold>
 

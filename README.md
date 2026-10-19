@@ -1308,12 +1308,17 @@ This mode generates private keys **sequentially in batches** within a specified 
 
 #### How it works
 - Scanning begins **at `startPrivateKey`**, producing sequential private keys in batches of `2^batchSizeInBits` keys each, up to and including `endPrivateKey`. See [Batch Size per Kernel (`batchSizeInBits`)](#-batch-size-per-kernel-batchsizeinbits) above for the exponent &#x2192; batch-size mapping and typical values.
-- Each batch contains exactly `2^batchSizeInBits` keys.
-- If the next full batch would go **beyond `endPrivateKey`**, the process stops with an **exception**.
-- The **`endPrivateKey` is inclusive**, but **partial batches are not allowed by default** &#x2014; batches must fit completely inside the range.
-- For optimal performance, especially with OpenCL, configure `batchSizeInBits` (and the matching `keysPerWorkItem`) so that batches align perfectly within the range. This prevents errors and maximizes throughput.
-
-> **Note:** If unsure, set the `endPrivateKey` slightly higher to match a `2^batchSizeInBits` multiple. This helps avoid exceptions and ensures efficient scanning.
+- The **`endPrivateKey` is inclusive**, and no key of the range is left out:
+  - **Grid mode** (`batchUsePrivateKeyIncrement: true`, the default, and the only mode of `producerOpenCL`): every
+    batch is a grid of `2^batchSizeInBits` keys whose base is aligned down to a multiple of `2^batchSizeInBits`.
+    The first grid can therefore start below `startPrivateKey` and the last one end above `endPrivateKey`; those
+    extra keys are checked too. One exception at the very top of the key space: the GPU does not compute the
+    last grid below the group order n, because it reaches past n (it is skipped with one logged error). Those are
+    the last `((n − 1) mod 2^batchSizeInBits) + 1` keys; the CPU grid checks them.
+  - **Explicit keys** (`batchUsePrivateKeyIncrement: false`, CPU only): batches of `2^batchSizeInBits` sequential
+    keys; when the range ends inside a batch, the last batch is the shorter rest up to and including `endPrivateKey`.
+- For optimal performance, especially with OpenCL, configure `batchSizeInBits` (and the matching `keysPerWorkItem`)
+  so that the range is a whole number of grids; otherwise the first and last grid check keys outside it.
 
 ---
 

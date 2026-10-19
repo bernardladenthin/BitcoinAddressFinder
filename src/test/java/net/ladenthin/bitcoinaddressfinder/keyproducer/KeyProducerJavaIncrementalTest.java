@@ -56,10 +56,10 @@ import org.junit.jupiter.api.Test;
  *     <td><code>createSecrets_currentValueAdvancesByBatchSize</code></td>
  *   </tr>
  *   <tr>
- *     <td>3. Inside range, partial batch</td>
- *     <td>Inside range (between start and end)</td>
- *     <td>Partial batch (batch size &gt; keys remaining)</td>
- *     <td>No</td>
+ *     <td>3. Range exhausted after full batches</td>
+ *     <td>Past endPrivateKey after the previous batch</td>
+ *     <td>Any</td>
+ *     <td>N/A</td>
  *     <td>Throws NoMoreSecretsAvailableException</td>
  *     <td>Yes</td>
  *     <td><code>createSecrets_threeBatches_twoElementsEach_thirdThrowsException</code></td>
@@ -74,13 +74,13 @@ import org.junit.jupiter.api.Test;
  *     <td><code>createSecrets_returnStartSecretOnlyTrue_returnsOneSecret</code></td>
  *   </tr>
  *   <tr>
- *     <td>5. At end, batch size > 1, partial batch not allowed</td>
+ *     <td>5. At end, batch size > 1, partial batch</td>
  *     <td>At endPrivateKey (max)</td>
  *     <td>Batch size &gt; 1</td>
  *     <td>No (batch overruns end)</td>
- *     <td>Throws NoMoreSecretsAvailableException</td>
- *     <td>Yes</td>
- *     <td><code>createSecrets_endPrivateKeyInclusive_butPartialBatchNotAllowed_throwsException</code></td>
+ *     <td>Returns the shorter rest up to and including endPrivateKey; the next call throws</td>
+ *     <td>No</td>
+ *     <td><code>createSecrets_endPrivateKeyInclusive_partialBatch_returnsTheRestThenThrows</code></td>
  *   </tr>
  *   <tr>
  *     <td>6. Beyond end address</td>
@@ -114,9 +114,9 @@ import org.junit.jupiter.api.Test;
  *     <td>Inside range or start</td>
  *     <td>Batch size &gt; keys remaining</td>
  *     <td>No</td>
- *     <td>Throws NoMoreSecretsAvailableException</td>
- *     <td>Yes</td>
- *     <td><code>createSecrets_batchExceedsEnd_throwsException</code></td>
+ *     <td>Returns the keys up to and including endPrivateKey</td>
+ *     <td>No</td>
+ *     <td><code>createSecrets_batchExceedsEnd_returnsTheKeysUpToTheEnd</code></td>
  *   </tr>
  * </table>
  *
@@ -203,12 +203,17 @@ public class KeyProducerJavaIncrementalTest {
 
     /**
      * Tests that requesting a batch larger than the available keys before the end address
-     * causes a NoMoreSecretsAvailableException to be thrown.
+     * returns the keys up to and including the end address, and that the range is exhausted after it.
      */
     @Test
-    public void createSecrets_batchExceedsEnd_throwsException() throws Exception {
+    public void createSecrets_batchExceedsEnd_returnsTheKeysUpToTheEnd() throws Exception {
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
                 startHex, "0000000000000000000000000000000000000000000000000000000000000003");
+
+        BigInteger[] secrets = producer.createSecrets(5, false);
+
+        assertThat(secrets.length, is(equalTo(2)));
+        verifySecrets(secrets, new BigInteger(startHex, Radix.HEX));
         assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(5, false));
     }
 
@@ -263,12 +268,11 @@ public class KeyProducerJavaIncrementalTest {
     }
 
     /**
-     * Tests that if a batch would partially exceed the end address, an exception is thrown.
-     * This test confirms partial batches are not allowed when returnStartSecretOnly is false.
+     * Tests that a call after the last key of the range was returned throws.
      */
     @Test
     public void createSecrets_threeBatches_twoElementsEach_thirdThrowsException() throws Exception {
-        // Setup: start = 1, end = 5 (allowed keys: 1, 2, 3, 4, 5)
+        // Setup: start = 1, end = 4 (allowed keys: 1, 2, 3, 4)
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
                 "0000000000000000000000000000000000000000000000000000000000000001",
                 "0000000000000000000000000000000000000000000000000000000000000004");
@@ -277,17 +281,16 @@ public class KeyProducerJavaIncrementalTest {
         assertTwoBatchedOk(producer, batchSize);
 
         // 3rd batch: should throw NoMoreSecretsAvailableException because
-        // the next values would be 5 and 6, but 6 exceeds the end address
+        // the next value would be 5, which exceeds the end address
         assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(batchSize, false));
     }
 
     /**
-     * Similar to above, but with the end address included.
-     * Demonstrates that partial batches beyond the end are disallowed and cause an exception,
-     * even if the end address itself is technically within the allowed range.
+     * Similar to above, but with the end address inside the third batch. The end address is
+     * inclusive, so the third batch is the shorter rest [5]; only the call after it throws.
      */
     @Test
-    public void createSecrets_endPrivateKeyInclusive_butPartialBatchNotAllowed_throwsException() throws Exception {
+    public void createSecrets_endPrivateKeyInclusive_partialBatch_returnsTheRestThenThrows() throws Exception {
         // Setup: start=1, end=5 (allowed keys: 1, 2, 3, 4, 5)
         KeyProducerJavaIncremental producer = createKeyProducerJavaIncremental(
                 "0000000000000000000000000000000000000000000000000000000000000001",
@@ -296,7 +299,11 @@ public class KeyProducerJavaIncrementalTest {
 
         assertTwoBatchedOk(producer, batchSize);
 
-        // 3rd batch: tries [5, 6], but 6 > end (5), so exception thrown
+        // 3rd batch: [5, 6] would overrun the end (5), so only [5] is returned
+        BigInteger[] batch3 = producer.createSecrets(batchSize, false);
+        assertThat(batch3.length, is(equalTo(1)));
+        assertThat(batch3[0], is(equalTo(BigInteger.valueOf(5))));
+
         assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(batchSize, false));
     }
 
