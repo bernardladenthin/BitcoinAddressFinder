@@ -73,7 +73,9 @@ it is done, as for every other item in this file.
   grid for the rejection (the bound does not depend on the grid size, see F151's 8-bit test).
 
 **CI and hardware runs** (the owner runs these together; the three hardware measurements have their
-own items below: heap reclaim, signal handlers of GPU drivers, zero-anchor branch):
+own items below: heap reclaim, signal handlers of GPU drivers, zero-anchor branch). **The complete
+measurement brief for an agent, with commands, hypotheses and answer fields, is
+`BUGHUNT-MEASUREMENTS.md` (B1–B8).**
 
 - The full `mvn test` once (the bug hunt ran only the affected test classes).
 - The `test-opencl` job (pocl), which now runs with `LD_PRELOAD=$JAVA_HOME/lib/libjsig.so` (F148)
