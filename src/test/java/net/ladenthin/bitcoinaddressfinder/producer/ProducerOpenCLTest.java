@@ -4,13 +4,20 @@
 package net.ladenthin.bitcoinaddressfinder.producer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.math.BigInteger;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -19,11 +26,14 @@ import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
 import net.ladenthin.bitcoinaddressfinder.OpenCLPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.OpenCLTest;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
+import net.ladenthin.bitcoinaddressfinder.util.PrivateKeyTooLargeException;
+import nl.altindag.log.LogCaptor;
 import org.bitcoinj.base.Network;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -269,6 +279,84 @@ public class ProducerOpenCLTest {
 
         // assert
         assertThat(mockConsumer.publicKeyBytesArrayList.size(), is(greaterThan(0)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="processSecretBase at the top of the key space">
+    /**
+     * The last aligned grid below the group order contains n, which the kernel cannot compute. Skipping
+     * it is expected at the end of the key space, so it is a single WARN naming the grid, not an ERROR
+     * with a stack trace; it is still recorded as the producer's last failure, so an orchestrator
+     * reading {@code getLastFailure()} sees that this grid was not computed.
+     */
+    @Test
+    @OpenCLTest
+    public void processSecretBase_gridContainingTheGroupOrder_isSkippedWithAWarningAndRecorded() throws Exception {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.batchSizeInBits = 8;
+        MockConsumer mockConsumer = new MockConsumer();
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(
+                cProducerOpenCL,
+                mockConsumer,
+                keyUtility,
+                new MockKeyProducer(keyUtility, new Random(1)),
+                bitHelper,
+                new RuntimeStatistics());
+        producerOpenCL.initProducer();
+        // ...CD0364100, the grid that contains n = ...CD0364141
+        BigInteger topGrid = Secp256k1Constants.MAX_PRIVATE_KEY.subtract(BigInteger.valueOf(0x41));
+
+        try (LogCaptor producerLog = LogCaptor.forClass(ProducerOpenCL.class);
+                LogCaptor abstractProducerLog = LogCaptor.forClass(AbstractProducer.class)) {
+            producerOpenCL.processSecretBase(topGrid);
+
+            assertThat(producerLog.getWarnLogs(), hasSize(1));
+            assertThat(producerLog.getWarnLogs().get(0), containsString("skipped"));
+            assertThat(
+                    producerLog.getWarnLogs().get(0),
+                    containsString(topGrid.toString(16).toUpperCase(Locale.ROOT)));
+            assertThat(producerLog.getErrorLogs(), is(empty()));
+            assertThat(abstractProducerLog.getErrorLogs(), is(empty()));
+        } finally {
+            producerOpenCL.releaseProducer();
+        }
+        assertThat(producerOpenCL.getLastFailure(), is(instanceOf(PrivateKeyTooLargeException.class)));
+        assertThat(mockConsumer.publicKeyBytesArrayList, is(empty()));
+    }
+
+    /**
+     * An unaligned base is a defect of the caller, not the expected end of the key space: it stays an
+     * ERROR, and the grid is not computed.
+     */
+    @Test
+    @OpenCLTest
+    public void processSecretBase_unalignedBase_isAnErrorAndNotComputed() throws Exception {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.batchSizeInBits = 8;
+        MockConsumer mockConsumer = new MockConsumer();
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(
+                cProducerOpenCL,
+                mockConsumer,
+                keyUtility,
+                new MockKeyProducer(keyUtility, new Random(1)),
+                bitHelper,
+                new RuntimeStatistics());
+        producerOpenCL.initProducer();
+
+        try (LogCaptor producerLog = LogCaptor.forClass(ProducerOpenCL.class);
+                LogCaptor abstractProducerLog = LogCaptor.forClass(AbstractProducer.class)) {
+            producerOpenCL.processSecretBase(BigInteger.valueOf(0x1_0001));
+
+            assertThat(producerLog.getWarnLogs(), is(empty()));
+            assertThat(abstractProducerLog.getErrorLogs(), hasSize(1));
+        } finally {
+            producerOpenCL.releaseProducer();
+        }
+        assertThat(producerOpenCL.getLastFailure(), is(instanceOf(IllegalArgumentException.class)));
+        assertThat(producerOpenCL.getLastFailure(), is(not(instanceOf(PrivateKeyTooLargeException.class))));
+        assertThat(mockConsumer.publicKeyBytesArrayList, is(empty()));
     }
     // </editor-fold>
 }

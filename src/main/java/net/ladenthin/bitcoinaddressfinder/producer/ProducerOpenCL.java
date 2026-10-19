@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder.producer;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.math.BigInteger;
+import java.util.Locale;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -18,6 +19,7 @@ import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLGridResult;
 import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.util.PrivateKeyTooLargeException;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -290,6 +292,16 @@ public class ProducerOpenCL extends AbstractProducer {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             logErrorInProduceKeys(e, secretBase);
+        } catch (PrivateKeyTooLargeException e) {
+            // The last aligned grid below the group order contains n, which the kernel cannot compute
+            // (n·G has no public key, and the batched inversion would spoil its neighbours). Expected
+            // at the end of the key space, so a warning rather than an error; still recorded, so an
+            // orchestrator reading getLastFailure() sees that this grid was not computed.
+            LOGGER.warn(
+                    "Grid at secretBase {} skipped on the GPU: it reaches the group order n. Its keys below n"
+                            + " are not checked by this producer.",
+                    secretBase.toString(16).toUpperCase(Locale.ROOT));
+            recordFailure(e);
         } catch (RuntimeException e) {
             logErrorInProduceKeys(e, secretBase);
         }

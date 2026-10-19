@@ -102,6 +102,57 @@ public class PrivateKeyValidatorTest {
     }
     // </editor-fold>
 
+    // <editor-fold defaultstate="collapsed" desc="isAlignedToBatchSize">
+    /**
+     * A grid's base must have its low {@code batchSizeInBits} bits clear: the OpenCL kernel derives a
+     * work item's key as {@code base | offset} (an OR into the lowest word), which equals the
+     * {@code base + offset} the host reports for a hit only for such a base.
+     */
+    @Test
+    public void isAlignedToBatchSize_lowBitsClear_returnsTrue() {
+        PrivateKeyValidator validator = new PrivateKeyValidator();
+
+        assertThat(validator.isAlignedToBatchSize(BigInteger.ZERO, 8), is(true));
+        assertThat(validator.isAlignedToBatchSize(BigInteger.valueOf(0x100), 8), is(true));
+        assertThat(validator.isAlignedToBatchSize(BigInteger.valueOf(0x1_0000), 16), is(true));
+        // the last aligned grid that stays below n with 8 bits: ...CD0364000
+        assertThat(
+                validator.isAlignedToBatchSize(
+                        Secp256k1Constants.MAX_PRIVATE_KEY.subtract(BigInteger.valueOf(0x141)), 8),
+                is(true));
+    }
+
+    @Test
+    public void isAlignedToBatchSize_anyLowBitSet_returnsFalse() {
+        PrivateKeyValidator validator = new PrivateKeyValidator();
+
+        assertThat(validator.isAlignedToBatchSize(BigInteger.ONE, 8), is(false));
+        assertThat(validator.isAlignedToBatchSize(BigInteger.valueOf(0x180), 8), is(false));
+        assertThat(validator.isAlignedToBatchSize(BigInteger.valueOf(0x1_8000), 16), is(false));
+        // n - 2^8 = ...CD0364041: the largest base the upper-bound check accepts, but not a grid base
+        assertThat(
+                validator.isAlignedToBatchSize(
+                        Secp256k1Constants.MAX_PRIVATE_KEY.subtract(BigInteger.valueOf(0x100)), 8),
+                is(false));
+    }
+
+    @Test
+    public void isAlignedToBatchSize_batchSizeZero_everyBaseIsAligned() {
+        PrivateKeyValidator validator = new PrivateKeyValidator();
+
+        assertThat(validator.isAlignedToBatchSize(BigInteger.valueOf(0x12345), 0), is(true));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {-1, Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS + 1})
+    public void isAlignedToBatchSize_batchSizeOutOfRange_throwsIllegalArgumentException(int batchSizeInBits) {
+        PrivateKeyValidator validator = new PrivateKeyValidator();
+
+        assertThrows(
+                IllegalArgumentException.class, () -> validator.isAlignedToBatchSize(BigInteger.ZERO, batchSizeInBits));
+    }
+    // </editor-fold>
+
     // <editor-fold defaultstate="collapsed" desc="isInvalidWithBatchSize">
     @ParameterizedTest
     @MethodSource(CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE)

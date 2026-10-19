@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.22.4, LogCaptor 2.12.7 -> 2.13.0 (test; still requests log4j 2.26.1, so the log4j floor guard is
   unchanged), pitest-maven 1.30.0 -> 1.30.1, central-publishing-maven-plugin 0.11.0 -> 0.12.0;
   `anthropics/claude-code-action` v1.0.255 and Gradle 9.8.2 in the shared `verify-signing-key-gradle` job.
+- **The OpenCL kernel refuses an unaligned secret base, and the skipped top grid is a warning.**
+  The kernel derives a work item's key by ORing its offset into the lowest word of the base, which is
+  the base plus the offset only when the low `batchSizeInBits` bits of the base are zero; the host
+  reports a hit as base plus offset. `OpenCLContext.createKeys` now checks that once per grid and
+  throws before anything is dispatched, instead of letting the GPU check other keys than the ones it
+  reports. The producers always aligned their bases, so a scan behaves as before; only direct callers
+  of `createKeys` can notice. The last grid below the group order n, which the GPU skips because it
+  contains n, is logged as one warning naming the base instead of an error with a stack trace (it is
+  still recorded as the producer's last failure).
 - **Build tooling: spotbugs-maven-plugin 4.10.4.1 -> 4.10.5.0**, in step with the sibling repositories, and with it
   **Lombok-generated code carries JSpecify nullness** (`lombok.addNullAnnotations = jspecify` in the
   shared `lombok.config`): under `@NullMarked` a generated `equals(Object)` parameter read as non-null

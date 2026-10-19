@@ -416,7 +416,7 @@ public class OpenCLContextTest {
             openCLContext.init();
 
             // act
-            try (OpenCLGridResult result = openCLContext.createKeys(BigInteger.valueOf(0x1234_5678L))) {
+            try (OpenCLGridResult result = openCLContext.createKeys(BigInteger.valueOf(0x1234_5600L))) {
                 // assert: a launch completed and produced a readable result buffer
                 assertThat(result.getResult().capacity(), is(greaterThan(0)));
             }

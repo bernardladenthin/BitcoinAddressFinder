@@ -946,6 +946,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 37bb737
 
+### F171 – BitcoinAddressFinder: Der OpenCL-Kernel rechnet mit einer nicht ausgerichteten Basis still andere Schlüssel, und das oberste Raster ist ein ERROR
+- **Zeit:** 2026-10-19 20:00 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/opencl/OpenCLContext.java` (`createKeys`), `util/PrivateKeyValidator.java` (`isAlignedToBatchSize`), `producer/ProducerOpenCL.java` (`processSecretBase`)
+- **Schwere:** niedrig (Härtung; die Producer richten jede Basis aus, `AbstractProducer.createSecretBase`)
+- **Historie:** Der Kernel leitet den Schlüssel eines Work-Items als `k[0] = baseK0 | base_offset` ab (ODER ins niedrigste Wort), der Host meldet einen Treffer als Basis + Offset (`KeyUtility.CALCULATE_SECRET_KEY_USE_OR = false`). `setSrcPrivateKeyChunk` prüfte nur die Obergrenze. Bei der Prüfung des Vorschlags „Raster vorher einmal kappen“ (2026-10-19) gefunden; das Kappen selbst ist mit dem ODER unmöglich (TODO.md).
+- **Beschreibung:** Eine nicht ausgerichtete Basis lief durch und der Kernel prüfte andere Schlüssel als die gemeldeten – still. Fünf bestehende Tests taten genau das (`OpenCLContextGpuFilterWidthTest` mit Basis 1, `OpenCLContextTest` mit `0x12345678`, `ProbeAddressesOpenCLTest` mit `n − 2^8` als „letzter erlaubter Basis“), ebenso die beiden JMH-Benchmarks (zufällige 256 Bit). Das oberste Raster `alignDown(n−1)`, das n enthält und erwartet übersprungen wird, kam als ERROR mit Stacktrace ins Log.
+- **Fix:** Entscheidung des Nutzers: eine Prüfung je Raster vor dem Dispatch, nichts je Work-Item. `PrivateKeyValidator.isAlignedToBatchSize`, aufgerufen in `createKeys`; eine nicht ausgerichtete Basis wirft `IllegalArgumentException` („not aligned … Refusing to dispatch“). `processSecretBase` fängt `PrivateKeyTooLargeException` eigens: ein WARN mit der Basis, weiter als letzter Fehler des Producers festgehalten, nichts an den Consumer. Bestehende Tests und Benchmarks auf ausgerichtete Basen umgestellt; README („logged warning“), TODO, CHANGELOG.
+- **Tests:** `PrivateKeyValidatorTest#isAlignedToBatchSize_*` (4), `ProbeAddressesOpenCLTest#createKeys_lastAlignedGridBelowTheGroupOrder_computesEveryKeyCorrectly` (Basis n − 0x141, alle 256 Schlüssel gegen die CPU), `#createKeys_gridContainingTheGroupOrder_isRefused`, `#createKeys_unalignedBase_isRefusedBeforeTheKernelRuns`, `ProducerOpenCLTest#processSecretBase_gridContainingTheGroupOrder_isSkippedWithAWarningAndRecorded`, `#processSecretBase_unalignedBase_isAnErrorAndNotComputed`.
+- **Rot-Grün-Nachweis:** ohne den Fix (Validator-Stub, keine Prüfung in `createKeys`, kein eigener Catch) rot (6 Fehlschläge), mit dem Fix grün auf pocl; die fünf bestehenden Tests mit nicht ausgerichteten Basen wurden durch die Prüfung rot und laufen ausgerichtet wieder grün; voller `mvn test` auf pocl grün.
+- **Status:** gefixt
+- **Commit:** (folgt)
+
 ## Offene Verdachte ohne Fund-ID
 
 - *(erledigt 2026-10-19, ohne Fund-ID: Testumgebung, kein Produktfehler)* `ProbeAddressesOpenCLTest#setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException` brach auf Geräten mit 1024 MiB je Allokation mit `CL_INVALID_BUFFER_SIZE` ab, bevor die Prüfung lief (B3: mit `POCL_MEMORY_LIMIT=4` reproduziert, ab 2047 MB grün). Läuft jetzt auf einem 8-Bit-Raster (eigener Provider `privateKeysTooLargeForASmallGrid`), mit und ohne Begrenzung grün. Commit 1faa48a. Ebenso B2: `test-opencl` setzt `POCL_MAX_WORK_GROUP_SIZE=256` (8cb9bb5), B6: `GcTrigger` entfernt (e451898).

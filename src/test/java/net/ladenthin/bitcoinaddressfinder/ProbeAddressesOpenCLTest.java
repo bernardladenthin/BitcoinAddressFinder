@@ -4,10 +4,13 @@
 package net.ladenthin.bitcoinaddressfinder;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.io.Resources;
@@ -387,6 +390,69 @@ public class ProbeAddressesOpenCLTest {
             assertThrows(
                     PrivateKeyTooLargeException.class,
                     () -> openClTask.setSrcPrivateKeyChunk(lastBase.add(BigInteger.ONE)));
+        }
+    }
+
+    /**
+     * The last aligned grid that stays below n ({@code ...CD0364000} with 8 bits): every one of its
+     * 256 keys must come out of the kernel exactly as the CPU derives {@code base + i}. This is the
+     * upper edge the GPU computes; the next grid contains n and is refused (below).
+     */
+    @OpenCLTest
+    @Test
+    public void createKeys_lastAlignedGridBelowTheGroupOrder_computesEveryKeyCorrectly() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.batchSizeInBits = 8;
+        BigInteger lastAlignedBase = Secp256k1Constants.MAX_PRIVATE_KEY.subtract(BigInteger.valueOf(0x141));
+        KeyUtility keyUtility = new KeyUtility(network, byteBufferUtility);
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+            openCLContext.init();
+
+            try (OpenCLGridResult result = openCLContext.createKeys(lastAlignedBase)) {
+                assertPublicKeyBytesCalculatedCorrect(result.getPublicKeyBytes(), lastAlignedBase, false, keyUtility);
+            }
+        }
+    }
+
+    @OpenCLTest
+    @Test
+    public void createKeys_gridContainingTheGroupOrder_isRefused() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.batchSizeInBits = 8;
+        // ...CD0364100: its keys run to ...CD03641FF and include n = ...CD0364141
+        BigInteger topGrid = Secp256k1Constants.MAX_PRIVATE_KEY.subtract(BigInteger.valueOf(0x41));
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+            openCLContext.init();
+
+            assertThrows(PrivateKeyTooLargeException.class, () -> openCLContext.createKeys(topGrid));
+        }
+    }
+
+    /**
+     * The kernel derives a work item's key as {@code base | offset}, an OR into the lowest word. For an
+     * unaligned base that is not {@code base + offset}, which is what the host reports for a hit, so the
+     * kernel would compute other keys than the ones named in the results, silently. The grid must be
+     * refused before the kernel runs, and not as a "too large" key, which the producer treats as the
+     * expected top-of-range skip.
+     */
+    @OpenCLTest
+    @Test
+    public void createKeys_unalignedBase_isRefusedBeforeTheKernelRuns() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.batchSizeInBits = 8;
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+            openCLContext.init();
+
+            IllegalArgumentException e = assertThrows(
+                    IllegalArgumentException.class, () -> openCLContext.createKeys(BigInteger.valueOf(0x1_0001)));
+            assertThat(e, is(not(instanceOf(PrivateKeyTooLargeException.class))));
+            assertThat(e.getMessage(), containsString("not aligned"));
         }
     }
 

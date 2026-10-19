@@ -32,6 +32,7 @@ import net.ladenthin.bitcoinaddressfinder.opencl.binding.OpenClBinding;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.MultilineLogger;
+import net.ladenthin.bitcoinaddressfinder.util.PrivateKeyValidator;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.opencl.CL10;
@@ -329,6 +330,10 @@ public class OpenCLContext implements ReleaseCLObject {
 
     private final CProducerOpenCL producerOpenCL;
     private final BitHelper bitHelper;
+
+    /** Checks the alignment of each grid base before it is dispatched (see {@link #createKeys}). */
+    @ToString.Exclude
+    private final PrivateKeyValidator privateKeyValidator = new PrivateKeyValidator();
 
     @ToString.Exclude
     private final ClApi clApi;
@@ -1311,6 +1316,15 @@ public class OpenCLContext implements ReleaseCLObject {
                     + ". This would silently drop funded addresses; refusing to dispatch.");
         }
         final int filterType = configuredType.getWireValue();
+        // The kernel derives a work item's key as baseK0 | base_offset (an OR into the lowest word),
+        // which is base + offset -- the key the host names for a hit -- only for an aligned base. An
+        // unaligned one would compute other keys than the results report, silently. Checked once per
+        // grid, before anything is dispatched; the producers always align (createSecretBase).
+        if (!privateKeyValidator.isAlignedToBatchSize(privateKeyBase, producerOpenCL.batchSizeInBits)) {
+            throw new IllegalArgumentException("secretBase " + privateKeyBase.toString(16)
+                    + " is not aligned to 2^" + producerOpenCL.batchSizeInBits
+                    + "; the kernel would compute other keys than it reports. Refusing to dispatch.");
+        }
 
         localOpenClTask.setSrcPrivateKeyChunk(privateKeyBase);
         ByteBuffer dstByteBuffer = localOpenClTask.executeKernel(

@@ -21,7 +21,7 @@ it is done, as for every other item in this file.
 
 - **Grid mode on the GPU, top of the key space — decided 2026-10-19: no change.** The last aligned
   grid `alignDown(n−1)` always contains n (for `batchSizeInBits` ≥ 2). `OpenClTask.setSrcPrivateKeyChunk`
-  rejects it, `ProducerOpenCL.processSecretBase` logs that once as an error, the producer goes on, and
+  rejects it, `ProducerOpenCL.processSecretBase` logs that once (a warning since F171), the producer goes on, and
   an incremental scan ends after it as usual: that grid never reaches OpenCL, so the GPU never computes
   past n. The owner's reasoning: the region is a few keys right at the bound, irrelevant for scanning,
   and computing it would cost every grid a check in the kernel. The lower bound needs nothing either:
@@ -35,19 +35,9 @@ it is done, as for every other item in this file.
   `k[0] = baseK0 | base_offset`, a bitwise OR into the lowest word, which is only correct for an
   aligned base; a top grid capped to `n − 2^bits` is unaligned and would yield wrong keys. Computing
   the grid and discarding the keys past n fails too (the batched inversion above). The one host check
-  per grid in `setSrcPrivateKeyChunk` is already the "guard once before the grid".
-
-**Waiting for the owner's decision:**
-
-- **Harden that guard with the kernel's precondition, and log the top grid as what it is.**
-  `setSrcPrivateKeyChunk` checks only the upper bound; an unaligned base passes and the kernel's OR
-  silently computes other keys than the host reports for a hit (`secretBase + i`, ADD). Production
-  never sends one (`consumeSecrets` → `createSecretBase` aligns), so this is hardening: reject an
-  unaligned base there (one check per grid, nothing per work item). `ProbeAddressesOpenCLTest` uses
-  the unaligned `n − 2^8` as its "last allowed base" and would move to the last aligned one. And the
-  skipped top grid is logged as an ERROR with a stack trace although it is expected; a single WARN
-  saying "last grid below n skipped on the GPU" would fit.
-
+  per grid in `setSrcPrivateKeyChunk` is already the "guard once before the grid". Since F171 it
+  has a second half, the kernel's precondition: `OpenCLContext.createKeys` refuses an unaligned base
+  before the kernel runs, and the skipped top grid is one WARN instead of an ERROR with a stack trace.
 
 ### Persistence backends (genuinely open work)
 

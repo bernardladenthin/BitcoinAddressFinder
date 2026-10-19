@@ -1313,7 +1313,7 @@ This mode generates private keys **sequentially in batches** within a specified 
     batch is a grid of `2^batchSizeInBits` keys whose base is aligned down to a multiple of `2^batchSizeInBits`.
     The first grid can therefore start below `startPrivateKey` and the last one end above `endPrivateKey`; those
     extra keys are checked too. One exception at the very top of the key space: the GPU does not compute the
-    last grid below the group order n, because it reaches past n (it is skipped with one logged error). Those are
+    last grid below the group order n, because it reaches past n (it is skipped with one logged warning). Those are
     the last `((n − 1) mod 2^batchSizeInBits) + 1` keys; the CPU grid checks them.
   - **Explicit keys** (`batchUsePrivateKeyIncrement: false`, CPU only): batches of `2^batchSizeInBits` sequential
     keys; when the range ends inside a batch, the last batch is the shorter rest up to and including `endPrivateKey`.

@@ -66,6 +66,29 @@ public class PrivateKeyValidator {
     }
 
     /**
+     * Checks whether a grid base has its low {@code batchSizeInBits} bits clear.
+     *
+     * <p>The OpenCL kernel derives a work item's key as {@code base | offset}, an OR into the lowest
+     * 32-bit word, which equals the {@code base + offset} the host reports for a hit only for such a
+     * base. An unaligned base would make the kernel compute other keys than the ones named in its
+     * results.
+     *
+     * @param secretBase      the grid base
+     * @param batchSizeInBits the grid size exponent
+     * @return {@code true} if the low {@code batchSizeInBits} bits of {@code secretBase} are zero
+     * @throws IllegalArgumentException if {@code batchSizeInBits} is outside
+     *     [0, {@link Secp256k1Constants#PRIVATE_KEY_MAX_NUM_BITS}]
+     */
+    public boolean isAlignedToBatchSize(@NonNull BigInteger secretBase, int batchSizeInBits) {
+        if (batchSizeInBits < 0 || batchSizeInBits > Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS) {
+            throw new IllegalArgumentException("batchSizeInBits must be in [0, "
+                    + Secp256k1Constants.PRIVATE_KEY_MAX_NUM_BITS + "] but was " + batchSizeInBits);
+        }
+        // the lowest set bit of a non-zero base must lie at or above batchSizeInBits; zero is aligned
+        return secretBase.signum() == 0 || secretBase.getLowestSetBit() >= batchSizeInBits;
+    }
+
+    /**
      * Checks whether a private key base exceeds the maximum allowed value for a given batch size.
      *
      * @param privateKeyBase the base private key to check

@@ -135,7 +135,7 @@ public class OpenCLContextGpuFilterWidthTest {
             upload16(context);
 
             IllegalStateException ex =
-                    assertThrows(IllegalStateException.class, () -> context.createKeys(BigInteger.ONE));
+                    assertThrows(IllegalStateException.class, () -> context.createKeys(BigInteger.valueOf(0x100)));
 
             assertThat(ex.getMessage(), containsString(GpuFilterType.FUSE_8.toString()));
             assertThat(ex.getMessage(), containsString(GpuFilterType.FUSE_16.toString()));
@@ -161,7 +161,7 @@ public class OpenCLContextGpuFilterWidthTest {
             upload8(context);
 
             IllegalStateException ex =
-                    assertThrows(IllegalStateException.class, () -> context.createKeys(BigInteger.ONE));
+                    assertThrows(IllegalStateException.class, () -> context.createKeys(BigInteger.valueOf(0x100)));
 
             assertThat(ex.getMessage(), containsString(GpuFilterType.FUSE_16.toString()));
             assertThat(ex.getMessage(), containsString(GpuFilterType.FUSE_8.toString()));
@@ -185,7 +185,7 @@ public class OpenCLContextGpuFilterWidthTest {
             context.init();
             upload16(context);
 
-            try (OpenCLGridResult result = context.createKeys(BigInteger.ONE)) {
+            try (OpenCLGridResult result = context.createKeys(BigInteger.valueOf(0x100))) {
                 assertThat(result.getResult().capacity() > 0, is(true));
             }
         } finally {
@@ -212,7 +212,7 @@ public class OpenCLContextGpuFilterWidthTest {
         try {
             context.init();
 
-            try (OpenCLGridResult result = context.createKeys(BigInteger.ONE)) {
+            try (OpenCLGridResult result = context.createKeys(BigInteger.valueOf(0x100))) {
                 // full transfer -> every work item comes back, nothing was filtered
                 assertThat(result.getPublicKeyBytes().length, is(equalTo(1 << bits)));
             }
