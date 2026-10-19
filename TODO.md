@@ -42,13 +42,6 @@ it is done, as for every other item in this file.
   fix: release the arm's producer through a `ProducerReleaser`. A red test needs a producer inside an
   arm that ignores the interrupt, i.e. a seam around `createProducer`.
 
-**Measured (`BUGHUNT-MEASUREMENTS.md`, B1–B8) and acted on:** the full `mvn test` is green, without
-OpenCL completely and on pocl apart from `MainTest`'s OpenCL round trip, which needed
-`POCL_MAX_WORK_GROUP_SIZE=256` (now set in `test-opencl`, B2); the `privateKeyTooLarge` test runs on an
-8-bit grid (B3); the heap reclaim before the filter upload is gone (B6); the new OpenCL tests passed on
-four real GPUs (B4); F136 holds with two real devices (B5); the zero-anchor branch costs nothing
-measurable (B8, on a notebook RTX 3070 only, not repeated on a desktop card). What stays open from
-there is the signal-handler item below.
 
 ### Persistence backends (genuinely open work)
 
@@ -599,20 +592,35 @@ Also correct `docs/performance.md`: its "≈255 registers with spilling" reading
 `kernelMaxWorkGroupSize = 256` is wrong — the driver's PTX assembles to 126–128 registers with no
 spill, and the 256 cap stays even at `-cl-nv-maxrregcount=96`.
 
-### GPU OpenCL drivers and the JVM's signal handlers: Intel, and Ctrl-C on ROCm
+### GPU OpenCL drivers and the JVM's signal handlers: what replacing them breaks
 
-Measured (`BUGHUNT-MEASUREMENTS.md`, B7; README "OpenCL on Linux: signal chaining"): pocl 5.0 and AMD
-ROCm 7.14 replace the JVM's handlers once the kernel is built, NVIDIA 580 does not. The `libjsig`
-preload in the launchers and the `SignalChainingCheck` warning therefore stay on for every Linux start
-(the idea of narrowing them to pocl is off the table). ROCm replaces more than pocl: also `SIGUSR2`
-(HotSpot's thread suspend/resume) and `SIGTERM`/`SIGINT`/`SIGHUP`/`SIGQUIT`; the safepoint probe did not
-crash there (0/5), which says nothing about those. Open:
+Measured (B7 in `BUGHUNT-MEASUREMENTS.md` at `c417479`; README "OpenCL on Linux: signal chaining"):
+pocl 5.0 and AMD ROCm 7.14 replace the JVM's handlers once a kernel is built, NVIDIA 580 does not. The
+`libjsig` preload in the launchers and the `SignalChainingCheck` warning stay on for every Linux start.
 
-1. Intel's Linux OpenCL driver: `-Xcheck:jni` after the kernel build, then the probe without and with
-   `libjsig` (no Linux machine with an Intel GPU so far).
-2. ROCm without `libjsig`: does Ctrl-C / `SIGTERM` still run the shutdown hooks (`Shutdown`, the
-   finder's interrupt chain), and does a thread dump (`jcmd Thread.print`, which uses suspend/resume)
-   still work?
+**Both replace the same set** (`-Xcheck:jni`, pocl measured locally 2026-10-19): `SIGSEGV`, `SIGBUS`,
+`SIGFPE`, `SIGILL`, and also `SIGUSR2` (HotSpot's suspend/resume), `SIGHUP`, `SIGINT`, `SIGTERM`,
+`SIGQUIT`, `SIGTRAP`; only `SIGPIPE` stays with the JVM. What that breaks, measured on pocl with a probe
+that builds the kernel, registers a shutdown hook and waits (`SigProbe4`, the brief has the source):
+
+| Signal / action | pocl, no `libjsig` | pocl with `libjsig` | without OpenCL |
+|---|---|---|---|
+| `SIGTERM` / `SIGINT` / `SIGHUP` | hook runs, exit 143 / 0 / 129 | same | same |
+| `SIGQUIT` (`kill -3`) | **no thread dump** | thread dump | thread dump |
+| `jcmd <pid> VM.version` (attach) | works | works | works |
+| JFR method sampling | samples (2767) | samples | samples |
+| 8 hot threads + 2000 safepoints | **crash 5 of 5** (B7) | no crash | no crash |
+
+So on pocl the shutdown path survives (LLVM's handler passes these signals on), the thread dump does
+not. Open, as the measurement brief **B9** (`BUGHUNT-MEASUREMENTS.md`):
+
+1. The same matrix on **AMD ROCm** (replaces the same set; the safepoint probe survived there 0 of 5,
+   the rest is unmeasured).
+2. **Intel's CPU OpenCL runtime** (oneAPI, `intel-oneapi-runtime-opencl`): any x86 VM, LLVM in-process.
+3. **Intel GPU** (compute-runtime/NEO, `libigc`): needs Intel GPU hardware under Linux.
+
+Afterwards: name the per-driver consequences in the README table (today it lists only the replaced
+signals), at least "no `kill -3` thread dump without `libjsig`".
 
 ### OpenCL backend abstraction & multi-device coverage (migrated from GitHub issues)
 

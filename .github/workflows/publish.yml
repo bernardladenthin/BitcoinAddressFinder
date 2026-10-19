@@ -427,7 +427,7 @@ jobs:
       # POCL_MAX_WORK_GROUP_SIZE: BAF passes no local work size, pocl then picks its maximum group
       # (4096 on a 16-core host) and the secp256k1 kernel runs off the end of the worker thread's
       # 8 MB stack -- MainTest#testRoundtripOpenCLProducer_* died 5 of 5 times without the limit
-      # and never with 256 (BUGHUNT-MEASUREMENTS.md, B2).
+      # and never with 256 (BUGHUNT-MEASUREMENTS.md B2, results at c417479).
       - name: All tests including OpenCL (pocl) + JaCoCo coverage
         shell: bash
         run: |

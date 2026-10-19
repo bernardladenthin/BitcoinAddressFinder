@@ -2206,14 +2206,15 @@ forced safepoints):
 
 | Driver | Replaces the JVM's handlers | Probe crashes without `libjsig` |
 |---|---|---|
-| pocl 5.0 (CPU) | yes | 5 of 5 |
-| AMD ROCm 7.14 (Instinct MI325X, `libLLVM.so.23.0git`) | yes — `SIGSEGV`, `SIGBUS`, `SIGFPE`, `SIGILL`, also `SIGUSR2` (the JVM's thread suspend/resume) and `SIGTERM`/`SIGINT`/`SIGHUP`/`SIGQUIT` | 0 of 5 |
+| pocl 5.0 (CPU, `libLLVM-16.so.1`) | yes — `SIGSEGV`, `SIGBUS`, `SIGFPE`, `SIGILL`, also `SIGUSR2` (the JVM's thread suspend/resume) and `SIGTERM`/`SIGINT`/`SIGHUP`/`SIGQUIT`/`SIGTRAP` | 5 of 5 |
+| AMD ROCm 7.14 (Instinct MI325X, `libLLVM.so.23.0git`) | yes — the same set | 0 of 5 |
 | NVIDIA 580.126.18 (RTX 3080) | no | 0 of 5 |
 | Intel | not measured | — |
 
-The ROCm probe not crashing does not make it safe: the probe exercises one failure path, and a replaced
-suspend/resume handler or a replaced `SIGTERM` handler (shutdown hooks on Ctrl-C) are risks of their
-own that it does not measure.
+The ROCm probe not crashing does not make it safe: the probe exercises one failure path. Measured on
+pocl, what else changes without `libjsig`: `kill -3` no longer prints a thread dump; Ctrl-C/`SIGTERM`
+still run the shutdown hooks, `jcmd` and JFR sampling still work. The same measurements on ROCm and
+Intel are open.
 
 The JDK ships the fix: preload its signal-chaining library, which keeps the JVM's handlers in front and
 forwards to the driver's:
