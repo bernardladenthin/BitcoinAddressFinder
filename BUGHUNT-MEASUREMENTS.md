@@ -283,8 +283,15 @@ und wurden einzeln getestet (der Tuner-Lauf mit beiden zugleich steht unter B5).
 
 **Folgerung:** F129 (Anker 0, `OpenCLZeroAnchorTest`, beide Feld-Implementierungen), F151 (oberstes Raster)
 und F154 (Tuner-Gerät ohne Gewinner) sind auf vier echten GPUs bestätigt — NVIDIA unter Windows (47/47) und
-Linux (49/49), AMD-dGPU RDNA3 (47/47) und AMD-iGPU (47/47), beide PAL/OpenCL 2.0 unter Windows. Eine AMD-GPU
-unter Linux (ROCm) fehlt.
+Linux (49/49), AMD-dGPU RDNA3 (47/47) und AMD-iGPU (47/47), beide PAL/OpenCL 2.0 unter Windows, sowie AMD
+Instinct MI325X (CDNA3, `gfx942`) unter Linux mit ROCm 7.14 (49/49, Umgebung wie in B7; Testsatz wie bei der
+RTX 3080, Kernel automatisch out-of-line):
+```
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.241 s -- in net.ladenthin.bitcoinaddressfinder.ProbeAddressesOpenCLTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.744 s -- in net.ladenthin.bitcoinaddressfinder.command.TuneConfigurationTest
+[INFO] Tests run: 49, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
 
 ---
 
@@ -477,19 +484,57 @@ jsig run 1 exit=0 1            (… run 2–5 identisch)
 eigene `SignalChainingCheck`-Warnung. Nocl 0/5, cl 0/5, jsig 0/5 Abstürze (pocl zum Vergleich laut `TODO.md`:
 cl 5/5).
 
-**AMD (Linux) — nicht ausgeführt.** Keine AMD-GPU unter Linux erreichbar: RunPod MI300X/MI350X ausverkauft
-(`stockStatus: none`), Vast.ai 0 AMD-Angebote, DigitalOcean verlangt für das erste GPU-Droplet eine
-Limit-Erhöhung (`422 … exceed your GPU limit`), Azure V710 wartet auf Quota, AWS g4ad existiert nicht mehr.
-Die lokale Radeon-iGPU läuft nur unter Windows (dort gibt es den POSIX-Signal-Mechanismus der Frage nicht).
+**AMD (Linux) — gemessen.** DigitalOcean GPU-Droplet `gpu-mi325x1-256gb` (`tor1`, Image `gpu-amd-base`):
+1× AMD Instinct **MI325X** (`gfx942:sramecc+:xnack-`, 304 CUs, 256 GB HBM), KVM-Gast auf AMD EPYC 9575F,
+20 vCPU, 157 GB RAM, Ubuntu 24.04.4 LTS, Kernel `6.8.0-137-generic`, `amdgpu-dkms 6.19.14.31400000`,
+**ROCm 7.14.0** (`amdrocm-opencl7.14`), OpenCL `AMD Accelerated Parallel Processing`, `OpenCL 2.1 AMD-APP
+(3581.0)`, Treiber **`3581.0 (HSA1.1,LC)`**, Temurin 21.0.12.1+1. Das Image installiert die ROCm-OpenCL-Laufzeit,
+registriert sie aber nicht; dafür `ocl-icd-libopencl1` installiert und
+`/etc/OpenCL/vendors/amdocl64.icd` → `/opt/rocm/core-7.14/lib/opencl/libamdocl64.so` angelegt (sonst nichts
+geändert). Stand des Klons: `36e31137` (der Branch war inzwischen weitergewandert; Quellcode des Kernels und von
+`OpenCLContext` gegenüber `088d3c48` für die Frage unverändert). Probe und Befehle wie bei NVIDIA:
+```
+### -Xcheck:jni handler check (cl, 10)
+Warning: SIGSEGV handler modified!
+Warning: SIGILL handler modified!
+Warning: SIGFPE handler modified!
+Warning: SIGBUS handler modified!
+Warning: SIGUSR2 handler modified!
+Signal Handlers:
+   SIGSEGV: SignalHandler in libLLVM.so.23.0git, mask=00000000000000000000000000000000, flags=SA_ONSTACK|SA_RESETHAND|SA_SIGINFO|SA_NODEFER|Unknown_flags:80000000, unblocked
+  *** Handler was modified!
+  *** Expected: javaSignalHandler in libjvm.so, mask=11100100110111111111111111111110, flags=SA_RESTART|SA_SIGINFO
+    SIGBUS: SignalHandler in libLLVM.so.23.0git, … (ebenso)
+    SIGFPE: SignalHandler in libLLVM.so.23.0git, … (ebenso)
+   SIGPIPE: javaSignalHandler in libjvm.so, mask=11100100010111111101111111111110, flags=SA_RESTART|SA_SIGINFO, unblocked
+   SIGXFSZ: SignalHandler in libLLVM.so.23.0git, … *** Handler was modified!
+    SIGILL: SignalHandler in libLLVM.so.23.0git, … *** Handler was modified!
+   SIGUSR2: SignalHandler in libLLVM.so.23.0git, …
+  *** Handler was modified!
+  *** Expected: SR_handler in libjvm.so, mask=00000000000000000000000000000000, flags=SA_RESTART|SA_SIGINFO
+    SIGHUP / SIGINT / SIGTERM / SIGQUIT / SIGTRAP: SignalHandler in libLLVM.so.23.0git, … flags=SA_ONSTACK|SA_RESETHAND|SA_SIGINFO|SA_NODEFER|…
+survived
+### probe runs
+nocl run 1 exit=0 1 hs_err=0   (… run 2–5 identisch)
+cl run 1 exit=0 1 hs_err=0     (… run 2–5 identisch)
+jsig run 1 exit=0 1            (… run 2–5 identisch)
+```
+Der ROCm-OpenCL-Treiber baut Kernel mit einem in den Prozess geladenen `libLLVM.so.23.0git` und ersetzt dabei —
+wie pocl — die Handler für `SIGSEGV`, `SIGBUS`, `SIGFPE`, `SIGILL`, dazu `SIGUSR2` (den Suspend/Resume-Handler
+`SR_handler` der JVM), `SIGXFSZ` und die Abbruchsignale `SIGHUP`/`SIGINT`/`SIGTERM`/`SIGQUIT`/`SIGTRAP`, jeweils
+mit `SA_RESETHAND`. Die Absturz-Probe (8 heiße Threads, 2000 erzwungene Safepoints nach dem Kernel-Bau) überlebte
+trotzdem 5/5 (pocl laut `TODO.md`: 5/5 Abstürze). Kosten des Laufs: ~11,5 min Droplet, ~0,72 USD.
 
 **Intel — nicht ausgeführt.** Kein Anbieter, bei dem ein Konto besteht, vermietet Intel-GPUs (Intel Tiber AI
 Cloud nicht mehr erreichbar); kein Intel-Rechner mit Linux verfügbar.
 
-**Folgerung:** Der NVIDIA-Treiber ersetzt die Signal-Handler der JVM nicht; die pocl-Absturzbedingung tritt dort
-nicht auf (0/5 statt 5/5). Für AMD (ROCm/comgr läuft LLVM in-process und ist laut `TODO.md` der
-wahrscheinlichste Kandidat) und Intel ist die Frage offen — die Warnung von `SignalChainingCheck` und der
-`LD_PRELOAD`-Block in den Skripten sollten deshalb vorerst für jeden Linux-Start bleiben; auf pocl einzuengen
-wäre erst nach einer AMD-Messung belegt.
+**Folgerung:** Die Warnung darf **nicht** auf pocl eingeengt werden: der AMD-ROCm-Treiber ersetzt die
+Signal-Handler der JVM genauso (LLVM in-process, `SA_RESETHAND`), sogar `SIGUSR2` und die Abbruchsignale. Dass die
+Probe auf ROCm nicht abstürzte, entkräftet das nicht — sie misst nur eine Absturzbedingung; ein ersetzter
+`SR_handler` und ersetzte `SIGTERM`/`SIGINT`-Handler sind eigene, ungemessene Risiken (Thread-Suspendierung,
+Shutdown-Hooks). Der NVIDIA-Treiber ersetzt nichts (0/5). Die Warnung von `SignalChainingCheck` und der
+`LD_PRELOAD`-Block sollten daher für jeden Linux-Start bleiben; die README („Known Issues“) sollte pocl **und**
+AMD ROCm als gemessen betroffen nennen, NVIDIA als gemessen unbetroffen, Intel als offen.
 
 ---
 
