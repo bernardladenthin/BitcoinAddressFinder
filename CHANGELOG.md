@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (3.15.0 final, from 3.14). The shared `check-versions.py` now also compares the Kotlin Gradle plugins
   of a repository with its POMs' Kotlin (nothing to compare here) and reads java-llama.cpp's
   `examples/server/pom.xml`.
+- **The default `endPrivateKey` of the incremental key producer is n − 1**
+  (`…D0364140`, `Secp256k1Constants.MAX_VALID_PRIVATE_KEY_HEX`), the last valid key. It was the group
+  order n itself, documented as an inclusive end although n is not a key since the bound became
+  exclusive; a scan of explicit keys to the default end then checked the replacement key in place of n.
+  Grid mode is unaffected: its last grid contains n either way and is skipped on the GPU.
 - **No `System.gc()` before the GPU filter upload any more** (`OpenCLContext.reclaimHeapBeforeUpload`,
   `GcTrigger` removed). It was added for `CL_MEM_OBJECT_ALLOCATION_FAILURE` on an RX 7900 XTX while
   the buffer was created with `CL_MEM_COPY_HOST_PTR`; on the chunked LWJGL upload the same card created

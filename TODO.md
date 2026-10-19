@@ -34,8 +34,6 @@ it is done, as for every other item in this file.
 
 **Waiting for the owner's decision:**
 
-- **Default `endPrivateKey` is n itself** (`MAX_PRIVATE_KEY_HEX`), documented as an *inclusive* bound,
-  but n has not been a valid key since F45. Proposal: default to n−1.
 - **`TuneConfiguration.runArm` releases a producer that may still run** (ledger: open suspicion,
   pattern review after F156). Same shape as F156 before its fix: `interrupt()`,
   `waitTillProducerNotRunning()`, then `releaseProducer()` without looking at the state. Possible

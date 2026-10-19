@@ -1304,7 +1304,7 @@ This mode generates private keys **sequentially in batches** within a specified 
 | JSON field     | Type   | Default                                                                                    | Purpose                                                      |
 |----------------|--------|--------------------------------------------------------------------------------------------|--------------------------------------------------------------|
 | `startPrivateKey` | string | `0000000000000000000000000000000000000000000000000000000000000002`                         | Hex string of the first private key in the range (inclusive) |
-| `endPrivateKey`   | string | `FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141` (secp256k1 group order) | Hex string of the last private key in the range (inclusive)  |
+| `endPrivateKey`   | string | `FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140` (n − 1, the last valid key; n is the secp256k1 group order) | Hex string of the last private key in the range (inclusive)  |
 
 #### How it works
 - Scanning begins **at `startPrivateKey`**, producing sequential private keys in batches of `2^batchSizeInBits` keys each, up to and including `endPrivateKey`. See [Batch Size per Kernel (`batchSizeInBits`)](#-batch-size-per-kernel-batchsizeinbits) above for the exponent &#x2192; batch-size mapping and typical values.
@@ -1332,7 +1332,7 @@ Example minimal configuration:
     {
       "keyProducerId": "exampleKeyProducerId",
       "startPrivateKey": "0000000000000000000000000000000000000000000000000000000000000002",
-      "endPrivateKey": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
+      "endPrivateKey": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140"
     }
   ]
 }

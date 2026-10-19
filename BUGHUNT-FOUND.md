@@ -922,6 +922,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** dd594a2
 
+### F169 – BitcoinAddressFinder: Die Vorgabe für `endPrivateKey` ist die Gruppenordnung n, die kein Schlüssel ist
+- **Zeit:** 2026-10-19 18:30 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/configuration/CKeyProducerJavaIncremental.java` (`endPrivateKey`), `constants/Secp256k1Constants.java`
+- **Schwere:** niedrig (Doku und eine doppelt geprüfte Ersatz-Taste, kein Schlüssel geht verloren)
+- **Historie:** Die Vorgabe `MAX_PRIVATE_KEY_HEX` stammt aus `86db751` (2025-07-19, „Implement keyProducerJavaIncremental, see #27“). Damals nannte die Javadoc der Konstante n den „maximum valid private key“, die Vorgabe war also folgerichtig. Erst F45 (2026-10-17) legte n als exklusive Grenze fest (n·G ist der Punkt im Unendlichen) – seitdem passte die Vorgabe nicht mehr zur dokumentierten inklusiven Obergrenze.
+- **Beschreibung:** Im Modus mit expliziten Schlüsseln erreichte ein Lauf bis zur Vorgabe n; `replaceInvalidPrivateKeys` ersetzte ihn durch `INVALID_PRIVATE_KEY_REPLACEMENT` (2), geprüft wurde also 2 noch einmal statt eines Schlüssels. Im Rastermodus ohne Wirkung: das letzte Raster enthält n so oder so und wird auf der GPU übersprungen. README-Tabelle und Beispiele nannten n als Vorgabe.
+- **Fix:** Neue Konstante `Secp256k1Constants.MAX_VALID_PRIVATE_KEY` / `_HEX` = n − 1 (Gegenstück zu `MIN_VALID_PRIVATE_KEY`), Vorgabe darauf; README-Tabelle, README-Beispiel, `examples/config_Find_1OpenCLDevice.json` und CHANGELOG angepasst.
+- **Tests:** `CKeyProducerJavaIncrementalTest#getEndPrivateKey_defaultEndAddress_returnsTheLastValidPrivateKey` (ersetzt `…_returnsMaxPrivateKey`, das die alte Vorgabe festschrieb): Vorgabe = n − 1, gültig, und n − 1 + 1 ungültig.
+- **Rot-Grün-Nachweis:** mit der alten Vorgabe rot (1 von 9), mit der neuen grün; dazu `KeyProducerJavaIncrementalTest`, `ConfigFixturesParseTest`, `BitcoinAddressFinderArchitectureTest` grün (40 Tests).
+- **Status:** gefixt
+- **Commit:** (folgt)
+
 ## Offene Verdachte ohne Fund-ID
 
 - *(erledigt 2026-10-19, ohne Fund-ID: Testumgebung, kein Produktfehler)* `ProbeAddressesOpenCLTest#setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException` brach auf Geräten mit 1024 MiB je Allokation mit `CL_INVALID_BUFFER_SIZE` ab, bevor die Prüfung lief (B3: mit `POCL_MEMORY_LIMIT=4` reproduziert, ab 2047 MB grün). Läuft jetzt auf einem 8-Bit-Raster (eigener Provider `privateKeysTooLargeForASmallGrid`), mit und ohne Begrenzung grün. Commit 1faa48a. Ebenso B2: `test-opencl` setzt `POCL_MAX_WORK_GROUP_SIZE=256` (8cb9bb5), B6: `GcTrigger` entfernt (e451898).

@@ -85,6 +85,17 @@ public final class Secp256k1Constants {
      * leaf package, never inlined.
      */
     public static final BigInteger MAX_PRIVATE_KEY = new BigInteger(MAX_PRIVATE_KEY_HEX, Radix.HEX);
+    /**
+     * The largest valid private key, {@code n - 1}: the inclusive counterpart of the exclusive bound
+     * {@link #MAX_PRIVATE_KEY}, for places that name the last key of a range.
+     */
+    public static final BigInteger MAX_VALID_PRIVATE_KEY = MAX_PRIVATE_KEY.subtract(BigInteger.ONE);
+    /**
+     * Uppercase hexadecimal representation of {@link #MAX_VALID_PRIVATE_KEY}, for the configuration
+     * layer's wire-format defaults (the inclusive end of the incremental key producer).
+     */
+    public static final String MAX_VALID_PRIVATE_KEY_HEX =
+            MAX_VALID_PRIVATE_KEY.toString(Radix.HEX).toUpperCase(Locale.ROOT);
 
     /**
      * Replacement value substituted for private keys that fall outside the
