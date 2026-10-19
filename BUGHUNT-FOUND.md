@@ -944,7 +944,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `TuneConfigurationTest#releaseArmProducer_stillRunningAfterTheWait_isNotReleasedAndReportsIt` (Mock mit `RUNNING` nach dem Warten: unterbrochen, gewartet, nicht freigegeben, `false`), `#releaseArmProducer_stoppedProducer_isReleased`.
 - **Rot-Grün-Nachweis:** mit dem bisherigen Ablauf im Helfer (immer freigeben) rot (1 von 2), mit dem Fix grün; `TuneConfigurationTest` 59 (1 übersprungen, braucht ein GPU-Gerät), auch auf pocl mit echten OpenCL-Armen grün; `ProducerReleaserTest` 5, `BitcoinAddressFinderArchitectureTest` 17. Die Verdrahtung in `runArm` (Abbruch des Sweeps) braucht einen hängenden Producer im Arm und ist nur übersetzt, nicht ausgelöst.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 37bb737
 
 ## Offene Verdachte ohne Fund-ID
 
