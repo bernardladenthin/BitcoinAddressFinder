@@ -908,7 +908,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `ZmqResultBroadcasterTest#close_whileTheSubscriberIsBehind_subscriberStillReceivesTheLastBatch`: der Abonnent liest während eines Bursts von 800 Meldungen (~20 MB) nicht (Empfangs-HWM 1, kleiner Kernel-Puffer), TCP staut zurück, `close()` läuft auf einem anderen Thread, während der Test leert.
 - **Rot-Grün-Nachweis:** mit Linger 0 rot (5 von 5 Läufen, die letzte Meldung kam nie an), mit 2000 ms grün (5 von 5, ganze Klasse ~1,7 s). Eine erste Fassung ohne Rückstau war nur in 1 von 3 bzw. 1 von 6 Läufen rot und wurde verworfen.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** ab5755b
 
 ## Offene Verdachte ohne Fund-ID
 
