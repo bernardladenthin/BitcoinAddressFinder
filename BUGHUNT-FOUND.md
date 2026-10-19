@@ -884,7 +884,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Fix:** Entscheidung des Nutzers: `volatile`, ausdrücklich ohne Rot-Test (eine Sichtbarkeitslücke ist auf HotSpot/x86 deterministisch nicht herstellbar, auch jcstress zeigt sie dort nicht). Begründung als Javadoc am Feld.
 - **Tests:** keiner neu; `WebSocketResultBroadcasterTest`, `KeyProducerJavaWebSocketTest`, `FinderTest` grün.
 - **Status:** gefixt (ohne Rot-Test, vom Nutzer so entschieden)
-- **Commit:** (folgt)
+- **Commit:** f0636d0
 
 ## Offene Verdachte ohne Fund-ID
 
