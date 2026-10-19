@@ -424,11 +424,16 @@ jobs:
       # concurrent safepoints in a forked test JVM can then kill it without an hs_err file.
       # Preloading the JDK's signal chaining keeps the JVM's handlers in front (inherited by
       # the Surefire forks). See SignalChainingCheck and README "OpenCL on Linux: signal chaining".
+      # POCL_MAX_WORK_GROUP_SIZE: BAF passes no local work size, pocl then picks its maximum group
+      # (4096 on a 16-core host) and the secp256k1 kernel runs off the end of the worker thread's
+      # 8 MB stack -- MainTest#testRoundtripOpenCLProducer_* died 5 of 5 times without the limit
+      # and never with 256 (BUGHUNT-MEASUREMENTS.md, B2).
       - name: All tests including OpenCL (pocl) + JaCoCo coverage
         shell: bash
         run: |
           test -f "$JAVA_HOME/lib/libjsig.so"
           export LD_PRELOAD="$JAVA_HOME/lib/libjsig.so"
+          export POCL_MAX_WORK_GROUP_SIZE=256
           mvn -e --batch-mode --no-transfer-progress -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true --update-snapshots test jacoco:report
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:

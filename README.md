@@ -2212,6 +2212,16 @@ LD_PRELOAD="$JAVA_HOME/lib/libjsig.so" java ... -jar bitcoinaddressfinder-<versi
 The OpenCL launchers in `examples/` (`run_*OpenCL*.sh`) do this already, and the finder logs a warning
 when it builds an OpenCL kernel on Linux without it. Windows is not affected.
 
+**pocl only: limit the work-group size.** BAF passes no local work size, so pocl picks its maximum
+group (4096 on a 16-core host), and the key-generation kernel overflows the 8 MB stack of pocl's worker
+thread: the JVM dies with exit code 139 or 134. Measured 5 of 5 times without a limit and never with
+
+```bash
+export POCL_MAX_WORK_GROUP_SIZE=256
+```
+
+which the CI job `test-opencl` sets. GPU drivers are not affected by this.
+
 ### Contributors: do not upgrade jqwik past 1.9.3
 
 > ⚠️ **DO NOT UPGRADE jqwik past 1.9.3.** jqwik 1.10.0 added an anti-AI prompt-injection string to test stdout; the 1.10.1 user guide states the library "is not meant to be used by any 'AI' coding agents at all." 1.9.3 is the last pre-disclosure release and is the pinned version. See `CLAUDE.md` section "jqwik prompt-injection in test output" for the full context. Dependabot is configured to ignore **all** `net.jqwik` updates (every version, including patches) — see the `ignore` rule in [`.github/dependabot.yml`](./.github/dependabot.yml).
