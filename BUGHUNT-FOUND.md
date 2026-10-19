@@ -956,7 +956,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `PrivateKeyValidatorTest#isAlignedToBatchSize_*` (4), `ProbeAddressesOpenCLTest#createKeys_lastAlignedGridBelowTheGroupOrder_computesEveryKeyCorrectly` (Basis n − 0x141, alle 256 Schlüssel gegen die CPU), `#createKeys_gridContainingTheGroupOrder_isRefused`, `#createKeys_unalignedBase_isRefusedBeforeTheKernelRuns`, `ProducerOpenCLTest#processSecretBase_gridContainingTheGroupOrder_isSkippedWithAWarningAndRecorded`, `#processSecretBase_unalignedBase_isAnErrorAndNotComputed`.
 - **Rot-Grün-Nachweis:** ohne den Fix (Validator-Stub, keine Prüfung in `createKeys`, kein eigener Catch) rot (6 Fehlschläge), mit dem Fix grün auf pocl; die fünf bestehenden Tests mit nicht ausgerichteten Basen wurden durch die Prüfung rot und laufen ausgerichtet wieder grün; voller `mvn test` auf pocl grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 24ca3de
 
 ## Offene Verdachte ohne Fund-ID
 
