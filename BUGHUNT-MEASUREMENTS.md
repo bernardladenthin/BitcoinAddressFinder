@@ -267,12 +267,24 @@ Dazu unter **Linux**: RTX 3080 (Vast.ai, Treiber 580.126.18, Umgebung wie in B7)
 [INFO] Tests run: 49, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
+Dazu die **RX 7900 XTX** (`gfx1100`, `3679.0 (PAL,LC)`, Windows; Umgebung wie in B6), Befehl des Briefs, Kernel
+automatisch out-of-line (`noInlineHelpers -> OUT-OF-LINE kernel (-D FORCE_NO_INLINE) on device 'gfx1100' … source: auto`):
+```
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.874 s -- in net.ladenthin.bitcoinaddressfinder.command.TuneConfigurationTest
+[INFO] Tests run: 32, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.477 s -- in net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContextTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.729 s -- in net.ladenthin.bitcoinaddressfinder.opencl.OpenCLZeroAnchorTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.782 s -- in net.ladenthin.bitcoinaddressfinder.ProbeAddressesOpenCLTest
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 12.59 s -- in net.ladenthin.bitcoinaddressfinder.producer.ProducerOpenCLTest
+[INFO] Tests run: 47, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
 Ein Multi-GPU-Rechner stand nicht zur Verfügung; die beiden lokalen Geräte gehören zu getrennten Plattformen
 und wurden einzeln getestet (der Tuner-Lauf mit beiden zugleich steht unter B5).
 
 **Folgerung:** F129 (Anker 0, `OpenCLZeroAnchorTest`, beide Feld-Implementierungen), F151 (oberstes Raster)
-und F154 (Tuner-Gerät ohne Gewinner) sind auf drei echten GPUs bestätigt — NVIDIA unter Windows (47/47) und
-Linux (49/49), AMD-iGPU (PAL, OpenCL 2.0) unter Windows (47/47). Eine AMD-GPU unter Linux (ROCm) fehlt.
+und F154 (Tuner-Gerät ohne Gewinner) sind auf vier echten GPUs bestätigt — NVIDIA unter Windows (47/47) und
+Linux (49/49), AMD-dGPU RDNA3 (47/47) und AMD-iGPU (47/47), beide PAL/OpenCL 2.0 unter Windows. Eine AMD-GPU
+unter Linux (ROCm) fehlt.
 
 ---
 
@@ -330,23 +342,72 @@ upload on the chunked LWJGL upload“. Braucht eine GPU mit genügend Speicher f
 **Entscheidet.** Ob `OpenCLContext.reclaimHeapBeforeUpload()` (`GcTrigger`) mit dem stückweisen
 LWJGL-Upload noch nötig ist.
 
-**Ergebnis:** **Nicht ausgeführt.** Die Messung verlangt die AMD-Maschine des Originals (RX 7900 XTX, Windows 11,
-Adrenalin-Treiber 3679.0 PAL/LC) mit der Full-DB (Fuse-16, ~3,1 GB) und `-Xmx48g`; laut `TODO.md` kann eine
-NVIDIA-Karte die Frage nicht beantworten. Geprüft am 2026-10-19, wo sich eine passende Maschine mieten ließe:
-- AWS g4ad (Radeon Pro V520) gibt es nicht mehr (`InvalidInstanceType`, in keiner von 17 Regionen angeboten);
-  Azure NVv4 ist seit 2026-09-30 abgeschaltet.
-- Azure NVads V710 v5 (Windows möglich) — GPU-Quota 0, Antrag `2610190050000851` läuft noch.
-- DigitalOcean, RunPod, Hot Aisle bieten AMD Instinct nur unter Linux (nicht der Treiber des Originals);
-  DigitalOcean verlangt für das erste GPU-Droplet eine Limit-Erhöhung, RunPod war ausverkauft.
-- Die lokale Radeon-iGPU (gfx90c, AMD-PAL-Treiber unter Windows) erlaubt 20,5 GB je Allokation, aber 63 GB
-  Host-RAM reichen nicht für `-Xmx48g` plus Filter-Bau (~40 GB transient), und eine iGPU hat kein eigenes VRAM.
-Außerdem: die veröffentlichte Full-DB (`lmdb_full.zip`, 41,7 GiB, Stand 2026-07-20) hat 1.472.947.953 Einträge,
-die Originalmessung 1.377.478.516 — der Fuse-16-Puffer wäre ~3,36 statt 3,1 GB, eine 1:1-Wiederholung also mit
-keiner Variante möglich.
+**Ergebnis:** Gemessen auf einer privaten Maschine derselben Konfiguration wie die Originalzeile in
+`docs/measurements/gpu_filter_probe.csv` (`ryzen79800x3d8core-61g-win11`, gfx1100):
 
-**Folgerung:** Keine Entscheidung möglich; `OpenCLContext.reclaimHeapBeforeUpload()` bleibt bis zur Messung
-unverändert. Am nächsten am Original wäre eine private RX 7900 XTX unter Windows (≥ 64 GB RAM) oder Azure
-`NV24ads_V710_v5` mit Windows Server, sobald die Quota erteilt ist.
+| | |
+|---|---|
+| CPU / RAM | AMD Ryzen 7 9800X3D (8 Kerne), 64 GB DDR5 verbaut, 61,61 GiB nutzbar |
+| GPU | AMD Radeon RX 7900 XTX (`gfx1100`), Adrenalin 26.6.4, Anzeigetreiber 32.0.31021.5001 |
+| OpenCL | `CL_DRIVER_VERSION: 3679.0 (PAL,LC)`, `OpenCL 2.0 AMD-APP (3679.0)`, 48 CUs, `CL_DEVICE_MAX_MEM_ALLOC_SIZE: 20876 MByte`, `CL_DEVICE_GLOBAL_MEM_SIZE: 24560 MByte`; erste Plattform, Gerät 0 (die iGPU `gfx1036` ist Gerät 1) |
+| OS / JDK | Windows 11 Pro 26H2, Build 26300.9711; Temurin 21.0.12.1+1; Maven 3.9.16 |
+| Stand | Branch `ccr-90fc5f6a-vs4s0f`, `a8752011` (gegenüber `088d3c48` nur diese Datei geändert) |
+
+Verfahren wie `GpuFilterProbeBenchmark` (FUSE16, synthetische 1.377.478.516 Einträge aus `PrngAddressIterable`,
+`probeCount` 4194304 — wie die Originalmessung, keine Datenbank), in einer Wegwerf-JMH-Klasse im Paket `opencl`
+mit dem `GcTrigger` als Parameter: `NOOP` (keine Collection vor dem Upload) bzw. `SYSTEM` (`System.gc()` mit
+Zeitmessung). Je ein Lauf `-f 1 -wi 1 -w 5 -i 3 -r 5`, `-jvmArgsAppend "-Xmx48g …"`, NOOP zuerst. Puffer:
+1.549.795.328 Fingerprints × 2 B = **3.099.590.656 B (3,10 GB)**. (Die Probe gab die GB-Zahl mit einem
+`int`-Überlauf negativ aus, `-1,195 GB`; die Rohzahl ist richtig.)
+
+Lauf (a) `gcMode=NOOP`:
+```
+B6| filter built in 321 s, fingerprints=1549795328 (-1,195 GB), heap used=40,9 GiB committed=41,1 GiB max=48,0 GiB
+B6| GcTrigger NOOP called, heap used=40,9 GiB committed=41,1 GiB max=48,0 GiB
+B6| UPLOAD OK in 490 ms (gcMode=NOOP)
+Benchmark                (entries)  (gcMode)  (probeCount)  Mode  Cnt  Score   Error  Units
+B6GcTriggerProbe.probe  1377478516      NOOP       4194304  avgt    3  2,253 ± 0,026  ms/op
+```
+Lauf (b) `gcMode=SYSTEM`:
+```
+B6| filter built in 321 s, fingerprints=1549795328 (-1,195 GB), heap used=40,9 GiB committed=41,1 GiB max=48,0 GiB
+B6| before System.gc(): heap used=40,9 GiB committed=41,1 GiB max=48,0 GiB
+B6| System.gc() took 83 ms; after: heap used=3,0 GiB committed=10,3 GiB max=48,0 GiB
+B6| UPLOAD OK in 585 ms (gcMode=SYSTEM)
+Benchmark                (entries)  (gcMode)  (probeCount)  Mode  Cnt  Score   Error  Units
+B6GcTriggerProbe.probe  1377478516    SYSTEM       4194304  avgt    3  2,252 ± 0,052  ms/op
+```
+Beide Läufe Exit 0, keine Exception (kein `CL_MEM_OBJECT_ALLOCATION_FAILURE`, kein `OutOfMemoryError`).
+
+Probe (nicht committet; nur der für B6 wesentliche Teil):
+```java
+package net.ladenthin.bitcoinaddressfinder.opencl;
+@BenchmarkMode(Mode.AverageTime) @OutputTimeUnit(TimeUnit.MILLISECONDS) @State(Scope.Benchmark)
+public class B6GcTriggerProbe {
+    @Param({"NOOP", "SYSTEM"}) public String gcMode;
+    @Param({"1377478516"}) public long entries;
+    @Param({"4194304"}) public int probeCount;
+    @Setup(Level.Trial) public void setUp() throws Exception {
+        CProducerOpenCL config = new CProducerOpenCL(); config.batchSizeInBits = 8;
+        context = new OpenCLContext(config, new BitHelper()); context.init();
+        context.setGcTrigger(gcMode.equals("NOOP") ? () -> log("GcTrigger NOOP called")
+                : () -> { long t0 = System.nanoTime(); System.gc(); log("System.gc() took " + ms(t0)); });
+        // probe keys and the FUSE16 filter exactly as in GpuFilterProbeBenchmark (MEMBER_SEED 0xC0FFEE,
+        // PROBE_SEED 0x5EED_1234_ABCD), then:
+        context.prepareBenchFilterProbeFuse16(data.fingerprints(), meta, probeKeys);   // calls reclaimHeapBeforeUpload()
+    }
+    @Benchmark public int probe() { return context.runBenchFilterProbe(); }
+}
+```
+
+**Folgerung:** Mit dem stückweisen LWJGL-Upload ist die Collection nicht mehr nötig: ohne `System.gc()` wurde der
+3,10-GB-Fuse-16-Puffer bei **40,9 GiB lebendigem Heap** angelegt und gefüllt (490 ms) — mehr Heap-Druck als beim
+ursprünglichen Fehlschlag (33,9 GiB, `CL_MEM_COPY_HOST_PTR`), auf demselben OpenCL-Treiberstand `3679.0 (PAL,LC)`.
+Der Unterschied liegt damit im Upload-Pfad, nicht im Treiber (ein Gegenlauf mit dem alten JOCL-Pfad wurde nicht
+gemacht). Die Collection kostet einmalig **83 ms** (40,9 → 3,0 GiB) und ändert den Probe-Durchsatz nicht
+(2,253 vs. 2,252 ms/op). `reclaimHeapBeforeUpload()`/`GcTrigger` können entfernt werden; wer den
+Sicherheitsgurt für andere Treiber behalten will, zahlt dafür ~0,1 s beim Start — das gehört dann als
+gemessener Grund und Preis in die `GcTrigger`-Javadoc.
 
 ---
 
