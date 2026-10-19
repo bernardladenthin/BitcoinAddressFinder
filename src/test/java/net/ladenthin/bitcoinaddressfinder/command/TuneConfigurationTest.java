@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -744,6 +745,83 @@ public class TuneConfigurationTest extends LMDBBase {
     // </editor-fold>
 
     // <editor-fold desc="sweep extension">
+    /**
+     * A winner on the edge of <b>both</b> axes must have both extended, even when the first extra arm
+     * loses.
+     *
+     * <p>The extension used to stop at the first arm that did not beat the winner and log "The
+     * optimum was inside range." With the winner at the largest {@code keysPerWorkItem} and the
+     * largest {@code batchSizeInBits}, a failed {@code keysPerWorkItem} arm left the other axis
+     * unmeasured, and the message was wrong for it.
+     */
+    @Test
+    public void extendSweep_firstAxisArmLoses_stillTriesTheOtherEdge() {
+        // arrange: lists [8, 10] x [1, 4], winner (10, 4)
+        List<TuneConfiguration.ArmResult> results = new ArrayList<>(List.of(
+                new TuneConfiguration.ArmResult(8, 1, 100.0d, 1.0d, 1.0d, null),
+                new TuneConfiguration.ArmResult(8, 4, 200.0d, 1.0d, 1.0d, null),
+                new TuneConfiguration.ArmResult(10, 1, 300.0d, 1.0d, 1.0d, null),
+                new TuneConfiguration.ArmResult(10, 4, 400.0d, 1.0d, 1.0d, null)));
+        List<TuneConfiguration.SweepExtension> measured = new ArrayList<>();
+
+        // act: every extra arm is slower than the winner
+        TuneConfiguration.extendSweep(results, 0, 10, 4, true, 5, () -> true, next -> {
+            measured.add(next);
+            return new TuneConfiguration.ArmResult(
+                    next.batchSizeInBits(), next.keysPerWorkItem(), 50.0d, 1.0d, 1.0d, null);
+        });
+
+        // assert
+        assertThat(measured, hasSize(2));
+        assertThat(measured.get(0).axis(), is(equalTo("keysPerWorkItem")));
+        assertThat(measured.get(0).keysPerWorkItem(), is(equalTo(8)));
+        assertThat(measured.get(1).axis(), is(equalTo("batchSizeInBits")));
+        assertThat(measured.get(1).batchSizeInBits(), is(equalTo(11)));
+        assertThat(measured.get(1).keysPerWorkItem(), is(equalTo(4)));
+        assertThat(results, hasSize(6));
+    }
+
+    @Test
+    public void extendSweep_extraArmWins_continuesFromTheNewWinner() {
+        // arrange: one candidate each, so the winner (10, 4) is on both edges
+        List<TuneConfiguration.ArmResult> results =
+                new ArrayList<>(List.of(new TuneConfiguration.ArmResult(10, 4, 400.0d, 1.0d, 1.0d, null)));
+        List<TuneConfiguration.SweepExtension> measured = new ArrayList<>();
+
+        // act: keysPerWorkItem 8 wins, 16 loses, then the bit axis of the new winner loses too
+        TuneConfiguration.extendSweep(results, 0, 10, 4, true, 5, () -> true, next -> {
+            measured.add(next);
+            double rate = next.keysPerWorkItem() == 8 && next.batchSizeInBits() == 10 ? 500.0d : 50.0d;
+            return new TuneConfiguration.ArmResult(
+                    next.batchSizeInBits(), next.keysPerWorkItem(), rate, 1.0d, 1.0d, null);
+        });
+
+        // assert
+        assertThat(measured.size(), is(equalTo(3)));
+        assertThat(measured.get(0).keysPerWorkItem(), is(equalTo(8)));
+        assertThat(measured.get(1).keysPerWorkItem(), is(equalTo(16)));
+        assertThat(measured.get(2).batchSizeInBits(), is(equalTo(11)));
+        assertThat(measured.get(2).keysPerWorkItem(), is(equalTo(8)));
+    }
+
+    @Test
+    public void extendSweep_maxExtensionArmsReached_stops() {
+        // arrange
+        List<TuneConfiguration.ArmResult> results =
+                new ArrayList<>(List.of(new TuneConfiguration.ArmResult(10, 4, 400.0d, 1.0d, 1.0d, null)));
+        List<TuneConfiguration.SweepExtension> measured = new ArrayList<>();
+
+        // act: every extra arm loses, but only one is allowed
+        TuneConfiguration.extendSweep(results, 0, 10, 4, true, 1, () -> true, next -> {
+            measured.add(next);
+            return new TuneConfiguration.ArmResult(
+                    next.batchSizeInBits(), next.keysPerWorkItem(), 50.0d, 1.0d, 1.0d, null);
+        });
+
+        // assert
+        assertThat(measured, hasSize(1));
+    }
+
     /**
      * A sweep whose winner sits at the largest value it tried has measured a lower bound, not a
      * peak — and telling the user to run the whole thing again is not a fix, because they run it

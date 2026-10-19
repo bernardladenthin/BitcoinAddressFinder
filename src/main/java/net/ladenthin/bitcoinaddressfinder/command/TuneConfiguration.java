@@ -26,6 +26,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CCommand;
@@ -600,9 +602,10 @@ public class TuneConfiguration implements Runnable, Interruptable {
      * swept, so a truncated list yields the real optimum instead of a lower bound labelled "Winner".
      *
      * <p>See {@link #nextExtensionArm} for which edges are worth continuing past and which are the
-     * end of the road. The loop stops as soon as an extra arm fails to beat the winner, so the usual
-     * cost is one wasted arm rather than a second sweep; {@code maxExtensionArms} bounds the
-     * pathological case where every step keeps improving.
+     * end of the road. An extra arm that fails to beat the winner ends its own axis, and the loop
+     * goes on with the winner's other edge if it sits on one, so the usual cost is one wasted arm
+     * per edge rather than a second sweep; {@code maxExtensionArms} bounds the pathological case
+     * where every step keeps improving.
      */
     private void extendSweepBeyondTheCandidates(
             CProducer template,
@@ -619,12 +622,56 @@ public class TuneConfiguration implements Runnable, Interruptable {
         if (!cTuneConfiguration.extendSweepWhenWinnerIsAtTheEdge) {
             return;
         }
-        boolean openCl = template instanceof CProducerOpenCL;
+        extendSweep(
+                results,
+                deviceArmsFromIndex,
+                largestSweptBatchSizeInBits,
+                largestSweptKeysPerWorkItem,
+                template instanceof CProducerOpenCL,
+                cTuneConfiguration.maxExtensionArms,
+                shouldRun::get,
+                next -> runArm(
+                        next.batchSizeInBits(),
+                        next.keysPerWorkItem(),
+                        template,
+                        finder,
+                        consumer,
+                        runtimeStatistics,
+                        producerExecutor,
+                        payload,
+                        keyUtility,
+                        bitHelper));
+    }
+
+    /**
+     * The extension loop of {@link #extendSweepBeyondTheCandidates}, with the measurement passed in
+     * so the loop can be driven without a device.
+     *
+     * @param results                     every arm so far; extension arms are appended
+     * @param deviceArmsFromIndex         index of this device's first arm in {@code results}
+     * @param largestSweptBatchSizeInBits the largest {@code batchSizeInBits} of the candidate list
+     * @param largestSweptKeysPerWorkItem the largest {@code keysPerWorkItem} of the candidate list
+     * @param openCl                      whether the swept producer is GPU-backed
+     * @param maxExtensionArms            upper bound on extension arms
+     * @param shouldRun                   {@code false} once the run is being interrupted
+     * @param measure                     runs one arm
+     */
+    @VisibleForTesting
+    static void extendSweep(
+            List<ArmResult> results,
+            int deviceArmsFromIndex,
+            int largestSweptBatchSizeInBits,
+            int largestSweptKeysPerWorkItem,
+            boolean openCl,
+            int maxExtensionArms,
+            BooleanSupplier shouldRun,
+            Function<SweepExtension, ArmResult> measure) {
         int largestBatchSizeInBits = largestSweptBatchSizeInBits;
         int largestKeysPerWorkItem = largestSweptKeysPerWorkItem;
+        boolean lastArmLost = false;
 
-        for (int extension = 1; extension <= cTuneConfiguration.maxExtensionArms; extension++) {
-            if (!shouldRun.get()) {
+        for (int extension = 1; extension <= maxExtensionArms; extension++) {
+            if (!shouldRun.getAsBoolean()) {
                 return;
             }
             // This device's own arms only. Consulting the global list would judge a slow device by
@@ -637,6 +684,10 @@ public class TuneConfiguration implements Runnable, Interruptable {
             SweepExtension next =
                     nextExtensionArmForDevice(deviceArms, largestKeysPerWorkItem, largestBatchSizeInBits, openCl);
             if (next == null) {
+                if (lastArmLost) {
+                    LOGGER.info("Extension stopped: no edge of the winner is left to extend. The optimum was inside"
+                            + " range.");
+                }
                 return;
             }
             LOGGER.info(
@@ -647,34 +698,23 @@ public class TuneConfiguration implements Runnable, Interruptable {
                     next.axis(),
                     "keysPerWorkItem".equals(next.axis()) ? next.keysPerWorkItem() : next.batchSizeInBits(),
                     extension,
-                    cTuneConfiguration.maxExtensionArms);
+                    maxExtensionArms);
 
-            ArmResult result = runArm(
-                    next.batchSizeInBits(),
-                    next.keysPerWorkItem(),
-                    template,
-                    finder,
-                    consumer,
-                    runtimeStatistics,
-                    producerExecutor,
-                    payload,
-                    keyUtility,
-                    bitHelper);
+            ArmResult result = measure.apply(next);
             results.add(result);
             LOGGER.info("Extension arm: {}", describeArm(result));
 
             largestBatchSizeInBits = Math.max(largestBatchSizeInBits, next.batchSizeInBits());
             largestKeysPerWorkItem = Math.max(largestKeysPerWorkItem, next.keysPerWorkItem());
 
-            if (!result.succeeded() || result.candidatesPerSecond() <= currentWinner.candidatesPerSecond()) {
-                LOGGER.info("Extension stopped: the extra arm did not beat the winner. The optimum was inside range.");
-                return;
-            }
+            // A losing arm ends only its own axis: it has now been measured past the winner, so the
+            // next decision moves on to the winner's other edge, if it sits on one.
+            lastArmLost = !result.succeeded() || result.candidatesPerSecond() <= currentWinner.candidatesPerSecond();
         }
         LOGGER.info(
                 "Extension stopped after {} arms (maxExtensionArms). The winner may still be a lower bound;"
                         + " raise maxExtensionArms or widen the candidate lists to look further.",
-                cTuneConfiguration.maxExtensionArms);
+                maxExtensionArms);
     }
 
     /**

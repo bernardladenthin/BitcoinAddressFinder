@@ -158,12 +158,13 @@ larger values without lengthening the run.
 
 **You no longer have to catch this yourself.** If the winner lands on the largest value swept, the
 tuner keeps measuring past your list on its own — doubling `keysPerWorkItem`, or adding a bit to
-`batchSizeInBits` — until an extra arm stops improving. It costs one arm per step instead of a second
-20-minute run. The report and the log say when it happened.
+`batchSizeInBits` — until an extra arm stops improving. A winner on the edge of both axes gets both
+extended: an arm that loses on one axis ends that axis only. It costs one arm per step instead of a
+second 20-minute run. The report and the log say when it happened.
 
 It stops for two different reasons, and the report distinguishes them:
 
-- **The optimum was inside your range.** The extra arm did not beat the winner. Nothing to do.
+- **The optimum was inside your range.** No extra arm beat the winner on any edge it sat on. Nothing to do.
 - **`batchSizeInBits=24` was reached.** That is the framework maximum
   (`BIT_COUNT_FOR_MAX_CHUNKS_ARRAY`), not a truncated sweep — there is nothing above it to try.
 
