@@ -50,8 +50,13 @@ public class WebSocketEndpoint {
     @ToString.Exclude
     private @Nullable MessageHandler messageHandler;
 
+    /**
+     * Set after the server started (the result broadcaster is built after the key producer) and read in
+     * {@code onOpen} on Java-WebSocket's worker thread, so the write needs a happens-before edge to the
+     * read: without {@code volatile} a client could, under the memory model, never see the greeting.
+     */
     @ToString.Exclude
-    private @Nullable Supplier<@Nullable String> greetingSupplier;
+    private volatile @Nullable Supplier<@Nullable String> greetingSupplier;
 
     /**
      * Creates an endpoint bound to the given port. The server is not started here.
