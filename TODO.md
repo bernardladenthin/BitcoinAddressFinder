@@ -674,6 +674,35 @@ signals), at least "no `kill -3` thread dump without `libjsig`".
     rationale and re-run `ZmqResultBroadcasterTest` in a loop (≥ 100 fresh forks) before
     calling it fixed — a single green run proves nothing at a 5 % rate.
 
+### Flaky CI tests seen on PR #389 (docs-only change, 2026-10-15)
+
+PR #389 changed only README/CSV/`TODO.md`, so both failures below are unrelated to it. Each needs
+reproducing on the current `HEAD` before anything is changed — a single CI run is not enough evidence.
+
+- **`SocketResultBroadcasterTest.onBatchChecked_twoConnectedClients_bothReceiveTheSameLine`** —
+  `java.net.SocketTimeoutException: Read timed out` after the 15 s budget (test 5/5 of the class, 1
+  error) in the `Test OpenCL (pocl CPU)` job, run 38698599185 (job 116307084481). The test waits for
+  `awaitClientCount(2)`, sends one batch and reads one line from each client; one client got nothing.
+  The `Test OpenCL (pocl CPU)` job was also red on PR #387 and #388. **Caveat:** the run was on base
+  `44ba793`; since then `SocketResultBroadcaster` was reworked by the bug hunt (`d0519ca8` stalled
+  listener, `59dfecff` greeting during announcement, `68a80f9f` queued results before close), so
+  the race may be gone or moved. Plan: run the class in a loop of fresh forks (≥ 100) on `HEAD`; if
+  it still fails, check whether a client registered by `awaitClientCount` can miss a broadcast that
+  is issued before its writer is ready.
+- **`Test (windows-latest)`: "There was a timeout in the fork"** (Surefire
+  `forkedProcessTimeoutInSeconds` = 240), same run, job 116307084615. All 2 206 tests that finished
+  were green; the only class that started and never reported is **`KeyProducerJavaZmqTest`**. That
+  fits the jeromq poller race above (`timeoutMillis = -1` tests wait for the handshake timer), but
+  one 30 s handshake stall alone should not use up 240 s — either several stalls in a row or a
+  Windows-specific hang. Not verified. Plan: rerun `KeyProducerJavaZmqTest` in a loop on Windows
+  with a thread dump on timeout (see `../workspace/policies/ci-test-diagnostics.md`), then decide
+  whether a test-side `setHandshakeIvl` cap (as in `ZmqResultBroadcasterTest`) or a finite
+  `timeoutMillis` is the right guard.
+- **`claude-review` (`claude-code-review.yml`) fails on every PR** — #387 … #393 all red, the action
+  ends after well under a second with `is_error: true`, `total_cost_usd: 0` and empty `modelUsage`,
+  i.e. no model call was made. Points at the action's token/credit, not at the PRs. Check the
+  `ANTHROPIC_API_KEY` secret and the credit of the account behind it.
+
 ## Open — cross-cutting (slice for this repo)
 
 - **jqwik pin policy** — see [`../workspace/policies/jqwik-prompt-injection.md`](../workspace/policies/jqwik-prompt-injection.md). `jqwik.version ≤ 1.9.3` is mandatory.
