@@ -920,7 +920,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `TuneConfigurationTest#extendSweep_firstAxisArmLoses_stillTriesTheOtherEdge`, `#extendSweep_extraArmWins_continuesFromTheNewWinner`, `#extendSweep_maxExtensionArmsReached_stops`.
 - **Rot-Grün-Nachweis:** mit der herausgelösten alten Schleife rot (2 von 3; der `maxExtensionArms`-Test ist beidseitig grün), mit dem Fix grün; ganze Klasse 57 Tests grün (1 OpenCL-Test übersprungen, kein Gerät).
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** dd594a2
 
 ## Offene Verdachte ohne Fund-ID
 
