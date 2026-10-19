@@ -47,13 +47,6 @@ it is done, as for every other item in this file.
   Written after the server started, read in `onOpen` on Java-WebSocket's worker thread, with no
   happens-before edge. The owner allowed this one without a red test: the visibility gap cannot be
   produced deterministically on HotSpot/x86.
-- **Amount column of address files** (ledger: open suspicion, `AddressTxtLine.java:331`
-  `getCoinIfPossible`). An amount `Long.parseLong` cannot read (`1.5`, `abc`, above `Long.MAX_VALUE`,
-  an empty second column) silently becomes 1, a negative one is taken over. Decision: warn once per
-  file about unreadable amounts, reject negative ones.
-- **ZeroMQ result broadcaster linger** (ledger: open suspicion, `ZmqResultBroadcaster`). Linger 0
-  drops what the `PUB` socket has not sent yet on close, possibly the last batches. Decision: a
-  bounded linger of 2000 ms, like the socket broadcaster's drain since F130.
 - **Tuner sweep extension tries the other edge too** (ledger: open suspicion
   "`TuneConfiguration.extendSweepBeyondTheCandidates`"). The extension stops at the first arm that
   does not beat the winner and reports "The optimum was inside range." even when the winner sits on

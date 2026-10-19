@@ -56,10 +56,13 @@ public class ZmqResultBroadcaster implements ResultListener, AutoCloseable {
     private static final int CONFIG_REPUBLISH_EVERY_N_BATCHES = 64;
 
     /**
-     * Linger of zero, so closing the context can never stall on undelivered messages. Results are
-     * best-effort by nature; blocking a shutdown to flush them would be the wrong trade.
+     * How long {@link #close()} may wait for messages the {@code PUB} socket has not written yet.
+     *
+     * <p>The last batch messages of a run are its completion signal; a linger of zero discarded them
+     * whenever a subscriber was behind at shutdown. Bounded to the same 2 s the socket broadcaster
+     * drains for, so a subscriber that has stopped reading delays the shutdown by at most that much.
      */
-    private static final int LINGER_MILLIS = 0;
+    private static final int LINGER_MILLIS = 2_000;
 
     private final BatchResultJsonFormatter formatter;
 

@@ -12,11 +12,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigInteger;
 import java.net.ServerSocket;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.core.BatchResult;
 import net.ladenthin.bitcoinaddressfinder.core.Hit;
@@ -55,6 +58,18 @@ class ZmqResultBroadcasterTest {
      * reconnects; jeromq's default is 30 s, twice {@link #AWAIT_MILLIS}.
      */
     private static final int HANDSHAKE_IVL_MILLIS = 1_000;
+
+    /**
+     * Batches of the burst in {@link #close_whileTheSubscriberIsBehind_subscriberStillReceivesTheLastBatch()};
+     * below the publisher's send high-water mark of 1000, so none is dropped before {@code close()}.
+     */
+    private static final int BURST_BATCHES = 800;
+
+    /** Hits per burst batch: the burst (about 20 MB) must exceed what the TCP buffers can hold. */
+    private static final int BURST_HITS_PER_BATCH = 150;
+
+    /** Kernel receive buffer of the lagging subscriber; small, so TCP pushes back early. */
+    private static final int SMALL_RECEIVE_BUFFER_BYTES = 4096;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -146,6 +161,67 @@ class ZmqResultBroadcasterTest {
             broadcaster.close();
         }
     }
+
+    @Test
+    void close_whileTheSubscriberIsBehind_subscriberStillReceivesTheLastBatch() throws Exception {
+        // The last batch messages are the completion signal of a run. With a linger of zero,
+        // closing the socket discarded whatever the PUB socket had not written yet, so a subscriber
+        // that was behind missed exactly the end of the run. The socket broadcaster drains for up
+        // to 2 s (F130); the ZeroMQ one now lingers as long.
+        //
+        // To make "behind" deterministic, the subscriber does not read during the burst and holds
+        // at most one message (receive high-water mark 1, small kernel buffer): its I/O thread stops
+        // reading, TCP pushes back, and the burst stays queued at the publisher. close() then runs
+        // on another thread while this one drains.
+
+        // arrange
+        final String address = "tcp://127.0.0.1:" + freePort();
+        final ZmqResultBroadcaster broadcaster = new ZmqResultBroadcaster(address);
+        final List<Hit> manyHits = new ArrayList<>();
+        for (int i = 0; i < BURST_HITS_PER_BATCH; i++) {
+            manyHits.add(new Hit(BigInteger.valueOf(i), "aabb".repeat(16), "1TestAddress" + i, true, false));
+        }
+        final ExecutorService closer = Executors.newSingleThreadExecutor();
+        try (ZContext context = new ZContext()) {
+            final ZMQ.Socket subscriber = context.createSocket(SocketType.SUB);
+            subscriber.setHandshakeIvl(HANDSHAKE_IVL_MILLIS);
+            subscriber.setRcvHWM(1);
+            subscriber.setReceiveBufferSize(SMALL_RECEIVE_BUFFER_BYTES);
+            subscriber.connect(address);
+            subscriber.subscribe(ZMQ.SUBSCRIPTION_ALL);
+            subscriber.setReceiveTimeOut(RECEIVE_TIMEOUT_MILLIS);
+            assertThat(
+                    receiveWhilePublishing(
+                            subscriber,
+                            () -> broadcaster.onBatchChecked(new BatchResult(BigInteger.ZERO, 1, List.of()))),
+                    is(notNullValue()));
+            for (long base = 1; base <= BURST_BATCHES; base++) {
+                broadcaster.onBatchChecked(new BatchResult(BigInteger.valueOf(base), 1, manyHits));
+            }
+
+            // act
+            final Future<?> closed = closer.submit(broadcaster::close);
+
+            // assert
+            final String lastBaseHex = BigInteger.valueOf(BURST_BATCHES).toString(16);
+            boolean lastSeen = false;
+            final long deadline = System.currentTimeMillis() + AWAIT_MILLIS;
+            while (!lastSeen && System.currentTimeMillis() < deadline) {
+                final byte[] received = subscriber.recv(0);
+                if (received == null) {
+                    continue;
+                }
+                final JsonNode message = objectMapper.readTree(new String(received, StandardCharsets.UTF_8));
+                lastSeen = lastBaseHex.equals(message.path("secretBase").asText());
+            }
+            assertThat(lastSeen, is(true));
+            closed.get(AWAIT_MILLIS, TimeUnit.MILLISECONDS);
+        } finally {
+            closer.shutdownNow();
+            broadcaster.close();
+        }
+    }
+
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="announceConfiguration">
