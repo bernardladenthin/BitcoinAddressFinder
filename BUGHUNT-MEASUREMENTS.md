@@ -26,6 +26,29 @@ export JSIG="$JAVA_HOME/lib/libjsig.so"   # Signalverkettung des JDK, F148
 
 ---
 
+## Messumgebung (Ergebnisse vom 2026-10-19)
+
+Gemessen 2026-10-19 auf Branch `ccr-90fc5f6a-vs4s0f` (`088d3c48`). Zwei Umgebungen:
+
+- **Laptop (lokal, Windows):** Notebook, AMD Ryzen 7 5800H (8 Kerne / 16 Threads), 63,3 GB RAM, Windows 11 Pro
+  10.0.26300, Temurin 21.0.12.1+1, Maven 3.9.11. Zwei OpenCL-Geräte:
+  - `NVIDIA GeForce RTX 3070 Laptop GPU`, Treiber 581.83, `OpenCL 3.0 CUDA`, 40 CUs, 8191 MB global,
+    `CL_DEVICE_MAX_MEM_ALLOC_SIZE` 2047 MB, max. Work-Group 1024 (Plattform 0)
+  - `gfx90c` (Radeon-Vega-iGPU des 5800H), Treiber `3444.0 (PAL,HSAIL)`, `OpenCL 2.0 AMD-APP (3444.0)`, 8 CUs,
+    24643 MB global (geteilter RAM), max. Allokation 20511 MB, max. Work-Group 256 (Plattform 1). Für die
+    parametrisierten Tests (die immer Plattform 0 nehmen) wurde die AMD-ICD direkt geladen:
+    `-Dorg.lwjgl.opencl.libname=C:\Windows\System32\DriverStore\FileRepository\u0382222.inf_amd64_de7bd56cf45c3a15\B380779\amdocl64.dll`
+    (dann ist die iGPU die einzige Plattform; keine Code-Änderung).
+  - Hinweis zu Oracle JDK 21.0.9: `mvn compile` bricht dort in NullAway ab (`-XDaddTypeAnnotationsToSymbol=true`
+    „not supported by the running JDK“), deshalb Temurin.
+- **Vultr-VM (Linux, pocl):** `voc-c-16c-32gb-300s-amd` (Frankfurt, dedizierte Kerne), AMD EPYC-Milan, 16 vCPU,
+  31 GB RAM, Ubuntu 24.04.5 LTS, Kernel 6.8.0-146-generic, Temurin 21.0.12.1+1, Maven 3.9.11,
+  `pocl-opencl-icd 5.0-2.1build3` (`OpenCL 3.0 PoCL 5.0+debian … LLVM 16.0.6`), `ocl-icd-libopencl1 2.3.2-1build1`.
+  pocl-Gerät `cpu-haswell-AMD EPYC-Milan Processor`: 16 CUs, max. Work-Group 4096, 29,33 GiB global,
+  max. Allokation 8 GiB. `JSIG=/opt/jdk-21.0.12.1+1/lib/libjsig.so`.
+
+---
+
 ## B1 Vollständiger Testlauf ohne und mit OpenCL
 
 **Ziel.** Der Bug-Hunt hat nur die betroffenen Testklassen laufen lassen. Ein voller Lauf in beiden
@@ -41,9 +64,30 @@ LD_PRELOAD="$JSIG" mvn -B -e -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTes
 **Hypothese.** Beide Läufe grün bis auf B2/B3.
 **Entscheidet.** Ob der Branch so in die gemeinsame CI kann.
 
-**Ergebnis:**
+**Ergebnis:** (Vultr-VM, Befehle wörtlich aus dem Brief; `OCL_ICD_VENDORS` zeigt auf ein leeres Verzeichnis)
 
-**Folgerung:**
+1. ohne OpenCL — `OCL_ICD_VENDORS=/tmp/emptyvendors mvn -B test`: **grün**
+   ```
+   [INFO] Tests run: 2904, Failures: 0, Errors: 0, Skipped: 107
+   [INFO] BUILD SUCCESS
+   [INFO] Total time:  06:53 min
+   ```
+2. mit pocl — `LD_PRELOAD="$JSIG" mvn -B -e -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true test jacoco:report`
+   (ohne `POCL_MAX_WORK_GROUP_SIZE`): **rot, ausschließlich durch `MainTest`**
+   ```
+   [INFO] Tests run: 2885, Failures: 0, Errors: 0, Skipped: 61
+   [ERROR] Process Exit Code: 139
+   [ERROR] Crashed tests:
+   net.ladenthin.bitcoinaddressfinder.MainTest
+   [INFO] BUILD FAILURE
+   [INFO] Total time:  07:34 min
+   ```
+   Alle übrigen 2885 Tests: 0 Failures, 0 Errors. Die abgestürzte Fork ist die aus B2.
+
+**Folgerung:** Der Branch ist bis auf den bekannten `MainTest`-Absturz auf pocl (B2) grün; ohne OpenCL ist er
+vollständig grün. In die gemeinsame CI kann er erst, wenn B2 entschieden ist (Variable im Job oder
+Local-Work-Size in BAF) — sonst wird `test-opencl` auf jedem Runner, auf dem pocl eine große Work-Group wählt,
+rot. B3 hat auf dieser Maschine nicht gestört (s. dort).
 
 ---
 
@@ -71,9 +115,59 @@ Branch) und das Ergebnis von `test-opencl` mit Run-ID eintragen.
 **Entscheidet.** Ob der Job `test-opencl` `POCL_MAX_WORK_GROUP_SIZE` setzen muss (oder BAF eine
 Local-Work-Size vorgeben sollte).
 
-**Ergebnis:**
+**Ergebnis:** (Vultr-VM; pocl wählt hier max. Work-Group **4096**)
 
-**Folgerung:**
+Achtung, der Befehl im Brief misst den ungesetzten Fall nicht: `POCL_MAX_WORK_GROUP_SIZE=$v` mit leerem `$v`
+setzt die Variable auf einen **leeren String**. pocl bricht dann in seiner eigenen Assertion ab, Exit **134**:
+```
+java: ./lib/CL/devices/common.c:1480: pocl_init_default_device_infos: Assertion `max_wg > 0' failed.
+[ERROR] Process Exit Code: 134
+```
+Deshalb zusätzlich mit wirklich ungesetzter Variable (`env -u POCL_MAX_WORK_GROUP_SIZE …`), je 5 Läufe,
+`LD_PRELOAD="$JSIG" mvn -B test -Djacoco.skip=true -Dtest='MainTest#testRoundtripOpenCLProducer*'`:
+```
+unset run 1 mvn=1 Process Exit Code: 139 Tests run: 0, Failures: 0, Errors: 0 hs_err=0
+256   run 1 mvn=0  Tests run: 1, Failures: 0, Errors: 0
+unset run 2 mvn=1 Process Exit Code: 134 Tests run: 0, Failures: 0, Errors: 0 hs_err=1
+256   run 2 mvn=0  Tests run: 1, Failures: 0, Errors: 0
+unset run 3 mvn=1 Process Exit Code: 139 Tests run: 0, Failures: 0, Errors: 0 hs_err=1
+256   run 3 mvn=0  Tests run: 1, Failures: 0, Errors: 0
+unset run 4 mvn=1 Process Exit Code: 139 Tests run: 0, Failures: 0, Errors: 0 hs_err=1
+256   run 4 mvn=0  Tests run: 1, Failures: 0, Errors: 0
+unset run 5 mvn=1 Process Exit Code: 139 Tests run: 0, Failures: 0, Errors: 0 hs_err=1
+256   run 5 mvn=0  Tests run: 1, Failures: 0, Errors: 0
+```
+Ungesetzt **5/5 rot** (4× 139 ohne `hs_err`, 1× 134 mit `hs_err`), mit `256` **5/5 grün**. Der eine `hs_err`
+(`hs_err_pid30260.log`) zeigt die Ursache aus `BUGHUNT-CHECKED.md` direkt — ein pocl-Worker-Thread, der im
+Kernel unter seinen Stack läuft:
+```
+#  SIGSEGV (0xb) at pc=0x000075cbcca3dcab, pid=30260, tid=30307
+# Problematic frame:
+# C  [generateKeysKernel_grid.so+0x3cab]  add+0x2b
+Current thread is native thread
+Stack: [0x000075cb3c7fc000,0x000075cb3cffc000],  sp=0x000075cb3c5ea730,  free space=18014398509479865k
+C  [generateKeysKernel_grid.so+0x3cab]  add+0x2b
+C  [generateKeysKernel_grid.so+0x4200]  mul_mod+0x150
+C  [generateKeysKernel_grid.so+0x4a4c]  point_mul_xy_comb+0x2dc
+```
+(`sp` liegt 2,1 MB unterhalb der Stack-Untergrenze → Guard-Page.) Ob 134 oder 139 entscheidet nur, ob der
+JVM-Handler den Fehler noch zu fassen bekommt.
+
+`clinfo`:
+```
+  Max compute units                               16
+  Max work group size                             4096
+  Global memory size                              31497936896 (29.33GiB)
+  Max memory allocation                           8589934592 (8GiB)
+```
+Ein echter CI-Lauf wurde nicht ausgelöst (Entscheidung des Auftraggebers: nur lokal reproduzieren) — keine Run-ID.
+
+**Folgerung:** Ohne Begrenzung stirbt `MainTest` auf pocl deterministisch (5/5), mit `256` nie (5/5). Der Job
+`test-opencl` muss `POCL_MAX_WORK_GROUP_SIZE=256` setzen, oder BAF gibt eine Local-Work-Size vor (das
+behebt die Ursache für jede Implementierung, die bei fehlender Angabe die maximale Gruppe wählt). Ob der
+GitHub-Runner (4 vCPU) ebenfalls 4096 meldet, ist nicht gemessen; der Mechanismus hängt an der gewählten
+Gruppengröße, nicht an der Kernzahl. Nebenbefund: die Schleife im Brief (`for v in "" 256`) prüft den
+ungesetzten Fall nicht — wer sie wiederverwendet, sieht die pocl-Assertion (134) statt des Stack-Überlaufs.
 
 ---
 
@@ -94,9 +188,34 @@ Auf dem CI-Runner (falls der Job läuft) und auf einer echten GPU wiederholen.
 **Hypothese.** Rot überall dort, wo `CL_DEVICE_MAX_MEM_ALLOC_SIZE` unter dem Bedarf eines 2^24-Rasters liegt.
 **Entscheidet.** Ob der Test ein kleineres Raster bekommt (Vorschlag in `TODO.md`).
 
-**Ergebnis:**
+**Ergebnis:** | Gerät | `CL_DEVICE_MAX_MEM_ALLOC_SIZE` | Ergebnis |
+|---|---|---|
+| pocl, Vultr-VM (31 GB RAM) | 8192 MB | `Tests run: 2, Failures: 0, Errors: 0, Skipped: 0` |
+| RTX 3070 Laptop (Windows) | 2047 MB | `Tests run: 2, Failures: 0, Errors: 0, Skipped: 0` |
+| gfx90c iGPU (Windows) | 20511 MB | `Tests run: 2, Failures: 0, Errors: 0, Skipped: 0` |
 
-**Folgerung:**
+Befehl auf der VM wörtlich aus dem Brief (`LD_PRELOAD="$JSIG" POCL_MAX_WORK_GROUP_SIZE=256 mvn -B -q test …`),
+lokal derselbe `-Dtest` ohne die Linux-Variablen. Kein `CL_INVALID_BUFFER_SIZE` auf einem der drei Geräte.
+
+Gegenprobe auf derselben VM, pocl künstlich auf den Fall des Briefs begrenzt (`POCL_MEMORY_LIMIT=<GiB>`, sonst
+gleicher Befehl):
+```
+== POCL_MEMORY_LIMIT=4
+  Global memory size                              4294967296 (4GiB)
+  Max memory allocation                           1073741824 (1024MiB)
+[ERROR]   ProbeAddressesOpenCLTest.setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException:360 » OpenClCallFailed OpenCL call clCreateBuffer failed: CL_INVALID_BUFFER_SIZE (-61)
+[ERROR] Tests run: 2, Failures: 0, Errors: 2, Skipped: 0
+== POCL_MEMORY_LIMIT=2
+  Max memory allocation                           536870912 (512MiB)
+[ERROR] Tests run: 2, Failures: 0, Errors: 2, Skipped: 0   (gleiche Ausnahme)
+```
+Ein CI-Lauf wurde nicht ausgelöst (nur lokal, Entscheidung des Auftraggebers).
+
+**Folgerung:** Der Test ist an die Allokationsgrenze des Geräts gebunden: bei 1024 MiB (der Wert des Briefs,
+4 Kerne/15 GB) scheitert er reproduzierbar mit genau `CL_INVALID_BUFFER_SIZE` in `clCreateBuffer`, ab 2047 MB
+(RTX 3070) läuft er. Auf einem CI-Runner mit ähnlich wenig RAM wie im Brief (15 GB) ist dasselbe zu erwarten
+(dort nicht gemessen). Ein kleineres Raster (Vorschlag in `TODO.md`) macht ihn hardwareunabhängig und ändert an
+der geprüften Aussage nichts.
 
 ---
 
@@ -116,9 +235,44 @@ Tests auf jedem Gerät laufen lassen (Plattform/Gerät über die Testkonfigurati
 **Entscheidet.** Ob F129 (Anker 0), F151 (oberstes Raster) und F154 (Tuner-Gerät ohne Gewinner) auf
 echter Hardware bestätigt sind.
 
-**Ergebnis:**
+**Ergebnis:** Befehl aus dem Brief (unter Windows ohne `LD_PRELOAD`), je einmal pro Gerät:
 
-**Folgerung:**
+RTX 3070 Laptop (NVIDIA, Plattform 0) — Kernel inlined:
+```
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 52.40 s -- in net.ladenthin.bitcoinaddressfinder.command.TuneConfigurationTest
+Tests run: 32, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 93.17 s -- in net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContextTest
+Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 49.11 s -- in net.ladenthin.bitcoinaddressfinder.opencl.OpenCLZeroAnchorTest
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.221 s -- in net.ladenthin.bitcoinaddressfinder.ProbeAddressesOpenCLTest
+Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 12.68 s -- in net.ladenthin.bitcoinaddressfinder.producer.ProducerOpenCLTest
+Tests run: 47, Failures: 0, Errors: 0, Skipped: 0
+```
+gfx90c (AMD-iGPU, über die AMD-ICD direkt) — Kernel automatisch out-of-line:
+```
+noInlineHelpers -> OUT-OF-LINE kernel (-D FORCE_NO_INLINE) on device 'gfx90c' (vendor 'Advanced Micro Devices, Inc.', source: auto)
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 8.727 s -- in net.ladenthin.bitcoinaddressfinder.command.TuneConfigurationTest
+Tests run: 32, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 33.26 s -- in net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContextTest
+Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 14.20 s -- in net.ladenthin.bitcoinaddressfinder.opencl.OpenCLZeroAnchorTest
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 9.117 s -- in net.ladenthin.bitcoinaddressfinder.ProbeAddressesOpenCLTest
+Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 57.67 s -- in net.ladenthin.bitcoinaddressfinder.producer.ProducerOpenCLTest
+Tests run: 47, Failures: 0, Errors: 0, Skipped: 0
+```
+`OpenCLInfo` vorher: siehe Umgebung oben. (`TuneConfigurationTest#run_noArmSucceedsOnOneDevice*` loggt wie
+vorgesehen `Invalid device index: 99` für das absichtlich ungültige Gerät.)
+
+Dazu unter **Linux**: RTX 3080 (Vast.ai, Treiber 580.126.18, Umgebung wie in B7), Testsatz des Briefs plus
+`ProbeAddressesOpenCLTest#setSrcPrivateKeyChunk_privateKeyTooLarge*`, mit `LD_PRELOAD="$JSIG"`:
+```
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 41.90 s -- in net.ladenthin.bitcoinaddressfinder.opencl.OpenCLZeroAnchorTest
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 13.74 s -- in net.ladenthin.bitcoinaddressfinder.producer.ProducerOpenCLTest
+[INFO] Tests run: 49, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
+Ein Multi-GPU-Rechner stand nicht zur Verfügung; die beiden lokalen Geräte gehören zu getrennten Plattformen
+und wurden einzeln getestet (der Tuner-Lauf mit beiden zugleich steht unter B5).
+
+**Folgerung:** F129 (Anker 0, `OpenCLZeroAnchorTest`, beide Feld-Implementierungen), F151 (oberstes Raster)
+und F154 (Tuner-Gerät ohne Gewinner) sind auf drei echten GPUs bestätigt — NVIDIA unter Windows (47/47) und
+Linux (49/49), AMD-iGPU (PAL, OpenCL 2.0) unter Windows (47/47). Eine AMD-GPU unter Linux (ROCm) fehlt.
 
 ---
 
@@ -134,9 +288,36 @@ zwei Geräte explizit eintragen.
 Im Bericht prüfen: der Filter-Sweep des ersten Geräts nutzt dessen eigenes Raster, und die ausgegebene
 Konfiguration trägt für jedes Gerät seine eigenen Werte.
 
-**Ergebnis:**
+**Ergebnis:** Laptop (Windows), RTX 3070 + gfx90c als zwei echte Geräte zweier Plattformen.
+`examples/config_TuneConfiguration.json` mit `sweepFilterTypes: true`, leerer `producerOpenCL`-Liste und — um die
+Laufzeit klein zu halten — verkleinertem Raster: `batchSizeInBitsCandidates [18,20]`,
+`keysPerWorkItemCandidates [1,16]`, `secondsPerArm 5`, `warmupSecondsPerArm 2`, `targetDatabaseEntries 10000000`
+(ohne LMDB: synthetischer Filter, Verifikationskosten als ESTIMATED markiert). `java -Xmx8g … cli.Main`, Exit 0.
+```
+No producer configured; sweeping every detected GPU instead. 2 found: NVIDIA GeForce RTX 3070 Laptop GPU (platformIndex=0, deviceIndex=0, identity uuid:36e7dc7a8961da6c2338c7593e5d9375); gfx90c (platformIndex=1, deviceIndex=0, identity amd-pcie:7:0:0).
+Sweeping 2 devices in turn, 4 arms each — roughly 1 minutes in total.
+...
+Winner per device (MEASURED):
+  GPU platformIndex=0 deviceIndex=0: batchSizeInBits=20 keysPerWorkItem=128 at 214,371,255.75 candidates/s
+  GPU platformIndex=1 deviceIndex=0: batchSizeInBits=20 keysPerWorkItem=256 at 6,693,605.65 candidates/s
+Rebuilding the pre-filter as FUSE_8 to measure it empirically (this is the opt-in cost of sweepFilterTypes) ...
+Filter arm FUSE_8: batchSizeInBits=20 keysPerWorkItem=128 -> 215,829,567.84 candidates/s (3,365,619.31 addresses checked/s over 5.00 s)
+Rebuilding the pre-filter as FUSE_16 to measure it empirically (this is the opt-in cost of sweepFilterTypes) ...
+Filter arm FUSE_16: batchSizeInBits=20 keysPerWorkItem=128 -> 220,970,676.20 candidates/s (13,589.55 addresses checked/s over 5.01 s)
+  Recommended: FUSE_16   (MEASURED empirically)
+```
+Ausgegebene Konfiguration (`producerOpenCL`, gekürzt):
+```
+{ "keyProducerId" : "exampleKeyProducerSecureRandomId",   "batchSizeInBits" : 20, "platformIndex" : 0, "deviceIndex" : 0, "keysPerWorkItem" : 128, "enableGpuFilter" : true, "gpuFilterType" : "FUSE_16", ... },
+{ "keyProducerId" : "exampleKeyProducerSecureRandomId_2", "batchSizeInBits" : 20, "platformIndex" : 1, "deviceIndex" : 0, "keysPerWorkItem" : 256, "enableGpuFilter" : true, "gpuFilterType" : "FUSE_16", ... }
+```
+Nebenbefund: auf der iGPU stoppte die Kanten-Erweiterung bei `maxExtensionArms`
+(„The winner may still be a lower bound“), auf der RTX 3070 lag das Optimum innerhalb (der Arm 20/256 war mit
+152,9 M langsamer als 20/128 mit 214,4 M candidates/s).
 
-**Folgerung:**
+**Folgerung:** F136 ist mit zwei echten Geräten bestätigt: Der Filter-Sweep läuft auf dem ersten Gerät mit
+**dessen eigenem** Gewinner (20/128, nicht dem der iGPU 20/256), und die ausgegebene Konfiguration trägt für
+jedes Gerät seine eigenen Werte (Plattform, `keysPerWorkItem`); der Filtertyp ist eine gemeinsame Wahl.
 
 ---
 
@@ -149,9 +330,23 @@ upload on the chunked LWJGL upload“. Braucht eine GPU mit genügend Speicher f
 **Entscheidet.** Ob `OpenCLContext.reclaimHeapBeforeUpload()` (`GcTrigger`) mit dem stückweisen
 LWJGL-Upload noch nötig ist.
 
-**Ergebnis:**
+**Ergebnis:** **Nicht ausgeführt.** Die Messung verlangt die AMD-Maschine des Originals (RX 7900 XTX, Windows 11,
+Adrenalin-Treiber 3679.0 PAL/LC) mit der Full-DB (Fuse-16, ~3,1 GB) und `-Xmx48g`; laut `TODO.md` kann eine
+NVIDIA-Karte die Frage nicht beantworten. Geprüft am 2026-10-19, wo sich eine passende Maschine mieten ließe:
+- AWS g4ad (Radeon Pro V520) gibt es nicht mehr (`InvalidInstanceType`, in keiner von 17 Regionen angeboten);
+  Azure NVv4 ist seit 2026-09-30 abgeschaltet.
+- Azure NVads V710 v5 (Windows möglich) — GPU-Quota 0, Antrag `2610190050000851` läuft noch.
+- DigitalOcean, RunPod, Hot Aisle bieten AMD Instinct nur unter Linux (nicht der Treiber des Originals);
+  DigitalOcean verlangt für das erste GPU-Droplet eine Limit-Erhöhung, RunPod war ausverkauft.
+- Die lokale Radeon-iGPU (gfx90c, AMD-PAL-Treiber unter Windows) erlaubt 20,5 GB je Allokation, aber 63 GB
+  Host-RAM reichen nicht für `-Xmx48g` plus Filter-Bau (~40 GB transient), und eine iGPU hat kein eigenes VRAM.
+Außerdem: die veröffentlichte Full-DB (`lmdb_full.zip`, 41,7 GiB, Stand 2026-07-20) hat 1.472.947.953 Einträge,
+die Originalmessung 1.377.478.516 — der Fuse-16-Puffer wäre ~3,36 statt 3,1 GB, eine 1:1-Wiederholung also mit
+keiner Variante möglich.
 
-**Folgerung:**
+**Folgerung:** Keine Entscheidung möglich; `OpenCLContext.reclaimHeapBeforeUpload()` bleibt bis zur Messung
+unverändert. Am nächsten am Original wäre eine private RX 7900 XTX unter Windows (≥ 64 GB RAM) oder Azure
+`NV24ads_V710_v5` mit Windows Server, sobald die Quota erteilt ist.
 
 ---
 
@@ -203,9 +398,37 @@ public class SigProbe3 {
 **Entscheidet.** Ob die Warnung von `SignalChainingCheck` und der `LD_PRELOAD`-Block in den
 `run_*OpenCL*.sh`-Skripten nur pocl betreffen oder allgemein nötig sind (README „Known Issues“ entsprechend).
 
-**Ergebnis:**
+**Ergebnis:** **NVIDIA (Linux) — gemessen.** Vast.ai-Container, `NVIDIA GeForce RTX 3080` (USA), Treiber 580.126.18
+(`OpenCL 3.0 CUDA 13.0.97`, ICD `libnvidia-opencl.so.1`), Leistungsgrenze 320 W = Standard, Host-Kernel
+`6.8.0-101-generic`, Container `eclipse-temurin:21-jdk` (Ubuntu 26.04.1), 10 vCPU, 251 GB RAM, Temurin 21.0.12.1+1,
+Branch `088d3c48`. Probe `SigProbe3` wörtlich aus dem Brief, Befehle wie im Brief (Exit-Code, Zahl der
+`survived`-Zeilen, Zahl der `hs_err`-Dateien):
+```
+### -Xcheck:jni handler check (cl, 10)
+... WARN  net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext - The JDK's signal chaining (libjsig) is not preloaded. An OpenCL driver that compiles kernels in-process with LLVM (measured: pocl) replaces the JVM's SIGSEGV handler, ...
+survived
+### probe runs
+nocl run 1 exit=0 1 hs_err=0   (… run 2–5 identisch)
+cl run 1 exit=0 1 hs_err=0     (… run 2–5 identisch)
+jsig run 1 exit=0 1            (… run 2–5 identisch)
+```
+`-Xcheck:jni` (`grep -i handler`) meldet **kein** `SIGSEGV handler modified!` — die einzige Treffer-Zeile ist BAFs
+eigene `SignalChainingCheck`-Warnung. Nocl 0/5, cl 0/5, jsig 0/5 Abstürze (pocl zum Vergleich laut `TODO.md`:
+cl 5/5).
 
-**Folgerung:**
+**AMD (Linux) — nicht ausgeführt.** Keine AMD-GPU unter Linux erreichbar: RunPod MI300X/MI350X ausverkauft
+(`stockStatus: none`), Vast.ai 0 AMD-Angebote, DigitalOcean verlangt für das erste GPU-Droplet eine
+Limit-Erhöhung (`422 … exceed your GPU limit`), Azure V710 wartet auf Quota, AWS g4ad existiert nicht mehr.
+Die lokale Radeon-iGPU läuft nur unter Windows (dort gibt es den POSIX-Signal-Mechanismus der Frage nicht).
+
+**Intel — nicht ausgeführt.** Kein Anbieter, bei dem ein Konto besteht, vermietet Intel-GPUs (Intel Tiber AI
+Cloud nicht mehr erreichbar); kein Intel-Rechner mit Linux verfügbar.
+
+**Folgerung:** Der NVIDIA-Treiber ersetzt die Signal-Handler der JVM nicht; die pocl-Absturzbedingung tritt dort
+nicht auf (0/5 statt 5/5). Für AMD (ROCm/comgr läuft LLVM in-process und ist laut `TODO.md` der
+wahrscheinlichste Kandidat) und Intel ist die Frage offen — die Warnung von `SignalChainingCheck` und der
+`LD_PRELOAD`-Block in den Skripten sollten deshalb vorerst für jeden Linux-Start bleiben; auf pocl einzuengen
+wäre erst nach einer AMD-Messung belegt.
 
 ---
 
@@ -217,6 +440,55 @@ Verfahren: `TODO.md`, „Measure the zero-anchor branch of the key kernel on a r
 **Hypothese.** Nicht messbar (eine ODER-Verknüpfung je Work-Item).
 **Entscheidet.** Ob der Zweig so bleiben kann.
 
-**Ergebnis:**
+**Ergebnis:** RTX 3070 Laptop (Windows, Treiber 581.83), `8b0faa60` (= `1a7b264~1`) gegen `1a7b2648`, je ein
+Git-Worktree. Die Sweet-Spot-Konfiguration `batchSizeInBits=24`, `keysPerWorkItem=512`; da
+`GridSizeSweepBenchmark` `useReducedRadixField` nicht als Parameter hat, lief eine Wegwerf-JMH-Klasse
+(identisch zu dessen `oneKernelLaunch`, plus `@Param useReducedRadixField {true,false}`; Quelltext unten, nicht
+committet). JMH `-f 1 -wi 2 -w 5 -i 5 -r 10` (die Werte von `GridSizeSweepBenchmark`), Einheit ops/s =
+Kernel-Starts à 2^24 Schlüssel pro Sekunde.
 
-**Folgerung:**
+Läufe 1–4 (beide Zweige je Lauf, Reihenfolge vorher/nachher/nachher/vorher):
+```
+run1 vorher   true 1,198 ± 0,005   false 1,147 ± 0,007
+run2 nachher  true 1,185 ± 0,007   false 1,155 ± 0,020
+run3 nachher  true 1,187 ± 0,003   false 1,122 ± 0,007
+run4 vorher   true 1,186 ± 0,002   false 2,813 ± 0,008
+```
+Der Sprung in Lauf 4 (`false` 2,4× schneller) war ein Zustandswechsel der Laptop-GPU während der Messung
+(Leistungsprofil/Takt), kein Code-Effekt — die Wiederholungen im neuen, stabilen Zustand (danach
+`nvidia-smi`: 1740 MHz, P0, ~41 W) zeigen es, abwechselnd vorher/nachher:
+```
+false: run5 vorher 2,824 ± 0,010 | run6 nachher 2,844 ± 0,010 | run7 vorher 2,838 ± 0,016 | run8 nachher 2,820 ± 0,073
+true:  run9 vorher 2,767 ± 0,031 | run10 nachher 2,892 ± 0,060 | run11 vorher 2,880 ± 0,024 | run12 nachher 2,898 ± 0,015
+```
+Mittel im stabilen Zustand: `false` vorher 2,831 / nachher 2,832 ops/s; `true` vorher 2,824 / nachher 2,895 ops/s
+(der erste Lauf 2,767 ist der Aufwärmlauf; ohne ihn vorher 2,880).
+
+Wegwerf-Probe (`src/test/java/net/ladenthin/bitcoinaddressfinder/benchmark/B8ZeroAnchorProbe.java`, nur in den
+Scratch-Worktrees):
+```java
+@BenchmarkMode(Mode.Throughput) @OutputTimeUnit(TimeUnit.SECONDS) @State(Scope.Benchmark)
+public class B8ZeroAnchorProbe {
+    @Param({"24"}) public int batchSizeInBits;
+    @Param({"512"}) public int keysPerWorkItem;
+    @Param({"true", "false"}) public boolean useReducedRadixField;
+    private OpenCLContext ctx; private BigInteger privateKeyBase;
+    @Setup(Level.Trial) public void setUp() throws Exception {
+        CProducerOpenCL p = new CProducerOpenCL();
+        p.batchSizeInBits = batchSizeInBits; p.keysPerWorkItem = keysPerWorkItem;
+        p.useReducedRadixField = useReducedRadixField;
+        ctx = new OpenCLContext(p, new BitHelper()); ctx.init();
+        privateKeyBase = new BigInteger(256, new SecureRandom());
+    }
+    @Benchmark public int oneKernelLaunch() {
+        try (OpenCLGridResult result = ctx.createKeys(privateKeyBase)) { return result.getResult().getInt(0); }
+    }
+    @TearDown(Level.Trial) public void tearDown() { if (ctx != null) ctx.close(); }
+}
+```
+
+**Folgerung:** Kein messbarer Preis des Anker-0-Zweigs: Die Unterschiede zwischen den Commits (< 0,1 % bei
+`false`, < 1 % bei `true` ohne Aufwärmlauf) liegen unter der Lauf-zu-Lauf-Streuung (bis ~4 %). Der Zweig kann
+so bleiben. Einschränkung: gemessen auf einer Notebook-GPU mit Leistungsdeckel und dem Sweet Spot der
+gemieteten Karten statt dem eigenen; der Vergleich ist relativ (gleiche Karte, gleicher Zustand), auf einer
+Desktop-Karte nicht wiederholt.
