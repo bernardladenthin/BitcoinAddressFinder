@@ -17,66 +17,38 @@ Everything the bug hunt left open, so nothing is lost when the session ends. The
 named in each item holds the analysis, the history and the reproduction; delete an item here when
 it is done, as for every other item in this file.
 
-**Decided by the owner, still to be implemented** (each with a test red without the fix):
+**Decided by the owner, recorded** (no change, kept so the reasoning is not lost):
 
-- **Incremental producer at the end of its range and at the group order n** (ledger: open suspicion
-  "`KeyProducerJavaIncremental`, Teilbatch am Bereichsende"; re-examined 2026-10-19). Three separate cases;
-  only the first one is still to be implemented:
-  - **Explicit keys (`batchUsePrivateKeyIncrement=false`, CPU only):** the last batch that only partly
-    fits throws `NoMoreSecretsAvailableException`, and up to `overallWorkSize - 1` keys before
-    `endPrivateKey` are never checked. Fix: return a shorter last batch (relax the length assertion in
-    `AbstractProducer.produceKeys`). Cases 3, 5, 8 and 9 of the table in `KeyProducerJavaIncrementalTest`
-    pin today's behaviour.
-  - **Grid mode (`batchUsePrivateKeyIncrement=true`), range end:** the base is aligned down, so the
-    first grid starts below `startPrivateKey` and the last one ends above `endPrivateKey`. Those keys
-    are real keys and are checked; nothing is missed. Proposal: keep it (no discard needed).
-  - **Grid mode on the GPU, top of the key space — decided 2026-10-19: no change.** The last aligned
-    grid `alignDown(n−1)` always contains n (for `batchSizeInBits` ≥ 2). `OpenClTask.setSrcPrivateKeyChunk`
-    rejects it, `ProducerOpenCL.processSecretBase` logs that once as an error, the producer goes on, and
-    an incremental scan ends after it as usual: that grid never reaches OpenCL, so the GPU never computes
-    past n. The owner's reasoning: the region is a few keys right at the bound, irrelevant for scanning,
-    and computing it would cost every grid a check in the kernel. The lower bound needs nothing either:
-    key 0 occurs once (grid base 0) and is handled since F129 (kernel) and by `INVALID_KEY_ONE` (host).
-    The only reader of the failure that the log records is `TuneConfiguration`, which practically never
-    reaches that grid. For the record, a pocl probe of computing that grid anyway: every key below n
-    correct except n−1, which the batched inversion (`KEYS_BATCH_INV` 16) poisons together with n
-    unless it is a work-item anchor; the CPU grid handles the same grid correctly (F45).
-  - Related: the default `endPrivateKey` is `MAX_PRIVATE_KEY_HEX`, i.e. n itself, documented as an
-    *inclusive* bound, but n has not been a valid key since F45. Proposal: default to n−1.
-- **`WebSocketEndpoint.greetingSupplier` → `volatile`** (ledger: open suspicion, `WebSocketEndpoint.java:54`).
-  Written after the server started, read in `onOpen` on Java-WebSocket's worker thread, with no
-  happens-before edge. The owner allowed this one without a red test: the visibility gap cannot be
-  produced deterministically on HotSpot/x86.
+- **Grid mode on the GPU, top of the key space — decided 2026-10-19: no change.** The last aligned
+  grid `alignDown(n−1)` always contains n (for `batchSizeInBits` ≥ 2). `OpenClTask.setSrcPrivateKeyChunk`
+  rejects it, `ProducerOpenCL.processSecretBase` logs that once as an error, the producer goes on, and
+  an incremental scan ends after it as usual: that grid never reaches OpenCL, so the GPU never computes
+  past n. The owner's reasoning: the region is a few keys right at the bound, irrelevant for scanning,
+  and computing it would cost every grid a check in the kernel. The lower bound needs nothing either:
+  key 0 occurs once (grid base 0) and is handled since F129 (kernel) and by `INVALID_KEY_ONE` (host).
+  For the record, a pocl probe of computing that grid anyway: every key below n correct except n−1,
+  which the batched inversion (`KEYS_BATCH_INV` 16) poisons together with n unless it is a work-item
+  anchor; the CPU grid handles the same grid correctly (F45). Grid mode at the ends of a range is fine
+  as it is: the base is aligned down, so the grids reach past `startPrivateKey`/`endPrivateKey`, and
+  those are real keys that are checked.
 
 **Waiting for the owner's decision:**
 
+- **Default `endPrivateKey` is n itself** (`MAX_PRIVATE_KEY_HEX`), documented as an *inclusive* bound,
+  but n has not been a valid key since F45. Proposal: default to n−1.
 - **`TuneConfiguration.runArm` releases a producer that may still run** (ledger: open suspicion,
   pattern review after F156). Same shape as F156 before its fix: `interrupt()`,
   `waitTillProducerNotRunning()`, then `releaseProducer()` without looking at the state. Possible
   fix: release the arm's producer through a `ProducerReleaser`. A red test needs a producer inside an
   arm that ignores the interrupt, i.e. a seam around `createProducer`.
-- **`ProbeAddressesOpenCLTest#setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException`** (ledger:
-  open suspicion). Both cases fail before the assertion with `CL_INVALID_BUFFER_SIZE` in
-  `OpenCLContext.init()`: the test builds the context with `batchSizeInBits` 24, and pocl on a
-  4-core/15 GB machine allows 1024 MB per allocation. Unrelated to F151. Possible fix: use a small
-  grid for the rejection (the bound does not depend on the grid size, see F151's 8-bit test).
 
-**CI and hardware runs** (the owner runs these together; the three hardware measurements have their
-own items below: heap reclaim, signal handlers of GPU drivers, zero-anchor branch). **The complete
-measurement brief for an agent, with commands, hypotheses and answer fields, is
-`BUGHUNT-MEASUREMENTS.md` (B1–B8).**
-
-- The full `mvn test` once (the bug hunt ran only the affected test classes).
-- The `test-opencl` job (pocl), which now runs with `LD_PRELOAD=$JAVA_HOME/lib/libjsig.so` (F148)
-  and the new OpenCL tests: `OpenCLZeroAnchorTest` (F129),
-  `ProbeAddressesOpenCLTest#setSrcPrivateKeyChunk_gridWouldReachTheGroupOrder_throwsException` (F151),
-  `TuneConfigurationTest#run_noArmSucceedsOnOneDevice_emittedConfigurationKeepsThatDevicesConfiguredValues`
-  (F154). Two things to watch there: the `privateKeyTooLarge` test above, and
-  `MainTest#testRoundtripOpenCLProducer_*`, which locally dies with SIGSEGV unless
-  `POCL_MAX_WORK_GROUP_SIZE=256` is set (pocl picks work-group size 4096 and overflows its 8 MB
-  thread stack, `BUGHUNT-CHECKED.md`); the job does not set the variable.
-- F136 with two real OpenCL devices (pocl offers one): `sweepFilterTypes` must measure each device's
-  own winner.
+**Measured (`BUGHUNT-MEASUREMENTS.md`, B1–B8) and acted on:** the full `mvn test` is green, without
+OpenCL completely and on pocl apart from `MainTest`'s OpenCL round trip, which needed
+`POCL_MAX_WORK_GROUP_SIZE=256` (now set in `test-opencl`, B2); the `privateKeyTooLarge` test runs on an
+8-bit grid (B3); the heap reclaim before the filter upload is gone (B6); the new OpenCL tests passed on
+four real GPUs (B4); F136 holds with two real devices (B5); the zero-anchor branch costs nothing
+measurable (B8, on a notebook RTX 3070 only, not repeated on a desktop card). What stays open from
+there is the signal-handler item below.
 
 ### Persistence backends (genuinely open work)
 
@@ -627,35 +599,20 @@ Also correct `docs/performance.md`: its "≈255 registers with spilling" reading
 `kernelMaxWorkGroupSize = 256` is wrong — the driver's PTX assembles to 126–128 registers with no
 spill, and the 256 cap stays even at `-cl-nv-maxrregcount=96`.
 
-### Check whether GPU OpenCL drivers replace the JVM's signal handlers (pocl does)
+### GPU OpenCL drivers and the JVM's signal handlers: Intel, and Ctrl-C on ROCm
 
-pocl 5.0 builds kernels with an in-process `libLLVM-16.so.1` that replaces the JVM's `SIGSEGV`,
-`SIGBUS`, `SIGFPE` and `SIGILL` handlers (`SA_RESETHAND`); concurrent faults, as at a safepoint, then
-kill the JVM with exit code 139 and no `hs_err` file. Measured on pocl only (2026-10-18): a probe with 8
-threads in hot compiled loops plus 2000 forced safepoints (`System.gc()` + `Thread.getAllStackTraces()`)
-after `OpenCLContext.init()` crashed 5/5, without the kernel build 0/5, with
-`LD_PRELOAD=$JAVA_HOME/lib/libjsig.so` 0/5. The launchers, the `test-opencl` job and a startup warning
-(`SignalChainingCheck`) now preload or ask for `libjsig` on Linux.
+Measured (`BUGHUNT-MEASUREMENTS.md`, B7; README "OpenCL on Linux: signal chaining"): pocl 5.0 and AMD
+ROCm 7.14 replace the JVM's handlers once the kernel is built, NVIDIA 580 does not. The `libjsig`
+preload in the launchers and the `SignalChainingCheck` warning therefore stay on for every Linux start
+(the idea of narrowing them to pocl is off the table). ROCm replaces more than pocl: also `SIGUSR2`
+(HotSpot's thread suspend/resume) and `SIGTERM`/`SIGINT`/`SIGHUP`/`SIGQUIT`; the safepoint probe did not
+crash there (0/5), which says nothing about those. Open:
 
-Open: the GPU drivers users actually run. On Linux, per driver (AMD ROCm/Adrenalin OpenCL, which runs
-LLVM/comgr in-process, is the likeliest; NVIDIA; Intel):
-1. Start any `Find` with `-Xcheck:jni` and an OpenCL producer; look for `SIGSEGV handler modified!` and
-   the library named under "Signal Handlers:".
-2. If it is modified, run the probe (8 hot threads, 2000 safepoints after the kernel build) without and
-   with `libjsig` preloaded.
-
-If no GPU driver is affected, the warning could be narrowed to pocl (platform name "Portable Computing
-Language"); until then it stays on for every Linux start.
-
-### Measure the zero-anchor branch of the key kernel on a real GPU
-
-`generateKeysKernel_grid` gained a branch for the work-item whose anchor scalar is 0 (the first
-work-item of a grid with base 0, fixed 2026-10-18, `OpenCLZeroAnchorTest`): one OR over the eight
-scalar words per work-item, and a branch that is false for every other work-item. Expected cost: not
-measurable. Confirm with the `GridSizeSweepBenchmark` / tuner arm of the device's sweet spot
-(`batchSizeInBits` 24, `keysPerWorkItem` 512 on the rented NVIDIA cards), the commit before against the
-commit with the branch, both orderings to defeat thermal bias, for the 2^32 and the
-`useReducedRadixField` walk.
+1. Intel's Linux OpenCL driver: `-Xcheck:jni` after the kernel build, then the probe without and with
+   `libjsig` (no Linux machine with an Intel GPU so far).
+2. ROCm without `libjsig`: does Ctrl-C / `SIGTERM` still run the shutdown hooks (`Shutdown`, the
+   finder's interrupt chain), and does a thread dump (`jcmd Thread.print`, which uses suspend/resume)
+   still work?
 
 ### OpenCL backend abstraction & multi-device coverage (migrated from GitHub issues)
 

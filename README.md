@@ -2199,8 +2199,21 @@ An OpenCL driver that compiles kernels inside the Java process with LLVM can tak
 device, also used in CI): its `libLLVM-16.so.1` installs its own handlers while the kernel is built.
 HotSpot raises `SIGSEGV` on purpose (implicit null checks, safepoint polls), so when several threads
 fault at once — at a safepoint, typically while the finder shuts down — the JVM can die with
-`Segmentation fault` (exit code 139) and **without** an `hs_err` file. Whether GPU drivers do the same
-has not been measured yet (AMD's OpenCL also runs LLVM in-process).
+`Segmentation fault` (exit code 139) and **without** an `hs_err` file.
+
+Measured per driver (`-Xcheck:jni` after the kernel build, plus a probe of 8 hot threads and 2000
+forced safepoints):
+
+| Driver | Replaces the JVM's handlers | Probe crashes without `libjsig` |
+|---|---|---|
+| pocl 5.0 (CPU) | yes | 5 of 5 |
+| AMD ROCm 7.14 (Instinct MI325X, `libLLVM.so.23.0git`) | yes — `SIGSEGV`, `SIGBUS`, `SIGFPE`, `SIGILL`, also `SIGUSR2` (the JVM's thread suspend/resume) and `SIGTERM`/`SIGINT`/`SIGHUP`/`SIGQUIT` | 0 of 5 |
+| NVIDIA 580.126.18 (RTX 3080) | no | 0 of 5 |
+| Intel | not measured | — |
+
+The ROCm probe not crashing does not make it safe: the probe exercises one failure path, and a replaced
+suspend/resume handler or a replaced `SIGTERM` handler (shutdown hooks on Ctrl-C) are risks of their
+own that it does not measure.
 
 The JDK ships the fix: preload its signal-chaining library, which keeps the JVM's handlers in front and
 forwards to the driver's:
@@ -2210,7 +2223,7 @@ LD_PRELOAD="$JAVA_HOME/lib/libjsig.so" java ... -jar bitcoinaddressfinder-<versi
 ```
 
 The OpenCL launchers in `examples/` (`run_*OpenCL*.sh`) do this already, and the finder logs a warning
-when it builds an OpenCL kernel on Linux without it. Windows is not affected.
+when it builds an OpenCL kernel on Linux without it, whatever the driver. Windows is not affected.
 
 **pocl only: limit the work-group size.** BAF passes no local work size, so pocl picks its maximum
 group (4096 on a 16-core host), and the key-generation kernel overflows the 8 MB stack of pocl's worker
