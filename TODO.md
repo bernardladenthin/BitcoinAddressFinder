@@ -687,19 +687,11 @@ Still open:
 
 ### Flaky CI tests seen on PR #389 (docs-only change, 2026-10-15)
 
-PR #389 changed only README/CSV/`TODO.md`, so both failures below are unrelated to it. Each needs
-reproducing on the current `HEAD` before anything is changed — a single CI run is not enough evidence.
+PR #389 changed only README/CSV/`TODO.md`, so its failures were unrelated to it. The
+`SocketResultBroadcasterTest` timeout is fixed (F191 in `BUGHUNT-FOUND.md`: the tests' port probe was
+counted as a client). What is left needs reproducing before anything is changed — a single CI run is
+not enough evidence.
 
-- **`SocketResultBroadcasterTest.onBatchChecked_twoConnectedClients_bothReceiveTheSameLine`** —
-  `java.net.SocketTimeoutException: Read timed out` after the 15 s budget (test 5/5 of the class, 1
-  error) in the `Test OpenCL (pocl CPU)` job, run 38698599185 (job 116307084481). The test waits for
-  `awaitClientCount(2)`, sends one batch and reads one line from each client; one client got nothing.
-  The `Test OpenCL (pocl CPU)` job was also red on PR #387 and #388. **Caveat:** the run was on base
-  `44ba793`; since then `SocketResultBroadcaster` was reworked by the bug hunt (`d0519ca8` stalled
-  listener, `59dfecff` greeting during announcement, `68a80f9f` queued results before close), so
-  the race may be gone or moved. Plan: run the class in a loop of fresh forks (≥ 100) on `HEAD`; if
-  it still fails, check whether a client registered by `awaitClientCount` can miss a broadcast that
-  is issued before its writer is ready.
 - **`Test (windows-latest)`: "There was a timeout in the fork"** (Surefire
   `forkedProcessTimeoutInSeconds` = 240), same run, job 116307084615. All 2 206 tests that finished
   were green; the only class that started and never reported is **`KeyProducerJavaZmqTest`**. That

@@ -958,6 +958,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 24ca3de
 
+### F191 – BitcoinAddressFinder: `SocketResultBroadcasterTest` zählt seine eigene Port-Probe als Client (flaky, rund 1 von 20 Forks)
+- **Zeit:** 2026-10-20 00:10 UTC
+- **Datei:** `src/test/java/net/ladenthin/bitcoinaddressfinder/keyproducer/SocketResultBroadcasterTest.java`
+- **Schwere:** niedrig (reiner Testcode; CI-Job `Test OpenCL (pocl CPU)` auf PR #387, #388, #389 rot, ohne Bezug zur Änderung)
+- **Historie:** Im TODO als „Flaky CI tests seen on PR #389“ notiert (`SocketTimeoutException: Read timed out` in `onBatchChecked_twoConnectedClients_bothReceiveTheSameLine`, Lauf 38698599185). Auf HEAD in frischen JVMs nachgestellt (je Lauf ein `java`-Prozess, die Klasse über den JUnit-Launcher, `argLine` wie in `pom.xml`): **2 von 40 Läufen rot**, einmal in `onBatchChecked_batchWithHit_clientReceivesTheKeyMaterial`, einmal in einem anderen Test derselben Klasse — der Fehler hängt also nicht an einem Test, sondern am gemeinsamen Muster.
+- **Beschreibung:** Jeder Test startete mit `broadcaster.start()` und danach `ConnectionUtils.waitUntilTcpPortOpen(…)`. Diese Probe öffnet eine echte TCP-Verbindung, und für den reinen TCP-Broadcaster ist sie ein vollwertiger Client: angenommen, registriert, bis zum ersten fehlgeschlagenen Schreiben in `clients`. `awaitClientCount(n)` zählte sie mit und kehrte zurück, sobald Probe plus n−1 echte Clients registriert waren; der Batch, den der Test danach schickte, ging am letzten echten Client vorbei, und dessen `readLine` lief nach 15 s ab. Das Log des roten Laufs zeigt es direkt: zwei `Result listener connected` in einem Test, der einen Client verbindet. Beim WebSocket-Broadcaster ist die Probe harmlos (sie schließt keinen Handshake ab); dort ist nichts zu ändern. Produktionscode ist nicht betroffen — `start()` bindet den `ServerSocket` synchron, und dass ein Client, der nach einem Batch registriert wird, ihn nicht bekommt, ist das dokumentierte Best-Effort-Verhalten.
+- **Fix:** Die Probe entfällt; alle Tests starten über einen Helfer `start(broadcaster)`, dessen Javadoc sagt, warum keine Probe nötig (der Port ist nach `start()` offen) und warum sie falsch ist.
+- **Tests:** neu `onBatchChecked_registrationIsSlow_theOnlyClientStillReceivesTheBatch`: verzögert über den bestehenden Test-Hook `setBeforeClientRegistered` jede Registrierung um 300 ms und macht das Rennen so zur Gewissheit.
+- **Rot-Grün-Nachweis:** Mit dem Helfer noch mit Probe ist der neue Test deterministisch rot (`but: was null`, der Batch ging an die Probe), ohne Probe grün (9/9). Schleife über frische JVMs: vorher 2/40 rot, nachher 0 von 51 (Zwischenstand, die Schleife läuft auf 150).
+- **Status:** gefixt
+- **Commit:** (folgt)
+
 ## Offene Verdachte ohne Fund-ID
 
 - *(erledigt 2026-10-19, ohne Fund-ID: Testumgebung, kein Produktfehler)* `ProbeAddressesOpenCLTest#setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException` brach auf Geräten mit 1024 MiB je Allokation mit `CL_INVALID_BUFFER_SIZE` ab, bevor die Prüfung lief (B3: mit `POCL_MEMORY_LIMIT=4` reproduziert, ab 2047 MB grün). Läuft jetzt auf einem 8-Bit-Raster (eigener Provider `privateKeysTooLargeForASmallGrid`), mit und ohne Begrenzung grün. Commit 1faa48a. Ebenso B2: `test-opencl` setzt `POCL_MAX_WORK_GROUP_SIZE=256` (8cb9bb5), B6: `GcTrigger` entfernt (e451898).

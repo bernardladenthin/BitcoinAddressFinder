@@ -47,6 +47,9 @@ class SocketResultBroadcasterTest {
     /** Read timeout for a message that, when it is sent at all, is sent at once. */
     private static final int SHORT_READ_MILLIS = 3_000;
 
+    /** How long each registration is held up in the test that makes the registration race certain. */
+    private static final int SLOW_REGISTRATION_MILLIS = 300;
+
     /** Receive buffer of a client that never reads; small so its buffers fill quickly. */
     private static final int STALLED_RECEIVE_BUFFER_BYTES = 4096;
 
@@ -62,8 +65,7 @@ class SocketResultBroadcasterTest {
         final int port = freePort();
         final SocketResultBroadcaster broadcaster = new SocketResultBroadcaster(port);
         try {
-            broadcaster.start();
-            ConnectionUtils.waitUntilTcpPortOpen("127.0.0.1", port, AWAIT_MILLIS);
+            start(broadcaster);
 
             try (Socket first = connect(port);
                     Socket second = connect(port)) {
@@ -112,8 +114,7 @@ class SocketResultBroadcasterTest {
         broadcaster.setAfterStopRequested(stopRequested::countDown);
         final ExecutorService readerExecutor = Executors.newSingleThreadExecutor();
         try {
-            broadcaster.start();
-            ConnectionUtils.waitUntilTcpPortOpen("127.0.0.1", port, AWAIT_MILLIS);
+            start(broadcaster);
             try (Socket client = connect(port)) {
                 final BufferedReader clientReader = reader(client);
                 broadcaster.awaitClientCount(1, AWAIT_MILLIS);
@@ -146,8 +147,7 @@ class SocketResultBroadcasterTest {
         final int port = freePort();
         final SocketResultBroadcaster broadcaster = new SocketResultBroadcaster(port);
         try {
-            broadcaster.start();
-            ConnectionUtils.waitUntilTcpPortOpen("127.0.0.1", port, AWAIT_MILLIS);
+            start(broadcaster);
 
             try (Socket client = connect(port)) {
                 final BufferedReader clientReader = reader(client);
@@ -175,8 +175,7 @@ class SocketResultBroadcasterTest {
         final int port = freePort();
         final SocketResultBroadcaster broadcaster = new SocketResultBroadcaster(port);
         try {
-            broadcaster.start();
-            ConnectionUtils.waitUntilTcpPortOpen("127.0.0.1", port, AWAIT_MILLIS);
+            start(broadcaster);
 
             final Socket leaving = connect(port);
             try (Socket staying = connect(port)) {
@@ -208,8 +207,7 @@ class SocketResultBroadcasterTest {
         final SocketResultBroadcaster broadcaster = new SocketResultBroadcaster(port);
         final ExecutorService caller = Executors.newSingleThreadExecutor();
         try {
-            broadcaster.start();
-            ConnectionUtils.waitUntilTcpPortOpen("127.0.0.1", port, AWAIT_MILLIS);
+            start(broadcaster);
             try (Socket stalled = new Socket()) {
                 stalled.setReceiveBufferSize(STALLED_RECEIVE_BUFFER_BYTES);
                 stalled.connect(new InetSocketAddress("127.0.0.1", port));
@@ -240,8 +238,7 @@ class SocketResultBroadcasterTest {
         final SocketResultBroadcaster broadcaster = new SocketResultBroadcaster(port);
         try {
             broadcaster.announceConfiguration(18, true);
-            broadcaster.start();
-            ConnectionUtils.waitUntilTcpPortOpen("127.0.0.1", port, AWAIT_MILLIS);
+            start(broadcaster);
 
             // act
             try (Socket client = connect(port)) {
@@ -262,8 +259,7 @@ class SocketResultBroadcasterTest {
         final int port = freePort();
         final SocketResultBroadcaster broadcaster = new SocketResultBroadcaster(port);
         try {
-            broadcaster.start();
-            ConnectionUtils.waitUntilTcpPortOpen("127.0.0.1", port, AWAIT_MILLIS);
+            start(broadcaster);
 
             try (Socket client = connect(port)) {
                 final BufferedReader clientReader = reader(client);
@@ -275,6 +271,45 @@ class SocketResultBroadcasterTest {
                 // assert
                 final JsonNode message = objectMapper.readTree(clientReader.readLine());
                 assertThat(message.get("type").asText(), is(equalTo("config")));
+            }
+        } finally {
+            broadcaster.close();
+        }
+    }
+
+    /**
+     * {@link SocketResultBroadcaster#awaitClientCount(int, int)} counts every accepted connection, so
+     * a test that connects anything besides its own clients -- a port probe, say -- returns from the
+     * wait before its last client is registered, and the batch sent next misses that client. That
+     * race is what made this class flaky (about one fork in twenty). Here every registration is
+     * slowed down, which turns the race into a certainty: the batch must still arrive.
+     */
+    @Test
+    void onBatchChecked_registrationIsSlow_theOnlyClientStillReceivesTheBatch() throws Exception {
+        // arrange
+        final int port = freePort();
+        final SocketResultBroadcaster broadcaster = new SocketResultBroadcaster(port);
+        broadcaster.setBeforeClientRegistered(() -> {
+            try {
+                Thread.sleep(SLOW_REGISTRATION_MILLIS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        try {
+            start(broadcaster);
+            try (Socket client = connect(port)) {
+                client.setSoTimeout(SHORT_READ_MILLIS);
+                final BufferedReader clientReader = reader(client);
+                broadcaster.awaitClientCount(1, AWAIT_MILLIS);
+
+                // act
+                broadcaster.onBatchChecked(new BatchResult(BigInteger.ONE, 1, List.of()));
+
+                // assert
+                final String line = readLineOrNull(clientReader);
+                assertThat(line, is(notNullValue()));
+                assertThat(objectMapper.readTree(line).get("type").asText(), is(equalTo("batch")));
             }
         } finally {
             broadcaster.close();
@@ -322,6 +357,21 @@ class SocketResultBroadcasterTest {
         }
     }
     // </editor-fold>
+
+    /**
+     * Starts the broadcaster. {@link SocketResultBroadcaster#start()} binds the server socket before it
+     * returns, so the port accepts connections from here on and nothing has to wait for it. Probing the
+     * port is not just unnecessary but wrong: the probe is accepted and registered like any client, so
+     * {@link SocketResultBroadcaster#awaitClientCount(int, int)} counts it and returns before the test's
+     * last client is registered (see
+     * {@link #onBatchChecked_registrationIsSlow_theOnlyClientStillReceivesTheBatch()}).
+     *
+     * @param broadcaster the broadcaster to start
+     * @throws Exception if it cannot be started
+     */
+    private static void start(SocketResultBroadcaster broadcaster) throws Exception {
+        broadcaster.start();
+    }
 
     /**
      * Reads one line, treating a read timeout as "nothing arrived".
