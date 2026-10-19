@@ -8,8 +8,6 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -221,39 +219,6 @@ public class OpenCLContextGpuFilterWidthTest {
         } finally {
             context.close();
         }
-    }
-    // </editor-fold>
-
-    // <editor-fold defaultstate="collapsed" desc="reclaimHeapBeforeUpload">
-
-    /**
-     * The upload path must reclaim the heap first, because building a Full-DB filter leaves
-     * ~40&nbsp;GB of transient garbage that, on some drivers, makes {@code clCreateBuffer} fail to pin
-     * host memory (a real {@code CL_MEM_OBJECT_ALLOCATION_FAILURE} was measured on an RX 7900 XTX).
-     * There is no size gate — the filter is uploaded once at startup, so the collection is a one-time
-     * cost. The {@code System.gc()} that fixes it is a hint the test cannot observe, so it is injected
-     * as a {@link GcTrigger} mock and the invocation is asserted directly — no device required.
-     */
-    @Test
-    public void reclaimHeapBeforeUpload_invokesTheTrigger() {
-        GcTrigger gcTrigger = mock(GcTrigger.class);
-        OpenCLContext context = new OpenCLContext(new CProducerOpenCL(), bitHelper);
-        context.setGcTrigger(gcTrigger);
-
-        context.reclaimHeapBeforeUpload();
-
-        verify(gcTrigger).requestGc();
-    }
-
-    /**
-     * The production default must be a real {@link System#gc()} hint, not a no-op — otherwise the
-     * reclaim would silently do nothing in a real run and the RDNA3 failure would return.
-     */
-    @Test
-    public void systemGcTrigger_isTheProductionDefault_andInvokesSystemGc() {
-        // Invoking it must not throw; System.gc() is a hint, so there is nothing else to assert about
-        // its effect, only that the wiring calls through.
-        GcTrigger.SYSTEM.requestGc();
     }
     // </editor-fold>
 }

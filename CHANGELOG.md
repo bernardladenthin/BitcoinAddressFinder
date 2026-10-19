@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (3.15.0 final, from 3.14). The shared `check-versions.py` now also compares the Kotlin Gradle plugins
   of a repository with its POMs' Kotlin (nothing to compare here) and reads java-llama.cpp's
   `examples/server/pom.xml`.
+- **No `System.gc()` before the GPU filter upload any more** (`OpenCLContext.reclaimHeapBeforeUpload`,
+  `GcTrigger` removed). It was added for `CL_MEM_OBJECT_ALLOCATION_FAILURE` on an RX 7900 XTX while
+  the buffer was created with `CL_MEM_COPY_HOST_PTR`; on the chunked LWJGL upload the same card created
+  and filled the 3.10 GB Full-DB Fuse-16 buffer at 40.9 GiB live heap without a collection, which cost
+  83 ms and changed nothing in the probe throughput (2.253 vs 2.252 ms/op).
 - **CI prints the runner's CPU** at the top of `test`, `test-opencl` and `vmlens`
   (`.github/print-host-info.sh`, a shared file of the four repositories): pocl computes on the CPU, so a
   throughput or a timing in those logs can be read against the hardware the job drew.

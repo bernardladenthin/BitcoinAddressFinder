@@ -447,33 +447,6 @@ public class OpenCLContext implements ReleaseCLObject {
         this.clApi = clApi;
     }
 
-    /** Reclaims the heap before a filter upload; injectable so the trigger can be verified. */
-    private GcTrigger gcTrigger = GcTrigger.SYSTEM;
-
-    /**
-     * Overrides the garbage-collection trigger. For tests only, so the reclaim-before-upload
-     * behaviour can be asserted against a mock without a real {@code System.gc()}.
-     *
-     * @param gcTrigger the trigger to use
-     */
-    @VisibleForTesting
-    void setGcTrigger(GcTrigger gcTrigger) {
-        this.gcTrigger = gcTrigger;
-    }
-
-    /**
-     * Reclaims the JVM heap right before a fingerprint buffer is created. A filter is uploaded once,
-     * at startup, immediately after its build, whose transient garbage (~40&nbsp;GB at the Full DB
-     * tier) may still occupy the heap; collecting it first is what removed the
-     * {@code CL_MEM_OBJECT_ALLOCATION_FAILURE} measured on RDNA3. No size gate: the collection runs
-     * once per upload. See {@link GcTrigger} for the measurement, which predates the chunked upload,
-     * and the JDK precedent.
-     */
-    @VisibleForTesting
-    void reclaimHeapBeforeUpload() {
-        gcTrigger.requestGc();
-    }
-
     /**
      * Initialises the OpenCL context, command queue, program and kernel.
      *
@@ -822,9 +795,6 @@ public class OpenCLContext implements ReleaseCLObject {
         // the padding byte is never read.
         final boolean empty = fingerprintByteSize <= 0L;
         final long byteSize = empty ? 1L : fingerprintByteSize;
-        // An upload right after a filter build can fail to pin host memory while the build's
-        // transient garbage still occupies the heap (measured on RDNA3); reclaim it first.
-        reclaimHeapBeforeUpload();
         final ClMem localFpMem = clApi.createBuffer(localContext, ClBufferFlags.READ_ONLY, byteSize);
         try {
             if (!empty) {
@@ -1176,9 +1146,6 @@ public class OpenCLContext implements ReleaseCLObject {
         releaseBenchFilterProbe(); // idempotent: a second prepare must not leak the first upload
         benchFilterProbeCount = probeKeys.length;
         benchFilterKernel = clApi.createKernel(localProgram, kernelName);
-        // Same host-memory-pinning trap as the production upload: reclaim the build's transient
-        // garbage so the driver can pin the staging region (see reclaimHeapBeforeUpload).
-        reclaimHeapBeforeUpload();
 
         final ClMem localFilterMem = clApi.createBuffer(localContext, ClBufferFlags.READ_ONLY, filterBytes);
         filterUpload.writeInto(localQueue, localFilterMem);

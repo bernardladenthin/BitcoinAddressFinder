@@ -627,26 +627,6 @@ Also correct `docs/performance.md`: its "≈255 registers with spilling" reading
 `kernelMaxWorkGroupSize = 256` is wrong — the driver's PTX assembles to 126–128 registers with no
 spill, and the 256 cap stays even at `-cl-nv-maxrregcount=96`.
 
-### Re-measure the heap reclaim before the GPU filter upload on the chunked LWJGL upload
-
-`OpenCLContext.reclaimHeapBeforeUpload()` runs `System.gc()` right before the fingerprint buffer is
-created (`GcTrigger`). It was introduced in `e3f3e72` and verified in `3a2cfba` (2026-07-20) on an RX
-7900 XTX: the 3.1 GB Full-DB Fuse-16 buffer failed with `CL_MEM_OBJECT_ALLOCATION_FAILURE` at 33.9 GiB
-live heap and passed after a collection. That was the JOCL binding, which created the buffer with
-`CL_MEM_COPY_HOST_PTR`, so the driver had to pin a host staging region for the whole payload. Since
-`5479507` (2026-08-02, LWJGL) the buffer is a plain `CL_MEM_READ_ONLY` allocation filled in bounded
-slices through `ClApi.writeBufferChunked`, and the collection has not been measured on that path.
-
-To settle it, on the AMD machine (driver as in `3a2cfba`), Full-DB Fuse-16, plain `-Xmx48g`:
-1. Run the upload with a no-op `GcTrigger` (`OpenCLContext.setGcTrigger`). If it passes, the failure
-   was specific to `CL_MEM_COPY_HOST_PTR`.
-2. Run it with `GcTrigger.SYSTEM` and log how long `requestGc()` takes on that heap (the Javadoc used
-   to say "a few milliseconds"; with ~30 GB of garbage it may be seconds).
-
-Then either keep the collection with the measured reason and cost in the `GcTrigger` Javadoc, or
-remove it together with `GcTrigger` and its test in `OpenCLContextGpuFilterWidthTest`. An NVIDIA card
-cannot answer this: the RTX 3070 never reproduced the original failure.
-
 ### Check whether GPU OpenCL drivers replace the JVM's signal handlers (pocl does)
 
 pocl 5.0 builds kernels with an in-process `libLLVM-16.so.1` that replaces the JVM's `SIGSEGV`,
