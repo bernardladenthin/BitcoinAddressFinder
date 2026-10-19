@@ -874,7 +874,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion / Tests:** `ProducerJavaTest#produceKeys_incrementalRangeEndingInsideABatch_checksEveryKeyUpToTheEnd` (Ende zu Ende über `ProducerJava`, Bereich 2 … 7, Batch 4: der Consumer bekommt 2 … 7); `KeyProducerJavaIncrementalTest#createSecrets_batchExceedsEnd_returnsTheKeysUpToTheEnd` und `#createSecrets_endPrivateKeyInclusive_partialBatch_returnsTheRestThenThrows` (vorher `…_throwsException`, schrieben die alte Regel fest).
 - **Rot-Grün-Nachweis:** ohne Fix rot („no item was <6>“, die beiden Key-Producer-Tests mit `NoMoreSecretsAvailableException`), mit Fix grün; Gegenprobe per `git stash` beider Produktionsdateien wieder rot (3 Tests), danach grün. Breit: `KeyProducerJavaIncrementalTest` 10/10, `ProducerJavaTest` 10/10, `AbstractProducerTest` 20/20, `FinderTest` 29/29; `spotless:apply`, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** a77564a
 
 ## Offene Verdachte ohne Fund-ID
 
