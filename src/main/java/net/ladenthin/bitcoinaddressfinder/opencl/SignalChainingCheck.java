@@ -15,7 +15,8 @@ import org.jspecify.annotations.Nullable;
  * and handles it itself. An OpenCL driver that compiles kernels in-process with LLVM can install its own
  * handlers for {@code SIGSEGV}, {@code SIGBUS}, {@code SIGFPE} and {@code SIGILL}: measured with pocl
  * 5.0, whose {@code libLLVM-16.so.1} takes them over while the kernel is built, with
- * {@code SA_RESETHAND}. A single fault is still forwarded to the JVM, but when several threads fault at
+ * {@code SA_RESETHAND}, with Intel's CPU OpenCL runtime 2026.2 ({@code libintelocl.so}, already at
+ * context creation) and with AMD ROCm 7.14 and 10.1 (where no crash was observed). A single fault is still forwarded to the JVM, but when several threads fault at
  * once, as they do at a safepoint, one of them meets the default handler and the process dies with
  * {@code SIGSEGV} &#x2014; without an {@code hs_err} file, because the JVM never sees the signal. Loading
  * the JDK's {@code libjsig} first ({@code LD_PRELOAD}) keeps the JVM's handlers in front and chains the
@@ -48,7 +49,7 @@ public final class SignalChainingCheck {
             return Optional.empty();
         }
         return Optional.of("The JDK's signal chaining (libjsig) is not preloaded. An OpenCL driver that compiles"
-                + " kernels in-process with LLVM (measured: pocl) replaces the JVM's SIGSEGV handler, and"
+                + " kernels in-process with LLVM (measured: pocl, Intel CPU runtime, AMD ROCm) replaces the JVM's SIGSEGV handler, and"
                 + " concurrent safepoints can then kill the JVM without an hs_err file. Start with"
                 + " LD_PRELOAD=" + javaHome + "/lib/" + LIBJSIG + ".so (the examples/run_*OpenCL*.sh scripts do).");
     }

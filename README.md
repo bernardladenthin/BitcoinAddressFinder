@@ -2207,14 +2207,23 @@ forced safepoints):
 | Driver | Replaces the JVM's handlers | Probe crashes without `libjsig` |
 |---|---|---|
 | pocl 5.0 (CPU, `libLLVM-16.so.1`) | yes — `SIGSEGV`, `SIGBUS`, `SIGFPE`, `SIGILL`, also `SIGUSR2` (the JVM's thread suspend/resume) and `SIGTERM`/`SIGINT`/`SIGHUP`/`SIGQUIT`/`SIGTRAP` | 5 of 5 |
-| AMD ROCm 7.14 (Instinct MI325X, `libLLVM.so.23.0git`) | yes — the same set | 0 of 5 |
+| AMD ROCm 7.14 (Instinct MI325X, CDNA3, `libLLVM.so.23.0git`) | yes — the same set | 0 of 5 |
+| AMD ROCm 10.1 (Radeon PRO V710, RDNA3 `gfx1101`, `libLLVM.so.24.0git`) | yes — the same set | 0 of 5 |
+| Intel CPU runtime 2026.2 (`intel-oneapi-runtime-opencl`, `libintelocl.so`) | yes — the same set, already when the context is created | 5 of 5 |
 | NVIDIA 580.126.18 (RTX 3080) | no | 0 of 5 |
-| Intel | not measured | — |
+| Intel GPU (compute-runtime/NEO) | not measured (no Intel GPU was reachable) | — |
 
-The ROCm probe not crashing does not make it safe: the probe exercises one failure path. Measured on
-pocl, what else changes without `libjsig`: `kill -3` no longer prints a thread dump; Ctrl-C/`SIGTERM`
-still run the shutdown hooks, `jcmd` and JFR sampling still work. The same measurements on ROCm and
-Intel are open.
+What else changes without `libjsig`, measured per driver:
+
+- **pocl:** `kill -3` no longer prints a thread dump; Ctrl-C/`SIGTERM`/`SIGHUP` still run the shutdown
+  hooks, `jcmd` and JFR sampling still work.
+- **Intel CPU runtime:** like pocl for the hooks, `jcmd` and JFR, and the probe crashes 5 of 5; `kill -3`
+  still dumps, but Intel's LLVM handler first prints a spurious "PLEASE submit a bug report" line.
+- **AMD ROCm** (both generations above): no observable consequence — the hooks run, `kill -3` dumps,
+  `jcmd` and JFR work, the probe survives. The handlers are replaced all the same (`-Xcheck:jni` reports
+  them), and the probe exercises one failure path only, so `libjsig` is recommended here as well.
+- **Intel GPU:** unmeasured. Its kernel compiler (`libigc`) is LLVM-based as well, so the safe default
+  is `libjsig` until it is measured.
 
 The JDK ships the fix: preload its signal-chaining library, which keeps the JVM's handlers in front and
 forwards to the driver's:

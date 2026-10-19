@@ -601,22 +601,33 @@ that builds the kernel, registers a shutdown hook and waits (`SigProbe4`, the br
 
 | Signal / action | pocl, no `libjsig` | pocl with `libjsig` | without OpenCL |
 |---|---|---|---|
-| `SIGTERM` / `SIGINT` / `SIGHUP` | hook runs, exit 143 / 0 / 129 | same | same |
+| `SIGTERM` / `SIGINT` / `SIGHUP` | hook runs, exit 143 / 0¹ / 129 | same | same |
 | `SIGQUIT` (`kill -3`) | **no thread dump** | thread dump | thread dump |
 | `jcmd <pid> VM.version` (attach) | works | works | works |
 | JFR method sampling | samples (2767) | samples | samples |
 | 8 hot threads + 2000 safepoints | **crash 5 of 5** (B7) | no crash | no crash |
 
+¹ Not a measurement of `SIGINT`: the probe inherited it as ignored (see the `signal-matrix.sh` item
+below), so it slept out its timeout and exited 0. With default signals ROCm and the Intel CPU runtime
+give 130; pocl was not re-measured that way.
+
 So on pocl the shutdown path survives (LLVM's handler passes these signals on), the thread dump does
-not. Open, as the measurement brief **B9** (`BUGHUNT-MEASUREMENTS.md`):
+not. **Measured since (B9, `BUGHUNT-MEASUREMENTS.md`, 2026-10-19), now in the README table:** AMD ROCm
+7.14 (MI325X) and 10.1 (Radeon PRO V710) replace the same set with no observable consequence (dump,
+hooks, `jcmd`, JFR, probe 0/5); Intel's CPU runtime 2026.2 replaces it at context creation and crashes
+5/5 without `libjsig` (0/5 with it), `kill -3` still dumps behind a spurious LLVM line.
 
-1. The same matrix on **AMD ROCm** (replaces the same set; the safepoint probe survived there 0 of 5,
-   the rest is unmeasured).
-2. **Intel's CPU OpenCL runtime** (oneAPI, `intel-oneapi-runtime-opencl`): any x86 VM, LLVM in-process.
-3. **Intel GPU** (compute-runtime/NEO, `libigc`): needs Intel GPU hardware under Linux.
+Still open:
 
-Afterwards: name the per-driver consequences in the README table (today it lists only the replaced
-signals), at least "no `kill -3` thread dump without `libjsig`".
+- **Intel GPU (compute-runtime/NEO, `libigc`)** — unmeasured, no Intel GPU was reachable (the only
+  rentable candidate, a Vultr E-2388G bare-metal box, has the iGPU disabled in the BIOS). Any Linux
+  machine with a Gen12+ iGPU will do: `intel-opencl-icd` instead of the oneAPI CPU runtime, then the
+  B9.2 steps. The README row says "not measured" until then.
+- **`signal-matrix.sh` cannot measure `SIGINT`/`SIGHUP`** as written (the script is in the brief, not
+  in the repository): it starts the probe with `&` from a non-interactive bash (and under `nohup`), so
+  both signals arrive as ignored (`SigIgn: 0000000000000003`) and the rows only time out. Before it is
+  used again, start the probe with `env --default-signal=HUP,INT` (coreutils ≥ 8.31) and record a
+  `TIMEOUT` column, as the B9 repeat did; then re-measure pocl's `SIGINT` row above.
 
 ### OpenCL backend abstraction & multi-device coverage (migrated from GitHub issues)
 
