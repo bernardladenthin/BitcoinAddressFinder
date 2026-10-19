@@ -349,7 +349,7 @@ public class ProbeAddressesOpenCLTest {
 
     @OpenCLTest
     @ParameterizedTest
-    @MethodSource(CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_WITH_CHUNK_SIZE)
+    @MethodSource(CommonDataProvider.DATA_PROVIDER_PRIVATE_KEYS_TOO_LARGE_FOR_A_SMALL_GRID)
     public void setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException(BigInteger privateKey, int chunkSize)
             throws IOException {
         new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
