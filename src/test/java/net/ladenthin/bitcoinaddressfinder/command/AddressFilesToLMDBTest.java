@@ -307,6 +307,43 @@ public class AddressFilesToLMDBTest extends LMDBBase {
         }
     }
 
+    /**
+     * Unusable amounts keep their addresses with the default amount, and the import says so once, with
+     * the number of affected lines and the first one, instead of storing them silently.
+     */
+    @Test
+    public void addressFilesToLMDB_unusableAmounts_warnsOnceAndStoresTheDefault() throws Exception {
+        P2PKH[] keys = P2PKH.values();
+        File file = folder.resolve("amounts.txt").toFile();
+        Files.write(
+                file.toPath(),
+                List.of(
+                        keys[0].getPublicAddress() + ",1.5",
+                        keys[1].getPublicAddress() + ",-5",
+                        keys[2].getPublicAddress() + ",abc",
+                        keys[3].getPublicAddress() + ",42"));
+
+        File lmdbDir;
+        try (LogCaptor logCaptor = LogCaptor.forClass(AddressFilesToLMDB.class)) {
+            lmdbDir = runImport(1, false, List.of(file.getAbsolutePath()), "amounts");
+
+            List<String> amountWarnings = logCaptor.getWarnLogs().stream()
+                    .filter(w -> w.contains("amount"))
+                    .toList();
+            assertThat(amountWarnings, hasSize(1));
+            assertThat(amountWarnings.get(0), containsString("3 line(s)"));
+            assertThat(amountWarnings.get(0), containsString(keys[0].getPublicAddress() + ",1.5"));
+        }
+
+        LMDBPersistence lmdb = openReadOnly(lmdbDir);
+        try {
+            assertThat(lmdb.getAmount(keys[1].getPublicKeyHashAsByteBuffer()), is(equalTo(Coin.SATOSHI)));
+            assertThat(lmdb.getAmount(keys[3].getPublicKeyHashAsByteBuffer()), is(equalTo(Coin.valueOf(42))));
+        } finally {
+            lmdb.close();
+        }
+    }
+
     /** An import stopped by {@code interrupt()} leaves an incomplete database and must not be reported as done. */
     @Test
     public void addressFilesToLMDB_interruptedBeforeTheImport_doesNotReportTheImportAsDone() throws Exception {

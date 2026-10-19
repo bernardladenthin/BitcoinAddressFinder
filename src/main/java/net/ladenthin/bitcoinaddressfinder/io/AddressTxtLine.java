@@ -14,6 +14,7 @@ import com.google.common.hash.Hashing;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
@@ -60,9 +61,6 @@ public class AddressTxtLine {
      */
     private static final Pattern HEX_HASH160 = Pattern.compile("[0-9a-fA-F]{40}");
 
-    /** Creates a new {@link AddressTxtLine}. */
-    public AddressTxtLine() {}
-
     /**
      * Should not be {@link Coin#ZERO} because it can't be written to LMDB.
      */
@@ -108,6 +106,25 @@ public class AddressTxtLine {
 
     Bech32Helper bech32Helper = new Bech32Helper();
 
+    /** Hears of every line whose amount was not usable; see {@link #AddressTxtLine(Consumer)}. */
+    @ToString.Exclude
+    private final Consumer<String> unusableAmountListener;
+
+    /** Creates a new {@link AddressTxtLine} that does not report unusable amounts. */
+    public AddressTxtLine() {
+        this(line -> {});
+    }
+
+    /**
+     * Creates a new {@link AddressTxtLine} that reports every line whose amount column is present but not
+     * a non-negative whole number of satoshi. Such a line keeps its address with {@link #DEFAULT_COIN}.
+     *
+     * @param unusableAmountListener receives the trimmed line
+     */
+    public AddressTxtLine(Consumer<String> unusableAmountListener) {
+        this.unusableAmountListener = unusableAmountListener;
+    }
+
     /**
      * Parses a line containing an address and optional amount.
      * Throws {@link AddressFormatNotAcceptedException} if the address is unsupported,
@@ -143,7 +160,7 @@ public class AddressTxtLine {
         }
         String[] lineSplitted = SeparatorFormat.split(line);
         String address = lineSplitted[COLUMN_ADDRESS];
-        Coin amount = getCoinIfPossible(lineSplitted, DEFAULT_COIN);
+        Coin amount = getCoinIfPossible(lineSplitted, DEFAULT_COIN, line);
         address = address.trim();
         // An all-uppercase CashAddr would otherwise reach the Base58 fallback and decode to a wrong
         // hash160. No Base58 address is 42 characters long, so the pattern cannot claim one.
@@ -344,16 +361,27 @@ public class AddressTxtLine {
         return new AddressToCoin(hash160AsByteBuffer, DEFAULT_COIN, addressType);
     }
 
-    private @NonNull Coin getCoinIfPossible(@NonNull String[] lineSplitted, @NonNull Coin defaultValue) {
-        if (lineSplitted.length > COLUMN_AMOUNT) {
-            String amountString = lineSplitted[COLUMN_AMOUNT];
-            try {
-                return Coin.valueOf(Long.parseLong(amountString));
-            } catch (NumberFormatException e) {
-                return defaultValue;
-            }
-        } else {
+    /**
+     * Reads the amount column. An amount that is present but not a non-negative whole number of satoshi
+     * (a decimal BTC value, text, a value above {@code Long.MAX_VALUE}, an empty column, a negative value)
+     * takes {@code defaultValue} and is reported to the listener; the address itself stays valid, since
+     * the amount is only side information for the search.
+     */
+    private @NonNull Coin getCoinIfPossible(
+            @NonNull String[] lineSplitted, @NonNull Coin defaultValue, @NonNull String line) {
+        if (lineSplitted.length <= COLUMN_AMOUNT) {
             return defaultValue;
         }
+        String amountString = lineSplitted[COLUMN_AMOUNT];
+        try {
+            long satoshi = Long.parseLong(amountString);
+            if (satoshi >= 0) {
+                return Coin.valueOf(satoshi);
+            }
+        } catch (NumberFormatException e) {
+            // reported below
+        }
+        unusableAmountListener.accept(line);
+        return defaultValue;
     }
 }

@@ -44,6 +44,7 @@ import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
 import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.Network;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,6 +103,12 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
 
     /** Count of lines rejected as unsupported/unparseable (incremented by the parser workers). */
     private final AtomicLong unsupportedCounter = new AtomicLong();
+
+    /** Lines whose amount column was present but not usable; they were stored with the default amount. */
+    private final AtomicLong unusableAmountCounter = new AtomicLong();
+
+    /** The first such line, quoted in the summary. */
+    private final AtomicReference<@Nullable String> firstUnusableAmountLine = new AtomicReference<>();
 
     /** Number of address files fully read so far (for "X/Y files" progress). */
     private final AtomicLong filesProcessed = new AtomicLong();
@@ -407,7 +414,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
             throws InterruptedException {
         // Both are stateless/immutable and reused for every line this worker parses.
         KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(true));
-        AddressTxtLine addressTxtLine = new AddressTxtLine();
+        AddressTxtLine addressTxtLine = new AddressTxtLine(this::recordUnusableAmount);
         while (failure.get() == null && shouldRun.get() && !(readingDone.get() && lineQueue.isEmpty())) {
             String line = lineQueue.poll(QUEUE_POLL_MILLIS, TimeUnit.MILLISECONDS);
             if (line == null) {
@@ -515,11 +522,29 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
         }
     }
 
+    /**
+     * Counts a line whose amount was not usable and keeps the first one for the summary.
+     *
+     * @param line the line
+     */
+    private void recordUnusableAmount(String line) {
+        unusableAmountCounter.incrementAndGet();
+        firstUnusableAmountLine.compareAndSet(null, line);
+    }
+
     private void logSummary() {
         LOGGER.info("Import summary: " + addressCounter.get() + " written, " + parsedCounter.get() + " parsed, "
                 + unsupportedCounter.get() + " unsupported, " + errors.size() + " error(s).");
         for (String error : errors) {
             LOGGER.info("Error in line: " + error);
+        }
+        long unusableAmounts = unusableAmountCounter.get();
+        if (unusableAmounts > 0) {
+            LOGGER.warn(
+                    "{} line(s) carried an amount that is not a non-negative whole number of satoshi; their"
+                            + " addresses were stored with the default amount of 1 satoshi. First: '{}'",
+                    unusableAmounts,
+                    Objects.requireNonNullElse(firstUnusableAmountLine.get(), ""));
         }
     }
 

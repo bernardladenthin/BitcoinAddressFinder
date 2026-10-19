@@ -8,6 +8,8 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
 import net.ladenthin.bitcoinaddressfinder.constants.AddressConstants;
@@ -47,6 +49,36 @@ public class AddressTxtLineTest {
      * hash160, whatever its digits and case: a line without a {@code 0} used to fall through to the
      * Base58 decoder and import a different hash160, and one with a {@code 0} was rejected.
      */
+    /**
+     * The amount column is only side information, so an amount that is not a non-negative whole
+     * number of satoshi keeps the address and takes the default amount; the listener hears of it so
+     * the import can say how many lines were affected. A negative amount used to be taken over.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"1.5", "abc", "-5", "99999999999999999999", ""})
+    public void fromLine_unusableAmount_takesTheDefaultAndReportsTheLine(String amount) throws Exception {
+        List<String> reported = new ArrayList<>();
+        AddressTxtLine addressTxtLine = new AddressTxtLine(reported::add);
+        String line = P2PKH.values()[0].getPublicAddress() + "," + amount + ",5";
+
+        AddressToCoin addressToCoin = addressTxtLine.fromLine(line, keyUtility);
+
+        assertThat(addressToCoin.coin(), is(equalTo(AddressTxtLine.DEFAULT_COIN)));
+        assertThat(reported, contains(line));
+    }
+
+    @Test
+    public void fromLine_validAmountOrNone_isNotReported() throws Exception {
+        List<String> reported = new ArrayList<>();
+        AddressTxtLine addressTxtLine = new AddressTxtLine(reported::add);
+
+        AddressToCoin withAmount = addressTxtLine.fromLine(P2PKH.values()[0].getPublicAddress() + ",42", keyUtility);
+        addressTxtLine.fromLine(P2PKH.values()[0].getPublicAddress(), keyUtility);
+
+        assertThat(withAmount.coin(), is(equalTo(Coin.valueOf(42))));
+        assertThat(reported, is(empty()));
+    }
+
     @ParameterizedTest
     @ValueSource(
             strings = {
