@@ -968,7 +968,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** neu `onBatchChecked_registrationIsSlow_theOnlyClientStillReceivesTheBatch`: verzögert über den bestehenden Test-Hook `setBeforeClientRegistered` jede Registrierung um 300 ms und macht das Rennen so zur Gewissheit.
 - **Rot-Grün-Nachweis:** Mit dem Helfer noch mit Probe ist der neue Test deterministisch rot (`but: was null`, der Batch ging an die Probe), ohne Probe grün (9/9). Schleife über frische JVMs: vorher 2/40 rot, nachher 0 von 51 (Zwischenstand, die Schleife läuft auf 150).
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 75a0f0e
 
 ## Offene Verdachte ohne Fund-ID
 
