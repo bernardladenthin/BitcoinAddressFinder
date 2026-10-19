@@ -20,8 +20,8 @@ it is done, as for every other item in this file.
 **Decided by the owner, still to be implemented** (each with a test red without the fix):
 
 - **Incremental producer at the end of its range and at the group order n** (ledger: open suspicion
-  "`KeyProducerJavaIncremental`, Teilbatch am Bereichsende"; re-examined 2026-10-19, decision (b)
-  "check the rest on the CPU" is **open again** for the grid case). Three separate cases:
+  "`KeyProducerJavaIncremental`, Teilbatch am Bereichsende"; re-examined 2026-10-19). Three separate cases;
+  only the first one is still to be implemented:
   - **Explicit keys (`batchUsePrivateKeyIncrement=false`, CPU only):** the last batch that only partly
     fits throws `NoMoreSecretsAvailableException`, and up to `overallWorkSize - 1` keys before
     `endPrivateKey` are never checked. Fix: return a shorter last batch (relax the length assertion in
@@ -30,30 +30,17 @@ it is done, as for every other item in this file.
   - **Grid mode (`batchUsePrivateKeyIncrement=true`), range end:** the base is aligned down, so the
     first grid starts below `startPrivateKey` and the last one ends above `endPrivateKey`. Those keys
     are real keys and are checked; nothing is missed. Proposal: keep it (no discard needed).
-  - **Grid mode on the GPU, top of the key space:** the last aligned grid `alignDown(n−1)` always
-    contains n (for `batchSizeInBits` ≥ 2), so `OpenClTask.setSrcPrivateKeyChunk` rejects it with
-    `PrivateKeyTooLargeException` (F151 tightened the bound, the gap existed before it too).
-    `ProducerOpenCL.processSecretBase` logs the exception and goes on, the next call is past the end,
-    and the run ends normally: the last `((n−1) mod 2^b) + 1` keys are **never checked** on the GPU
-    (b=20: 409,921 keys; b=24: 3,555,649). The CPU grid handles the same grid correctly (F45). No test
-    scans the top of the range with OpenCL.
-    **The owner's idea — let the GPU compute the whole grid and discard what is ≥ n — was measured on
-    pocl (2026-10-19, throwaway probe, both field implementations):** every key below n is correct
-    except one. Keys ≥ n come out as (k−n)·G, or as garbage where the walk's batched inversion
-    (`KEYS_BATCH_INV` 16) meets a zero denominator: at k = n (point at infinity) and where the anchor
-    is s·G and m = s (doubling). The zero denominator poisons its whole sub-batch of 16, and n's index in
-    the grid is always ≡ 1 (mod 16), so the one valid key in that sub-batch, **n−1**, is wrong unless it
-    happens to be a work-item anchor (measured: correct with `keysPerWorkItem` 16, wrong with 128). A
-    zero denominator cannot occur below the top grid (it needs k ≡ −m mod n; base 0 is handled since
-    F129). Options for the owner:
-    (1) allow a base up to n−1, drop every result with key ≥ n on the host, and compute n−1 on the
-    CPU (one key per scan); F151's `gridWouldReachTheGroupOrder_throwsException` turns into the opposite
-    test;
-    (2) as (1), but exclude a zero denominator from the Montgomery product in the kernel (mark that
-    output invalid), so n−1 comes out right on the GPU — cleaner, but a kernel change that needs a
-    measurement on a real GPU;
-    (3) keep the rejection and check the top grid on the CPU (up to 3.5 M keys at b=24, once per scan).
-    Either way a new OpenCL test should scan from `alignDown(n−1)` to n−1 and see every key exactly once.
+  - **Grid mode on the GPU, top of the key space — decided 2026-10-19: no change.** The last aligned
+    grid `alignDown(n−1)` always contains n (for `batchSizeInBits` ≥ 2). `OpenClTask.setSrcPrivateKeyChunk`
+    rejects it, `ProducerOpenCL.processSecretBase` logs that once as an error, the producer goes on, and
+    an incremental scan ends after it as usual: that grid never reaches OpenCL, so the GPU never computes
+    past n. The owner's reasoning: the region is a few keys right at the bound, irrelevant for scanning,
+    and computing it would cost every grid a check in the kernel. The lower bound needs nothing either:
+    key 0 occurs once (grid base 0) and is handled since F129 (kernel) and by `INVALID_KEY_ONE` (host).
+    The only reader of the failure that the log records is `TuneConfiguration`, which practically never
+    reaches that grid. For the record, a pocl probe of computing that grid anyway: every key below n
+    correct except n−1, which the batched inversion (`KEYS_BATCH_INV` 16) poisons together with n
+    unless it is a work-item anchor; the CPU grid handles the same grid correctly (F45).
   - Related: the default `endPrivateKey` is `MAX_PRIVATE_KEY_HEX`, i.e. n itself, documented as an
     *inclusive* bound, but n has not been a valid key since F45. Proposal: default to n−1.
 - **`WebSocketEndpoint.greetingSupplier` → `volatile`** (ledger: open suspicion, `WebSocketEndpoint.java:54`).
