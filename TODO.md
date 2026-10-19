@@ -30,15 +30,23 @@ it is done, as for every other item in this file.
   which the batched inversion (`KEYS_BATCH_INV` 16) poisons together with n unless it is a work-item
   anchor; the CPU grid handles the same grid correctly (F45). Grid mode at the ends of a range is fine
   as it is: the base is aligned down, so the grids reach past `startPrivateKey`/`endPrivateKey`, and
-  those are real keys that are checked.
+  those are real keys that are checked. Re-examined 2026-10-19 (owner: "cap the grid once before it
+  starts instead?"): not possible without a kernel change. The kernel derives a work item's key as
+  `k[0] = baseK0 | base_offset`, a bitwise OR into the lowest word, which is only correct for an
+  aligned base; a top grid capped to `n − 2^bits` is unaligned and would yield wrong keys. Computing
+  the grid and discarding the keys past n fails too (the batched inversion above). The one host check
+  per grid in `setSrcPrivateKeyChunk` is already the "guard once before the grid".
 
 **Waiting for the owner's decision:**
 
-- **`TuneConfiguration.runArm` releases a producer that may still run** (ledger: open suspicion,
-  pattern review after F156). Same shape as F156 before its fix: `interrupt()`,
-  `waitTillProducerNotRunning()`, then `releaseProducer()` without looking at the state. Possible
-  fix: release the arm's producer through a `ProducerReleaser`. A red test needs a producer inside an
-  arm that ignores the interrupt, i.e. a seam around `createProducer`.
+- **Harden that guard with the kernel's precondition, and log the top grid as what it is.**
+  `setSrcPrivateKeyChunk` checks only the upper bound; an unaligned base passes and the kernel's OR
+  silently computes other keys than the host reports for a hit (`secretBase + i`, ADD). Production
+  never sends one (`consumeSecrets` → `createSecretBase` aligns), so this is hardening: reject an
+  unaligned base there (one check per grid, nothing per work item). `ProbeAddressesOpenCLTest` uses
+  the unaligned `n − 2^8` as its "last allowed base" and would move to the last aligned one. And the
+  skipped top grid is logged as an ERROR with a stack trace although it is expected; a single WARN
+  saying "last grid below n skipped on the GPU" would fit.
 
 
 ### Persistence backends (genuinely open work)

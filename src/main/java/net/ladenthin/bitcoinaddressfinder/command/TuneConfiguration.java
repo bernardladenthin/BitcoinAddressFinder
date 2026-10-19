@@ -63,6 +63,8 @@ import net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence;
 import net.ladenthin.bitcoinaddressfinder.producer.Producer;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerJava;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerOpenCL;
+import net.ladenthin.bitcoinaddressfinder.producer.ProducerReleaser;
+import net.ladenthin.bitcoinaddressfinder.producer.ProducerState;
 import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
@@ -181,6 +183,13 @@ public class TuneConfiguration implements Runnable, Interruptable {
     /** Cancellation flag; cleared by {@link #interrupt()}. Uninformative in an aggregate toString. */
     @ToString.Exclude
     private final AtomicBoolean shouldRun = new AtomicBoolean(true);
+
+    /**
+     * Releases the arm producers, so the rule that a producer still running after its wait is never
+     * released lives in one place ({@link ProducerReleaser}, F156) for shutdown and tuning alike.
+     */
+    @ToString.Exclude
+    private final ProducerReleaser armProducerReleaser = new ProducerReleaser();
 
     /**
      * Counted down by {@link #interrupt()}. Every wait in this command is an
@@ -811,12 +820,31 @@ public class TuneConfiguration implements Runnable, Interruptable {
                     0.0d,
                     e.getClass().getSimpleName() + ": " + e.getMessage());
         } finally {
-            if (producer != null) {
-                producer.interrupt();
-                producer.waitTillProducerNotRunning();
-                producer.releaseProducer();
+            if (producer != null && !releaseArmProducer(producer, armProducerReleaser)) {
+                LOGGER.error(
+                        "The producer of arm batchSizeInBits={} keysPerWorkItem={} is still running after the wait;"
+                                + " the sweep stops, since a further arm would share the device with it.",
+                        batchSizeInBits,
+                        keysPerWorkItem);
+                shouldRun.set(false);
             }
         }
+    }
+
+    /**
+     * Stops an arm's producer and releases it, unless it is still running after the wait.
+     *
+     * @param producer the arm's producer
+     * @param releaser the releaser of this run's arm producers
+     * @return whether the producer was released
+     */
+    @VisibleForTesting
+    static boolean releaseArmProducer(Producer producer, ProducerReleaser releaser) {
+        // ProducerReleaser interrupts, waits, and leaves a producer that is still running unreleased:
+        // freeing its kernel, queue and buffers while it may still use them inside the driver is
+        // worse than leaking them (F156). It only logs that; the caller needs to know, to stop.
+        releaser.release(List.of(producer));
+        return producer.getState() != ProducerState.RUNNING;
     }
 
     /**

@@ -934,8 +934,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** d185aed
 
+### F170 – BitcoinAddressFinder: `TuneConfiguration.runArm` gibt den Producer eines Arms frei, auch wenn er noch läuft
+- **Zeit:** 2026-10-19 19:00 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/command/TuneConfiguration.java` (`runArm`, `finally`)
+- **Schwere:** niedrig (nur wenn das Warten eines Arms abläuft, `shutdownTimeoutSeconds`, Vorgabe 300 s; dann aber Use-after-free von OpenCL-Handles im Treiber)
+- **Historie:** `runArm` stammt aus `aabe5a7` (2026-07-19, „TuneConfiguration run mode“) mit `interrupt()`, `waitTillProducerNotRunning()`, `releaseProducer()` ohne Blick auf den Zustand – dieselbe Form wie `ProducerReleaser` vor F156. Gefunden in der Musterdurchsicht nach F156 (2026-10-18).
+- **Beschreibung:** Läuft das Warten ab, gab `runArm` Kernel, Queue und Puffer eines Producers frei, der sie noch benutzen kann. Schlimmer als beim Herunterfahren: danach startet der nächste Arm auf demselben Gerät, während der alte Producer womöglich weiterläuft – seine Messung wäre verfälscht.
+- **Fix:** Entscheidung des Nutzers: der Arm-Producer geht über einen `ProducerReleaser` (eine Stelle für die Regel aus F156: ein noch laufender Producer wird nicht freigegeben, ERROR im Log). Der neue Helfer `releaseArmProducer` meldet, ob freigegeben wurde; wenn nicht, beendet `runArm` den Sweep (`shouldRun`) mit einem ERROR, der den Arm nennt, statt den nächsten Arm neben dem alten zu starten. Die bis dahin gemessenen Arme bleiben im Bericht.
+- **Tests:** `TuneConfigurationTest#releaseArmProducer_stillRunningAfterTheWait_isNotReleasedAndReportsIt` (Mock mit `RUNNING` nach dem Warten: unterbrochen, gewartet, nicht freigegeben, `false`), `#releaseArmProducer_stoppedProducer_isReleased`.
+- **Rot-Grün-Nachweis:** mit dem bisherigen Ablauf im Helfer (immer freigeben) rot (1 von 2), mit dem Fix grün; `TuneConfigurationTest` 59 (1 übersprungen, braucht ein GPU-Gerät), auch auf pocl mit echten OpenCL-Armen grün; `ProducerReleaserTest` 5, `BitcoinAddressFinderArchitectureTest` 17. Die Verdrahtung in `runArm` (Abbruch des Sweeps) braucht einen hängenden Producer im Arm und ist nur übersetzt, nicht ausgelöst.
+- **Status:** gefixt
+- **Commit:** (folgt)
+
 ## Offene Verdachte ohne Fund-ID
 
 - *(erledigt 2026-10-19, ohne Fund-ID: Testumgebung, kein Produktfehler)* `ProbeAddressesOpenCLTest#setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException` brach auf Geräten mit 1024 MiB je Allokation mit `CL_INVALID_BUFFER_SIZE` ab, bevor die Prüfung lief (B3: mit `POCL_MEMORY_LIMIT=4` reproduziert, ab 2047 MB grün). Läuft jetzt auf einem 8-Bit-Raster (eigener Provider `privateKeysTooLargeForASmallGrid`), mit und ohne Begrenzung grün. Commit 1faa48a. Ebenso B2: `test-opencl` setzt `POCL_MAX_WORK_GROUP_SIZE=256` (8cb9bb5), B6: `GcTrigger` entfernt (e451898).
 
-- *(latent, niedrig, nur beschrieben, 2026-10-18, Musterdurchsicht nach F156)* BitcoinAddressFinder `command/TuneConfiguration.runArm`, `finally`: dasselbe Muster wie vor F156 – `interrupt()`, `waitTillProducerNotRunning()`, dann `releaseProducer()` ohne Blick auf den Zustand. Läuft das Warten eines Arms ab (`shutdownTimeoutSeconds` des Templates), werden die OpenCL-Ressourcen eines noch laufenden Producers freigegeben. Möglicher Fix: den Arm-Producer über einen `ProducerReleaser` freigeben (eine Stelle für die Regel). Nicht umgesetzt, weil ein Rot-Test einen Producer bräuchte, der im Arm die Unterbrechung ignoriert – `createProducer` ist intern; eine Naht dafür wäre eine eigene Entscheidung.

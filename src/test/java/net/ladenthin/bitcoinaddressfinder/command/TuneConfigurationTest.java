@@ -20,6 +20,8 @@ import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
@@ -48,6 +50,9 @@ import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLDeviceSelection;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatform;
 import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLPlatformSelector;
 import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClPlatformId;
+import net.ladenthin.bitcoinaddressfinder.producer.Producer;
+import net.ladenthin.bitcoinaddressfinder.producer.ProducerReleaser;
+import net.ladenthin.bitcoinaddressfinder.producer.ProducerState;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import nl.altindag.log.LogCaptor;
@@ -745,6 +750,35 @@ public class TuneConfigurationTest extends LMDBBase {
     // </editor-fold>
 
     // <editor-fold desc="sweep extension">
+    /**
+     * An arm's producer that is still running after the wait (its {@code shutdownTimeoutSeconds} ran
+     * out) must not be released: releasing it frees the kernel, queue and buffers it may still be using
+     * inside the driver. That was the shape of F156, and {@code runArm} released unconditionally.
+     */
+    @Test
+    public void releaseArmProducer_stillRunningAfterTheWait_isNotReleasedAndReportsIt() {
+        Producer producer = mock(Producer.class);
+        when(producer.getState()).thenReturn(ProducerState.RUNNING);
+
+        boolean released = TuneConfiguration.releaseArmProducer(producer, new ProducerReleaser());
+
+        assertThat(released, is(false));
+        verify(producer).interrupt();
+        verify(producer).waitTillProducerNotRunning();
+        verify(producer, never()).releaseProducer();
+    }
+
+    @Test
+    public void releaseArmProducer_stoppedProducer_isReleased() {
+        Producer producer = mock(Producer.class);
+        when(producer.getState()).thenReturn(ProducerState.NOT_RUNNING);
+
+        boolean released = TuneConfiguration.releaseArmProducer(producer, new ProducerReleaser());
+
+        assertThat(released, is(true));
+        verify(producer).releaseProducer();
+    }
+
     /**
      * A winner on the edge of <b>both</b> axes must have both extended, even when the first extra arm
      * loses.
