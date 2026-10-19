@@ -259,6 +259,56 @@ Die Absturz-Probe `SigProbe3` wurde nicht wiederholt, sie ist aus B7 bekannt (RO
 - Die Handler sind trotzdem ersetzt, `SIGQUIT` eingeschlossen. Laut `-Xcheck:jni` sind sie zum Zeitpunkt der Prüfung eingetragen. Die beobachtbaren Folgen bleiben aber aus. Dazu passt die Absturz-Probe in B7 (0/5). Die naheliegende Erklärung, nicht gemessen: Der LLVM-Handler gibt nicht behandelte Signale an den vorher eingetragenen Handler der JVM weiter. Bei pocl geht `SIGQUIT` verloren.
 - **README-Zeile für ROCm:** „replaces the handlers (same set as pocl); measured consequences on ROCm 7.14 / MI325X: none — hooks, `kill -3` dump, `jcmd` and JFR work, crash probe 0/5. `libjsig` is still recommended, since `-Xcheck:jni` reports the handlers as replaced.“
 
+**Nachtrag: RDNA3 (Radeon PRO V710) mit ROCm 10.1.** Gemessen 2026-10-19, 22:28–23:01 UTC, dieselben Skripte
+und Proben wie oben (`b9-run.sh amd`, danach `SigProbe3` und die Wiederholung mit `--default-signal`).
+
+**Umgebung:**
+- Azure `Standard_NV24ads_V710_v5` (ganze GPU), `southcentralus`, Image `Canonical:ubuntu-24_04-lts:server:latest`.
+- AMD EPYC 9V64, 24 vCPU, 125 GB RAM, Ubuntu 24.04.5 LTS, Kernel `7.0.0-1017-azure`.
+- GPU als SR-IOV-VF `1002:7461`, `rocminfo`: **`AMD Radeon Pro V710 MxGPU`**, `gfx1101` (RDNA3, wie RX 7700/7800 XT), 27 CUs laut OpenCL.
+- `amdgpu-install` 31.60 (`--usecase=opencl`): `amdgpu-dkms 1:7.1.9.31600000`, `amdrocm-opencl10.1 10.1.0-3`.
+- ICD von Hand registriert (`/opt/rocm/core-10.1/lib/opencl/libamdocl64.so`). Plattform `OpenCL 2.1 AMD-APP (3684.0)`, Treiber **`3684.0 (HSA1.1,LC)`**, `PLATFORM=0`.
+- Temurin `21.0.12.1+1`, Branch-Stand `606823a9`.
+
+`-Xcheck:jni`, `SigProbe4 cl wait 0`: dieselben fünf Warnungen und dieselbe Menge wie auf der MI325X, jetzt aus
+`libLLVM.so.24.0git`. `SIGPIPE` bleibt bei der JVM, `SIGQUIT` ist wieder `blocked`. Exit 143, `HOOK RAN`.
+
+```
+   SIGSEGV: SignalHandler in libLLVM.so.24.0git, mask=00000000000000000000000000000000, flags=SA_ONSTACK|SA_RESETHAND|SA_SIGINFO|SA_NODEFER|Unknown_flags:80000000, unblocked
+   SIGPIPE: javaSignalHandler in libjvm.so, mask=11100100010111111101111111111110, flags=SA_RESTART|SA_SIGINFO, unblocked
+   SIGQUIT: SignalHandler in libLLVM.so.24.0git, mask=00000000000000000000000000000000, flags=SA_ONSTACK|SA_RESETHAND|SA_SIGINFO|SA_NODEFER|Unknown_flags:80000000, blocked
+```
+
+(`SIGBUS`, `SIGFPE`, `SIGXFSZ`, `SIGILL`, `SIGUSR2`, `SIGHUP`, `SIGINT`, `SIGTERM`, `SIGTRAP`: wie `SIGSEGV`.)
+
+Matrix, wörtlich. Die Zeilen ohne `libjsig` sind gleich aufgebaut wie die mit `libjsig`:
+
+```
+amd cl SIGTERM exit=143 hook=1 dump=0 llvmcrash=0 hserr=0
+amd cl SIGQUIT exit=143 hook=1 dump=1 llvmcrash=0 hserr=0
+amd cl jcmd: alive-after=yes output=[33119: OpenJDK 64-Bit Server VM version 21.0.12.1+1-LTS ]
+amd cl JFR exit=0 done=1 executionSamples=7291
+amd nocl JFR exit=0 done=1 executionSamples=7280
+amd+jsig cl SIGQUIT exit=143 hook=1 dump=1 llvmcrash=0 hserr=0
+amd+jsig cl JFR exit=0 done=1 executionSamples=7266
+amd-dfl cl SIGTERM exit=143 hook=1 dump=0 llvmcrash=0 hserr=0 timeout=0
+amd-dfl cl SIGINT exit=130 hook=1 dump=0 llvmcrash=0 hserr=0 timeout=0
+amd-dfl cl SIGHUP exit=129 hook=1 dump=0 llvmcrash=0 hserr=0 timeout=0
+amd-dfl cl SIGQUIT exit=143 hook=1 dump=1 llvmcrash=0 hserr=0 timeout=0
+amd-dfl+jsig cl SIGINT exit=130 hook=1 dump=0 llvmcrash=0 hserr=0 timeout=0
+amd-dfl+jsig cl SIGHUP exit=129 hook=1 dump=0 llvmcrash=0 hserr=0 timeout=0
+```
+
+- Alle übrigen Zeilen haben `hook=1 llvmcrash=0 hserr=0`, und `jcmd` lief jedes Mal mit `alive-after=yes`.
+- `SIGINT`/`SIGHUP` aus dem Lauf wie im Auftrag (geerbte Einstellungen) wieder `exit=0`. Das ist der Messfehler im Skript, belegt wie unten: `SigIgn: 0000000000000003`.
+- Absturz-Probe `SigProbe3` (8 heiße Threads, 2000 Safepoints): `nocl` 0/5, `cl` 0/5, `cl` mit `libjsig` 0/5. Jeder Lauf mit Exit 0 und `survived`, keine `hs_err`-Datei.
+- Laufzeit der VM 22:19:38–23:05:20 UTC, rund 46 min, etwa 1,60 EUR.
+
+**Folgerung (Nachtrag):**
+- Auf RDNA3 mit ROCm 10.1 ist das Bild **genau wie auf CDNA3 mit ROCm 7.14**: ersetzt ist dieselbe Menge, beobachtbare Folgen gibt es keine. Der Dump bei `kill -3` kommt auch ohne `libjsig`, JFR zeigt keinen Sample-Verlust, die Absturz-Probe ergibt 0/5.
+- Das Ergebnis hängt damit weder an der GPU-Generation noch an der ROCm-Hauptversion (7.14 und 10.1, `libLLVM` 23 und 24).
+- Für die README-Zeile: „measured consequences on ROCm 7.14 / MI325X (CDNA3) and ROCm 10.1 / Radeon PRO V710 (RDNA3, `gfx1101`): none …“, Rest unverändert.
+
 ---
 
 ## B9.2 Intel CPU-OpenCL-Runtime (jede x86-VM)
