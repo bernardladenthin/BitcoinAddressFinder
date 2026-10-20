@@ -284,8 +284,8 @@ public class Finder implements Interruptable {
     /**
      * Initialises and starts the {@link ConsumerJava}; does nothing once {@link #interrupt()} ran.
      *
-     * @throws Exception if the consumer's LMDB layer cannot be opened or the
-     *     accelerator snapshot cannot be built
+     * @throws Exception if the consumer's LMDB layer cannot be opened, the
+     *     accelerator snapshot cannot be built, or a result server cannot bind its port
      */
     public void startConsumer() throws Exception {
         LOGGER.info("startConsumer");
@@ -315,8 +315,9 @@ public class Finder implements Interruptable {
      * consumer sees nothing but the {@code ResultListener} contract.
      *
      * @return the listeners to notify for every checked batch, possibly empty
+     * @throws IOException if a socket key producer's result server cannot bind its port
      */
-    private List<ResultListener> createResultListeners() {
+    private List<ResultListener> createResultListeners() throws IOException {
         final List<ResultListener> listeners = new ArrayList<>();
         addWebSocketBroadcasters(listeners);
         addZmqBroadcasters(listeners);
@@ -407,9 +408,15 @@ public class Finder implements Interruptable {
      * <p>Serves on a port of its own, because the inbound side handles a single peer with a
      * different framing.
      *
+     * <p>A port that cannot be bound fails the start, as the key producer's own port does and as a
+     * ZeroMQ publisher's address does: continuing without the result server would leave its clients
+     * without a single batch report while the run still ended with exit 0.
+     *
      * @param listeners the list to add to
+     * @throws IOException if a result server cannot bind its port; the message names the key producer
+     *                     and the port
      */
-    private void addSocketBroadcasters(List<ResultListener> listeners) {
+    private void addSocketBroadcasters(List<ResultListener> listeners) throws IOException {
         for (CKeyProducerJavaSocket config : finder.keyProducerJavaSocket) {
             if (!config.broadcastResults) {
                 continue;
@@ -418,8 +425,10 @@ public class Finder implements Interruptable {
             try {
                 broadcaster.start();
             } catch (IOException e) {
-                LOGGER.error("Could not serve results on port {}; continuing without it.", config.resultPort, e);
-                continue;
+                throw new IOException(
+                        "The socket key producer " + config.keyProducerId + " cannot serve results on port "
+                                + config.resultPort + ": " + e.getMessage(),
+                        e);
             }
             addForAnnouncement(config.keyProducerId, broadcaster::announceConfiguration);
             socketBroadcasters.add(broadcaster);

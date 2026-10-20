@@ -89,6 +89,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F196](#f196) — niedrig — *gefixt*
 - [F206](#f206) — niedrig — *gefixt*
 - [F207](#f207) — mittel — *gefixt*
+- [F208](#f208) — niedrig — *gefixt*
 
 ## Funde
 
@@ -1106,6 +1107,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** gegen den alten Code rot, beide mit „Expected java.lang.IllegalStateException to be thrown, but nothing was thrown.“; mit dem Fix grün. Breite Liste: `WebSocketEndpointTest` 3/3, `KeyProducerJavaWebSocketTest` 6/6, `WebSocketResultBroadcasterTest` 4/4, `FinderWebSocketRoundtripTest` 1/1, `FinderTest` 34/34 (mit `POCL_MAX_WORK_GROUP_SIZE=256`), `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
 - **Commit:** 4190e6c
+
+<a id="f208"></a>
+### F208 – BitcoinAddressFinder: Ein nicht bindbarer `resultPort` des Socket-Key-Producers wird zu „continuing without it“ herabgestuft
+- **Zeit:** 2026-10-20 20:26 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/engine/Finder.java` (`addSocketBroadcasters`, `createResultListeners`, `startConsumer`)
+- **Schwere:** niedrig (Konfigurations-/Umgebungsfehler mit stillem Ausgang)
+- **Historie:** Gefunden beim Review des Branches am 2026-10-20 (Fund XB-2). Das Verhalten ist älter als der Branch (5479507); der Branch hat mit F157 aber die Regel „ein nicht bindbarer Port ist überall ein Startfehler“ gesetzt und mit F155 den Fall `port == resultPort` abgelehnt.
+- **Beschreibung:** `addSocketBroadcasters` fing die `IOException` aus `SocketResultBroadcaster.start()` (`new ServerSocket(resultPort)`), loggte „Could not serve results on port {}; continuing without it.“ und lief weiter. Hielt ein fremder Prozess den `resultPort`, erhielt kein Ergebnis-Client eine einzige Batch-Meldung, und der Lauf endete trotzdem mit Exit 0. Der ZeroMQ-Broadcaster bindet dagegen im Konstruktor und lässt den Start an der `ZMQException` scheitern; der `resultPort` wird in beiden Modi (SERVER und CLIENT) gebunden.
+- **Fix:** Die `IOException` wird mit Kontext weitergereicht: „The socket key producer <id> cannot serve results on port <resultPort>: <Ursache>“, die Ursache angehängt. `addSocketBroadcasters` und `createResultListeners` deklarieren `throws IOException`, `startConsumer()` warf ohnehin `Exception` – eine geprüfte Ausnahme, daher keine weitere SpotBugs-Unterdrückung. `Main.startFinder` bricht den Start über `abortStart()` ab, das die schon gestarteten Result-Server schließt; der gescheiterte hält keinen Socket. README: Zeile `resultPort` nennt den Startfehler.
+- **Tests:** `FinderTest#startConsumer_resultPortHeldByAnotherProcess_failsTheStart` (ein `ServerSocket` hält den Port, ein Socket-Key-Producer im SERVER-Modus mit freiem `port` und diesem `resultPort`; `startConsumer` muss eine `IOException` werfen, die Key-Producer-Id und Port nennt, und es läuft kein Consumer).
+- **Rot-Grün-Nachweis:** gegen den alten Code rot („Expected java.io.IOException to be thrown, but nothing was thrown.“), mit dem Fix grün. Breite Liste: `FinderTest` 35/35 (mit `POCL_MAX_WORK_GROUP_SIZE=256`), `MainStartFinderTest` 2/2, `KeyProducerJavaSocketTest` 23/23, `SocketResultBroadcasterTest` 11/11, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 

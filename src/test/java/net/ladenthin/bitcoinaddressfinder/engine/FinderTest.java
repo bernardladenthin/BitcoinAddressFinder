@@ -655,6 +655,42 @@ public class FinderTest {
         assertThat(reported.get(), is(equalTo(producers)));
     }
 
+    /**
+     * A result port held by another process is a start failure, as it is for the key producer's own
+     * port (F157) and for a ZeroMQ publisher. The result server used to log it and run on without
+     * reporting a single batch, ending with exit 0.
+     */
+    @Test
+    public void startConsumer_resultPortHeldByAnotherProcess_failsTheStart() throws Exception {
+        try (java.net.ServerSocket occupant = new java.net.ServerSocket(0)) {
+            // arrange
+            CFinder cFinder = new CFinder();
+            CKeyProducerJavaSocket socket = new CKeyProducerJavaSocket();
+            socket.mode = CKeyProducerJavaSocket.Mode.SERVER;
+            socket.port = KeyProducerJavaSocketTest.findFreePort();
+            socket.timeoutMillis = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
+            socket.keyProducerId = "socket";
+            socket.broadcastResults = true;
+            socket.resultPort = occupant.getLocalPort();
+            cFinder.keyProducerJavaSocket.add(socket);
+            configureConsumerJava(cFinder);
+            Finder finder = new Finder(cFinder);
+            try {
+                finder.startKeyProducer();
+
+                // act
+                IOException e = assertThrows(IOException.class, finder::startConsumer);
+
+                // assert
+                assertThat(e.getMessage(), containsString("socket"));
+                assertThat(e.getMessage(), containsString(String.valueOf(occupant.getLocalPort())));
+                assertThat(finder.isConsumerRunning(), is(false));
+            } finally {
+                finder.abortStart();
+            }
+        }
+    }
+
     /** A start that fails after the consumer started must not leave its non-daemon threads running. */
     @Test
     public void abortStart_consumerStarted_consumerIsReleased() throws Exception {
