@@ -3,6 +3,12 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
+# pocl's CPU device runs kernels in work-groups of up to 4096 by default, and the key kernel then
+# overflows the 8 MB stack of pocl's worker thread (SIGSEGV, exit 139/134). The finder launches the key
+# kernel there with a local work size of at most 256 itself; this caps every kernel pocl runs. Other
+# OpenCL drivers ignore the variable.
+export POCL_MAX_WORK_GROUP_SIZE="${POCL_MAX_WORK_GROUP_SIZE:-256}"
+
 # OpenCL drivers that compile kernels in-process with LLVM (measured: pocl) replace the JVM's SIGSEGV
 # handler, and concurrent safepoints can then kill the JVM without an hs_err file. Preloading the
 # JDK's signal chaining (libjsig) keeps the JVM's handlers in front. Linux only.

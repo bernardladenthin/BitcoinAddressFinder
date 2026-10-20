@@ -371,19 +371,48 @@ public class LwjglClApi implements ClApi {
     @Override
     public @Nullable ClEvent enqueueNDRangeKernel(
             ClCommandQueue commandQueue, ClKernel kernel, long[] globalWorkSize, boolean profilingEvent) {
+        // Null local work size: the runtime picks the work-group size, as before.
+        return enqueueKernel(commandQueue, kernel, globalWorkSize, null, profilingEvent);
+    }
+
+    @Override
+    public @Nullable ClEvent enqueueNDRangeKernel(
+            ClCommandQueue commandQueue,
+            ClKernel kernel,
+            long[] globalWorkSize,
+            long[] localWorkSize,
+            boolean profilingEvent) {
+        if (localWorkSize.length != globalWorkSize.length) {
+            throw new IllegalArgumentException("localWorkSize has " + localWorkSize.length
+                    + " dimension(s) but globalWorkSize has " + globalWorkSize.length);
+        }
+        return enqueueKernel(commandQueue, kernel, globalWorkSize, localWorkSize, profilingEvent);
+    }
+
+    private @Nullable ClEvent enqueueKernel(
+            ClCommandQueue commandQueue,
+            ClKernel kernel,
+            long[] globalWorkSize,
+            long @Nullable [] localWorkSize,
+            boolean profilingEvent) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            final PointerBuffer global = stack.mallocPointer(globalWorkSize.length);
-            for (int i = 0; i < globalWorkSize.length; i++) {
-                global.put(i, globalWorkSize[i]);
-            }
-            // Null local work size: the runtime picks the work-group size, as before.
+            final PointerBuffer global = toPointerBuffer(globalWorkSize, stack);
+            final @Nullable PointerBuffer local = localWorkSize == null ? null : toPointerBuffer(localWorkSize, stack);
             final PointerBuffer event = profilingEvent ? stack.mallocPointer(1) : null;
             errorChecker.checkSuccess(
                     CL10.clEnqueueNDRangeKernel(
-                            commandQueue.handle(), kernel.handle(), WORK_DIMENSIONS, null, global, null, null, event),
+                            commandQueue.handle(), kernel.handle(), WORK_DIMENSIONS, null, global, local, null, event),
                     "clEnqueueNDRangeKernel");
             return event == null ? null : new ClEvent(event.get(0));
         }
+    }
+
+    private static PointerBuffer toPointerBuffer(long[] values, MemoryStack stack) {
+        final PointerBuffer buffer = stack.mallocPointer(values.length);
+        for (int i = 0; i < values.length; i++) {
+            buffer.put(i, values[i]);
+        }
+        return buffer;
     }
 
     // ---------------------------------------------------------------------------------------

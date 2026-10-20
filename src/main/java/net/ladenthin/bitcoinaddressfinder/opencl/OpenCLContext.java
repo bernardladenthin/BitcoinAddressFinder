@@ -525,9 +525,20 @@ public class OpenCLContext implements ReleaseCLObject {
         // Create the kernel
         kernel = clApi.createKernel(localProgram, KERNEL_NAME);
 
-        logKernelResourceUsage(device);
+        final long kernelWorkGroupSize = logKernelResourceUsage(device);
+        final boolean poclCpuDevice = OpenClLocalWorkSize.isPoclCpuDevice(
+                selection.platform().platformName(), device.deviceVersion(), device.deviceType());
+        if (poclCpuDevice) {
+            LOGGER.info(
+                    "pocl CPU device: the key kernel is launched with a local work size of at most {} (driver"
+                            + " default here: {}), because pocl's larger work-groups overflow its worker thread's"
+                            + " stack and kill the JVM.",
+                    OpenClLocalWorkSize.POCL_CPU_MAX_LOCAL_WORK_SIZE,
+                    kernelWorkGroupSize);
+        }
 
-        openClTask = new OpenClTask(clApi, localContext, producerOpenCL, bitHelper, byteBufferUtility);
+        openClTask = new OpenClTask(
+                clApi, localContext, producerOpenCL, bitHelper, byteBufferUtility, kernelWorkGroupSize, poclCpuDevice);
 
         // Allocate a dummy empty filter so the kernel's fuse8 arguments are always bindable.
         // uploadGpuFilter() replaces it with the real filter; until then the kernel runs in
@@ -553,8 +564,9 @@ public class OpenCLContext implements ReleaseCLObject {
      * device-local memory. {@code workGroupSizeMultiple} is the warp/wavefront size.
      *
      * @param device the selected OpenCL device the kernel was built for
+     * @return the kernel's {@code CL_KERNEL_WORK_GROUP_SIZE} on the device
      */
-    private void logKernelResourceUsage(OpenCLDevice device) {
+    private long logKernelResourceUsage(OpenCLDevice device) {
         final ClKernel localKernel = Objects.requireNonNull(kernel);
         // Width matters: the two work-group sizes are size_t, the two memory sizes are cl_ulong.
         final long kernelMaxWorkGroupSize =
@@ -573,6 +585,7 @@ public class OpenCLContext implements ReleaseCLObject {
                 localMemBytes);
         // The heuristic starting-config suggestion lives in the device-info block
         // (OpenCLDevice.toStringPretty, logged above and shown by the OpenCLInfo command).
+        return kernelMaxWorkGroupSize;
     }
 
     /**

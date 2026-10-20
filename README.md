@@ -1667,6 +1667,8 @@ The CPU then hashes the X and Y coordinates of the public keys to derive the cor
 
 The OpenCL code is compatible with and tested against [PoCL](https://github.com/pocl/pocl), an open-source, portable OpenCL implementation. PoCL lets you run the kernels without a vendor GPU driver and exposes a range of **specialized targets** (backends) that PoCL supports — for example CPU (host), CUDA, and other device backends — so you can pick the device that best fits your hardware. Select the desired PoCL device through the usual `producerOpenCL` `platformIndex` / `deviceIndex` settings (use the `OpenCLInfo` command to list the platforms and devices PoCL exposes).
 
+**Work-group limit on PoCL's CPU device.** Left to itself, PoCL's CPU device runs the key kernel in work-groups of its maximum size (4096), and the kernel then overflows the 8 MB stack of PoCL's worker thread: the JVM dies with `SIGSEGV` (exit code 139 or 134). The finder therefore launches the key kernel on a PoCL CPU device (detected by the platform name `Portable Computing Language` or `PoCL` in `CL_DEVICE_VERSION`, not by the vendor string, which names the CPU) with an explicit local work size of at most 256 and logs that at start-up; every other device keeps the driver's choice. The `run_*OpenCL*.sh` launchers and `run_TuneConfiguration.sh` also export `POCL_MAX_WORK_GROUP_SIZE=256` (unless it is set already), which caps every kernel PoCL runs. On Linux, also preload `libjsig` (see [OpenCL on Linux: signal chaining](#opencl-on-linux-signal-chaining-libjsig)).
+
 #### Built-in Self-Test (BIST)
 
 The OpenCL backend includes a built-in self-test mechanism that cross-verifies results from the GPU against a CPU-generated reference. This ensures that the OpenCL device is functioning correctly and producing valid EC keys—giving end users confidence in the reliability of their hardware-accelerated address search.
@@ -2243,15 +2245,19 @@ case as well.
 The OpenCL launchers in `examples/` (`run_*OpenCL*.sh`) do this already, and the finder logs a warning
 when it builds an OpenCL kernel on Linux without it, whatever the driver. Windows is not affected.
 
-**pocl only: limit the work-group size.** BAF passes no local work size, so pocl picks its maximum
-group (4096 on a 16-core host), and the key-generation kernel overflows the 8 MB stack of pocl's worker
-thread: the JVM dies with exit code 139 or 134. Measured 5 of 5 times without a limit and never with
+**pocl only: the work-group size.** Without a local work size, pocl picks its maximum group (4096
+on 4- and 16-core hosts), and the key-generation kernel overflows the 8 MB stack of pocl's worker
+thread: the JVM dies with exit code 139 or 134 (measured 5 of 5 times without a limit, never with 256).
+The finder therefore passes a local work size of at most 256 for the key kernel on a pocl CPU device
+(see [PoCL support](#pocl-portable-computing-language-support)). The launchers and the CI job
+`test-opencl` additionally set
 
 ```bash
 export POCL_MAX_WORK_GROUP_SIZE=256
 ```
 
-which the CI job `test-opencl` sets. GPU drivers are not affected by this.
+which also caps the kernels the finder launches without a local size (the test and benchmark
+kernels). GPU drivers are not affected by this.
 
 ### Contributors: do not upgrade jqwik past 1.9.3
 
