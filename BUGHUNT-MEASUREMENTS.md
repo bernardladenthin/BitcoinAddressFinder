@@ -1,7 +1,7 @@
 # Messauftrag B9 — OpenCL-Treiber und die Signale der JVM (BitcoinAddressFinder)
 
-B1–B8 sind gemessen und umgesetzt; der Auftrag mit allen Ergebnissen steht im Stand `c417479`
-(`git show c417479:BUGHUNT-MEASUREMENTS.md`). Offen ist nur noch B9. Hintergrund: `TODO.md`, „GPU OpenCL
+B1–B8 sind gemessen und umgesetzt; der Auftrag mit allen Ergebnissen steht im Stand `feb6157`
+(`git show feb6157:BUGHUNT-MEASUREMENTS.md`). Offen ist nur noch B9. Hintergrund: `TODO.md`, „GPU OpenCL
 drivers and the JVM's signal handlers: what replacing them breaks“, und README „OpenCL on Linux: signal
 chaining“.
 
@@ -60,7 +60,7 @@ java -Xcheck:jni $OPENS -cp "$PROBE_DIR:$CP" SigProbe4 cl wait ${PLATFORM:-0} & 
 /tmp/sigprobe/signal-matrix.sh <label>+jsig env LD_PRELOAD="$JSIG" java
 ```
 
-Die Absturz-Probe aus B7 (`SigProbe3`, Quelltext in `c417479`) zusätzlich, wo sie nicht schon gemessen ist
+Die Absturz-Probe aus B7 (`SigProbe3`, Quelltext in `feb6157`) zusätzlich, wo sie nicht schon gemessen ist
 (Intel): je 5 Läufe `nocl`/`cl`/`jsig` mit 2000 Safepoints.
 
 `SigProbe4.java`:
@@ -170,7 +170,7 @@ eigentliche Befund (etwa JFR ohne Samples oder ein Abbruch bei `SIGUSR2`).
 - 1× **MI325X** (`gfx942:sramecc+:xnack-`), `amdgpu-dkms 1:6.19.14.31400000`, `amdrocm-opencl7.14 7.14.0~pre3`.
 - ICD von Hand registriert wie in B7 (`/etc/OpenCL/vendors/amdocl64.icd` → `/opt/rocm/core-7.14/lib/opencl/libamdocl64.so`).
 - Plattform `AMD Accelerated Parallel Processing`, `OpenCL 2.1 AMD-APP (3581.0)`, Treiber **`3581.0 (HSA1.1,LC)`**, `PLATFORM=0`.
-- Temurin `21.0.12.1+1`, Branch-Stand `2d79dd5a`.
+- Temurin `21.0.12.1+1`, Branch-Stand `50de32ec`.
 - Skript und Probe wörtlich aus diesem Auftrag, gestartet aus einem `nohup bash`-Lauf.
 
 `-Xcheck:jni`, `SigProbe4 cl wait 0`, 5 s nach `READY` `SIGTERM`, Exit 143:
@@ -268,7 +268,7 @@ und Proben wie oben (`b9-run.sh amd`, danach `SigProbe3` und die Wiederholung mi
 - GPU als SR-IOV-VF `1002:7461`, `rocminfo`: **`AMD Radeon Pro V710 MxGPU`**, `gfx1101` (RDNA3, wie RX 7700/7800 XT), 27 CUs laut OpenCL.
 - `amdgpu-install` 31.60 (`--usecase=opencl`): `amdgpu-dkms 1:7.1.9.31600000`, `amdrocm-opencl10.1 10.1.0-3`.
 - ICD von Hand registriert (`/opt/rocm/core-10.1/lib/opencl/libamdocl64.so`). Plattform `OpenCL 2.1 AMD-APP (3684.0)`, Treiber **`3684.0 (HSA1.1,LC)`**, `PLATFORM=0`.
-- Temurin `21.0.12.1+1`, Branch-Stand `606823a9`.
+- Temurin `21.0.12.1+1`, Branch-Stand `542c0246`.
 
 `-Xcheck:jni`, `SigProbe4 cl wait 0`: dieselben fünf Warnungen und dieselbe Menge wie auf der MI325X, jetzt aus
 `libLLVM.so.24.0git`. `SIGPIPE` bleibt bei der JVM, `SIGQUIT` ist wieder `blocked`. Exit 143, `HOOK RAN`.
@@ -335,7 +335,7 @@ Kein pocl installieren (oder `PLATFORM` auf die Intel-Plattform setzen). `-Xchec
 - Ubuntu 24.04.5 LTS, Kernel `6.8.0-146-generic`.
 - `intel-oneapi-runtime-opencl 2026.2.0-863` aus dem oneAPI-Repository, wie im Auftrag; die ICD-Datei registrierte das Paket selbst (`/etc/OpenCL/vendors/intel64.icd` → `/opt/intel/oneapi/redist/lib/libintelocl.so`).
 - Kein pocl. Einzige Plattform `Intel(R) OpenCL`, `OpenCL 3.1 LINUX`, Gerät `Intel Xeon Processor (Cascadelake)`, `CL_DEVICE_TYPE_CPU`, Treiber **`2026.22.10.0.01_160000`**, `PLATFORM=0`.
-- Temurin `21.0.12.1+1`, Branch-Stand `2d79dd5a`.
+- Temurin `21.0.12.1+1`, Branch-Stand `50de32ec`.
 
 `-Xcheck:jni`, `SigProbe4 cl wait 0`, 5 s nach `READY` `SIGTERM`, Exit 143:
 

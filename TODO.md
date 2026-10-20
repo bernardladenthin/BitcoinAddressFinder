@@ -606,7 +606,7 @@ spill, and the 256 cap stays even at `-cl-nv-maxrregcount=96`.
 
 ### GPU OpenCL drivers and the JVM's signal handlers: what replacing them breaks
 
-Measured (B7 in `BUGHUNT-MEASUREMENTS.md` at `c417479`; README "OpenCL on Linux: signal chaining"):
+Measured (B7 in `BUGHUNT-MEASUREMENTS.md` at `feb6157`; README "OpenCL on Linux: signal chaining"):
 pocl 5.0 and AMD ROCm 7.14 replace the JVM's handlers once a kernel is built, NVIDIA 580 does not. The
 `libjsig` preload in the launchers and the `SignalChainingCheck` warning stay on for every Linux start.
 

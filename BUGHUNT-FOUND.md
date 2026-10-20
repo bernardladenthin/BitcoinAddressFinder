@@ -107,7 +107,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Fix:** `createOpenCLDevice` fragt `CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS` zuerst ab und dimensioniert damit die Abfrage der Größen; die feste Konstante `MAX_WORK_ITEM_SIZE_DIMENSIONS = 3` entfällt.
 - **Rot-Grün-Nachweis:** ohne Fix rot 1/4 („Unexpected exception thrown: IllegalStateException: clGetDeviceInfo: CL_INVALID_VALUE“), mit Fix grün 4/4 (1 übersprungen: der vorhandene Test für ein echtes OpenCL-Gerät, das hier fehlt), Gegenprobe per `git stash` rot, nach `stash pop` grün. `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BAF `0fa7428`
+- **Commit:** BAF `e3b3ef9`
 
 <a id="f08"></a>
 ### F08 – BAF: Secrets-Datei mit `batchUsePrivateKeyIncrement=false` prüft kein einziges Secret
@@ -118,7 +118,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `ProducerJavaSecretsFilesTest#produceKeys_filesConfiguredWithoutPrivateKeyIncrement_keysCreated` (alle 4 Formate; vorher rot: 0 statt 6 Keys, danach grün). `ProducerJavaSecretsFilesTest` 11/11.
 - **Nebenbefund (nicht geändert, niedrig):** `interrupt()` kann zwischen der `shouldRun`-Prüfung und `currentSecretsFile.set(...)` fallen; dann wird die nächste Datei trotzdem komplett gelesen. Außerdem bleibt `currentSecretsFile` bei einer Exception aus `readFile()` gesetzt (kein `finally`).
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `89d0abc`
+- **Commit:** BitcoinAddressFinder `1fa0506`
 
 <a id="f10"></a>
 ### F10 – BAF: Shutdown hängt, wenn mehrere Producer einen Socket/WebSocket/ZMQ-Key-Producer teilen (`timeoutMillis: -1`)
@@ -129,7 +129,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `AbstractKeyProducerQueueBufferedTest#interrupt_unblocksEveryBlockedConsumer_negativeTimeout` (vorher rot: `TimeoutException` beim zweiten Aufrufer, danach grün). Zusätzlich grün: `AbstractKeyProducerQueueBufferedTest` 11/11, `KeyProducerJavaWebSocketTest` 5/5, `KeyProducerJavaSocketTest` 17/17, `KeyProducerJavaZmqTest` 7/7. PIT nicht gelaufen (der neue `offer`-false-Zweig ist nur Trace-Logging, wie der bestehende in `signalShutdown`).
 - **Nebenbefund (nicht geändert):** Bricht `createSecrets` mitten in einem Batch ab (Timeout bei `i > 0`, nur ohne `batchUsePrivateKeyIncrement`), sind die bereits entnommenen Secrets verloren und werden nie geprüft. `addSecret` loggt bei voller Queue `{}` mit einem `byte[]` – Ausgabe ist `[B@…`, aber die Standard-Queue ist unbegrenzt.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `d2c3bc9`
+- **Commit:** BitcoinAddressFinder `d193ab7`
 
 <a id="f11"></a>
 ### F11 – BAF: „Average contains time“ misst praktisch immer 0 ms
@@ -142,7 +142,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Fix:** `containsAddress` misst mit `System.nanoTime()` und summiert Nanosekunden; die Statistikzeile meldet „Average contains time: N ns“. README-Beispiel und -Tabelle sowie die erwarteten Zeichenketten in `ConsumerJavaTest`/`StatisticsTest` angepasst. Achtung, sichtbare Formatänderung: Wer die Logzeile maschinell liest, sieht jetzt `ns` statt `ms`.
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is a value equal to or greater than <1000000L> but: <1L> was less than <1000000L>“), mit Fix grün; `ConsumerJavaTest` 35/35, `StatisticsTest` 11/11 (skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BAF `43ebd7a`
+- **Commit:** BAF `0fb1dcb`
 
 <a id="f14"></a>
 ### F14 – BAF: BIP39-Producer hält jeden abgeleiteten Schlüssel im Speicher → OutOfMemory bei langen Läufen
@@ -152,7 +152,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Beschreibung:** `DeterministicKeyChain.getKeyByPath(path, true)` (bitcoinj 0.17.1) legt jeden abgeleiteten Schlüssel dauerhaft in der `DeterministicHierarchy` des Chains ab. Der BIP39-Producer leitet pro Kandidat einen Schlüssel ab. **Gemessen:** Cache wächst exakt um 1 Eintrag pro Schlüssel; 200 000 Schlüssel = **103 MB** dauerhaft belegt (~540 Byte/Schlüssel). Mit dem Test-/Default-Heap von 2 GB ist nach ~4 Mio. Kandidaten Schluss. Fix: Nur der private Schlüssel am Basispfad wird gehalten, jedes Kind direkt mit `HDKeyDerivation.deriveChildKey(parent, child)` abgeleitet. Gleiche Schlüssel, nachgerechnet für 1000 normale Indizes und gehärtete Kinder; nach dem Fix bleibt bei 200 000 Schlüsseln **nichts** zurück (−1 MB gemessen).
 - **Reproduktion:** `BIP39KeyProducerTest#producer_keepsNoKeyChainThatCachesEveryDerivedKey` (vorher rot, danach grün; strukturell, weil die Cache-Größe nur über bitcoinj-Interna sichtbar ist) + `#nextKey_matchesTheKeyChainDerivation_forPlainAndHardenedChildren` (Gleichwertigkeit, normal und gehärtet). `BIP39KeyProducerTest` 296/296, `KeyProducerJavaBip39Test` 1/1. Messprogramm (Heap vor/nach 200k `nextKey()`): Scratchpad `bip/Q.java`.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `f1dcbb9`
+- **Commit:** BitcoinAddressFinder `8163bfe`
 
 <a id="f15"></a>
 ### F15 – BAF: Beim Shutdown werden noch eingereihte Batches nie geprüft (Treffer gehen verloren)
@@ -162,7 +162,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Beschreibung:** `Finder.shutdownAndAwaitTermination()` stoppt zuerst die Producer, dann `ConsumerJava.interrupt()`. Laut Javadoc von `CConsumerJava.awaitQueueEmptySeconds` wartet das darauf, dass der Worker-Pool „die Keys-Queue leert“. Die Worker-Schleife (`while (shouldRun.get())`) endete aber sofort, als `shouldRun` auf `false` ging, ohne die Queue zu leeren. Alles, was noch eingereiht war (bis `queueSize` = 10 Batches à `2^batchSizeInBits` Schlüssel), blieb ungeprüft. Betroffen ist jeder Lauf, der von selbst endet: inkrementeller Bereich bis zum Ende, Secrets-Datei, `runOnce`, Socket-Feed mit Timeout. Gerade das Ende des Bereichs bzw. die letzten Zeilen fehlten, ein Treffer dort ging verloren. Mit Result-Broadcast fehlte für diese Bereiche auch das Event. Fix: Jeder Worker leert die Queue nach der Schleife einmal (`consumeKeys`), bevor er endet.
 - **Reproduktion:** `ConsumerJavaTest#interrupt_batchesStillQueued_areCheckedBeforeTheConsumerStops` (Listener hält Batch 1 fest, Batch 2 liegt in der Queue, Shutdown beginnt; vorher rot: 1 statt 2 geprüfte Batches, danach grün). `ConsumerJavaTest` 34/34, `FinderTest` 21/21.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `90457e3`
+- **Commit:** BitcoinAddressFinder `e1b05c9`
 
 <a id="f19"></a>
 ### F19 – BAF: ZeroMQ-Ergebnis-Broadcast aus mehreren Consumer-Threads korrumpiert den Socket → Consumer-Threads hängen für immer
@@ -173,7 +173,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Fix:** `send` und `close` teilen ein privates Lock; ein Send nach `close` wird übersprungen, `close` ist idempotent. WebSocket- und Socket-Broadcaster geprüft: Java-WebSocket ist thread-sicher, `SocketResultBroadcaster` schreibt jede Nachricht in einem einzigen `write`, das `NioSocketImpl` unter seinem Write-Lock ausführt → keine Verzahnung.
 - **Reproduktion:** `ZmqResultBroadcasterTest#onBatchChecked_calledFromSeveralConsumerThreads_everyCallReturns` (8 Threads × 200 Aufrufe; vorher hängt er, nachher 4/4 grün in 1,5 s). Zusätzliche Probe `/home/user/BUGHUNT-2026-10-17-F19-probe.java`: vorher 3 von 3 Läufen Timeout mit 1 100–1 500 `IndexOutOfBoundsException`, nachher 1600/1600 Nachrichten empfangen.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `107e4ac`
+- **Commit:** BitcoinAddressFinder `1922809`
 
 <a id="f20"></a>
 ### F20 – BAF: Ein Ergebnis-Client, der verbindet und nie liest, friert über `SocketResultBroadcaster` den ganzen Scan ein
@@ -184,7 +184,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Fix:** pro Client eine begrenzte Queue (4096 Nachrichten) und ein eigener Writer (Executor); `broadcast` legt nur ab, ein Client, dessen Queue voll ist, wird getrennt. Greeting wird vor der Registrierung eingereiht (bleibt die erste Zeile). `close()` beendet auch die Writer. Javadoc korrigiert.
 - **Reproduktion:** `SocketResultBroadcasterTest#onBatchChecked_clientConnectedButNeverReading_doesNotBlockTheCaller` (vorher `TimeoutException` nach 15 s, nachher 6/6 grün in 1,1 s); `BitcoinAddressFinderArchitectureTest` 17/17, `FinderTest` 21/21 grün.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `d0519ca`
+- **Commit:** BitcoinAddressFinder `dbdefe4`
 
 <a id="f21"></a>
 ### F21 – BAF: `WebSocketEndpoint` lässt einen Nicht-Daemon-Thread zurück → JVM beendet sich nach einem Find-Lauf mit WebSocket-Key-Producer nie
@@ -192,10 +192,10 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/WebSocketEndpoint.java:176` (`start`)
 - **Schwere:** mittel
 - **Beschreibung:** `start()` übergab `WebSocketServer.start()` – das sofort zurückkehrt und eigene Threads startet – an einen frisch erzeugten `Executors.newSingleThreadExecutor()`, der nie heruntergefahren wurde. Dessen untätiger Worker (`pool-N-thread-1`) ist kein Daemon und überlebt `stop()`. Da `Main` kein `System.exit` aufruft, hält er die JVM am Leben: ein Lauf, dessen Producer enden (z. B. `timeoutMillis` > 0 → `NoMoreSecretsAvailableException`), kehrt aus `main` zurück, der Prozess aber nie. Probe: nach `start(); stop();` bleibt `[pool-1-thread-1]` übrig, die JVM wird erst vom `timeout` beendet (Exit 124).
-- **Fix:** Executor direkt nach dem `submit` per `shutdown()` beenden (die Startaufgabe läuft noch zu Ende). **Überholt durch `b1379fe`:** `WebSocketEndpoint.start()` ruft `localServer.start()` seither direkt auf, es gibt keinen Start-Executor mehr; die Wirkung (kein Nicht-Daemon-Thread hält die JVM) ist dieselbe.
+- **Fix:** Executor direkt nach dem `submit` per `shutdown()` beenden (die Startaufgabe läuft noch zu Ende). **Überholt durch `48616fd`:** `WebSocketEndpoint.start()` ruft `localServer.start()` seither direkt auf, es gibt keinen Start-Executor mehr; die Wirkung (kein Nicht-Daemon-Thread hält die JVM) ist dieselbe.
 - **Reproduktion:** neuer `WebSocketEndpointTest#stop_afterStart_leavesNoNonDaemonThreadBehind` (vorher rot: `<[Thread[#31,pool-2-thread-1,5,main]]>`, nachher grün); `KeyProducerJavaWebSocketTest` 5/5 und `WebSocketResultBroadcasterTest` 4/4 grün.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `7469a72`
+- **Commit:** BitcoinAddressFinder `1baed42`
 
 <a id="f22"></a>
 ### F22 – BAF: `KeyProducerJavaSocket` – `connectRetryCount` ist ein Lebenszeit-Budget → Producer stirbt still nach N Trennungen
@@ -206,7 +206,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Fix:** `attempts = 0` sobald eine Verbindung steht; `connectRetryCount` begrenzt damit wie dokumentiert die Versuche *pro* Verbindungsaufbau.
 - **Reproduktion:** `KeyProducerJavaSocketTest#createSecrets_peerReconnectsMoreOftenThanTheRetryCount_keepsReading` (4 Verbindungen à 1 Secret bei `connectRetryCount = 2`; vorher `NoMoreSecretsAvailableException` beim dritten Secret, nachher grün; Klasse 18/18).
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `260f4db`
+- **Commit:** BitcoinAddressFinder `fec089b`
 
 <a id="f23"></a>
 ### F23 – BAF: Adresszeilen mit führendem Leerraum werden beim Import als „address is empty“ verworfen
@@ -217,7 +217,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Fix:** `fromLine` trimmt die ganze Zeile vor dem Aufteilen.
 - **Reproduktion:** `AddressTxtLineTest#fromLine_addressWithLeadingWhitespace_returnHash160AndAmount` (Leerzeichen, Tab, zwei Leerzeichen; vorher `AddressFormatNotAcceptedException: address is empty`, nachher grün). `AddressTxtLineTest` 291/291, `SeparatorFormatTest` 83/83, `AddressFilesToLMDBTest` 24/24 grün.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `f7c8d6c`
+- **Commit:** BitcoinAddressFinder `33c2210`
 
 <a id="f27"></a>
 ### F27 – BAF: LMDB-Map wird bei vollem Speicher nur einmal vergrößert → Batch-Import bricht mit `MapFullException` ab
@@ -228,7 +228,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Fix:** beide Schreibpfade vergrößern die Map schrittweise, bis die Transaktion passt (`growMapOrRethrow`); `increaseSizeInMiB = 0` oder `increaseMapAutomatically = false` werfen wie bisher. Javadoc von `CLMDBConfigurationWrite.increaseSizeInMiB` angepasst.
 - **Reproduktion:** `LMDBPersistenceTest#putNewAmounts_batchLargerThanOneIncreaseStep_mapGrowsUntilTheBatchFits` (128 Ki Einträge in einer Transaktion bei 1 MiB Schrittweite; vorher `MapFullException: Environment mapsize reached`, nachher grün). `LMDBPersistenceTest` 50/50 (inkl. der bestehenden Tests zur genauen Anzahl der Vergrößerungen), `AddressFilesToLMDBTest` 24/24 grün.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `ccdb3cf`
+- **Commit:** BitcoinAddressFinder `8260810`
 - **Nachtrag:** die private Javadoc von `putNewAmountWithAutoIncrease` wurde dabei übersehen, siehe [F142](#f142).
 
 <a id="f31"></a>
@@ -239,7 +239,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Beschreibung:** Die Schutzprüfung „targetDirectory muss sich vom lmdbDirectory unterscheiden" verglich nur `getAbsolutePath()`. `<quelle>/.`, `<quelle>/../<quelle>`, `./lmdb` gegen `lmdb` oder ein Symlink auf die Quelle bestehen die Prüfung; danach löscht `run()` „eine frühere Kompaktierung" – also `data.mdb` **der Quelle** – noch bevor die Quelle geöffnet wird. Fix: Vergleich der kanonischen Pfade (`getCanonicalFile`). Nebenbefund ohne Fix: Das Feld `shouldRun` wird in `run()` nie gelesen, obwohl der Kommentar sagt, es verhindere einen noch nicht gestarteten Lauf (`interrupt()` ist damit wirkungslos).
 - **Reproduktion:** `LMDBCompactTest#compactLMDB_targetIsSourceSpelledDifferently_throwsAndKeepsTheSourceDatabase` (ohne Fix: Quelle gelöscht, `LmdbNativeException`; mit Fix 3/3 grün)
 - **Status:** gefixt
-- **Commit:** 0535ba6
+- **Commit:** 301fe73
 
 <a id="f32"></a>
 ### F32 – BAF: `LMDBCompact.interrupt()` ist wirkungslos – ein vor dem Start unterbrochener Lauf löscht und kopiert trotzdem
@@ -250,7 +250,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `LMDBCompactTest#compactLMDB_interruptedBeforeRun_writesNothing`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <false> but: was <true>“: Zielverzeichnis angelegt), mit Fix grün 4/4 (skipped 0), Gegenprobe per `git stash` rot, nach `stash pop` wieder grün 4/4.
 - **Status:** gefixt
-- **Commit:** BAF `833b879`
+- **Commit:** BAF `ab52958`
 
 <a id="f33"></a>
 ### F33 – BAF: `OpenClLibraryLoader.ensureLoaded()` initialisiert OpenCL bei gleichzeitigem Erstaufruf zweimal
@@ -261,7 +261,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `OpenClLibraryLoaderTest#ensureLoaded_calledFromTwoThreadsAtOnce_initializesOnlyOnce` (der Fake hält den ersten `create()` fest, bis der zweite Thread `ensureLoaded()` betreten hat)
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <1> but: was <2>“), mit Fix grün 9/9 (skipped 0), Gegenprobe per `git stash` rot, nach `stash pop` grün 9/9.
 - **Status:** gefixt
-- **Commit:** BAF `4328bde`
+- **Commit:** BAF `b50c531`
 
 <a id="f34"></a>
 ### F34 – BAF: `Finder.interrupt()` aus Shutdown-Hook und Main-Thread gleichzeitig → `ConcurrentModificationException` im Shutdown
@@ -272,7 +272,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `FinderTest#interrupt_calledFromTwoThreadsAtOnce_neitherFails` (ein ZMQ-Broadcaster auf `inproc://`, dessen erstes `close()` festgehalten wird, per Reflection in die private Liste gelegt)
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is null but: was <java.util.ConcurrentModificationException>“), mit Fix grün, `FinderTest` 22/22, `BitcoinAddressFinderArchitectureTest` 17/17; Gegenprobe per `git stash` rot, nach `stash pop` grün. `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BAF `cf46353`
+- **Commit:** BAF `514f564`
 - **Nachtrag (Branch-Review 2026-10-20):** Seit F206 durchläuft `interrupt()` die Broadcaster-Listen nicht mehr, das tut `closeBroadcasters()` (unter demselben `interruptLock`). Der Test heißt deshalb `FinderTest#teardown_calledFromTwoThreadsAtOnce_neitherFails` und lässt zwei Threads `abortStart()` rufen (jeweils `interrupt()`, dann `closeBroadcasters()`); der festgehaltene `close()` liegt weiter im ersten Aufruf.
 
 <a id="f35"></a>
@@ -286,9 +286,9 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Fix:** Entscheidung des Nutzers (Variante B). `GcTrigger` beschreibt die Messung, dass sie vom alten Upload-Weg stammt und auf dem gestückelten Upload nicht nachgemessen ist; `reclaimHeapBeforeUpload` ohne „few milliseconds“ und `CL_MEM_COPY_HOST_PTR`; `uploadGpuFilter` nennt `CL_MEM_READ_ONLY` + `writeBufferChunked`; `AddressLookup` zeigt eine echte Kette und die tatsächliche Verdrahtung. Neuer `TODO.md`-Eintrag „Re-measure the heap reclaim before the GPU filter upload on the chunked LWJGL upload“ (AMD-Karte, no-op-`GcTrigger` gegen `GcTrigger.SYSTEM`, Dauer der Collection) – CI-/Hardware-Bedarf.
 - **Reproduktion:** keine – reine Dokumentationsabweichung; `OpenCLContextGpuFilterWidthTest#reclaimHeapBeforeUpload_invokesTheTrigger` prüft weiterhin, dass die Collection läuft.
 - **Rot-Grün-Nachweis:** – (Doku-Korrektur, Freigabe des Nutzers für Doku ohne roten Test)
-- **Überholt:** `e451898` (Messauftrag B6) hat `GcTrigger` und den `System.gc()` vor dem Upload entfernt, nachdem die Nachmessung auf der RX 7900 XTX ohne ihn grün war; die hier beschriebene Doku und der Test `OpenCLContextGpuFilterWidthTest#reclaimHeapBeforeUpload_invokesTheTrigger` gibt es deshalb nicht mehr.
+- **Überholt:** `51fcfb3` (Messauftrag B6) hat `GcTrigger` und den `System.gc()` vor dem Upload entfernt, nachdem die Nachmessung auf der RX 7900 XTX ohne ihn grün war; die hier beschriebene Doku und der Test `OpenCLContextGpuFilterWidthTest#reclaimHeapBeforeUpload_invokesTheTrigger` gibt es deshalb nicht mehr.
 - **Status:** gefixt (Doku)
-- **Commit:** 0060d6b
+- **Commit:** c7c2aaf
 
 <a id="f40"></a>
 ### F40 – BAF: Secrets-Datei im falschen Format hält jede Zeile in `ReadStatistic.errors` → OutOfMemory
@@ -301,7 +301,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: a collection with size <100> but: collection size was <105>“), mit Fix grün 11/11 (skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `ReadStatisticTest` 15/15, `SecretsFileTest` 10/10, `AddressFileTest` 11/11, `ProducerJavaSecretsFilesTest` 11/11, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün. `AddressFilesToLMDB` führt eine eigene Fehlerliste, die es im Abschluss Zeile für Zeile ausgibt; die ist ebenfalls unbegrenzt, wird aber tatsächlich benutzt und bleibt unverändert.
 - **Musterdurchsicht nach F40 (2026-10-17):** alle Instanz-Collections in BAF, java-llama.cpp (Java) und streambuffer, die pro Element wachsen. Begrenzt bzw. unkritisch: `SlidingWindowRate.samples` (auf das Zeitfenster gekürzt), `OpenClTask.hostBufferPool` (enthält nur zurückgegebene Puffer, höchstens so viele wie gleichzeitig in Gebrauch), Producer-/Broadcaster-/Interruptable-Listen (durch die Konfiguration begrenzt), Tool-Maps pro Stream. Die unbegrenzte Fehlerliste von `AddressFilesToLMDB` ist kein realistisches Risiko: Formatfehler landen als „unsupported“ nur in einem Zähler, ein nicht numerischer Betrag fällt auf den Standardwert zurück, der `RuntimeException`-Pfad fängt nur echte Einzelfehler.
 - **Status:** gefixt
-- **Commit:** BAF `be8ff36`
+- **Commit:** BAF `03409ac`
 
 <a id="f41"></a>
 ### F41 – BAF: abgeschnittene Meldung, wenn der inkrementelle Producer schon hinter dem Bereichsende steht
@@ -313,7 +313,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `KeyProducerJavaIncrementalTest#createSecrets_startExceedsEnd_messageNamesTheEndPrivateKey`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is "16 exceeds end private key 5" but: was "16 exceeds "“), mit Fix grün 10/10 (skipped 0); Gegenprobe per `git stash` rot (10 Tests, 1 Failure), nach `stash pop` grün. `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BAF `767708a`
+- **Commit:** BAF `6021b2a`
 
 <a id="f42"></a>
 ### F42 – BAF: UTF-8-BOM am Dateianfang bleibt in der ersten Zeile – erstes Brainwallet-Secret falsch, erste Adresse unlesbar
@@ -325,7 +325,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `SecretsFileTest#readFile_stringDoSha256FormatWithUtf8ByteOrderMark_firstLineIsHashedWithoutTheMark`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <72155939…63272> but: was <26164307…44373>“ – SHA256 von „U+FEFF test“ statt „test“), mit Fix grün 11/11 (skipped 0); Gegenprobe per `git stash` rot (1 Failure), nach `stash pop` grün. `AbstractPlaintextFileTest` 11/11, `AddressFileTest` 11/11, `ProducerJavaSecretsFilesTest` 11/11, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BAF `b068ef1`
+- **Commit:** BAF `22ba361`
 
 <a id="f43"></a>
 ### F43 – BAF: Adressimport (`AddressFilesToLMDB`) verliert die erste Adresse einer Datei mit UTF-8-BOM
@@ -337,7 +337,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `AddressFilesToLMDBTest#addressFilesToLMDB_fileWithUtf8ByteOrderMark_importsTheFirstAddress`
 - **Rot-Grün-Nachweis:** ohne Fix rot („the first address after the byte order mark was not imported – Expected: is <true> but: was <false>“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. Ganze Klasse `AddressFilesToLMDBTest` 25/25, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BAF `fa1d418`
+- **Commit:** BAF `f5ba9b2`
 
 <a id="f44"></a>
 ### F44 – BAF: JSON-Konfiguration mit UTF-8-BOM lässt sich nicht laden
@@ -349,7 +349,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `MainTest#loadConfiguration_jsonFileWithUtf8ByteOrderMark_returnsExpectedConfiguration`
 - **Rot-Grün-Nachweis:** ohne Fix rot („JsonParse Unexpected character ('?' (code 65279 / 0xfeff)): expected a valid value“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `MainTest` 18 Tests (6 OpenCL-Tests überspringen sich ohne Gerät, wie zuvor), `ConfigFixturesParseTest` 3/3, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BAF `b94d720`
+- **Commit:** BAF `bde669f`
 
 <a id="f45"></a>
 ### F45 – BAF: die Gruppenordnung n gilt als gültiger privater Schlüssel – der CPU-Producer stürzt ab, wenn ein Raster n erreicht
@@ -361,7 +361,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `ProducerJavaTest#createGrid_gridReachesTheGroupOrder_marksItInvalidAndKeepsTheKeyBelow` (Raster n−1, n, n+1, n+2 mit `batchSizeInBits` 2), dazu `PrivateKeyValidatorTest#isOutsidePrivateKeyRange_groupOrder_returnsTrue`.
 - **Rot-Grün-Nachweis:** ohne Fix rot (`java.lang.ArrayIndexOutOfBoundsException: Index 64 out of bounds for length 1` aus `PublicKeyBytes.fromPrivate`), mit Fix grün; Gegenprobe per `git stash` des Validators rot mit derselben Exception, nach `stash pop` grün. Breit: `PrivateKeyValidatorTest` 22/22, `ProducerJavaTest` 9/9, `AbstractProducerTest` 20/20, `PublicKeyBytesTest` 32/32, `KeyUtilityTest` 58 (1 seit langem `@Disabled`), `ConsumerJavaTest` 35 (8 LMDB/OpenCL-abhängig übersprungen), `KeyProducerJavaIncrementalTest` 10/10, `PrivateKeyTooLargeExceptionTest` 11/11, `CKeyProducerJavaIncrementalTest` 9/9, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BAF `2d7c23c`
+- **Commit:** BAF `fd44de7`
 
 <a id="f46"></a>
 ### F46 – BAF: abgebrochener LMDB-Export meldet „writeAllAmounts done“
@@ -373,7 +373,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `LMDBToAddressFileTest#run_interruptedBeforeTheExport_doesNotReportTheExportAsDone`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: not a collection containing "writeAllAmounts done" but: was <[writeAllAmounts ..., writeAllAmounts done]>“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `LMDBToAddressFileTest` 13/13, `MainTest` 18 (6 OpenCL übersprungen), `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BAF `61d9cc2`
+- **Commit:** BAF `a940cee`
 
 <a id="f47"></a>
 ### F47 – BAF: abgebrochener Adressimport meldet „... import done.“ und „finished“ für halb gelesene Dateien
@@ -385,7 +385,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `AddressFilesToLMDBTest#addressFilesToLMDB_interruptedBeforeTheImport_doesNotReportTheImportAsDone`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: not a collection containing "... import done." but: was <[…, Import summary: 0 written, 0 parsed, 0 unsupported, 0 error(s)., ... import done.]>“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `AddressFilesToLMDBTest` 26/26, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BAF `396b967`
+- **Commit:** BAF `71b202b`
 
 <a id="f48"></a>
 ### F48 – BAF: abgebrochenes LMDB-Delta meldet „... delta done“
@@ -397,7 +397,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `LMDBDeltaTest#run_interruptedBeforeTheDelta_doesNotReportTheDeltaAsDone`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: not a collection containing a string starting with "... delta done" but: was <[…, ... delta done: 0 address(es) written to …]>“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `LMDBDeltaTest` 13/13, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BAF `20dde71`
+- **Commit:** BAF `7517415`
 
 <a id="f49"></a>
 ### F49 – BAF: unterbrochener Secrets-Datei-Producer meldet „Finished processing“ und „All secrets files processed.“
@@ -409,7 +409,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `ProducerJavaSecretsFilesTest#produceKeys_interruptedWhileReadingAFile_doesNotReportTheFileOrTheRunAsProcessed` (ein Consumer ruft nach dem ersten Schlüssel `interrupt()`)
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: not a collection containing a string starting with "Finished processing" but: was <[…, Finished processing: …/secrets.txt, Progress: … Current File progress: 28.…]>“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` rot, nach `stash pop` grün. `ProducerJavaSecretsFilesTest` 12/12, `AbstractProducerTest` 20/20, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BAF `1a957de`
+- **Commit:** BAF `aa704dc`
 
 <a id="f50"></a>
 ### F50 – BAF: `ProducerJavaSecretsFiles.interrupt()` zwischen Flagprüfung und Dateistart wird übersehen
@@ -421,7 +421,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `ProducerJavaSecretsFilesTest#produceKeys_interruptBetweenFlagCheckAndReaderRegistration_doesNotReadTheFile`
 - **Rot-Grün-Nachweis:** mit Naht, ohne Fix rot („Expected: is <0> but: was <3>“ – alle drei Secrets gelesen), die übrigen 12 Tests der Klasse grün (Naht verhaltensneutral); mit Fix grün; Gegenprobe (nur die Nachprüfung entfernt, Naht behalten) wieder rot, danach grün. `ProducerJavaSecretsFilesTest` 13/13, `AbstractProducerTest` 20/20, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BAF `e245947`
+- **Commit:** BAF `72d9152`
 
 <a id="f51"></a>
 ### F51 – BAF: BIP39-Producer kürzt die abgeleiteten Schlüssel, wenn `privateKeyMaxNumBits` < 256
@@ -433,7 +433,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `KeyProducerJavaBip39Test#constructor_privateKeyMaxNumBitsBelowFullKeySize_throwsIllegalArgumentException`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected java.lang.IllegalArgumentException to be thrown, but nothing was thrown.“), mit Fix grün; Gegenprobe per `git stash` rot, nach `stash pop` grün. `KeyProducerJavaBip39Test` 2/2, `BIP39KeyProducerTest` 296/296, `KeyProducerJavaTest` 156/156, `FinderTest` 22/22, `ConfigFixturesParseTest` 3/3, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün (der erste Fix-Versuch mit der Prüfung im Konstruktorrumpf war es nicht und wurde nicht gepusht). Die Beispielkonfigurationen setzen für BIP39 kein abweichendes `privateKeyMaxNumBits`.
 - **Status:** gefixt
-- **Commit:** BAF `d871b31`
+- **Commit:** BAF `73d5d14`
 
 <a id="f52"></a>
 ### F52 – BAF: ein Producer, dessen Freigabe fehlschlägt, lässt alle folgenden weiterlaufen
@@ -445,7 +445,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `ProducerReleaserTest#release_firstProducerFailsToRelease_releasesTheOthersAndRethrows`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <1> but: was <0>“ – der zweite Producer wurde nie freigegeben), mit Fix grün; Gegenprobe per `git stash` rot, nach `stash pop` grün. `ProducerReleaserTest` 4/4, `FinderTest` 22/22, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün (nach Aufnahme in die Unterdrückung; der Lauf davor war rot und wurde nicht gepusht).
 - **Status:** gefixt
-- **Commit:** BAF `338ec00`
+- **Commit:** BAF `9c258b5`
 
 <a id="f58"></a>
 ### F58 – BitcoinAddressFinder: vorzeichenbehafteter Base36-Hash wird als Zweierkomplement importiert
@@ -457,7 +457,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `Base36DecoderTest#decodeBase36ToFixedLengthBytes_leadingMinus_throwsNumberFormatException`, `…_leadingPlus_throwsNumberFormatException`
 - **Rot-Grün-Nachweis:** ohne Fix rot (beide: „Expected java.lang.NumberFormatException to be thrown, but nothing was thrown.“, 16 Tests, 2 Fehlschläge), mit Fix grün 16/16; Gegenprobe per `git stash` rot (2 Fehlschläge), nach `stash pop` grün. `AddressTxtLineTest` 291/291, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `3c355ee`
+- **Commit:** BitcoinAddressFinder `ea71a25`
 
 <a id="f66"></a>
 ### F66 – BAF: Nach dem Shutdown-Timeout werden Batches gegen die geschlossene Datenbank als „geprüft, nichts gefunden“ gemeldet
@@ -469,7 +469,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `ConsumerJavaTest#interrupt_awaitTimesOut_batchCheckedAfterThePersistenceClosedIsNotReportedAsChecked` (Listener hält Batch 1 fest, Batch 2 mit einer Adresse der Test-DB liegt in der Queue, `awaitQueueEmptySeconds = 1`)
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <[]> but: was <[BatchResult[secretBase=2, checkedCount=1, hits=[]]]>“), mit Fix grün, `ConsumerJavaTest` 36/36; Gegenprobe per `git stash` rot, nach `stash pop` grün. Vorprobe: bei offener Datenbank (Freigabe vor `interrupt()`) meldet derselbe Aufbau Batch 2 mit seinem Treffer – der leere Bericht ist also ein verlorener Treffer. `FinderTest` 22/22, `BitcoinAddressFinderArchitectureTest` 17/17, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `6c94e19`
+- **Commit:** BitcoinAddressFinder `0ea5ec9`
 
 <a id="f100"></a>
 ### F100 – BAF: Socket-Key-Producer mit negativem `timeoutMillis` hängt still statt beim Start zu scheitern
@@ -482,7 +482,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected java.lang.IllegalArgumentException to be thrown, but nothing was thrown.“), mit Fix grün (19/19 der Klasse, skipped 0); Gegenprobe per `git stash` rot (1), nach `pop` grün. `FinderTest` 22/22, `AbstractKeyProducerQueueBufferedTest` 11/11, `ConfigFixturesParseTest` 3/3, `BitcoinAddressFinderArchitectureTest` 17/17, `spotless:apply` und `spotbugs:check` grün. Kein Beispiel unter `examples/` nutzt einen negativen Socket-Timeout.
 - **Nebenbefund (gefixt als F101):** Auch die `IllegalStateException` „Unable to establish socket connection … after N attempts“ am Ende des Readers geht im unbeobachteten `Future` verloren; der Nutzer sieht nur die einzelnen „Connection attempt N failed“-Warnungen und danach eine `NoMoreSecretsAvailableException` mit „Timeout while waiting for secret“.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `9d66eb7`
+- **Commit:** BitcoinAddressFinder `807cef2`
 
 <a id="f101"></a>
 ### F101 – BAF: Endgültiger Verbindungsfehler des Socket-Key-Producers geht im unbeobachteten `Future` verloren
@@ -494,7 +494,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `KeyProducerJavaSocketTest#start_noPeerAfterAllRetries_logsTheFailureInsteadOfLosingItInTheFuture` (Client auf einen freien Port, ein Versuch, LogCaptor)
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: a collection containing a string containing "Unable to establish socket connection" but: was empty“), mit Fix grün (20/20 der Klasse, skipped 0); Gegenprobe per `git stash` rot (1), nach `pop` grün. `FinderTest` 22/22, `AbstractKeyProducerQueueBufferedTest` 11/11, `ConfigFixturesParseTest` 3/3, `BitcoinAddressFinderArchitectureTest` 17/17, `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `eb3ee16`
+- **Commit:** BitcoinAddressFinder `445f352`
 
 <a id="f119"></a>
 ### F119 – BitcoinAddressFinder: Ein Client, der während der Gitter-Ankündigung verbindet, erfährt das Gitter nie
@@ -506,7 +506,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `SocketResultBroadcasterTest#announceConfiguration_whileAClientIsBeingRegistered_theClientStillReceivesIt` – über die neue, verhaltensneutrale Naht `setBeforeClientRegistered` läuft die Ankündigung auf einem zweiten Thread genau im Fenster, bis sie endet oder auf das Lock wartet (`Thread.State.BLOCKED`).
 - **Rot-Grün-Nachweis:** gegen den Naht-Stand ohne Fix rot („Expected: is not null but: was null“, kein `config` binnen 3 s), mit Fix grün (7/7 der Klasse, skipped 0); Gegenprobe durch Zurückkopieren des Naht-Stands rot (1), danach wieder grün. Breite Liste (alle drei Broadcaster, `KeyProducerJavaSocketTest`, `FinderTest`, `BitcoinAddressFinderArchitectureTest`) grün, `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `59dfecf`
+- **Commit:** BitcoinAddressFinder `d1b3125`
 
 <a id="f120"></a>
 ### F120 – BitcoinAddressFinder: BIP39-Mnemonics ohne NFKD-Normalisierung ergeben für nicht-englische Sprachen falsche Schlüssel
@@ -518,7 +518,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `BIP39KeyProducerTest#nextKey_givenTheVectorMnemonicAsWritten_derivesTheKeyOfTheStandardSeed` und `#nextKey_givenTheVectorMnemonicComposed_derivesTheKeyOfTheStandardSeed` (je über alle 288 Trezor-Vektoren in zwölf Sprachen; Erwartung: der Schlüssel `M/44H/0H/0H/0/0` aus dem Vektor-Seed)
 - **Rot-Grün-Nachweis:** ohne Fix rot in 142 Fällen (24 japanische Vektoren wie geschrieben, 118 zusammengesetzte: Französisch 19, Japanisch 24, Koreanisch 24, Russisch 13, Spanisch 20, Türkisch 18), z. B. „Expected: is "8041a494…" but: was "de26cfef…"“; mit Fix grün (872/872 der Klasse, skipped 0); Gegenprobe per `git stash` rot (142), nach `pop` grün. Breite Liste (`BIP39WordlistTest`, `KeyProducerJavaBip39Test`, `KeyUtilityTest`, `ConfigFixturesParseTest`, `BitcoinAddressFinderArchitectureTest`) grün, `spotless:apply` grün, `spotbugs:check` grün nach der Unterdrückung.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `6cb074f`
+- **Commit:** BitcoinAddressFinder `aaea9fc`
 
 <a id="f121"></a>
 ### F121 – BitcoinAddressFinder: CashAddr in Großbuchstaben wird abgelehnt oder als falscher Hash importiert
@@ -530,7 +530,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `AddressTxtLineTest#fromLine_uppercaseCashAddrWithPrefix_returnsTheHash160OfTheLowercaseForm`, `#fromLine_uppercaseCashAddrWithoutPrefix_returnsTheHash160OfTheLowercaseForm` (Beispiel der Spezifikation, hash160 von `1BpEi6DfDAUFd7GtittLSdBeYJvcoaVggu`)
 - **Rot-Grün-Nachweis:** ohne Fix beide rot („Unexpected exception thrown: … invalid Base58 address (input: BITCOINCASH)“ bzw. „Expected: is "76a04053bda0a88bda5177b86a15c3b29f559873" but: was "7119debe7d4714d8bb5357c7f28d4d00f5c8f9a6"“), mit Fix grün (293/293 der Klasse, skipped 0); Gegenprobe per `git stash` rot (2), nach `pop` grün. Breite Liste (`Bech32HelperTest`, `AddressFilesToLMDBTest`, `SeparatorFormatTest`, `BitcoinAddressFinderArchitectureTest`) grün, `spotless:apply` und `spotbugs:check` grün (das großgeschriebene Präfix ist ein Literal, `toUpperCase` auf einem Literal meldet `SPP_CONVERSION_OF_STRING_LITERAL`).
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `8abd2d0`
+- **Commit:** BitcoinAddressFinder `6f0fc7d`
 
 <a id="f122"></a>
 ### F122 – BitcoinAddressFinder: Riecoin-ScriptPubKey in Großbuchstaben wird als falscher Hash importiert
@@ -542,7 +542,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `AddressTxtLineTest#fromLine_uppercaseRiecoinScriptPubKey_returnsTheHash160OfTheLowercaseForm`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is "751e76e8199196d454941c45d1b3a323f1433bd6" but: was "21e32e15ba0d03cb848d066dccdb18df5745ef83"“), mit Fix grün (294/294 der Klasse, skipped 0); Gegenprobe per `git stash` rot (1), nach `pop` grün. Breite Liste wie F121 grün, `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `1107caf`
+- **Commit:** BitcoinAddressFinder `b061522`
 
 <a id="f124"></a>
 ### F124 – BitcoinAddressFinder: Strg-C während des Datenbankladens meldet „Key producer id is unknown“
@@ -554,7 +554,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `FinderTest#configureProducer_interruptedWhileConsumerStarted_doesNotReportUnknownKeyProducer`, `FinderTest#startConsumer_interruptedBefore_consumerNotStarted`
 - **Rot-Grün-Nachweis:** ohne Fix beide rot („Unexpected exception thrown: …KeyProducerIdUnknownException: Key producer id is unknown: exampleId“ bzw. „Expected: is an empty collection but: <[ConsumerJava(…)]>“), mit Fix grün (2/2, skipped 0); Gegenprobe per `git stash` rot (2), nach `pop` grün. Breite Liste: `FinderTest` 24/24, `MainTest` 18 (6 OpenCL übersprungen wie zuvor), `ConsumerJavaTest` 36/36, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `279f8de`
+- **Commit:** BitcoinAddressFinder `778abcd`
 
 <a id="f126"></a>
 ### F126 – BitcoinAddressFinder: Ein Tippfehler in der `keyProducerId` eines Producers fällt erst nach dem Datenbankladen auf
@@ -566,7 +566,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `FinderTest#startKeyProducer_producerKeyProducerIdIsNull_ExceptionThrown`, `#startKeyProducer_producerKeyProducerIdHasATypo_ExceptionThrown`, `#startKeyProducer_producerBatchSizeOutOfRange_ExceptionThrown`
 - **Rot-Grün-Nachweis:** ohne Fix alle drei rot („Expected …KeyProducerIdUnknownException to be thrown, but nothing was thrown.“ bzw. „Expected java.lang.IllegalArgumentException …“), mit Fix grün (3/3, skipped 0); Gegenprobe per `git stash` rot (3), nach `pop` grün. Breite Liste: `FinderTest` 26/26, `MainTest` 18 (6 OpenCL übersprungen wie zuvor), `ConfigFixturesParseTest` 3/3, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün. Alle `examples/config_Find*.json` außer dem Secrets-Datei-Beispiel bestehen die neue Prüfung (Skript über die JSON-Dateien); zu diesem siehe F127.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `b230cfa`
+- **Commit:** BitcoinAddressFinder `9a35d88`
 - **Nachtrag (Branch-Review 2026-10-20):** Die drei Tests konfigurierten nur einen `CProducerJava`; `validateProducerConfiguration` prüft aber auch `producerJavaSecretsFiles` und `producerOpenCL`, und das Streichen einer dieser beiden `addAll`-Zeilen ließ alle Tests grün (für den OpenCL-Producer also wieder der F126-Fehler, F140 reproduzierte ihn genau damit). Die drei Tests laufen jetzt über `FinderTest.ProducerList` (`PRODUCER_JAVA`, `PRODUCER_JAVA_SECRETS_FILES`, `PRODUCER_OPENCL`: legt den Producer-Typ der Liste an und hängt ihn dort ein; ohne OpenCL-Gerät, da vor der Prüfung kein Producer gebaut wird). Gegenprobe: jede der drei `addAll`-Zeilen einzeln entfernt macht genau die drei Zeilen ihrer Liste rot („Expected …KeyProducerIdUnknownException to be thrown, but nothing was thrown.“ bzw. „Expected java.lang.IllegalArgumentException …“), unverändert 9/9 grün.
 
 <a id="f127"></a>
@@ -579,7 +579,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `ConfigFixturesParseTest#secretsFileExample_everyProducerNamesAConfiguredKeyProducer` (lädt die mitgelieferte Datei und ruft `Finder.startKeyProducer`)
 - **Rot-Grün-Nachweis:** ohne Fix rot („Unexpected exception thrown: …KeyProducerIdUnknownException: Key producer id is unknown: null“), mit Fix grün (1/1, skipped 0); Gegenprobe per `git stash` der Beispieldatei rot (1), nach `pop` grün. `ConfigFixturesParseTest` 4/4, `BitcoinAddressFinderArchitectureTest` 17/17, `spotless:apply` ohne weiteren Diff; kein Produktionscode geändert.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `c5dd4d2`
+- **Commit:** BitcoinAddressFinder `2cdea44`
 
 <a id="f129"></a>
 ### F129 – BitcoinAddressFinder: Der OpenCL-Producer verfehlt die Schlüssel 2 … keysPerWorkItem−1, weil das erste Work-Item der Basis 0 bei 0·G verankert ist
@@ -595,7 +595,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Regression:** alle OpenCL-nahen Tests auf pocl (`*OpenCL*`, `Probe*`, `ProducerOpenCLTest`, `TuneConfigurationTest`, `FinderGpuFilterTypeTest`): 22 Klassen, 262 Tests, 0 Fehler; 23 übersprungen aus bestehenden Gründen (`@Disabled`, Rastergröße über dem pocl-Gerät, Annahme eines GPU-Geräts).
 - **CI-Bedarf:** der `test-opencl`-Job (pocl) und eine Laufzeitmessung des Kernels auf echter GPU (erwartet: nicht messbar).
 - **Status:** gefixt
-- **Commit:** 1a7b264
+- **Commit:** 97a2234
 
 <a id="f130"></a>
 ### F130 – BitcoinAddressFinder: `SocketResultBroadcaster.close()` verwirft Ergebnisse, die schon für einen verbundenen Client bereitliegen
@@ -607,7 +607,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `SocketResultBroadcasterTest#close_batchesStillQueued_aConnectedClientReceivesAllOfThem` – der Writer wird vor dem ersten Schreiben festgehalten, bis `close()` den Stopp angefordert hat; zehn Batches liegen dann sicher in der Warteschlange.
 - **Rot-Grün-Nachweis:** gegen den Naht-Stand ohne Fix rot (dreimal „Expected: is <10> but: was <0>“, die übrigen 7 Tests der Klasse grün), mit Fix grün in 3 von 3 Läufen (8/8 der Klasse, skipped 0); Gegenprobe durch Zurückkopieren des Naht-Stands rot („but: was <1>“), danach wieder grün. Breite Liste: `WebSocketResultBroadcasterTest` 4/4, `ZmqResultBroadcasterTest` 4/4, `KeyProducerJavaSocketTest` 20/20, `FinderTest` 26/26, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün. Zwei Vorfassungen des Tests ohne Naht waren nicht deterministisch (439/500 nur im ersten von drei Läufen, mit 4000 Nachrichten rot in 4 von 5) und wurden nicht übernommen.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `68a80f9`
+- **Commit:** BitcoinAddressFinder `2b8ab58`
 
 <a id="f131"></a>
 ### F131 – BitcoinAddressFinder: `Finder.shutdownAndAwaitTermination` schließt die Result-Broadcaster, bevor der Consumer die letzten Batches geprüft hat
@@ -619,7 +619,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `FinderTest#shutdownAndAwaitTermination_consumerStillDraining_everyBatchIsReportedBeforeTheBroadcastersClose` – vier Producer mit je einem Batch, ein Consumer-Thread, ein Test-Listener hält jeden Batch 200 ms; die Naht hält fest, wie viele Batches beim Schließen der Broadcaster schon gemeldet waren.
 - **Rot-Grün-Nachweis:** gegen den Naht-Stand ohne Fix rot („Expected: is <4> but: was <0>“, die übrigen 26 Tests der Klasse grün), mit Fix grün in 3 von 3 Läufen; Gegenprobe durch Zurückkopieren des Naht-Stands rot („but: was <0>“), danach wieder grün. Breite Liste: `FinderTest` 27/27, `ConsumerJavaTest` 36/36, die drei Broadcaster-Tests, `ConfigFixturesParseTest` 4/4, `BitcoinAddressFinderArchitectureTest` 17/17; `MainTest` 18/18 mit `POCL_MAX_WORK_GROUP_SIZE=256` (ohne die Variable stirbt seine OpenCL-Roundtrip-Fork auf pocl, auch gegen den unveränderten Stand – siehe die pocl-Beobachtung in BUGHUNT-CHECKED.md); `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `035f2ac`
+- **Commit:** BitcoinAddressFinder `b4bcdb1`
 - **Nachtrag (Branch-Review 2026-10-20):** Die Zusicherung galt nur auf dem Abschlusspfad. Nach einem Ctrl-C schloss der Shutdown-Hook über `interrupt()` die Broadcaster (und stoppte den WebSocket-Endpunkt), während der Main-Thread den Consumer noch leeren ließ; behoben als [F206](#f206): die Broadcaster schließen jetzt auf jedem Pfad erst nach `releaseConsumer()`.
 
 <a id="f132"></a>
@@ -632,7 +632,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `LMDBCompactTest#compactLMDB_targetHoldsAnotherDatabase_keepsItsDataFile` – das Ziel erhält `data.mdb` und `lock.mdb` der Testdatenbank; erwartet wird, dass `data.mdb` danach unverändert vorhanden ist.
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <true> but: was <false>“, die übrigen 5 Tests der Klasse grün), mit Fix 6/6 (skipped 0). Der Schutztest `compactLMDB_targetHoldsAPreviousCompaction_isReplaced` (zweiter Lauf auf dasselbe Ziel) ist in beiden Ständen grün. `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:check` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `2c6841a`
+- **Commit:** BitcoinAddressFinder `4a05732`
 
 <a id="f135"></a>
 ### F135 – BitcoinAddressFinder: `TuneConfiguration` erweitert nicht, wenn `keysPerWorkItem` das Raster füllt, obwohl `batchSizeInBits` am Rand liegt
@@ -644,7 +644,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `TuneConfigurationTest#nextExtensionArm_keysPerWorkItemFillsTheGridAtTheLargestBatchSize_continuesByOneBit`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is not null but: was null“, die übrigen Tests der Klasse grün), mit Fix 50 Tests, 0 Fehler (1 übersprungen: `run_noProducerConfiguredButGpuPresent_sweepsTheDetectedDevices`, in beiden Ständen), Gegenprobe per `git stash` rot, danach wieder grün; `nextExtensionArm_doublingWouldExceedTheGrid_doesNotContinue` (Gewinner nicht am Bit-Rand) bleibt grün. `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:check` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `275fc61`
+- **Commit:** BitcoinAddressFinder `8c36e8c`
 
 <a id="f136"></a>
 ### F136 – BitcoinAddressFinder: `TuneConfiguration` misst mit `sweepFilterTypes` auf dem ersten Gerät das Raster des globalen Gewinners und schreibt es in dessen Producer
@@ -657,7 +657,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** gegen den Naht-Stand rot („Expected: is sameInstance(<ArmResult[batchSizeInBits=22, keysPerWorkItem=256, …]>) but: was <ArmResult[batchSizeInBits=24, keysPerWorkItem=2048, …]>“, die übrigen Tests der Klasse grün), mit Fix 51 Tests, 0 Fehler (1 übersprungen, in beiden Ständen), Gegenprobe durch Zurückkopieren des Naht-Stands rot, danach wieder grün. Ende zu Ende über die CLI auf pocl mit `sweepFilterTypes` (ein Gerät): beide Filterarme laufen am Gewinner (10, 4), Empfehlung „MEASURED empirically“. `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:check` und `spotbugs:check` grün.
 - **CI-Bedarf:** Ein Lauf mit zwei echten Geräten ist hier nicht möglich (pocl stellt eines).
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `9e317c5`
+- **Commit:** BitcoinAddressFinder `7aa8f4c`
 
 <a id="f139"></a>
 ### F139 – BitcoinAddressFinder: Scheitert der Find-Start nach dem Consumer-Start, beendet sich die JVM nie
@@ -669,7 +669,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `MainTest#run_findStartFailsAfterTheConsumerStarted_leavesNoNonDaemonThreadBehind` (Find mit Test-LMDB und `printStatisticsEveryNSeconds` 0; danach darf binnen 10 s kein neuer Nicht-Daemon-Thread mehr leben)
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is an empty collection but: <[Thread[#33,pool-6-thread-2,5,main], Thread[#32,pool-6-thread-1,5,main]]>“), mit Fix grün; Gegenprobe per `git stash` beider Produktionsdateien rot, danach wieder grün. Breit: `MainTest` 19/19 (mit pocl und `POCL_MAX_WORK_GROUP_SIZE=256`, 0 übersprungen), `FinderTest` 27/27, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:check` und `spotbugs:check` grün. Ende zu Ende mit Fix: beide CLI-Fälle enden nach 1–2 s mit Exit 1.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `4264e7a`
+- **Commit:** BitcoinAddressFinder `021c672`
 
 <a id="f140"></a>
 ### F140 – BitcoinAddressFinder: `TuneConfiguration` hängt nach einer unbekannten Key-Producer-ID (Folge von F126)
@@ -681,7 +681,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `TuneConfigurationTest#run_unknownKeyProducerId_leavesNoNonDaemonThreadBehind`
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is an empty collection but: <[Thread[#27,pool-3-thread-1,5,main]]>“), mit Fix grün; Gegenprobe per `git stash` rot, danach wieder grün. `TuneConfigurationTest` 52 Tests, 0 Fehler (1 übersprungen, wie zuvor), `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:check` und `spotbugs:check` grün. Ende zu Ende mit Fix: Exit 1 nach 2 s.
 - **Status:** gefixt
-- **Commit:** BitcoinAddressFinder `b124070`
+- **Commit:** BitcoinAddressFinder `1c27475`
 
 <a id="f141"></a>
 ### F141 – BitcoinAddressFinder: `TRUNCATED_LONG_64` meldet Kollisionen als Treffer; die versprochene Auflösung über LMDB gibt es nicht
@@ -707,7 +707,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Gegenprobe:** `TRUNCATED_LONG_64` testweise auf `HashSetAddressPresence` verdrahtet → der Consumer-Test wird rot (`Expected: is <1L> but: was <0L>`); zurückgesetzt.
 - **Rot-Grün-Nachweis:** – (Doku-Korrektur; Tests halten das Verhalten fest, Freigabe des Nutzers für Doku ohne roten Test)
 - **Status:** gefixt (Doku)
-- **Commit:** ba6f610
+- **Commit:** e57f3e0
 
 <a id="f142"></a>
 ### F142 – BitcoinAddressFinder: Javadoc von `putNewAmountWithAutoIncrease` beschreibt noch den Zustand vor F27
@@ -715,7 +715,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/persistence/lmdb/LMDBPersistence.java:483` (Javadoc von `putNewAmountWithAutoIncrease`)
 - **Schwere:** niedrig
 - **Beschreibung:** Die Javadoc sagt, nach `MapFullException` werde die Map um `increaseSizeInMiB` vergrößert „and the insert is retried once“, und „if the second attempt also fails, the configured increase size is too small“. Seit F27 wächst die Map in einer Schleife über `growMapOrRethrow`, bis der Eintrag passt; geworfen wird nur noch bei `increaseMapAutomatically = false` oder `increaseSizeInMiB <= 0`. Ende zu Ende bestätigt: Import von 50 000 Adressen mit `initialMapSizeInMiB` 1 und `increaseSizeInMiB` 1 läuft durch (Exit 0, „50000 written“, `data.mdb` auf 5 MiB gewachsen). Reine Doku-Abweichung, das Verhalten ist das bessere.
-- **Historie:** Die Javadoc kam mit `b46c6ca` (2025-11-23) und stimmte damals: einmal vergrößern, einmal wiederholen, beim zweiten `MapFullException` ein Konfigurationsproblem. Veraltet ist sie durch meinen eigenen F27-Fix `ccdb3cf` (2026-10-17), der beide Pfade auf die Schleife über `growMapOrRethrow` umgestellt und die Javadoc von `CLMDBConfigurationWrite.increaseSizeInMiB` angepasst, diese private Javadoc aber übersehen hat. Fließtext außerhalb des Codes (README, docs) beschreibt das Wachstum nicht; `examples/config_AddressFilesToLMDB.json` (`increaseSizeInMiB: 1`) passt.
+- **Historie:** Die Javadoc kam mit `b46c6ca` (2025-11-23) und stimmte damals: einmal vergrößern, einmal wiederholen, beim zweiten `MapFullException` ein Konfigurationsproblem. Veraltet ist sie durch meinen eigenen F27-Fix `8260810` (2026-10-17), der beide Pfade auf die Schleife über `growMapOrRethrow` umgestellt und die Javadoc von `CLMDBConfigurationWrite.increaseSizeInMiB` angepasst, diese private Javadoc aber übersehen hat. Fließtext außerhalb des Codes (README, docs) beschreibt das Wachstum nicht; `examples/config_AddressFilesToLMDB.json` (`increaseSizeInMiB: 1`) passt.
 - **Auswirkung:** keine für Nutzer. Die Methode ist `private`, ihre Javadoc steht nicht in der veröffentlichten API; die öffentliche Konfigurations-Javadoc ist richtig.
 - **Fix:** Javadoc beschreibt die Wiederholung „as often as needed“ und das Werfen ohne Vergrößerung bei `increaseMapAutomatically = false` oder `increaseSizeInMiB <= 0`.
 - **Lücke geschlossen:** Der dokumentierte Vertrag „`0` disables growth“ hatte keinen Test. Neu: `LMDBPersistenceTest#putNewAmount_increaseSizeZero_fullMapThrowsWithoutResizing` und `#putNewAmounts_increaseSizeZero_fullMapThrowsWithoutResizing` (`MapFullException`, `getIncreasedCounter() == 0`, Map bleibt 1 MiB, Timeout 20 s).
@@ -723,7 +723,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Bestehend abgedeckt:** `#putNewAmounts_batchLargerThanOneIncreaseStep_mapGrowsUntilTheBatchFits` (Schleife, Batch), `#putNewAmount_initialLMDBSetTo1MiB_fillWithTooMuchValues_increaseDatabaseSizeAndNoExceptionThrown` (Wachstum, Einzelpfad), `#putNewAmount_initialLMDBSetTo1MiB_fillWithTooMuchValues_exceptionThrown` (`increaseMapAutomatically = false`).
 - **Rot-Grün-Nachweis:** – (Doku-Korrektur; die neuen Tests halten den Vertrag fest)
 - **Status:** gefixt (Doku)
-- **Commit:** 7aaabbe
+- **Commit:** bb40b64
 
 <a id="f144"></a>
 ### F144 – BitcoinAddressFinder: Javadoc von `CProducerOpenCL.enableGpuFilter` bindet den GPU-Filter noch an `BINARY_FUSE_8`
@@ -735,7 +735,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** Lesen gegen `Finder.isGpuFilterRequested`, `ConsumerJava.initLMDB`; bestehend abgedeckt durch `ConsumerJavaTest#gpuFilter_selfContainedBackend_builtBeforeLmdbClosed` (HASHSET) und die LMDB_ONLY-Fälle.
 - **Rot-Grün-Nachweis:** – (Doku-Korrektur, Freigabe des Nutzers für Doku ohne roten Test)
 - **Status:** gefixt (Doku)
-- **Commit:** 681b98e
+- **Commit:** ee958e3
 
 <a id="f145"></a>
 ### F145 – BitcoinAddressFinder: README nennt die Empfehlung „Defaults“
@@ -747,7 +747,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** Lesen gegen `CProducerOpenCL` und `CLMDBConfigurationReadOnly`.
 - **Rot-Grün-Nachweis:** – (Doku-Korrektur, Freigabe des Nutzers für Doku ohne roten Test)
 - **Status:** gefixt (Doku)
-- **Commit:** 681b98e
+- **Commit:** ee958e3
 
 <a id="f146"></a>
 ### F146 – BitcoinAddressFinder: `TRUNCATED_LONG_64` wird an vier Stellen „exakt“ genannt
@@ -759,7 +759,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** die Verhaltenstests von F141.
 - **Rot-Grün-Nachweis:** – (Doku-Korrektur, Freigabe des Nutzers für Doku ohne roten Test)
 - **Status:** gefixt (Doku)
-- **Commit:** 681b98e
+- **Commit:** ee958e3
 
 <a id="f147"></a>
 ### F147 – BitcoinAddressFinder: GPU-Eintrag in `TODO.md` empfiehlt noch `TRUNCATED_LONG_64` als ersten GPU-Filter
@@ -771,7 +771,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `src/main/resources/inc_ecc_secp256k1custom.cl` (`fuse8_contains`/`fuse16_contains`, kein Truncated-Probe), echte Kernel-Tests `OpenCLFilterHitSetIntegrationTest` und `OpenCLCompactOutputIntegrationTest` auf pocl grün.
 - **Rot-Grün-Nachweis:** – (Doku-Korrektur, Freigabe des Nutzers für Doku ohne roten Test)
 - **Status:** gefixt (Doku)
-- **Commit:** 681b98e
+- **Commit:** ee958e3
 
 <a id="f148"></a>
 ### F148 – BitcoinAddressFinder: Nach dem Kernel-Bau mit pocl gehört der SIGSEGV-Handler LLVM; gleichzeitige Safepoints töten die JVM ohne `hs_err`
@@ -787,7 +787,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **CI-Bedarf:** der `test-opencl`-Job mit dem neuen `LD_PRELOAD`; Messung auf echten GPU-Treibern laut `TODO.md`.
 - **Rot-Grün-Nachweis:** siehe Tests.
 - **Status:** gefixt
-- **Commit:** 5c8833c
+- **Commit:** 9975403
 - **Nachtrag (Branch-Review 2026-10-20):** Die Ende-zu-Ende-Aussage „loggt die Warnung einmal“ galt nur für einen `Find` mit einem Producer; der Tuner (ein Kernel je Arm) und ein `Find` mit mehreren OpenCL-Producern loggten sie je Kontext, und `run_TuneConfiguration.sh` lud `libjsig` nicht vor – behoben als [F210](#f210). Die Prüfung entscheidet seit [F209](#f209) über `/proc/self/maps` statt über den `LD_PRELOAD`-String.
 
 <a id="f150"></a>
@@ -801,20 +801,20 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion / Tests:** `LMDBToAddressFileTest#exportThenImport_everyFormat_roundTripsTheHash160Set` (neu, über alle drei Exportformate: Export einer Datenbank, Import der Datei in eine neue, Vergleich der hash160-Mengen, beim Format mit Betrag auch der Beträge) – der erste Round-Trip-Test des Exports. `AddressTxtLineTest#fromLine_hexHash160_isImportedAsThatHash160` (4 Zeilen: 40 Einsen – die Base58-fähige Zeile, die vorher zu einem falschen Hash wurde –, eine echte Hash-Zeile klein und groß, mit Betrag).
 - **Rot-Grün-Nachweis:** ohne Fix rot: Round-Trip für `HexHash` „but: was <[]>“ (die beiden Base58-Formate grün), Hex-Zeilen 4/4 rot („1111…“ → „but: was "0000…"“, die übrigen „invalid Base58 address“). Mit Fix grün; Gegenprobe per `git stash` der Produktionsdatei wieder rot, danach grün. Breit: `AddressTxtLineTest` 298/298, `LMDBToAddressFileTest` 16/16, `AddressFilesToLMDBTest` 26/26, `SeparatorFormatTest` 83/83, `BitcoinAddressFinderArchitectureTest` 17/17, `MainTest` 18/18 einzeln je Methode (die OpenCL-Roundtrip-Methode mit `POCL_MAX_WORK_GROUP_SIZE=256`, siehe die pocl-Beobachtung in `BUGHUNT-CHECKED.md`); `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** e81b8e2
+- **Commit:** b5ddcec
 
 <a id="f151"></a>
 ### F151 – BitcoinAddressFinder: `getMaxPrivateKeyForBatchSize` lässt ein OpenCL-Raster zu, das auf der Gruppenordnung n endet
 - **Zeit:** 2026-10-18 21:05 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/util/PrivateKeyValidator.java` (`getMaxPrivateKeyForBatchSize`), Javadoc von `constants/Secp256k1Constants.MIN_VALID_PRIVATE_KEY`
 - **Schwere:** niedrig (ein Rasterplatz mit einem ungültigen Schlüssel; kein Absturz, kein verpasster Schlüssel)
-- **Historie:** Die Methode stammt aus `979ae5f` (Auslagerung aus `KeyUtility`, in `f4ab38c` nach `PrivateKeyValidator`). Ihr Kommentar „baseKey + (2^bits − 1) ≤ MAX_PRIVATE_KEY“ zeigt die Absicht: jeder Schlüssel des Rasters soll gültig sein. Geschrieben wurde das, als `MAX_PRIVATE_KEY` (= n) noch als größter gültiger Schlüssel galt; F45 (`2d7c23c`) hat die Obergrenze exklusiv gemacht, diese Rechnung aber nicht nachgezogen. Damit wurde aus „≤ n“ ein Raster, dessen letzter Schlüssel n ist. Dieselbe vor-F45-Lesart stand noch in der Javadoc von `MIN_VALID_PRIVATE_KEY` („`[0x1, MAX_PRIVATE_KEY]`“).
+- **Historie:** Die Methode stammt aus `979ae5f` (Auslagerung aus `KeyUtility`, in `f4ab38c` nach `PrivateKeyValidator`). Ihr Kommentar „baseKey + (2^bits − 1) ≤ MAX_PRIVATE_KEY“ zeigt die Absicht: jeder Schlüssel des Rasters soll gültig sein. Geschrieben wurde das, als `MAX_PRIVATE_KEY` (= n) noch als größter gültiger Schlüssel galt; F45 (`fd44de7`) hat die Obergrenze exklusiv gemacht, diese Rechnung aber nicht nachgezogen. Damit wurde aus „≤ n“ ein Raster, dessen letzter Schlüssel n ist. Dieselbe vor-F45-Lesart stand noch in der Javadoc von `MIN_VALID_PRIVATE_KEY` („`[0x1, MAX_PRIVATE_KEY]`“).
 - **Beschreibung:** `maxSafeKey = n − 2^b + 1`; `OpenClTask.setSrcPrivateKeyChunk` nahm also die Basis `n − 2^b + 1` an, deren Raster mit n endet. Der Kernel liefert für n·G Koordinaten, die zu keinem Eintrag passen – es wird nur ein sinnloser Schlüssel geprüft. Bei `batchSizeInBits` 0 und 1 ist das die letzte ausgerichtete Basis selbst (n−1 bzw. das Raster {n−1, n}).
 - **Fix:** Entscheidung des Nutzers. `maxSafeKey = n − 2^b`: das Raster ab dem Maximum endet auf n−1. Javadoc der Methode und von `MIN_VALID_PRIVATE_KEY` (`[0x1, MAX_PRIVATE_KEY)`) korrigiert. Die drei Tests, die die alte Grenze festschrieben (`batchSize0` = n, `batchSize1` = n−1, `maxAllowedBitSize` = n − 2^255 + 1), erwarten jetzt n−1, n−2 und n − 2^255.
 - **Reproduktion / Tests:** `PrivateKeyValidatorTest#getMaxPrivateKeyForBatchSize_gridFromTheMaximum_endsOnTheLastValidKey` (b = 0, 1, 2, 8, 20, 255: letzter Schlüssel des Rasters ab dem Maximum ist n−1 und gültig); `ProbeAddressesOpenCLTest#setSrcPrivateKeyChunk_gridWouldReachTheGroupOrder_throwsException` (pocl, b = 8: Basis n − 2^8 angenommen, n − 2^8 + 1 abgelehnt).
 - **Rot-Grün-Nachweis:** ohne Fix rot: der neue Validator-Test 6/6 („Expected: is <…494336> but: was <…494337>“, also n statt n−1), der OpenCL-Test „Expected PrivateKeyTooLargeException to be thrown, but nothing was thrown“. Mit Fix grün; Gegenprobe per `git stash` des Validators: 9 Validator-Tests (6 neue + 3 angepasste) und der OpenCL-Test wieder rot, danach grün. Breit: `PrivateKeyValidatorTest` 28/28, `PrivateKeyTooLargeExceptionTest` 11/11, `ProducerOpenCLTest` 11/11, `KeyProducerJavaIncrementalTest`, `ProducerJavaTest`, `BitcoinAddressFinderArchitectureTest` grün; `spotless:apply`, `spotbugs:check`, Release-Javadoc grün.
 - **Status:** gefixt
-- **Commit:** 039f598
+- **Commit:** 1498910
 
 <a id="f152"></a>
 ### F152 – BitcoinAddressFinder: `TuneConfiguration.templatesForDevices` übernimmt die Gerätetyp-Maske des Prototyps, die erkannten Indizes zählen aber alle Geräte
@@ -827,7 +827,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion / Tests:** `TuneConfigurationTest#templatesForDevices_prototypeWithGpuMask_templateSelectsTheDetectedDevice` (Plattform [CPU, GPU] aus Mockito-Geräten, Prototyp mit GPU-Maske, erkannte GPU an Index 1; die Vorlage wird durch den echten `OpenCLPlatformSelector` aufgelöst, wie `OpenCLContext` es tut).
 - **Rot-Grün-Nachweis:** ohne Fix rot (`IllegalArgumentException: Invalid device index: 1 for deviceType: 4`), mit Fix grün; Gegenprobe per `git stash` der Produktionsdatei wieder rot, danach grün. Breit: `TuneConfigurationTest` 53 (1 übersprungen, bestehend), `OpenCLPlatformSelectorTest`, `BitcoinAddressFinderArchitectureTest` grün; `spotless:apply`, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** 686a346
+- **Commit:** c2688f4
 
 <a id="f153"></a>
 ### F153 – BitcoinAddressFinder: Ergebnis-Clients erfahren das größte Gitter aller Producer, auch solcher, die ihre Basen nie bekommen
@@ -840,7 +840,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion / Tests:** `FinderTest#configureProducer_producersWithDifferentGrids_webSocketAnnouncesTheGridItsBasesAreExpandedTo` (Ende zu Ende: echter WebSocket-Key-Producer mit `broadcastResults`, LMDB-Testdatenbank, `startKeyProducer` → `startConsumer` → `configureProducer`, dann ein echter WebSocket-Client, der den Gruß liest; Fälle: zweiter Producer mit 8 Bit an `keyProducerJavaRandom` bzw. am selben WebSocket-Key-Producer, erwartet jeweils 4).
 - **Rot-Grün-Nachweis:** ohne Fix rot in beiden Fällen („Expected: is <4> but: was <8>“), mit Fix grün; Gegenprobe per `git stash` von `Finder.java` wieder 2/2 rot, danach grün. Breit: `FinderTest` 29/29, `WebSocketResultBroadcasterTest` 4/4, `ZmqResultBroadcasterTest` 4/4, `SocketResultBroadcasterTest` 8/8, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply`, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** 703819a
+- **Commit:** b07e54a
 - **Nachtrag (Branch-Review 2026-10-20):** Der dritte Ausgang („Speist der Key-Producer keinen Producer, wird nichts angekündigt (Warnung)“) hatte keinen Test. `FinderTest#configureProducer_broadcasterWhoseKeyProducerFeedsNoProducer_announcesNothingAndWarns`: WebSocket-Key-Producer `ws` mit `broadcastResults`, der einzige Producer an `random`; der Client verbindet vor `configureProducer`, der Test wartet, bis der Server `onOpen` ausgeführt hat (die Verbindung ist dann registriert, eine Ankündigung erreichte sie über `greetAll`), danach sendet er auf derselben Verbindung eine Markierung – sie muss die erste Meldung sein (statt auf das Ausbleiben eines `config` zu warten), und genau eine Warnung „no producer draws from it“ für `ws` muss geloggt sein. Gegenprobe am Produktionscode: Ankündigung eines Standardgitters im Zweig rot („but: was "{\"type\":\"config\",\"batchSizeInBits\":0,…}"“), Warnung entfernt rot („Expected: is <1L> but: was <0L>“), Zweig entfernt rot (`NoSuchElementException` aus `TreeSet.first()`); unverändert grün.
 
 <a id="f154"></a>
@@ -854,7 +854,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion / Tests:** `TuneConfigurationTest#run_noArmSucceedsOnOneDevice_emittedConfigurationKeepsThatDevicesConfiguredValues` (pocl, Ende zu Ende: zwei OpenCL-Producer, der zweite mit `deviceIndex` 99, `batchSizeInBits` 3, `keysPerWorkItem` 2; die ausgegebene Konfiguration wird mit `Main.fromJson` zurückgelesen); der bisherige Einheitstest heißt jetzt `applyWinnerTo_deviceWithoutAUsableArm_restoresTheConfiguredGrid` und verändert den Producer vorher wie die Schleife.
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <3> but: was <4>“: das Raster des gescheiterten Arms). Mit Fix grün; Gegenprobe durch Entfernen nur der Rückschreibung: beide Tests rot („was <4>“, „was <20>“), danach grün. Breit: `TuneConfigurationTest` 54 (1 übersprungen, bestehend); `spotless:apply`, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** 1b6782e
+- **Commit:** f123f9f
 
 <a id="f155"></a>
 ### F155 – BitcoinAddressFinder: Socket-Key-Producer mit `port` = `resultPort` endet als regulärer Lauf ohne einen geprüften Schlüssel
@@ -867,20 +867,20 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion / Tests:** `KeyProducerJavaSocketTest#constructor_serverPortIsTheResultPort_isRejectedInsteadOfEndingWithoutAKey`, Gegenstück `…WithoutBroadcast_isAccepted`. Ende zu Ende mit Fix: dieselbe CLI-Konfiguration endet nach 1 s mit Exit 1 und „port and resultPort of the socket key producer s must differ in server mode while broadcastResults is set, but both are 5591“.
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected java.lang.IllegalArgumentException to be thrown, but nothing was thrown“), das Gegenstück grün; mit Fix beide grün; Gegenprobe per `git stash` der Produktionsdatei wieder rot, danach grün. Breit: `KeyProducerJavaSocketTest` 22/22, `SocketResultBroadcasterTest` 8/8, `FinderTest` 29/29; `spotless:apply`, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** 9a28130
+- **Commit:** 6c7aace
 
 <a id="f156"></a>
 ### F156 – BitcoinAddressFinder: `ProducerReleaser` gibt einen Producer frei, dessen Warten abgelaufen ist und der noch läuft
 - **Zeit:** 2026-10-18 22:30 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/producer/ProducerReleaser.java` (`release`)
 - **Schwere:** niedrig (nur nach einem Shutdown-Timeout; dann aber Use-after-free von OpenCL-Handles im Treiber)
-- **Historie:** `ProducerReleaser` entstand in `5479507` (die Freigabe „genau einmal“ als Objekt), `338ec00` (F52) ließ die übrigen Producer weiterlaufen, wenn einer scheitert. Die Javadoc legt die Absicht fest: „Each producer is interrupted, awaited and then released, in that order: releasing the resources of a producer that is still running would pull them out from under it.“ `AbstractProducer.waitTillProducerNotRunning` kehrt nach `shutdownTimeoutSeconds` (300 s) aber auch ohne bestätigtes Ende zurück („Continuing shutdown without confirming this producer stopped“) – die Freigabe folgte trotzdem.
+- **Historie:** `ProducerReleaser` entstand in `5479507` (die Freigabe „genau einmal“ als Objekt), `9c258b5` (F52) ließ die übrigen Producer weiterlaufen, wenn einer scheitert. Die Javadoc legt die Absicht fest: „Each producer is interrupted, awaited and then released, in that order: releasing the resources of a producer that is still running would pull them out from under it.“ `AbstractProducer.waitTillProducerNotRunning` kehrt nach `shutdownTimeoutSeconds` (300 s) aber auch ohne bestätigtes Ende zurück („Continuing shutdown without confirming this producer stopped“) – die Freigabe folgte trotzdem.
 - **Beschreibung:** Läuft das Warten ab, ruft `release` `releaseProducer()` dennoch und `ProducerOpenCL` gibt Kernel, Queue, `dstMem` und Kontext frei, während der Producer noch laufen kann; ist er gerade in `OpenClTask.executeKernel`, benutzt er freigegebene Handles (undefiniert im Treiber).
 - **Fix:** Entscheidung des Nutzers. Meldet der Producer nach dem Warten noch `RUNNING` (Timeout oder Unterbrechung), wird er nicht freigegeben; ein ERROR nennt ihn („Producer is still running after the wait; its resources are not released“), die übrigen werden wie gewohnt freigegeben. Er bleibt als behandelt markiert, ein zweiter Aufruf (Shutdown-Hook) wartet also nicht noch einmal 300 s. Javadoc ergänzt.
 - **Reproduktion / Tests:** `ProducerReleaserTest#release_producerStillRunningAfterTheWait_isNotReleasedAndTheOthersAre` (Testdouble, das nach dem Warten `RUNNING` meldet: keine Freigabe, die beiden anderen je einmal, ERROR-Log). Den Schaden selbst (Freigabe im laufenden Kernel) zeigt kein Mock; der Test belegt die Reihenfolge, die ihn ausschließt.
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is <0> but: was <1>“), mit Fix grün; Gegenprobe per `git stash` der Produktionsdatei wieder rot, danach grün. Breit: `ProducerReleaserTest` 5/5, `FinderTest` 29/29, `ProducerOpenCLTest` 11/11, `ProducerJavaTest` 9/9, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply`, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** af5bb59
+- **Commit:** b80bf76
 
 <a id="f157"></a>
 ### F157 – BitcoinAddressFinder: Socket-Key-Producer mit belegtem Server-Port endet als regulärer Lauf ohne einen geprüften Schlüssel (Rest nach F155)
@@ -894,7 +894,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion / Tests:** `KeyProducerJavaSocketTest#start_serverPortHeldByAnotherProcess_failsTheStartInsteadOfEndingWithoutAKey` (ein `ServerSocket` hält den Port). Ende zu Ende über die CLI, Port 5591 von einem Python-Prozess gehalten: mit Fix Exit 1 nach 1 s, „The socket key producer s cannot listen on port 5591: Address already in use“.
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected java.lang.IllegalStateException to be thrown, but nothing was thrown“), mit Fix grün; Gegenprobe per `git stash` der Produktionsdatei wieder rot, danach grün. Breit: `KeyProducerJavaSocketTest` 23/23, `FinderTest` 29/29, `SocketResultBroadcasterTest` 8/8, `BitcoinAddressFinderArchitectureTest`, `ConfigFixturesParseTest` grün; `spotless:apply`, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** bf140a6
+- **Commit:** 6db153a
 
 <a id="f159"></a>
 ### F159 – BitcoinAddressFinder: `websocket_scanner.html` rundet „To“ ab und meldet „Range complete.“, obwohl der Rest ungeprüft blieb
@@ -906,7 +906,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Fix:** Entscheidung des Nutzers. „To“ wird mit dem neuen `alignUp` aufgerundet; für ausgerichtete Werte (auch den Standardwert) ändert sich nichts.
 - **Reproduktion / Tests:** Kein Java-Code, kein Testrahmen für die Seite; mit Node nachgerechnet (Raster 16, From 0x10, To 0x35): vorher letzter geprüfter Schlüssel 0x2f (0x30 … 0x34 fehlen), nachher 0x3f; From 0x10, To 0x40: gleiche Blockzahl wie vorher.
 - **Status:** gefixt
-- **Commit:** cf67ad3
+- **Commit:** 7630dd1
 
 <a id="f160"></a>
 ### F160 – BitcoinAddressFinder: Inkrementeller Scan mit expliziten Schlüsseln lässt den Rest vor `endPrivateKey` aus
@@ -919,7 +919,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion / Tests:** `ProducerJavaTest#produceKeys_incrementalRangeEndingInsideABatch_checksEveryKeyUpToTheEnd` (Ende zu Ende über `ProducerJava`, Bereich 2 … 7, Batch 4: der Consumer bekommt 2 … 7); `KeyProducerJavaIncrementalTest#createSecrets_batchExceedsEnd_returnsTheKeysUpToTheEnd` und `#createSecrets_endPrivateKeyInclusive_partialBatch_returnsTheRestThenThrows` (vorher `…_throwsException`, schrieben die alte Regel fest).
 - **Rot-Grün-Nachweis:** ohne Fix rot („no item was <6>“, die beiden Key-Producer-Tests mit `NoMoreSecretsAvailableException`), mit Fix grün; Gegenprobe per `git stash` beider Produktionsdateien wieder rot (3 Tests), danach grün. Breit: `KeyProducerJavaIncrementalTest` 10/10, `ProducerJavaTest` 10/10, `AbstractProducerTest` 20/20, `FinderTest` 29/29; `spotless:apply`, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** a77564a
+- **Commit:** 1d9b065
 
 <a id="f161"></a>
 ### F161 – BitcoinAddressFinder: `WebSocketEndpoint.greetingSupplier` wird nach dem Serverstart ohne Happens-before-Kante geschrieben
@@ -930,7 +930,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Fix:** Entscheidung des Nutzers: `volatile`, ausdrücklich ohne Rot-Test (eine Sichtbarkeitslücke ist auf HotSpot/x86 deterministisch nicht herstellbar, auch jcstress zeigt sie dort nicht). Begründung als Javadoc am Feld.
 - **Tests:** keiner neu; `WebSocketResultBroadcasterTest`, `KeyProducerJavaWebSocketTest`, `FinderTest` grün.
 - **Status:** gefixt (ohne Rot-Test, vom Nutzer so entschieden)
-- **Commit:** f0636d0
+- **Commit:** 6f118fb
 
 <a id="f162"></a>
 ### F162 – BitcoinAddressFinder: Unlesbare oder negative Betragsspalte einer Adressdatei wird still übernommen
@@ -943,7 +943,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `AddressTxtLineTest#fromLine_unusableAmount_takesTheDefaultAndReportsTheLine` (5 Fälle), `#fromLine_validAmountOrNone_isNotReported`, `AddressFilesToLMDBTest#addressFilesToLMDB_unusableAmounts_warnsOnceAndStoresTheDefault`.
 - **Rot-Grün-Nachweis:** mit der alten Auswertung rot (`AddressTxtLineTest` 5 von 6, `AddressFilesToLMDBTest` 1 von 1), mit dem Fix grün (304 + 27, `LMDBToAddressFileTest` 16).
 - **Status:** gefixt
-- **Commit:** a2bbe09
+- **Commit:** 34a8da1
 
 <a id="f163"></a>
 ### F163 – BitcoinAddressFinder: `ZmqResultBroadcaster` verwirft beim Schließen, was ein zurückliegender Abonnent noch nicht bekommen hat
@@ -956,7 +956,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `ZmqResultBroadcasterTest#close_whileTheSubscriberIsBehind_subscriberStillReceivesTheLastBatch`: der Abonnent liest während eines Bursts von 800 Meldungen (~20 MB) nicht (Empfangs-HWM 1, kleiner Kernel-Puffer), TCP staut zurück, `close()` läuft auf einem anderen Thread, während der Test leert.
 - **Rot-Grün-Nachweis:** mit Linger 0 rot (5 von 5 Läufen, die letzte Meldung kam nie an), mit 2000 ms grün (5 von 5, ganze Klasse ~1,7 s). Eine erste Fassung ohne Rückstau war nur in 1 von 3 bzw. 1 von 6 Läufen rot und wurde verworfen.
 - **Status:** gefixt
-- **Commit:** ab5755b
+- **Commit:** ff215e5
 - **Nachtrag (Branch-Review 2026-10-20):** Der Test hing an einer Zeitreserve: grün hieß, der Test-Thread holt die ~20 MB über Loopback und parst 800 Meldungen innerhalb der ausgelieferten 2 s ab `close()`; auf einem ausgelasteten Runner konnte er ohne Defekt rot werden (beobachtet ist das nicht). Neu ist ein package-privater `@VisibleForTesting`-Konstruktor `ZmqResultBroadcaster(String, BatchResultJsonFormatter, int lingerMillis)`, an den der öffentliche mit `LINGER_MILLIS` delegiert (die Konstante bleibt privat; reine Test-Naht ohne Verhaltensänderung, daher keine eigene Fund-Id). `#close_whileTheSubscriberIsBehind_subscriberStillReceivesTheLastBatch` baut den Broadcaster mit 15 s Linger und pinnt nur noch „close() verwirft nichts“ (über die Naht mit 0 rot: „Expected: is <true> but: was <false>“). Den ausgelieferten Wert pinnt `#close_subscriberStoppedReading_waitsForTheShippedLingerAndThenReturns` über seine Schranke statt über die Konstante: öffentlicher Konstruktor, ein Abonnent, der nicht mehr liest, `close()` muss nach mindestens 1 s und innerhalb von 15 s zurückkehren – Linger 0 im öffentlichen Konstruktor rot („Expected: is a value equal to or greater than <1000L> but: <6L> was less than <1000L>“), −1 rot (`TimeoutException`), unverändert grün (~2,3 s). Der Burst-Aufbau beider Tests liegt in `connectSubscriberAndFallBehind`. `ZmqResultBroadcasterTest` 7/7 in drei Läufen, `spotbugs:check` und `BitcoinAddressFinderArchitectureTest` grün.
 
 <a id="f164"></a>
@@ -970,7 +970,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `TuneConfigurationTest#extendSweep_firstAxisArmLoses_stillTriesTheOtherEdge`, `#extendSweep_extraArmWins_continuesFromTheNewWinner`, `#extendSweep_maxExtensionArmsReached_stops`.
 - **Rot-Grün-Nachweis:** mit der herausgelösten alten Schleife rot (2 von 3; der `maxExtensionArms`-Test ist beidseitig grün), mit dem Fix grün; ganze Klasse 57 Tests grün (1 OpenCL-Test übersprungen, kein Gerät).
 - **Status:** gefixt
-- **Commit:** dd594a2
+- **Commit:** c0af424
 
 <a id="f169"></a>
 ### F169 – BitcoinAddressFinder: Die Vorgabe für `endPrivateKey` ist die Gruppenordnung n, die kein Schlüssel ist
@@ -983,7 +983,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `CKeyProducerJavaIncrementalTest#getEndPrivateKey_defaultEndAddress_returnsTheLastValidPrivateKey` (ersetzt `…_returnsMaxPrivateKey`, das die alte Vorgabe festschrieb): Vorgabe = n − 1, gültig, und n − 1 + 1 ungültig.
 - **Rot-Grün-Nachweis:** mit der alten Vorgabe rot (1 von 9), mit der neuen grün; dazu `KeyProducerJavaIncrementalTest`, `ConfigFixturesParseTest`, `BitcoinAddressFinderArchitectureTest` grün (40 Tests).
 - **Status:** gefixt
-- **Commit:** d185aed
+- **Commit:** 46d2515
 
 <a id="f170"></a>
 ### F170 – BitcoinAddressFinder: `TuneConfiguration.runArm` gibt den Producer eines Arms frei, auch wenn er noch läuft
@@ -996,7 +996,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `TuneConfigurationTest#releaseArmProducer_stillRunningAfterTheWait_isNotReleasedAndReportsIt` (Mock mit `RUNNING` nach dem Warten: unterbrochen, gewartet, nicht freigegeben, `false`), `#releaseArmProducer_stoppedProducer_isReleased`.
 - **Rot-Grün-Nachweis:** mit dem bisherigen Ablauf im Helfer (immer freigeben) rot (1 von 2), mit dem Fix grün; `TuneConfigurationTest` 59 (1 übersprungen, braucht ein GPU-Gerät), auch auf pocl mit echten OpenCL-Armen grün; `ProducerReleaserTest` 5, `BitcoinAddressFinderArchitectureTest` 17. Die Verdrahtung in `runArm` (Abbruch des Sweeps) braucht einen hängenden Producer im Arm und ist nur übersetzt, nicht ausgelöst.
 - **Status:** gefixt
-- **Commit:** 37bb737
+- **Commit:** 03f195a
 
 <a id="f171"></a>
 ### F171 – BitcoinAddressFinder: Der OpenCL-Kernel rechnet mit einer nicht ausgerichteten Basis still andere Schlüssel, und das oberste Raster ist ein ERROR
@@ -1009,7 +1009,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `PrivateKeyValidatorTest#isAlignedToBatchSize_*` (4), `ProbeAddressesOpenCLTest#createKeys_lastAlignedGridBelowTheGroupOrder_computesEveryKeyCorrectly` (Basis n − 0x141, alle 256 Schlüssel gegen die CPU), `#createKeys_gridContainingTheGroupOrder_isRefused`, `#createKeys_unalignedBase_isRefusedBeforeTheKernelRuns`, `ProducerOpenCLTest#processSecretBase_gridContainingTheGroupOrder_isSkippedWithAWarningAndRecorded`, `#processSecretBase_unalignedBase_isAnErrorAndNotComputed`.
 - **Rot-Grün-Nachweis:** ohne den Fix (Validator-Stub, keine Prüfung in `createKeys`, kein eigener Catch) rot (6 Fehlschläge), mit dem Fix grün auf pocl; die fünf bestehenden Tests mit nicht ausgerichteten Basen wurden durch die Prüfung rot und laufen ausgerichtet wieder grün; voller `mvn test` auf pocl grün.
 - **Status:** gefixt
-- **Commit:** 24ca3de
+- **Commit:** 345c49a
 
 <a id="f191"></a>
 ### F191 – BitcoinAddressFinder: `SocketResultBroadcasterTest` zählt seine eigene Port-Probe als Client (flaky, rund 1 von 20 Forks)
@@ -1022,7 +1022,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** neu `onBatchChecked_registrationIsSlow_theOnlyClientStillReceivesTheBatch`: verzögert über den bestehenden Test-Hook `setBeforeClientRegistered` jede Registrierung um 300 ms und macht das Rennen so zur Gewissheit.
 - **Rot-Grün-Nachweis:** Mit dem Helfer noch mit Probe ist der neue Test deterministisch rot (`but: was null`, der Batch ging an die Probe), ohne Probe grün (9/9). Schleife über frische JVMs: vorher 2/40 rot, nachher 0 von 150.
 - **Status:** gefixt
-- **Commit:** 75a0f0e
+- **Commit:** 2dcbfc0
 
 <a id="f192"></a>
 ### F192 – BitcoinAddressFinder: F131 lässt einen endlichen GPU-Lauf seine letzten Batches verlieren (Regression des Branches)
@@ -1035,7 +1035,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `ProducerOpenCLTest#run_readerStillBusyAfterTheLastGrid_runReturnsOnlyAfterTheBatchReachedTheConsumer` (ein langsamer Consumer hält den Reader 1 s auf, das Rennen wird zur Gewissheit), `#run_readerBusyLongerThanTheShutdownTimeout_runEndsAndLogsTheBusyReader` (Timeout-Zweig), `AbstractProducerTest#run_loopEnds_pendingBatchesAwaitedOnceWhileStillRunning`, `#run_produceKeysThrows_pendingBatchesStillAwaited`, `FinderTest#shutdownAndAwaitTermination_openClProducerFinished_everyBatchIsReported` (Ende zu Ende über den Finder).
 - **Rot-Grün-Nachweis:** Der erste ProducerOpenCL-Test ist ohne Fix deterministisch rot (`Expected: is <1> but: was <0>`), mit Fix grün; der Timeout-Test ohne Fix rot (keine Meldung). Der Finder-Test mit abgeschaltetem Warten 2 von 3 Läufen rot (`but: was <0>`), mit Fix 3 von 3 grün. Producer-Testklassen 60/60 grün auf pocl.
 - **Status:** gefixt
-- **Commit:** 271cc53
+- **Commit:** ef96fad
 
 <a id="f193"></a>
 ### F193 – BitcoinAddressFinder: Die Betragswarnung des Imports (F162) zählt abgelehnte Zeilen und nennt den falschen Betrag
@@ -1048,7 +1048,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `AddressTxtLineTest#fromLine_rejectedLineWithTextInTheAmountColumn_isNotReported` (Kopfzeile, P2MS-Zeile), `AddressFilesToLMDBTest#addressFilesToLMDB_blockchairHeaderLine_noAmountWarning`, `#addressFilesToLMDB_unusableAmountWithStaticAmount_noWarningAndTheStaticAmountIsStored`; die bestehenden F162-Tests (`fromLine_unusableAmount_*`, `addressFilesToLMDB_unusableAmounts_warnsOnceAndStoresTheDefault`) bleiben grün. Nebenbei das Javadoc von `fromLine_hexHash160_isImportedAsThatHash160` an seinen Test zurückgesetzt (es stand über einem anderen).
 - **Rot-Grün-Nachweis:** die drei neuen Tests (vier Fälle) gegen den alten Code rot (die Kopfzeile bzw. die `-5`-Zeile in der Warnung, `[address balance]` beim Listener), mit dem Fix grün; `AddressTxtLineTest` + `AddressFilesToLMDBTest` 335/335.
 - **Status:** gefixt
-- **Commit:** 4264808
+- **Commit:** 2094bb1
 
 <a id="f194"></a>
 ### F194 – BitcoinAddressFinder: Secrets-File ohne Increment: Schlüssel außerhalb des gültigen Bereichs werfen oder werden still als k−n gerechnet
@@ -1061,7 +1061,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `ProducerJavaTest#processSecrets_keyOutsideTheValidRange_isReplacedByKeyOneAsInAGrid` (0, 1, n, n+1, n+5, 2^256−1), `#processSecrets_validKeys_areComputedUnchanged` (2 und n−1), `ProducerJavaSecretsFilesTest#produceKeys_withoutPrivateKeyIncrementKeysZeroAndOne_checkedAsInAGridWithoutAnError` (Ende zu Ende über eine Datei mit `0` und `1`).
 - **Rot-Grün-Nachweis:** gegen den alten Code 7 Fehlschläge (ERROR-Logs bei 0, 1, n, n+1; falsche Instanz bei n+5 und 2^256−1; zwei ERRORs im Datei-Test), mit dem Fix grün; Producer- und Consumer-Testklassen 105/105.
 - **Status:** gefixt
-- **Commit:** 43b766b
+- **Commit:** 45a33dc
 - **Nachtrag (Branch-Review 2026-10-20):** Die beiden `processSecrets`-Tests und ihre Quelle `keysOutsideTheValidRange()` standen zwischen `@ToStringTest` und dem toString-Test, den der Marker kennzeichnet; der Marker lag damit auf dem Bereichstest (vor dessen Javadoc, die so nicht mehr als Doc-Kommentar galt), und `toString_whenCalled_containsClassNameAndConfig` trug keinen mehr. Die drei Mitglieder stehen jetzt in einem eigenen `processSecrets`-Abschnitt vor dem toString-Abschnitt, der toString-Test trägt wieder `@ToStringTest` direkt über `@Test`. Nur verschoben, Namen und Verhalten unverändert (`ProducerJavaTest` grün).
 
 <a id="f195"></a>
@@ -1075,7 +1075,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `MainStartFinderTest#startFinder_startFails_abortsOnceAndRethrowsTheStartFailure`, `#startFinder_startAndAbortFail_theStartFailureIsThrownWithTheAbortFailureSuppressed`, `FinderTest#abortStart_consumerStarted_consumerIsReleased`, `#abortStart_interruptThrows_consumerIsReleasedAnyway`. Bis dahin gab es für `abortStart` keinen Test.
 - **Rot-Grün-Nachweis:** mit den beiden Fixes einzeln zurückgenommen rot (der Teardown-Fehler statt des Startfehlers; der Consumer nicht freigegeben), mit ihnen grün; `MainTest` + `MainStartFinderTest` + `FinderTest` 53/53 (mit `LD_PRELOAD=libjsig`, wie CI: ohne stirbt der `MainTest`-Fork mit seinem OpenCL-Test auf pocl ohne `hs_err`, auch auf dem unveränderten Stand).
 - **Status:** gefixt
-- **Commit:** 4b6dc55
+- **Commit:** 2189cc1
 
 <a id="f196"></a>
 ### F196 – BitcoinAddressFinder: Ein während `close()` angenommener Client des `SocketResultBroadcaster` bleibt verbunden
@@ -1088,7 +1088,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `SocketResultBroadcasterTest#close_whileAnAcceptedClientIsBeingRegistered_theClientIsDisconnected`: über den bestehenden Hook `setBeforeClientRegistered` läuft das ganze `close()`, während der Accept-Thread einen angenommenen, noch nicht registrierten Client hält; der Client muss danach das Ende des Streams lesen. Der `RejectedExecutionException`-Zweig ist nur durch Lesen geprüft (ein deterministischer Test bräuchte einen weiteren Seam).
 - **Rot-Grün-Nachweis:** gegen den alten Code rot (der Client liest nach 3 s nichts statt EOF), mit dem Fix grün; die Klasse 10/10 dreimal hintereinander, dazu 60 frische JVMs (siehe Commit-Nachricht).
 - **Status:** gefixt
-- **Commit:** 2125b60
+- **Commit:** fb9ea84
 
 <a id="f206"></a>
 ### F206 – BitcoinAddressFinder: Nach einem Ctrl-C meldet der Consumer die beim Herunterfahren geprüften Batches an schon geschlossene Broadcaster, ohne ein Wort
@@ -1101,7 +1101,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `FinderTest#interrupt_whileConsumerStillDraining_everyBatchIsReportedBeforeTheBroadcastersClose` (vier Producer mit je einem Batch, ein Consumer-Thread, 200-ms-Listener; ein zweiter Thread ruft nach der ersten Meldung `interrupt()` wie der Hook, der Main-Thread steht in `shutdownAndAwaitTermination`; die Naht `setBeforeResultBroadcastersClosed` sitzt jetzt in `closeBroadcasters()`), `FinderTest#interrupt_whileConsumerStillDraining_webSocketClientReceivesEveryBatch` (dasselbe über den echten WebSocket-Transport: ein Client muss alle vier `batch`-Nachrichten erhalten), `ZmqResultBroadcasterTest#onBatchChecked_afterClose_warnsOnceThatTheResultIsNotPublished`, `SocketResultBroadcasterTest#onBatchChecked_afterClose_warnsOnceThatTheResultIsNotSent`, `WebSocketEndpointTest#broadcast_afterStop_warnsOnceThatTheMessageIsNotSent`. Der F34-Test heißt jetzt `FinderTest#teardown_calledFromTwoThreadsAtOnce_neitherFails` und läuft über `abortStart()`, weil `interrupt()` die Broadcaster-Listen nicht mehr durchläuft.
 - **Rot-Grün-Nachweis:** gegen den alten Code rot: Naht-Test „Expected: is <4> but: was <1>“, WebSocket-Test „Expected: is <4> but: was <2>“, die drei Log-Tests je „Expected: a collection with size <1> but: collection size was <0>“; mit dem Fix grün, die beiden Finder-Tests dreimal hintereinander. Breite Liste: `FinderTest` 34/34 (mit `POCL_MAX_WORK_GROUP_SIZE=256`, ohne stirbt die OpenCL-Fork auf pocl wie schon bei F131 notiert), `ZmqResultBroadcasterTest` 6/6, `SocketResultBroadcasterTest` 11/11, `WebSocketEndpointTest` 2/2, `WebSocketResultBroadcasterTest` 4/4, `KeyProducerJavaWebSocketTest` 5/5, `MainTest` 19/19, `MainStartFinderTest` 2/2, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** 4f60482
+- **Commit:** 92839f5
 
 <a id="f207"></a>
 ### F207 – BitcoinAddressFinder: Der WebSocket-Key-Producer startet „erfolgreich“, wenn sein Port nicht gebunden werden kann, und wartet dann ewig
@@ -1114,7 +1114,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `WebSocketEndpointTest#start_portHeldByAnotherProcess_failsTheStartInsteadOfLoggingAndReturning` und `KeyProducerJavaWebSocketTest#start_portHeldByAnotherProcess_failsTheStartInsteadOfWaitingForever` (ein `ServerSocket` hält den Port; die Meldung muss den Port nennen).
 - **Rot-Grün-Nachweis:** gegen den alten Code rot, beide mit „Expected java.lang.IllegalStateException to be thrown, but nothing was thrown.“; mit dem Fix grün. Breite Liste: `WebSocketEndpointTest` 3/3, `KeyProducerJavaWebSocketTest` 6/6, `WebSocketResultBroadcasterTest` 4/4, `FinderWebSocketRoundtripTest` 1/1, `FinderTest` 34/34 (mit `POCL_MAX_WORK_GROUP_SIZE=256`), `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** 4190e6c
+- **Commit:** fd12fa5
 
 <a id="f208"></a>
 ### F208 – BitcoinAddressFinder: Ein nicht bindbarer `resultPort` des Socket-Key-Producers wird zu „continuing without it“ herabgestuft
@@ -1127,7 +1127,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `FinderTest#startConsumer_resultPortHeldByAnotherProcess_failsTheStart` (ein `ServerSocket` hält den Port, ein Socket-Key-Producer im SERVER-Modus mit freiem `port` und diesem `resultPort`; `startConsumer` muss eine `IOException` werfen, die Key-Producer-Id und Port nennt, und es läuft kein Consumer).
 - **Rot-Grün-Nachweis:** gegen den alten Code rot („Expected java.io.IOException to be thrown, but nothing was thrown.“), mit dem Fix grün. Breite Liste: `FinderTest` 35/35 (mit `POCL_MAX_WORK_GROUP_SIZE=256`), `MainStartFinderTest` 2/2, `KeyProducerJavaSocketTest` 23/23, `SocketResultBroadcasterTest` 11/11, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** cf4e085
+- **Commit:** 4b244a4
 - **Nachtrag (Verifikation 2026-10-20):** Die Id-Assertion des Tests war wirkungslos: die Id `socket` steht ohnehin in „The socket key producer“. Der Test nutzt jetzt die eindeutige Id `heldResultPortProducer`, sodass er wirklich prüft, dass die Meldung den Key-Producer nennt. Rot/Grün der drei Fixe F206–F208 unabhängig nachvollzogen (Produktionsdateien auf den Elternstand gesetzt: rot mit den genannten Assertions; zurückgesetzt: grün).
 
 <a id="f209"></a>
@@ -1141,7 +1141,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `SignalChainingCheckTest#warning_linuxLibjsigNamedInLdPreloadButNotMapped_warns`, `#warning_linuxLibjsigMappedWithoutLdPreload_isEmpty`, `#warning_linuxMappingUnreadable_fallsBackToLdPreload` (beide `LD_PRELOAD`-Werte), `#libjsigMapped_mapsListLibjsig_isTrue`, `#libjsigMapped_mapsWithoutLibjsig_isFalse`, `#libjsigMapped_unreadableMaps_isUnknown` (Maps-Datei im `@TempDir`). Die fünf bisherigen Fälle laufen über die neue Überladung mit festem Mapping, die Windows-/macOS-Fälle mit einem Supplier, der wirft – sonst hinge ihr Ergebnis vom Prozess ab (der CI-Job `test-opencl` lädt `libjsig` vor). Ende zu Ende mit einer kleinen Probe über die Dreier-Überladung: ohne Preload die alte Warnung, mit `LD_PRELOAD=/lib/libjsig.so` die ld.so-ERROR-Zeile und die neue Warnung, mit dem echten Pfad keine Warnung.
 - **Rot-Grün-Nachweis:** gegen den alten Entscheidungscode (neue Überladung als Stub, die den Supplier ignoriert und an die alte Logik delegiert; `libjsigMapped` als Stub „leer“) rot: `warning_linuxLibjsigNamedInLdPreloadButNotMapped_warns` „Expected: is <true> but: was <false>“, `warning_linuxLibjsigMappedWithoutLdPreload_isEmpty` „Expected: is <false> but: was <true>“, `warning_linuxMappingUnreadable_fallsBackToLdPreload` „Expected: a string containing "could not be read"“, die beiden Maps-Tests „Expected: is <Optional[true]>/<Optional[false]> but: was <Optional.empty>“; mit dem Fix grün, `SignalChainingCheckTest` 11/11, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** 896bcc4
+- **Commit:** e406105
 
 <a id="f210"></a>
 ### F210 – BitcoinAddressFinder: Der Tuner wiederholt die libjsig-Warnung je Arm, und sein Startskript lädt libjsig nicht vor
@@ -1154,22 +1154,22 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `SignalChainingCheckTest#warningOnce_linuxWithoutPreload_secondCallIsEmpty`, `#warningOnce_libjsigLoaded_doesNotConsumeTheGate`, `#warning_afterWarningOnceOfTheSameInstance_stillAnswers` (frische Instanzen); `OpenCLContextTest#signalChainingCheck_oneInstanceSharedByEveryContext` pinnt die Verdrahtung über die Deklaration (genau ein `static final`-Feld vom Typ `SignalChainingCheck`), weil `init()` ein Gerät braucht. Ende zu Ende auf pocl ohne Preload: zwei `OpenCLContext`-`init()` hintereinander in einer JVM loggen die Warnung einmal (vorher zweimal).
 - **Rot-Grün-Nachweis:** gegen den alten Code (`warningOnce` als Stub ohne Tor, `OpenCLContext` ohne geteilte Instanz) rot: `warningOnce_linuxWithoutPreload_secondCallIsEmpty` „Expected: is <false> but: was <true>“, `signalChainingCheck_oneInstanceSharedByEveryContext` „Expected: a collection with size <1> but: collection size was <0>“; mit dem Fix grün. Breite Liste: `SignalChainingCheckTest` 14/14, `OpenCLContextTest` 33/33 (auf pocl), `ExampleRunScriptJarVersionTest` 1/1, `JvmModuleFlagConsistencyTest` 4/4, `BitcoinAddressFinderArchitectureTest` 17/17; `bash -n` des Skripts, `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** 5fbb179
+- **Commit:** 001c669
 
 <a id="f211"></a>
 ### F211 – BitcoinAddressFinder: Auf pocls CPU-Gerät stirbt die JVM bei Standardeinstellungen; die Work-Group-Grenze stand nur im CI
 - **Zeit:** 2026-10-20 21:59 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/opencl/OpenClTask.java` (`executeKernel`), `opencl/OpenCLContext.java` (`init`, `logKernelResourceUsage`), `opencl/binding/ClApi.java` / `LwjglClApi.java` (`enqueueNDRangeKernel`), neu `opencl/OpenClLocalWorkSize.java`; `README.md`, die vier OpenCL-Startskripte
 - **Schwere:** mittel (nativer JVM-Absturz ohne Java-Meldung auf einer Plattform, die das README als unterstützt und getestet führt; betrifft den CPU-OpenCL-Betrieb über pocl)
-- **Historie:** Gefunden beim Review des Branches am 2026-10-20 (Fund XB-1). Beobachtet schon am 2026-10-18 (`BUGHUNT-CHECKED.md`, `OpenCLContext` + Kernel: SIGSEGV in `_pocl_kernel_generateKeysKernel_grid_workgroup`, Guard-Page des 8-MB-Stacks) und als B2 in `BUGHUNT-MEASUREMENTS.md` gemessen (5 von 5 Abstürzen ohne Grenze); damals nur im CI-Job `test-opencl` mit `POCL_MAX_WORK_GROUP_SIZE=256` umgangen (8cb9bb5) und als „Testumgebung, kein Produktfehler“ abgelegt – beide Notizen verweisen jetzt hierher.
+- **Historie:** Gefunden beim Review des Branches am 2026-10-20 (Fund XB-1). Beobachtet schon am 2026-10-18 (`BUGHUNT-CHECKED.md`, `OpenCLContext` + Kernel: SIGSEGV in `_pocl_kernel_generateKeysKernel_grid_workgroup`, Guard-Page des 8-MB-Stacks) und als B2 in `BUGHUNT-MEASUREMENTS.md` gemessen (5 von 5 Abstürzen ohne Grenze); damals nur im CI-Job `test-opencl` mit `POCL_MAX_WORK_GROUP_SIZE=256` umgangen (794d2b5) und als „Testumgebung, kein Produktfehler“ abgelegt – beide Notizen verweisen jetzt hierher.
 - **Beschreibung:** `LwjglClApi.enqueueNDRangeKernel` übergab nie eine Local-Work-Size; der Treiber wählt. pocls CPU-Gerät wählt sein Maximum (`CL_KERNEL_WORK_GROUP_SIZE` 4096, hier auf 4 Kernen wie zuvor auf 16 gemessen), und die Work-Group-Funktion des Schlüssel-Kernels läuft über den 8-MB-Stack von pocls Worker-Thread: die JVM stirbt mit Exit 139/134. Die drei `run_*OpenCL*.sh` und `run_TuneConfiguration.sh` setzten die Variable nicht, der README-Abschnitt „PoCL support“ erwähnte die Grenze nicht, und die Laufzeit sagte nichts. Ein Java-Prozess kann `POCL_MAX_WORK_GROUP_SIZE` für sich selbst nicht setzen, bevor pocl initialisiert.
 - **Fix:** Neue reine Wahlfunktion `OpenClLocalWorkSize.choose(globalWorkSize, kernelWorkGroupSize, poclCpuDevice)`: leer (der Treiber wählt, wie bisher) für jedes Gerät außer pocls CPU-Gerät; dort die größte Zweierpotenz ≤ min(256, `CL_KERNEL_WORK_GROUP_SIZE`, größte Zweierpotenz, die die globale Größe teilt) – teilt die globale Größe also immer (OpenCL 1.x verlangt das; der Kernel wird als CL1.2 gebaut), und ein vom Nutzer gesetztes `POCL_MAX_WORK_GROUP_SIZE` steckt schon im abgefragten Kernel-Limit. Nicht positive Größen werden mit `IllegalArgumentException` abgelehnt. `isPoclCpuDevice(platformName, deviceVersion, deviceType)` erkennt pocl am Plattformnamen „Portable Computing Language“ oder an „PoCL“ in `CL_DEVICE_VERSION` und verlangt den Gerätetyp CPU – nicht am `CL_DEVICE_VENDOR`, der bei pocls CPU-Gerät die CPU nennt (hier „GenuineIntel“); pocls CUDA- und andere Backends bleiben beim Treiber. Neue `ClApi`-Überladung `enqueueNDRangeKernel(queue, kernel, global, local, profiling)` (lehnt eine andere Dimensionszahl vor dem Treiberaufruf ab); `OpenClTask` wählt pro Launch und ruft die alte Überladung, wenn die Wahl leer ist, sodass GPUs unverändert laufen. `OpenCLContext.init` übergibt das abgefragte Kernel-Limit (`logKernelResourceUsage` gibt es jetzt zurück) und die Erkennung, und loggt auf pocls CPU-Gerät eine INFO-Zeile mit der Grenze und dem Treiber-Default. Doku: README „PoCL support“ nennt die Grenze und die Erkennung, der pocl-Absatz im libjsig-Abschnitt beschreibt das neue Verhalten; die vier OpenCL-Startskripte exportieren `POCL_MAX_WORK_GROUP_SIZE=${POCL_MAX_WORK_GROUP_SIZE:-256}` mit Kommentar; der CI-Kommentar in `test-opencl` sagt, wofür die Variable dort noch steht. Nicht abgedeckt: die Benchmark-Haken (`runBenchInvMod`, `runBenchFeMul`, `runBenchFilterProbe`) und die Test-Kernel starten weiter ohne Local-Size; für sie bleibt die Variable (Launcher, CI).
 - **Tests:** `OpenClLocalWorkSizeTest` (12: Erkennung über Plattformname, über die Geräteversion bei fremdem Plattformnamen, pocl-GPU-Backend nein, Intel-CPU-Runtime nein, NVIDIA nein; Wahl: kein pocl → leer, 4096 → 256, Kernel-Limit 128 → 128, 200 → 128, globale Größe 64 → 64, 96 → 32, nicht positive Größen abgelehnt), `OpenClTaskLocalWorkSizeTest` (2, Mock-`ClApi`: auf pocls CPU-Gerät die Überladung mit `{256}` bei globaler Größe 4096 und nie die alte, sonst die alte und nie die neue), `LwjglClApiKernelLaunchTest` (3: andere Dimensionszahl abgelehnt, ohne Treiberaufruf; auf dem Gerät: eine nicht teilende Local-Size endet mit `CL_INVALID_WORK_GROUP_SIZE`, eine teilende läuft jedes Work-Item – damit ist belegt, dass die Größe wirklich beim Treiber ankommt). Ende zu Ende auf pocl ohne `POCL_MAX_WORK_GROUP_SIZE` und ohne libjsig: `init()` plus drei Raster 2^14 – vor dem Fix 2 von 2 Läufen SIGSEGV (Exit 139), nach dem Fix 3 von 3 durch, mit der INFO-Zeile „local work size of at most 256 (driver default here: 4096)“.
 - **Rot-Grün-Nachweis:** gegen den alten Code (Wahlfunktion als Stub „leer/false“, `OpenClTask` ruft die alte Überladung, `LwjglClApi`-Überladung ignoriert die Local-Size) rot: `choose_poclCpuDeviceDefaultLimit_isCappedAt256` „Expected: is <OptionalLong[256]> but: was <OptionalLong.empty>“ (ebenso die übrigen Wahl- und zwei Erkennungstests, 8 von 12), `executeKernel_poclCpuDevice_launchesWithTheCappedLocalWorkSize` „Argument(s) are different! Wanted: …“, `enqueueNDRangeKernel_localSizeNotDividingTheGlobalSize_isRefusedByTheDriver` „Expected …OpenClCallFailedException to be thrown, but nothing was thrown.“; der Dimensionstest ließ gegen den Stub die Fork-JVM in `clEnqueueNDRangeKernel` mit den Attrappen-Handles abstürzen (die Prüfung fehlte). Mit dem Fix grün: 12/12, 2/2, 3/3. Breite Liste, ohne `POCL_MAX_WORK_GROUP_SIZE` und ohne libjsig auf pocl (vorher brauchten `FinderTest` und `MainTest` die Variable, siehe F206): `MainTest` 19/19, `FinderTest` 35/35, `ProducerOpenCLTest` 15/15, `OpenCLContextTest` 33/33, `OpenCLGridResultTest` 17/17, `OpenCLContextGpuFilterWidthTest` 4/4, `OpenCLContextAllocationFailureTest` 2/2, `OpenCLZeroAnchorTest` 2/2, `OpenCLBuilderTest` 4/4, `OpenCLAddKernelSmokeTest` 1/1, `LwjglClApiBufferTest` 2/2; dazu `BitcoinAddressFinderArchitectureTest` 17/17, `ExampleRunScriptJarVersionTest` 1/1, `JvmModuleFlagConsistencyTest` 4/4, `bash -n` der vier Skripte, `check-run-scripts.py`, YAML-Prüfung, `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** 0e5f918
+- **Commit:** e1025ea
 
 ## Offene Verdachte ohne Fund-ID
 
-- *(erledigt 2026-10-19, ohne Fund-ID: Testumgebung, kein Produktfehler)* `ProbeAddressesOpenCLTest#setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException` brach auf Geräten mit 1024 MiB je Allokation mit `CL_INVALID_BUFFER_SIZE` ab, bevor die Prüfung lief (B3: mit `POCL_MEMORY_LIMIT=4` reproduziert, ab 2047 MB grün). Läuft jetzt auf einem 8-Bit-Raster (eigener Provider `privateKeysTooLargeForASmallGrid`), mit und ohne Begrenzung grün. Commit 1faa48a. Ebenso B2: `test-opencl` setzt `POCL_MAX_WORK_GROUP_SIZE=256` (8cb9bb5; beim Branch-Review 2026-10-20 als Produktfehler eingeordnet und im Produkt behoben, [F211](#f211)), B6: `GcTrigger` entfernt (e451898).
+- *(erledigt 2026-10-19, ohne Fund-ID: Testumgebung, kein Produktfehler)* `ProbeAddressesOpenCLTest#setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException` brach auf Geräten mit 1024 MiB je Allokation mit `CL_INVALID_BUFFER_SIZE` ab, bevor die Prüfung lief (B3: mit `POCL_MEMORY_LIMIT=4` reproduziert, ab 2047 MB grün). Läuft jetzt auf einem 8-Bit-Raster (eigener Provider `privateKeysTooLargeForASmallGrid`), mit und ohne Begrenzung grün. Commit f06dd60. Ebenso B2: `test-opencl` setzt `POCL_MAX_WORK_GROUP_SIZE=256` (794d2b5; beim Branch-Review 2026-10-20 als Produktfehler eingeordnet und im Produkt behoben, [F211](#f211)), B6: `GcTrigger` entfernt (51fcfb3).
 
