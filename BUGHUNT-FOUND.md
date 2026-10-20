@@ -1119,7 +1119,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `FinderTest#startConsumer_resultPortHeldByAnotherProcess_failsTheStart` (ein `ServerSocket` hält den Port, ein Socket-Key-Producer im SERVER-Modus mit freiem `port` und diesem `resultPort`; `startConsumer` muss eine `IOException` werfen, die Key-Producer-Id und Port nennt, und es läuft kein Consumer).
 - **Rot-Grün-Nachweis:** gegen den alten Code rot („Expected java.io.IOException to be thrown, but nothing was thrown.“), mit dem Fix grün. Breite Liste: `FinderTest` 35/35 (mit `POCL_MAX_WORK_GROUP_SIZE=256`), `MainStartFinderTest` 2/2, `KeyProducerJavaSocketTest` 23/23, `SocketResultBroadcasterTest` 11/11, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** cf4e085
 
 ## Offene Verdachte ohne Fund-ID
 
