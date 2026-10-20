@@ -1016,7 +1016,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `MainStartFinderTest#startFinder_startFails_abortsOnceAndRethrowsTheStartFailure`, `#startFinder_startAndAbortFail_theStartFailureIsThrownWithTheAbortFailureSuppressed`, `FinderTest#abortStart_consumerStarted_consumerIsReleased`, `#abortStart_interruptThrows_consumerIsReleasedAnyway`. Bis dahin gab es für `abortStart` keinen Test.
 - **Rot-Grün-Nachweis:** mit den beiden Fixes einzeln zurückgenommen rot (der Teardown-Fehler statt des Startfehlers; der Consumer nicht freigegeben), mit ihnen grün; `MainTest` + `MainStartFinderTest` + `FinderTest` 53/53 (mit `LD_PRELOAD=libjsig`, wie CI: ohne stirbt der `MainTest`-Fork mit seinem OpenCL-Test auf pocl ohne `hs_err`, auch auf dem unveränderten Stand).
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 4b6dc55
 
 ## Offene Verdachte ohne Fund-ID
 
