@@ -56,11 +56,13 @@ import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaSocketTest;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaTest;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaZmq;
+import net.ladenthin.bitcoinaddressfinder.keyproducer.WebSocketEndpoint;
 import net.ladenthin.bitcoinaddressfinder.producer.Producer;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerState;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerStateProvider;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
+import nl.altindag.log.LogCaptor;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import org.jspecify.annotations.Nullable;
@@ -247,6 +249,84 @@ public class FinderTest {
             finder.interrupt();
             finder.shutdownAndAwaitTermination();
         }
+    }
+
+    /**
+     * A broadcaster whose key producer feeds no producer has no grid to announce: none of the
+     * configured producers expands its bases, so any step would be a guess. Nothing must be announced
+     * (neither a default nor another key producer's grid), and the configuration must say why.
+     *
+     * <p>The client connects before {@link Finder#configureProducer()} and waits until the server has
+     * opened its connection, so an announcement would reach it through {@code greetAll}. A marker sent
+     * on the same connection after {@code configureProducer} then arrives after any greeting that call
+     * sent: the marker as the first message proves that none was sent, without waiting for an absence.
+     */
+    @Test
+    public void configureProducer_broadcasterWhoseKeyProducerFeedsNoProducer_announcesNothingAndWarns()
+            throws Exception {
+        // arrange
+        CFinder cFinder = new CFinder();
+        CKeyProducerJavaWebSocket webSocket = new CKeyProducerJavaWebSocket();
+        webSocket.port = KeyProducerJavaSocketTest.findFreePort();
+        webSocket.timeoutMillis = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
+        webSocket.keyProducerId = "ws";
+        webSocket.broadcastResults = true;
+        cFinder.keyProducerJavaWebSocket.add(webSocket);
+        configureKeyProducerJavaRandom("random", cFinder);
+
+        CProducerJava fedByRandom = new CProducerJava();
+        fedByRandom.keyProducerId = "random";
+        fedByRandom.batchSizeInBits = 4;
+        cFinder.producerJava.add(fedByRandom);
+        configureConsumerJava(cFinder);
+
+        final String marker = "{\"type\":\"marker\"}";
+        Finder finder = new Finder(cFinder);
+        RecordingWebSocketClient client = new RecordingWebSocketClient(URI.create("ws://127.0.0.1:" + webSocket.port));
+        try (LogCaptor finderLog = LogCaptor.forClass(Finder.class);
+                LogCaptor endpointLog = LogCaptor.forClass(WebSocketEndpoint.class)) {
+            finder.startKeyProducer();
+            finder.startConsumer();
+            ConnectionUtils.waitUntilTcpPortOpen("127.0.0.1", webSocket.port, 15_000);
+            assertThat(client.connectBlocking(15, TimeUnit.SECONDS), is(true));
+            awaitConnectionOpenedByTheServer(endpointLog);
+
+            // act
+            finder.configureProducer();
+            ((KeyProducerJavaWebSocket)
+                            Objects.requireNonNull(finder.getKeyProducers().get("ws")))
+                    .getEndpoint()
+                    .broadcast(marker);
+
+            // assert
+            assertThat(client.awaitMessage(), is(equalTo(marker)));
+            assertThat(
+                    finderLog.getWarnLogs().stream()
+                            .filter(warning -> warning.contains("keyProducerId ws")
+                                    && warning.contains("no producer draws from it"))
+                            .count(),
+                    is(equalTo(1L)));
+        } finally {
+            client.closeBlocking();
+            finder.interrupt();
+            finder.shutdownAndAwaitTermination();
+        }
+    }
+
+    /**
+     * Waits until the WebSocket server has run {@code onOpen} for a client. Java-WebSocket registers
+     * the connection before {@code onOpen}, so from then on a broadcast reaches it.
+     *
+     * @param endpointLog captures the {@link WebSocketEndpoint} log, which {@code onOpen} writes first
+     * @throws InterruptedException if the wait is interrupted
+     */
+    private static void awaitConnectionOpenedByTheServer(LogCaptor endpointLog) throws InterruptedException {
+        final long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+        while (endpointLog.getInfoLogs().stream().noneMatch(line -> line.contains("WebSocket connection opened from"))
+                && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+        assertThat(endpointLog.getInfoLogs(), hasItem(containsString("WebSocket connection opened from")));
     }
 
     @Test
