@@ -994,6 +994,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 4264808
 
+### F194 – BitcoinAddressFinder: Secrets-File ohne Increment: Schlüssel außerhalb des gültigen Bereichs werfen oder werden still als k−n gerechnet
+- **Zeit:** 2026-10-20 07:00 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/producer/ProducerJava.java` (`processSecrets`)
+- **Schwere:** niedrig (keine Regression: vor F08 prüfte dieser Modus gar nichts; aber Schlüssel 1 wurde nicht geprüft, und ein Wert über n wurde unter falschem Schlüssel gemeldet)
+- **Historie:** Gefunden beim Review des Branches am 2026-10-20. F08 machte den Secrets-File-Modus mit `batchUsePrivateKeyIncrement = false` funktionsfähig; dieser Weg übergibt `SecretsFile`-Zeilen direkt an `consumeSecrets` und überspringt `replaceInvalidPrivateKeys`, das `produceKeys` aufruft.
+- **Beschreibung:** `processSecrets` rief `PublicKeyBytes.fromPrivate` mit dem Rohwert auf. Gemessen vom Reviewer: 0, 1 und n+1 werfen `IllegalArgumentException`, n eine `ArrayIndexOutOfBoundsException` (je ein ERROR mit Stacktrace und `recordFailure`), ein Wert in (n+1, 2^256) ergibt still den öffentlichen Schlüssel von k−n, während k gemeldet wird. Im Raster (`createGrid`) steht für einen Schlüssel außerhalb des Bereichs `PublicKeyBytes.INVALID_KEY_ONE`, also wird Schlüssel 1 dort geprüft.
+- **Fix:** `processSecrets` wendet dieselbe Regel an wie das Raster: ein Schlüssel außerhalb des gültigen Bereichs wird durch `INVALID_KEY_ONE` ersetzt, ohne Fehler. Die anderen Wege sind unverändert (sie ersetzen vorher schon durch 2).
+- **Tests:** `ProducerJavaTest#processSecrets_keyOutsideTheValidRange_isReplacedByKeyOneAsInAGrid` (0, 1, n, n+1, n+5, 2^256−1), `#processSecrets_validKeys_areComputedUnchanged` (2 und n−1), `ProducerJavaSecretsFilesTest#produceKeys_withoutPrivateKeyIncrementKeysZeroAndOne_checkedAsInAGridWithoutAnError` (Ende zu Ende über eine Datei mit `0` und `1`).
+- **Rot-Grün-Nachweis:** gegen den alten Code 7 Fehlschläge (ERROR-Logs bei 0, 1, n, n+1; falsche Instanz bei n+5 und 2^256−1; zwei ERRORs im Datei-Test), mit dem Fix grün; Producer- und Consumer-Testklassen 105/105.
+- **Status:** gefixt
+- **Commit:** (folgt)
+
 ## Offene Verdachte ohne Fund-ID
 
 - *(erledigt 2026-10-19, ohne Fund-ID: Testumgebung, kein Produktfehler)* `ProbeAddressesOpenCLTest#setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException` brach auf Geräten mit 1024 MiB je Allokation mit `CL_INVALID_BUFFER_SIZE` ab, bevor die Prüfung lief (B3: mit `POCL_MEMORY_LIMIT=4` reproduziert, ab 2047 MB grün). Läuft jetzt auf einem 8-Bit-Raster (eigener Provider `privateKeysTooLargeForASmallGrid`), mit und ohne Begrenzung grün. Commit 1faa48a. Ebenso B2: `test-opencl` setzt `POCL_MAX_WORK_GROUP_SIZE=256` (8cb9bb5), B6: `GcTrigger` entfernt (e451898).

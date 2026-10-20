@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.stream.Stream;
 import net.ladenthin.bitcoinaddressfinder.MockConsumer;
 import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
 import net.ladenthin.bitcoinaddressfinder.ToStringTest;
@@ -26,9 +27,12 @@ import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
 import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
+import nl.altindag.log.LogCaptor;
 import org.bitcoinj.base.Network;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public class ProducerJavaTest {
 
@@ -104,6 +108,75 @@ public class ProducerJavaTest {
 
     // <editor-fold defaultstate="collapsed" desc="toString">
     @ToStringTest
+    /**
+     * Keys outside the valid range reach {@code processSecrets} from a secrets file read without
+     * {@code batchUsePrivateKeyIncrement}, which applies no validation of its own. They are treated as
+     * a grid treats them: {@link PublicKeyBytes#INVALID_KEY_ONE} in their place. Before, key 0, 1 and
+     * {@code n + 1} failed in {@code fromPrivate} with an ERROR, {@code n} with an
+     * {@code ArrayIndexOutOfBoundsException}, and a value above {@code n + 1} was silently computed as
+     * the key {@code k − n} while reported as {@code k}.
+     *
+     * @param secret the key to process
+     */
+    @ParameterizedTest
+    @MethodSource("keysOutsideTheValidRange")
+    public void processSecrets_keyOutsideTheValidRange_isReplacedByKeyOneAsInAGrid(BigInteger secret) {
+        // arrange
+        MockConsumer mockConsumer = new MockConsumer();
+        ProducerJava producerJava = new ProducerJava(
+                new CProducerJava(),
+                mockConsumer,
+                keyUtility,
+                new MockKeyProducer(keyUtility, new Random(1)),
+                bitHelper,
+                new RuntimeStatistics());
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(AbstractProducer.class)) {
+            // act
+            producerJava.processSecrets(new BigInteger[] {secret});
+
+            // assert
+            assertThat(logCaptor.getErrorLogs(), is(empty()));
+        }
+        assertThat(mockConsumer.publicKeyBytesArrayList, hasSize(1));
+        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[0], is(sameInstance(PublicKeyBytes.INVALID_KEY_ONE)));
+        assertThat(producerJava.getLastFailure(), is(nullValue()));
+    }
+
+    static Stream<BigInteger> keysOutsideTheValidRange() {
+        final BigInteger n = Secp256k1Constants.MAX_PRIVATE_KEY;
+        return Stream.of(
+                BigInteger.ZERO,
+                BigInteger.ONE,
+                n,
+                n.add(BigInteger.ONE),
+                n.add(BigInteger.valueOf(5)),
+                BigInteger.TWO.pow(256).subtract(BigInteger.ONE));
+    }
+
+    @Test
+    public void processSecrets_validKeys_areComputedUnchanged() {
+        // arrange
+        MockConsumer mockConsumer = new MockConsumer();
+        ProducerJava producerJava = new ProducerJava(
+                new CProducerJava(),
+                mockConsumer,
+                keyUtility,
+                new MockKeyProducer(keyUtility, new Random(1)),
+                bitHelper,
+                new RuntimeStatistics());
+        final BigInteger lowest = Secp256k1Constants.MIN_VALID_PRIVATE_KEY;
+        final BigInteger highest = Secp256k1Constants.MAX_PRIVATE_KEY.subtract(BigInteger.ONE);
+
+        // act
+        producerJava.processSecrets(new BigInteger[] {lowest, highest});
+
+        // assert
+        assertThat(mockConsumer.publicKeyBytesArrayList, hasSize(1));
+        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[0], is(equalTo(PublicKeyBytes.fromPrivate(lowest))));
+        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[1], is(equalTo(PublicKeyBytes.fromPrivate(highest))));
+    }
+
     @Test
     public void toString_whenCalled_containsClassNameAndConfig() {
         // After migrating ProducerJava to Lombok @ToString(callSuper = true) the output

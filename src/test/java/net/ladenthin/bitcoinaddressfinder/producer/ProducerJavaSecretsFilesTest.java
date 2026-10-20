@@ -8,10 +8,14 @@ import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.SHA
 import static net.ladenthin.bitcoinaddressfinder.configuration.CSecretFormat.STRING_SHA256;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.sameInstance;
 import static org.hamcrest.Matchers.startsWith;
 
 import com.google.common.hash.Hashing;
@@ -312,6 +316,43 @@ public class ProducerJavaSecretsFilesTest {
         assertThat(
                 mockConsumer.publicKeyBytesArrayList.get(5)[0],
                 is(equalTo(PrivateKey.WITH_SPECIAL_CHARACTER.getPublicKeyBytes())));
+    }
+
+    /**
+     * A secrets file read without {@code batchUsePrivateKeyIncrement} hands its lines to the producer
+     * without the validation the other paths apply. Key 1 is a real key and must be checked (as a grid
+     * checks it), not end in an ERROR; key 0 is no key and must not end in one either.
+     */
+    @Test
+    public void produceKeys_withoutPrivateKeyIncrementKeysZeroAndOne_checkedAsInAGridWithoutAnError() throws Exception {
+        // arrange
+        File secretsFile = folder.resolve("edge-keys.txt").toFile();
+        Files.write(secretsFile.toPath(), List.of("0", "1"));
+        CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
+        cProducerJavaSecretsFiles.secretsFiles = List.of(secretsFile.getAbsolutePath());
+        cProducerJavaSecretsFiles.secretFormat = CSecretFormat.BIG_INTEGER;
+        cProducerJavaSecretsFiles.batchSizeInBits = 0;
+        cProducerJavaSecretsFiles.batchUsePrivateKeyIncrement = false;
+        MockConsumer mockConsumer = new MockConsumer();
+        ProducerJavaSecretsFiles producerJavaSecretsFiles = new ProducerJavaSecretsFiles(
+                cProducerJavaSecretsFiles,
+                mockConsumer,
+                keyUtility,
+                new MockKeyProducer(keyUtility, new Random(1)),
+                bitHelper,
+                new RuntimeStatistics());
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(AbstractProducer.class)) {
+            // act
+            producerJavaSecretsFiles.produceKeys();
+
+            // assert
+            assertThat(logCaptor.getErrorLogs(), is(empty()));
+        }
+        assertThat(mockConsumer.publicKeyBytesArrayList, hasSize(2));
+        assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[0], is(sameInstance(PublicKeyBytes.INVALID_KEY_ONE)));
+        assertThat(mockConsumer.publicKeyBytesArrayList.get(1)[0], is(sameInstance(PublicKeyBytes.INVALID_KEY_ONE)));
+        assertThat(producerJavaSecretsFiles.getLastFailure(), is(nullValue()));
     }
     // </editor-fold>
 
