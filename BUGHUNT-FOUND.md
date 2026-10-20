@@ -1059,6 +1059,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** gegen den alten Code 7 Fehlschläge (ERROR-Logs bei 0, 1, n, n+1; falsche Instanz bei n+5 und 2^256−1; zwei ERRORs im Datei-Test), mit dem Fix grün; Producer- und Consumer-Testklassen 105/105.
 - **Status:** gefixt
 - **Commit:** 43b766b
+- **Nachtrag (Branch-Review 2026-10-20):** Die beiden `processSecrets`-Tests und ihre Quelle `keysOutsideTheValidRange()` standen zwischen `@ToStringTest` und dem toString-Test, den der Marker kennzeichnet; der Marker lag damit auf dem Bereichstest (vor dessen Javadoc, die so nicht mehr als Doc-Kommentar galt), und `toString_whenCalled_containsClassNameAndConfig` trug keinen mehr. Die drei Mitglieder stehen jetzt in einem eigenen `processSecrets`-Abschnitt vor dem toString-Abschnitt, der toString-Test trägt wieder `@ToStringTest` direkt über `@Test`. Nur verschoben, Namen und Verhalten unverändert (`ProducerJavaTest` grün).
 
 <a id="f195"></a>
 ### F195 – BitcoinAddressFinder: Schlägt der Abbruch eines fehlgeschlagenen Starts fehl, verschwindet der Startfehler und der Consumer läuft weiter

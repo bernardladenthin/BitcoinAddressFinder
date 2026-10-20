@@ -106,8 +106,7 @@ public class ProducerJavaTest {
     }
     // </editor-fold>
 
-    // <editor-fold defaultstate="collapsed" desc="toString">
-    @ToStringTest
+    // <editor-fold defaultstate="collapsed" desc="processSecrets">
     /**
      * Keys outside the valid range reach {@code processSecrets} from a secrets file read without
      * {@code batchUsePrivateKeyIncrement}, which applies no validation of its own. They are treated as
@@ -176,7 +175,10 @@ public class ProducerJavaTest {
         assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[0], is(equalTo(PublicKeyBytes.fromPrivate(lowest))));
         assertThat(mockConsumer.publicKeyBytesArrayList.get(0)[1], is(equalTo(PublicKeyBytes.fromPrivate(highest))));
     }
+    // </editor-fold>
 
+    // <editor-fold defaultstate="collapsed" desc="toString">
+    @ToStringTest
     @Test
     public void toString_whenCalled_containsClassNameAndConfig() {
         // After migrating ProducerJava to Lombok @ToString(callSuper = true) the output
