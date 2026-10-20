@@ -7,6 +7,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -316,6 +317,57 @@ class SocketResultBroadcasterTest {
         }
     }
 
+    /**
+     * A connection the accept loop took just before {@code close()} must not survive it. Here the
+     * whole {@code close()} runs while the accept thread holds an accepted client it has not
+     * registered yet, so the client is registered after close swept the client set: it used to stay
+     * connected forever (nothing would close its socket), and starting its writer on the shut-down
+     * executor threw a {@code RejectedExecutionException} that died unseen in the accept task.
+     */
+    @Test
+    void close_whileAnAcceptedClientIsBeingRegistered_theClientIsDisconnected() throws Exception {
+        // arrange
+        final int port = freePort();
+        final SocketResultBroadcaster broadcaster = new SocketResultBroadcaster(port);
+        final AtomicReference<@Nullable Throwable> closeFailure = new AtomicReference<>();
+        broadcaster.setBeforeClientRegistered(() -> {
+            final Thread closer = new Thread(() -> {
+                try {
+                    broadcaster.close();
+                } catch (Throwable t) {
+                    closeFailure.set(t);
+                }
+            });
+            closer.start();
+            // close() interrupts this accept thread; wait for it to finish all the same
+            boolean interrupted = false;
+            while (closer.isAlive()) {
+                try {
+                    closer.join();
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                }
+            }
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        try {
+            start(broadcaster);
+
+            // act
+            try (Socket client = connect(port)) {
+                client.setSoTimeout(SHORT_READ_MILLIS);
+
+                // assert: the server end is closed, so the read ends instead of timing out
+                assertThat(readEndOfStream(client), is(true));
+            }
+            assertThat(closeFailure.get(), is(nullValue()));
+        } finally {
+            broadcaster.close();
+        }
+    }
+
     @Test
     void announceConfiguration_whileAClientIsBeingRegistered_theClientStillReceivesIt() throws Exception {
         // arrange: the announcement runs on another thread exactly while the accept loop has decided
@@ -371,6 +423,24 @@ class SocketResultBroadcasterTest {
      */
     private static void start(SocketResultBroadcaster broadcaster) throws Exception {
         broadcaster.start();
+    }
+
+    /**
+     * Reads until the peer closes the connection.
+     *
+     * @param socket the connected socket, with a read timeout
+     * @return {@code true} if the stream ended, {@code false} if the read timed out
+     * @throws Exception if the read fails for another reason
+     */
+    private static boolean readEndOfStream(Socket socket) throws Exception {
+        try {
+            while (socket.getInputStream().read() != -1) {
+                // skip whatever arrives before the end
+            }
+            return true;
+        } catch (SocketTimeoutException e) {
+            return false;
+        }
     }
 
     /**

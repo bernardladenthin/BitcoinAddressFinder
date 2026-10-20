@@ -17,6 +17,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.core.BatchResult;
@@ -181,7 +182,18 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
                         beforeClientRegistered.run();
                         clients.add(client);
                     }
-                    startWriter(client);
+                    // close() sets shouldStop before it sweeps the clients, so a client registered
+                    // after the sweep sees the flag here; one registered before it is closed by it.
+                    if (shouldStop) {
+                        drop(client);
+                        continue;
+                    }
+                    try {
+                        startWriter(client);
+                    } catch (RejectedExecutionException e) {
+                        // close() shut the writers down between the check above and here
+                        drop(client);
+                    }
                 } catch (java.net.SocketTimeoutException e) {
                     // expected: the timeout exists so the loop can observe shouldStop
                 } catch (IOException e) {
