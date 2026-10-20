@@ -1149,7 +1149,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `SignalChainingCheckTest#warningOnce_linuxWithoutPreload_secondCallIsEmpty`, `#warningOnce_libjsigLoaded_doesNotConsumeTheGate`, `#warning_afterWarningOnceOfTheSameInstance_stillAnswers` (frische Instanzen); `OpenCLContextTest#signalChainingCheck_oneInstanceSharedByEveryContext` pinnt die Verdrahtung über die Deklaration (genau ein `static final`-Feld vom Typ `SignalChainingCheck`), weil `init()` ein Gerät braucht. Ende zu Ende auf pocl ohne Preload: zwei `OpenCLContext`-`init()` hintereinander in einer JVM loggen die Warnung einmal (vorher zweimal).
 - **Rot-Grün-Nachweis:** gegen den alten Code (`warningOnce` als Stub ohne Tor, `OpenCLContext` ohne geteilte Instanz) rot: `warningOnce_linuxWithoutPreload_secondCallIsEmpty` „Expected: is <false> but: was <true>“, `signalChainingCheck_oneInstanceSharedByEveryContext` „Expected: a collection with size <1> but: collection size was <0>“; mit dem Fix grün. Breite Liste: `SignalChainingCheckTest` 14/14, `OpenCLContextTest` 33/33 (auf pocl), `ExampleRunScriptJarVersionTest` 1/1, `JvmModuleFlagConsistencyTest` 4/4, `BitcoinAddressFinderArchitectureTest` 17/17; `bash -n` des Skripts, `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 5fbb179
 
 ## Offene Verdachte ohne Fund-ID
 
