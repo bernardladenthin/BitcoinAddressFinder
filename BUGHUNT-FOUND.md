@@ -87,6 +87,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F194](#f194) — niedrig — *gefixt*
 - [F195](#f195) — niedrig — *gefixt*
 - [F196](#f196) — niedrig — *gefixt*
+- [F206](#f206) — niedrig — *gefixt*
 
 ## Funde
 
@@ -267,6 +268,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** ohne Fix rot („Expected: is null but: was <java.util.ConcurrentModificationException>“), mit Fix grün, `FinderTest` 22/22, `BitcoinAddressFinderArchitectureTest` 17/17; Gegenprobe per `git stash` rot, nach `stash pop` grün. `spotbugs:check` grün.
 - **Status:** gefixt
 - **Commit:** BAF `cf46353`
+- **Nachtrag (Branch-Review 2026-10-20):** Seit F206 durchläuft `interrupt()` die Broadcaster-Listen nicht mehr, das tut `closeBroadcasters()` (unter demselben `interruptLock`). Der Test heißt deshalb `FinderTest#teardown_calledFromTwoThreadsAtOnce_neitherFails` und lässt zwei Threads `abortStart()` rufen (jeweils `interrupt()`, dann `closeBroadcasters()`); der festgehaltene `close()` liegt weiter im ersten Aufruf.
 
 <a id="f35"></a>
 ### F35 – BAF: Javadoc begründet den GC vor dem GPU-Filter-Upload mit `CL_MEM_COPY_HOST_PTR`, das der Code nicht mehr nutzt
@@ -612,6 +614,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** gegen den Naht-Stand ohne Fix rot („Expected: is <4> but: was <0>“, die übrigen 26 Tests der Klasse grün), mit Fix grün in 3 von 3 Läufen; Gegenprobe durch Zurückkopieren des Naht-Stands rot („but: was <0>“), danach wieder grün. Breite Liste: `FinderTest` 27/27, `ConsumerJavaTest` 36/36, die drei Broadcaster-Tests, `ConfigFixturesParseTest` 4/4, `BitcoinAddressFinderArchitectureTest` 17/17; `MainTest` 18/18 mit `POCL_MAX_WORK_GROUP_SIZE=256` (ohne die Variable stirbt seine OpenCL-Roundtrip-Fork auf pocl, auch gegen den unveränderten Stand – siehe die pocl-Beobachtung in BUGHUNT-CHECKED.md); `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `035f2ac`
+- **Nachtrag (Branch-Review 2026-10-20):** Die Zusicherung galt nur auf dem Abschlusspfad. Nach einem Ctrl-C schloss der Shutdown-Hook über `interrupt()` die Broadcaster (und stoppte den WebSocket-Endpunkt), während der Main-Thread den Consumer noch leeren ließ; behoben als [F206](#f206): die Broadcaster schließen jetzt auf jedem Pfad erst nach `releaseConsumer()`.
 
 <a id="f132"></a>
 ### F132 – BitcoinAddressFinder: `CompactLMDB` löscht die `data.mdb` einer anderen Datenbank im Zielverzeichnis und scheitert danach
@@ -1076,6 +1079,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** gegen den alten Code rot (der Client liest nach 3 s nichts statt EOF), mit dem Fix grün; die Klasse 10/10 dreimal hintereinander, dazu 60 frische JVMs (siehe Commit-Nachricht).
 - **Status:** gefixt
 - **Commit:** 2125b60
+
+<a id="f206"></a>
+### F206 – BitcoinAddressFinder: Nach einem Ctrl-C meldet der Consumer die beim Herunterfahren geprüften Batches an schon geschlossene Broadcaster, ohne ein Wort
+- **Zeit:** 2026-10-20 20:07 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/engine/Finder.java` (`interrupt`, `shutdownAndAwaitTermination`, `abortStart`), `keyproducer/KeyProducerJavaWebSocket.java` (`interrupt`), die drei Result-Broadcaster
+- **Schwere:** niedrig bis mittel (nur auf dem Abbruchpfad; Treffer stehen weiter im Log, verloren geht das Abschlusssignal der zuletzt geprüften Batches)
+- **Historie:** Gefunden beim Review des Branches am 2026-10-20 (Fund B1-1). F131 hatte die Reihenfolge nur auf dem Abschlusspfad korrigiert (Consumer zuerst, dann `interrupt()`); der Shutdown-Hook ruft `interrupt()` aber unabhängig vom Main-Thread.
+- **Beschreibung:** Nach einem Ctrl-C ruft der Shutdown-Hook `Finder.interrupt()`, während der Main-Thread noch in `shutdownAndAwaitTermination` steht. `interrupt()` unterbrach die Key-Producer – beim WebSocket-Key-Producer mit `endpoint.stop()` auch den Server, auf dem der WebSocket-Broadcaster sendet – und schloss die ZeroMQ- und Socket-Broadcaster. Erst danach ließ der Main-Thread den Consumer die eingereihten Batches prüfen (`releaseConsumer`), und dessen Meldungen fielen ohne Log-Zeile weg: `WebSocketEndpoint.broadcast` an einen gestoppten Server, `ZmqResultBroadcaster.send` kehrte bei `closed` zurück, `SocketResultBroadcaster.broadcast` lief über die geleerte Client-Liste. Ein Client, der die Bereiche geschickt hatte, erhielt für diese Batches nie das „geprüft“, das die Ergebnis-Übertragung je Batch zusichert.
+- **Fix:** Der Abbau ist getrennt in Signal, Drain und Schließen. `interrupt()` weckt und stoppt nur noch die Quellen (Key-Producer, Producer) und lässt die Broadcaster offen; ein neues, unter `interruptLock` laufendes und idempotentes `closeBroadcasters()` schließt WebSocket-, ZeroMQ- und Socket-Broadcaster und leert die Ankündigungsliste. `shutdownAndAwaitTermination` (beide Zweige, im `finally`) und `abortStart` (im `finally` nach `releaseConsumer`) rufen es, nachdem der Consumer freigegeben ist. Der WebSocket-Key-Producer übergibt seinen Endpunkt mit `shareEndpoint()` an den Broadcaster; sein `interrupt()` stoppt den Endpunkt dann nicht mehr, das tut `WebSocketResultBroadcaster.close()`. Eine Meldung, die nach dem Schließen ankommt, schreibt jetzt je Broadcaster einmal eine WARN-Zeile (ZeroMQ „already closed“, Socket „already closed“, WebSocket-Endpunkt „already stopped“), statt still zu verschwinden.
+- **Tests:** `FinderTest#interrupt_whileConsumerStillDraining_everyBatchIsReportedBeforeTheBroadcastersClose` (vier Producer mit je einem Batch, ein Consumer-Thread, 200-ms-Listener; ein zweiter Thread ruft nach der ersten Meldung `interrupt()` wie der Hook, der Main-Thread steht in `shutdownAndAwaitTermination`; die Naht `setBeforeResultBroadcastersClosed` sitzt jetzt in `closeBroadcasters()`), `FinderTest#interrupt_whileConsumerStillDraining_webSocketClientReceivesEveryBatch` (dasselbe über den echten WebSocket-Transport: ein Client muss alle vier `batch`-Nachrichten erhalten), `ZmqResultBroadcasterTest#onBatchChecked_afterClose_warnsOnceThatTheResultIsNotPublished`, `SocketResultBroadcasterTest#onBatchChecked_afterClose_warnsOnceThatTheResultIsNotSent`, `WebSocketEndpointTest#broadcast_afterStop_warnsOnceThatTheMessageIsNotSent`. Der F34-Test heißt jetzt `FinderTest#teardown_calledFromTwoThreadsAtOnce_neitherFails` und läuft über `abortStart()`, weil `interrupt()` die Broadcaster-Listen nicht mehr durchläuft.
+- **Rot-Grün-Nachweis:** gegen den alten Code rot: Naht-Test „Expected: is <4> but: was <1>“, WebSocket-Test „Expected: is <4> but: was <2>“, die drei Log-Tests je „Expected: a collection with size <1> but: collection size was <0>“; mit dem Fix grün, die beiden Finder-Tests dreimal hintereinander. Breite Liste: `FinderTest` 34/34 (mit `POCL_MAX_WORK_GROUP_SIZE=256`, ohne stirbt die OpenCL-Fork auf pocl wie schon bei F131 notiert), `ZmqResultBroadcasterTest` 6/6, `SocketResultBroadcasterTest` 11/11, `WebSocketEndpointTest` 2/2, `WebSocketResultBroadcasterTest` 4/4, `KeyProducerJavaWebSocketTest` 5/5, `MainTest` 19/19, `MainStartFinderTest` 2/2, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 

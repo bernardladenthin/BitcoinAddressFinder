@@ -112,6 +112,10 @@ public class Finder implements Interruptable {
      */
     private record KeyedResultBroadcaster(String keyProducerId, ResultBroadcaster broadcaster) {}
 
+    /** WebSocket broadcasters, kept so the key producer's endpoint they took over can be stopped on shutdown. */
+    @ToString.Exclude
+    private final List<WebSocketResultBroadcaster> webSocketBroadcasters = new ArrayList<>();
+
     /** ZeroMQ publishers, kept so their context can be closed on shutdown. */
     @ToString.Exclude
     private final List<ZmqResultBroadcaster> zmqBroadcasters = new ArrayList<>();
@@ -124,8 +128,9 @@ public class Finder implements Interruptable {
     private final ProducerReleaser producerReleaser = new ProducerReleaser();
 
     /**
-     * Serializes {@link #interrupt()}: the JVM shutdown hook and {@link #shutdownAndAwaitTermination()}
-     * both call it, at the same time after a Ctrl-C, and it walks and clears plain lists.
+     * Serializes {@link #interrupt()} and {@link #closeBroadcasters()}: the JVM shutdown hook and
+     * {@link #shutdownAndAwaitTermination()} both reach them, at the same time after a Ctrl-C, and they
+     * walk and clear plain lists.
      */
     @ToString.Exclude
     private final Object interruptLock = new Object();
@@ -142,7 +147,7 @@ public class Finder implements Interruptable {
     @ToString.Exclude
     private final List<ResultListener> additionalResultListeners = new ArrayList<>();
 
-    /** Test seam: runs in {@link #interrupt()} right before the key producers and broadcasters close. */
+    /** Test seam: runs in {@link #closeBroadcasters()} right before the result broadcasters close. */
     @ToString.Exclude
     private volatile Runnable beforeResultBroadcastersClosed = () -> {};
 
@@ -332,8 +337,8 @@ public class Finder implements Interruptable {
     }
 
     /**
-     * Installs the hook that runs in {@link #interrupt()} right before the key producers and the
-     * result broadcasters are closed.
+     * Installs the hook that runs in {@link #closeBroadcasters()} right before the result broadcasters
+     * are closed.
      *
      * @param hook the code to run
      */
@@ -368,8 +373,9 @@ public class Finder implements Interruptable {
                 continue;
             }
             final WebSocketResultBroadcaster broadcaster =
-                    new WebSocketResultBroadcaster(webSocketKeyProducer.getEndpoint());
+                    new WebSocketResultBroadcaster(webSocketKeyProducer.shareEndpoint());
             resultBroadcasters.add(new KeyedResultBroadcaster(keyProducerId, broadcaster::announceConfiguration));
+            webSocketBroadcasters.add(broadcaster);
             listeners.add(broadcaster);
             LOGGER.info("Broadcasting results on the WebSocket of keyProducerId {}", keyProducerId);
         }
@@ -795,6 +801,10 @@ public class Finder implements Interruptable {
      * Shuts down the producer executor, lets the consumer check what the producers queued, then
      * releases the key producers, broadcasters and producers.
      *
+     * <p>The result broadcasters close last, after the consumer has been released, on both branches
+     * and also when a {@code Ctrl+C} lands meanwhile: the shutdown hook's {@link #interrupt()} stops the
+     * sources and the producers, and leaves the broadcasters to this method.
+     *
      * @throws InterruptedException if the calling thread is interrupted while awaiting termination;
      *                              callers are responsible for restoring the interrupt flag or
      *                              propagating it according to their own design.
@@ -823,12 +833,20 @@ public class Finder implements Interruptable {
         // for -- reached nobody. When the wait timed out instead, producers are still running and
         // filling the queue; they have to be stopped first, or a producer blocked on the full queue
         // of a stopped consumer would hold interrupt() for its whole shutdownTimeoutSeconds.
-        if (producersTerminated) {
-            releaseConsumer();
-            interrupt();
-        } else {
-            interrupt();
-            releaseConsumer();
+        //
+        // The broadcasters close after both, whichever branch ran: a Ctrl+C that lands during the drain
+        // runs interrupt() from the shutdown hook, and when that closed them, the batches the consumer
+        // was still checking were reported to closed broadcasters and reached nobody.
+        try {
+            if (producersTerminated) {
+                releaseConsumer();
+                interrupt();
+            } else {
+                interrupt();
+                releaseConsumer();
+            }
+        } finally {
+            closeBroadcasters();
         }
     }
 
@@ -846,7 +864,11 @@ public class Finder implements Interruptable {
         try {
             interrupt();
         } finally {
-            releaseConsumer();
+            try {
+                releaseConsumer();
+            } finally {
+                closeBroadcasters();
+            }
         }
     }
 
@@ -885,13 +907,17 @@ public class Finder implements Interruptable {
      * the release of the producers included. That can take up to {@code shutdownTimeoutSeconds} per
      * producer still running; a {@code Ctrl+C} during the teardown of a finished run therefore waits
      * for that teardown rather than racing it.
+     *
+     * <p>The result broadcasters are left open: the consumer may still be checking what the producers
+     * queued, and it reports every batch to them. {@link #shutdownAndAwaitTermination()} and
+     * {@link #abortStart()} close them once the consumer is released. A WebSocket key producer whose
+     * endpoint a broadcaster took over therefore keeps that endpoint running here.
      */
     @Override
     public void interrupt() {
         synchronized (interruptLock) {
             interrupted = true;
             LOGGER.info("interrupt called: delegate interrupt to all keyProducers and producers");
-            beforeResultBroadcastersClosed.run();
 
             // Key producers first. A producer waiting for its next secret is parked inside the key
             // producer, and a key producer configured to block indefinitely (timeoutMillis < 0, which is
@@ -905,7 +931,28 @@ public class Finder implements Interruptable {
             }
             freeAllKeyProducers();
 
-            // Broadcasters own sockets of their own; releasing them here keeps the process able to exit.
+            // Interrupt and release all Producers, each exactly once even under a concurrent teardown.
+            producerReleaser.release(getAllProducers());
+            freeAllProducers();
+
+            LOGGER.info("All producers released and freed.");
+        }
+    }
+
+    /**
+     * Closes the result broadcasters; called once the consumer is released, so no batch can be
+     * reported any more. Idempotent: the lists it walks are cleared.
+     *
+     * <p>Broadcasters own sockets (and a WebSocket broadcaster the key producer's endpoint); releasing
+     * them keeps the process able to exit.
+     */
+    private void closeBroadcasters() {
+        synchronized (interruptLock) {
+            beforeResultBroadcastersClosed.run();
+            for (WebSocketResultBroadcaster broadcaster : webSocketBroadcasters) {
+                broadcaster.close();
+            }
+            webSocketBroadcasters.clear();
             for (ZmqResultBroadcaster broadcaster : zmqBroadcasters) {
                 broadcaster.close();
             }
@@ -915,12 +962,6 @@ public class Finder implements Interruptable {
             }
             socketBroadcasters.clear();
             resultBroadcasters.clear();
-
-            // Interrupt and release all Producers, each exactly once even under a concurrent teardown.
-            producerReleaser.release(getAllProducers());
-            freeAllProducers();
-
-            LOGGER.info("All producers released and freed.");
         }
     }
 

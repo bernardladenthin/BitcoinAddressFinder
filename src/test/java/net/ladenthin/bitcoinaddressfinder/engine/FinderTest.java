@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -115,9 +116,10 @@ public class FinderTest {
     }
 
     @Test
-    public void interrupt_calledFromTwoThreadsAtOnce_neitherFails() throws Exception {
-        // arrange: the shutdown hook and the main thread's shutdownAndAwaitTermination() both call
-        // interrupt(); the first is held inside a broadcaster's close() while the second runs
+    public void teardown_calledFromTwoThreadsAtOnce_neitherFails() throws Exception {
+        // arrange: two teardowns overlap (the shutdown hook's interrupt() and the main thread's own);
+        // each runs interrupt() and then closes the broadcasters, and the first is held inside a
+        // broadcaster's close() while the second runs
         Finder finder = new Finder(new CFinder());
         HeldCloseZmqBroadcaster held = new HeldCloseZmqBroadcaster("inproc://finder-test-held");
         ZmqResultBroadcaster other = new ZmqResultBroadcaster("inproc://finder-test-other");
@@ -131,7 +133,7 @@ public class FinderTest {
                 new java.util.concurrent.atomic.AtomicReference<>();
         Runnable interrupt = () -> {
             try {
-                finder.interrupt();
+                finder.abortStart();
             } catch (Throwable t) {
                 failure.compareAndSet(null, t);
             }
@@ -463,6 +465,150 @@ public class FinderTest {
         // assert
         assertThat(reported.get(), is(equalTo(producers)));
         assertThat(reportedWhenClosing.get(), is(equalTo(producers)));
+    }
+
+    /**
+     * The same guarantee after a {@code Ctrl+C}: the JVM shutdown hook calls {@link Finder#interrupt()}
+     * while the main thread is still in {@link Finder#shutdownAndAwaitTermination()}, letting the
+     * consumer check what is queued. The interrupt stops the sources at once, but the broadcasters must
+     * stay open until that drain has reported every batch.
+     */
+    @Test
+    public void interrupt_whileConsumerStillDraining_everyBatchIsReportedBeforeTheBroadcastersClose() throws Exception {
+        // arrange
+        final int producers = 4;
+        CFinder cFinder = new CFinder();
+        String keyProducerId = "exampleId";
+        for (int i = 0; i < producers; i++) {
+            final CProducerJava cProducerJava = new CProducerJava();
+            cProducerJava.keyProducerId = keyProducerId;
+            cProducerJava.runOnce = true;
+            cFinder.producerJava.add(cProducerJava);
+        }
+        configureKeyProducerJavaRandom(keyProducerId, cFinder);
+        configureConsumerJava(cFinder);
+        Objects.requireNonNull(cFinder.consumerJava).threads = 1;
+
+        Finder finder = new Finder(cFinder);
+        final AtomicInteger reported = new AtomicInteger();
+        final AtomicInteger reportedWhenClosing = new AtomicInteger(-1);
+        final CountDownLatch firstReported = new CountDownLatch(1);
+        finder.addResultListener(batchResult -> {
+            try {
+                Thread.sleep(SLOW_LISTENER_MILLIS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            reported.incrementAndGet();
+            firstReported.countDown();
+        });
+        finder.setBeforeResultBroadcastersClosed(() -> reportedWhenClosing.compareAndSet(-1, reported.get()));
+        finder.startKeyProducer();
+        finder.startConsumer();
+        finder.configureProducer();
+        finder.initProducer();
+        finder.startProducer();
+        Thread shutdownHook = startShutdownHookAfter(firstReported, finder);
+
+        // act
+        finder.shutdownAndAwaitTermination();
+        shutdownHook.join(10_000);
+
+        // assert
+        assertThat(reported.get(), is(equalTo(producers)));
+        assertThat(reportedWhenClosing.get(), is(equalTo(producers)));
+    }
+
+    /**
+     * The WebSocket transport of the same guarantee. Its server is the key producer's own endpoint, so
+     * interrupting the key producer, which a {@code Ctrl+C} does first, must not stop it while the
+     * consumer still reports on it.
+     */
+    @Test
+    public void interrupt_whileConsumerStillDraining_webSocketClientReceivesEveryBatch() throws Exception {
+        // arrange
+        final int producers = 4;
+        CFinder cFinder = new CFinder();
+        CKeyProducerJavaWebSocket webSocket = new CKeyProducerJavaWebSocket();
+        webSocket.port = KeyProducerJavaSocketTest.findFreePort();
+        webSocket.timeoutMillis = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
+        webSocket.keyProducerId = "ws";
+        webSocket.broadcastResults = true;
+        cFinder.keyProducerJavaWebSocket.add(webSocket);
+        String keyProducerId = "random";
+        for (int i = 0; i < producers; i++) {
+            final CProducerJava cProducerJava = new CProducerJava();
+            cProducerJava.keyProducerId = keyProducerId;
+            cProducerJava.runOnce = true;
+            cFinder.producerJava.add(cProducerJava);
+        }
+        configureKeyProducerJavaRandom(keyProducerId, cFinder);
+        configureConsumerJava(cFinder);
+        Objects.requireNonNull(cFinder.consumerJava).threads = 1;
+
+        Finder finder = new Finder(cFinder);
+        final CountDownLatch firstReported = new CountDownLatch(1);
+        finder.addResultListener(batchResult -> {
+            try {
+                Thread.sleep(SLOW_LISTENER_MILLIS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            firstReported.countDown();
+        });
+        RecordingWebSocketClient client = new RecordingWebSocketClient(URI.create("ws://127.0.0.1:" + webSocket.port));
+        try {
+            finder.startKeyProducer();
+            finder.startConsumer();
+            finder.configureProducer();
+            ConnectionUtils.waitUntilTcpPortOpen("127.0.0.1", webSocket.port, 15_000);
+            assertThat(client.connectBlocking(15, TimeUnit.SECONDS), is(true));
+            finder.initProducer();
+            finder.startProducer();
+            Thread shutdownHook = startShutdownHookAfter(firstReported, finder);
+
+            // act
+            finder.shutdownAndAwaitTermination();
+            shutdownHook.join(10_000);
+
+            // assert
+            int batchMessages = 0;
+            ObjectMapper objectMapper = new ObjectMapper();
+            String message;
+            while (batchMessages < producers && (message = client.awaitMessage()) != null) {
+                if ("batch".equals(objectMapper.readTree(message).get("type").asText())) {
+                    batchMessages++;
+                }
+            }
+            assertThat(batchMessages, is(equalTo(producers)));
+        } finally {
+            client.closeBlocking();
+            finder.interrupt();
+        }
+    }
+
+    /**
+     * Calls {@link Finder#interrupt()} from another thread once the latch opens, the way the JVM
+     * shutdown hook does after a {@code Ctrl+C}.
+     *
+     * @param latch  opens once the consumer reported its first batch
+     * @param finder the finder to interrupt
+     * @return the started thread
+     */
+    private static Thread startShutdownHookAfter(CountDownLatch latch, Finder finder) {
+        Thread shutdownHook = new Thread(
+                () -> {
+                    try {
+                        if (latch.await(15, TimeUnit.SECONDS)) {
+                            finder.interrupt();
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                },
+                "shutdown-hook");
+        shutdownHook.start();
+        return shutdownHook;
     }
 
     /**

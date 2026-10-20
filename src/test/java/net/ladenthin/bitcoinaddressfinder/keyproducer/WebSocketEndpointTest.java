@@ -4,12 +4,15 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 
 import java.net.ServerSocket;
 import java.util.HashSet;
 import java.util.Set;
+import nl.altindag.log.LogCaptor;
 import org.junit.jupiter.api.Test;
 
 /** Lifecycle tests for {@link WebSocketEndpoint}. */
@@ -46,6 +49,29 @@ class WebSocketEndpointTest {
         }
         assertThat(leftOver, is(empty()));
     }
+    /**
+     * A message sent after {@link WebSocketEndpoint#stop()} reaches no client any more: a batch
+     * reported then would vanish without a word. That must be visible in the log, once.
+     */
+    @Test
+    void broadcast_afterStop_warnsOnceThatTheMessageIsNotSent() throws Exception {
+        // arrange
+        final int port = freePort();
+        final WebSocketEndpoint endpoint = new WebSocketEndpoint(port);
+        endpoint.start();
+        ConnectionUtils.waitUntilTcpPortOpen("127.0.0.1", port, (int) AWAIT_MILLIS);
+        endpoint.stop();
+        try (LogCaptor logCaptor = LogCaptor.forClass(WebSocketEndpoint.class)) {
+            // act
+            endpoint.broadcast("first");
+            endpoint.broadcast("second");
+
+            // assert
+            assertThat(logCaptor.getWarnLogs(), hasSize(1));
+            assertThat(logCaptor.getWarnLogs().get(0), containsString("already stopped"));
+        }
+    }
+
     // </editor-fold>
 
     private static int freePort() throws Exception {

@@ -4,7 +4,9 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
@@ -28,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import net.ladenthin.bitcoinaddressfinder.core.BatchResult;
 import net.ladenthin.bitcoinaddressfinder.core.Hit;
+import nl.altindag.log.LogCaptor;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -408,6 +411,27 @@ class SocketResultBroadcasterTest {
             announcer.shutdownNow();
         }
     }
+    /**
+     * A batch reported after {@link SocketResultBroadcaster#close()} reaches no client any more. That
+     * must be visible in the log, once, instead of the report disappearing without a word.
+     */
+    @Test
+    void onBatchChecked_afterClose_warnsOnceThatTheResultIsNotSent() throws Exception {
+        // arrange
+        SocketResultBroadcaster broadcaster = new SocketResultBroadcaster(freePort());
+        start(broadcaster);
+        broadcaster.close();
+        try (LogCaptor logCaptor = LogCaptor.forClass(SocketResultBroadcaster.class)) {
+            // act
+            broadcaster.onBatchChecked(new BatchResult(BigInteger.ONE, 1, List.of()));
+            broadcaster.onBatchChecked(new BatchResult(BigInteger.TWO, 1, List.of()));
+
+            // assert
+            assertThat(logCaptor.getWarnLogs(), hasSize(1));
+            assertThat(logCaptor.getWarnLogs().get(0), containsString("already closed"));
+        }
+    }
+
     // </editor-fold>
 
     /**

@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.core.BatchResult;
@@ -97,6 +98,10 @@ public class ZmqResultBroadcaster implements ResultListener, AutoCloseable {
     @ToString.Exclude
     private boolean closed;
 
+    /** Set by the first send after {@link #close()}, so that send is logged once and not per batch. */
+    @ToString.Exclude
+    private final AtomicBoolean sendAfterCloseReported = new AtomicBoolean();
+
     /**
      * Creates a publisher bound to the given address.
      *
@@ -181,6 +186,7 @@ public class ZmqResultBroadcaster implements ResultListener, AutoCloseable {
         try {
             synchronized (socketLock) {
                 if (closed) {
+                    reportSendAfterClose();
                     return;
                 }
                 publisher.send(bytes, ZMQ.DONTWAIT);
@@ -192,10 +198,21 @@ public class ZmqResultBroadcaster implements ResultListener, AutoCloseable {
     }
 
     /**
+     * Logs, once, that a message arrived after {@link #close()}: it is not published, and a subscriber
+     * waiting for the batch it reports would otherwise never learn why it did not arrive.
+     */
+    private void reportSendAfterClose() {
+        if (sendAfterCloseReported.compareAndSet(false, true)) {
+            LOGGER.warn("The result publisher is already closed; results reported from now on are not published.");
+        }
+    }
+
+    /**
      * Closes the socket and the context. The context's close waits up to the socket's linger for a
      * subscriber to take what is queued, and it runs under the socket lock, so a consumer thread that
-     * publishes at the same time (on the timeout and abort paths the consumer may still be running)
-     * waits as long; it then sees the broadcaster closed and returns.
+     * publishes at the same time (the finder closes the broadcasters after the consumer, but a consumer
+     * whose drain timed out may still be running) waits as long; it then sees the broadcaster closed,
+     * logs that once and returns.
      */
     @Override
     public void close() {

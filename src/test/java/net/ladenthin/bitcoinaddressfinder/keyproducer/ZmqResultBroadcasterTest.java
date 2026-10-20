@@ -4,7 +4,9 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 
@@ -23,6 +25,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import net.ladenthin.bitcoinaddressfinder.core.BatchResult;
 import net.ladenthin.bitcoinaddressfinder.core.Hit;
+import nl.altindag.log.LogCaptor;
 import org.junit.jupiter.api.Test;
 import org.zeromq.SocketType;
 import org.zeromq.ZContext;
@@ -250,6 +253,26 @@ class ZmqResultBroadcasterTest {
             broadcaster.close();
         }
     }
+    /**
+     * A batch reported after {@link ZmqResultBroadcaster#close()} cannot be published any more. That
+     * must be visible in the log, once, instead of the report disappearing without a word.
+     */
+    @Test
+    void onBatchChecked_afterClose_warnsOnceThatTheResultIsNotPublished() {
+        // arrange
+        ZmqResultBroadcaster broadcaster = new ZmqResultBroadcaster("inproc://zmq-result-broadcaster-closed");
+        broadcaster.close();
+        try (LogCaptor logCaptor = LogCaptor.forClass(ZmqResultBroadcaster.class)) {
+            // act
+            broadcaster.onBatchChecked(new BatchResult(BigInteger.ONE, 1, List.of()));
+            broadcaster.onBatchChecked(new BatchResult(BigInteger.TWO, 1, List.of()));
+
+            // assert
+            assertThat(logCaptor.getWarnLogs(), hasSize(1));
+            assertThat(logCaptor.getWarnLogs().get(0), containsString("already closed"));
+        }
+    }
+
     // </editor-fold>
 
     /**

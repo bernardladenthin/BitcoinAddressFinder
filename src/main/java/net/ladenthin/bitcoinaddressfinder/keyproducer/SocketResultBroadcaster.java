@@ -19,6 +19,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.core.BatchResult;
 import net.ladenthin.bitcoinaddressfinder.core.FireAndForget;
@@ -106,6 +107,13 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
     private final ExecutorService writerExecutor = Executors.newCachedThreadPool();
 
     private volatile boolean shouldStop = false;
+
+    /** Set at the end of {@link #close()}, once no client is connected any more. */
+    private volatile boolean closed;
+
+    /** Set by the first message after {@link #close()}, so that message is logged once and not per batch. */
+    @ToString.Exclude
+    private final AtomicBoolean broadcastAfterCloseReported = new AtomicBoolean();
 
     @ToString.Exclude
     private volatile @Nullable ServerSocket serverSocket;
@@ -296,6 +304,14 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
      * @param message the message to send, without its terminator
      */
     private void broadcast(String message) {
+        if (closed) {
+            if (broadcastAfterCloseReported.compareAndSet(false, true)) {
+                LOGGER.warn(
+                        "The result server on port {} is already closed; results reported from now on are not sent.",
+                        port);
+            }
+            return;
+        }
         for (Client client : clients) {
             if (!client.queue().offer(message)) {
                 LOGGER.warn(
@@ -411,6 +427,7 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
             closeQuietly(client.socket());
         }
         clients.clear();
+        closed = true;
         writerExecutor.shutdownNow();
     }
 

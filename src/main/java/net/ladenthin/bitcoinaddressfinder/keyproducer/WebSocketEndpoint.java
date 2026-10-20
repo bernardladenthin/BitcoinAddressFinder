@@ -5,6 +5,7 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import lombok.ToString;
 import org.java_websocket.WebSocket;
@@ -49,6 +50,13 @@ public class WebSocketEndpoint {
 
     @ToString.Exclude
     private @Nullable MessageHandler messageHandler;
+
+    /** Set by {@link #stop()}; a message sent after it reaches no client. */
+    private volatile boolean stopped;
+
+    /** Set by the first message after {@link #stop()}, so that message is logged once and not per batch. */
+    @ToString.Exclude
+    private final AtomicBoolean broadcastAfterStopReported = new AtomicBoolean();
 
     /**
      * Set after the server started (the result broadcaster is built after the key producer) and read in
@@ -183,6 +191,15 @@ public class WebSocketEndpoint {
      * @param message the message to send
      */
     public void broadcast(String message) {
+        if (stopped) {
+            if (broadcastAfterStopReported.compareAndSet(false, true)) {
+                LOGGER.warn(
+                        "The WebSocket server on port {} is already stopped; messages sent from now on reach no"
+                                + " client.",
+                        port);
+            }
+            return;
+        }
         final WebSocketServer localServer = webSocketServer;
         if (localServer == null) {
             return;
@@ -196,6 +213,7 @@ public class WebSocketEndpoint {
 
     /** Stops the server, if it was started. */
     public void stop() {
+        stopped = true;
         final WebSocketServer localServer = webSocketServer;
         if (localServer != null) {
             try {

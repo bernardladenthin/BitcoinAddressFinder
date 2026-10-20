@@ -23,9 +23,13 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Delivery is best-effort. A client that is not connected at the moment a batch completes misses
  * that message and it is not replayed; the log remains the authoritative record of a hit.
+ *
+ * <p>The endpoint belongs to the key producer, but once a broadcaster sends on it, the broadcaster
+ * stops it: {@link #close()} runs after the consumer reported its last batch, which is later than the
+ * key producer is interrupted (see {@link KeyProducerJavaWebSocket#shareEndpoint()}).
  */
 @ToString
-public class WebSocketResultBroadcaster implements ResultListener {
+public class WebSocketResultBroadcaster implements ResultListener, AutoCloseable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(WebSocketResultBroadcaster.class);
 
@@ -96,5 +100,11 @@ public class WebSocketResultBroadcaster implements ResultListener {
             return;
         }
         endpoint.broadcast(message);
+    }
+
+    /** Stops the shared endpoint; called once no batch can be reported any more. */
+    @Override
+    public void close() {
+        endpoint.stop();
     }
 }
