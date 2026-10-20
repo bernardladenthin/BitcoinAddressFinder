@@ -1004,7 +1004,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `ProducerJavaTest#processSecrets_keyOutsideTheValidRange_isReplacedByKeyOneAsInAGrid` (0, 1, n, n+1, n+5, 2^256−1), `#processSecrets_validKeys_areComputedUnchanged` (2 und n−1), `ProducerJavaSecretsFilesTest#produceKeys_withoutPrivateKeyIncrementKeysZeroAndOne_checkedAsInAGridWithoutAnError` (Ende zu Ende über eine Datei mit `0` und `1`).
 - **Rot-Grün-Nachweis:** gegen den alten Code 7 Fehlschläge (ERROR-Logs bei 0, 1, n, n+1; falsche Instanz bei n+5 und 2^256−1; zwei ERRORs im Datei-Test), mit dem Fix grün; Producer- und Consumer-Testklassen 105/105.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 43b766b
 
 ## Offene Verdachte ohne Fund-ID
 
