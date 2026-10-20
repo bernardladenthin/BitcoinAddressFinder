@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder.keyproducer;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
@@ -73,6 +74,12 @@ class ZmqResultBroadcasterTest {
 
     /** Kernel receive buffer of the lagging subscriber; small, so TCP pushes back early. */
     private static final int SMALL_RECEIVE_BUFFER_BYTES = 4096;
+
+    /**
+     * Half the 2 s the shipped {@link ZmqResultBroadcaster} lingers: a {@code close()} with a lagging
+     * subscriber that returns sooner did not wait for it.
+     */
+    private static final long HALF_THE_SHIPPED_LINGER_MILLIS = 1_000;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -169,38 +176,20 @@ class ZmqResultBroadcasterTest {
     void close_whileTheSubscriberIsBehind_subscriberStillReceivesTheLastBatch() throws Exception {
         // The last batch messages are the completion signal of a run. With a linger of zero,
         // closing the socket discarded whatever the PUB socket had not written yet, so a subscriber
-        // that was behind missed exactly the end of the run. The socket broadcaster drains for up
-        // to 2 s (F130); the ZeroMQ one now lingers as long.
+        // that was behind missed exactly the end of the run (F163).
         //
-        // To make "behind" deterministic, the subscriber does not read during the burst and holds
-        // at most one message (receive high-water mark 1, small kernel buffer): its I/O thread stops
-        // reading, TCP pushes back, and the burst stays queued at the publisher. close() then runs
-        // on another thread while this one drains.
+        // The broadcaster lingers for AWAIT_MILLIS here, not the shipped 2 s: the drain below must
+        // move the whole burst and parse it, and racing that against the shipped value made the
+        // outcome depend on the speed of the machine. What is pinned is that close() does not
+        // discard pending messages; the shipped bound has its own test below.
 
         // arrange
         final String address = "tcp://127.0.0.1:" + freePort();
-        final ZmqResultBroadcaster broadcaster = new ZmqResultBroadcaster(address);
-        final List<Hit> manyHits = new ArrayList<>();
-        for (int i = 0; i < BURST_HITS_PER_BATCH; i++) {
-            manyHits.add(new Hit(BigInteger.valueOf(i), "aabb".repeat(16), "1TestAddress" + i, true, false));
-        }
+        final ZmqResultBroadcaster broadcaster =
+                new ZmqResultBroadcaster(address, new BatchResultJsonFormatter(), AWAIT_MILLIS);
         final ExecutorService closer = Executors.newSingleThreadExecutor();
         try (ZContext context = new ZContext()) {
-            final ZMQ.Socket subscriber = context.createSocket(SocketType.SUB);
-            subscriber.setHandshakeIvl(HANDSHAKE_IVL_MILLIS);
-            subscriber.setRcvHWM(1);
-            subscriber.setReceiveBufferSize(SMALL_RECEIVE_BUFFER_BYTES);
-            subscriber.connect(address);
-            subscriber.subscribe(ZMQ.SUBSCRIPTION_ALL);
-            subscriber.setReceiveTimeOut(RECEIVE_TIMEOUT_MILLIS);
-            assertThat(
-                    receiveWhilePublishing(
-                            subscriber,
-                            () -> broadcaster.onBatchChecked(new BatchResult(BigInteger.ZERO, 1, List.of()))),
-                    is(notNullValue()));
-            for (long base = 1; base <= BURST_BATCHES; base++) {
-                broadcaster.onBatchChecked(new BatchResult(BigInteger.valueOf(base), 1, manyHits));
-            }
+            final ZMQ.Socket subscriber = connectSubscriberAndFallBehind(context, address, broadcaster);
 
             // act
             final Future<?> closed = closer.submit(broadcaster::close);
@@ -219,6 +208,36 @@ class ZmqResultBroadcasterTest {
             }
             assertThat(lastSeen, is(true));
             closed.get(AWAIT_MILLIS, TimeUnit.MILLISECONDS);
+        } finally {
+            closer.shutdownNow();
+            broadcaster.close();
+        }
+    }
+
+    /**
+     * The shipped linger bounds the shutdown: a subscriber that has stopped reading delays
+     * {@link ZmqResultBroadcaster#close()} by that long, not longer, and not less. The ceiling is
+     * loose ({@link #AWAIT_MILLIS}) and the floor half the shipped 2 s, so the timing of the machine
+     * only ever moves the measurement away from both: an infinite linger hangs the shutdown, a zero
+     * linger returns at once and discards the pending end of the run.
+     */
+    @Test
+    void close_subscriberStoppedReading_waitsForTheShippedLingerAndThenReturns() throws Exception {
+        // arrange
+        final String address = "tcp://127.0.0.1:" + freePort();
+        final ZmqResultBroadcaster broadcaster = new ZmqResultBroadcaster(address);
+        final ExecutorService closer = Executors.newSingleThreadExecutor();
+        try (ZContext context = new ZContext()) {
+            connectSubscriberAndFallBehind(context, address, broadcaster);
+
+            // act
+            final long start = System.nanoTime();
+            final Future<?> closed = closer.submit(broadcaster::close);
+            closed.get(AWAIT_MILLIS, TimeUnit.MILLISECONDS);
+            final long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+
+            // assert
+            assertThat(elapsedMillis, is(greaterThanOrEqualTo(HALF_THE_SHIPPED_LINGER_MILLIS)));
         } finally {
             closer.shutdownNow();
             broadcaster.close();
@@ -300,6 +319,42 @@ class ZmqResultBroadcasterTest {
         subscriber.connect(address);
         subscriber.subscribe(ZMQ.SUBSCRIPTION_ALL);
         subscriber.setReceiveTimeOut(RECEIVE_TIMEOUT_MILLIS);
+        return subscriber;
+    }
+
+    /**
+     * Connects a subscriber that holds at most one message and then publishes a burst it does not
+     * read, so the burst stays queued at the publisher.
+     *
+     * <p>Receive high-water mark 1 and a small kernel buffer: the subscriber's I/O thread stops
+     * reading, TCP pushes back, and the publisher keeps the rest. That makes "behind" deterministic
+     * instead of a matter of how fast this thread reads.
+     *
+     * @param context     the context that owns the subscriber
+     * @param address     the publisher's address
+     * @param broadcaster the publisher to drive
+     * @return the subscriber, connected and behind by the burst
+     */
+    private static ZMQ.Socket connectSubscriberAndFallBehind(
+            ZContext context, String address, ZmqResultBroadcaster broadcaster) {
+        final List<Hit> manyHits = new ArrayList<>();
+        for (int i = 0; i < BURST_HITS_PER_BATCH; i++) {
+            manyHits.add(new Hit(BigInteger.valueOf(i), "aabb".repeat(16), "1TestAddress" + i, true, false));
+        }
+        final ZMQ.Socket subscriber = context.createSocket(SocketType.SUB);
+        subscriber.setHandshakeIvl(HANDSHAKE_IVL_MILLIS);
+        subscriber.setRcvHWM(1);
+        subscriber.setReceiveBufferSize(SMALL_RECEIVE_BUFFER_BYTES);
+        subscriber.connect(address);
+        subscriber.subscribe(ZMQ.SUBSCRIPTION_ALL);
+        subscriber.setReceiveTimeOut(RECEIVE_TIMEOUT_MILLIS);
+        assertThat(
+                receiveWhilePublishing(
+                        subscriber, () -> broadcaster.onBatchChecked(new BatchResult(BigInteger.ZERO, 1, List.of()))),
+                is(notNullValue()));
+        for (long base = 1; base <= BURST_BATCHES; base++) {
+            broadcaster.onBatchChecked(new BatchResult(BigInteger.valueOf(base), 1, manyHits));
+        }
         return subscriber;
     }
 

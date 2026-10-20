@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.annotations.VisibleForTesting;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -118,10 +119,25 @@ public class ZmqResultBroadcaster implements ResultListener, AutoCloseable {
      * @param formatter      renders the wire messages
      */
     public ZmqResultBroadcaster(String publishAddress, BatchResultJsonFormatter formatter) {
+        this(publishAddress, formatter, LINGER_MILLIS);
+    }
+
+    /**
+     * Creates a publisher with an explicit linger.
+     *
+     * <p>Only for tests: a test that proves {@link #close()} keeps pending messages must not race the
+     * shipped {@link #LINGER_MILLIS} against the speed of the machine it runs on.
+     *
+     * @param publishAddress the ZeroMQ address to bind the {@code PUB} socket to
+     * @param formatter      renders the wire messages
+     * @param lingerMillis   how long {@link #close()} may wait for messages not yet written
+     */
+    @VisibleForTesting
+    ZmqResultBroadcaster(String publishAddress, BatchResultJsonFormatter formatter, int lingerMillis) {
         this.formatter = formatter;
         this.context = new ZContext();
         this.publisher = context.createSocket(SocketType.PUB);
-        this.publisher.setLinger(LINGER_MILLIS);
+        this.publisher.setLinger(lingerMillis);
         this.publisher.bind(publishAddress);
         LOGGER.info("Publishing results on {}", publishAddress);
     }
