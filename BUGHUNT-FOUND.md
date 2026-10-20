@@ -90,6 +90,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F206](#f206) — niedrig bis mittel — *gefixt*
 - [F207](#f207) — niedrig bis mittel — *gefixt*
 - [F208](#f208) — niedrig — *gefixt*
+- [F209](#f209) — niedrig — *gefixt*
 
 ## Funde
 
@@ -1121,6 +1122,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** cf4e085
 - **Nachtrag (Verifikation 2026-10-20):** Die Id-Assertion des Tests war wirkungslos: die Id `socket` steht ohnehin in „The socket key producer“. Der Test nutzt jetzt die eindeutige Id `heldResultPortProducer`, sodass er wirklich prüft, dass die Meldung den Key-Producer nennt. Rot/Grün der drei Fixe F206–F208 unabhängig nachvollzogen (Produktionsdateien auf den Elternstand gesetzt: rot mit den genannten Assertions; zurückgesetzt: grün).
+
+<a id="f209"></a>
+### F209 – BitcoinAddressFinder: Die libjsig-Warnung glaubt dem `LD_PRELOAD`-String; ein nicht ladbarer Eintrag lässt sie schweigen
+- **Zeit:** 2026-10-20 21:26 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/opencl/SignalChainingCheck.java` (`warning`), `README.md` (Abschnitt „OpenCL on Linux: signal chaining (`libjsig`)“)
+- **Schwere:** niedrig (die Warnung fehlt genau in der Fehlkonfiguration, vor der sie schützen soll; `ld.so` schreibt immerhin eine eigene ERROR-Zeile auf stderr)
+- **Historie:** Gefunden beim Review des Branches am 2026-10-20 (Fund B3-1). Die Prüfung kam mit F148 und entschied rein über `os.name`, `LD_PRELOAD`, `java.home`.
+- **Beschreibung:** `SignalChainingCheck.warning` gab leer zurück, sobald der `LD_PRELOAD`-String „libjsig“ enthielt. glibcs `ld.so` überspringt einen Preload-Eintrag, den es nicht öffnen kann („ERROR: ld.so: object '…' from LD_PRELOAD cannot be preloaded …: ignored.“), und startet die JVM ohne Signalverkettung. Genau dahin führte die README-Zeile `LD_PRELOAD="$JAVA_HOME/lib/libjsig.so" java …`: mit nicht gesetztem `JAVA_HOME` (Java nur über `PATH`, der häufige Fall) wird daraus `/lib/libjsig.so`, das es nicht gibt – die JVM lief ungeschützt, und BAFs eigene Warnung vor dem Kernel-Bau blieb aus. Umgekehrt warnte die Prüfung, wenn `libjsig` über `/etc/ld.so.preload` oder einen Launcher geladen war, obwohl die Verkettung aktiv war.
+- **Fix:** Die Entscheidung fällt jetzt über das, was tatsächlich gemappt ist: die neue Überladung `warning(osName, ldPreload, javaHome, Supplier<Optional<Boolean>> libjsigMapped)`; die bisherige Dreier-Überladung (Aufruf in `OpenCLContext.init`) liefert den Supplier, der `/proc/self/maps` liest (`libjsigMapped(Path)`: eine Zeile mit „/libjsig.“). Regeln: nicht Linux → leer; gemappt → leer; nicht gemappt und `LD_PRELOAD` nennt libjsig → Warnung „LD_PRELOAD names libjsig (…), but it was not loaded: the dynamic linker printed "cannot be preloaded ... ignored" …“ mit dem Pfad aus `java.home`; nicht gemappt sonst → die bisherige Warnung; Mapping nicht lesbar (Leseausnahme, DEBUG-Log mit Ursache) → die bisherige String-Entscheidung, und die Warnung sagt „/proc/self/maps could not be read, so this was decided from LD_PRELOAD alone“. README: der Aufruf leitet den Pfad wie die `run_*OpenCL*.sh`-Skripte aus dem laufenden `java` ab statt aus `JAVA_HOME`, und ein Absatz erklärt den stillen Fehlschlag von `ld.so` und dass der Finder das Mapping prüft.
+- **Tests:** `SignalChainingCheckTest#warning_linuxLibjsigNamedInLdPreloadButNotMapped_warns`, `#warning_linuxLibjsigMappedWithoutLdPreload_isEmpty`, `#warning_linuxMappingUnreadable_fallsBackToLdPreload` (beide `LD_PRELOAD`-Werte), `#libjsigMapped_mapsListLibjsig_isTrue`, `#libjsigMapped_mapsWithoutLibjsig_isFalse`, `#libjsigMapped_unreadableMaps_isUnknown` (Maps-Datei im `@TempDir`). Die fünf bisherigen Fälle laufen über die neue Überladung mit festem Mapping, die Windows-/macOS-Fälle mit einem Supplier, der wirft – sonst hinge ihr Ergebnis vom Prozess ab (der CI-Job `test-opencl` lädt `libjsig` vor). Ende zu Ende mit einer kleinen Probe über die Dreier-Überladung: ohne Preload die alte Warnung, mit `LD_PRELOAD=/lib/libjsig.so` die ld.so-ERROR-Zeile und die neue Warnung, mit dem echten Pfad keine Warnung.
+- **Rot-Grün-Nachweis:** gegen den alten Entscheidungscode (neue Überladung als Stub, die den Supplier ignoriert und an die alte Logik delegiert; `libjsigMapped` als Stub „leer“) rot: `warning_linuxLibjsigNamedInLdPreloadButNotMapped_warns` „Expected: is <true> but: was <false>“, `warning_linuxLibjsigMappedWithoutLdPreload_isEmpty` „Expected: is <false> but: was <true>“, `warning_linuxMappingUnreadable_fallsBackToLdPreload` „Expected: a string containing "could not be read"“, die beiden Maps-Tests „Expected: is <Optional[true]>/<Optional[false]> but: was <Optional.empty>“; mit dem Fix grün, `SignalChainingCheckTest` 11/11, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 

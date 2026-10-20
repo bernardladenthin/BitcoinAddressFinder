@@ -2229,8 +2229,16 @@ The JDK ships the fix: preload its signal-chaining library, which keeps the JVM'
 forwards to the driver's:
 
 ```bash
-LD_PRELOAD="$JAVA_HOME/lib/libjsig.so" java ... -jar bitcoinaddressfinder-<version>-jar-with-dependencies.jar config.json
+# the libjsig of the JDK whose java runs (does not depend on JAVA_HOME being set)
+JSIG="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")/lib/libjsig.so"
+LD_PRELOAD="$JSIG" java ... -jar bitcoinaddressfinder-<version>-jar-with-dependencies.jar config.json
 ```
+
+A path that does not exist is not an error for the dynamic linker: it prints `ERROR: ld.so: object
+'...' from LD_PRELOAD cannot be preloaded ...: ignored.` and starts the JVM without signal chaining
+(`"$JAVA_HOME/lib/libjsig.so"` with `JAVA_HOME` unset is `/lib/libjsig.so`). The finder therefore
+checks what is actually loaded (`/proc/self/maps`), not the `LD_PRELOAD` string, and warns in that
+case as well.
 
 The OpenCL launchers in `examples/` (`run_*OpenCL*.sh`) do this already, and the finder logs a warning
 when it builds an OpenCL kernel on Linux without it, whatever the driver. Windows is not affected.
