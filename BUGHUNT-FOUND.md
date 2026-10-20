@@ -1105,7 +1105,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `WebSocketEndpointTest#start_portHeldByAnotherProcess_failsTheStartInsteadOfLoggingAndReturning` und `KeyProducerJavaWebSocketTest#start_portHeldByAnotherProcess_failsTheStartInsteadOfWaitingForever` (ein `ServerSocket` hält den Port; die Meldung muss den Port nennen).
 - **Rot-Grün-Nachweis:** gegen den alten Code rot, beide mit „Expected java.lang.IllegalStateException to be thrown, but nothing was thrown.“; mit dem Fix grün. Breite Liste: `WebSocketEndpointTest` 3/3, `KeyProducerJavaWebSocketTest` 6/6, `WebSocketResultBroadcasterTest` 4/4, `FinderWebSocketRoundtripTest` 1/1, `FinderTest` 34/34 (mit `POCL_MAX_WORK_GROUP_SIZE=256`), `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 4190e6c
 
 ## Offene Verdachte ohne Fund-ID
 
