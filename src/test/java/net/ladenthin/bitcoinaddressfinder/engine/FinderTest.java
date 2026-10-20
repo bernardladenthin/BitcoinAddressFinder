@@ -26,6 +26,8 @@ import net.ladenthin.bitcoinaddressfinder.AwaitTimeTest;
 import net.ladenthin.bitcoinaddressfinder.AwaitTimeTests;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
 import net.ladenthin.bitcoinaddressfinder.LogLevelChange;
+import net.ladenthin.bitcoinaddressfinder.OpenCLPlatformAssume;
+import net.ladenthin.bitcoinaddressfinder.OpenCLTest;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaBip39;
@@ -70,6 +72,9 @@ public class FinderTest {
 
     /** How long the slow test listener holds the consumer per batch. */
     private static final long SLOW_LISTENER_MILLIS = 200;
+
+    /** Grid of the GPU end-to-end test: large enough that reading it back takes noticeably long. */
+    private static final int OPENCL_GRID_BITS = 18;
 
     @TempDir
     public Path folder;
@@ -458,6 +463,50 @@ public class FinderTest {
         // assert
         assertThat(reported.get(), is(equalTo(producers)));
         assertThat(reportedWhenClosing.get(), is(equalTo(producers)));
+    }
+
+    /**
+     * The same guarantee for the GPU producer, whose batches reach the consumer asynchronously: a
+     * result reader thread reads the grid back and enqueues it after {@code processSecretBase}
+     * returned. Before the producer waited for its readers, the finder released the consumer while a
+     * reader was still busy and the last batch of a finite run was never checked or reported — lost in
+     * 4 of 5 runs on pocl. Probabilistic in the red direction only: with the wait in place every batch
+     * is reported, every time.
+     */
+    @Test
+    @OpenCLTest
+    public void shutdownAndAwaitTermination_openClProducerFinished_everyBatchIsReported() throws Exception {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        // arrange
+        final int producers = 2;
+        CFinder cFinder = new CFinder();
+        String keyProducerId = "exampleId";
+        for (int i = 0; i < producers; i++) {
+            final CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+            cProducerOpenCL.keyProducerId = keyProducerId;
+            cProducerOpenCL.runOnce = true;
+            cProducerOpenCL.batchSizeInBits = OPENCL_GRID_BITS;
+            cProducerOpenCL.transferAll = true;
+            cFinder.producerOpenCL.add(cProducerOpenCL);
+        }
+        configureKeyProducerJavaRandom(keyProducerId, cFinder);
+        configureConsumerJava(cFinder);
+        Objects.requireNonNull(cFinder.consumerJava).threads = 1;
+
+        Finder finder = new Finder(cFinder);
+        final AtomicInteger reported = new AtomicInteger();
+        finder.addResultListener(batchResult -> reported.incrementAndGet());
+        finder.startKeyProducer();
+        finder.startConsumer();
+        finder.configureProducer();
+        finder.initProducer();
+        finder.startProducer();
+
+        // act
+        finder.shutdownAndAwaitTermination();
+
+        // assert
+        assertThat(reported.get(), is(equalTo(producers)));
     }
 
     @Test

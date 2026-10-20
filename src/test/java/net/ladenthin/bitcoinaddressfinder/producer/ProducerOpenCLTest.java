@@ -19,14 +19,18 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.ladenthin.bitcoinaddressfinder.MockConsumer;
 import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
 import net.ladenthin.bitcoinaddressfinder.OpenCLPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.OpenCLTest;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
+import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
 import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
@@ -35,6 +39,7 @@ import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
 import net.ladenthin.bitcoinaddressfinder.util.PrivateKeyTooLargeException;
 import nl.altindag.log.LogCaptor;
 import org.bitcoinj.base.Network;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -46,6 +51,12 @@ public class ProducerOpenCLTest {
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
     private final BitHelper bitHelper = new BitHelper();
+
+    /** How long the slow consumer holds a result reader up; far longer than the kernel needs. */
+    private static final long SLOW_CONSUMER_MILLIS = 1_000L;
+
+    /** Upper bound for the consumer that never takes its batch; the test must end well before it. */
+    private static final long STUCK_CONSUMER_MAX_SECONDS = 30L;
 
     // <editor-fold defaultstate="collapsed" desc="initProducer">
     @OpenCLTest
@@ -279,6 +290,100 @@ public class ProducerOpenCLTest {
 
         // assert
         assertThat(mockConsumer.publicKeyBytesArrayList.size(), is(greaterThan(0)));
+    }
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="run: the last batch">
+    /**
+     * {@code processSecretBase} only hands a computed grid to a result-reader thread; the reader puts
+     * the keys into the consumer afterwards. A finite run must not report itself finished before
+     * that has happened: the finder releases the consumer as soon as every producer is finished, so a
+     * batch a reader enqueues after that is never checked — a hit in it is lost without a word
+     * (F131's regression, reproduced through the finder on pocl). The reader here is held up by a
+     * slow consumer, which makes the race a certainty.
+     */
+    @Test
+    @OpenCLTest
+    public void run_readerStillBusyAfterTheLastGrid_runReturnsOnlyAfterTheBatchReachedTheConsumer() throws Exception {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.batchSizeInBits = 8;
+        cProducerOpenCL.runOnce = true;
+        final AtomicInteger consumedBatches = new AtomicInteger();
+        MockConsumer slowConsumer = new MockConsumer() {
+            @Override
+            public void consumeKeys(PublicKeyBytes[] publicKeyBytes, @Nullable BigInteger secretBase)
+                    throws InterruptedException {
+                Thread.sleep(SLOW_CONSUMER_MILLIS);
+                consumedBatches.incrementAndGet();
+            }
+        };
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(
+                cProducerOpenCL,
+                slowConsumer,
+                keyUtility,
+                new MockKeyProducer(keyUtility, new Random(1)),
+                bitHelper,
+                new RuntimeStatistics());
+        producerOpenCL.initProducer();
+        try {
+            // act
+            producerOpenCL.run();
+
+            // assert
+            assertThat(producerOpenCL.getState(), is(equalTo(ProducerState.NOT_RUNNING)));
+            assertThat(consumedBatches.get(), is(equalTo(1)));
+        } finally {
+            producerOpenCL.releaseProducer();
+        }
+    }
+
+    /**
+     * The wait for the readers is bounded by {@code shutdownTimeoutSeconds}: a consumer that does not
+     * take the batch in time must not hold the producer forever. The producer ends anyway and says that
+     * a batch may not have arrived.
+     */
+    @Test
+    @OpenCLTest
+    public void run_readerBusyLongerThanTheShutdownTimeout_runEndsAndLogsTheBusyReader() throws Exception {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.batchSizeInBits = 8;
+        cProducerOpenCL.runOnce = true;
+        cProducerOpenCL.shutdownTimeoutSeconds = 1;
+        final CountDownLatch release = new CountDownLatch(1);
+        MockConsumer stuckConsumer = new MockConsumer() {
+            @Override
+            public void consumeKeys(PublicKeyBytes[] publicKeyBytes, @Nullable BigInteger secretBase)
+                    throws InterruptedException {
+                release.await(STUCK_CONSUMER_MAX_SECONDS, TimeUnit.SECONDS);
+            }
+        };
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(
+                cProducerOpenCL,
+                stuckConsumer,
+                keyUtility,
+                new MockKeyProducer(keyUtility, new Random(1)),
+                bitHelper,
+                new RuntimeStatistics());
+        producerOpenCL.initProducer();
+        try (LogCaptor logCaptor = LogCaptor.forClass(ProducerOpenCL.class)) {
+            // act
+            final long start = System.nanoTime();
+            producerOpenCL.run();
+            final long elapsedSeconds = TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - start);
+
+            // assert
+            assertThat(producerOpenCL.getState(), is(equalTo(ProducerState.NOT_RUNNING)));
+            assertThat(elapsedSeconds < STUCK_CONSUMER_MAX_SECONDS, is(true));
+            assertThat(logCaptor.getErrorLogs(), hasSize(1));
+            assertThat(logCaptor.getErrorLogs().get(0), containsString("1 of 4 result reader(s) still busy after 1s"));
+        } finally {
+            release.countDown();
+            producerOpenCL.releaseProducer();
+        }
     }
     // </editor-fold>
 

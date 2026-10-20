@@ -9,6 +9,7 @@ import java.util.Locale;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.consumer.Consumer;
@@ -304,6 +305,31 @@ public class ProducerOpenCL extends AbstractProducer {
             recordFailure(e);
         } catch (RuntimeException e) {
             logErrorInProduceKeys(e, secretBase);
+        }
+    }
+
+    /**
+     * Waits until every result reader has put its batch into the consumer. A reader holds one
+     * {@link #submitSlot} permit until it is done, so holding all of them means none is running.
+     * Bounded by {@code shutdownTimeoutSeconds}; a reader still busy after that is logged, not waited
+     * for, so a stuck consumer cannot hold the producer forever.
+     */
+    @Override
+    protected void awaitPendingBatches() {
+        final int permits = producerOpenCL.maxResultReaderThreads;
+        try {
+            if (submitSlot.tryAcquire(permits, producerOpenCL.shutdownTimeoutSeconds, TimeUnit.SECONDS)) {
+                submitSlot.release(permits);
+            } else {
+                LOGGER.error(
+                        "{} of {} result reader(s) still busy after {}s; their batches may not reach the consumer.",
+                        permits - submitSlot.availablePermits(),
+                        permits,
+                        producerOpenCL.shutdownTimeoutSeconds);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOGGER.warn("Interrupted while waiting for the result readers; their batches may not reach the consumer.");
         }
     }
 

@@ -970,6 +970,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 75a0f0e
 
+### F192 – BitcoinAddressFinder: F131 lässt einen endlichen GPU-Lauf seine letzten Batches verlieren (Regression des Branches)
+- **Zeit:** 2026-10-20 06:00 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/producer/AbstractProducer.java` (`run`, neu `awaitPendingBatches`), `producer/ProducerOpenCL.java` (`awaitPendingBatches`)
+- **Schwere:** hoch (stiller Datenverlust: der letzte Batch eines endlichen OpenCL-Laufs wird nicht geprüft, ein Treffer darin geht ohne Meldung verloren)
+- **Historie:** Gefunden beim Review des ganzen Branches am 2026-10-20. F131 (`Finder.shutdownAndAwaitTermination`: erst den Consumer freigeben, wenn alle Producer beendet sind) nahm an, dass ein beendeter Producer alle seine Batches schon in die Consumer-Queue gelegt hat. Für `ProducerJava` und den Secrets-File-Producer stimmt das, für `ProducerOpenCL` nicht.
+- **Beschreibung:** `ProducerOpenCL.processSecretBase` gibt jedes Raster an einen Result-Reader-Thread (bis zu `maxResultReaderThreads`, Vorgabe 4) und kehrt zurück; `run()` endet, während die Reader noch zurücklesen. Der Finder gibt daraufhin den Consumer frei, der Worker leert seine Queue einmal und endet, und der Reader legt seinen Batch danach in eine Queue, die niemand mehr liest. `releaseProducer()` schloss außerdem den OpenCL-Kontext, während ein Reader noch lesen konnte. Gemessen auf pocl über den echten Finder (`runOnce`, Raster 2^18, `transferAll`): 0 gemeldete Batches in 4 von 5 Läufen, mit der alten Reihenfolge 5 von 5 korrekt.
+- **Fix:** Ein Producer gilt erst als beendet, wenn alle seine Batches beim Consumer sind. `AbstractProducer.run()` ruft vor `signalNotRunning()` den neuen Hook `awaitPendingBatches()` auf (Vorgabe: nichts zu tun), auch nach einer Exception. `ProducerOpenCL` überschreibt ihn: Er holt alle `submitSlot`-Permits (ein Reader hält einen, bis er fertig ist) und gibt sie wieder frei, begrenzt durch `shutdownTimeoutSeconds`; ein danach noch beschäftigter Reader wird als ERROR gemeldet statt ewig abgewartet.
+- **Tests:** `ProducerOpenCLTest#run_readerStillBusyAfterTheLastGrid_runReturnsOnlyAfterTheBatchReachedTheConsumer` (ein langsamer Consumer hält den Reader 1 s auf, das Rennen wird zur Gewissheit), `#run_readerBusyLongerThanTheShutdownTimeout_runEndsAndLogsTheBusyReader` (Timeout-Zweig), `AbstractProducerTest#run_loopEnds_pendingBatchesAwaitedOnceWhileStillRunning`, `#run_produceKeysThrows_pendingBatchesStillAwaited`, `FinderTest#shutdownAndAwaitTermination_openClProducerFinished_everyBatchIsReported` (Ende zu Ende über den Finder).
+- **Rot-Grün-Nachweis:** Der erste ProducerOpenCL-Test ist ohne Fix deterministisch rot (`Expected: is <1> but: was <0>`), mit Fix grün; der Timeout-Test ohne Fix rot (keine Meldung). Der Finder-Test mit abgeschaltetem Warten 2 von 3 Läufen rot (`but: was <0>`), mit Fix 3 von 3 grün. Producer-Testklassen 60/60 grün auf pocl.
+- **Status:** gefixt
+- **Commit:** (folgt)
+
 ## Offene Verdachte ohne Fund-ID
 
 - *(erledigt 2026-10-19, ohne Fund-ID: Testumgebung, kein Produktfehler)* `ProbeAddressesOpenCLTest#setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException` brach auf Geräten mit 1024 MiB je Allokation mit `CL_INVALID_BUFFER_SIZE` ab, bevor die Prüfung lief (B3: mit `POCL_MEMORY_LIMIT=4` reproduziert, ab 2047 MB grün). Läuft jetzt auf einem 8-Bit-Raster (eigener Provider `privateKeysTooLargeForASmallGrid`), mit und ohne Begrenzung grün. Commit 1faa48a. Ebenso B2: `test-opencl` setzt `POCL_MAX_WORK_GROUP_SIZE=256` (8cb9bb5), B6: `GcTrigger` entfernt (e451898).

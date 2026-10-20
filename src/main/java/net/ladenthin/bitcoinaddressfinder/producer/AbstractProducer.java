@@ -193,8 +193,21 @@ public abstract class AbstractProducer implements Producer {
                 break;
             }
         }
+        awaitPendingBatches();
         signalNotRunning();
     }
+
+    /**
+     * Waits until every batch this producer has started is in the consumer. Runs at the end of
+     * {@link #run()}, while the state is still {@link ProducerState#RUNNING}, whether the loop ended
+     * normally, on request or with an exception.
+     *
+     * <p>A producer that hands its batches to the consumer on its own thread has nothing to wait for,
+     * which is this default. One that hands them over asynchronously must override it: the finder
+     * releases the consumer as soon as every producer is no longer running, and a batch enqueued after
+     * that is never checked.
+     */
+    protected void awaitPendingBatches() {}
 
     /**
      * Transitions the producer to {@link ProducerState#NOT_RUNNING} and releases

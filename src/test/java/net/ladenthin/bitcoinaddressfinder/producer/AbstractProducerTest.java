@@ -20,6 +20,7 @@ import java.math.BigInteger;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
@@ -359,6 +360,72 @@ public class AbstractProducerTest {
 
         // assert
         assertThat(producer.getLastFailure(), is(sameInstance(thrown)));
+    }
+
+    /**
+     * A producer that hands batches over asynchronously gets one chance to wait for them, before it
+     * reports itself finished: the finder releases the consumer the moment no producer is running.
+     */
+    @Test
+    public void run_loopEnds_pendingBatchesAwaitedOnceWhileStillRunning() throws Exception {
+        // arrange
+        CProducer cProducer = new CProducer();
+        cProducer.runOnce = true;
+        final List<ProducerState> statesWhileAwaiting = new ArrayList<>();
+        AbstractProducerTestImpl producer =
+                new AbstractProducerTestImpl(
+                        cProducer,
+                        new MockConsumer(),
+                        keyUtility,
+                        new MockKeyProducer(keyUtility, new Random(1)),
+                        bitHelper,
+                        new RuntimeStatistics()) {
+                    @Override
+                    protected void awaitPendingBatches() {
+                        statesWhileAwaiting.add(getState());
+                    }
+                };
+        producer.initProducer();
+
+        // act
+        producer.run();
+
+        // assert
+        assertThat(statesWhileAwaiting, is(equalTo(List.of(ProducerState.RUNNING))));
+        assertThat(producer.getState(), is(equalTo(ProducerState.NOT_RUNNING)));
+    }
+
+    @Test
+    public void run_produceKeysThrows_pendingBatchesStillAwaited() throws Exception {
+        // arrange
+        CProducer cProducer = new CProducer();
+        final List<ProducerState> statesWhileAwaiting = new ArrayList<>();
+        AbstractProducerTestImpl producer =
+                new AbstractProducerTestImpl(
+                        cProducer,
+                        new MockConsumer(),
+                        keyUtility,
+                        new MockKeyProducer(keyUtility, new Random(1)),
+                        bitHelper,
+                        new RuntimeStatistics()) {
+                    @Override
+                    public void produceKeys() {
+                        throw new RuntimeException("Test exception");
+                    }
+
+                    @Override
+                    protected void awaitPendingBatches() {
+                        statesWhileAwaiting.add(getState());
+                    }
+                };
+        producer.initProducer();
+
+        // act
+        producer.run();
+
+        // assert
+        assertThat(statesWhileAwaiting, is(equalTo(List.of(ProducerState.RUNNING))));
+        assertThat(producer.getState(), is(equalTo(ProducerState.NOT_RUNNING)));
     }
 
     /**
