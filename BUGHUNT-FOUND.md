@@ -980,7 +980,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `ProducerOpenCLTest#run_readerStillBusyAfterTheLastGrid_runReturnsOnlyAfterTheBatchReachedTheConsumer` (ein langsamer Consumer hält den Reader 1 s auf, das Rennen wird zur Gewissheit), `#run_readerBusyLongerThanTheShutdownTimeout_runEndsAndLogsTheBusyReader` (Timeout-Zweig), `AbstractProducerTest#run_loopEnds_pendingBatchesAwaitedOnceWhileStillRunning`, `#run_produceKeysThrows_pendingBatchesStillAwaited`, `FinderTest#shutdownAndAwaitTermination_openClProducerFinished_everyBatchIsReported` (Ende zu Ende über den Finder).
 - **Rot-Grün-Nachweis:** Der erste ProducerOpenCL-Test ist ohne Fix deterministisch rot (`Expected: is <1> but: was <0>`), mit Fix grün; der Timeout-Test ohne Fix rot (keine Meldung). Der Finder-Test mit abgeschaltetem Warten 2 von 3 Läufen rot (`but: was <0>`), mit Fix 3 von 3 grün. Producer-Testklassen 60/60 grün auf pocl.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 271cc53
 
 ## Offene Verdachte ohne Fund-ID
 
