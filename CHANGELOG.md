@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Dependencies and build tooling bumped in step with the sibling repositories: Jackson 2.22.3 ->
+  2.22.4, LogCaptor 2.12.7 -> 2.13.0 (test; still requests log4j 2.26.1, so the log4j floor guard is
+  unchanged), pitest-maven 1.30.0 -> 1.30.1, central-publishing-maven-plugin 0.11.0 -> 0.12.0;
+  `anthropics/claude-code-action` v1.0.255 and Gradle 9.8.2 in the shared `verify-signing-key-gradle` job.
 - **Build tooling: spotbugs-maven-plugin 4.10.4.1 -> 4.10.5.0**, in step with the sibling repositories, and with it
   **Lombok-generated code carries JSpecify nullness** (`lombok.addNullAnnotations = jspecify` in the
   shared `lombok.config`): under `@NullMarked` a generated `equals(Object)` parameter read as non-null
