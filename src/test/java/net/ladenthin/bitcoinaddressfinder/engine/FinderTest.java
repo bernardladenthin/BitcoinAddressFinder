@@ -39,6 +39,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaZmq;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
+import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJava;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerJavaSecretsFiles;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
@@ -67,6 +68,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 public class FinderTest {
@@ -838,15 +840,15 @@ public class FinderTest {
      * configured key producer must fail before it, not after: {@code Main} starts the key producers,
      * then the consumer, then the producers.
      */
-    @Test
-    public void startKeyProducer_producerKeyProducerIdIsNull_ExceptionThrown() throws Exception {
+    @ParameterizedTest
+    @EnumSource(ProducerList.class)
+    public void startKeyProducer_producerKeyProducerIdIsNull_ExceptionThrown(ProducerList producerList)
+            throws Exception {
         // arrange
         CFinder cFinder = new CFinder();
-        final CProducerJava cProducerJava = new CProducerJava();
-        cProducerJava.runOnce = false;
+        final CProducer cProducer = producerList.addProducer(cFinder);
         // null is not valid or will find any other id
-        cProducerJava.keyProducerId = null;
-        cFinder.producerJava.add(cProducerJava);
+        cProducer.keyProducerId = null;
         configureKeyProducerJavaRandom("unknownId", cFinder);
 
         Finder finder = new Finder(cFinder);
@@ -856,13 +858,14 @@ public class FinderTest {
         finder.shutdownAndAwaitTermination();
     }
 
-    @Test
-    public void startKeyProducer_producerKeyProducerIdHasATypo_ExceptionThrown() throws Exception {
+    @ParameterizedTest
+    @EnumSource(ProducerList.class)
+    public void startKeyProducer_producerKeyProducerIdHasATypo_ExceptionThrown(ProducerList producerList)
+            throws Exception {
         // arrange
         CFinder cFinder = new CFinder();
-        final CProducerJava cProducerJava = new CProducerJava();
-        cProducerJava.keyProducerId = "exampleld";
-        cFinder.producerJava.add(cProducerJava);
+        final CProducer cProducer = producerList.addProducer(cFinder);
+        cProducer.keyProducerId = "exampleld";
         configureKeyProducerJavaRandom("exampleId", cFinder);
 
         Finder finder = new Finder(cFinder);
@@ -872,14 +875,15 @@ public class FinderTest {
         finder.shutdownAndAwaitTermination();
     }
 
-    @Test
-    public void startKeyProducer_producerBatchSizeOutOfRange_ExceptionThrown() throws Exception {
+    @ParameterizedTest
+    @EnumSource(ProducerList.class)
+    public void startKeyProducer_producerBatchSizeOutOfRange_ExceptionThrown(ProducerList producerList)
+            throws Exception {
         // arrange
         CFinder cFinder = new CFinder();
-        final CProducerJava cProducerJava = new CProducerJava();
-        cProducerJava.keyProducerId = "exampleId";
-        cProducerJava.batchSizeInBits = -1;
-        cFinder.producerJava.add(cProducerJava);
+        final CProducer cProducer = producerList.addProducer(cFinder);
+        cProducer.keyProducerId = "exampleId";
+        cProducer.batchSizeInBits = -1;
         configureKeyProducerJavaRandom("exampleId", cFinder);
 
         Finder finder = new Finder(cFinder);
@@ -887,6 +891,47 @@ public class FinderTest {
         // act
         assertThrows(IllegalArgumentException.class, finder::startKeyProducer);
         finder.shutdownAndAwaitTermination();
+    }
+
+    /**
+     * The producer lists of {@link CFinder}, each with its own configuration type. The early
+     * validation of {@link Finder#startKeyProducer()} has to cover every one of them: a list it skips
+     * fails only in {@link Finder#configureProducer()}, after the consumer's database load. No
+     * producer is constructed before that, so the OpenCL list needs no device.
+     */
+    enum ProducerList {
+        PRODUCER_JAVA {
+            @Override
+            CProducer addProducer(CFinder cFinder) {
+                final CProducerJava cProducerJava = new CProducerJava();
+                cFinder.producerJava.add(cProducerJava);
+                return cProducerJava;
+            }
+        },
+        PRODUCER_JAVA_SECRETS_FILES {
+            @Override
+            CProducer addProducer(CFinder cFinder) {
+                final CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
+                cFinder.producerJavaSecretsFiles.add(cProducerJavaSecretsFiles);
+                return cProducerJavaSecretsFiles;
+            }
+        },
+        PRODUCER_OPENCL {
+            @Override
+            CProducer addProducer(CFinder cFinder) {
+                final CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+                cFinder.producerOpenCL.add(cProducerOpenCL);
+                return cProducerOpenCL;
+            }
+        };
+
+        /**
+         * Adds a default producer of this list's type to {@code cFinder}.
+         *
+         * @param cFinder the configuration to add it to
+         * @return the added producer, to be configured further
+         */
+        abstract CProducer addProducer(CFinder cFinder);
     }
     // </editor-fold>
 
