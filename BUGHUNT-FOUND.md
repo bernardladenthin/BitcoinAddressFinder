@@ -992,7 +992,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `AddressTxtLineTest#fromLine_rejectedLineWithTextInTheAmountColumn_isNotReported` (Kopfzeile, P2MS-Zeile), `AddressFilesToLMDBTest#addressFilesToLMDB_blockchairHeaderLine_noAmountWarning`, `#addressFilesToLMDB_unusableAmountWithStaticAmount_noWarningAndTheStaticAmountIsStored`; die bestehenden F162-Tests (`fromLine_unusableAmount_*`, `addressFilesToLMDB_unusableAmounts_warnsOnceAndStoresTheDefault`) bleiben grün. Nebenbei das Javadoc von `fromLine_hexHash160_isImportedAsThatHash160` an seinen Test zurückgesetzt (es stand über einem anderen).
 - **Rot-Grün-Nachweis:** die drei neuen Tests (vier Fälle) gegen den alten Code rot (die Kopfzeile bzw. die `-5`-Zeile in der Warnung, `[address balance]` beim Listener), mit dem Fix grün; `AddressTxtLineTest` + `AddressFilesToLMDBTest` 335/335.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 4264808
 
 ## Offene Verdachte ohne Fund-ID
 
