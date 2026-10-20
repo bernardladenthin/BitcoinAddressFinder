@@ -268,6 +268,39 @@ public class Main implements Runnable, Interruptable {
                                 + "\n" + "########## END   transformed YAML configuration ##########\n");
     }
 
+    /**
+     * Starts a finder in order: key producer, consumer, producers. If a step fails, whatever already
+     * started is torn down before the failure propagates, since the consumer's threads would otherwise
+     * keep the JVM alive. A failure of that teardown is attached to the start failure as suppressed,
+     * so the error that stopped the start is still the one reported.
+     *
+     * @param finder the finder to start
+     * @throws Exception the failure of the step that failed
+     */
+    @VisibleForTesting
+    static void startFinder(Finder finder) throws Exception {
+        try {
+            // key producer first
+            finder.startKeyProducer();
+
+            // consumer second
+            finder.startConsumer();
+
+            // producer last
+            finder.configureProducer();
+            finder.initProducer();
+            finder.startProducer();
+        } catch (Exception e) {
+            // the consumer threads may already run; left alone they keep the JVM alive
+            try {
+                finder.abortStart();
+            } catch (RuntimeException abortFailure) {
+                e.addSuppressed(abortFailure);
+            }
+            throw e;
+        }
+    }
+
     @Override
     public void run() {
         LOGGER.info(configuration.command.name());
@@ -280,22 +313,7 @@ public class Main implements Runnable, Interruptable {
                     CFinder cFinder = Objects.requireNonNull(configuration.finder);
                     Finder finder = new Finder(cFinder);
                     interruptables.add(finder);
-                    try {
-                        // key producer first
-                        finder.startKeyProducer();
-
-                        // consumer second
-                        finder.startConsumer();
-
-                        // producer last
-                        finder.configureProducer();
-                        finder.initProducer();
-                        finder.startProducer();
-                    } catch (Exception e) {
-                        // the consumer threads may already run; left alone they keep the JVM alive
-                        finder.abortStart();
-                        throw e;
-                    }
+                    startFinder(finder);
                     finder.shutdownAndAwaitTermination();
                 }
                 case LMDBToAddressFile -> {

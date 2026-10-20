@@ -839,11 +839,26 @@ public class Finder implements Interruptable {
      * <p>{@link #interrupt()} alone leaves the consumer running, because on the completion path
      * {@link #shutdownAndAwaitTermination()} releases it. A start that fails after
      * {@link #startConsumer()} never reaches that path, and the consumer's non-daemon threads then
-     * keep the JVM alive after the error has been reported.
+     * keep the JVM alive after the error has been reported. For the same reason the consumer is
+     * released even if stopping the rest fails; that failure then propagates.
      */
     public void abortStart() {
-        interrupt();
-        releaseConsumer();
+        try {
+            interrupt();
+        } finally {
+            releaseConsumer();
+        }
+    }
+
+    /**
+     * Returns the running consumer, or {@code null} before {@link #startConsumer()} and after it was
+     * released.
+     *
+     * @return the consumer, if one is running
+     */
+    @VisibleForTesting
+    public @Nullable ConsumerJava getConsumerJava() {
+        return consumerJava;
     }
 
     /** Interrupts the consumer, which checks what is still queued before it stops, and forgets it. */

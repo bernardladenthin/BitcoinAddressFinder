@@ -509,6 +509,53 @@ public class FinderTest {
         assertThat(reported.get(), is(equalTo(producers)));
     }
 
+    /** A start that fails after the consumer started must not leave its non-daemon threads running. */
+    @Test
+    public void abortStart_consumerStarted_consumerIsReleased() throws Exception {
+        // arrange
+        CFinder cFinder = new CFinder();
+        configureConsumerJava(cFinder);
+        Finder finder = new Finder(cFinder);
+        finder.startConsumer();
+
+        // pre-assert
+        assertThat(finder.getConsumerJava(), is(notNullValue()));
+
+        // act
+        finder.abortStart();
+
+        // assert
+        assertThat(finder.getConsumerJava(), is(nullValue()));
+    }
+
+    /**
+     * The teardown of the producers can fail (the producer releaser rethrows what a release threw).
+     * The consumer must be released all the same, or its non-daemon threads keep the JVM alive after
+     * the start error has been reported.
+     */
+    @Test
+    public void abortStart_interruptThrows_consumerIsReleasedAnyway() throws Exception {
+        // arrange
+        CFinder cFinder = new CFinder();
+        configureConsumerJava(cFinder);
+        final IllegalStateException teardownFailure = new IllegalStateException("teardown failed");
+        Finder finder = new Finder(cFinder) {
+            @Override
+            public void interrupt() {
+                super.interrupt();
+                throw teardownFailure;
+            }
+        };
+        finder.startConsumer();
+
+        // act
+        IllegalStateException thrown = assertThrows(IllegalStateException.class, finder::abortStart);
+
+        // assert
+        assertThat(thrown, is(sameInstance(teardownFailure)));
+        assertThat(finder.getConsumerJava(), is(nullValue()));
+    }
+
     @Test
     public void shutdownAndAwaitTermination_producerFinished_producersAndKeyProducersReleased() throws Exception {
         // arrange
