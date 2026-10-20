@@ -88,6 +88,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F195](#f195) — niedrig — *gefixt*
 - [F196](#f196) — niedrig — *gefixt*
 - [F206](#f206) — niedrig — *gefixt*
+- [F207](#f207) — mittel — *gefixt*
 
 ## Funde
 
@@ -1092,6 +1093,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** gegen den alten Code rot: Naht-Test „Expected: is <4> but: was <1>“, WebSocket-Test „Expected: is <4> but: was <2>“, die drei Log-Tests je „Expected: a collection with size <1> but: collection size was <0>“; mit dem Fix grün, die beiden Finder-Tests dreimal hintereinander. Breite Liste: `FinderTest` 34/34 (mit `POCL_MAX_WORK_GROUP_SIZE=256`, ohne stirbt die OpenCL-Fork auf pocl wie schon bei F131 notiert), `ZmqResultBroadcasterTest` 6/6, `SocketResultBroadcasterTest` 11/11, `WebSocketEndpointTest` 2/2, `WebSocketResultBroadcasterTest` 4/4, `KeyProducerJavaWebSocketTest` 5/5, `MainTest` 19/19, `MainStartFinderTest` 2/2, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
 - **Commit:** 4f60482
+
+<a id="f207"></a>
+### F207 – BitcoinAddressFinder: Der WebSocket-Key-Producer startet „erfolgreich“, wenn sein Port nicht gebunden werden kann, und wartet dann ewig
+- **Zeit:** 2026-10-20 20:16 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/WebSocketEndpoint.java` (`start`, `onError`, `onStart`)
+- **Schwere:** niedrig bis mittel (Konfigurations-/Umgebungsfehler wie F157; mit dem empfohlenen `timeoutMillis: -1` aber ein dauerhaftes Hängen)
+- **Historie:** Gefunden beim Review des Branches am 2026-10-20 (Fund B2-1). F157 legte die Regel fest „ein nicht bindbarer Port ist überall ein Startfehler“, setzte sie aber nur für den Socket-Key-Producer um.
+- **Beschreibung:** Java-WebSocket 1.6.0 bindet den Port auf seinem eigenen Selector-Thread (`doSetupSelectorAndServerThread`) und meldet einen Fehlschlag nur über `handleFatal` → `onError(null, ex)`, das der Endpunkt bloß loggte. `WebSocketEndpoint.start()` kehrte nach `localServer.start()` sofort normal zurück, also auch `KeyProducerJavaWebSocket.start()`; der Finder registrierte den Key-Producer, und `createSecrets` wartete mit `timeoutMillis: -1` für immer in `take()` (mit positivem Timeout endete der Lauf wie ein regulärer, ohne einen Schlüssel geprüft zu haben).
+- **Fix:** `start()` legt je Start ein `CompletableFuture` an, das `onStart()` erfüllt und `onError(conn == null, ex)` scheitern lässt (spätere Server-Fehler treffen ein schon erfülltes Future und bleiben wirkungslos, das Log bleibt), und wartet nach `localServer.start()` darauf (höchstens 10 s). Ein Bind-Fehler wird zur `IllegalStateException` „The WebSocket key producer cannot listen on port <port>: <Ursache>“ mit der Ursache; läuft die Wartezeit ab oder wird das Warten unterbrochen (Flag wiederhergestellt), wird der Server gestoppt und der Start ebenfalls mit einer `IllegalStateException` abgebrochen – nie als Erfolg gewertet. README: Zeile `port` des WebSocket-Abschnitts sagt das jetzt. SpotBugs: dieselbe begründete `EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS`-Unterdrückung wie bei F157, für `WebSocketEndpoint.awaitListening`.
+- **Tests:** `WebSocketEndpointTest#start_portHeldByAnotherProcess_failsTheStartInsteadOfLoggingAndReturning` und `KeyProducerJavaWebSocketTest#start_portHeldByAnotherProcess_failsTheStartInsteadOfWaitingForever` (ein `ServerSocket` hält den Port; die Meldung muss den Port nennen).
+- **Rot-Grün-Nachweis:** gegen den alten Code rot, beide mit „Expected java.lang.IllegalStateException to be thrown, but nothing was thrown.“; mit dem Fix grün. Breite Liste: `WebSocketEndpointTest` 3/3, `KeyProducerJavaWebSocketTest` 6/6, `WebSocketResultBroadcasterTest` 4/4, `FinderWebSocketRoundtripTest` 1/1, `FinderTest` 34/34 (mit `POCL_MAX_WORK_GROUP_SIZE=256`), `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 

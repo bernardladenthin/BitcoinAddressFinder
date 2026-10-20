@@ -242,6 +242,23 @@ SPDX-License-Identifier: Apache-2.0
 
     <!--
         EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
+        WebSocketEndpoint.awaitListening: same reason as bindServerSocket
+        above. The endpoint starts inside KeyProducerJavaWebSocket.start(),
+        whose contract (core.Startable#start) declares no checked
+        exception. Java-WebSocket reports a bind failure only through the
+        future that onError completes, so its ExecutionException (and a
+        timeout or an interrupted wait) is rethrown as an
+        IllegalStateException naming the port, with the original as its
+        cause.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.WebSocketEndpoint"/>
+        <Method name="awaitListening"/>
+        <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
+    </Match>
+
+    <!--
+        EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
         KeyProducerJavaRandom constructor (3 sites). Same
         "this cannot happen if invariants hold" idiom we suppress
         elsewhere:

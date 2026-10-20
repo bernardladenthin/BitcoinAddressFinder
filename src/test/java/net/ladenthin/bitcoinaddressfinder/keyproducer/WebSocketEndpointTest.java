@@ -8,6 +8,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.net.ServerSocket;
 import java.util.HashSet;
@@ -23,6 +24,27 @@ class WebSocketEndpointTest {
 
     /** Poll interval while waiting for the threads to end. */
     private static final long POLL_MILLIS = 50L;
+
+    // <editor-fold defaultstate="collapsed" desc="start">
+    @Test
+    void start_portHeldByAnotherProcess_failsTheStartInsteadOfLoggingAndReturning() throws Exception {
+        // Java-WebSocket binds on its own selector thread and reports a bind failure only to onError.
+        // start() returned normally, and a run with timeoutMillis -1 then waited for a secret forever.
+        try (ServerSocket occupant = new ServerSocket(0)) {
+            // arrange
+            final WebSocketEndpoint endpoint = new WebSocketEndpoint(occupant.getLocalPort());
+            try {
+                // act
+                IllegalStateException e = assertThrows(IllegalStateException.class, endpoint::start);
+
+                // assert
+                assertThat(e.getMessage(), containsString(String.valueOf(occupant.getLocalPort())));
+            } finally {
+                endpoint.stop();
+            }
+        }
+    }
+    // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="stop">
     @Test

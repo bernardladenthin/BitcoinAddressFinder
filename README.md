@@ -1490,7 +1490,7 @@ open `examples/websocket_scanner.html` in a browser.
 | JSON field         | Type    | Default | Description                                                        |
 |--------------------|---------|---------|--------------------------------------------------------------------|
 | keyProducerId      | string  | —       | Unique identifier for this key producer                             |
-| port               | number  | `8080`  | TCP port the WebSocket server binds to                              |
+| port               | number  | `8080`  | TCP port the WebSocket server binds to; a port that cannot be bound (e.g. already in use) fails the start |
 | timeoutMillis      | number  | `1000`  | How long `createSecrets()` waits for a queued secret:<br> `-1` = block forever, `0` = return immediately, `>0` = wait that long |
 | logReceivedSecret  | boolean | `false` | Whether to log each received secret in hex                          |
 | broadcastResults   | boolean | `false` | Send the outcome of every checked batch back on this same port      |
