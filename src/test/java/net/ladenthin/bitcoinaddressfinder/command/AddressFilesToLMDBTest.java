@@ -344,6 +344,58 @@ public class AddressFilesToLMDBTest extends LMDBBase {
         }
     }
 
+    /**
+     * The header line of a Blockchair export is rejected, not imported, so it is no line with an
+     * unusable amount; an import of such a file must not warn.
+     */
+    @Test
+    public void addressFilesToLMDB_blockchairHeaderLine_noAmountWarning() throws Exception {
+        P2PKH[] keys = P2PKH.values();
+        File file = folder.resolve("blockchair.tsv").toFile();
+        Files.write(file.toPath(), List.of("address\tbalance", keys[0].getPublicAddress() + "\t42"));
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(AddressFilesToLMDB.class)) {
+            runImport(1, false, List.of(file.getAbsolutePath()), "blockchair-header");
+
+            assertThat(
+                    logCaptor.getWarnLogs().stream()
+                            .filter(w -> w.contains("amount"))
+                            .toList(),
+                    is(empty()));
+        }
+    }
+
+    /**
+     * With {@code useStaticAmount} (the default) the amount column is not used at all: every address
+     * is stored with {@code staticAmount}. An unusable amount there changes nothing, so there is
+     * nothing to warn about — and the old text, "stored with the default amount of 1 satoshi", was
+     * wrong in that mode.
+     */
+    @Test
+    public void addressFilesToLMDB_unusableAmountWithStaticAmount_noWarningAndTheStaticAmountIsStored()
+            throws Exception {
+        P2PKH[] keys = P2PKH.values();
+        File file = folder.resolve("static-amounts.txt").toFile();
+        Files.write(file.toPath(), List.of(keys[0].getPublicAddress() + ",-5"));
+
+        File lmdbDir;
+        try (LogCaptor logCaptor = LogCaptor.forClass(AddressFilesToLMDB.class)) {
+            lmdbDir = runImport(1, true, List.of(file.getAbsolutePath()), "static-amounts");
+
+            assertThat(
+                    logCaptor.getWarnLogs().stream()
+                            .filter(w -> w.contains("amount"))
+                            .toList(),
+                    is(empty()));
+        }
+        LMDBPersistence lmdb = openReadOnly(lmdbDir);
+        try {
+            assertThat(lmdb.getAmount(keys[0].getPublicKeyHashAsByteBuffer()), is(equalTo(Coin.ZERO)));
+        } finally {
+            lmdb.close();
+        }
+    }
+
     /** An import stopped by {@code interrupt()} leaves an incomplete database and must not be reported as done. */
     @Test
     public void addressFilesToLMDB_interruptedBeforeTheImport_doesNotReportTheImportAsDone() throws Exception {

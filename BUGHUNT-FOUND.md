@@ -982,6 +982,18 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 271cc53
 
+### F193 – BitcoinAddressFinder: Die Betragswarnung des Imports (F162) zählt abgelehnte Zeilen und nennt den falschen Betrag
+- **Zeit:** 2026-10-20 06:40 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/io/AddressTxtLine.java` (`fromLine`, neu `fromAddress`, `getCoinIfPossible`), `command/AddressFilesToLMDB.java` (`logSummary`)
+- **Schwere:** mittel (jeder Import einer Blockchair-TSV mit der Vorgabekonfiguration loggt eine falsche Warnung mit falschem Text)
+- **Historie:** Gefunden beim Review des Branches am 2026-10-20; die Warnung kam mit F162 auf diesen Branch.
+- **Beschreibung:** `getCoinIfPossible` meldete die Zeile an den Listener, bevor die Adresse geprüft war. Die Kopfzeile `address<TAB>balance` einer Blockchair-Datei und jede nicht unterstützte Adresse (P2TR, P2MS) mit Text in der zweiten Spalte zählten so als „Zeile mit unbrauchbarem Betrag“, obwohl sie abgelehnt und nicht gespeichert werden. Der Text „stored with the default amount of 1 satoshi“ war außerdem bei `useStaticAmount = true` falsch, der Vorgabe: dann wird die Betragsspalte gar nicht verwendet und `staticAmount` (0) gespeichert. Gemessen vom Reviewer: Kopfzeile, `42` und `-5` mit der Vorgabe ergaben „2 line(s) … 1 satoshi. First: 'address balance'“, gespeichert wurde 0.
+- **Fix:** `getCoinIfPossible` meldet nichts mehr und liefert `null` für einen unbrauchbaren Betrag; der Adressteil von `fromLine` ist in `fromAddress` ausgelagert, und `fromLine` meldet die Zeile erst, wenn die Adresse angenommen wurde. `logSummary` warnt nur noch ohne `useStaticAmount`, dort stimmt der Text.
+- **Tests:** `AddressTxtLineTest#fromLine_rejectedLineWithTextInTheAmountColumn_isNotReported` (Kopfzeile, P2MS-Zeile), `AddressFilesToLMDBTest#addressFilesToLMDB_blockchairHeaderLine_noAmountWarning`, `#addressFilesToLMDB_unusableAmountWithStaticAmount_noWarningAndTheStaticAmountIsStored`; die bestehenden F162-Tests (`fromLine_unusableAmount_*`, `addressFilesToLMDB_unusableAmounts_warnsOnceAndStoresTheDefault`) bleiben grün. Nebenbei das Javadoc von `fromLine_hexHash160_isImportedAsThatHash160` an seinen Test zurückgesetzt (es stand über einem anderen).
+- **Rot-Grün-Nachweis:** die drei neuen Tests (vier Fälle) gegen den alten Code rot (die Kopfzeile bzw. die `-5`-Zeile in der Warnung, `[address balance]` beim Listener), mit dem Fix grün; `AddressTxtLineTest` + `AddressFilesToLMDBTest` 335/335.
+- **Status:** gefixt
+- **Commit:** (folgt)
+
 ## Offene Verdachte ohne Fund-ID
 
 - *(erledigt 2026-10-19, ohne Fund-ID: Testumgebung, kein Produktfehler)* `ProbeAddressesOpenCLTest#setSrcPrivateKeyChunk_privateKeyTooLarge_throwsException` brach auf Geräten mit 1024 MiB je Allokation mit `CL_INVALID_BUFFER_SIZE` ab, bevor die Prüfung lief (B3: mit `POCL_MEMORY_LIMIT=4` reproduziert, ab 2047 MB grün). Läuft jetzt auf einem 8-Bit-Raster (eigener Provider `privateKeysTooLargeForASmallGrid`), mit und ohne Begrenzung grün. Commit 1faa48a. Ebenso B2: `test-opencl` setzt `POCL_MAX_WORK_GROUP_SIZE=256` (8cb9bb5), B6: `GcTrigger` entfernt (e451898).

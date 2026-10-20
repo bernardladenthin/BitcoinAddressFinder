@@ -30,6 +30,7 @@ import org.bitcoinj.base.SegwitAddress;
 import org.bitcoinj.base.exceptions.AddressFormatException;
 import org.bouncycastle.util.encoders.DecoderException;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -159,8 +160,29 @@ public class AddressTxtLine {
             line = line.replace(BITCOIN_CASH_PREFIX, "");
         }
         String[] lineSplitted = SeparatorFormat.split(line);
-        String address = lineSplitted[COLUMN_ADDRESS];
-        Coin amount = getCoinIfPossible(lineSplitted, DEFAULT_COIN, line);
+        final @Nullable Coin parsedAmount = getCoinIfPossible(lineSplitted, DEFAULT_COIN);
+        final AddressToCoin addressToCoin = fromAddress(
+                lineSplitted[COLUMN_ADDRESS], parsedAmount != null ? parsedAmount : DEFAULT_COIN, line, keyUtility);
+        // Reported only once the address is accepted: a rejected line (a header, an unsupported
+        // format) stores nothing, so it is no address with an unusable amount.
+        if (parsedAmount == null) {
+            unusableAmountListener.accept(line);
+        }
+        return addressToCoin;
+    }
+
+    /**
+     * Parses the address column of one line.
+     *
+     * @param address    the address column, untrimmed
+     * @param amount     the amount the line carries, or the default
+     * @param line       the whole line, for rejection reasons
+     * @param keyUtility utility for byte buffer conversions
+     * @return the parsed address with {@code amount}
+     * @throws AddressFormatNotAcceptedException if the address is not accepted
+     */
+    private @NonNull AddressToCoin fromAddress(String address, Coin amount, String line, KeyUtility keyUtility)
+            throws AddressFormatNotAcceptedException {
         address = address.trim();
         // An all-uppercase CashAddr would otherwise reach the Base58 fallback and decode to a wrong
         // hash160. No Base58 address is 42 characters long, so the pattern cannot claim one.
@@ -364,11 +386,14 @@ public class AddressTxtLine {
     /**
      * Reads the amount column. An amount that is present but not a non-negative whole number of satoshi
      * (a decimal BTC value, text, a value above {@code Long.MAX_VALUE}, an empty column, a negative value)
-     * takes {@code defaultValue} and is reported to the listener; the address itself stays valid, since
-     * the amount is only side information for the search.
+     * is unusable; the address itself stays valid, since the amount is only side information for the
+     * search, and {@link #fromLine} reports the line once the address is accepted.
+     *
+     * @param lineSplitted the columns of the line
+     * @param defaultValue the amount of a line without an amount column
+     * @return the amount, {@code defaultValue} without an amount column, or {@code null} if unusable
      */
-    private @NonNull Coin getCoinIfPossible(
-            @NonNull String[] lineSplitted, @NonNull Coin defaultValue, @NonNull String line) {
+    private @Nullable Coin getCoinIfPossible(@NonNull String[] lineSplitted, @NonNull Coin defaultValue) {
         if (lineSplitted.length <= COLUMN_AMOUNT) {
             return defaultValue;
         }
@@ -379,9 +404,8 @@ public class AddressTxtLine {
                 return Coin.valueOf(satoshi);
             }
         } catch (NumberFormatException e) {
-            // reported below
+            // unusable, see the return below
         }
-        unusableAmountListener.accept(line);
-        return defaultValue;
+        return null;
     }
 }

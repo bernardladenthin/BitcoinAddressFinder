@@ -6,6 +6,7 @@ package net.ladenthin.bitcoinaddressfinder.io;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.ArrayList;
@@ -45,11 +46,6 @@ public class AddressTxtLineTest {
 
     // <editor-fold defaultstate="collapsed" desc="fromLine">
     /**
-     * The {@code HexHash} export writes one bare hash160 in hex per line. It is read back as that
-     * hash160, whatever its digits and case: a line without a {@code 0} used to fall through to the
-     * Base58 decoder and import a different hash160, and one with a {@code 0} was rejected.
-     */
-    /**
      * The amount column is only side information, so an amount that is not a non-negative whole
      * number of satoshi keeps the address and takes the default amount; the listener hears of it so
      * the import can say how many lines were affected. A negative amount used to be taken over.
@@ -67,6 +63,22 @@ public class AddressTxtLineTest {
         assertThat(reported, contains(line));
     }
 
+    /**
+     * A line that is rejected is not an address with an unusable amount: nothing of it is stored, so
+     * the import must not count it as one. A Blockchair export starts with exactly such a header line,
+     * {@code address<TAB>balance}, and every import of one used to report it.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"address\tbalance", "d-1BoatSLRHtKNngkdXEeobR76b53LETtpyT,abc"})
+    public void fromLine_rejectedLineWithTextInTheAmountColumn_isNotReported(String line) {
+        List<String> reported = new ArrayList<>();
+        AddressTxtLine addressTxtLine = new AddressTxtLine(reported::add);
+
+        assertThrows(AddressFormatNotAcceptedException.class, () -> addressTxtLine.fromLine(line, keyUtility));
+
+        assertThat(reported, is(empty()));
+    }
+
     @Test
     public void fromLine_validAmountOrNone_isNotReported() throws Exception {
         List<String> reported = new ArrayList<>();
@@ -79,6 +91,11 @@ public class AddressTxtLineTest {
         assertThat(reported, is(empty()));
     }
 
+    /**
+     * The {@code HexHash} export writes one bare hash160 in hex per line. It is read back as that
+     * hash160, whatever its digits and case: a line without a {@code 0} used to fall through to the
+     * Base58 decoder and import a different hash160, and one with a {@code 0} was rejected.
+     */
     @ParameterizedTest
     @ValueSource(
             strings = {

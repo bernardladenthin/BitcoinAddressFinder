@@ -168,7 +168,7 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
                 LOGGER.info("Import " + files.size() + " address file(s) with " + threads + " parser thread(s), "
                         + "batched writes of " + writeBatchSize + ", queue capacity " + queueCapacity + " ...");
                 importFiles(network, persistence, files, threads, writeBatchSize, queueCapacity);
-                logSummary();
+                logSummary(lmdbConfigurationWrite.useStaticAmount);
                 if (shouldRun.get()) {
                     LOGGER.info("... import done.");
                 } else {
@@ -532,14 +532,20 @@ public class AddressFilesToLMDB implements Runnable, Interruptable {
         firstUnusableAmountLine.compareAndSet(null, line);
     }
 
-    private void logSummary() {
+    /**
+     * Logs the import summary.
+     *
+     * @param useStaticAmount whether the amount column was ignored for this import
+     */
+    private void logSummary(boolean useStaticAmount) {
         LOGGER.info("Import summary: " + addressCounter.get() + " written, " + parsedCounter.get() + " parsed, "
                 + unsupportedCounter.get() + " unsupported, " + errors.size() + " error(s).");
         for (String error : errors) {
             LOGGER.info("Error in line: " + error);
         }
         long unusableAmounts = unusableAmountCounter.get();
-        if (unusableAmounts > 0) {
+        // With useStaticAmount the amount column is not used at all, so an unusable one changes nothing.
+        if (unusableAmounts > 0 && !useStaticAmount) {
             LOGGER.warn(
                     "{} line(s) carried an amount that is not a non-negative whole number of satoshi; their"
                             + " addresses were stored with the default amount of 1 satoshi. First: '{}'",
