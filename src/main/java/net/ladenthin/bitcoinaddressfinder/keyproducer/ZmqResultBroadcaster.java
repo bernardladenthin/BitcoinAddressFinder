@@ -191,6 +191,12 @@ public class ZmqResultBroadcaster implements ResultListener, AutoCloseable {
         }
     }
 
+    /**
+     * Closes the socket and the context. The context's close waits up to the socket's linger for a
+     * subscriber to take what is queued, and it runs under the socket lock, so a consumer thread that
+     * publishes at the same time (on the timeout and abort paths the consumer may still be running)
+     * waits as long; it then sees the broadcaster closed and returns.
+     */
     @Override
     public void close() {
         synchronized (socketLock) {

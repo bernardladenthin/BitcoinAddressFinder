@@ -1889,7 +1889,7 @@ are fully configurable (see [Customizing Log Output](#customizing-log-output)).
 A statistics line looks like this:
 
 ```
-Statistics: [uptime 43 min] [Generated 128.0 M/s (333258 M total)] [-> LMDB 2.000 M/s (5196 M lookups total), 99.22% pre-filtered] [rate window 60s] [Keys per producer: exampleKeyProducerSecureRandomId (Random, GPU)=333.3 G (100.0%)] [Producers running: 1] [Consumers running: 8] [Consumer ready for work (queue empty): 167939] [Producer blocked (queue full): 0] [Average contains time: 0 ns] [keys queue size: 0] [Hits: 0]
+Statistics: [uptime 43 min] [Generated 128.0 M/s (333258 M total)] [-> LMDB 2.000 M/s (5196 M lookups total), 99.22% pre-filtered] [rate window 60s] [Keys per producer: exampleKeyProducerSecureRandomId (Random, GPU)=333.3 G (100.0%)] [Producers running: 1] [Consumers running: 8] [Consumer ready for work (queue empty): 167939] [Producer blocked (queue full): 0] [Average contains time: 3850 ns] [keys queue size: 0] [Hits: 0]
 ```
 
 | Field | Meaning |

@@ -12,6 +12,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.22.4, LogCaptor 2.12.7 -> 2.13.0 (test; still requests log4j 2.26.1, so the log4j floor guard is
   unchanged), pitest-maven 1.30.0 -> 1.30.1, central-publishing-maven-plugin 0.11.0 -> 0.12.0;
   `anthropics/claude-code-action` v1.0.255 and Gradle 9.8.2 in the shared `verify-signing-key-gradle` job.
+- **Behaviour changes from the bug hunt of 2026-10-16 … 20** (details and tests per id in
+  `BUGHUNT-FOUND.md`). Visible to a user or a configuration:
+  - **Statistics:** "Average contains time" is measured and printed in **ns** (it was `ms` and read 0
+    nearly always) (F11).
+  - **BIP39:** mnemonic and passphrase are **NFKD-normalised** as the BIP39 specification requires, so a
+    non-English mnemonic that was not in NFKD now derives *different* (the correct) keys (F120);
+    `privateKeyMaxNumBits` other than 256 is rejected for BIP39 instead of truncating the keys (F51).
+  - **Socket key producer:** refuses at start a negative `timeoutMillis` (F100), `port == resultPort`
+    in server mode (F155) and a port that is already bound (F157), instead of ending as a regular run
+    without a checked key; its final connection failure is logged (F101); `connectRetryCount` counts
+    consecutive failures, not failures over the whole run (F22).
+  - **Result broadcast:** the grid is announced per key producer, and the **smallest** `batchSizeInBits`
+    wins when they differ (F153); a client connecting during the announcement gets it (F119). The socket
+    broadcaster has a per-client queue of 4096 messages, drops a client that falls behind and drains for
+    up to 2 s on close (F20, F130); the ZeroMQ broadcaster lingers 2 s on close (F163).
+  - **Incremental key producer with explicit keys:** the last batch before `endPrivateKey` is shorter
+    instead of being skipped (F160).
+  - **Address import (`AddressFilesToLMDB`):** an amount column that is not a non-negative whole number
+    of satoshi keeps the address with the default amount and is reported once, without
+    `useStaticAmount` (F162, F193); the `HexHash` export is importable again (F150); uppercase CashAddr
+    and Riecoin scripts are read correctly (F121, F122); a leading space or UTF-8 BOM no longer loses a
+    line (F23, F42, F43); a signed Base36 hash is no longer read as two's complement (F58).
+  - **`CompactLMDB`** refuses a non-empty target directory and a target that is the source under another
+    spelling (F31, F132), and honours an interrupt before it starts (F32).
+  - **OpenCL on Linux:** a warning is logged when the kernel is built without the JDK's signal chaining
+    (`libjsig`), and the `run_*OpenCL*.sh` launchers preload it (F148; README "OpenCL on Linux").
+  - **Configuration errors fail early:** an unknown `keyProducerId` is reported before the database is
+    loaded (F126); a JSON configuration with a UTF-8 BOM loads (F44).
+  - **Shutdown:** `Finder.interrupt()` serialises its callers, so a Ctrl-C during the teardown of a
+    finished run waits for it (up to `shutdownTimeoutSeconds` per producer) instead of racing it (F34).
 - **The OpenCL kernel refuses an unaligned secret base, and the skipped top grid is a warning.**
   The kernel derives a work item's key by ORing its offset into the lowest word of the base, which is
   the base plus the offset only when the low `batchSizeInBits` bits of the base are zero; the host
@@ -96,6 +126,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Spotless formatter version -- is used in another version than in a sibling's default branch.
 
 ### Fixed
+- **Fixes from the bug hunt of 2026-10-16 … 20** (details, reproduction and red/green proof per id in
+  `BUGHUNT-FOUND.md`; the user-visible behaviour changes are listed under "Changed"). Lost or
+  unchecked keys:
+  - the GPU skipped keys 2 … `keysPerWorkItem`−1 of the grid at base 0, the default incremental start
+    (F129); a finite GPU run lost its last batches, because the run ended while result readers were
+    still reading back (F192);
+  - batches still queued at shutdown were never checked (F15), and after the shutdown timeout they were
+    reported as "checked, nothing found" against the closed database (F66); the result broadcasters
+    were closed before the consumer had checked the last batches (F131);
+  - a secrets file without `batchUsePrivateKeyIncrement` checked no secret (F08), and out-of-range keys
+    in it are now treated as a grid treats them (F194); the group order n counted as a valid key and the
+    last OpenCL base is n − 2^`batchSizeInBits` (F45, F151).
+
+  Hangs, crashes and resource leaks: a shared socket/WebSocket/ZeroMQ key producer hung the shutdown
+  (F10); concurrent ZeroMQ broadcasts corrupted the socket (F19); a result client that never reads froze
+  the scan (F20); the WebSocket endpoint left a non-daemon thread (F21); the BIP39 producer kept every
+  derived key (F14); the LMDB map grew only once per write (F27); a failed start, or a failed abort of
+  one, left the consumer running (F139, F195); a producer whose release failed left the others running,
+  and one still running was released (F52, F156); a client accepted during the socket broadcaster's
+  close stayed connected (F196); OpenCL was initialised twice on a concurrent first call (F33);
+  `OpenCLBuilder` queried a fixed three work-item sizes (F04).
+
+  Wrong reports: interrupted exports, imports, deltas and secrets-file runs reported "done" (F46–F50);
+  the tuner extended, measured and reported the wrong arm in several cases (F135, F136, F140, F152,
+  F154, F164, F170).
 - **CI: the GitHub `snapshot` pre-release holds exactly the current build, and the release assets
   include the pom.** `gh release upload --clobber` replaces same-named assets and never removes any
   other, so the `snapshot` release accumulated: the six 1.8.0-SNAPSHOT jars next to the 1.9.0-SNAPSHOT ones, 6

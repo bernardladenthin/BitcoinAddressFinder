@@ -358,7 +358,7 @@ See `examples/config_*.json` for all configuration variants.
 
 ### Test execution policy for AI assistants
 
-**A full `mvn test` run takes ~5 minutes on this repo (1 785 tests, forked JVMs, LMDB and OpenCL probe paths).** That is far too slow to invoke after every small edit. Default to the **narrowest meaningful test surface** for the change at hand and only run a full suite when the user explicitly asks for it.
+**A full `mvn test` run takes ~5 minutes on this repo (about 2 900 tests, forked JVMs, LMDB and OpenCL probe paths).** That is far too slow to invoke after every small edit. Default to the **narrowest meaningful test surface** for the change at hand and only run a full suite when the user explicitly asks for it.
 
 Recommended scoping by change type:
 

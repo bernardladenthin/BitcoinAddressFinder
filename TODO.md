@@ -17,6 +17,22 @@ Everything the bug hunt left open, so nothing is lost when the session ends. The
 named in each item holds the analysis, the history and the reproduction; delete an item here when
 it is done, as for every other item in this file.
 
+**Side findings recorded in the ledgers, not changed yet** (each small; all model-free):
+
+- **A timed-out `createSecrets` loses the secrets it already took** (F10's side finding,
+  `AbstractKeyProducerQueueBuffered`): without `batchUsePrivateKeyIncrement`, a timeout at `i > 0`
+  drops the partial batch, and those secrets are never checked. Fix: return the partial batch (the
+  producer accepts a shorter last batch since F160) or put the taken secrets back. Its `addSecret` log
+  on a full queue also prints a `byte[]` as `[B@…`.
+- **`maxResultReaderThreads = 0` fails with a bare `IllegalArgumentException`** from
+  `newFixedThreadPool` that does not name the field (`BUGHUNT-CHECKED.md`, `CProducerOpenCL`). Fix:
+  validate `≥ 1` with a message naming it.
+- **Empty `batchSizeInBitsCandidates` / `keysPerWorkItemCandidates` throw a bare
+  `NoSuchElementException`** from `Collections.max` in `TuneConfiguration` (`BUGHUNT-CHECKED.md`,
+  `CTuneConfiguration`). Fix: validate non-empty with a message.
+- **`Statistics.formatRate` does not round over at the unit boundary**: 999 999.9/s prints as
+  "1000.0 k/s" instead of "1.000 M/s" (cosmetic).
+
 **Decided by the owner, recorded** (no change, kept so the reasoning is not lost):
 
 - **Grid mode on the GPU, top of the key space — decided 2026-10-19: no change.** The last aligned
@@ -697,7 +713,11 @@ not enough evidence.
   were green; the only class that started and never reported is **`KeyProducerJavaZmqTest`**. That
   fits the jeromq poller race above (`timeoutMillis = -1` tests wait for the handshake timer), but
   one 30 s handshake stall alone should not use up 240 s — either several stalls in a row or a
-  Windows-specific hang. Not verified. Plan: rerun `KeyProducerJavaZmqTest` in a loop on Windows
+  Windows-specific hang. **Not Windows-only:** reproduced on Linux in the branch review (2026-10-20),
+  under load (load average ~9 on 4 cores), with `main` blocked in `LinkedBlockingQueue.take` at
+  `AbstractKeyProducerQueueBuffered.java:90`, called from
+  `KeyProducerJavaZmqTest.createSecrets_connectMode_receivesSecret:120`; the class alone passed 3 of 3.
+  Plan: rerun `KeyProducerJavaZmqTest` in a loop (on Linux under load, and on Windows)
   with a thread dump on timeout (see `../workspace/policies/ci-test-diagnostics.md`), then decide
   whether a test-side `setHandshakeIvl` cap (as in `ZmqResultBroadcasterTest`) or a finite
   `timeoutMillis` is the right guard.

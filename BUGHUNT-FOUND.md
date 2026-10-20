@@ -64,6 +64,29 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F146](#f146) — niedrig — *gefixt (Doku)*
 - [F147](#f147) — niedrig — *gefixt (Doku)*
 - [F148](#f148) — mittel — *gefixt*
+- [F150](#f150) — niedrig — *gefixt*
+- [F151](#f151) — niedrig — *gefixt*
+- [F152](#f152) — niedrig — *gefixt*
+- [F153](#f153) — mittel — *gefixt*
+- [F154](#f154) — niedrig — *gefixt*
+- [F155](#f155) — niedrig — *gefixt*
+- [F156](#f156) — niedrig — *gefixt*
+- [F157](#f157) — niedrig — *gefixt*
+- [F159](#f159) — niedrig — *gefixt*
+- [F160](#f160) — niedrig bis mittel — *gefixt*
+- [F161](#f161) — niedrig — *gefixt*
+- [F162](#f162) — niedrig — *gefixt*
+- [F163](#f163) — niedrig — *gefixt*
+- [F164](#f164) — niedrig — *gefixt*
+- [F169](#f169) — niedrig — *gefixt*
+- [F170](#f170) — niedrig — *gefixt*
+- [F171](#f171) — niedrig — *gefixt*
+- [F191](#f191) — niedrig — *gefixt*
+- [F192](#f192) — hoch — *gefixt*
+- [F193](#f193) — mittel — *gefixt*
+- [F194](#f194) — niedrig — *gefixt*
+- [F195](#f195) — niedrig — *gefixt*
+- [F196](#f196) — niedrig — *gefixt*
 
 ## Funde
 
@@ -163,7 +186,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/WebSocketEndpoint.java:176` (`start`)
 - **Schwere:** mittel
 - **Beschreibung:** `start()` übergab `WebSocketServer.start()` – das sofort zurückkehrt und eigene Threads startet – an einen frisch erzeugten `Executors.newSingleThreadExecutor()`, der nie heruntergefahren wurde. Dessen untätiger Worker (`pool-N-thread-1`) ist kein Daemon und überlebt `stop()`. Da `Main` kein `System.exit` aufruft, hält er die JVM am Leben: ein Lauf, dessen Producer enden (z. B. `timeoutMillis` > 0 → `NoMoreSecretsAvailableException`), kehrt aus `main` zurück, der Prozess aber nie. Probe: nach `start(); stop();` bleibt `[pool-1-thread-1]` übrig, die JVM wird erst vom `timeout` beendet (Exit 124).
-- **Fix:** Executor direkt nach dem `submit` per `shutdown()` beenden (die Startaufgabe läuft noch zu Ende).
+- **Fix:** Executor direkt nach dem `submit` per `shutdown()` beenden (die Startaufgabe läuft noch zu Ende). **Überholt durch `b1379fe`:** `WebSocketEndpoint.start()` ruft `localServer.start()` seither direkt auf, es gibt keinen Start-Executor mehr; die Wirkung (kein Nicht-Daemon-Thread hält die JVM) ist dieselbe.
 - **Reproduktion:** neuer `WebSocketEndpointTest#stop_afterStart_leavesNoNonDaemonThreadBehind` (vorher rot: `<[Thread[#31,pool-2-thread-1,5,main]]>`, nachher grün); `KeyProducerJavaWebSocketTest` 5/5 und `WebSocketResultBroadcasterTest` 4/4 grün.
 - **Status:** gefixt
 - **Commit:** BitcoinAddressFinder `7469a72`
@@ -256,6 +279,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Fix:** Entscheidung des Nutzers (Variante B). `GcTrigger` beschreibt die Messung, dass sie vom alten Upload-Weg stammt und auf dem gestückelten Upload nicht nachgemessen ist; `reclaimHeapBeforeUpload` ohne „few milliseconds“ und `CL_MEM_COPY_HOST_PTR`; `uploadGpuFilter` nennt `CL_MEM_READ_ONLY` + `writeBufferChunked`; `AddressLookup` zeigt eine echte Kette und die tatsächliche Verdrahtung. Neuer `TODO.md`-Eintrag „Re-measure the heap reclaim before the GPU filter upload on the chunked LWJGL upload“ (AMD-Karte, no-op-`GcTrigger` gegen `GcTrigger.SYSTEM`, Dauer der Collection) – CI-/Hardware-Bedarf.
 - **Reproduktion:** keine – reine Dokumentationsabweichung; `OpenCLContextGpuFilterWidthTest#reclaimHeapBeforeUpload_invokesTheTrigger` prüft weiterhin, dass die Collection läuft.
 - **Rot-Grün-Nachweis:** – (Doku-Korrektur, Freigabe des Nutzers für Doku ohne roten Test)
+- **Überholt:** `e451898` (Messauftrag B6) hat `GcTrigger` und den `System.gc()` vor dem Upload entfernt, nachdem die Nachmessung auf der RX 7900 XTX ohne ihn grün war; die hier beschriebene Doku und der Test `OpenCLContextGpuFilterWidthTest#reclaimHeapBeforeUpload_invokesTheTrigger` gibt es deshalb nicht mehr.
 - **Status:** gefixt (Doku)
 - **Commit:** 0060d6b
 
@@ -756,6 +780,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 5c8833c
 
+<a id="f150"></a>
 ### F150 – BitcoinAddressFinder: Der `HexHash`-Export lässt sich nicht wieder importieren; 7,6 % seiner Zeilen werden zu falschen Hashes
 - **Zeit:** 2026-10-18 20:45 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/io/AddressTxtLine.java` (`fromLine`)
@@ -768,6 +793,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** e81b8e2
 
+<a id="f151"></a>
 ### F151 – BitcoinAddressFinder: `getMaxPrivateKeyForBatchSize` lässt ein OpenCL-Raster zu, das auf der Gruppenordnung n endet
 - **Zeit:** 2026-10-18 21:05 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/util/PrivateKeyValidator.java` (`getMaxPrivateKeyForBatchSize`), Javadoc von `constants/Secp256k1Constants.MIN_VALID_PRIVATE_KEY`
@@ -780,6 +806,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 039f598
 
+<a id="f152"></a>
 ### F152 – BitcoinAddressFinder: `TuneConfiguration.templatesForDevices` übernimmt die Gerätetyp-Maske des Prototyps, die erkannten Indizes zählen aber alle Geräte
 - **Zeit:** 2026-10-18 21:20 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/command/TuneConfiguration.java` (`templatesForDevices`)
@@ -792,6 +819,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 686a346
 
+<a id="f153"></a>
 ### F153 – BitcoinAddressFinder: Ergebnis-Clients erfahren das größte Gitter aller Producer, auch solcher, die ihre Basen nie bekommen
 - **Zeit:** 2026-10-18 21:40 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/engine/Finder.java` (`announceGridConfigurationToBroadcasters`), `CLAUDE.md` („The grid configuration is announced late“)
@@ -804,6 +832,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 703819a
 
+<a id="f154"></a>
 ### F154 – BitcoinAddressFinder: `TuneConfiguration` gibt für ein Gerät ohne erfolgreichen Arm das Raster seines letzten, gescheiterten Arms aus
 - **Zeit:** 2026-10-18 22:00 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/command/TuneConfiguration.java` (`applyWinnerTo`, Geräteschleife in `run`)
@@ -816,6 +845,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 1b6782e
 
+<a id="f155"></a>
 ### F155 – BitcoinAddressFinder: Socket-Key-Producer mit `port` = `resultPort` endet als regulärer Lauf ohne einen geprüften Schlüssel
 - **Zeit:** 2026-10-18 22:15 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/KeyProducerJavaSocket.java` (Konstruktor), Javadoc von `CKeyProducerJavaSocket.resultPort`, README-Tabelle des Socket-Key-Producers
@@ -828,6 +858,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 9a28130
 
+<a id="f156"></a>
 ### F156 – BitcoinAddressFinder: `ProducerReleaser` gibt einen Producer frei, dessen Warten abgelaufen ist und der noch läuft
 - **Zeit:** 2026-10-18 22:30 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/producer/ProducerReleaser.java` (`release`)
@@ -840,6 +871,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** af5bb59
 
+<a id="f157"></a>
 ### F157 – BitcoinAddressFinder: Socket-Key-Producer mit belegtem Server-Port endet als regulärer Lauf ohne einen geprüften Schlüssel (Rest nach F155)
 - **Zeit:** 2026-10-18 23:00 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/KeyProducerJavaSocket.java` (`start`, neu `bindServerSocket`), `spotbugs-exclude.xml`, README-Tabelle
@@ -853,6 +885,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** bf140a6
 
+<a id="f159"></a>
 ### F159 – BitcoinAddressFinder: `websocket_scanner.html` rundet „To“ ab und meldet „Range complete.“, obwohl der Rest ungeprüft blieb
 - **Zeit:** 2026-10-19 00:25 UTC
 - **Datei:** `examples/websocket_scanner.html` (`start()`, neu `alignUp`)
@@ -864,6 +897,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** cf67ad3
 
+<a id="f160"></a>
 ### F160 – BitcoinAddressFinder: Inkrementeller Scan mit expliziten Schlüsseln lässt den Rest vor `endPrivateKey` aus
 - **Zeit:** 2026-10-19 12:00 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/KeyProducerJavaIncremental.java` (`createSecrets`), `producer/AbstractProducer.java` (`produceKeys`, Längenprüfung), README „incremental scanning“
@@ -876,6 +910,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** a77564a
 
+<a id="f161"></a>
 ### F161 – BitcoinAddressFinder: `WebSocketEndpoint.greetingSupplier` wird nach dem Serverstart ohne Happens-before-Kante geschrieben
 - **Zeit:** 2026-10-19 12:10 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/WebSocketEndpoint.java` (Feld `greetingSupplier`)
@@ -886,6 +921,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt (ohne Rot-Test, vom Nutzer so entschieden)
 - **Commit:** f0636d0
 
+<a id="f162"></a>
 ### F162 – BitcoinAddressFinder: Unlesbare oder negative Betragsspalte einer Adressdatei wird still übernommen
 - **Zeit:** 2026-10-19 13:00 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/io/AddressTxtLine.java` (`getCoinIfPossible`), `src/main/java/net/ladenthin/bitcoinaddressfinder/command/AddressFilesToLMDB.java`
@@ -898,6 +934,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** a2bbe09
 
+<a id="f163"></a>
 ### F163 – BitcoinAddressFinder: `ZmqResultBroadcaster` verwirft beim Schließen, was ein zurückliegender Abonnent noch nicht bekommen hat
 - **Zeit:** 2026-10-19 13:30 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/ZmqResultBroadcaster.java` (`LINGER_MILLIS`)
@@ -910,6 +947,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** ab5755b
 
+<a id="f164"></a>
 ### F164 – BitcoinAddressFinder: Tuner-Erweiterung lässt die zweite Achse aus, wenn der erste Zusatz-Arm verliert
 - **Zeit:** 2026-10-19 14:00 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/command/TuneConfiguration.java` (`extendSweepBeyondTheCandidates`, jetzt `extendSweep`)
@@ -922,6 +960,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** dd594a2
 
+<a id="f169"></a>
 ### F169 – BitcoinAddressFinder: Die Vorgabe für `endPrivateKey` ist die Gruppenordnung n, die kein Schlüssel ist
 - **Zeit:** 2026-10-19 18:30 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/configuration/CKeyProducerJavaIncremental.java` (`endPrivateKey`), `constants/Secp256k1Constants.java`
@@ -934,6 +973,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** d185aed
 
+<a id="f170"></a>
 ### F170 – BitcoinAddressFinder: `TuneConfiguration.runArm` gibt den Producer eines Arms frei, auch wenn er noch läuft
 - **Zeit:** 2026-10-19 19:00 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/command/TuneConfiguration.java` (`runArm`, `finally`)
@@ -946,6 +986,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 37bb737
 
+<a id="f171"></a>
 ### F171 – BitcoinAddressFinder: Der OpenCL-Kernel rechnet mit einer nicht ausgerichteten Basis still andere Schlüssel, und das oberste Raster ist ein ERROR
 - **Zeit:** 2026-10-19 20:00 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/opencl/OpenCLContext.java` (`createKeys`), `util/PrivateKeyValidator.java` (`isAlignedToBatchSize`), `producer/ProducerOpenCL.java` (`processSecretBase`)
@@ -958,6 +999,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 24ca3de
 
+<a id="f191"></a>
 ### F191 – BitcoinAddressFinder: `SocketResultBroadcasterTest` zählt seine eigene Port-Probe als Client (flaky, rund 1 von 20 Forks)
 - **Zeit:** 2026-10-20 00:10 UTC
 - **Datei:** `src/test/java/net/ladenthin/bitcoinaddressfinder/keyproducer/SocketResultBroadcasterTest.java`
@@ -970,6 +1012,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 75a0f0e
 
+<a id="f192"></a>
 ### F192 – BitcoinAddressFinder: F131 lässt einen endlichen GPU-Lauf seine letzten Batches verlieren (Regression des Branches)
 - **Zeit:** 2026-10-20 06:00 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/producer/AbstractProducer.java` (`run`, neu `awaitPendingBatches`), `producer/ProducerOpenCL.java` (`awaitPendingBatches`)
@@ -982,6 +1025,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 271cc53
 
+<a id="f193"></a>
 ### F193 – BitcoinAddressFinder: Die Betragswarnung des Imports (F162) zählt abgelehnte Zeilen und nennt den falschen Betrag
 - **Zeit:** 2026-10-20 06:40 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/io/AddressTxtLine.java` (`fromLine`, neu `fromAddress`, `getCoinIfPossible`), `command/AddressFilesToLMDB.java` (`logSummary`)
@@ -994,6 +1038,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 4264808
 
+<a id="f194"></a>
 ### F194 – BitcoinAddressFinder: Secrets-File ohne Increment: Schlüssel außerhalb des gültigen Bereichs werfen oder werden still als k−n gerechnet
 - **Zeit:** 2026-10-20 07:00 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/producer/ProducerJava.java` (`processSecrets`)
@@ -1006,6 +1051,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 43b766b
 
+<a id="f195"></a>
 ### F195 – BitcoinAddressFinder: Schlägt der Abbruch eines fehlgeschlagenen Starts fehl, verschwindet der Startfehler und der Consumer läuft weiter
 - **Zeit:** 2026-10-20 07:30 UTC
 - **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/cli/Main.java` (neu `startFinder`), `engine/Finder.java` (`abortStart`, neu `getConsumerJava`)
@@ -1017,6 +1063,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** mit den beiden Fixes einzeln zurückgenommen rot (der Teardown-Fehler statt des Startfehlers; der Consumer nicht freigegeben), mit ihnen grün; `MainTest` + `MainStartFinderTest` + `FinderTest` 53/53 (mit `LD_PRELOAD=libjsig`, wie CI: ohne stirbt der `MainTest`-Fork mit seinem OpenCL-Test auf pocl ohne `hs_err`, auch auf dem unveränderten Stand).
 - **Status:** gefixt
 - **Commit:** 4b6dc55
+
+<a id="f196"></a>
+### F196 – BitcoinAddressFinder: Ein während `close()` angenommener Client des `SocketResultBroadcaster` bleibt verbunden
+- **Zeit:** 2026-10-20 07:50 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/SocketResultBroadcaster.java` (Accept-Schleife in `start`)
+- **Schwere:** niedrig (ein Socket bleibt offen, eine Exception verschwindet ungesehen; nur bei einem Verbindungsaufbau genau während des Schließens)
+- **Historie:** Gefunden beim Review des Branches am 2026-10-20; die Form ist älter, F20/F130 (Writer je Client, Drain beim Schließen) haben das Fenster etwas vergrößert.
+- **Beschreibung:** Die Accept-Schleife registriert einen angenommenen Client und startet seinen Writer. Läuft `close()` zwischen `accept()` und der Registrierung, fegt es die Client-Menge, bevor der neue Client darin steht; er wird danach registriert, und niemand schließt seinen Socket. `startWriter` auf dem schon heruntergefahrenen Writer-Executor wirft eine `RejectedExecutionException`, die in der Accept-Aufgabe ungesehen stirbt und die Schleife beendet.
+- **Fix:** Nach der Registrierung prüft die Schleife `shouldStop` (das `close()` vor dem Fegen setzt) und wirft einen solchen Client wieder hinaus; eine `RejectedExecutionException` beim Start des Writers (das Fenster zwischen dieser Prüfung und dem Start) wirft ihn ebenfalls hinaus.
+- **Tests:** `SocketResultBroadcasterTest#close_whileAnAcceptedClientIsBeingRegistered_theClientIsDisconnected`: über den bestehenden Hook `setBeforeClientRegistered` läuft das ganze `close()`, während der Accept-Thread einen angenommenen, noch nicht registrierten Client hält; der Client muss danach das Ende des Streams lesen. Der `RejectedExecutionException`-Zweig ist nur durch Lesen geprüft (ein deterministischer Test bräuchte einen weiteren Seam).
+- **Rot-Grün-Nachweis:** gegen den alten Code rot (der Client liest nach 3 s nichts statt EOF), mit dem Fix grün; die Klasse 10/10 dreimal hintereinander, dazu 60 frische JVMs (siehe Commit-Nachricht).
+- **Status:** gefixt
+- **Commit:** 2125b60
 
 ## Offene Verdachte ohne Fund-ID
 
