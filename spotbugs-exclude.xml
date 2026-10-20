@@ -203,8 +203,8 @@ SPDX-License-Identifier: Apache-2.0
 
     <!--
         RFI_SET_ACCESSIBLE flags reflective access into
-        private/protected members. All 5 sites here reach into
-        third-party libraries that expose no public alternative for
+        private/protected members. Both sites here reach into
+        a third-party library that exposes no public alternative for
         what we need:
 
           - Bech32Helper: bitcoinj 0.17's Bech32.convertBits is
@@ -212,45 +212,17 @@ SPDX-License-Identifier: Apache-2.0
             Bech32.Bech32Bytes.witnessProgram / witnessVersion are
             protected; both are needed for SegWit address decoding
             paths that bitcoinj does not expose publicly.
-          - LMDBPersistence.getApproximateSizeBytes: Guava's
-            BloomFilter does not expose its in-memory size. We read
-            the private backing array length for diagnostics.
 
         The :add-opens JVM flags in .mvn/jvm.config and pom.xml
         explicitly permit this access at runtime.
     -->
     <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.util.Bech32Helper"/>
         <Or>
-            <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.util.Bech32Helper"/>
-                <Or>
-                    <Method name="invokeConvertBitsStatic"/>
-                    <Method name="invokeProtectedMethod"/>
-                </Or>
-            </And>
-            <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
-                <Method name="getApproximateSizeBytes"/>
-            </And>
+            <Method name="invokeConvertBitsStatic"/>
+            <Method name="invokeProtectedMethod"/>
         </Or>
         <Bug pattern="RFI_SET_ACCESSIBLE"/>
-    </Match>
-
-    <!--
-        EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
-        LMDBPersistence.getApproximateSizeBytes: the reflective
-        access suppressed in the RFI block above can throw checked
-        exceptions (NoSuchFieldException, IllegalAccessException).
-        They are wrapped in RuntimeException because this is a
-        best-effort diagnostic-size estimate; callers log the
-        result and continue regardless. Adding throws to the static
-        helper would force every caller to handle exceptions for a
-        non-critical metric.
-    -->
-    <Match>
-        <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
-        <Method name="getApproximateSizeBytes"/>
-        <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
     </Match>
 
     <!--
@@ -299,7 +271,7 @@ SPDX-License-Identifier: Apache-2.0
 
     <!--
         EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
-        AddressTxtLine.fromLine: the inner try block uses a
+        AddressTxtLine.fromAddress (the address part of fromLine): the inner try block uses a
         type-filtering catch pattern - DecoderException (Bouncy
         Castle unchecked, signalling invalid Bech32 chars) is
         caught and rethrown unchanged so callers see the original
@@ -313,14 +285,28 @@ SPDX-License-Identifier: Apache-2.0
     -->
     <Match>
         <Class name="net.ladenthin.bitcoinaddressfinder.io.AddressTxtLine"/>
-        <Method name="fromLine"/>
+        <Method name="fromAddress"/>
         <Bug pattern="EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS"/>
+    </Match>
+
+    <!--
+        ACEM_ABSTRACT_CLASS_EMPTY_METHODS on AbstractProducer.awaitPendingBatches:
+        a hook with a deliberate no-op default. Producers that hand their batches to
+        the consumer on their own thread (ProducerJava, the secrets-file producer)
+        have nothing to wait for; only ProducerOpenCL, whose result readers enqueue
+        asynchronously, overrides it (F192). Declaring it abstract would force an
+        empty override into every synchronous producer.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.producer.AbstractProducer"/>
+        <Method name="awaitPendingBatches"/>
+        <Bug pattern="ACEM_ABSTRACT_CLASS_EMPTY_METHODS"/>
     </Match>
 
     <!--
         EXS_EXCEPTION_SOFTENING_NO_CONSTRAINTS on
         AbstractPlaintextFile.readFile: same type-filtering catch
-        idiom as AddressTxtLine.fromLine above. LmdbException
+        idiom as AddressTxtLine.fromAddress above. LmdbException
         (subclass e.g. MapFullException is the trigger for the
         map-auto-grow recovery path elsewhere) must propagate
         unchanged; everything else is logged and the read
@@ -1056,10 +1042,6 @@ SPDX-License-Identifier: Apache-2.0
                 <Method name="swapIntBytes"/>
             </And>
             <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenClTask"/>
-                <Method name="cloneByteBuffer"/>
-            </And>
-            <And>
                 <Class name="net.ladenthin.bitcoinaddressfinder.persistence.PersistenceUtils"/>
                 <Or>
                     <Method name="addressListToByteBufferDirect"/>
@@ -1341,14 +1323,6 @@ SPDX-License-Identifier: Apache-2.0
         <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext"/>
         <Method name="releaseGpuFilter"/>
         <Bug pattern="ENMI_NULL_ENUM_VALUE"/>
-    </Match>
-
-    <!-- Intentional leak-safe fail-fast: rethrows the caught RuntimeException after freeing the
-         first allocated buffer so no VRAM leaks on a partial allocation failure. -->
-    <Match>
-        <Class name="net.ladenthin.bitcoinaddressfinder.opencl.OpenCLContext"/>
-        <Method name="allocateFilterBuffersFromPointer"/>
-        <Bug pattern="THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"/>
     </Match>
 
     <!-- Serialising the recommended configuration (a local in-memory POJO) to JSON can only fail on

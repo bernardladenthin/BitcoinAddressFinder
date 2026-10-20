@@ -519,13 +519,13 @@ public class FinderTest {
         finder.startConsumer();
 
         // pre-assert
-        assertThat(finder.getConsumerJava(), is(notNullValue()));
+        assertThat(finder.isConsumerRunning(), is(true));
 
         // act
         finder.abortStart();
 
         // assert
-        assertThat(finder.getConsumerJava(), is(nullValue()));
+        assertThat(finder.isConsumerRunning(), is(false));
     }
 
     /**
@@ -553,7 +553,7 @@ public class FinderTest {
 
         // assert
         assertThat(thrown, is(sameInstance(teardownFailure)));
-        assertThat(finder.getConsumerJava(), is(nullValue()));
+        assertThat(finder.isConsumerRunning(), is(false));
     }
 
     @Test

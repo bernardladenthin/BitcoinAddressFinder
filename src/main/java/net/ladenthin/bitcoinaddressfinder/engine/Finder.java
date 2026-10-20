@@ -851,14 +851,13 @@ public class Finder implements Interruptable {
     }
 
     /**
-     * Returns the running consumer, or {@code null} before {@link #startConsumer()} and after it was
-     * released.
+     * Tells whether a consumer is running: started by {@link #startConsumer()} and not yet released.
      *
-     * @return the consumer, if one is running
+     * @return {@code true} while the consumer runs
      */
     @VisibleForTesting
-    public @Nullable ConsumerJava getConsumerJava() {
-        return consumerJava;
+    public boolean isConsumerRunning() {
+        return consumerJava != null;
     }
 
     /** Interrupts the consumer, which checks what is still queued before it stops, and forgets it. */
@@ -881,6 +880,11 @@ public class Finder implements Interruptable {
      * producer twice is not harmless — an OpenCL producer's second release is rejected by the driver
      * with {@code CL_INVALID_MEM_OBJECT}. {@link ProducerReleaser} owns that guarantee; clearing the
      * collections below is bookkeeping, not the safeguard.
+     *
+     * <p>The whole body runs under one lock, so the second caller waits until the first has finished,
+     * the release of the producers included. That can take up to {@code shutdownTimeoutSeconds} per
+     * producer still running; a {@code Ctrl+C} during the teardown of a finished run therefore waits
+     * for that teardown rather than racing it.
      */
     @Override
     public void interrupt() {
