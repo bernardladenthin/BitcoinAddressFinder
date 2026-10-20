@@ -1134,7 +1134,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `SignalChainingCheckTest#warning_linuxLibjsigNamedInLdPreloadButNotMapped_warns`, `#warning_linuxLibjsigMappedWithoutLdPreload_isEmpty`, `#warning_linuxMappingUnreadable_fallsBackToLdPreload` (beide `LD_PRELOAD`-Werte), `#libjsigMapped_mapsListLibjsig_isTrue`, `#libjsigMapped_mapsWithoutLibjsig_isFalse`, `#libjsigMapped_unreadableMaps_isUnknown` (Maps-Datei im `@TempDir`). Die fünf bisherigen Fälle laufen über die neue Überladung mit festem Mapping, die Windows-/macOS-Fälle mit einem Supplier, der wirft – sonst hinge ihr Ergebnis vom Prozess ab (der CI-Job `test-opencl` lädt `libjsig` vor). Ende zu Ende mit einer kleinen Probe über die Dreier-Überladung: ohne Preload die alte Warnung, mit `LD_PRELOAD=/lib/libjsig.so` die ld.so-ERROR-Zeile und die neue Warnung, mit dem echten Pfad keine Warnung.
 - **Rot-Grün-Nachweis:** gegen den alten Entscheidungscode (neue Überladung als Stub, die den Supplier ignoriert und an die alte Logik delegiert; `libjsigMapped` als Stub „leer“) rot: `warning_linuxLibjsigNamedInLdPreloadButNotMapped_warns` „Expected: is <true> but: was <false>“, `warning_linuxLibjsigMappedWithoutLdPreload_isEmpty` „Expected: is <false> but: was <true>“, `warning_linuxMappingUnreadable_fallsBackToLdPreload` „Expected: a string containing "could not be read"“, die beiden Maps-Tests „Expected: is <Optional[true]>/<Optional[false]> but: was <Optional.empty>“; mit dem Fix grün, `SignalChainingCheckTest` 11/11, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 896bcc4
 
 ## Offene Verdachte ohne Fund-ID
 
