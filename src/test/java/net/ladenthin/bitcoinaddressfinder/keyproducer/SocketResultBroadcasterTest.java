@@ -411,6 +411,7 @@ class SocketResultBroadcasterTest {
             announcer.shutdownNow();
         }
     }
+
     /**
      * A batch reported after {@link SocketResultBroadcaster#close()} reaches no client any more. That
      * must be visible in the log, once, instead of the report disappearing without a word.

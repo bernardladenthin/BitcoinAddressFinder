@@ -87,8 +87,8 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F194](#f194) — niedrig — *gefixt*
 - [F195](#f195) — niedrig — *gefixt*
 - [F196](#f196) — niedrig — *gefixt*
-- [F206](#f206) — niedrig — *gefixt*
-- [F207](#f207) — mittel — *gefixt*
+- [F206](#f206) — niedrig bis mittel — *gefixt*
+- [F207](#f207) — niedrig bis mittel — *gefixt*
 - [F208](#f208) — niedrig — *gefixt*
 
 ## Funde
@@ -1120,6 +1120,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** gegen den alten Code rot („Expected java.io.IOException to be thrown, but nothing was thrown.“), mit dem Fix grün. Breite Liste: `FinderTest` 35/35 (mit `POCL_MAX_WORK_GROUP_SIZE=256`), `MainStartFinderTest` 2/2, `KeyProducerJavaSocketTest` 23/23, `SocketResultBroadcasterTest` 11/11, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
 - **Commit:** cf4e085
+- **Nachtrag (Verifikation 2026-10-20):** Die Id-Assertion des Tests war wirkungslos: die Id `socket` steht ohnehin in „The socket key producer“. Der Test nutzt jetzt die eindeutige Id `heldResultPortProducer`, sodass er wirklich prüft, dass die Meldung den Key-Producer nennt. Rot/Grün der drei Fixe F206–F208 unabhängig nachvollzogen (Produktionsdateien auf den Elternstand gesetzt: rot mit den genannten Assertions; zurückgesetzt: grün).
 
 ## Offene Verdachte ohne Fund-ID
 

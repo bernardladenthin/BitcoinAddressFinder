@@ -253,6 +253,7 @@ class ZmqResultBroadcasterTest {
             broadcaster.close();
         }
     }
+
     /**
      * A batch reported after {@link ZmqResultBroadcaster#close()} cannot be published any more. That
      * must be visible in the log, once, instead of the report disappearing without a word.

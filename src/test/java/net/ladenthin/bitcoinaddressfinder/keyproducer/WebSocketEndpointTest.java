@@ -71,6 +71,7 @@ class WebSocketEndpointTest {
         }
         assertThat(leftOver, is(empty()));
     }
+
     /**
      * A message sent after {@link WebSocketEndpoint#stop()} reaches no client any more: a batch
      * reported then would vanish without a word. That must be visible in the log, once.

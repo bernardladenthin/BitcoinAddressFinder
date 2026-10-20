@@ -583,7 +583,9 @@ public class FinderTest {
             assertThat(batchMessages, is(equalTo(producers)));
         } finally {
             client.closeBlocking();
-            finder.interrupt();
+            // abortStart also closes the broadcasters, which stop the shared endpoint; interrupt()
+            // alone leaves it running when the test fails before shutdownAndAwaitTermination
+            finder.abortStart();
         }
     }
 
@@ -669,7 +671,7 @@ public class FinderTest {
             socket.mode = CKeyProducerJavaSocket.Mode.SERVER;
             socket.port = KeyProducerJavaSocketTest.findFreePort();
             socket.timeoutMillis = KeyProducerJavaTest.TIMEOUT_FOR_TERMINATE;
-            socket.keyProducerId = "socket";
+            socket.keyProducerId = "heldResultPortProducer";
             socket.broadcastResults = true;
             socket.resultPort = occupant.getLocalPort();
             cFinder.keyProducerJavaSocket.add(socket);
@@ -682,7 +684,7 @@ public class FinderTest {
                 IOException e = assertThrows(IOException.class, finder::startConsumer);
 
                 // assert
-                assertThat(e.getMessage(), containsString("socket"));
+                assertThat(e.getMessage(), containsString("heldResultPortProducer"));
                 assertThat(e.getMessage(), containsString(String.valueOf(occupant.getLocalPort())));
                 assertThat(finder.isConsumerRunning(), is(false));
             } finally {

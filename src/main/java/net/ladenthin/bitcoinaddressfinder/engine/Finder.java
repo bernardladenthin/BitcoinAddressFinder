@@ -837,8 +837,8 @@ public class Finder implements Interruptable {
         // the collections it walks), so the hook calling it again later is harmless.
         //
         // When the producers have ended, the consumer goes first: it may still be checking what they
-        // queued, and it reports every checked batch to the result broadcasters that interrupt()
-        // closes. Closed first, the last batches of a run -- the completion signal a client waits
+        // queued, and it reports every checked batch to the result broadcasters that
+        // closeBroadcasters() closes. Closed first, the last batches of a run -- the completion signal a client waits
         // for -- reached nobody. When the wait timed out instead, producers are still running and
         // filling the queue; they have to be stopped first, or a producer blocked on the full queue
         // of a stopped consumer would hold interrupt() for its whole shutdownTimeoutSeconds.
