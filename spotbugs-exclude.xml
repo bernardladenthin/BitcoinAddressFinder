@@ -605,6 +605,21 @@ SPDX-License-Identifier: Apache-2.0
     </Match>
 
     <!--
+        IMC_IMMATURE_CLASS_NO_EQUALS on SignalChainingCheck.
+
+        SignalChainingCheck carries a once-per-instance gate (an AtomicBoolean behind
+        warningOnce) and is held by OpenCLContext as one static instance, so the libjsig
+        warning is logged once per JVM. Its Lombok @ToString trips the IMC heuristic into
+        demanding equals()/hashCode(), but value equality would be wrong for a gate: two
+        instances with the same flag are still two gates, and the class is only ever used by
+        identity. equals()/hashCode() are intentionally omitted.
+    -->
+    <Match>
+        <Class name="net.ladenthin.bitcoinaddressfinder.opencl.SignalChainingCheck"/>
+        <Bug pattern="IMC_IMMATURE_CLASS_NO_EQUALS"/>
+    </Match>
+
+    <!--
         USBR_UNNECESSARY_STORE_BEFORE_RETURN on Lombok-generated equals / hashCode /
         canEqual / toString.
 

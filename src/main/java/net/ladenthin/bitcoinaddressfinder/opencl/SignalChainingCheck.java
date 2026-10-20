@@ -11,8 +11,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
+import lombok.ToString;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,6 +46,7 @@ import org.slf4j.LoggerFactory;
  * <p>Only Linux is affected: Windows has no POSIX signals, and the warning is not raised for macOS,
  * where it has not been observed.
  */
+@ToString
 public final class SignalChainingCheck {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SignalChainingCheck.class);
@@ -59,6 +62,9 @@ public final class SignalChainingCheck {
 
     /** Advice appended to every warning: what to preload and that the shipped launchers do it. */
     private static final String START_WITH = " Start with LD_PRELOAD=";
+
+    /** Set once {@link #warningOnce} has handed out its warning. */
+    private final AtomicBoolean warned = new AtomicBoolean();
 
     /** Creates a check. */
     public SignalChainingCheck() {}
@@ -112,6 +118,43 @@ public final class SignalChainingCheck {
                     + " (the library of the JVM that runs, " + javaHome + ").");
         }
         return Optional.of(notPreloadedWarning(libraryToPreload));
+    }
+
+    /**
+     * Returns the warning of {@link #warning(String, String, String)} the first time it is present for
+     * this instance, and empty afterwards. The condition is fixed for the life of the process (the
+     * environment, {@code os.name} and {@code java.home} cannot change, nor can what {@code ld.so}
+     * preloaded), so a caller that builds a kernel many times (one {@code OpenCLContext} per producer
+     * and per tuner arm) shares one instance and logs the warning once.
+     *
+     * @param osName the value of the {@code os.name} system property
+     * @param ldPreload the {@code LD_PRELOAD} environment variable, or {@code null} when unset
+     * @param javaHome the value of the {@code java.home} system property
+     * @return the warning on its first occurrence for this instance, otherwise empty
+     */
+    public Optional<String> warningOnce(String osName, @Nullable String ldPreload, String javaHome) {
+        return warningOnce(osName, ldPreload, javaHome, () -> libjsigMapped(Paths.get(PROC_SELF_MAPS)));
+    }
+
+    /**
+     * Returns the warning of {@link #warning(String, String, String, Supplier)} the first time it is
+     * present for this instance, and empty afterwards. A call that answers empty does not use up the
+     * gate. {@link #warning} itself stays a pure decision and is not affected.
+     *
+     * @param osName the value of the {@code os.name} system property
+     * @param ldPreload the {@code LD_PRELOAD} environment variable, or {@code null} when unset
+     * @param javaHome the value of the {@code java.home} system property
+     * @param libjsigMapped whether {@code libjsig} is mapped into the process; empty when that could not
+     *     be determined
+     * @return the warning on its first occurrence for this instance, otherwise empty
+     */
+    public Optional<String> warningOnce(
+            String osName, @Nullable String ldPreload, String javaHome, Supplier<Optional<Boolean>> libjsigMapped) {
+        final Optional<String> warning = warning(osName, ldPreload, javaHome, libjsigMapped);
+        if (warning.isPresent() && warned.compareAndSet(false, true)) {
+            return warning;
+        }
+        return Optional.empty();
     }
 
     /**

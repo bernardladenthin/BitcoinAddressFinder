@@ -49,6 +49,12 @@ public class OpenCLContext implements ReleaseCLObject {
     private static final Logger LOGGER = LoggerFactory.getLogger(OpenCLContext.class);
 
     /**
+     * The libjsig check shared by every context of this JVM, so its warning is logged once per process
+     * rather than once per producer or tuner arm (see {@link SignalChainingCheck#warningOnce}).
+     */
+    private static final SignalChainingCheck SIGNAL_CHAINING_CHECK = new SignalChainingCheck();
+
+    /**
      * Loads the OpenCL kernel sources from the classpath and strips {@code #include} directives.
      *
      * @return one source string per kernel source resource
@@ -503,8 +509,9 @@ public class OpenCLContext implements ReleaseCLObject {
         final boolean effectiveNoInlineHelpers =
                 resolveEffectiveNoInlineHelpers(device.deviceName(), device.deviceVendor());
         // The build is where an in-process LLVM takes over the JVM's signal handlers (see SignalChainingCheck).
-        new SignalChainingCheck()
-                .warning(
+        // One shared instance: init() runs once per producer and once per tuner arm, the warning is logged once.
+        SIGNAL_CHAINING_CHECK
+                .warningOnce(
                         System.getProperty("os.name", ""),
                         System.getenv("LD_PRELOAD"),
                         System.getProperty("java.home", ""))

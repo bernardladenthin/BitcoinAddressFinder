@@ -8,6 +8,8 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -31,6 +33,24 @@ import org.junit.jupiter.params.provider.EnumSource;
 public class OpenCLContextTest {
 
     private final BitHelper bitHelper = new BitHelper();
+
+    @Test
+    public void signalChainingCheck_oneInstanceSharedByEveryContext() {
+        // init() runs once per producer and once per tuner arm; the libjsig warning gate (warningOnce)
+        // only says it once per JVM if every context asks the same instance. init() itself needs a
+        // device, so the wiring is pinned by its declaration.
+        final List<Field> sharedChecks = new ArrayList<>();
+        for (Field field : OpenCLContext.class.getDeclaredFields()) {
+            final int modifiers = field.getModifiers();
+            if (field.getType() == SignalChainingCheck.class
+                    && Modifier.isStatic(modifiers)
+                    && Modifier.isFinal(modifiers)) {
+                sharedChecks.add(field);
+            }
+        }
+
+        assertThat(sharedChecks, hasSize(1));
+    }
 
     /** Minimal in-memory {@link AddressIterable} of 20-byte hash160 snapshots for filter builds. */
     private static AddressIterable iterableOf(List<byte[]> entries) {

@@ -91,6 +91,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F207](#f207) — niedrig bis mittel — *gefixt*
 - [F208](#f208) — niedrig — *gefixt*
 - [F209](#f209) — niedrig — *gefixt*
+- [F210](#f210) — niedrig — *gefixt*
 
 ## Funde
 
@@ -785,6 +786,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** siehe Tests.
 - **Status:** gefixt
 - **Commit:** 5c8833c
+- **Nachtrag (Branch-Review 2026-10-20):** Die Ende-zu-Ende-Aussage „loggt die Warnung einmal“ galt nur für einen `Find` mit einem Producer; der Tuner (ein Kernel je Arm) und ein `Find` mit mehreren OpenCL-Producern loggten sie je Kontext, und `run_TuneConfiguration.sh` lud `libjsig` nicht vor – behoben als [F210](#f210). Die Prüfung entscheidet seit [F209](#f209) über `/proc/self/maps` statt über den `LD_PRELOAD`-String.
 
 <a id="f150"></a>
 ### F150 – BitcoinAddressFinder: Der `HexHash`-Export lässt sich nicht wieder importieren; 7,6 % seiner Zeilen werden zu falschen Hashes
@@ -1135,6 +1137,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** gegen den alten Entscheidungscode (neue Überladung als Stub, die den Supplier ignoriert und an die alte Logik delegiert; `libjsigMapped` als Stub „leer“) rot: `warning_linuxLibjsigNamedInLdPreloadButNotMapped_warns` „Expected: is <true> but: was <false>“, `warning_linuxLibjsigMappedWithoutLdPreload_isEmpty` „Expected: is <false> but: was <true>“, `warning_linuxMappingUnreadable_fallsBackToLdPreload` „Expected: a string containing "could not be read"“, die beiden Maps-Tests „Expected: is <Optional[true]>/<Optional[false]> but: was <Optional.empty>“; mit dem Fix grün, `SignalChainingCheckTest` 11/11, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply` und `spotbugs:check` grün.
 - **Status:** gefixt
 - **Commit:** 896bcc4
+
+<a id="f210"></a>
+### F210 – BitcoinAddressFinder: Der Tuner wiederholt die libjsig-Warnung je Arm, und sein Startskript lädt libjsig nicht vor
+- **Zeit:** 2026-10-20 21:38 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/opencl/OpenCLContext.java` (`init`), `opencl/SignalChainingCheck.java`, `examples/run_TuneConfiguration.sh`
+- **Schwere:** niedrig (Log-Rauschen im Tuner-Log, das der Nutzer nach dem Gewinner lesen soll; dazu das Absturzrisiko von F148 für den Tuner auf pocl/Intel-CPU)
+- **Historie:** Gefunden beim Review des Branches am 2026-10-20 (Fund B3-4). Die Warnung kam mit F148; dessen Ende-zu-Ende-Prüfung lief nur mit einem `Find` mit einem Producer („loggt die Warnung einmal“).
+- **Beschreibung:** `OpenCLContext.init()` legte bei jedem Aufruf eine neue `SignalChainingCheck` an und loggte deren Warnung. `TuneConfiguration.runArm` baut je Arm einen neuen Producer, dessen `initProducer` einen neuen `OpenCLContext` initialisiert; ein Standard-Sweep (7 Rastergrößen × 5 `keysPerWorkItem`, dazu Erweiterungs- und Filter-Arme) auf Linux ohne Preload schrieb dieselbe WARN-Zeile 35- bis 45-mal, ein `Find` mit mehreren OpenCL-Producern einmal je Producer. Die Bedingung kann sich im Prozess nicht ändern. Dazu lud `examples/run_TuneConfiguration.sh` – anders als die drei `run_*OpenCL*.sh` – `libjsig` nicht vor, obwohl der Tuner beim Tunen eines OpenCL-Producers je Arm einen Kernel baut.
+- **Fix:** `SignalChainingCheck.warning` bleibt eine reine Entscheidung. Neu ist das Tor `warningOnce` (Dreier-Überladung über `/proc/self/maps`, Vierer-Überladung mit Mapping-Supplier, siehe F209): es gibt die Warnung beim ersten Auftreten je Instanz zurück (`AtomicBoolean.compareAndSet`), danach leer; eine leere Antwort verbraucht das Tor nicht. `OpenCLContext` hält eine geteilte Instanz `private static final SignalChainingCheck SIGNAL_CHAINING_CHECK` und ruft `warningOnce` unmittelbar vor `buildProgram`, also einmal je JVM. `run_TuneConfiguration.sh` hat jetzt denselben Linux-Block wie die OpenCL-Skripte (`readlink -f $(command -v java)`, `export LD_PRELOAD` nur, wenn die Datei existiert). SpotBugs: die Klasse hat mit dem Tor einen Zustand und trägt `@ToString`; `IMC_IMMATURE_CLASS_NO_EQUALS` ist begründet unterdrückt (ein Tor hat Identitätssemantik).
+- **Tests:** `SignalChainingCheckTest#warningOnce_linuxWithoutPreload_secondCallIsEmpty`, `#warningOnce_libjsigLoaded_doesNotConsumeTheGate`, `#warning_afterWarningOnceOfTheSameInstance_stillAnswers` (frische Instanzen); `OpenCLContextTest#signalChainingCheck_oneInstanceSharedByEveryContext` pinnt die Verdrahtung über die Deklaration (genau ein `static final`-Feld vom Typ `SignalChainingCheck`), weil `init()` ein Gerät braucht. Ende zu Ende auf pocl ohne Preload: zwei `OpenCLContext`-`init()` hintereinander in einer JVM loggen die Warnung einmal (vorher zweimal).
+- **Rot-Grün-Nachweis:** gegen den alten Code (`warningOnce` als Stub ohne Tor, `OpenCLContext` ohne geteilte Instanz) rot: `warningOnce_linuxWithoutPreload_secondCallIsEmpty` „Expected: is <false> but: was <true>“, `signalChainingCheck_oneInstanceSharedByEveryContext` „Expected: a collection with size <1> but: collection size was <0>“; mit dem Fix grün. Breite Liste: `SignalChainingCheckTest` 14/14, `OpenCLContextTest` 33/33 (auf pocl), `ExampleRunScriptJarVersionTest` 1/1, `JvmModuleFlagConsistencyTest` 4/4, `BitcoinAddressFinderArchitectureTest` 17/17; `bash -n` des Skripts, `spotless:apply` und `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 

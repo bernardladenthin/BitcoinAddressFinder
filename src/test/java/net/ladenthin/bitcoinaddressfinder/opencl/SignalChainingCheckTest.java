@@ -113,6 +113,40 @@ class SignalChainingCheckTest {
     }
     // </editor-fold>
 
+    // <editor-fold defaultstate="collapsed" desc="warningOnce">
+    @Test
+    void warningOnce_linuxWithoutPreload_secondCallIsEmpty() {
+        // the tuner builds a kernel per arm, i.e. calls this once per arm; the condition cannot change
+        final SignalChainingCheck gate = new SignalChainingCheck();
+
+        Optional<String> first = gate.warningOnce("Linux", null, JAVA_HOME, NOT_MAPPED);
+        Optional<String> second = gate.warningOnce("Linux", null, JAVA_HOME, NOT_MAPPED);
+
+        assertThat(first.isPresent(), is(true));
+        assertThat(second.isPresent(), is(false));
+    }
+
+    @Test
+    void warningOnce_libjsigLoaded_doesNotConsumeTheGate() {
+        final SignalChainingCheck gate = new SignalChainingCheck();
+
+        Optional<String> whileLoaded = gate.warningOnce("Linux", null, JAVA_HOME, MAPPED);
+        Optional<String> afterwards = gate.warningOnce("Linux", null, JAVA_HOME, NOT_MAPPED);
+
+        assertThat(whileLoaded.isPresent(), is(false));
+        assertThat(afterwards.isPresent(), is(true));
+    }
+
+    @Test
+    void warning_afterWarningOnceOfTheSameInstance_stillAnswers() {
+        // the gate is separate: warning(...) stays a pure decision
+        final SignalChainingCheck gate = new SignalChainingCheck();
+        gate.warningOnce("Linux", null, JAVA_HOME, NOT_MAPPED);
+
+        assertThat(gate.warning("Linux", null, JAVA_HOME, NOT_MAPPED).isPresent(), is(true));
+    }
+    // </editor-fold>
+
     // <editor-fold defaultstate="collapsed" desc="libjsigMapped">
     @Test
     void libjsigMapped_mapsListLibjsig_isTrue() throws IOException {
