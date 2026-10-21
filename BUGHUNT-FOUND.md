@@ -1251,7 +1251,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `OpenClKernelLauncherTest` (4, Mock-`ClApi`: pocl-CPU und Kernel-Limit 4096 → Überladung mit `{256}`, nie die alte; Kernel-Limit 128 → `{128}`; global 1 → Local `{1}`; anderes Gerät → alte Überladung, nie die neue, keine Abfrage des Kernel-Limits). `OpenCLContextLocalWorkSizeTest#benchmarkHooks_poclCpuDevice_launchWithTheCappedLocalWorkSize` (Gerätetest, Mockito-Spy über der echten Bindung, überspringt sich ohne pocls CPU-Gerät): `init()`, alle drei Haken mit global 4096 – die Precompute-Starts kommen mit `{1}`/`{1}`, die Haken mit `{4096}`/`{256}`, die Überladung ohne Local-Size wird kein einziges Mal gerufen.
 - **Rot-Grün-Nachweis:** gegen den unveränderten Kontext rot: `benchmarkHooks_poclCpuDevice_launchWithTheCappedLocalWorkSize` „Argument(s) are different! Wanted: clApi.enqueueNDRangeKernel(<any>, <any>, [1], [1], false)“ (die Precompute-Starts kamen über die Überladung ohne Local-Size); gegen einen Launcher-Stub, der die alte Überladung ruft, rot: 3 von 4 in `OpenClKernelLauncherTest` („Argument(s) are different! Wanted: …“; der vierte Fall ist das alte Verhalten). Mit dem Fix grün: 4/4 und 1/1. Breit, auf pocl ohne `POCL_MAX_WORK_GROUP_SIZE`, mit libjsig: `OpenCLContextTest` 33/33, `OpenCLPrecomputeKernelTest` 10/10, `OpenCLFe10x26ParityTest` 1/1, `OpenClTaskLocalWorkSizeTest` 2/2, `ProbeAddressesOpenCLTest` 50 (22 übersprungen, Rastergrößen), `OpenCLAddKernelSmokeTest` 1/1, `BitcoinAddressFinderArchitectureTest` 17/17; `bash -n` der Startskripte, YAML-Prüfung, `spotless:apply`.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** befc8d0
 
 ## Offene Verdachte ohne Fund-ID
 
