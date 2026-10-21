@@ -1315,7 +1315,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `FilterBuildProgressTest#largeTotal_rateRoundingUpToAThousandK_isShownInM` (Gesamt 9 996 000, ein Segment von 999 600 in 1 s → „phase: 10% (999600/9996000), 1.0M/s, ETA 9s, elapsed 1s.“), `#formatRate_valueRoundingUpToAThousandOfItsUnit_carriesIntoTheNextUnit` (`999_600` und `999_500` → „1.0M/s“, `999.96` und `999.5` → „1k/s“), `#formatRate_valueBelowTheCarry_keepsItsUnit` (`999_499` → „999k/s“, `999.4` → „999/s“, `1_000_000` → „1.0M/s“, `1_000` → „1k/s“).
 - **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: „Expected: is "1.0M/s" but: was "1000k/s"“ und „Expected: iterable containing ["phase: 10% (999600/9996000), 1.0M/s, ETA 9s, elapsed 1s."] but: item 0: was "phase: 10% (999600/9996000), 1000k/s, ETA 9s, elapsed 1s."“ (die Unterhalb-Fälle waren schon grün, sie pinnen die Grenze); mit dem Fix grün, `FilterBuildProgressTest` 10/10, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply`.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 73851db
 
 ## Offene Verdachte ohne Fund-ID
 
