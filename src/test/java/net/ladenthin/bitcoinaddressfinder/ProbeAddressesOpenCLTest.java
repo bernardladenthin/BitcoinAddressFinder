@@ -437,7 +437,8 @@ public class ProbeAddressesOpenCLTest {
      * unaligned base that is not {@code base + offset}, which is what the host reports for a hit, so the
      * kernel would compute other keys than the ones named in the results, silently. The grid must be
      * refused before the kernel runs, and not as a "too large" key, which the producer treats as the
-     * expected top-of-range skip.
+     * expected top-of-range skip. "Before the kernel runs" is pinned by the source argument: it is
+     * all zero after {@code init()} and still all zero after the refusal.
      */
     @OpenCLTest
     @Test
@@ -448,12 +449,53 @@ public class ProbeAddressesOpenCLTest {
         producerOpenCL.batchSizeInBits = 8;
         try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
             openCLContext.init();
+            ByteBuffer source = openCLContext
+                    .getOpenClTask()
+                    .orElseThrow()
+                    .getPrivateKeySourceArgument()
+                    .getByteBuffer();
+            assertThat(allBytesOf(source), is(equalTo(new byte[source.capacity()])));
 
             IllegalArgumentException e = assertThrows(
                     IllegalArgumentException.class, () -> openCLContext.createKeys(BigInteger.valueOf(0x1_0001)));
             assertThat(e, is(not(instanceOf(PrivateKeyTooLargeException.class))));
             assertThat(e.getMessage(), containsString("not aligned"));
+            // the kernel reads its key base from this argument, which executeKernel uploads only after
+            // setSrcPrivateKeyChunk wrote it: still all zero means nothing was prepared or dispatched
+            assertThat(allBytesOf(source), is(equalTo(new byte[source.capacity()])));
         }
+    }
+
+    /**
+     * A base that is both unaligned and above the batch-size maximum: {@code n} itself, odd, so
+     * unaligned at 8 bits. The alignment check must win, because the producer treats a
+     * {@link PrivateKeyTooLargeException} as the expected top-of-range skip and logs it only as a
+     * warning; swapping the two checks would hide a caller defect as that skip.
+     */
+    @OpenCLTest
+    @Test
+    public void createKeys_unalignedBaseAboveTheMaximum_isRefusedAsUnaligned() throws IOException {
+        new OpenCLPlatformAssume().assumeOpenClLibraryAvailableAndOneOpenCL2_0OrGreaterDeviceAvailable();
+
+        CProducerOpenCL producerOpenCL = new CProducerOpenCL();
+        producerOpenCL.batchSizeInBits = 8;
+        BigInteger groupOrder = Secp256k1Constants.MAX_PRIVATE_KEY.add(BigInteger.ONE);
+        try (OpenCLContext openCLContext = new OpenCLContext(producerOpenCL, bitHelper)) {
+            openCLContext.init();
+
+            IllegalArgumentException e =
+                    assertThrows(IllegalArgumentException.class, () -> openCLContext.createKeys(groupOrder));
+
+            assertThat(e, is(not(instanceOf(PrivateKeyTooLargeException.class))));
+            assertThat(e.getMessage(), containsString("not aligned"));
+        }
+    }
+
+    /** Reads every byte of the buffer by absolute position, independent of its position and limit. */
+    private static byte[] allBytesOf(ByteBuffer buffer) {
+        byte[] bytes = new byte[buffer.capacity()];
+        buffer.duplicate().clear().get(bytes);
+        return bytes;
     }
 
     @ParameterizedTest
