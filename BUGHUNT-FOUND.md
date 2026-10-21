@@ -96,6 +96,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F212](#f212) — mittel — *gefixt*
 - [F213](#f213) — niedrig — *gefixt*
 - [F214](#f214) — niedrig — *gefixt*
+- [F215](#f215) — niedrig — *gefixt*
 
 ## Funde
 
@@ -1220,6 +1221,20 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: „Unexpected exception type thrown, expected: <java.lang.IllegalArgumentException> but was: <java.util.NoSuchElementException>“ (beide leeren Listen) und „… but was: <java.lang.NullPointerException>“ („Cannot invoke "java.lang.Integer.intValue()" because the return value of "java.util.Iterator.next()" is null“); mit dem Fix grün. Breit: `TuneConfigurationTest` 62/62 (1 übersprungen); `spotless:apply`.
 - **Status:** gefixt
 - **Commit:** 4bcad44
+
+<a id="f215"></a>
+### F215 – BitcoinAddressFinder: `Statistics.formatRate`/`formatCount` zeigen an der Einheitsgrenze „1000.0 k/s“ statt „1.000 M/s“
+- **Zeit:** 2026-10-21 13:55 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/statistics/Statistics.java` (`formatRate`, `formatCount`, neu `formatScaled` und `roundForDisplay`, Javadoc von `withSignificantDigits`)
+- **Schwere:** niedrig (kosmetisch, Statistikzeile und Tuner-Bericht)
+- **Historie:** Offener Punkt aus dem Branch-Review 2026-10-20/21 (TODO.md; Brief BR-4), umgesetzt am 2026-10-21 nach der Entscheidung des Eigentümers, alle offenen Punkte vor 6.0.0 zu schließen. Das alte Verhalten war bewusst und im Javadoc von `withSignificantDigits` als „nicht befördern“ festgehalten (zweimal formatieren für einen kosmetischen Gewinn); `StatisticsTest#formatRate_justBelowTheNextUnit_rendersAsAThousandOfTheSmallerUnit` pinnte es.
+- **Beschreibung:** Die Einheit wurde am ungerundeten Wert gewählt und danach auf vier signifikante Stellen gerundet: `999_999.9` wählte k und wurde zu „1000.0 k/s“, `999_999_999` zu „1000.0 M/s“, und unterhalb von 1000 wurde `999.6` zu „1000/s“. `formatCount` hatte denselben Aufbau („1000.0 M“).
+- **Fix:** Erst runden, dann die Einheit wählen: `roundForDisplay` rundet unterhalb von 1000 auf eine ganze Zahl (dort zeigt die Ausgabe keine Nachkommastellen), ab 1000 per `BigDecimal` auf `SIGNIFICANT_DIGITS` (4, `HALF_UP` wie `String.format`); `formatScaled` wählt G/M/k am gerundeten Wert, sodass nichts mehr zweimal formatiert wird. `formatRate` und `formatCount` teilen die Funktion (Suffix `/s` bzw. leer). Nicht endliche und negative Werte bleiben wie vorher (`NaN` → „0/s“). Der Javadoc-Absatz zum Nicht-Befördern ist ersetzt.
+- **Nebenbefund (nicht geändert):** `persistence/FilterBuildProgress.formatRate` ist eine eigene, gröbere Hilfsfunktion (`%.1fM/s`, `%.0fk/s`) mit derselben Klasse: `999_600` → „1000k/s“. Nicht Teil dieses Punkts.
+- **Tests:** `StatisticsTest#formatRate_valueRoundingUpToAThousandOfItsUnit_carriesIntoTheNextUnit` (`999_999.9` → „1.000 M/s“, `999_999_999` → „1.000 G/s“, `999_950` → „1.000 M/s“, `999.96` und `999.5` → „1.000 k/s“), `#formatRate_valueBelowTheCarry_keepsItsUnit` (`999.4` → „999/s“, `999_949` → „999.9 k/s“, `999_949_999` → „999.9 M/s“), `#formatCount_valueRoundingUpToAThousandOfItsUnit_carriesIntoTheNextUnit` (`999_999_999` → „1.000 G“, `999_950` → „1.000 M“, `999_949` → „999.9 k“, `999` → „999“). Der alte Pin-Test ist durch den ersten ersetzt.
+- **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: „Expected: is "1.000 M/s" but: was "1000.0 k/s"“ und „Expected: is "1.000 G" but: was "1000.0 M"“ (die Unterhalb-Fälle waren schon grün, sie pinnen die Grenze); mit dem Fix grün. Breit: `StatisticsTest` 13/13; `spotless:apply`, `spotbugs:check` grün.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 

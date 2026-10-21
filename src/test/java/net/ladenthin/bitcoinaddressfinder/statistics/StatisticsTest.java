@@ -132,13 +132,24 @@ public class StatisticsTest {
     }
 
     /**
-     * A value within rounding distance of the next unit is rendered in the unit its magnitude
-     * selected rather than being promoted. Pinned because it looks like a bug on first sight and a
-     * future reader should find the decision recorded rather than "fix" it.
+     * A value that rounds up to a thousand of its unit is shown in the next unit: the rounding to
+     * {@code SIGNIFICANT_DIGITS} decides the unit, not the unrounded magnitude. Below the carry the
+     * value keeps its unit.
      */
     @Test
-    public void formatRate_justBelowTheNextUnit_rendersAsAThousandOfTheSmallerUnit() {
-        assertThat(Statistics.formatRate(999_999_999.0), is(equalTo("1000.0 M/s")));
+    public void formatRate_valueRoundingUpToAThousandOfItsUnit_carriesIntoTheNextUnit() {
+        assertThat(Statistics.formatRate(999_999.9), is(equalTo("1.000 M/s")));
+        assertThat(Statistics.formatRate(999_999_999.0), is(equalTo("1.000 G/s")));
+        assertThat(Statistics.formatRate(999_950.0), is(equalTo("1.000 M/s")));
+        assertThat(Statistics.formatRate(999.96), is(equalTo("1.000 k/s")));
+        assertThat(Statistics.formatRate(999.5), is(equalTo("1.000 k/s")));
+    }
+
+    @Test
+    public void formatRate_valueBelowTheCarry_keepsItsUnit() {
+        assertThat(Statistics.formatRate(999.4), is(equalTo("999/s")));
+        assertThat(Statistics.formatRate(999_949.0), is(equalTo("999.9 k/s")));
+        assertThat(Statistics.formatRate(999_949_999.0), is(equalTo("999.9 M/s")));
     }
     // </editor-fold>
 
@@ -203,6 +214,14 @@ public class StatisticsTest {
         assertThat(Statistics.formatCount(1_000_000L), is(equalTo("1.000 M")));
         assertThat(Statistics.formatCount(1_000L), is(equalTo("1.000 k")));
         assertThat(Statistics.formatCount(0L), is(equalTo("0")));
+    }
+
+    @Test
+    public void formatCount_valueRoundingUpToAThousandOfItsUnit_carriesIntoTheNextUnit() {
+        assertThat(Statistics.formatCount(999_999_999L), is(equalTo("1.000 G")));
+        assertThat(Statistics.formatCount(999_950L), is(equalTo("1.000 M")));
+        assertThat(Statistics.formatCount(999_949L), is(equalTo("999.9 k")));
+        assertThat(Statistics.formatCount(999L), is(equalTo("999")));
     }
     // </editor-fold>
 
