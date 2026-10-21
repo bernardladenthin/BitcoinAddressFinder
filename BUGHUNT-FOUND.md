@@ -1170,6 +1170,8 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 001c669
 
+- **Nachtrag (Branch-Review 2026-10-20, umgesetzt 2026-10-21):** Wächtertest `ExampleRunScriptSignalChainingTest#openClLaunchersPreloadLibjsig_andTheOthersDoNot` (modellfrei): liest jedes `examples/run_*.sh`, verlangt genau eine existierende `config_*.json`, parst sie mit Jackson und stuft den Lauf als OpenCL-Lauf ein, wenn `command` `OpenCLInfo` oder `TuneConfiguration` ist oder `finder.producerOpenCL` nicht leer ist (die CPU-Configs tragen ein leeres `"producerOpenCL": []`, darum kein Substring-Vergleich). OpenCL-Starts müssen `libjsig.so` nennen und `export LD_PRELOAD="$JSIG…` setzen, alle anderen dürfen weder `libjsig` noch `LD_PRELOAD` enthalten; zusätzlich pinnt er die Menge der vier OpenCL-Starts, damit ein Klassifikator, der nichts erkennt, nicht durchrutscht. Die `.bat`-Starts prüft er nicht (Windows ist nicht betroffen). Heute grün (pinnt); mit entfernter `export LD_PRELOAD`-Zeile in `run_TuneConfiguration.sh` rot: „Expected: is an empty collection but: <[examples/run_TuneConfiguration.sh starts an OpenCL run but does not preload libjsig.so]>“ (Brief BR-6).
+
 <a id="f211"></a>
 ### F211 – BitcoinAddressFinder: Auf pocls CPU-Gerät stirbt die JVM bei Standardeinstellungen; die Work-Group-Grenze stand nur im CI
 - **Zeit:** 2026-10-20 21:59 UTC
