@@ -1268,7 +1268,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `SignalChainingCheckTest#warning_namesLaunchersThatExistAndPreloadLibjsig`: zieht jeden `run_…sh`-Dateinamen aus der Warnung, verlangt mindestens einen, und jeder muss in `examples/` existieren und `libjsig.so` nennen – so kann der Text nicht wieder von den Starts abdriften (die Gegenrichtung hält `ExampleRunScriptSignalChainingTest`).
 - **Rot-Grün-Nachweis:** gegen den alten Wortlaut rot: „Expected: is not an empty collection but: was <[]>“ (das Muster ist kein Dateiname); mit dem Fix grün, `SignalChainingCheckTest` 15/15; `spotless:apply`.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 0f44a09
 
 ## Offene Verdachte ohne Fund-ID
 
