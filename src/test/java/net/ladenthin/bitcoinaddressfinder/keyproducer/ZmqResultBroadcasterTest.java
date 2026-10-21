@@ -47,7 +47,7 @@ import org.zeromq.ZMQ;
  * the full {@link #AWAIT_MILLIS} elapsed and nothing received. See the helper for what stalls and
  * why the cap is the fix; the deterministic reproduction and the full write-up are in
  * {@link JeromqPollerHandOffRaceTest}, which goes red once a jeromq build fixes the race — that is
- * the moment to delete the cap.
+ * the moment to delete the cap. The fix is submitted as zeromq/jeromq#1022 (open as of 2026-10-21).
  */
 class ZmqResultBroadcasterTest {
 

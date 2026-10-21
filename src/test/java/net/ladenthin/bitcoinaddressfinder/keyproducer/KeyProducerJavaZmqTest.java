@@ -48,7 +48,8 @@ import org.zeromq.ZMQ;
  *       {@link JeromqPollerHandOffRaceTest} and {@code ZmqResultBroadcasterTest}); the engine never
  *       sends its greeting, and only the handshake timer, 30 s by default, recovers it.
  *       {@link #connectSender_peerNeverAnswersTheHandshake_reconnectsWithinTheCap()} pins that the cap
- *       reaches the engine.</li>
+ *       reaches the engine. The fix of the race is submitted as zeromq/jeromq#1022 (open as of
+ *       2026-10-21); {@code TODO.md} says what to change here once a release carries it.</li>
  *   <li>Every test has a finite {@link Timeout} in its own thread, so a wedge ends as a failure of that
  *       test, with a thread dump ({@code junit-platform.properties}), instead of taking the fork down.
  *       The two tests in which the producer connects get {@link #PRODUCER_CONNECTS_TIMEOUT_SECONDS}: the

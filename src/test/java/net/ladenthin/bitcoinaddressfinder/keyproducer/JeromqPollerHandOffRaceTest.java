@@ -82,12 +82,18 @@ import zmq.poll.Poller;
  * {@code jeromq-core/src/test/java/zmq/poll/} as a regression test, build, point BAF at the
  * fork, and expect this class to go red and {@link ZmqResultBroadcasterTest} to stay green with
  * {@code HANDSHAKE_IVL_MILLIS} removed. Upstream: github.com/zeromq/jeromq, branch
- * {@code master}, no release after 0.6.0 (Maven Central, 2024-02).
+ * {@code master}, no release after 0.6.0 (Maven Central, 2024-02); the fix is submitted as
+ * zeromq/jeromq#1022, "Poller: flush cancelled keys before registering handles (connect hand-off
+ * race)" (open as of 2026-10-21). {@code TODO.md} lists what to change here once a release carries
+ * it.
  *
  * <h2>Production exposure</h2>
  * {@link ZmqResultBroadcaster} binds and is not affected. {@code KeyProducerJavaZmq} in
- * {@code CONNECT} mode is: a hit delays the first key by up to 30 s and then self-heals through
- * jeromq's reconnect; nothing is lost because {@code PUSH}/{@code PULL} queue rather than drop.
+ * {@code CONNECT} mode is: a hit delays the first key by up to 30 s, until jeromq's handshake timer
+ * drops the connection and reconnects. A message is not always kept through that: jeromq 0.6.0 creates
+ * the bound peer's pipe when it accepts the connection, so a bound {@code PUSH} client can queue a
+ * message on the stalled connection before its handshake, and the dropped connection takes the
+ * message with it (measured in {@code KeyProducerJavaZmqTest}, F218 in {@code BUGHUNT-FOUND.md}).
  */
 class JeromqPollerHandOffRaceTest {
 
