@@ -67,7 +67,7 @@ SPDX-License-Identifier: Apache-2.0
     </select>
   </div>
   <div class="row"><label>From (hex)</label><input type="text" id="fromHex" value="0000000000000000000000000000000000000000000000000000000100000000" /></div>
-  <div class="row"><label>To (hex)</label><input type="text" id="toHex"   value="0000000000000000000000000000000000000000000000000000000108000000" /></div>
+  <div class="row"><label>To (hex, inclusive)</label><input type="text" id="toHex"   value="0000000000000000000000000000000000000000000000000000000107FFFFFF" /></div>
   <div class="row">
     <label>Lookahead</label>
     <input type="number" id="lookahead" value="4" min="1" max="64" style="width:5rem" />
@@ -156,8 +156,10 @@ function alignDown(value) {
 }
 
 /**
- * The end of the range is exclusive and rounded up, not down: rounded down, the keys between the
- * last full block and "To" were never sent, and "Range complete." was reported anyway.
+ * Rounds up to the next grid boundary. start() applies it to "To" + 1, which makes "To" inclusive
+ * like endPrivateKey of the incremental key producer: the block that contains the key named in
+ * "To" is always sent. Rounded down instead, the keys between the last full block and "To" were
+ * never sent, and "Range complete." was reported anyway.
  */
 function alignUp(value) {
   return step === 0n ? value : ((value + step - 1n) / step) * step;
@@ -297,7 +299,7 @@ function connect() {
 function start() {
   if (!config) { log("No server configuration yet."); return; }
   fromBase = alignDown(BigInt("0x" + $("fromHex").value.trim().replace(/^0x/, "")));
-  toBase   = alignUp(BigInt("0x" + $("toHex").value.trim().replace(/^0x/, "")));
+  toBase   = alignUp(BigInt("0x" + $("toHex").value.trim().replace(/^0x/, "")) + 1n);
   nextBase = fromBase;
   sent = checked = hits = keys = 0; inFlight = 0;
   $("statSent").textContent = $("statChecked").textContent = $("statHits").textContent = $("statKeys").textContent = 0;
@@ -326,7 +328,9 @@ $("btnStop").onclick = stop;
   2<sup>batchSizeInBits</sup> candidates, so a few dozen messages per second are enough to keep a GPU
   busy. The lookahead exists because the server's queue is unbounded — keep it small, since anything
   still queued when the process stops was never checked, and only the batches reported back here are
-  known to be done. Results are broadcast to <b>every</b> connected client and
+  known to be done. <b>From</b> and <b>To</b> are both inclusive and widen to whole blocks: the
+  block containing From and the block containing To are both sent. Results are broadcast to
+  <b>every</b> connected client and
   <b>contain private keys</b>.
 </div>
 
