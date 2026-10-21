@@ -43,6 +43,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     loaded (F126); a JSON configuration with a UTF-8 BOM loads (F44).
   - **Shutdown:** `Finder.interrupt()` serialises its callers, so a Ctrl-C during the teardown of a
     finished run waits for it (up to `shutdownTimeoutSeconds` per producer) instead of racing it (F34).
+  - **Result broadcast after a Ctrl-C:** the broadcasters are closed only after the consumer has
+    checked the batches still queued, so a client gets the report for every batch drained during the
+    shutdown; a report that arrives after a broadcaster was closed is logged once as a warning instead of
+    being dropped without a word.
+  - **Ports that cannot be bound fail the start:** the WebSocket key producer's `port` (it started
+    "successfully" and, with `timeoutMillis: -1`, waited forever) and the socket key producer's
+    `resultPort` (it went on without serving results).
+  - **OpenCL on Linux, `libjsig`:** the warning is decided from what is mapped into the process
+    (`/proc/self/maps`) instead of the `LD_PRELOAD` string, so a preload entry the dynamic linker ignored
+    is warned about and a `libjsig` loaded another way is not; it is logged once per JVM, no longer once
+    per kernel build (the tuner logged it once per arm); `run_TuneConfiguration.sh` preloads it too.
+  - **pocl's CPU device:** the key kernel runs there with a local work size of at most 256 (logged at
+    start-up); left to pocl it overflowed the worker thread's stack and the JVM died with exit code 139
+    or 134 at default settings. Other devices keep the driver's choice. The OpenCL launchers also export
+    `POCL_MAX_WORK_GROUP_SIZE=256` unless it is set, which the test and benchmark kernels still rely on.
 - **The OpenCL kernel refuses an unaligned secret base, and the skipped top grid is a warning.**
   The kernel derives a work item's key by ORing its offset into the lowest word of the base, which is
   the base plus the offset only when the low `batchSizeInBits` bits of the base are zero; the host
