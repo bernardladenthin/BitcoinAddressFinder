@@ -82,7 +82,8 @@ public class CTuneConfiguration {
     public long targetDatabaseEntries = 141_045_995L;
 
     /**
-     * Candidate {@code batchSizeInBits} values to sweep.
+     * Candidate {@code batchSizeInBits} values to sweep. Must name at least one candidate and no
+     * {@code null}; the tuner rejects the list before it measures anything otherwise.
      *
      * <p>Each candidate is crossed with every {@link #keysPerWorkItemCandidates} entry, so the arm
      * count — and the run time, {@code arms × (warmupSecondsPerArm + secondsPerArm)} — is the
@@ -97,7 +98,8 @@ public class CTuneConfiguration {
     public List<Integer> batchSizeInBitsCandidates = new ArrayList<>(List.of(18, 19, 20, 21, 22, 23, 24));
 
     /**
-     * Candidate {@code keysPerWorkItem} values to sweep. Must be powers of two.
+     * Candidate {@code keysPerWorkItem} values to sweep. Must be powers of two; must name at least
+     * one candidate and no {@code null}, which the tuner checks before it measures anything.
      *
      * <p>Inert for CPU producers, which have no work-items; when the sweep degrades to a CPU
      * producer these candidates collapse to repeated measurements of the same arm and the report

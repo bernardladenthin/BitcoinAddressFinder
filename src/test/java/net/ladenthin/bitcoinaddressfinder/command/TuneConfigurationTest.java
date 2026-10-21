@@ -136,6 +136,55 @@ public class TuneConfigurationTest extends LMDBBase {
     }
 
     @Test
+    public void run_noBatchSizeCandidate_isRejectedNamingTheField() {
+        // arrange
+        CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();
+        cTuneConfiguration.batchSizeInBitsCandidates = List.of();
+
+        // act
+        IllegalArgumentException exception =
+                assertThrows(IllegalArgumentException.class, () -> new TuneConfiguration(cTuneConfiguration).run());
+
+        // assert
+        assertThat(
+                exception.getMessage(),
+                is(equalTo("tuneConfiguration.batchSizeInBitsCandidates must name at least one candidate")));
+    }
+
+    @Test
+    public void run_noKeysPerWorkItemCandidate_isRejectedNamingTheField() {
+        // arrange
+        CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();
+        cTuneConfiguration.keysPerWorkItemCandidates = List.of();
+
+        // act
+        IllegalArgumentException exception =
+                assertThrows(IllegalArgumentException.class, () -> new TuneConfiguration(cTuneConfiguration).run());
+
+        // assert
+        assertThat(
+                exception.getMessage(),
+                is(equalTo("tuneConfiguration.keysPerWorkItemCandidates must name at least one candidate")));
+    }
+
+    @Test
+    public void run_nullBatchSizeCandidate_isRejectedNamingTheField() {
+        // arrange — a JSON "null" in the list binds to a null element
+        CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();
+        cTuneConfiguration.batchSizeInBitsCandidates = new ArrayList<>(BATCH_SIZE_CANDIDATES);
+        cTuneConfiguration.batchSizeInBitsCandidates.add(null);
+
+        // act
+        IllegalArgumentException exception =
+                assertThrows(IllegalArgumentException.class, () -> new TuneConfiguration(cTuneConfiguration).run());
+
+        // assert
+        assertThat(
+                exception.getMessage(),
+                is(equalTo("tuneConfiguration.batchSizeInBitsCandidates must not contain null but was [4, 5, null]")));
+    }
+
+    @Test
     public void run_cpuProducerWithoutDatabase_producesOneArmPerCandidatePair() {
         // arrange
         CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();

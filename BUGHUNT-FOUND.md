@@ -95,6 +95,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F211](#f211) — mittel — *gefixt*
 - [F212](#f212) — mittel — *gefixt*
 - [F213](#f213) — niedrig — *gefixt*
+- [F214](#f214) — niedrig — *gefixt*
 
 ## Funde
 
@@ -1205,6 +1206,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: „Expected: is "producerOpenCL.maxResultReaderThreads must be at least 1 but was 0" but: was null“ und „Expected java.lang.IllegalArgumentException to be thrown, but nothing was thrown.“; mit dem Fix grün. Breit: `ProducerOpenCLTest` 22/22 (mit pocl, nichts übersprungen); `spotless:apply`.
 - **Status:** gefixt
 - **Commit:** 1922d84
+
+<a id="f214"></a>
+### F214 – BitcoinAddressFinder: Eine leere Kandidatenliste des Tuners scheitert erst nach Stufe 1 mit einer nackten `NoSuchElementException`
+- **Zeit:** 2026-10-21 13:50 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/command/TuneConfiguration.java` (`run`, neu `requireCandidates`); Javadoc `configuration/CTuneConfiguration.java` (`batchSizeInBitsCandidates`, `keysPerWorkItemCandidates`)
+- **Schwere:** niedrig (Fehlkonfiguration; die Meldung nannte das Feld nicht, und Stufe 1 lief vorher umsonst)
+- **Historie:** Offener Punkt aus dem Branch-Review 2026-10-20/21 (TODO.md; Brief BR-3), umgesetzt am 2026-10-21 nach der Entscheidung des Eigentümers, alle offenen Punkte vor 6.0.0 zu schließen. Notiert am 2026-10-17 in `BUGHUNT-CHECKED.md` (`CTuneConfiguration`/`TuneConfiguration`, „Kleinigkeiten, nicht geändert“).
+- **Beschreibung:** Eine leere `batchSizeInBitsCandidates` oder `keysPerWorkItemCandidates` lief durch Stufe 1 (Verifikationskosten), startete Consumer und Key-Producer, sweepte nichts und scheiterte dann in `Collections.max` mit einer `NoSuchElementException` ohne Meldung. Ein `null`-Element (JSON `null`) scheiterte beim Auspacken in der Sweep-Schleife mit einer `NullPointerException`.
+- **Fix:** `run()` prüft beide Listen als Erstes, vor jeder Messung und jedem Gerätezugriff: leer → `IllegalArgumentException` „tuneConfiguration.<feld> must name at least one candidate“, `null`-Element → „tuneConfiguration.<feld> must not contain null but was [...]“ (Schleife statt `contains(null)`, das bei `List.of(...)` selbst wirft). Die Werte selbst prüft wie bisher jeder Arm (`assertBatchSizeInBitsIsInRange`, `OpenClTask` für `keysPerWorkItem`); ein ungültiger Wert lässt seinen Arm scheitern, was der Bericht zeigt – das bleibt so. Javadoc der beiden Felder nennt die Regel.
+- **Tests:** `TuneConfigurationTest#run_noBatchSizeCandidate_isRejectedNamingTheField`, `#run_noKeysPerWorkItemCandidate_isRejectedNamingTheField`, `#run_nullBatchSizeCandidate_isRejectedNamingTheField` (CPU-Producer ohne Datenbank, kein OpenCL nötig).
+- **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: „Unexpected exception type thrown, expected: <java.lang.IllegalArgumentException> but was: <java.util.NoSuchElementException>“ (beide leeren Listen) und „… but was: <java.lang.NullPointerException>“ („Cannot invoke "java.lang.Integer.intValue()" because the return value of "java.util.Iterator.next()" is null“); mit dem Fix grün. Breit: `TuneConfigurationTest` 62/62 (1 übersprungen); `spotless:apply`.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 

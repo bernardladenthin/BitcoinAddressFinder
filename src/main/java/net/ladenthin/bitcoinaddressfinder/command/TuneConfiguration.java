@@ -370,6 +370,10 @@ public class TuneConfiguration implements Runnable, Interruptable {
 
     @Override
     public void run() {
+        // Before anything is measured or started: an empty list used to surface as a bare
+        // NoSuchElementException from Collections.max after the first stage had already run.
+        requireCandidates("batchSizeInBitsCandidates", cTuneConfiguration.batchSizeInBitsCandidates);
+        requireCandidates("keysPerWorkItemCandidates", cTuneConfiguration.keysPerWorkItemCandidates);
         CFinder cFinder = Objects.requireNonNull(
                 cTuneConfiguration.finder, "tuneConfiguration.finder is required: it is the configuration being tuned");
         CConsumerJava cConsumerJava =
@@ -523,6 +527,29 @@ public class TuneConfiguration implements Runnable, Interruptable {
             double micros = totalNanos / (samples * 1_000.0d);
             LOGGER.info("Measured verification cost: {} us per lookup (mean of {}).", format(micros), samples);
             return micros;
+        }
+    }
+
+    /**
+     * Rejects a candidate list the sweep cannot use: one without any candidate, which would sweep
+     * nothing and then fail in {@link Collections#max}, or one with a {@code null} element (a JSON
+     * {@code null}), which would fail when the sweep unboxes it. The values themselves are checked
+     * per arm: an out-of-range one fails its arm, which the report shows.
+     *
+     * @param field      the field name in {@link CTuneConfiguration}, for the message
+     * @param candidates the configured candidates
+     * @throws IllegalArgumentException if {@code candidates} is empty or contains {@code null}
+     */
+    private static void requireCandidates(String field, List<? extends @Nullable Integer> candidates) {
+        if (candidates.isEmpty()) {
+            throw new IllegalArgumentException("tuneConfiguration." + field + " must name at least one candidate");
+        }
+        // A loop, not contains(null): an immutable List.of(...) throws on contains(null).
+        for (Integer candidate : candidates) {
+            if (candidate == null) {
+                throw new IllegalArgumentException(
+                        "tuneConfiguration." + field + " must not contain null but was " + candidates);
+            }
         }
     }
 
