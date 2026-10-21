@@ -176,6 +176,8 @@ public final class SignalChainingCheck {
         return "The JDK's signal chaining (libjsig) is not preloaded. An OpenCL driver that compiles"
                 + " kernels in-process with LLVM (measured: pocl, Intel CPU runtime, AMD ROCm) replaces the JVM's SIGSEGV handler, and"
                 + " concurrent safepoints can then kill the JVM without an hs_err file." + START_WITH
-                + libraryToPreload + " (the examples/run_*OpenCL*.sh scripts do).";
+                + libraryToPreload
+                + " (the OpenCL launchers in examples/ do, e.g. run_OpenCLInfo.sh, run_Find_1OpenCLDevice.sh"
+                + " and run_TuneConfiguration.sh).";
     }
 }

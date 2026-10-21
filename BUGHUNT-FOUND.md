@@ -98,6 +98,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F214](#f214) — niedrig — *gefixt*
 - [F215](#f215) — niedrig — *gefixt*
 - [F216](#f216) — niedrig — *gefixt*
+- [F217](#f217) — niedrig — *gefixt*
 
 ## Funde
 
@@ -799,6 +800,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** 9975403
 - **Nachtrag (Branch-Review 2026-10-20):** Die Ende-zu-Ende-Aussage „loggt die Warnung einmal“ galt nur für einen `Find` mit einem Producer; der Tuner (ein Kernel je Arm) und ein `Find` mit mehreren OpenCL-Producern loggten sie je Kontext, und `run_TuneConfiguration.sh` lud `libjsig` nicht vor – behoben als [F210](#f210). Die Prüfung entscheidet seit [F209](#f209) über `/proc/self/maps` statt über den `LD_PRELOAD`-String.
+- **Nachtrag (Branch-Review 2026-10-20, umgesetzt 2026-10-21):** Die Startmeldung nennt seit [F217](#f217) Dateinamen statt des Musters `run_*OpenCL*.sh` (darunter `run_TuneConfiguration.sh`), gepinnt von `SignalChainingCheckTest#warning_namesLaunchersThatExistAndPreloadLibjsig`.
 
 <a id="f150"></a>
 ### F150 – BitcoinAddressFinder: Der `HexHash`-Export lässt sich nicht wieder importieren; 7,6 % seiner Zeilen werden zu falschen Hashes
@@ -1254,6 +1256,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** gegen den unveränderten Kontext rot: `benchmarkHooks_poclCpuDevice_launchWithTheCappedLocalWorkSize` „Argument(s) are different! Wanted: clApi.enqueueNDRangeKernel(<any>, <any>, [1], [1], false)“ (die Precompute-Starts kamen über die Überladung ohne Local-Size); gegen einen Launcher-Stub, der die alte Überladung ruft, rot: 3 von 4 in `OpenClKernelLauncherTest` („Argument(s) are different! Wanted: …“; der vierte Fall ist das alte Verhalten). Mit dem Fix grün: 4/4 und 1/1. Breit, auf pocl ohne `POCL_MAX_WORK_GROUP_SIZE`, mit libjsig: `OpenCLContextTest` 33/33, `OpenCLPrecomputeKernelTest` 10/10, `OpenCLFe10x26ParityTest` 1/1, `OpenClTaskLocalWorkSizeTest` 2/2, `ProbeAddressesOpenCLTest` 50 (22 übersprungen, Rastergrößen), `OpenCLAddKernelSmokeTest` 1/1, `BitcoinAddressFinderArchitectureTest` 17/17; `bash -n` der Startskripte, YAML-Prüfung, `spotless:apply`.
 - **Status:** gefixt
 - **Commit:** befc8d0
+
+<a id="f217"></a>
+### F217 – BitcoinAddressFinder: Die libjsig-Warnung verweist nur auf das Glob-Muster `run_*OpenCL*.sh`
+- **Zeit:** 2026-10-21 14:58 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/opencl/SignalChainingCheck.java` (`notPreloadedWarning`)
+- **Schwere:** niedrig (Wortlaut einer WARN-Zeile; der Nutzer findet über das Muster den Tuner-Start nicht)
+- **Historie:** Offener Punkt aus dem Branch-Review 2026-10-20/21 (TODO.md; Brief BR-7), umgesetzt am 2026-10-21 nach der Entscheidung des Eigentümers, alle offenen Punkte vor 6.0.0 zu schließen. Der Nachtrag zu [F148](#f148) hatte den Satz als „stimmt für das genannte Muster“ stehen lassen, nachdem [F210](#f210) `run_TuneConfiguration.sh` den Preload gab.
+- **Beschreibung:** Die Warnung endete mit „(the examples/run_*OpenCL*.sh scripts do).“ Seit F210 lädt auch `run_TuneConfiguration.sh` `libjsig` vor, dessen Name nicht unter das Muster fällt; wer der Warnung nach dem Tunen folgte, suchte unter einem Muster, das den Start, den er gerade benutzt hatte, nicht nennt.
+- **Fix:** Die Warnung nennt Dateinamen statt eines Musters: „(the OpenCL launchers in examples/ do, e.g. run_OpenCLInfo.sh, run_Find_1OpenCLDevice.sh and run_TuneConfiguration.sh).“ Kein Test prüfte den alten Wortlaut.
+- **Tests:** `SignalChainingCheckTest#warning_namesLaunchersThatExistAndPreloadLibjsig`: zieht jeden `run_…sh`-Dateinamen aus der Warnung, verlangt mindestens einen, und jeder muss in `examples/` existieren und `libjsig.so` nennen – so kann der Text nicht wieder von den Starts abdriften (die Gegenrichtung hält `ExampleRunScriptSignalChainingTest`).
+- **Rot-Grün-Nachweis:** gegen den alten Wortlaut rot: „Expected: is not an empty collection but: was <[]>“ (das Muster ist kein Dateiname); mit dem Fix grün, `SignalChainingCheckTest` 15/15; `spotless:apply`.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 

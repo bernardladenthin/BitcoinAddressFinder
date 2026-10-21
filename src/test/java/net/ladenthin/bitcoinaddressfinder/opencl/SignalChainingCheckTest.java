@@ -5,22 +5,30 @@ package net.ladenthin.bitcoinaddressfinder.opencl;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class SignalChainingCheckTest {
 
     private static final String JAVA_HOME = "/usr/lib/jvm/java-21";
+
+    /** A launcher the warning names by its file name (a glob such as {@code run_*OpenCL*.sh} is no name). */
+    private static final Pattern LAUNCHER_NAME = Pattern.compile("run_[A-Za-z0-9_]+\\.sh");
 
     /** What the README's {@code LD_PRELOAD="$JAVA_HOME/lib/libjsig.so"} expands to with JAVA_HOME unset. */
     private static final String UNLOADABLE_LIBJSIG_PRELOAD = "/lib/libjsig.so";
@@ -47,6 +55,24 @@ class SignalChainingCheckTest {
 
         assertThat(warning.isPresent(), is(true));
         assertThat(warning.get(), containsString("LD_PRELOAD=/usr/lib/jvm/java-21/lib/libjsig.so"));
+    }
+
+    @Test
+    void warning_namesLaunchersThatExistAndPreloadLibjsig() throws IOException {
+        final String warning =
+                check.warning("Linux", null, JAVA_HOME, NOT_MAPPED).orElseThrow();
+
+        final Matcher launcher = LAUNCHER_NAME.matcher(warning);
+        final List<String> named = new ArrayList<>();
+        while (launcher.find()) {
+            named.add(launcher.group());
+        }
+        assertThat(warning, named, is(not(empty())));
+        for (String name : named) {
+            final Path script = Path.of("examples", name);
+            assertThat(script + " named by the warning", Files.isRegularFile(script), is(true));
+            assertThat(Files.readString(script, StandardCharsets.UTF_8), containsString("libjsig.so"));
+        }
     }
 
     @Test
