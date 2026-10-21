@@ -17,13 +17,6 @@ Everything the bug hunt left open, so nothing is lost when the session ends. The
 named in each item holds the analysis, the history and the reproduction; delete an item here when
 it is done, as for every other item in this file.
 
-**Side findings recorded in the ledgers, not changed yet** (each small; all model-free):
-
-- **`persistence/FilterBuildProgress.formatRate` has the carry problem F215 fixed in `Statistics`**:
-  a separate, coarser helper (`%.1fM/s`, `%.0fk/s`) that chooses the unit before rounding, so 999 600/s
-  prints as "1000k/s" instead of "1.0M/s" (cosmetic, filter-build progress line). Fix as in F215:
-  round first, then choose the unit.
-
 **Decided by the owner, recorded** (no change, kept so the reasoning is not lost):
 
 - **Grid mode on the GPU, top of the key space — decided 2026-10-19: no change.** The last aligned

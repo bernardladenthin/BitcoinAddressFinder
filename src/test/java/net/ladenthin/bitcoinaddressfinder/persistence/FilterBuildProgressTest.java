@@ -76,6 +76,35 @@ class FilterBuildProgressTest {
     }
 
     @Test
+    void largeTotal_rateRoundingUpToAThousandK_isShownInM() {
+        long total = 9_996_000L; // step = 999_600
+        long step = total / FilterBuildProgress.SEGMENTS;
+        FilterBuildProgress progress = new FilterBuildProgress(sink, "phase", total, clock);
+
+        // 999_600 units in 1s rounds to a thousand k/s, which is 1.0M/s
+        clock.advanceSeconds(1);
+        progress.report(step);
+
+        assertThat(lines, contains("phase: 10% (999600/9996000), 1.0M/s, ETA 9s, elapsed 1s."));
+    }
+
+    @Test
+    void formatRate_valueRoundingUpToAThousandOfItsUnit_carriesIntoTheNextUnit() {
+        assertThat(FilterBuildProgress.formatRate(999_600.0), is("1.0M/s"));
+        assertThat(FilterBuildProgress.formatRate(999_500.0), is("1.0M/s"));
+        assertThat(FilterBuildProgress.formatRate(999.96), is("1k/s"));
+        assertThat(FilterBuildProgress.formatRate(999.5), is("1k/s"));
+    }
+
+    @Test
+    void formatRate_valueBelowTheCarry_keepsItsUnit() {
+        assertThat(FilterBuildProgress.formatRate(999_499.0), is("999k/s"));
+        assertThat(FilterBuildProgress.formatRate(999.4), is("999/s"));
+        assertThat(FilterBuildProgress.formatRate(1_000_000.0), is("1.0M/s"));
+        assertThat(FilterBuildProgress.formatRate(1_000.0), is("1k/s"));
+    }
+
+    @Test
     void largeTotal_fullSweep_logsOncePerSegment() {
         long total = 2_000_000L; // step = 200_000, exactly SEGMENTS milestones
         long step = total / FilterBuildProgress.SEGMENTS;

@@ -101,6 +101,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F217](#f217) — niedrig — *gefixt*
 - [F218](#f218) — niedrig — *gefixt*
 - [F219](#f219) — niedrig bis mittel — *gefixt*
+- [F220](#f220) — niedrig — *gefixt*
 
 ## Funde
 
@@ -1246,6 +1247,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Nebenbefund (nicht geändert):** `persistence/FilterBuildProgress.formatRate` ist eine eigene, gröbere Hilfsfunktion (`%.1fM/s`, `%.0fk/s`) mit derselben Klasse: `999_600` → „1000k/s“. Nicht Teil dieses Punkts.
 - **Tests:** `StatisticsTest#formatRate_valueRoundingUpToAThousandOfItsUnit_carriesIntoTheNextUnit` (`999_999.9` → „1.000 M/s“, `999_999_999` → „1.000 G/s“, `999_950` → „1.000 M/s“, `999.96` und `999.5` → „1.000 k/s“), `#formatRate_valueBelowTheCarry_keepsItsUnit` (`999.4` → „999/s“, `999_949` → „999.9 k/s“, `999_949_999` → „999.9 M/s“), `#formatCount_valueRoundingUpToAThousandOfItsUnit_carriesIntoTheNextUnit` (`999_999_999` → „1.000 G“, `999_950` → „1.000 M“, `999_949` → „999.9 k“, `999` → „999“). Der alte Pin-Test ist durch den ersten ersetzt.
 - **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: „Expected: is "1.000 M/s" but: was "1000.0 k/s"“ und „Expected: is "1.000 G" but: was "1000.0 M"“ (die Unterhalb-Fälle waren schon grün, sie pinnen die Grenze); mit dem Fix grün. Breit: `StatisticsTest` 13/13; `spotless:apply`, `spotbugs:check` grün.
+- **Nachtrag (Durchgang 2026-10-21, Brief BR-13):** Der Nebenbefund `FilterBuildProgress.formatRate` ist als [F220](#f220) gefixt: die Einheit wird nach dem Runden gewählt, `999_600` → „1.0M/s“ statt „1000k/s“; das Format der Fortschrittszeile bleibt.
 - **Status:** gefixt
 - **Commit:** 70d7677
 
@@ -1301,6 +1303,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: „NoMoreSecretsAvailableException: Invalid secret length: 2“ (aus `createSecrets(4, false)`, kein Secret geprüft); mit dem Fix grün, `AbstractKeyProducerQueueBufferedTest` 14/14; `spotless:apply`.
 - **Status:** gefixt
 - **Commit:** 847402a
+
+<a id="f220"></a>
+### F220 – BitcoinAddressFinder: `FilterBuildProgress.formatRate` zeigt an der Einheitsgrenze „1000k/s“ statt „1.0M/s“
+- **Zeit:** 2026-10-21 16:14 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/persistence/FilterBuildProgress.java` (`formatRate`, jetzt paketprivat mit `@VisibleForTesting`)
+- **Schwere:** niedrig (kosmetisch, Fortschrittszeile beim Aufbau eines In-RAM-Filters)
+- **Historie:** Folgepunkt des Prüfers aus dem Durchgang 2026-10-21 (Brief BR-13), umgesetzt am 2026-10-21 nach der Entscheidung des Eigentümers, alle offenen Punkte vor 6.0.0 zu schließen. Als Nebenbefund von [F215](#f215) festgehalten (dort „nicht geändert“) und in TODO.md geführt.
+- **Beschreibung:** `formatRate` wählte die Einheit am ungerundeten Wert und rundete danach (`%.1fM/s`, `%.0fk/s`, `%.0f/s`): `999_600` lag unter einer Million, wählte k und wurde zu „1000k/s“; unterhalb von 1000 wurde `999.5` zu „1000/s“. Dieselbe Klasse wie F215 in `Statistics`, aber eine eigene, gröbere Hilfsfunktion mit eigenem Format.
+- **Fix:** An Ort und Stelle: die Einheit wird am angezeigten Wert gewählt, also nach dem Runden auf die ganze Zahl, die `k/s` bzw. `/s` zeigen (`Math.round(perSecond / 1000) >= 1000` → M, `Math.round(perSecond) >= 1000` → k; `Math.round` rundet halb nach oben wie `String.format`). Das Format der Zeile bleibt (`%.1fM/s`, `%.0fk/s`, `%.0f/s`). Die F215-Hilfsfunktion wurde nicht wiederverwendet: sie ist paketprivat in `statistics`, hat ein anderes Format (vier signifikante Stellen, Leerzeichen vor der Einheit, G) und hätte die Fortschrittszeile verändert; `formatRate` ist jetzt paketprivat, damit die Grenzen direkt getestet werden.
+- **Tests:** `FilterBuildProgressTest#largeTotal_rateRoundingUpToAThousandK_isShownInM` (Gesamt 9 996 000, ein Segment von 999 600 in 1 s → „phase: 10% (999600/9996000), 1.0M/s, ETA 9s, elapsed 1s.“), `#formatRate_valueRoundingUpToAThousandOfItsUnit_carriesIntoTheNextUnit` (`999_600` und `999_500` → „1.0M/s“, `999.96` und `999.5` → „1k/s“), `#formatRate_valueBelowTheCarry_keepsItsUnit` (`999_499` → „999k/s“, `999.4` → „999/s“, `1_000_000` → „1.0M/s“, `1_000` → „1k/s“).
+- **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: „Expected: is "1.0M/s" but: was "1000k/s"“ und „Expected: iterable containing ["phase: 10% (999600/9996000), 1.0M/s, ETA 9s, elapsed 1s."] but: item 0: was "phase: 10% (999600/9996000), 1000k/s, ETA 9s, elapsed 1s."“ (die Unterhalb-Fälle waren schon grün, sie pinnen die Grenze); mit dem Fix grün, `FilterBuildProgressTest` 10/10, `BitcoinAddressFinderArchitectureTest` 17/17; `spotless:apply`.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 

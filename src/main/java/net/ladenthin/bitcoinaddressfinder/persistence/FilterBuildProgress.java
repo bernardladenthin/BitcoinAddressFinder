@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.persistence;
 
+import com.google.common.annotations.VisibleForTesting;
+
 /**
  * Bounded progress reporter for the O(n) phases of any in-memory address-lookup construction.
  *
@@ -195,14 +197,20 @@ public final class FilterBuildProgress {
     /**
      * Renders a throughput with a compact magnitude suffix, e.g. {@code "2.9M/s"}.
      *
+     * <p>The unit is chosen on the value as it will be displayed: {@code k/s} and plain {@code /s}
+     * show whole numbers, so a rate that rounds up to a thousand of its unit is shown in the next one
+     * ({@code 999_600} &#x2192; {@code "1.0M/s"}, not {@code "1000k/s"}; {@code 999.5} &#x2192;
+     * {@code "1k/s"}). {@link Math#round(double)} rounds half up like {@link String#format}.
+     *
      * @param perSecond units processed per second
      * @return the rendered rate
      */
-    private static String formatRate(double perSecond) {
-        if (perSecond >= 1_000_000.0) {
+    @VisibleForTesting
+    static String formatRate(double perSecond) {
+        if (Math.round(perSecond / 1_000.0) >= 1_000L) {
             return String.format(java.util.Locale.ROOT, "%.1fM/s", perSecond / 1_000_000.0);
         }
-        if (perSecond >= 1_000.0) {
+        if (Math.round(perSecond) >= 1_000L) {
             return String.format(java.util.Locale.ROOT, "%.0fk/s", perSecond / 1_000.0);
         }
         return String.format(java.util.Locale.ROOT, "%.0f/s", perSecond);

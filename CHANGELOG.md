@@ -79,7 +79,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `keysPerWorkItemCandidates` is rejected before the tuner measures anything (it failed after stage 1
     with a `NoSuchElementException` or a `NullPointerException`).
   - **Statistics:** a rate or count that rounds up to a thousand of its unit is shown in the next unit,
-    `1.000 M/s` instead of `1000.0 k/s` (statistics line and tuner report).
+    `1.000 M/s` instead of `1000.0 k/s` (statistics line and tuner report); the same holds for the
+    filter-build progress line, `1.0M/s` instead of `1000k/s`.
 - **The OpenCL kernel refuses an unaligned secret base, and the skipped top grid is a warning.**
   The kernel derives a work item's key by ORing its offset into the lowest word of the base, which is
   the base plus the offset only when the low `batchSizeInBits` bits of the base are zero; the host
