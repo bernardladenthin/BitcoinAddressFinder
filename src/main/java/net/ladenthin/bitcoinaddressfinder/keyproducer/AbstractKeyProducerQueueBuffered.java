@@ -83,9 +83,17 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
      * which ends the producer; with {@code returnStartSecretOnly} the batch is a single secret,
      * so a timeout always throws there.
      *
-     * @throws NoMoreSecretsAvailableException if no secret arrives within the read timeout, a
-     *         received secret does not have {@link OpenClKernelConstants#PRIVATE_KEY_MAX_NUM_BYTES}
-     *         bytes, or shutdown is signalled or the thread is interrupted while waiting
+     * <p>A received secret that does not have {@link OpenClKernelConstants#PRIVATE_KEY_MAX_NUM_BYTES}
+     * bytes ends the batch the same way: after at least one valid secret, the valid secrets are
+     * returned as a shorter batch, the invalid one is discarded and logged as a warning (in hex), and
+     * the secrets queued after it stay in the queue for the next call. As the first secret of a batch
+     * it throws {@link NoMoreSecretsAvailableException}. A shutdown or an interrupt in the middle of a
+     * batch still throws and discards the secrets read so far: the run ends there either way.
+     *
+     * @throws NoMoreSecretsAvailableException if no secret arrives within the read timeout before the
+     *         first secret of the batch, the first secret of the batch does not have
+     *         {@link OpenClKernelConstants#PRIVATE_KEY_MAX_NUM_BYTES} bytes, or shutdown is signalled
+     *         or the thread is interrupted while waiting
      */
     @Override
     public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) {
@@ -117,9 +125,7 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
                                     timeout,
                                     i,
                                     length);
-                            BigInteger[] partialBatch = new BigInteger[i];
-                            System.arraycopy(secrets, 0, partialBatch, 0, i);
-                            return partialBatch;
+                            return copyPartialBatch(secrets, i);
                         }
                         throw new NoMoreSecretsAvailableException("Timeout while waiting for secret (" + timeout
                                 + " ms, iteration " + i + "/" + length + ")");
@@ -138,6 +144,19 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
                 }
 
                 if (secret.length != OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES) {
+                    if (i > 0) {
+                        // As for a timeout: the valid secrets before it are out of the queue already;
+                        // return them rather than lose them. The secrets after it stay queued.
+                        LOGGER.warn(
+                                "Discarded a secret of invalid length {} (expected {} bytes) after {} of {};"
+                                        + " returning the partial batch. Secret: {}",
+                                secret.length,
+                                OpenClKernelConstants.PRIVATE_KEY_MAX_NUM_BYTES,
+                                i,
+                                length,
+                                Hex.encodeHexString(secret));
+                        return copyPartialBatch(secrets, i);
+                    }
                     throw new NoMoreSecretsAvailableException("Invalid secret length: " + secret.length);
                 }
 
@@ -155,6 +174,19 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
         }
 
         return secrets;
+    }
+
+    /**
+     * Copies the first {@code count} secrets of a batch that ends early.
+     *
+     * @param secrets the batch being filled
+     * @param count   the number of secrets read so far (at least one)
+     * @return a new array holding exactly those secrets
+     */
+    private static BigInteger[] copyPartialBatch(BigInteger[] secrets, int count) {
+        BigInteger[] partialBatch = new BigInteger[count];
+        System.arraycopy(secrets, 0, partialBatch, 0, count);
+        return partialBatch;
     }
 
     /**

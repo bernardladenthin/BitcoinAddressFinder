@@ -19,14 +19,6 @@ it is done, as for every other item in this file.
 
 **Side findings recorded in the ledgers, not changed yet** (each small; all model-free):
 
-- **A secret of the wrong length in the middle of a batch discards the secrets read before it**
-  (F212's remainder, `AbstractKeyProducerQueueBuffered.createSecrets`): since F212 a *timeout* after
-  some secrets returns them as a shorter batch, but a received secret that does not have 32 bytes still
-  throws `NoMoreSecretsAvailableException` at any position, so the valid secrets already taken from the
-  queue are never checked and the producer ends. Proposed: return the valid secrets as a partial batch
-  and log the invalid one as a warning (hex); keep the exception when it is the first secret of a
-  batch; pin whether the secrets after it stay queued. A shutdown or an interrupt in the middle of a
-  batch keeps discarding: the run ends there either way.
 - **`persistence/FilterBuildProgress.formatRate` has the carry problem F215 fixed in `Statistics`**:
   a separate, coarser helper (`%.1fM/s`, `%.0fk/s`) that chooses the unit before rounding, so 999 600/s
   prints as "1000k/s" instead of "1.0M/s" (cosmetic, filter-build progress line). Fix as in F215:

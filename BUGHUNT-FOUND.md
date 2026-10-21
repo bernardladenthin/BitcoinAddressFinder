@@ -100,6 +100,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F216](#f216) — niedrig — *gefixt*
 - [F217](#f217) — niedrig — *gefixt*
 - [F218](#f218) — niedrig — *gefixt*
+- [F219](#f219) — niedrig bis mittel — *gefixt*
 
 ## Funde
 
@@ -1202,6 +1203,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `AbstractKeyProducerQueueBufferedTest#createSecrets_timeoutAfterSomeSecrets_returnsThePartialBatch` (zwei Secrets, Batch 3, Timeout 500 ms → genau diese zwei), `#createSecrets_timeoutBeforeAnySecretOfABatch_throwsException` (Batch 3 ohne Secret wirft weiter), `#addSecret_throwsWhenQueueFull` prüft jetzt die vollständige Meldung mit Hex statt nur des Präfixes. `KeyProducerJavaSocketTest#createSecrets_malformedSecretStream_throwsException` schrieb den Verlust fest (40 Bytes = ein vollständiges Secret plus 8 Bytes Rest, Batch 2 → Ausnahme) und heißt jetzt `#createSecrets_malformedSecretStream_returnsTheCompleteSecretThenThrows`: der erste Aufruf liefert das vollständige Secret (`0`), der zweite wirft.
 - **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: `createSecrets_timeoutAfterSomeSecrets_returnsThePartialBatch` „NoMoreSecretsAvailableException: Timeout while waiting for secret (500 ms, iteration 2/3)“, `addSecret_throwsWhenQueueFull` „Expected: a collection containing "Secret queue is full, ignore secret: abab…ab" but: mismatches were: [was "Secret queue is full, ignore secret: [-85, -85, …]"]“; mit dem Fix grün. Breit: `AbstractKeyProducerQueueBufferedTest` 13/13, `KeyProducerJavaSocketTest` 23/23 (vor der Anpassung des alten Tests: 1 Fehler, „Expected …NoMoreSecretsAvailableException to be thrown, but nothing was thrown.“ – genau das geänderte Verhalten), `KeyProducerJavaZmqTest` 7/7, `KeyProducerJavaWebSocketTest` 6/6; `spotless:apply`.
 - **Nachtrag (Branch-Review 2026-10-20, Doku 2026-10-21):** Die README-Zeilen zu `timeoutMillis` der drei Key-Producer (Socket, ZeroMQ, WebSocket) nennen jetzt den Teilbatch nach einem Timeout und dass erst ein Timeout vor dem ersten Secret eines Batches den Producer beendet; die Socket-Zeile nennt zusätzlich das Warten von `createSecrets()` auf die Queue. Dabei korrigiert: die ZeroMQ-Zeile gab als Default `-1` an, der Code hat `1000` (`CKeyProducerJavaZmq.timeoutMillis`); eine Minimalkonfiguration ohne `timeoutMillis` endet also nach 1 s ohne Secret, nicht nie.
+- **Nachtrag (Durchgang 2026-10-21, Brief BR-12):** Der in **Fix** genannte Abbruch bei falscher Secret-Länge ist als [F219](#f219) gefixt: nach mindestens einem gültigen Secret liefert `createSecrets` die gültigen als Teilbatch und loggt das ungültige als WARN in Hex; Shutdown und Interrupt verwerfen weiter (Entscheidung, der Lauf endet dort).
 - **Status:** gefixt
 - **Commit:** 7132685
 
@@ -1286,6 +1288,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Nachtrag (Branch-Review 2026-10-20, Doku 2026-10-21):** Der Eigentümer hat den Fix des Poller-Rennens als [zeromq/jeromq#1022](https://github.com/zeromq/jeromq/pull/1022) eingereicht („Poller: flush cancelled keys before registering handles (connect hand-off race)“, Stand 2026-10-21 offen, in keinem Release). Die Klassen-Javadoc von `KeyProducerJavaZmqTest`, `ZmqResultBroadcasterTest` und `JeromqPollerHandOffRaceTest` nennt die PR; in `JeromqPollerHandOffRaceTest` ist der Satz „nothing is lost because PUSH/PULL queue rather than drop“ durch den hier gemessenen Verlust ersetzt (eine gebundene Gegenstelle legt die Nachricht auf die stehengebliebene Verbindung, die der Handshake-Timer samt Pipe verwirft). `TODO.md` („jeromq 0.6.0 poller registration race“) führt, was nach einem Release mit dem Fix zurückzubauen ist, und den offenen Produktionsbefund.
 - **Status:** gefixt
 - **Commit:** a6ac9af
+
+<a id="f219"></a>
+### F219 – BitcoinAddressFinder: Ein Secret mit falscher Länge mitten im Batch verwirft die schon entnommenen Secrets eines Socket/WebSocket/ZMQ-Key-Producers
+- **Zeit:** 2026-10-21 16:07 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/keyproducer/AbstractKeyProducerQueueBuffered.java` (`createSecrets`, neu `copyPartialBatch`); `README.md` (ZeroMQ-Protokoll)
+- **Schwere:** niedrig bis mittel (still: Secrets, die ein Client geschickt hat, werden nie geprüft, und der Producer endet)
+- **Historie:** Folgepunkt des Prüfers aus dem Durchgang 2026-10-21 (Brief BR-12), umgesetzt am 2026-10-21 nach der Entscheidung des Eigentümers, alle offenen Punkte vor 6.0.0 zu schließen. Der Rest von [F212](#f212): F212 gab bei einem *Timeout* nach mindestens einem Secret den Teilbatch zurück und ließ „andere Abbrüche mitten im Batch (Shutdown, falsche Secret-Länge, Interrupt)“ als Ausnahmen stehen; TODO.md führte die falsche Länge als offenen Nebenbefund.
+- **Beschreibung:** `createSecrets` warf bei einem empfangenen Secret, das nicht `PRIVATE_KEY_MAX_NUM_BYTES` (32) Bytes hat, an jeder Position des Batches `NoMoreSecretsAvailableException("Invalid secret length: <n>")`. Die gültigen Secrets davor waren schon aus der Queue entnommen und wurden nie geprüft; `AbstractProducer` behandelt die Ausnahme als Ende der Secrets, der Producer endete also. Das ungültige Secret selbst tauchte nur als Länge in der Meldung auf. Erreichbar über ZeroMQ und WebSocket (eine Nachricht = ein Secret); der Socket-Producer reiht nur vollständige 32-Byte-Blöcke ein.
+- **Fix:** Wie beim Timeout seit F212: nach mindestens einem gültigen Secret gibt `createSecrets` die gültigen Secrets als kürzeren Batch zurück und loggt das ungültige als WARN mit Länge, erwarteter Länge, Position und dem Secret in Hex; die Secrets, die danach in der Queue stehen, bleiben dort und kommen mit dem nächsten Aufruf (festgelegt und gepinnt). Als erstes Secret eines Batches wirft es unverändert `NoMoreSecretsAvailableException("Invalid secret length: <n>")`, der Producer endet wie bisher. **Entscheidung:** Shutdown und Interrupt mitten im Batch werfen weiter und verwerfen die gelesenen Secrets, denn der Lauf endet dort ohnehin. Die Kopie des Teilbatches teilen sich Timeout und falsche Länge (`copyPartialBatch`). Javadoc von `createSecrets` beschreibt alle drei Fälle; die README-Zeile zum ZeroMQ-Protokoll („discarded or raise errors“) nennt das Verhalten genau.
+- **Tests:** `AbstractKeyProducerQueueBufferedTest#createSecrets_invalidLengthAfterSomeSecrets_returnsThePartialBatchAndLogsTheSecret`: Queue [0x11…, 0x22…, `cafe` (2 Bytes), 0x44…], Batch 4 → genau die ersten zwei; der nächste Aufruf (`createSecrets(1, true)`) liefert das vierte; LogCaptor-WARN „Discarded a secret of invalid length 2 (expected 32 bytes) after 2 of 4; returning the partial batch. Secret: cafe“. `#createSecrets_throwsException_onInvalidLength` (ungültiges Secret als erstes) pinnt weiter die Ausnahme.
+- **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: „NoMoreSecretsAvailableException: Invalid secret length: 2“ (aus `createSecrets(4, false)`, kein Secret geprüft); mit dem Fix grün, `AbstractKeyProducerQueueBufferedTest` 14/14; `spotless:apply`.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 

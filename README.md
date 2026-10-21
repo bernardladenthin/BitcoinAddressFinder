@@ -1596,7 +1596,9 @@ while True:
 * Each private key must be exactly 32 raw bytes, sent as a single ZeroMQ message.
 * Messages are interpreted as unsigned big-endian (`new BigInteger(1, bytes)` in Java).
 * No framing or delimiters needed—ZeroMQ handles message boundaries.
-* Messages larger or smaller than 32 bytes will be discarded or raise errors.
+* A message larger or smaller than 32 bytes is rejected: after valid secrets of the same batch it ends
+  the batch early (the valid secrets are checked, the invalid one is logged as a warning in hex and
+  dropped, later messages stay queued); as the first secret of a batch it ends the producer.
 
 
 #### 📄 Secrets File Producer (`producerJavaSecretsFiles`)

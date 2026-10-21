@@ -68,7 +68,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `timeoutMillis` runs out after at least one secret of a batch was received, those secrets are
     returned as a shorter batch and checked; they used to be dropped unchecked together with the
     producer. A timeout before the first secret of a batch still ends the producer. A secret dropped
-    because the queue is full is logged in hex instead of as a list of signed bytes.
+    because the queue is full is logged in hex instead of as a list of signed bytes. A received secret
+    that is not 32 bytes long ends a batch the same way: the valid secrets before it are returned and
+    checked, the invalid one is logged as a warning in hex and dropped, and the secrets after it stay
+    queued for the next batch; only as the first secret of a batch does it still end the producer.
   - **Configuration errors name the field:** `producerOpenCL.maxResultReaderThreads` below 1 is rejected
     when the producer is created (0 failed with a bare `IllegalArgumentException`, a negative value
     through the constructor with an injected pool built a semaphore the first grid waited on forever);

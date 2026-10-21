@@ -122,6 +122,38 @@ public class AbstractKeyProducerQueueBufferedTest {
     }
 
     @Test
+    public void createSecrets_invalidLengthAfterSomeSecrets_returnsThePartialBatchAndLogsTheSecret() throws Exception {
+        // arrange — the third secret of a batch of four has the wrong length. The two before it are out of
+        // the queue already; throwing would lose them unchecked and end the producer. The fourth was never
+        // taken, so it stays queued for the next call.
+        CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
+        TestKeyProducer producer = createTestKeyProducer(config);
+        KeyProducerTestUtility utility = new KeyProducerTestUtility();
+        byte[] first = utility.createFilledSecret((byte) 0x11);
+        byte[] second = utility.createFilledSecret((byte) 0x22);
+        byte[] invalid = {(byte) 0xCA, (byte) 0xFE};
+        byte[] fourth = utility.createFilledSecret((byte) 0x44);
+        producer.addSecret(first);
+        producer.addSecret(second);
+        producer.addSecret(invalid);
+        producer.addSecret(fourth);
+
+        try (LogCaptor logCaptor = LogCaptor.forClass(AbstractKeyProducerQueueBuffered.class)) {
+            // act
+            BigInteger[] secrets = producer.createSecrets(4, false);
+            BigInteger[] next = producer.createSecrets(1, true);
+
+            // assert
+            assertThat(secrets, is(equalTo(new BigInteger[] {new BigInteger(1, first), new BigInteger(1, second)})));
+            assertThat(next, is(equalTo(new BigInteger[] {new BigInteger(1, fourth)})));
+            assertThat(
+                    logCaptor.getWarnLogs(),
+                    hasItem("Discarded a secret of invalid length 2 (expected 32 bytes) after 2 of 4;"
+                            + " returning the partial batch. Secret: cafe"));
+        }
+    }
+
+    @Test
     public void createSecrets_throwsException_onTimeout() throws Exception {
         CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
         TestKeyProducer producer = createTestKeyProducer(config);
