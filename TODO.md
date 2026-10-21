@@ -11,7 +11,7 @@ so everything below is genuinely still open.
 
 ## Open — BAF-specific
 
-### Open points from the bug hunt of 2026-10-16 … 19 (details: `BUGHUNT-FOUND.md`)
+### Open points from the bug hunt of 2026-10-16 … 20 (details: `BUGHUNT-FOUND.md`)
 
 Everything the bug hunt left open, so nothing is lost when the session ends. The ledger entry
 named in each item holds the analysis, the history and the reproduction; delete an item here when
