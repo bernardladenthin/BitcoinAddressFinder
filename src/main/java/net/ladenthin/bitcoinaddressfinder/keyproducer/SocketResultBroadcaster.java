@@ -162,15 +162,15 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
      *
      * @throws IOException if the port cannot be bound
      */
+    @FireAndForget("lifecycle via close()")
+    @SuppressWarnings("FutureReturnValueIgnored")
     public void start() throws IOException {
         final ServerSocket localServerSocket = new ServerSocket(port);
         localServerSocket.setSoTimeout(ACCEPT_TIMEOUT_MILLIS);
         serverSocket = localServerSocket;
         LOGGER.info("Serving results on port {}", port);
 
-        @FireAndForget("lifecycle via close()")
-        @SuppressWarnings("FutureReturnValueIgnored")
-        Object unused = acceptExecutor.submit(() -> {
+        acceptExecutor.submit(() -> {
             while (!shouldStop) {
                 try {
                     final Socket socket = localServerSocket.accept();
@@ -332,7 +332,7 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
     @FireAndForget("lifecycle via drop() and close()")
     @SuppressWarnings("FutureReturnValueIgnored")
     private void startWriter(Client client) {
-        Object unused = writerExecutor.submit(() -> {
+        writerExecutor.submit(() -> {
             try {
                 // After a stop the writer keeps going until its queue is empty: the last batches of a
                 // run are its completion signal, and close() waits for exactly this drain.

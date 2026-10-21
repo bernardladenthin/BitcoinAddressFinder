@@ -913,44 +913,41 @@ SPDX-License-Identifier: Apache-2.0
     </Match>
 
     <!--
-        DLS_DEAD_LOCAL_STORE on four deliberate "ignored value" patterns.
-
-        Three are the canonical Error-Prone-compliant "fire-and-forget Future"
-        idiom: when a submit/scheduleAtFixedRate return is intentionally
-        unused, the project assigns it to `Object unused` and applies
-        @FireAndForget("…rationale…") + @SuppressWarnings("FutureReturnValueIgnored")
-        to silence Error Prone's FutureReturnValueIgnored. fb-contrib's DLS
-        reads the same dead store and flags it; honouring DLS by dropping the
-        local would immediately re-trigger FutureReturnValueIgnored, so the
-        two rules are at odds and we accept the DLS finding as the documented
-        tradeoff. Sites: ConsumerJava.startStatisticsTimer (scheduler),
-        Finder.startProducer (producer submit), KeyProducerJavaWebSocket.start
-        (server submit).
-
-        The fourth (LMDBPersistence.count) is the standard "count an Iterable
-        by iterating, discarding each item" pattern:
+        DLS_DEAD_LOCAL_STORE on LMDBPersistence.count, the standard "count an
+        Iterable by iterating, discarding each item" pattern:
             for (KeyVal ignored : iterable) { count++; }
         The loop variable IS the count's side effect; LMDB's CursorIterable
         offers no Stream / size() shortcut so the iteration is mandatory.
     -->
     <Match>
         <Bug pattern="DLS_DEAD_LOCAL_STORE"/>
+        <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
+        <Method name="count"/>
+    </Match>
+
+    <!--
+        RV_RETURN_VALUE_IGNORED_BAD_PRACTICE on the fire-and-forget submits: the Future of a task
+        whose lifecycle is driven out of band (Producer.interrupt() and Finder.interrupt() for the
+        producers, close() for the result broadcaster's accept loop and writers) is deliberately not
+        kept. Each site carries @FireAndForget naming that lifecycle and the method-level
+        @SuppressWarnings("FutureReturnValueIgnored") for Error Prone. The sites used to assign the
+        Future to `Object unused` instead, which fb-contrib read as a dead store (the DLS entries
+        above) and CodeQL as an unread local variable (PR #395); a bare call is what every tool
+        but SpotBugs accepts, and this is SpotBugs' share of the same tradeoff.
+    -->
+    <Match>
+        <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE"/>
         <Or>
-            <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.consumer.ConsumerJava"/>
-                <Method name="startStatisticsTimer"/>
-            </And>
             <And>
                 <Class name="net.ladenthin.bitcoinaddressfinder.engine.Finder"/>
                 <Method name="startProducer"/>
             </And>
             <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaWebSocket"/>
-                <Method name="start"/>
-            </And>
-            <And>
-                <Class name="net.ladenthin.bitcoinaddressfinder.persistence.lmdb.LMDBPersistence"/>
-                <Method name="count"/>
+                <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.SocketResultBroadcaster"/>
+                <Or>
+                    <Method name="start"/>
+                    <Method name="startWriter"/>
+                </Or>
             </And>
         </Or>
     </Match>
@@ -1433,9 +1430,9 @@ SPDX-License-Identifier: Apache-2.0
         ("deliberate dependency injection") in the main EI_EXPOSE_REP block above, where the
         OpenCL classes are listed.
 
-        DLS_DEAD_LOCAL_STORE - the "Object unused = executor.submit(...)" form used to satisfy
-        Error Prone's FutureReturnValueIgnored for a deliberately fire-and-forget task. Both sites
-        carry @FireAndForget naming the lifecycle that replaces the Future.
+        DLS_DEAD_LOCAL_STORE - WebSocketEndpoint; SocketResultBroadcaster's entry went with the
+        "Object unused = executor.submit(...)" form, whose replacement is the
+        RV_RETURN_VALUE_IGNORED_BAD_PRACTICE entry above.
 
         EXS_EXCEPTION_SOFTENING_* - both sites soften on purpose. OpenClLibraryLoader turns an
         UnsatisfiedLinkError from a failed library-name probe into a domain exception that names
@@ -1464,10 +1461,7 @@ SPDX-License-Identifier: Apache-2.0
     </Match>
 
     <Match>
-        <Or>
-            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.SocketResultBroadcaster"/>
-            <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.WebSocketEndpoint"/>
-        </Or>
+        <Class name="net.ladenthin.bitcoinaddressfinder.keyproducer.WebSocketEndpoint"/>
         <Bug pattern="DLS_DEAD_LOCAL_STORE"/>
     </Match>
 

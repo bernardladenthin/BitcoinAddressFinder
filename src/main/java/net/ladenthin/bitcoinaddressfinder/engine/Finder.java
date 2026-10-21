@@ -792,6 +792,8 @@ public class Finder implements Interruptable {
     /**
      * Submits every configured producer to the producer executor service.
      */
+    @FireAndForget("lifecycle via Producer.interrupt() and Finder.interrupt() shutdown")
+    @SuppressWarnings("FutureReturnValueIgnored")
     public void startProducer() {
         LOGGER.info("startProducer");
         // Late-bind the running-producer gauge now that the producers exist (the consumer's
@@ -800,9 +802,7 @@ public class Finder implements Interruptable {
                 .filter(producer -> producer.getState() == ProducerState.RUNNING)
                 .count());
         for (Producer producer : getAllProducers()) {
-            @FireAndForget("lifecycle via Producer.interrupt() and Finder.interrupt() shutdown")
-            @SuppressWarnings("FutureReturnValueIgnored")
-            Object unused = producerExecutorService.submit(producer);
+            producerExecutorService.submit(producer);
         }
     }
 

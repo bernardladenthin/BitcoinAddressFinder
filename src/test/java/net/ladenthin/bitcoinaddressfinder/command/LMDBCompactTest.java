@@ -132,6 +132,53 @@ public class LMDBCompactTest extends LMDBBase {
         assertThat(Files.readSymbolicLink(link), is(equalTo(sourceDirectory.toPath())));
     }
 
+    /**
+     * The helper behind the identity check: a symbolic link resolves to its target. On Windows
+     * {@link File#getCanonicalFile()} does not resolve links (JDK-8003887), which is how the symlink
+     * case above reached the empty-target check in the Windows run of PR #395; {@code Path.toRealPath}
+     * does on every platform. Aborted where the file system cannot create links.
+     */
+    @Test
+    public void canonical_symbolicLinkToADirectory_isThatDirectory() throws Exception {
+        Path real = Files.createDirectory(folder.resolve("real"));
+        Path link = createSymbolicLinkOrAbort(folder.resolve("link"), real);
+
+        assertThat(
+                LMDBCompact.canonical(link.toFile()),
+                is(equalTo(real.toRealPath().toFile())));
+        assertThat(LMDBCompact.canonical(link.toFile()), is(equalTo(LMDBCompact.canonical(real.toFile()))));
+    }
+
+    /** A path below a link that does not exist yet (the usual target directory) resolves the link too. */
+    @Test
+    public void canonical_missingPathBelowASymbolicLink_resolvesTheLink() throws Exception {
+        Path real = Files.createDirectory(folder.resolve("real"));
+        Path link = createSymbolicLinkOrAbort(folder.resolve("link"), real);
+
+        File resolved = LMDBCompact.canonical(new File(link.toFile(), "lmdb_compact"));
+
+        assertThat(
+                resolved, is(equalTo(real.toRealPath().resolve("lmdb_compact").toFile())));
+    }
+
+    /** A path that does not exist is still returned absolute and without {@code .} or {@code ..}. */
+    @Test
+    public void canonical_missingPath_isAbsoluteAndNormalized() throws Exception {
+        File resolved = LMDBCompact.canonical(new File(folder.toFile(), "a/./b/../c"));
+
+        assertThat(
+                resolved,
+                is(equalTo(folder.toRealPath().resolve("a").resolve("c").toFile())));
+    }
+
+    private static Path createSymbolicLinkOrAbort(Path link, Path target) {
+        try {
+            return Files.createSymbolicLink(link, target);
+        } catch (UnsupportedOperationException | IOException e) {
+            return Assumptions.abort("symbolic links not available: " + e);
+        }
+    }
+
     /** An interrupt before the run starts must stop it before anything is created or deleted. */
     @Test
     public void compactLMDB_interruptedBeforeRun_writesNothing() throws Exception {

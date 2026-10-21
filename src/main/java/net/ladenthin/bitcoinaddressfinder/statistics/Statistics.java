@@ -152,27 +152,45 @@ public class Statistics {
     }
 
     /**
-     * Rounds {@code value} to the precision it is displayed with, before the unit is chosen: to a
-     * whole number below a thousand (where no unit is shown and no decimals either), and to
-     * {@link #SIGNIFICANT_DIGITS} significant digits from a thousand on. Choosing the unit on the
-     * unrounded value let {@code 999_999.9} pick k and then round to {@code "1000.0 k/s"}.
+     * Rounds {@code value} to the precision it is displayed with, before the unit is chosen: to its
+     * integer digits below a thousand (a whole number, where no unit is shown and no decimals either),
+     * and to {@link #SIGNIFICANT_DIGITS} significant digits from a thousand on, where the value has
+     * at least four. Choosing the unit on the unrounded value let {@code 999_999.9} pick k and then
+     * round to {@code "1000.0 k/s"}.
      *
-     * <p>A value that is not finite, or negative, is returned unchanged; {@link #formatScaled} renders
-     * it as before (a {@code NaN} rate as {@code "0/s"}).
+     * <p>One rounding with a computed precision rather than a branch at a thousand: both branches
+     * agreed at exactly a thousand, so the boundary of that comparison could not be observed, and a
+     * mutation test cannot tell {@code <} from {@code <=} there.
+     *
+     * <p>A value that is not finite is returned unchanged; {@link #formatScaled} renders it as before
+     * (a {@code NaN} rate as {@code "0/s"}, an infinite one as {@code "Infinity G/s"}). A negative or
+     * fractional value rounds to one digit at
+     * least, which {@link #formatScaled} never shows: below a thousand it renders the whole number of
+     * the original value.
      *
      * @param value the value to round
      * @return the value rounded to its displayed precision
      */
     private static double roundForDisplay(double value) {
-        if (!Double.isFinite(value) || value < 0.0d) {
+        if (!Double.isFinite(value)) {
             return value;
         }
-        if (value < 1_000.0d) {
-            return Math.round(value);
-        }
+        int precision = Math.max(1, Math.min(SIGNIFICANT_DIGITS, integerDigits(value)));
         return BigDecimal.valueOf(value)
-                .round(new MathContext(SIGNIFICANT_DIGITS, RoundingMode.HALF_UP))
+                .round(new MathContext(precision, RoundingMode.HALF_UP))
                 .doubleValue();
+    }
+
+    /**
+     * The number of digits before the decimal point of a positive value ({@code 999.5} has three,
+     * {@code 1000} four); zero or less for a value below one, and one for a value that is not positive
+     * ({@code log10} of zero or a negative number has no integer part to count).
+     *
+     * @param value the value
+     * @return its integer digits
+     */
+    private static int integerDigits(double value) {
+        return (int) Math.floor(Math.log10(value)) + 1;
     }
 
     /**
@@ -188,8 +206,7 @@ public class Statistics {
      * @return the value rendered with a constant number of significant digits
      */
     private static String withSignificantDigits(double scaled) {
-        int integerDigits = (int) Math.floor(Math.log10(scaled)) + 1;
-        int decimals = Math.max(0, SIGNIFICANT_DIGITS - integerDigits);
+        int decimals = Math.max(0, SIGNIFICANT_DIGITS - integerDigits(scaled));
         // A literal format string per branch, rather than one assembled from `decimals` or looked up
         // in an array. Both of those are still "computed" to a static analyser even when every input
         // is our own arithmetic, and spelling the three cases out documents the only shapes this

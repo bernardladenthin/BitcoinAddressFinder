@@ -3,9 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.command;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CCompactLMDB;
@@ -61,8 +64,8 @@ public class LMDBCompact implements Runnable, Interruptable {
         String sourceDirectory = compactLMDB.lmdbConfigurationReadOnly.lmdbDirectory;
         File targetDirectory = new File(compactLMDB.targetDirectory);
 
-        // canonical, not absolute: "<source>/." or a symlink to the source would otherwise pass, and the
-        // delete below would remove the source database itself
+        // the real path, not the absolute one: "<source>/." or a symlink to the source would otherwise
+        // pass, and the delete below would remove the source database itself
         final boolean targetIsSource;
         try {
             targetIsSource = canonical(targetDirectory).equals(canonical(new File(sourceDirectory)));
@@ -130,8 +133,35 @@ public class LMDBCompact implements Runnable, Interruptable {
         }
     }
 
-    private static File canonical(File file) throws IOException {
-        return file.getCanonicalFile();
+    /**
+     * The real path of {@code file}: absolute, normalized, every symbolic link resolved, also for a path
+     * that does not exist yet (its deepest existing ancestor is resolved and the rest appended).
+     *
+     * <p>Not {@link File#getCanonicalFile()}: on Windows that resolves no symbolic link (JDK-8003887), so
+     * a link to the source passed the identity check there and was refused one step later, by the
+     * empty-target check at {@code lock.mdb}, with the wrong exception. {@link Path#toRealPath} resolves
+     * links on every platform.
+     *
+     * @param file the path to resolve
+     * @return the resolved path
+     * @throws IOException if the existing part of the path cannot be resolved
+     */
+    @VisibleForTesting
+    static File canonical(File file) throws IOException {
+        Path path = file.toPath().toAbsolutePath().normalize();
+        Path existing = path;
+        Path rest = path.getFileSystem().getPath("");
+        while (!Files.exists(existing)) {
+            Path parent = existing.getParent();
+            Path name = existing.getFileName();
+            if (parent == null || name == null) {
+                // the root itself does not exist: toRealPath below reports it
+                break;
+            }
+            rest = name.resolve(rest);
+            existing = parent;
+        }
+        return existing.toRealPath().resolve(rest).toFile();
     }
 
     private static String mib(long bytes) {

@@ -151,6 +151,24 @@ public class StatisticsTest {
         assertThat(Statistics.formatRate(999_949.0), is(equalTo("999.9 k/s")));
         assertThat(Statistics.formatRate(999_949_999.0), is(equalTo("999.9 M/s")));
     }
+
+    /**
+     * The precision of the rounding follows the value: its integer digits below a thousand, four from a
+     * thousand on. A value with exactly four integer digits is the case that tells the two apart (a
+     * precision one short renders {@code 1234.5} as {@code "1.200 k/s"}); a value that is not a number
+     * renders as zero, an infinite one says so (it passes the rounding unchanged, and a rounding that
+     * replaced it with zero would render {@code Long.MAX_VALUE}), and a negative or fractional one as
+     * its whole number, as before.
+     */
+    @Test
+    public void formatRate_precisionFollowsTheIntegerDigits() {
+        assertThat(Statistics.formatRate(1_234.5), is(equalTo("1.235 k/s")));
+        assertThat(Statistics.formatRate(12.5), is(equalTo("13/s")));
+        assertThat(Statistics.formatRate(0.4), is(equalTo("0/s")));
+        assertThat(Statistics.formatRate(Double.NaN), is(equalTo("0/s")));
+        assertThat(Statistics.formatRate(Double.POSITIVE_INFINITY), is(equalTo("Infinity G/s")));
+        assertThat(Statistics.formatRate(-2_500.4), is(equalTo("-2500/s")));
+    }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="describeProducerShares">
@@ -221,6 +239,7 @@ public class StatisticsTest {
         assertThat(Statistics.formatCount(999_999_999L), is(equalTo("1.000 G")));
         assertThat(Statistics.formatCount(999_950L), is(equalTo("1.000 M")));
         assertThat(Statistics.formatCount(999_949L), is(equalTo("999.9 k")));
+        assertThat(Statistics.formatCount(1_234L), is(equalTo("1.234 k")));
         assertThat(Statistics.formatCount(999L), is(equalTo("999")));
     }
     // </editor-fold>
