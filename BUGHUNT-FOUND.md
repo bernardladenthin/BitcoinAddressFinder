@@ -1190,7 +1190,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `AbstractKeyProducerQueueBufferedTest#createSecrets_timeoutAfterSomeSecrets_returnsThePartialBatch` (zwei Secrets, Batch 3, Timeout 500 ms → genau diese zwei), `#createSecrets_timeoutBeforeAnySecretOfABatch_throwsException` (Batch 3 ohne Secret wirft weiter), `#addSecret_throwsWhenQueueFull` prüft jetzt die vollständige Meldung mit Hex statt nur des Präfixes. `KeyProducerJavaSocketTest#createSecrets_malformedSecretStream_throwsException` schrieb den Verlust fest (40 Bytes = ein vollständiges Secret plus 8 Bytes Rest, Batch 2 → Ausnahme) und heißt jetzt `#createSecrets_malformedSecretStream_returnsTheCompleteSecretThenThrows`: der erste Aufruf liefert das vollständige Secret (`0`), der zweite wirft.
 - **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: `createSecrets_timeoutAfterSomeSecrets_returnsThePartialBatch` „NoMoreSecretsAvailableException: Timeout while waiting for secret (500 ms, iteration 2/3)“, `addSecret_throwsWhenQueueFull` „Expected: a collection containing "Secret queue is full, ignore secret: abab…ab" but: mismatches were: [was "Secret queue is full, ignore secret: [-85, -85, …]"]“; mit dem Fix grün. Breit: `AbstractKeyProducerQueueBufferedTest` 13/13, `KeyProducerJavaSocketTest` 23/23 (vor der Anpassung des alten Tests: 1 Fehler, „Expected …NoMoreSecretsAvailableException to be thrown, but nothing was thrown.“ – genau das geänderte Verhalten), `KeyProducerJavaZmqTest` 7/7, `KeyProducerJavaWebSocketTest` 6/6; `spotless:apply`.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 7132685
 
 ## Offene Verdachte ohne Fund-ID
 
