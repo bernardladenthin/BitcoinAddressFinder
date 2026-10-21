@@ -1364,7 +1364,7 @@ Useful for piping externally generated secrets (e.g., from Python, Go, etc.) dir
 | `mode`                        | string enum (`CLIENT`, `SERVER`) | `"SERVER"`    | Whether to connect to a remote socket (`CLIENT`) or wait for connections (`SERVER`) |
 | `host`                        | string                           | `"localhost"` | Remote host to connect to (used only in `CLIENT` mode)                              |
 | `port`                        | number                           | `12345`       | TCP port to connect to or bind on; in `SERVER` mode a port that cannot be bound (e.g. already in use) fails the start |
-| `timeoutMillis`               | number                           | `3000`        | Socket timeout in milliseconds, applied to accept (server), connect (client) and per-read. Must be non-negative |
+| `timeoutMillis`               | number                           | `3000`        | Timeout in milliseconds, applied to accept (server), connect (client), per-read and to how long `createSecrets()` waits for a queued secret. Must be non-negative. A wait that times out before the first secret of a batch ends the producer; one that times out after some secrets returns those as a shorter batch, which is checked |
 | `logReceivedSecret`           | boolean                          | `false`       | Whether to log each received private key as a hex string                            |
 | `connectRetryCount`           | number                           | `5`           | Number of times to retry establishing a socket connection (client mode)             |
 | `broadcastResults`            | boolean                          | `false`       | Serve the outcome of every checked batch on `resultPort` (see below)                |
@@ -1448,7 +1448,7 @@ Ideal for decoupled key streaming where producers push keys using ZeroMQ `PUSH` 
 | keyProducerId      | string                       | —                      | Unique identifier for this key producer     |
 | address            | string                       | tcp://localhost:5555   | The ZeroMQ address to bind or connect to    |
 | mode               | string enum (BIND, CONNECT)  | BIND                   | Whether this socket binds to or connects    |
-| timeoutMillis      | number                       | `-1`                   | Receive timeout in milliseconds:<br> `0` = non-blocking,<br> `-1` = infinite,<br> `>0` = wait that long |
+| timeoutMillis      | number                       | `1000`                 | Receive timeout in milliseconds, for the socket and for `createSecrets()`:<br> `0` = non-blocking,<br> `-1` = infinite,<br> `>0` = wait that long.<br> A timeout before the first secret of a batch ends the producer; one after some secrets returns those as a shorter batch, which is checked |
 | logReceivedSecret  | boolean                      | false                  | Whether to log each received secret in hex  |
 | broadcastResults   | boolean                      | false                  | Publish the outcome of every checked batch (see below) |
 | publishAddress     | string                       | tcp://127.0.0.1:5558   | Address the result `PUB` socket binds to, used only when `broadcastResults` is set |
@@ -1491,7 +1491,7 @@ open `examples/websocket_scanner.html` in a browser.
 |--------------------|---------|---------|--------------------------------------------------------------------|
 | keyProducerId      | string  | —       | Unique identifier for this key producer                             |
 | port               | number  | `8080`  | TCP port the WebSocket server binds to; a port that cannot be bound (e.g. already in use) fails the start |
-| timeoutMillis      | number  | `1000`  | How long `createSecrets()` waits for a queued secret:<br> `-1` = block forever, `0` = return immediately, `>0` = wait that long |
+| timeoutMillis      | number  | `1000`  | How long `createSecrets()` waits for a queued secret:<br> `-1` = block forever, `0` = return immediately, `>0` = wait that long.<br> A timeout before the first secret of a batch ends the producer; one after some secrets returns those as a shorter batch, which is checked |
 | logReceivedSecret  | boolean | `false` | Whether to log each received secret in hex                          |
 | broadcastResults   | boolean | `false` | Send the outcome of every checked batch back on this same port      |
 

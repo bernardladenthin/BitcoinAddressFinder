@@ -175,6 +175,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inclusive `endPrivateKey` of an incremental range. The page now rounds up from "To" + 1, the default
   "To" is `…0107FFFFFF` so the default range keeps its 2^27 keys, and the label and the notes panel
   state the convention.
+- **README: the ZeroMQ key producer's `timeoutMillis` defaults to 1000 ms**, as the code always did; the
+  table said `-1` (wait forever), so a configuration that left it out ended after a second without a
+  secret instead of waiting.
 - **Fixes from the bug hunt of 2026-10-16 … 20** (details, reproduction and red/green proof per id in
   `BUGHUNT-FOUND.md`; the user-visible behaviour changes are listed under "Changed"). Lost or
   unchecked keys:
