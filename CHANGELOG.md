@@ -54,10 +54,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     (`/proc/self/maps`) instead of the `LD_PRELOAD` string, so a preload entry the dynamic linker ignored
     is warned about and a `libjsig` loaded another way is not; it is logged once per JVM, no longer once
     per kernel build (the tuner logged it once per arm); `run_TuneConfiguration.sh` preloads it too.
-  - **pocl's CPU device:** the key kernel runs there with a local work size of at most 256 (logged at
-    start-up); left to pocl it overflowed the worker thread's stack and the JVM died with exit code 139
-    or 134 at default settings. Other devices keep the driver's choice. The OpenCL launchers also export
-    `POCL_MAX_WORK_GROUP_SIZE=256` unless it is set, which the test and benchmark kernels still rely on.
+    The warning names the launchers to copy (`run_OpenCLInfo.sh`, `run_Find_1OpenCLDevice.sh`,
+    `run_TuneConfiguration.sh`) instead of the pattern `run_*OpenCL*.sh`, which missed the tuner's, and
+    a test holds every launcher of an OpenCL run, and only those, to the preload.
+  - **pocl's CPU device:** every kernel the finder launches -- the key kernel, the table precompute
+    kernels and the benchmark hooks the JMH benchmarks call -- runs there with a local work size of at
+    most 256 and at most the kernel's own limit (logged at start-up); left to pocl the key kernel
+    overflowed the worker thread's stack and the JVM died with exit code 139 or 134 at default settings.
+    Other devices keep the driver's choice. The OpenCL launchers still export
+    `POCL_MAX_WORK_GROUP_SIZE=256` unless it is set; the finder does not need it, and a smaller value set
+    there lowers the limit it reads from pocl.
+  - **Socket, WebSocket and ZeroMQ key producers keep a partial batch on a timeout:** when
+    `timeoutMillis` runs out after at least one secret of a batch was received, those secrets are
+    returned as a shorter batch and checked; they used to be dropped unchecked together with the
+    producer. A timeout before the first secret of a batch still ends the producer. A secret dropped
+    because the queue is full is logged in hex instead of as a list of signed bytes.
+  - **Configuration errors name the field:** `producerOpenCL.maxResultReaderThreads` below 1 is rejected
+    when the producer is created (0 failed with a bare `IllegalArgumentException`, a negative value
+    through the constructor with an injected pool built a semaphore the first grid waited on forever);
+    an empty, `null` or `null`-containing `tuneConfiguration.batchSizeInBitsCandidates` or
+    `keysPerWorkItemCandidates` is rejected before the tuner measures anything (it failed after stage 1
+    with a `NoSuchElementException` or a `NullPointerException`).
+  - **Statistics:** a rate or count that rounds up to a thousand of its unit is shown in the next unit,
+    `1.000 M/s` instead of `1000.0 k/s` (statistics line and tuner report).
 - **The OpenCL kernel refuses an unaligned secret base, and the skipped top grid is a warning.**
   The kernel derives a work item's key by ORing its offset into the lowest word of the base, which is
   the base plus the offset only when the low `batchSizeInBits` bits of the base are zero; the host
@@ -94,6 +113,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the buffer was created with `CL_MEM_COPY_HOST_PTR`; on the chunked LWJGL upload the same card created
   and filled the 3.10 GB Full-DB Fuse-16 buffer at 40.9 GiB live heap without a collection, which cost
   83 ms and changed nothing in the probe throughput (2.253 vs 2.252 ms/op).
+- **CI: `KeyProducerJavaZmqTest` no longer runs into the fork timeout.** It was reported as "There
+  was a timeout in the fork" (Windows) and hung on Linux under load when a connection stalled in the
+  ZMTP handshake, jeromq 0.6.0's poller registration race. Every test now has its own `@Timeout` and a
+  thread dump when it fires (`junit-platform.properties`), the test-side sockets that connect cap the
+  handshake at 1 s, and where the producer connects the bound test sender waits for a completed
+  handshake before it sends. That is a guard, not the fix: the fix of the race itself is submitted to
+  jeromq as [zeromq/jeromq#1022](https://github.com/zeromq/jeromq/pull/1022) (open, in no release yet);
+  `TODO.md` lists what to undo once a release carries it.
 - **CI prints the runner's CPU** at the top of `test`, `test-opencl` and `vmlens`
   (`.github/print-host-info.sh`, a shared file of the four repositories): pocl computes on the CPU, so a
   throughput or a timing in those logs can be read against the hardware the job drew.
