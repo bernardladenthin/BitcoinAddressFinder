@@ -4,6 +4,7 @@
 package net.ladenthin.bitcoinaddressfinder.opencl;
 
 import java.util.OptionalLong;
+import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClApi;
 import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClCommandQueue;
 import net.ladenthin.bitcoinaddressfinder.opencl.binding.ClDeviceId;
@@ -18,8 +19,10 @@ import org.lwjgl.opencl.CL10;
  * choice, as before. Whether a pocl work-group of 4096 overflows the 8 MB stack of pocl's worker thread
  * depends on the kernel and the compiler, so no launch on that device is left to the default.
  */
+@ToString
 final class OpenClKernelLauncher {
 
+    @ToString.Exclude
     private final ClApi clApi;
 
     private final ClDeviceId device;
