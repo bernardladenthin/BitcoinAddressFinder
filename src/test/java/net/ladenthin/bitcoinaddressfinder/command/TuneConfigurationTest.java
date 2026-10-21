@@ -168,6 +168,23 @@ public class TuneConfigurationTest extends LMDBBase {
     }
 
     @Test
+    public void run_nullKeysPerWorkItemCandidates_isRejectedNamingTheField() {
+        // arrange — a JSON "null" for the whole list binds to a null field
+        CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();
+        cTuneConfiguration.keysPerWorkItemCandidates = null;
+
+        // act
+        IllegalArgumentException exception =
+                assertThrows(IllegalArgumentException.class, () -> new TuneConfiguration(cTuneConfiguration).run());
+
+        // assert
+        assertThat(
+                exception.getMessage(),
+                is(equalTo(
+                        "tuneConfiguration.keysPerWorkItemCandidates must name at least one candidate but was null")));
+    }
+
+    @Test
     public void run_nullBatchSizeCandidate_isRejectedNamingTheField() {
         // arrange — a JSON "null" in the list binds to a null element
         CTuneConfiguration cTuneConfiguration = cpuTuneConfiguration();

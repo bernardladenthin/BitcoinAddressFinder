@@ -531,16 +531,23 @@ public class TuneConfiguration implements Runnable, Interruptable {
     }
 
     /**
-     * Rejects a candidate list the sweep cannot use: one without any candidate, which would sweep
-     * nothing and then fail in {@link Collections#max}, or one with a {@code null} element (a JSON
-     * {@code null}), which would fail when the sweep unboxes it. The values themselves are checked
-     * per arm: an out-of-range one fails its arm, which the report shows.
+     * Rejects a candidate list the sweep cannot use: a missing one (a JSON {@code null} for the whole
+     * list), one without any candidate, which would sweep nothing and then fail in
+     * {@link Collections#max}, or one with a {@code null} element (a JSON {@code null}), which would
+     * fail when the sweep unboxes it. The values themselves are checked per arm: an out-of-range one
+     * fails its arm, which the report shows.
      *
      * @param field      the field name in {@link CTuneConfiguration}, for the message
-     * @param candidates the configured candidates
-     * @throws IllegalArgumentException if {@code candidates} is empty or contains {@code null}
+     * @param candidates the configured candidates; {@code null} when the configuration sets the list
+     *                   to {@code null}
+     * @throws IllegalArgumentException if {@code candidates} is {@code null}, empty or contains
+     *         {@code null}
      */
-    private static void requireCandidates(String field, List<? extends @Nullable Integer> candidates) {
+    private static void requireCandidates(String field, @Nullable List<? extends @Nullable Integer> candidates) {
+        if (candidates == null) {
+            throw new IllegalArgumentException(
+                    "tuneConfiguration." + field + " must name at least one candidate but was null");
+        }
         if (candidates.isEmpty()) {
             throw new IllegalArgumentException("tuneConfiguration." + field + " must name at least one candidate");
         }
