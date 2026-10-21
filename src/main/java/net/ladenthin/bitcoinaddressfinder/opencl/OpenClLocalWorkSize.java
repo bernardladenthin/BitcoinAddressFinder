@@ -7,7 +7,9 @@ import java.util.OptionalLong;
 import org.lwjgl.opencl.CL10;
 
 /**
- * Chooses the local work size (work-group size) of the key-generation kernel launch.
+ * Chooses the local work size (work-group size) of a kernel launch: of the key-generation kernel in
+ * {@link OpenClTask}, and of every other kernel {@link OpenCLContext} launches (precompute, benchmark
+ * hooks) through {@link OpenClKernelLauncher}.
  *
  * <h2>Why</h2>
  * Without a local size the runtime picks the work-group size. pocl's CPU device then picks its

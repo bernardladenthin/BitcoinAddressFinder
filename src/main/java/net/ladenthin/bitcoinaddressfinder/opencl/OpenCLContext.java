@@ -102,7 +102,7 @@ public class OpenCLContext implements ReleaseCLObject {
     private static final String UNKNOWN_VENDOR = "unknown";
 
     /** Global work size of the fixed-base precompute kernels, which are single-work-item by design. */
-    private static final long[] SINGLE_WORK_ITEM = {1L};
+    private static final long SINGLE_WORK_ITEM = 1L;
 
     /**
      * {@code clBuildProgram} options string (Stage-0 quick win). Kept as a single constant so it is
@@ -363,6 +363,13 @@ public class OpenCLContext implements ReleaseCLObject {
     private @Nullable OpenClTask openClTask;
 
     /**
+     * Launches the kernels this context runs itself (precompute, benchmark hooks) with the local work
+     * size the key kernel gets too; set in {@link #init()}.
+     */
+    @ToString.Exclude
+    private @Nullable OpenClKernelLauncher kernelLauncher;
+
+    /**
      * GPU VRAM buffer holding the Binary Fuse 8 fingerprint slot array.
      *
      * <p>Always non-{@code null} between {@link #init()} and {@link #close()}: {@link #init()}
@@ -530,15 +537,18 @@ public class OpenCLContext implements ReleaseCLObject {
                 selection.platform().platformName(), device.deviceVersion(), device.deviceType());
         if (poclCpuDevice) {
             LOGGER.info(
-                    "pocl CPU device: the key kernel is launched with a local work size of at most {} (driver"
-                            + " default here: {}), because pocl's larger work-groups overflow its worker thread's"
-                            + " stack and kill the JVM.",
+                    "pocl CPU device: kernels are launched with a local work size of at most {} (driver"
+                            + " default for the key kernel here: {}), because pocl's larger work-groups overflow"
+                            + " its worker thread's stack and kill the JVM.",
                     OpenClLocalWorkSize.POCL_CPU_MAX_LOCAL_WORK_SIZE,
                     kernelWorkGroupSize);
         }
 
         openClTask = new OpenClTask(
                 clApi, localContext, producerOpenCL, bitHelper, byteBufferUtility, kernelWorkGroupSize, poclCpuDevice);
+        // The other kernels of the context (precompute below, benchmark hooks) get the same choice,
+        // each for its own CL_KERNEL_WORK_GROUP_SIZE.
+        kernelLauncher = new OpenClKernelLauncher(clApi, device.device(), poclCpuDevice);
 
         // Allocate a dummy empty filter so the kernel's fuse8 arguments are always bindable.
         // uploadGpuFilter() replaces it with the real filter; until then the kernel runs in
@@ -918,7 +928,7 @@ public class OpenCLContext implements ReleaseCLObject {
             clApi.setKernelArg(convertKernel, 0, out);
             clApi.setKernelArg(convertKernel, 1, in);
             clApi.setKernelArgInt(convertKernel, 2, count);
-            clApi.enqueueNDRangeKernel(localQueue, convertKernel, SINGLE_WORK_ITEM, false);
+            Objects.requireNonNull(kernelLauncher).launch(localQueue, convertKernel, SINGLE_WORK_ITEM);
             clApi.finish(localQueue);
         } finally {
             clApi.releaseKernel(convertKernel);
@@ -944,7 +954,7 @@ public class OpenCLContext implements ReleaseCLObject {
             if (countArg != null) {
                 clApi.setKernelArgInt(precomputeKernel, 1, countArg);
             }
-            clApi.enqueueNDRangeKernel(localQueue, precomputeKernel, SINGLE_WORK_ITEM, false);
+            Objects.requireNonNull(kernelLauncher).launch(localQueue, precomputeKernel, SINGLE_WORK_ITEM);
             clApi.finish(localQueue);
         } finally {
             clApi.releaseKernel(precomputeKernel);
@@ -1080,7 +1090,7 @@ public class OpenCLContext implements ReleaseCLObject {
             clApi.setKernelArg(benchKernel, 0, out);
             clApi.setKernelArgInt(benchKernel, 1, iterations);
             clApi.setKernelArgInt(benchKernel, 2, inputHighLimbsZero ? 1 : 0);
-            clApi.enqueueNDRangeKernel(localQueue, benchKernel, new long[] {globalWorkSize}, false);
+            Objects.requireNonNull(kernelLauncher).launch(localQueue, benchKernel, globalWorkSize);
             clApi.finish(localQueue);
         } finally {
             clApi.releaseMemObject(out);
@@ -1214,7 +1224,7 @@ public class OpenCLContext implements ReleaseCLObject {
                             + benchFilterProbeCount
                             + ")");
         }
-        clApi.enqueueNDRangeKernel(localQueue, k, new long[] {benchFilterProbeCount}, false);
+        Objects.requireNonNull(kernelLauncher).launch(localQueue, k, benchFilterProbeCount);
         clApi.finish(localQueue);
         return benchFilterProbeCount;
     }
@@ -1264,7 +1274,7 @@ public class OpenCLContext implements ReleaseCLObject {
             clApi.setKernelArg(benchKernel, 0, out);
             clApi.setKernelArgInt(benchKernel, 1, iterations);
             clApi.setKernelArgInt(benchKernel, 2, useReducedRadix ? 1 : 0);
-            clApi.enqueueNDRangeKernel(localQueue, benchKernel, new long[] {globalWorkSize}, false);
+            Objects.requireNonNull(kernelLauncher).launch(localQueue, benchKernel, globalWorkSize);
             clApi.finish(localQueue);
         } finally {
             clApi.releaseMemObject(out);
@@ -1287,6 +1297,7 @@ public class OpenCLContext implements ReleaseCLObject {
                 openClTask.close();
                 openClTask = null;
             }
+            kernelLauncher = null;
             if (kernel != null) {
                 clApi.releaseKernel(kernel);
                 kernel = null;

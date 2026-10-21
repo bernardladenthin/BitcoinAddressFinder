@@ -97,6 +97,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F213](#f213) — niedrig — *gefixt*
 - [F214](#f214) — niedrig — *gefixt*
 - [F215](#f215) — niedrig — *gefixt*
+- [F216](#f216) — niedrig — *gefixt*
 
 ## Funde
 
@@ -1182,6 +1183,8 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Status:** gefixt
 - **Commit:** e1025ea
 
+- **Nachtrag (Branch-Review 2026-10-20, umgesetzt 2026-10-21):** Die hier „nicht abgedeckten“ Starts des Kontexts (Benchmark-Haken, Precompute-Kernel) wählen seit [F216](#f216) dieselbe Local-Size über `OpenClKernelLauncher`; gemessen liefen sie auch vorher ohne Variable durch. Die Variable bleibt in den Startskripten (mit korrigierter Begründung) und im CI nur für Kernel, die Testklassen direkt über `ClApi` starten.
+
 <a id="f212"></a>
 ### F212 – BitcoinAddressFinder: Ein Timeout mitten im Batch verwirft die schon entnommenen Secrets eines Socket/WebSocket/ZMQ-Key-Producers
 - **Zeit:** 2026-10-21 13:33 UTC
@@ -1236,6 +1239,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: „Expected: is "1.000 M/s" but: was "1000.0 k/s"“ und „Expected: is "1.000 G" but: was "1000.0 M"“ (die Unterhalb-Fälle waren schon grün, sie pinnen die Grenze); mit dem Fix grün. Breit: `StatisticsTest` 13/13; `spotless:apply`, `spotbugs:check` grün.
 - **Status:** gefixt
 - **Commit:** 70d7677
+
+<a id="f216"></a>
+### F216 – BitcoinAddressFinder: Die übrigen Kernel-Starts des Kontexts liefen auf pocls CPU-Gerät weiter ohne Local-Work-Size
+- **Zeit:** 2026-10-21 14:50 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/opencl/OpenCLContext.java` (`init`, `enqueueConvertIgTableToFe10x26`, `enqueuePrecomputeKernel`, `runBenchInvMod`, `runBenchFeMul`, `runBenchFilterProbe`), neu `opencl/OpenClKernelLauncher.java`; Javadoc `opencl/OpenClLocalWorkSize.java`; README („PoCL support“, libjsig-Abschnitt), die vier OpenCL-Startskripte, Kommentar im CI-Job `test-opencl`
+- **Schwere:** niedrig (Vorsorge: auf diesem pocl laufen die betroffenen Kernel auch ohne Grenze durch; ob eine Work-Group von 4096 in den 8-MB-Stack passt, hängt aber am Kernel und am Compiler, und die Doku versprach für diese Starts nur die Umgebungsvariable)
+- **Historie:** Offener Punkt aus dem Branch-Review 2026-10-20/21 (TODO.md; Brief BR-5), umgesetzt am 2026-10-21 nach der Entscheidung des Eigentümers, alle offenen Punkte vor 6.0.0 zu schließen. Rest von [F211](#f211), dessen Eintrag die Benchmark-Haken und die Test-Kernel ausdrücklich als „nicht abgedeckt“ führte.
+- **Beschreibung:** F211 gab nur dem Schlüssel-Kernel (`OpenClTask.executeKernel`) auf pocls CPU-Gerät eine Local-Work-Size. Alle anderen Starts in `OpenCLContext` riefen weiter `enqueueNDRangeKernel` ohne Local-Size auf, der Treiber wählte also sein Maximum: die drei Benchmark-Haken (`runBenchInvMod`, `runBenchFeMul`, `runBenchFilterProbe`, global 2^n) und die Ein-Work-Item-Starts der Tabellen-Precompute-Kernel in `init()` (global 1, dort wählt jeder Treiber 1, also unschädlich). Für diese Starts stand nur `POCL_MAX_WORK_GROUP_SIZE` in Startskripten und CI. Gemessen am HEAD vor dem Fix (pocl im Sandbox, 4 Kerne, `CL_KERNEL_WORK_GROUP_SIZE` 4096, ohne Variable, mit libjsig, eigener JVM-Prozess): `runBenchInvMod` und `runBenchFeMul` mit global 16384, je 3 Starts, 2 von 2 Läufen je Haken Exit 0 – kein Absturz; die Kernel sind klein genug. Die Testklassen, die Kernel direkt über `ClApi` starten (`ProbeAddressesOpenCLTest`, `OpenCLAddKernelSmokeTest`), laufen ohne Variable ebenfalls grün.
+- **Fix:** Neue paketinterne Klasse `OpenClKernelLauncher(clApi, device, poclCpuDevice)` mit `launch(queue, kernel, global)`: auf pocls CPU-Gerät fragt sie das `CL_KERNEL_WORK_GROUP_SIZE` des jeweiligen Kernels ab und startet mit `OpenClLocalWorkSize.choose(...)` (Überladung mit Local-Size), auf jedem anderen Gerät unverändert die alte Überladung ohne Treiberabfrage. `OpenCLContext.init` legt sie neben dem `OpenClTask` an; die zwei Precompute-Starts und die drei Benchmark-Haken gehen darüber, `SINGLE_WORK_ITEM` ist jetzt ein `long`. `close()` gibt die Referenz frei. Die INFO-Zeile in `init` sagt „kernels are launched with a local work size of at most 256 (driver default for the key kernel here: 4096)“. Doku: README nennt beide Stellen für alle Kernel des Finders und sagt, dass der Finder die Variable nicht braucht (ein dort gesetzter kleinerer Wert senkt die Grenze, die er liest); die vier Startskripte behalten die Variable mit korrigierter Begründung; der CI-Kommentar sagt, die Variable stehe dort nur noch für die Kernel, die Testklassen direkt über `ClApi` starten.
+- **Tests:** `OpenClKernelLauncherTest` (4, Mock-`ClApi`: pocl-CPU und Kernel-Limit 4096 → Überladung mit `{256}`, nie die alte; Kernel-Limit 128 → `{128}`; global 1 → Local `{1}`; anderes Gerät → alte Überladung, nie die neue, keine Abfrage des Kernel-Limits). `OpenCLContextLocalWorkSizeTest#benchmarkHooks_poclCpuDevice_launchWithTheCappedLocalWorkSize` (Gerätetest, Mockito-Spy über der echten Bindung, überspringt sich ohne pocls CPU-Gerät): `init()`, alle drei Haken mit global 4096 – die Precompute-Starts kommen mit `{1}`/`{1}`, die Haken mit `{4096}`/`{256}`, die Überladung ohne Local-Size wird kein einziges Mal gerufen.
+- **Rot-Grün-Nachweis:** gegen den unveränderten Kontext rot: `benchmarkHooks_poclCpuDevice_launchWithTheCappedLocalWorkSize` „Argument(s) are different! Wanted: clApi.enqueueNDRangeKernel(<any>, <any>, [1], [1], false)“ (die Precompute-Starts kamen über die Überladung ohne Local-Size); gegen einen Launcher-Stub, der die alte Überladung ruft, rot: 3 von 4 in `OpenClKernelLauncherTest` („Argument(s) are different! Wanted: …“; der vierte Fall ist das alte Verhalten). Mit dem Fix grün: 4/4 und 1/1. Breit, auf pocl ohne `POCL_MAX_WORK_GROUP_SIZE`, mit libjsig: `OpenCLContextTest` 33/33, `OpenCLPrecomputeKernelTest` 10/10, `OpenCLFe10x26ParityTest` 1/1, `OpenClTaskLocalWorkSizeTest` 2/2, `ProbeAddressesOpenCLTest` 50 (22 übersprungen, Rastergrößen), `OpenCLAddKernelSmokeTest` 1/1, `BitcoinAddressFinderArchitectureTest` 17/17; `bash -n` der Startskripte, YAML-Prüfung, `spotless:apply`.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 
