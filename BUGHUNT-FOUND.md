@@ -802,6 +802,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Commit:** 9975403
 - **Nachtrag (Branch-Review 2026-10-20):** Die Ende-zu-Ende-Aussage „loggt die Warnung einmal“ galt nur für einen `Find` mit einem Producer; der Tuner (ein Kernel je Arm) und ein `Find` mit mehreren OpenCL-Producern loggten sie je Kontext, und `run_TuneConfiguration.sh` lud `libjsig` nicht vor – behoben als [F210](#f210). Die Prüfung entscheidet seit [F209](#f209) über `/proc/self/maps` statt über den `LD_PRELOAD`-String.
 - **Nachtrag (Branch-Review 2026-10-20, umgesetzt 2026-10-21):** Die Startmeldung nennt seit [F217](#f217) Dateinamen statt des Musters `run_*OpenCL*.sh` (darunter `run_TuneConfiguration.sh`), gepinnt von `SignalChainingCheckTest#warning_namesLaunchersThatExistAndPreloadLibjsig`.
+- **Nachtrag (Branch-Review 2026-10-20, Doku 2026-10-21):** `TEST_WRITING_GUIDE.md` (Abschnitt 5, „Running the OpenCL tests locally“) beschreibt das lokale Symptom (Fork beendet mit Exit 139, kein `hs_err`, z. B. bei `FinderTest`, `MainTest`, `ProducerOpenCLTest` auf pocl) und wie man die Tests wie der CI-Job `test-opencl` startet: `LD_PRELOAD=$JAVA_HOME/lib/libjsig.so` (und `POCL_MAX_WORK_GROUP_SIZE=256`) in der Shell exportieren, die Maven startet; `-DargLine` reicht nicht, weil der dynamische Linker `LD_PRELOAD` beim Prozessstart liest.
 
 <a id="f150"></a>
 ### F150 – BitcoinAddressFinder: Der `HexHash`-Export lässt sich nicht wieder importieren; 7,6 % seiner Zeilen werden zu falschen Hashes

@@ -142,6 +142,32 @@ Tests that **only** use the handle records (`ClDeviceId`, `ClPlatformId`, `ClCon
 
 **Decision rule:** "Does this test call any method that invokes a native OpenCL function?" If yes → `@OpenCLTest` + assume. If no → no annotation needed.
 
+### Running the OpenCL tests locally (Linux, pocl)
+
+pocl builds kernels with an in-process LLVM that replaces the JVM's `SIGSEGV` handler (F148 in
+`BUGHUNT-FOUND.md`). Without the JDK's signal chaining preloaded, a test JVM that has built a kernel
+can die at the next burst of safepoints: Surefire reports the fork as terminated ("The forked VM
+terminated without properly saying goodbye"), the exit code is 139, and there is no `hs_err` file.
+The classes that start a whole run on the OpenCL producer are the ones that hit it — `FinderTest`,
+`MainTest`, `ProducerOpenCLTest` and the other `*OpenCL*Test` classes on a pocl device; on a machine
+without an OpenCL ICD they skip themselves and nothing crashes.
+
+Run them the way the CI job `test-opencl` does (`.github/workflows/publish.yml`): export the variables
+in the shell that starts Maven, so every Surefire fork inherits them.
+
+```bash
+test -f "$JAVA_HOME/lib/libjsig.so"
+export LD_PRELOAD="$JAVA_HOME/lib/libjsig.so"
+export POCL_MAX_WORK_GROUP_SIZE=256
+mvn -Dnet.ladenthin.bitcoinaddressfinder.disableLMDBTest=true test -Dtest=FinderTest
+```
+
+`-DargLine` cannot do this: the dynamic linker reads `LD_PRELOAD` when the process starts, before
+any JVM option is parsed. `POCL_MAX_WORK_GROUP_SIZE` is no longer needed by the finder's own kernel
+launches (they pass a local work size of at most 256 on pocl's CPU device, F211/F216); the CI keeps
+it for the kernels that test classes launch directly through `ClApi` without one. The launchers in
+`examples/` set both for an OpenCL run (README "OpenCL on Linux: signal chaining").
+
 ---
 
 ## 6. LMDB / File System Tests
