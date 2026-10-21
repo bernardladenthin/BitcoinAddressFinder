@@ -635,12 +635,12 @@ Still open:
   - **Scope: two _physical_ OpenCL devices** — e.g. a machine with two GPUs, or one GPU plus a CPU that exposes an OpenCL device. (Not two logical handles to the same device.) Each `producerOpenCL` targets a distinct `(platformIndex, deviceIndex)`.
   - Availability gate: the test must self-skip unless **≥ 2 distinct physical OpenCL devices** are enumerated (extend the `OpenCLPlatformAssume` pattern). Most CI has 0–1 device, so it will usually skip, like the existing OpenCL tests; it is meant to run on a real dual-device host.
 
-### jeromq 0.6.0 poller registration race (upstream bug, fix submitted, worked around in two tests)
+### jeromq 0.6.0 poller registration race (upstream bug, fix submitted, test guards in two tests, no product workaround)
 
 - **Upstream fix submitted: [zeromq/jeromq#1022](https://github.com/zeromq/jeromq/pull/1022)** ("Poller:
   flush cancelled keys before registering handles (connect hand-off race)", one commit, open as of
   2026-10-21, in no release; its description names #912/#624 as likely duplicates and #849/#669 as
-  plausible ones). Drop the workarounds when a jeromq release carries it. `zmq.poll.Poller.run`
+  plausible ones). Drop the test guards when a jeromq release carries it. `zmq.poll.Poller.run`
   registers new handles in one "retired" pass per loop iteration: for each handle it looks up
   `handle.fd.keyFor(selector)`, registers the channel when the key is `null`, and updates
   `interestOps` when the key is valid. A key that is *cancelled but not yet deregistered* (that
@@ -666,13 +666,16 @@ Still open:
   - `KeyProducerJavaZmqTest` (F218) caps the handshake of every test-side socket that connects,
     gives every test its own `@Timeout` with a thread dump, and lets a bound test sender send only
     after a completed handshake where the producer connects.
-  - **Open, for the owner: `KeyProducerJavaZmq` in `CONNECT` mode can lose a message** (F218's side
-    finding). The stall delays the first key by up to 30 s, until the handshake timer drops the
-    connection and the producer reconnects; but jeromq 0.6.0 creates the bound peer's pipe when it
-    accepts the connection, so a client whose `PUSH` binds can queue a message on the stalled
-    connection before its handshake, and the dropped connection takes the message with it. Options:
-    wait for the jeromq fix above, or a client-side measure (send after a handshake event, as the
-    test does). A production `setHandshakeIvl` only shortens the stall, it does not keep the message.
+  - **Decided 2026-10-21 (owner): wait for the jeromq release that carries #1022; no fix and no
+    workaround in this repository.** `KeyProducerJavaZmq` in `CONNECT` mode can lose a message (F218's
+    side finding), and that stays as measured until then. The stall delays the first key by up to 30 s,
+    until the handshake timer drops the connection and the producer reconnects; but jeromq 0.6.0
+    creates the bound peer's pipe when it accepts the connection, so a client whose `PUSH` binds can
+    queue a message on the stalled connection before its handshake, and the dropped connection takes
+    the message with it. The fix belongs upstream, where the owner submitted it, so there is no
+    client-side measure and no production `setHandshakeIvl` (which would only shorten the stall, not
+    keep the message). The test guards below are not a product workaround: they keep CI
+    deterministic and stay until the undo list at the end of this section.
   - **`JeromqPollerHandOffRaceTest` is the deterministic, socket-free reproduction and the
     complete write-up** (mechanism, the real connecter-to-engine path, evidence, the shape of the
     fix, the verification plan). It asserts the bug is *present* (20/20 stalls on 0.6.0) with a
@@ -691,7 +694,7 @@ Still open:
     `@Timeout`s as a plain time limit (they bound any hang, not just this one), noting that decision
     in the class comment; re-run `ZmqResultBroadcasterTest` and `KeyProducerJavaZmqTest` in a loop
     (≥ 100 fresh forks each, under load) before calling it fixed — a single green run proves nothing
-    at a 5 % rate; and decide the `CONNECT`-mode item above anew.
+    at a 5 % rate; and re-check the `CONNECT`-mode loss above against the fixed release (it should be gone).
 
 ### Flaky CI tests seen on PR #389 (docs-only change, 2026-10-15)
 
