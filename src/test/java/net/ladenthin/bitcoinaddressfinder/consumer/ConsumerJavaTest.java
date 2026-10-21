@@ -568,11 +568,19 @@ public class ConsumerJavaTest {
         cConsumerJava.threads = 1;
         cConsumerJava.lmdbConfigurationReadOnly = new CLMDBConfigurationReadOnly();
         cConsumerJava.lmdbConfigurationReadOnly.lmdbDirectory = lmdbFolderPath.getAbsolutePath();
+        // Batch 1 must arrive through the timed poll: if the worker's non-blocking drain took it, the
+        // same drain loop would also take batch 2 after the release and the test would pass without
+        // the post-loop drain. A long timeout keeps the worker parked in that poll until batch 1 comes.
+        cConsumerJava.queuePollTimeoutMillis = 30_000L;
         java.util.concurrent.CountDownLatch firstBatchEntered = new java.util.concurrent.CountDownLatch(1);
         java.util.concurrent.CountDownLatch releaseFirstBatch = new java.util.concurrent.CountDownLatch(1);
         java.util.concurrent.atomic.AtomicInteger checkedBatches = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicReference<String> firstBatchCaller =
+                new java.util.concurrent.atomic.AtomicReference<>();
         net.ladenthin.bitcoinaddressfinder.core.ResultListener blockingListener = batchResult -> {
-            checkedBatches.incrementAndGet();
+            if (checkedBatches.incrementAndGet() == 1) {
+                firstBatchCaller.set(callerOfProcessBatch());
+            }
             firstBatchEntered.countDown();
             try {
                 releaseFirstBatch.await();
@@ -584,10 +592,12 @@ public class ConsumerJavaTest {
                 new ConsumerJava(cConsumerJava, keyUtility, persistenceUtils, java.util.List.of(blockingListener));
         consumerJava.initLMDB();
         consumerJava.startConsumer();
+        awaitWorkerParkedInTheTimedPoll(Duration.ofSeconds(10));
 
         // the worker takes the first batch and stays inside it until released
         consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), null);
         assertThat(firstBatchEntered.await(10, java.util.concurrent.TimeUnit.SECONDS), is(true));
+        assertThat(firstBatchCaller.get(), is(equalTo("consumeOneCycle")));
         // the second batch is still queued when the shutdown begins
         consumerJava.consumeKeys(createExamplePublicKeyBytesfromPrivateKey73(), null);
         Thread interrupter = new Thread(consumerJava::interrupt);
@@ -600,6 +610,59 @@ public class ConsumerJavaTest {
 
         assertThat(checkedBatches.get(), is(equalTo(2)));
         assertThat(consumerJava.keysQueueSize(), is(equalTo(0)));
+    }
+
+    /**
+     * Waits until a consumer worker is parked in the timed {@code keysQueue.poll} of
+     * {@code consumeOneCycle}. The non-blocking drain poll never parks in {@code TIMED_WAITING}, so
+     * this state proves that the next batch put into the queue is taken by the timed poll.
+     */
+    private static void awaitWorkerParkedInTheTimedPoll(Duration timeout) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (!isAWorkerParkedInTheTimedPoll()) {
+            if (System.nanoTime() - deadline > 0) {
+                throw new AssertionError("no consumer worker parked in the timed poll within " + timeout);
+            }
+            Thread.onSpinWait();
+        }
+    }
+
+    private static boolean isAWorkerParkedInTheTimedPoll() {
+        for (Map.Entry<Thread, StackTraceElement[]> entry :
+                Thread.getAllStackTraces().entrySet()) {
+            if (entry.getKey().getState() != Thread.State.TIMED_WAITING) {
+                continue;
+            }
+            boolean inConsumeOneCycle = false;
+            boolean inQueuePoll = false;
+            for (StackTraceElement frame : entry.getValue()) {
+                inConsumeOneCycle |= frame.getClassName().equals(ConsumerJava.class.getName())
+                        && frame.getMethodName().equals("consumeOneCycle");
+                inQueuePoll |= frame.getClassName().equals("java.util.concurrent.LinkedBlockingQueue")
+                        && frame.getMethodName().equals("poll");
+            }
+            if (inConsumeOneCycle && inQueuePoll) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Names the {@link ConsumerJava} method that called {@code processBatch} on the current thread:
+     * {@code consumeOneCycle} for a batch from the timed poll, {@code consumeKeys} for one from the
+     * non-blocking drain.
+     */
+    private static String callerOfProcessBatch() {
+        List<String> consumerFrames = StackWalker.getInstance()
+                .walk(frames -> frames.filter(frame -> frame.getClassName().equals(ConsumerJava.class.getName()))
+                        .map(StackWalker.StackFrame::getMethodName)
+                        .toList());
+        int processBatch = consumerFrames.indexOf("processBatch");
+        if (processBatch < 0 || processBatch + 1 >= consumerFrames.size()) {
+            return "not called from processBatch: " + consumerFrames;
+        }
+        return consumerFrames.get(processBatch + 1);
     }
 
     @Test
