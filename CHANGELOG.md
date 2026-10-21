@@ -37,7 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **`CompactLMDB`** refuses a non-empty target directory and a target that is the source under another
     spelling (F31, F132), and honours an interrupt before it starts (F32).
   - **OpenCL on Linux:** a warning is logged when the kernel is built without the JDK's signal chaining
-    (`libjsig`), and the `run_*OpenCL*.sh` launchers preload it (F148; README "OpenCL on Linux").
+    (`libjsig`), and the launchers of an OpenCL run (`run_*OpenCL*.sh`, `run_TuneConfiguration.sh`)
+    preload it (F148; README "OpenCL on Linux").
   - **Configuration errors fail early:** an unknown `keyProducerId` is reported before the database is
     loaded (F126); a JSON configuration with a UTF-8 BOM loads (F44).
   - **Shutdown:** `Finder.interrupt()` serialises its callers, so a Ctrl-C during the teardown of a

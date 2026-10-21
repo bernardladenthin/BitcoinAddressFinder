@@ -2242,8 +2242,9 @@ A path that does not exist is not an error for the dynamic linker: it prints `ER
 checks what is actually loaded (`/proc/self/maps`), not the `LD_PRELOAD` string, and warns in that
 case as well.
 
-The OpenCL launchers in `examples/` (`run_*OpenCL*.sh`) do this already, and the finder logs a warning
-when it builds an OpenCL kernel on Linux without it, whatever the driver. Windows is not affected.
+The launchers in `examples/` that start an OpenCL run (`run_*OpenCL*.sh` and `run_TuneConfiguration.sh`)
+do this already, and the finder logs a warning, once per JVM, when it builds an OpenCL kernel on Linux
+without it, whatever the driver. Windows is not affected.
 
 **pocl only: the work-group size.** Without a local work size, pocl picks its maximum group (4096
 on 4- and 16-core hosts), and the key-generation kernel overflows the 8 MB stack of pocl's worker

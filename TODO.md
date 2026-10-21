@@ -32,6 +32,13 @@ it is done, as for every other item in this file.
   `CTuneConfiguration`). Fix: validate non-empty with a message.
 - **`Statistics.formatRate` does not round over at the unit boundary**: 999 999.9/s prints as
   "1000.0 k/s" instead of "1.000 M/s" (cosmetic).
+- **No test holds the example launchers to the `libjsig` preload** (F148, F210): `run_TuneConfiguration.sh`
+  went without it until F210, and a future OpenCL example could again. A model-free guard next to
+  `ExampleRunScriptJarVersionTest` would parse the `config_*.json` each `run_*.sh` names (Jackson, not a
+  substring match: the CPU-only configs carry an empty `"producerOpenCL": []`), classify it as an
+  OpenCL run when `command` is `OpenCLInfo` or `TuneConfiguration` or `finder.producerOpenCL` is
+  non-empty, require `libjsig` in exactly those scripts, and check the reverse for the CPU-only ones.
+  It would be green today, so it pins rather than fixes.
 
 **Decided by the owner, recorded** (no change, kept so the reasoning is not lost):
 
