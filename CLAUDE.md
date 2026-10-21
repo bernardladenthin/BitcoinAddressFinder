@@ -342,13 +342,16 @@ See `examples/config_*.json` for all configuration variants.
 ### Conventions
 
 - Tests use forked JVMs (1 fork, no reuse) for isolation.
-- There is **no JUnit per-test timeout**. The only hard bound is the Surefire
+- There is **no project-wide JUnit per-test timeout**. The hard bound is the Surefire
   whole-fork timeout (`forkedProcessTimeoutInSeconds`, 240s in `pom.xml`): with
   `reuseForks=false` it must cover JVM startup + every method of one test class +
   JVM shutdown. A fork that exceeds it is killed and the build fails with
   "There was a timeout in the fork" — without per-test diagnostics. Test classes
   must therefore never leak resources (sockets, ZMQ contexts, executors) that
-  could stall fork shutdown.
+  could stall fork shutdown. Tests that wait on a network peer carry their own
+  `@Timeout` (`KeyProducerJavaSocketTest`, `KeyProducerJavaZmqTest`), so a hang fails
+  that test instead; `src/test/resources/junit-platform.properties` makes JUnit print
+  a thread dump when a `@Timeout` fires.
 - Base/utility test classes: `LMDBBase`, `BIP39DataProvider`, `TestTimeProvider`, `KeyProducerTestUtility`.
 - LMDB tests can be skipped with system property:
   ```

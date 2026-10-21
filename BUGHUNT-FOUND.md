@@ -99,6 +99,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F215](#f215) — niedrig — *gefixt*
 - [F216](#f216) — niedrig — *gefixt*
 - [F217](#f217) — niedrig — *gefixt*
+- [F218](#f218) — niedrig — *gefixt*
 
 ## Funde
 
@@ -1269,6 +1270,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** gegen den alten Wortlaut rot: „Expected: is not an empty collection but: was <[]>“ (das Muster ist kein Dateiname); mit dem Fix grün, `SignalChainingCheckTest` 15/15; `spotless:apply`.
 - **Status:** gefixt
 - **Commit:** 0f44a09
+
+<a id="f218"></a>
+### F218 – BitcoinAddressFinder: `KeyProducerJavaZmqTest` hängt bis zum Fork-Timeout, wenn die Verbindung des Producers im Handshake stehen bleibt
+- **Zeit:** 2026-10-21 15:25 UTC
+- **Datei:** `src/test/java/net/ladenthin/bitcoinaddressfinder/keyproducer/KeyProducerJavaZmqTest.java`, neu `src/test/resources/junit-platform.properties`; `CLAUDE.md` (Testkonventionen)
+- **Schwere:** niedrig (Test-Stabilität: ein Hänger riss den Surefire-Fork-Timeout von 240 s und meldete die Klasse ohne Diagnose; dazu ein Nebenbefund im Produktionsverhalten, siehe unten)
+- **Historie:** Offener Punkt aus dem Branch-Review 2026-10-20/21 (TODO.md „Flaky CI tests seen on PR #389“, erster Punkt; Brief BR-10), umgesetzt am 2026-10-21 nach der Entscheidung des Eigentümers, alle offenen Punkte vor 6.0.0 zu schließen. Zuerst gesehen als „There was a timeout in the fork“ auf `windows-latest` (PR #389); im Branch-Review auf Linux unter Last nachgestellt (`main` in `LinkedBlockingQueue.take` aus `createSecrets_connectMode_receivesSecret`).
+- **Beschreibung:** Messung am HEAD unter Last (8 `yes`-Prozesse auf 4 Kernen, Last 11–14, je Lauf eine frische Maven-JVM, `jstack` nach 75 s): ohne Guard 5 von 5 Läufen grün (je Test ≤ 2 s); mit dem ersten Guard (Handshake-Kappung der Test-Sender, `@Timeout` 45 s) im dritten von drei weiteren Läufen ein Hänger in `createSecrets_invalidSecretLength_errorLogged`: Abbruch nach 45 s mit Thread-Dump, `main` in `take` aus `createSecrets` (Zeile 337), `ZMQ-Receiver` in `Signaler.waitEvent`, und der Producer hatte **keine** der beiden Nachrichten erhalten (kein „Received invalid secret length: 16“), obwohl beide `send` zurückgekehrt waren. Beide beobachteten Hänger sind die zwei Tests, in denen der Producer verbindet und der Test-Sender bindet. Mechanismus: jeromq 0.6.0 legt die Pipe der bindenden Seite schon beim `accept` an (`SessionBase.processAttach` ruft `Pipe.pair`, nicht erst `engineReady`), ein `send` kehrt also sofort zurück und die Nachricht wartet in der Pipe dieser Verbindung. Bleibt der Handshake des verbindenden Producer-Sockets am Poller-Rennen hängen (siehe TODO.md „jeromq 0.6.0 poller registration race“), beenden die Handshake-Timer (30 s) diese Verbindung samt ihrer Pipe; der Reconnect des Producers öffnet eine neue, leere – die Nachricht ist verloren, `take()` wartet ewig. Das bloße Abwarten des 30-s-Timers heilt diesen Fall also nicht. **Nebenbefund (Produktion, nicht geändert):** derselbe Verlust trifft `KeyProducerJavaZmq` im Modus `CONNECT`, wenn der Client-`PUSH` bindet – die TODO-Aussage „no message is lost because PUSH/PULL queues rather than drops“ gilt dort nicht; offen für den Eigentümer (jeromq-Fix oder Client-seitige Gegenmaßnahme).
+- **Fix (Test):** (1) Jeder Test-Socket, der verbindet, entsteht über `connectSender`, der den ZMTP-Handshake vor `connect` auf 1 s kappt (wie `ZmqResultBroadcasterTest`). (2) In den zwei Tests, in denen der Producer verbindet, sendet der gebundene Test-Sender erst nach einem abgeschlossenen Handshake: `monitorHandshakes` hängt einen Monitor (`ZMQ.EVENT_HANDSHAKE_PROTOCOL`, `inproc`-`PAIR`, verbunden bevor der Producer verbindet) an den Sender, `awaitHandshake` wartet bis zu 40 s darauf – ein Stillstand kostet dann bis zu 30 s statt der Nachricht. (3) Klassenweites `@Timeout(15 s, SEPARATE_THREAD)`, für die zwei Producer-verbindet-Tests 50 s, so dass ein Hänger als Fehler dieses Tests endet statt den Fork zu reißen (Worst Case 2 × 50 + 6 × 15 s < 240 s). (4) `junit-platform.properties` setzt `junit.jupiter.execution.timeout.threaddump.enabled=true`: ein auslösendes `@Timeout` druckt einen Thread-Dump ins Log. Begründung als Klassen-Javadoc; `CLAUDE.md` nennt die Test-Timeouts jetzt statt „no JUnit per-test timeout“ (das schon für `KeyProducerJavaSocketTest` nicht mehr stimmte).
+- **Tests:** neu `KeyProducerJavaZmqTest#connectSender_peerNeverAnswersTheHandshake_reconnectsWithinTheCap`: ein TCP-Peer, der annimmt und nie grüßt; der über `connectSender` erzeugte Socket muss innerhalb von 10 s ein zweites Mal verbinden (pinnt, dass die Kappung den Engine erreicht). Ohne Kappung rot, mit grün.
+- **Rot-Grün-Nachweis:** `connectSender_peerNeverAnswersTheHandshake_reconnectsWithinTheCap` mit einem `connectSender` ohne `setHandshakeIvl` rot: „java.net.SocketTimeoutException: Accept timed out“ (nach 10 s); mit Kappung grün (1,4–1,9 s). Stabilität: vor dem Handshake-Monitor 1 Hänger in 8 Läufen unter Last (s. o.); mit allen Guards 10 von 10 Läufen unter Last grün, davon einer mit `createSecrets_connectMode_receivesSecret` = 30,09 s – ein Stillstand des Producer-Handshakes, der über den 30-s-Timer heilte, ohne dass die Nachricht verloren ging. `KeyProducerJavaZmqTest` 8/8; `spotless:apply`. Ein Probelauf mit einem absichtlich hängenden Test bestätigte Abbruch nach dem Timeout mit Thread-Dump.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 
