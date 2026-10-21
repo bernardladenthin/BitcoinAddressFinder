@@ -1282,7 +1282,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** neu `KeyProducerJavaZmqTest#connectSender_peerNeverAnswersTheHandshake_reconnectsWithinTheCap`: ein TCP-Peer, der annimmt und nie grüßt; der über `connectSender` erzeugte Socket muss innerhalb von 10 s ein zweites Mal verbinden (pinnt, dass die Kappung den Engine erreicht). Ohne Kappung rot, mit grün.
 - **Rot-Grün-Nachweis:** `connectSender_peerNeverAnswersTheHandshake_reconnectsWithinTheCap` mit einem `connectSender` ohne `setHandshakeIvl` rot: „java.net.SocketTimeoutException: Accept timed out“ (nach 10 s); mit Kappung grün (1,4–1,9 s). Stabilität: vor dem Handshake-Monitor 1 Hänger in 8 Läufen unter Last (s. o.); mit allen Guards 10 von 10 Läufen unter Last grün, davon einer mit `createSecrets_connectMode_receivesSecret` = 30,09 s – ein Stillstand des Producer-Handshakes, der über den 30-s-Timer heilte, ohne dass die Nachricht verloren ging. `KeyProducerJavaZmqTest` 8/8; `spotless:apply`. Ein Probelauf mit einem absichtlich hängenden Test bestätigte Abbruch nach dem Timeout mit Thread-Dump.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** a6ac9af
 
 ## Offene Verdachte ohne Fund-ID
 
