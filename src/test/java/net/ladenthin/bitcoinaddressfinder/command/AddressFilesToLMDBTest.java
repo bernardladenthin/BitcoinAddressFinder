@@ -8,6 +8,8 @@ import static org.hamcrest.Matchers.*;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.AppenderBase;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -39,6 +41,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.LoggerFactory;
 
 /**
  * Direct unit tests for {@link AddressFilesToLMDB}.
@@ -413,7 +416,52 @@ public class AddressFilesToLMDBTest extends LMDBBase {
             importer.run();
 
             assertThat(logCaptor.getInfoLogs(), not(hasItem("... import done.")));
-            assertThat(logCaptor.getWarnLogs(), hasItem(containsString("interrupted")));
+            assertThat(logCaptor.getWarnLogs(), hasItem(startsWith("... import interrupted")));
+        }
+    }
+
+    /**
+     * An import interrupted while a file is being read reports that file as interrupted, not as
+     * finished. A log hook clears the run flag on the {@code "process <path>"} line, which the reader
+     * logs right before it reads the file, so the reader leaves the file at its first loop check:
+     * deterministic, without a second thread or a large file.
+     */
+    @Test
+    public void addressFilesToLMDB_interruptedWhileReading_reportsTheFileAsInterruptedNotFinished() throws Exception {
+        List<String> files = writeAddressFilesRoundRobin(base58P2PKHAddresses(), 1, "interrupted-reading");
+        CAddressFilesToLMDB config = new CAddressFilesToLMDB();
+        config.addressesFiles.addAll(files);
+        config.lmdbConfigurationWrite = new CLMDBConfigurationWrite();
+        File lmdbFolder = Files.createDirectory(folder.resolve("lmdb-interrupted-reading"))
+                .toFile();
+        config.lmdbConfigurationWrite.lmdbDirectory = lmdbFolder.getAbsolutePath();
+        AddressFilesToLMDB importer = new AddressFilesToLMDB(config);
+
+        ch.qos.logback.classic.Logger logger =
+                (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(AddressFilesToLMDB.class);
+        AppenderBase<ILoggingEvent> interruptOnProcess = new AppenderBase<>() {
+            @Override
+            protected void append(ILoggingEvent event) {
+                if (event.getFormattedMessage().startsWith("process ")) {
+                    importer.interrupt();
+                }
+            }
+        };
+        try (LogCaptor logCaptor = LogCaptor.forClass(AddressFilesToLMDB.class)) {
+            interruptOnProcess.setContext(logger.getLoggerContext());
+            interruptOnProcess.start();
+            logger.addAppender(interruptOnProcess);
+            try {
+                importer.run();
+            } finally {
+                logger.detachAppender(interruptOnProcess);
+                interruptOnProcess.stop();
+            }
+
+            assertThat(logCaptor.getInfoLogs(), hasItem(startsWith("process ")));
+            assertThat(logCaptor.getWarnLogs(), hasItem(startsWith("interrupted while reading ")));
+            assertThat(logCaptor.getInfoLogs(), not(hasItem(startsWith("finished ("))));
+            assertThat(logCaptor.getInfoLogs(), not(hasItem("... import done.")));
         }
     }
 
