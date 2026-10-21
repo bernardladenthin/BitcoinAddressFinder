@@ -12,7 +12,9 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import net.ladenthin.bitcoinaddressfinder.LMDBBase;
 import net.ladenthin.bitcoinaddressfinder.configuration.CCompactLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CLMDBConfigurationReadOnly;
@@ -22,6 +24,7 @@ import net.ladenthin.bitcoinaddressfinder.staticaddresses.StaticAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.enums.P2PKH;
 import nl.altindag.log.LogCaptor;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -97,6 +100,36 @@ public class LMDBCompactTest extends LMDBBase {
         assertThrows(IllegalArgumentException.class, () -> new LMDBCompact(config).run());
         assertThat(sourceDataFile.exists(), is(true));
         assertThat(sourceDataFile.length(), is(equalTo(sourceBytes)));
+    }
+
+    /**
+     * The symlink case F31 names: a link to the source is the source, which only the canonical
+     * comparison sees ({@code Path.normalize()} removes {@code "."} but follows no link). The
+     * empty-target check would stop such a run later too, but with an {@link IllegalStateException}
+     * at {@code lock.mdb}; the type and message pin the canonical check itself.
+     */
+    @Test
+    public void compactLMDB_targetIsASymlinkToTheSource_throwsAndKeepsTheSourceDatabase() throws Exception {
+        StaticAddressesFiles staticAddressesFiles = new StaticAddressesFiles();
+        File sourceDirectory = new TestAddressesLMDB().createTestLMDB(folder, staticAddressesFiles, true, false);
+        File sourceDataFile = new File(sourceDirectory, "data.mdb");
+        long sourceBytes = sourceDataFile.length();
+        Path link = folder.resolve("lmdb-link");
+        try {
+            Files.createSymbolicLink(link, sourceDirectory.toPath());
+        } catch (UnsupportedOperationException | IOException e) {
+            Assumptions.abort("symbolic links not available: " + e);
+        }
+
+        CCompactLMDB config = new CCompactLMDB();
+        config.lmdbConfigurationReadOnly.lmdbDirectory = sourceDirectory.getAbsolutePath();
+        config.targetDirectory = link.toString();
+
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> new LMDBCompact(config).run());
+        assertThat(e.getMessage(), containsString("must differ"));
+        assertThat(sourceDataFile.exists(), is(true));
+        assertThat(sourceDataFile.length(), is(equalTo(sourceBytes)));
+        assertThat(Files.readSymbolicLink(link), is(equalTo(sourceDirectory.toPath())));
     }
 
     /** An interrupt before the run starts must stop it before anything is created or deleted. */

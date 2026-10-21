@@ -241,6 +241,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Reproduktion:** `LMDBCompactTest#compactLMDB_targetIsSourceSpelledDifferently_throwsAndKeepsTheSourceDatabase` (ohne Fix: Quelle gelöscht, `LmdbNativeException`; mit Fix 3/3 grün)
 - **Status:** gefixt
 - **Commit:** 301fe73
+- **Nachtrag (Branch-Review 2026-10-20):** Den Symlink-Fall, nach dem der kanonische Vergleich gewählt wurde, deckte kein Test ab; `<quelle>/.` fängt auch ein Vergleich über `toAbsolutePath().normalize()`, der keinem Link folgt. Neu `LMDBCompactTest#compactLMDB_targetIsASymlinkToTheSource_throwsAndKeepsTheSourceDatabase`: Ziel ist ein symbolischer Link auf die Quelle (kann das Dateisystem keine Links anlegen, bricht der Test über `Assumptions.abort` ab statt still grün zu sein); verlangt `IllegalArgumentException` mit „must differ“, die Quelle `data.mdb` unverändert und den Link weiter auf die Quelle zeigend. Typ und Meldung pinnen die kanonische Prüfung selbst: seit der Prüfung auf ein leeres Ziel stünde ohne sie eine `IllegalStateException` an `lock.mdb` statt eines Datenverlusts. Gegenprobe: `canonical()` als `toAbsolutePath().normalize()` rot („Unexpected exception type thrown, expected: <java.lang.IllegalArgumentException> but was: <java.lang.IllegalStateException>“), der `/.`-Test bleibt dabei grün; unverändert `LMDBCompactTest` 7/7 grün.
 
 <a id="f32"></a>
 ### F32 – BAF: `LMDBCompact.interrupt()` ist wirkungslos – ein vor dem Start unterbrochener Lauf löscht und kopiert trotzdem
