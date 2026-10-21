@@ -674,7 +674,7 @@ Still open:
     queue a message on the stalled connection before its handshake, and the dropped connection takes
     the message with it. The fix belongs upstream, where the owner submitted it, so there is no
     client-side measure and no production `setHandshakeIvl` (which would only shorten the stall, not
-    keep the message). The test guards below are not a product workaround: they keep CI
+    keep the message). The test guards above are not a product workaround: they keep CI
     deterministic and stay until the undo list at the end of this section.
   - **`JeromqPollerHandOffRaceTest` is the deterministic, socket-free reproduction and the
     complete write-up** (mechanism, the real connecter-to-engine path, evidence, the shape of the
