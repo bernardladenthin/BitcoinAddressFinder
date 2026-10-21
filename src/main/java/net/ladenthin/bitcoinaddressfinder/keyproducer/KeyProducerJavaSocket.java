@@ -111,11 +111,16 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
 
     /**
      * Submits the background reader runnable that connects (or accepts) on the
-     * configured port and feeds incoming secrets into the queue. Idempotency:
-     * calling {@code start()} more than once will submit a second runnable on
-     * the same single-thread executor, which will sit queued behind the first.
-     * The intended usage is a single invocation right after construction; tests
-     * and the production caller (Finder) do exactly one call.
+     * configured port and feeds incoming secrets into the queue. Call this once,
+     * right after construction; the production caller (Finder) and the tests do
+     * exactly that. In server mode a second call made while the first reader still
+     * holds the port fails with {@link IllegalStateException}, because the port is
+     * already bound, and nothing is submitted. In client mode a second call submits
+     * a second reader to the same single-thread executor, where it waits behind the
+     * first, and replaces the stored reader future. A second call in server mode is
+     * not guaranteed to fail either: the reader closes its server socket after a
+     * failed or timed-out accept and binds it again, and with port {@code 0} every
+     * bind gets a new ephemeral port.
      *
      * <p>In server mode the port is bound here, on the calling thread, before the reader is
      * submitted. A port that cannot be bound (held by another process, or not permitted) is a
