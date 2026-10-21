@@ -1204,7 +1204,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `ProducerOpenCLTest#constructor_noResultReaderThread_isRejectedNamingTheField` (0 über den öffentlichen Konstruktor), `#constructor_injectedPoolAndNegativeResultReaderThreads_isRejectedNamingTheField` (−1 über den Konstruktor mit injiziertem Pool).
 - **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: „Expected: is "producerOpenCL.maxResultReaderThreads must be at least 1 but was 0" but: was null“ und „Expected java.lang.IllegalArgumentException to be thrown, but nothing was thrown.“; mit dem Fix grün. Breit: `ProducerOpenCLTest` 22/22 (mit pocl, nichts übersprungen); `spotless:apply`.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 1922d84
 
 ## Offene Verdachte ohne Fund-ID
 
