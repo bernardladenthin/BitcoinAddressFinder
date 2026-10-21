@@ -579,7 +579,7 @@ public class KeyProducerJavaSocketTest {
     }
 
     @Test
-    public void createSecrets_malformedSecretStream_throwsException() throws Exception {
+    public void createSecrets_malformedSecretStream_returnsTheCompleteSecretThenThrows() throws Exception {
         int port = findFreePort();
 
         ServerSocket serverSocket = new ServerSocket(port);
@@ -598,6 +598,9 @@ public class KeyProducerJavaSocketTest {
         client.start();
 
         try {
+            // The first 32 bytes are a complete secret: it is returned as a shorter batch rather than
+            // lost with the timeout that follows. The trailing 8 bytes never make a secret.
+            assertThat(client.createSecrets(2, false), is(equalTo(new BigInteger[] {BigInteger.ZERO})));
             assertThrows(NoMoreSecretsAvailableException.class, () -> client.createSecrets(2, false));
         } finally {
             cleanup(client, serverFuture, serverSocket);

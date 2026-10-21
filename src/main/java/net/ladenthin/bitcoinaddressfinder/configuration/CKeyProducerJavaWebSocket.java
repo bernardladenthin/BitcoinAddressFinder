@@ -25,9 +25,11 @@ public class CKeyProducerJavaWebSocket extends CKeyProducerJavaReceiver {
      * <p>Semantics:
      * <ul>
      *   <li>A positive value: the maximum time (in ms) to wait for each receive
-     *       operation. A timed-out wait causes
+     *       operation. A timed-out wait for the first secret of a batch causes
      *       {@code createSecrets()} to throw
-     *       {@code NoMoreSecretsAvailableException}.</li>
+     *       {@code NoMoreSecretsAvailableException}, which ends the producer; a
+     *       timed-out wait after some secrets of the batch returns those as a
+     *       shorter batch.</li>
      *   <li>A negative value (typically {@code -1}): block indefinitely until a
      *       message arrives or the producer is interrupted via
      *       {@code interrupt()}.</li>

@@ -131,6 +131,37 @@ public class AbstractKeyProducerQueueBufferedTest {
     }
 
     @Test
+    public void createSecrets_timeoutAfterSomeSecrets_returnsThePartialBatch() throws Exception {
+        // arrange — a batch of three, but only two secrets arrive before the read timeout. The two
+        // are taken from the queue already; throwing would lose them, and nothing would ever check them.
+        CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
+        TestKeyProducer producer = createTestKeyProducer(config);
+        producer.setReadTimeoutMs(TestTimeProvider.DEFAULT_DELAY);
+        KeyProducerTestUtility utility = new KeyProducerTestUtility();
+        byte[] first = utility.createFilledSecret((byte) 0x11);
+        byte[] second = utility.createFilledSecret((byte) 0x22);
+        producer.addSecret(first);
+        producer.addSecret(second);
+
+        // act
+        BigInteger[] secrets = producer.createSecrets(3, false);
+
+        // assert
+        assertThat(secrets, is(equalTo(new BigInteger[] {new BigInteger(1, first), new BigInteger(1, second)})));
+    }
+
+    @Test
+    public void createSecrets_timeoutBeforeAnySecretOfABatch_throwsException() throws Exception {
+        // arrange — the partial batch is only for secrets already taken; an empty wait still ends the producer.
+        CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
+        TestKeyProducer producer = createTestKeyProducer(config);
+        producer.setReadTimeoutMs(TestTimeProvider.DEFAULT_DELAY);
+
+        // act + assert
+        assertThrows(NoMoreSecretsAvailableException.class, () -> producer.createSecrets(3, false));
+    }
+
+    @Test
     public void createSecrets_throwsException_whenShouldStopSet() throws Exception {
         CKeyProducerJavaReceiver config = new CKeyProducerJavaReceiver();
         TestKeyProducer producer = createTestKeyProducer(config);
@@ -175,13 +206,11 @@ public class AbstractKeyProducerQueueBufferedTest {
             producer.addSecret(secret); // fills queue
             producer.addSecret(secret); // must fail
 
-            // The formatted message uses the {} placeholder with the byte[] reference --
-            // because byte[].toString() prints '[B@<hash>' the formatted log line is
-            // non-deterministic, but the prefix is stable. Match the prefix only.
+            // The dropped secret is named in hex, so it can be sent again -- not as the
+            // byte[] reference ('[B@<hash>'), which says nothing about which secret it was.
             assertThat(
-                    logCaptor.getErrorLogs().stream()
-                            .anyMatch(s -> s.startsWith("Secret queue is full, ignore secret: ")),
-                    is(true));
+                    logCaptor.getErrorLogs(),
+                    hasItem("Secret queue is full, ignore secret: " + "ab".repeat(secret.length)));
         }
     }
 

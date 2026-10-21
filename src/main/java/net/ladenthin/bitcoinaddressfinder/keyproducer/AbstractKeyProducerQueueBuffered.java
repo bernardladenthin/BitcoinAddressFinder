@@ -12,6 +12,7 @@ import net.ladenthin.bitcoinaddressfinder.configuration.CKeyProducerJavaReceiver
 import net.ladenthin.bitcoinaddressfinder.constants.OpenClKernelConstants;
 import net.ladenthin.bitcoinaddressfinder.secret.NoMoreSecretsAvailableException;
 import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
+import org.apache.commons.codec.binary.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,6 +69,24 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
         this.secretQueue = queue;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Reads one secret from the queue per element of the batch, waiting at most
+     * {@link #getReadTimeout()} for each (or indefinitely when it is negative).
+     *
+     * <p>When the wait for a secret times out after at least one secret of this batch was taken
+     * from the queue, the secrets taken so far are returned as a shorter batch: they are no
+     * longer in the queue, and throwing would leave them unchecked. The producer accepts a
+     * shorter batch of explicit secrets (see {@code AbstractProducer#produceKeys}). A timeout
+     * before the first secret of the batch still throws {@link NoMoreSecretsAvailableException},
+     * which ends the producer; with {@code returnStartSecretOnly} the batch is a single secret,
+     * so a timeout always throws there.
+     *
+     * @throws NoMoreSecretsAvailableException if no secret arrives within the read timeout, a
+     *         received secret does not have {@link OpenClKernelConstants#PRIVATE_KEY_MAX_NUM_BYTES}
+     *         bytes, or shutdown is signalled or the thread is interrupted while waiting
+     */
     @Override
     public BigInteger[] createSecrets(int overallWorkSize, boolean returnStartSecretOnly) {
         verifyWorkSize(overallWorkSize, cKeyProducerJava.maxWorkSize);
@@ -91,6 +110,17 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
                 } else {
                     secret = secretQueue.poll(timeout, TimeUnit.MILLISECONDS);
                     if (secret == null) {
+                        if (i > 0) {
+                            // These secrets are out of the queue already; return them rather than lose them.
+                            LOGGER.debug(
+                                    "Timeout while waiting for secret ({} ms) after {} of {}; returning the partial batch.",
+                                    timeout,
+                                    i,
+                                    length);
+                            BigInteger[] partialBatch = new BigInteger[i];
+                            System.arraycopy(secrets, 0, partialBatch, 0, i);
+                            return partialBatch;
+                        }
                         throw new NoMoreSecretsAvailableException("Timeout while waiting for secret (" + timeout
                                 + " ms, iteration " + i + "/" + length + ")");
                     }
@@ -171,7 +201,7 @@ public abstract class AbstractKeyProducerQueueBuffered<T extends CKeyProducerJav
     protected void addSecret(byte[] secret) {
         if (!shouldStop) {
             if (!secretQueue.offer(secret)) {
-                LOGGER.error("Secret queue is full, ignore secret: {}", secret);
+                LOGGER.error("Secret queue is full, ignore secret: {}", Hex.encodeHexString(secret));
             }
         }
     }
