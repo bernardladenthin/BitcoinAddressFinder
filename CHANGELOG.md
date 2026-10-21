@@ -142,6 +142,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Spotless formatter version -- is used in another version than in a sibling's default branch.
 
 ### Fixed
+- **`examples/websocket_scanner.html` sends the block that holds "To".** The page treated "To" as
+  exclusive, which only a script comment said: with an aligned "To" (the default included) the block
+  containing the named key was never sent while "Range complete." was logged anyway, unlike the
+  inclusive `endPrivateKey` of an incremental range. The page now rounds up from "To" + 1, the default
+  "To" is `…0107FFFFFF` so the default range keeps its 2^27 keys, and the label and the notes panel
+  state the convention.
 - **Fixes from the bug hunt of 2026-10-16 … 20** (details, reproduction and red/green proof per id in
   `BUGHUNT-FOUND.md`; the user-visible behaviour changes are listed under "Changed"). Lost or
   unchecked keys:
