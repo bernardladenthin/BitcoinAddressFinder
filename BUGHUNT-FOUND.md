@@ -1234,7 +1234,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `StatisticsTest#formatRate_valueRoundingUpToAThousandOfItsUnit_carriesIntoTheNextUnit` (`999_999.9` → „1.000 M/s“, `999_999_999` → „1.000 G/s“, `999_950` → „1.000 M/s“, `999.96` und `999.5` → „1.000 k/s“), `#formatRate_valueBelowTheCarry_keepsItsUnit` (`999.4` → „999/s“, `999_949` → „999.9 k/s“, `999_949_999` → „999.9 M/s“), `#formatCount_valueRoundingUpToAThousandOfItsUnit_carriesIntoTheNextUnit` (`999_999_999` → „1.000 G“, `999_950` → „1.000 M“, `999_949` → „999.9 k“, `999` → „999“). Der alte Pin-Test ist durch den ersten ersetzt.
 - **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: „Expected: is "1.000 M/s" but: was "1000.0 k/s"“ und „Expected: is "1.000 G" but: was "1000.0 M"“ (die Unterhalb-Fälle waren schon grün, sie pinnen die Grenze); mit dem Fix grün. Breit: `StatisticsTest` 13/13; `spotless:apply`, `spotbugs:check` grün.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 70d7677
 
 ## Offene Verdachte ohne Fund-ID
 
