@@ -26,7 +26,10 @@ public class CProducerOpenCL extends CProducer {
     /** Index of the OpenCL device within the selected platform. */
     public int deviceIndex = 0;
 
-    /** Maximum number of threads that read OpenCL kernel results concurrently. */
+    /**
+     * Maximum number of threads that read OpenCL kernel results concurrently. Must be at least 1;
+     * the producer rejects a smaller value when it is constructed.
+     */
     public int maxResultReaderThreads = 4;
 
     /**

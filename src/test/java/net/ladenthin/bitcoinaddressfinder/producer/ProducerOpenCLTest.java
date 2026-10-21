@@ -165,6 +165,62 @@ public class ProducerOpenCLTest {
     }
     // </editor-fold>
 
+    // <editor-fold defaultstate="collapsed" desc="constructor">
+    @Test
+    public void constructor_noResultReaderThread_isRejectedNamingTheField() {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.maxResultReaderThreads = 0;
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, new Random(1));
+
+        // act
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> new ProducerOpenCL(
+                        cProducerOpenCL,
+                        new MockConsumer(),
+                        keyUtility,
+                        mockKeyProducer,
+                        bitHelper,
+                        new RuntimeStatistics()));
+
+        // assert
+        assertThat(
+                exception.getMessage(),
+                is(equalTo("producerOpenCL.maxResultReaderThreads must be at least 1 but was 0")));
+    }
+
+    @Test
+    public void constructor_injectedPoolAndNegativeResultReaderThreads_isRejectedNamingTheField() {
+        // arrange — the injected pool has threads of its own; the field still sizes the submit slots,
+        // and a semaphore without permits would block the first grid forever.
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.maxResultReaderThreads = -1;
+        MockKeyProducer mockKeyProducer = new MockKeyProducer(keyUtility, new Random(1));
+        ThreadPoolExecutor pool = (ThreadPoolExecutor) Executors.newFixedThreadPool(1);
+        try {
+            // act
+            IllegalArgumentException exception = assertThrows(
+                    IllegalArgumentException.class,
+                    () -> new ProducerOpenCL(
+                            cProducerOpenCL,
+                            new MockConsumer(),
+                            keyUtility,
+                            mockKeyProducer,
+                            bitHelper,
+                            new RuntimeStatistics(),
+                            pool));
+
+            // assert
+            assertThat(
+                    exception.getMessage(),
+                    is(equalTo("producerOpenCL.maxResultReaderThreads must be at least 1 but was -1")));
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+    // </editor-fold>
+
     // <editor-fold defaultstate="collapsed" desc="getFreeThreads">
     @Test
     public void getFreeThreads_notInitialized_numberOfFreeThreadsReturned() throws Exception {

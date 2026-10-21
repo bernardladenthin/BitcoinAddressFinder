@@ -165,6 +165,7 @@ public class ProducerOpenCL extends AbstractProducer {
      * @param keyProducer       the secret supplying strategy
      * @param bitHelper         bit/batch-size helper
      * @param runtimeStatistics shared runtime metrics sink for per-producer batch counts
+     * @throws IllegalArgumentException if {@code producerOpenCL.maxResultReaderThreads} is less than one
      */
     public ProducerOpenCL(
             CProducerOpenCL producerOpenCL,
@@ -174,7 +175,25 @@ public class ProducerOpenCL extends AbstractProducer {
             BitHelper bitHelper,
             RuntimeStatistics runtimeStatistics) {
         this(producerOpenCL, consumer, keyUtility, keyProducer, bitHelper, runtimeStatistics, (ThreadPoolExecutor)
-                Executors.newFixedThreadPool(producerOpenCL.maxResultReaderThreads));
+                Executors.newFixedThreadPool(requireResultReaderThread(producerOpenCL).maxResultReaderThreads));
+    }
+
+    /**
+     * Rejects a {@code maxResultReaderThreads} below one. The field sizes both the result-reader pool
+     * and the semaphore that admits a grid: without the check a {@code 0} failed in
+     * {@code Executors.newFixedThreadPool} with an {@link IllegalArgumentException} that names nothing,
+     * and with an injected pool a semaphore without permits would block the first grid forever.
+     *
+     * @param producerOpenCL the OpenCL producer configuration
+     * @return {@code producerOpenCL}, unchanged
+     * @throws IllegalArgumentException if {@code maxResultReaderThreads} is less than one
+     */
+    private static CProducerOpenCL requireResultReaderThread(CProducerOpenCL producerOpenCL) {
+        if (producerOpenCL.maxResultReaderThreads < 1) {
+            throw new IllegalArgumentException("producerOpenCL.maxResultReaderThreads must be at least 1 but was "
+                    + producerOpenCL.maxResultReaderThreads);
+        }
+        return producerOpenCL;
     }
 
     @Override
@@ -196,6 +215,7 @@ public class ProducerOpenCL extends AbstractProducer {
      * @param bitHelper                       bit/batch-size helper
      * @param runtimeStatistics               shared runtime metrics sink for per-producer batch counts
      * @param resultReaderThreadPoolExecutor  pool used to drain GPU results back to the host
+     * @throws IllegalArgumentException if {@code producerOpenCL.maxResultReaderThreads} is less than one
      */
     @VisibleForTesting
     ProducerOpenCL(
@@ -206,7 +226,13 @@ public class ProducerOpenCL extends AbstractProducer {
             BitHelper bitHelper,
             RuntimeStatistics runtimeStatistics,
             ThreadPoolExecutor resultReaderThreadPoolExecutor) {
-        super(producerOpenCL, consumer, keyUtility, keyProducer, bitHelper, runtimeStatistics);
+        super(
+                requireResultReaderThread(producerOpenCL),
+                consumer,
+                keyUtility,
+                keyProducer,
+                bitHelper,
+                runtimeStatistics);
         this.producerOpenCL = producerOpenCL;
         this.resultReaderThreadPoolExecutor = resultReaderThreadPoolExecutor;
         this.submitSlot = new Semaphore(producerOpenCL.maxResultReaderThreads);

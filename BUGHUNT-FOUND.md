@@ -94,6 +94,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - [F210](#f210) — niedrig — *gefixt*
 - [F211](#f211) — mittel — *gefixt*
 - [F212](#f212) — mittel — *gefixt*
+- [F213](#f213) — niedrig — *gefixt*
 
 ## Funde
 
@@ -1191,6 +1192,19 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: `createSecrets_timeoutAfterSomeSecrets_returnsThePartialBatch` „NoMoreSecretsAvailableException: Timeout while waiting for secret (500 ms, iteration 2/3)“, `addSecret_throwsWhenQueueFull` „Expected: a collection containing "Secret queue is full, ignore secret: abab…ab" but: mismatches were: [was "Secret queue is full, ignore secret: [-85, -85, …]"]“; mit dem Fix grün. Breit: `AbstractKeyProducerQueueBufferedTest` 13/13, `KeyProducerJavaSocketTest` 23/23 (vor der Anpassung des alten Tests: 1 Fehler, „Expected …NoMoreSecretsAvailableException to be thrown, but nothing was thrown.“ – genau das geänderte Verhalten), `KeyProducerJavaZmqTest` 7/7, `KeyProducerJavaWebSocketTest` 6/6; `spotless:apply`.
 - **Status:** gefixt
 - **Commit:** 7132685
+
+<a id="f213"></a>
+### F213 – BitcoinAddressFinder: `maxResultReaderThreads` unter 1 scheitert ohne Feldnamen oder blockiert den ersten Grid
+- **Zeit:** 2026-10-21 13:39 UTC
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/producer/ProducerOpenCL.java` (beide Konstruktoren, neu `requireResultReaderThread`); Javadoc `configuration/CProducerOpenCL.java` (`maxResultReaderThreads`)
+- **Schwere:** niedrig (Fehlkonfiguration; die Meldung nannte das Feld nicht)
+- **Historie:** Offener Punkt aus dem Branch-Review 2026-10-20/21 (TODO.md; Brief BR-2), umgesetzt am 2026-10-21 nach der Entscheidung des Eigentümers, alle offenen Punkte vor 6.0.0 zu schließen. Notiert am 2026-10-18 in `BUGHUNT-CHECKED.md` (`CProducerOpenCL`, zweite Durchsicht: „nicht geändert“).
+- **Beschreibung:** `maxResultReaderThreads` dimensioniert den Reader-Pool (`Executors.newFixedThreadPool`) und die `Semaphore`, die einen Grid zulässt. `0` scheiterte im Pool mit einer `IllegalArgumentException` ohne Meldung, die niemandem sagt, welches Feld falsch ist; über den Konstruktor mit injiziertem Pool lief ein Wert unter 1 sogar durch und hätte eine Semaphore ohne Erlaubnis gebaut, an der der erste Grid für immer wartet.
+- **Fix:** `requireResultReaderThread` lehnt `maxResultReaderThreads < 1` in beiden Konstruktoren ab, bevor der Pool entsteht und bevor `super(...)` läuft, mit „producerOpenCL.maxResultReaderThreads must be at least 1 but was <n>“ (Muster wie `KeyProducerJavaSocket.requireNonNegativeTimeout`, F100/F155). Default 4 unverändert; Javadoc des Feldes und `@throws` der Konstruktoren nennen die Grenze.
+- **Tests:** `ProducerOpenCLTest#constructor_noResultReaderThread_isRejectedNamingTheField` (0 über den öffentlichen Konstruktor), `#constructor_injectedPoolAndNegativeResultReaderThreads_isRejectedNamingTheField` (−1 über den Konstruktor mit injiziertem Pool).
+- **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: „Expected: is "producerOpenCL.maxResultReaderThreads must be at least 1 but was 0" but: was null“ und „Expected java.lang.IllegalArgumentException to be thrown, but nothing was thrown.“; mit dem Fix grün. Breit: `ProducerOpenCLTest` 22/22 (mit pocl, nichts übersprungen); `spotless:apply`.
+- **Status:** gefixt
+- **Commit:** (folgt)
 
 ## Offene Verdachte ohne Fund-ID
 
