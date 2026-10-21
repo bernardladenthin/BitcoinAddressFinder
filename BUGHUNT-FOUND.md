@@ -1300,7 +1300,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `AbstractKeyProducerQueueBufferedTest#createSecrets_invalidLengthAfterSomeSecrets_returnsThePartialBatchAndLogsTheSecret`: Queue [0x11…, 0x22…, `cafe` (2 Bytes), 0x44…], Batch 4 → genau die ersten zwei; der nächste Aufruf (`createSecrets(1, true)`) liefert das vierte; LogCaptor-WARN „Discarded a secret of invalid length 2 (expected 32 bytes) after 2 of 4; returning the partial batch. Secret: cafe“. `#createSecrets_throwsException_onInvalidLength` (ungültiges Secret als erstes) pinnt weiter die Ausnahme.
 - **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: „NoMoreSecretsAvailableException: Invalid secret length: 2“ (aus `createSecrets(4, false)`, kein Secret geprüft); mit dem Fix grün, `AbstractKeyProducerQueueBufferedTest` 14/14; `spotless:apply`.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 847402a
 
 ## Offene Verdachte ohne Fund-ID
 
