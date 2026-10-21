@@ -19,26 +19,18 @@ it is done, as for every other item in this file.
 
 **Side findings recorded in the ledgers, not changed yet** (each small; all model-free):
 
-- **A timed-out `createSecrets` loses the secrets it already took** (F10's side finding,
-  `AbstractKeyProducerQueueBuffered`): without `batchUsePrivateKeyIncrement`, a timeout at `i > 0`
-  drops the partial batch, and those secrets are never checked. Fix: return the partial batch (the
-  producer accepts a shorter last batch since F160) or put the taken secrets back. Its `addSecret` log
-  on a full queue also prints a `byte[]` as `[B@…`.
-- **`maxResultReaderThreads = 0` fails with a bare `IllegalArgumentException`** from
-  `newFixedThreadPool` that does not name the field (`BUGHUNT-CHECKED.md`, `CProducerOpenCL`). Fix:
-  validate `≥ 1` with a message naming it.
-- **Empty `batchSizeInBitsCandidates` / `keysPerWorkItemCandidates` throw a bare
-  `NoSuchElementException`** from `Collections.max` in `TuneConfiguration` (`BUGHUNT-CHECKED.md`,
-  `CTuneConfiguration`). Fix: validate non-empty with a message.
-- **`Statistics.formatRate` does not round over at the unit boundary**: 999 999.9/s prints as
-  "1000.0 k/s" instead of "1.000 M/s" (cosmetic).
-- **No test holds the example launchers to the `libjsig` preload** (F148, F210): `run_TuneConfiguration.sh`
-  went without it until F210, and a future OpenCL example could again. A model-free guard next to
-  `ExampleRunScriptJarVersionTest` would parse the `config_*.json` each `run_*.sh` names (Jackson, not a
-  substring match: the CPU-only configs carry an empty `"producerOpenCL": []`), classify it as an
-  OpenCL run when `command` is `OpenCLInfo` or `TuneConfiguration` or `finder.producerOpenCL` is
-  non-empty, require `libjsig` in exactly those scripts, and check the reverse for the CPU-only ones.
-  It would be green today, so it pins rather than fixes.
+- **A secret of the wrong length in the middle of a batch discards the secrets read before it**
+  (F212's remainder, `AbstractKeyProducerQueueBuffered.createSecrets`): since F212 a *timeout* after
+  some secrets returns them as a shorter batch, but a received secret that does not have 32 bytes still
+  throws `NoMoreSecretsAvailableException` at any position, so the valid secrets already taken from the
+  queue are never checked and the producer ends. Proposed: return the valid secrets as a partial batch
+  and log the invalid one as a warning (hex); keep the exception when it is the first secret of a
+  batch; pin whether the secrets after it stay queued. A shutdown or an interrupt in the middle of a
+  batch keeps discarding: the run ends there either way.
+- **`persistence/FilterBuildProgress.formatRate` has the carry problem F215 fixed in `Statistics`**:
+  a separate, coarser helper (`%.1fM/s`, `%.0fk/s`) that chooses the unit before rounding, so 999 600/s
+  prints as "1000k/s" instead of "1.0M/s" (cosmetic, filter-build progress line). Fix as in F215:
+  round first, then choose the unit.
 
 **Decided by the owner, recorded** (no change, kept so the reasoning is not lost):
 
@@ -658,9 +650,12 @@ Still open:
   - **Scope: two _physical_ OpenCL devices** — e.g. a machine with two GPUs, or one GPU plus a CPU that exposes an OpenCL device. (Not two logical handles to the same device.) Each `producerOpenCL` targets a distinct `(platformIndex, deviceIndex)`.
   - Availability gate: the test must self-skip unless **≥ 2 distinct physical OpenCL devices** are enumerated (extend the `OpenCLPlatformAssume` pattern). Most CI has 0–1 device, so it will usually skip, like the existing OpenCL tests; it is meant to run on a real dual-device host.
 
-### jeromq 0.6.0 poller registration race (upstream bug, worked around in one test)
+### jeromq 0.6.0 poller registration race (upstream bug, fix submitted, worked around in two tests)
 
-- **File it upstream and drop the workaround when a fixed jeromq ships.** `zmq.poll.Poller.run`
+- **Upstream fix submitted: [zeromq/jeromq#1022](https://github.com/zeromq/jeromq/pull/1022)** ("Poller:
+  flush cancelled keys before registering handles (connect hand-off race)", one commit, open as of
+  2026-10-21, in no release; its description names #912/#624 as likely duplicates and #849/#669 as
+  plausible ones). Drop the workarounds when a jeromq release carries it. `zmq.poll.Poller.run`
   registers new handles in one "retired" pass per loop iteration: for each handle it looks up
   `handle.fd.keyFor(selector)`, registers the channel when the key is `null`, and updates
   `interestOps` when the key is valid. A key that is *cancelled but not yet deregistered* (that
@@ -683,51 +678,47 @@ Still open:
     `test` / `test-opencl` jobs of run 35511514278 (2026-09-20) and a run on 2026-08-26, always
     with nothing received in the full budget. The race is platform-independent (pure NIO
     bookkeeping), so the other OS jobs were lucky, not immune.
-  - `KeyProducerJavaZmq` in `CONNECT` mode is exposed to the same stall in production: a hit
-    delays the first key by up to 30 s and then self-heals through jeromq's own reconnect; no
-    message is lost because `PUSH`/`PULL` queues rather than drops. Not changed — a production
-    `setHandshakeIvl` is a behavioural choice for the owner, and `PUSH`-side clients are outside
-    this repo. `KeyProducerJavaZmqTest` uses `timeoutMillis = -1` and the 240 s fork budget, so it
-    only slows down on a stall.
+  - `KeyProducerJavaZmqTest` (F218) caps the handshake of every test-side socket that connects,
+    gives every test its own `@Timeout` with a thread dump, and lets a bound test sender send only
+    after a completed handshake where the producer connects.
+  - **Open, for the owner: `KeyProducerJavaZmq` in `CONNECT` mode can lose a message** (F218's side
+    finding). The stall delays the first key by up to 30 s, until the handshake timer drops the
+    connection and the producer reconnects; but jeromq 0.6.0 creates the bound peer's pipe when it
+    accepts the connection, so a client whose `PUSH` binds can queue a message on the stalled
+    connection before its handshake, and the dropped connection takes the message with it. Options:
+    wait for the jeromq fix above, or a client-side measure (send after a handshake event, as the
+    test does). A production `setHandshakeIvl` only shortens the stall, it does not keep the message.
   - **`JeromqPollerHandOffRaceTest` is the deterministic, socket-free reproduction and the
     complete write-up** (mechanism, the real connecter-to-engine path, evidence, the shape of the
     fix, the verification plan). It asserts the bug is *present* (20/20 stalls on 0.6.0) with a
     control (same hand-off across two passes works) and the healing path (any later pass
     registers the stuck handle — why the handshake cap works). It goes red on a fixed jeromq.
-  - Plan: fork `zeromq/jeromq` (`master`, code under `jeromq-core/`), apply the retire → flush →
-    register fix in `jeromq-core/src/main/java/zmq/poll/Poller.java`, port the reproduction
-    inverted into `jeromq-core/src/test/java/zmq/poll/` as the regression test, point BAF at the
-    fork (`jeromq.version`), and expect `JeromqPollerHandOffRaceTest` red and
-    `ZmqResultBroadcasterTest` green **without** `HANDSHAKE_IVL_MILLIS`; then PR upstream. The
-    fix was validated once in a local copy (50/50 deterministic, 300 fresh JVMs / 900 real
-    connections with zero stalls) but must be re-proven independently in the fork. Open detail:
-    what makes the mailbox readable in the same select as the connect completion is not
-    established (the signaler's write-then-count order was tested and is not it); irrelevant to
-    the fix, useful for the upstream issue text.
-  - When the fixed jeromq is in use, delete `HANDSHAKE_IVL_MILLIS` + the `connectSubscriber`
-    rationale and re-run `ZmqResultBroadcasterTest` in a loop (≥ 100 fresh forks) before
-    calling it fixed — a single green run proves nothing at a 5 % rate.
+  - The fix (retire → flush → register in `jeromq-core/src/main/java/zmq/poll/Poller.java`) was
+    validated in a local copy (50/50 deterministic, 300 fresh JVMs / 900 real connections with zero
+    stalls) and is what #1022 submits. Open detail for the upstream discussion: what makes the mailbox
+    readable in the same select as the connect completion is not established (the signaler's
+    write-then-count order was tested and is not it).
+  - **When a jeromq release carries the fix:** raise `jeromq.version` in `pom.xml` (0.6.0 today);
+    `JeromqPollerHandOffRaceTest` then goes red, because it asserts the bug is present — invert it
+    into a regression test or delete it; delete `HANDSHAKE_IVL_MILLIS` and the `connectSubscriber`
+    rationale in `ZmqResultBroadcasterTest`; in `KeyProducerJavaZmqTest` drop the handshake cap of
+    `connectSender` and the handshake monitor (`monitorHandshakes`/`awaitHandshake`) and keep the
+    `@Timeout`s as a plain time limit (they bound any hang, not just this one), noting that decision
+    in the class comment; re-run `ZmqResultBroadcasterTest` and `KeyProducerJavaZmqTest` in a loop
+    (≥ 100 fresh forks each, under load) before calling it fixed — a single green run proves nothing
+    at a 5 % rate; and decide the `CONNECT`-mode item above anew.
 
 ### Flaky CI tests seen on PR #389 (docs-only change, 2026-10-15)
 
 PR #389 changed only README/CSV/`TODO.md`, so its failures were unrelated to it. The
 `SocketResultBroadcasterTest` timeout is fixed (F191 in `BUGHUNT-FOUND.md`: the tests' port probe was
-counted as a client). What is left needs reproducing before anything is changed — a single CI run is
-not enough evidence.
+counted as a client), the `KeyProducerJavaZmqTest` hang is guarded (F218).
 
-- **`Test (windows-latest)`: "There was a timeout in the fork"** (Surefire
-  `forkedProcessTimeoutInSeconds` = 240), same run, job 116307084615. All 2 206 tests that finished
-  were green; the only class that started and never reported is **`KeyProducerJavaZmqTest`**. That
-  fits the jeromq poller race above (`timeoutMillis = -1` tests wait for the handshake timer), but
-  one 30 s handshake stall alone should not use up 240 s — either several stalls in a row or a
-  Windows-specific hang. **Not Windows-only:** reproduced on Linux in the branch review (2026-10-20),
-  under load (load average ~9 on 4 cores), with `main` blocked in `LinkedBlockingQueue.take` at
-  `AbstractKeyProducerQueueBuffered.java:90`, called from
-  `KeyProducerJavaZmqTest.createSecrets_connectMode_receivesSecret:120`; the class alone passed 3 of 3.
-  Plan: rerun `KeyProducerJavaZmqTest` in a loop (on Linux under load, and on Windows)
-  with a thread dump on timeout (see `../workspace/policies/ci-test-diagnostics.md`), then decide
-  whether a test-side `setHandshakeIvl` cap (as in `ZmqResultBroadcasterTest`) or a finite
-  `timeoutMillis` is the right guard.
+- **`Test (windows-latest)`: "There was a timeout in the fork" in `KeyProducerJavaZmqTest`** — guarded
+  since F218 (per-test `@Timeout` with a thread dump, handshake cap, send after the handshake), measured
+  on Linux under load only (10 of 10 green). Open: confirm on the Windows CI job that a stall now ends
+  as a failure of one test or heals, not as a fork timeout. The cause is the jeromq poller race above;
+  its fix is [zeromq/jeromq#1022](https://github.com/zeromq/jeromq/pull/1022).
 - **`claude-review` (`claude-code-review.yml`) fails on every PR** — #387 … #393 all red, the action
   ends after well under a second with `is_error: true`, `total_cost_usd: 0` and empty `modelUsage`,
   i.e. no model call was made. Points at the action's token/credit, not at the PRs. Check the
