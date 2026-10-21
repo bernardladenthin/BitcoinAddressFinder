@@ -1071,13 +1071,14 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 <a id="f195"></a>
 ### F195 – BitcoinAddressFinder: Schlägt der Abbruch eines fehlgeschlagenen Starts fehl, verschwindet der Startfehler und der Consumer läuft weiter
 - **Zeit:** 2026-10-20 07:30 UTC
-- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/cli/Main.java` (neu `startFinder`), `engine/Finder.java` (`abortStart`, neu `getConsumerJava`)
+- **Datei:** `src/main/java/net/ladenthin/bitcoinaddressfinder/cli/Main.java` (neu `startFinder`), `engine/Finder.java` (`abortStart`, neu `isConsumerRunning`)
 - **Schwere:** niedrig (nur wenn der Start fehlschlägt und danach auch das Aufräumen; dann aber ein falscher Fehler und eine JVM, die nicht endet)
 - **Historie:** Gefunden beim Review des Branches am 2026-10-20; der Catch-Block kam mit F139 auf diesen Branch.
 - **Beschreibung:** Bei einem Startfehler rief `Main` `finder.abortStart()` und warf dann den Fehler weiter. Warf `abortStart()` selbst — `interrupt()` lässt `ProducerReleaser` werfen, was ein `releaseProducer()` warf —, ging der eigentliche Startfehler verloren, und `abortStart()` übersprang `releaseConsumer()`, sodass die Nicht-Daemon-Threads des Consumers die JVM am Leben hielten, genau was F139 verhindern sollte.
 - **Fix:** `Finder.abortStart()` gibt den Consumer in einem `finally` frei, auch wenn `interrupt()` wirft. Die Startsequenz steht in `Main.startFinder(Finder)`; ein Fehler des Abbruchs wird dem Startfehler als suppressed angehängt, der Startfehler bleibt der geworfene.
 - **Tests:** `MainStartFinderTest#startFinder_startFails_abortsOnceAndRethrowsTheStartFailure`, `#startFinder_startAndAbortFail_theStartFailureIsThrownWithTheAbortFailureSuppressed`, `FinderTest#abortStart_consumerStarted_consumerIsReleased`, `#abortStart_interruptThrows_consumerIsReleasedAnyway`. Bis dahin gab es für `abortStart` keinen Test.
 - **Rot-Grün-Nachweis:** mit den beiden Fixes einzeln zurückgenommen rot (der Teardown-Fehler statt des Startfehlers; der Consumer nicht freigegeben), mit ihnen grün; `MainTest` + `MainStartFinderTest` + `FinderTest` 53/53 (mit `LD_PRELOAD=libjsig`, wie CI: ohne stirbt der `MainTest`-Fork mit seinem OpenCL-Test auf pocl ohne `hs_err`, auch auf dem unveränderten Stand).
+- **Nachtrag (Branch-Review 2026-10-20):** Die Datei-Zeile nannte den Testzugriff `getConsumerJava()`, den 2189cc1 einführte; a550fa2 („Clear the SpotBugs findings of F192, F193 and F195“) ersetzte ihn durch `isConsumerRunning()`, weil die Rückgabe des Consumers selbst SpotBugs `EI_EXPOSE_REP` auslöste, und die beiden `FinderTest`-Fälle fragen seitdem `is(true)`/`is(false)`. Die Zeile nennt jetzt die vorhandene Methode; reine Doku-Korrektur.
 - **Status:** gefixt
 - **Commit:** 2189cc1
 
