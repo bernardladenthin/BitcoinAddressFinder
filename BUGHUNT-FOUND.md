@@ -1218,7 +1218,7 @@ Repos plus eins. Geprüfte Klassen ohne Fund stehen in [`BUGHUNT-CHECKED.md`](BU
 - **Tests:** `TuneConfigurationTest#run_noBatchSizeCandidate_isRejectedNamingTheField`, `#run_noKeysPerWorkItemCandidate_isRejectedNamingTheField`, `#run_nullBatchSizeCandidate_isRejectedNamingTheField` (CPU-Producer ohne Datenbank, kein OpenCL nötig).
 - **Rot-Grün-Nachweis:** gegen den unveränderten Code rot: „Unexpected exception type thrown, expected: <java.lang.IllegalArgumentException> but was: <java.util.NoSuchElementException>“ (beide leeren Listen) und „… but was: <java.lang.NullPointerException>“ („Cannot invoke "java.lang.Integer.intValue()" because the return value of "java.util.Iterator.next()" is null“); mit dem Fix grün. Breit: `TuneConfigurationTest` 62/62 (1 übersprungen); `spotless:apply`.
 - **Status:** gefixt
-- **Commit:** (folgt)
+- **Commit:** 4bcad44
 
 ## Offene Verdachte ohne Fund-ID
 
