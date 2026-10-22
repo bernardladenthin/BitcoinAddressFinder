@@ -27,9 +27,9 @@ jobs:
         with: { java-version: '25', distribution: temurin }
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with: { java-version-file: .java-version, distribution: temurin }
-      - uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with: { languages: java, queries: +security-and-quality }
       - name: Build with Maven
         run: mvn --batch-mode --no-transfer-progress compile
-      - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with: { category: "/language:java" }
