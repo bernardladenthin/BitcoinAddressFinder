@@ -8,10 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Build tooling bumped in step with the sibling repositories: `anthropics/claude-code-action` v1.0.258,
+  `github/codeql-action` v4.39.1 and `actions/setup-python` v7.1.0 (measurement-tools workflow).
+  maven-clean-plugin 3.5.0, maven-resources-plugin 3.5.0, maven-install-plugin 3.2.0, maven-deploy-plugin
+  3.2.0 and maven-dependency-plugin 3.11.0 are now declared: no POM named them, so their versions came from
+  whichever Maven ran the build. Maven 3.9 runs clean 3.2.0, resources 3.3.1, install and deploy 3.1.x and
+  dependency 3.7.0; the Ubuntu runners' Maven 3.10.0 already matches, except that it leaves the dependency
+  plugin to the newest release. Resource output is byte-identical under resources 3.3.1 and 3.5.0.
 - Dependencies and build tooling bumped in step with the sibling repositories: Jackson 2.22.3 ->
   2.22.4, LogCaptor 2.12.7 -> 2.13.0 (test; still requests log4j 2.26.1, so the log4j floor guard is
   unchanged), pitest-maven 1.30.0 -> 1.30.1, central-publishing-maven-plugin 0.11.0 -> 0.12.0;
-  `anthropics/claude-code-action` v1.0.255 and Gradle 9.8.2 in the shared `verify-signing-key-gradle` job.
+  Gradle 9.8.2 in the shared `verify-signing-key-gradle` job.
 - **Behaviour changes from the bug hunt of 2026-10-16 … 20** (details and tests per id in
   `BUGHUNT-FOUND.md`). Visible to a user or a configuration:
   - **Statistics:** "Average contains time" is measured and printed in **ns** (it was `ms` and read 0

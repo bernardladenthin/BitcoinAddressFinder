@@ -284,6 +284,39 @@ SPDX-License-Identifier: Apache-2.0
                     <artifactId>central-publishing-maven-plugin</artifactId>
                     <version>0.12.0</version>
                 </plugin>
+                <!--
+                    Bound by the clean and default lifecycles (clean, resources, install, deploy) or invoked by prefix
+                    (mvn dependency:...) and configured nowhere else, so their versions came from whichever Maven ran the
+                    build: Maven 3.10.0 binds clean 3.5.0, resources 3.5.0, install 3.2.0 and deploy 3.2.0 and manages no
+                    dependency plugin (dependency:... then takes the newest release); Maven 3.9 binds clean 3.2.0, resources
+                    3.3.1, install and deploy 3.1.x and manages dependency 3.7.0. Stated here so the build does not depend on
+                    the Maven that runs it, and so check-versions.py compares them across the repositories.
+                -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-clean-plugin</artifactId>
+                    <version>3.5.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>3.5.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-install-plugin</artifactId>
+                    <version>3.2.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-deploy-plugin</artifactId>
+                    <version>3.2.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>3.11.0</version>
+                </plugin>
             </plugins>
         </pluginManagement>
         <plugins>
