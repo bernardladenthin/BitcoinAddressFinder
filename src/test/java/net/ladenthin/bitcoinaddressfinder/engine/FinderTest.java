@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.util.concurrent.ForwardingExecutorService;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -17,16 +18,22 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import net.ladenthin.bitcoinaddressfinder.AwaitTimeTest;
 import net.ladenthin.bitcoinaddressfinder.AwaitTimeTests;
 import net.ladenthin.bitcoinaddressfinder.CommonDataProvider;
 import net.ladenthin.bitcoinaddressfinder.LogLevelChange;
+import net.ladenthin.bitcoinaddressfinder.MockConsumer;
+import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
 import net.ladenthin.bitcoinaddressfinder.OpenCLPlatformAssume;
 import net.ladenthin.bitcoinaddressfinder.OpenCLTest;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConsumerJava;
@@ -57,12 +64,19 @@ import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaTest;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaWebSocket;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.KeyProducerJavaZmq;
 import net.ladenthin.bitcoinaddressfinder.keyproducer.WebSocketEndpoint;
+import net.ladenthin.bitcoinaddressfinder.producer.AbstractProducerTestImpl;
 import net.ladenthin.bitcoinaddressfinder.producer.Producer;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerState;
 import net.ladenthin.bitcoinaddressfinder.producer.ProducerStateProvider;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesFiles;
 import net.ladenthin.bitcoinaddressfinder.staticaddresses.TestAddressesLMDB;
+import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
+import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
+import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
+import net.ladenthin.bitcoinaddressfinder.util.KeyUtility;
+import net.ladenthin.bitcoinaddressfinder.util.NetworkParameterFactory;
 import nl.altindag.log.LogCaptor;
+import org.bitcoinj.base.Network;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import org.jspecify.annotations.Nullable;
@@ -83,6 +97,10 @@ public class FinderTest {
 
     @TempDir
     public Path folder;
+
+    private final Network network = new NetworkParameterFactory().getNetwork();
+    private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
+    private final BitHelper bitHelper = new BitHelper();
 
     // <editor-fold defaultstate="collapsed" desc="interrupt">
     @Test
@@ -411,6 +429,238 @@ public class FinderTest {
         assertThat(finder.getAllConsumers(), is(empty()));
         finder.shutdownAndAwaitTermination();
     }
+
+    /**
+     * A cached thread pool that counts the tasks submitted to it, runs a hook before each submit and,
+     * when told to, reports the wait for its termination as interrupted, the way a thread interrupt
+     * cuts that wait short.
+     */
+    private static final class ObservableExecutorService extends ForwardingExecutorService {
+        private final ExecutorService delegate = Executors.newCachedThreadPool();
+        private final AtomicInteger submitted = new AtomicInteger();
+        private volatile Runnable beforeSubmit = () -> {};
+        private volatile boolean interruptAwaitTermination;
+
+        @Override
+        protected ExecutorService delegate() {
+            return delegate;
+        }
+
+        @Override
+        public Future<?> submit(Runnable task) {
+            beforeSubmit.run();
+            submitted.incrementAndGet();
+            return super.submit(task);
+        }
+
+        @Override
+        public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
+            if (interruptAwaitTermination) {
+                throw new InterruptedException("interrupted while awaiting the producers");
+            }
+            return super.awaitTermination(timeout, unit);
+        }
+    }
+
+    /** A producer whose initialisation runs a hook first, so a test can act while the finder is inside it. */
+    private static final class HookedInitProducer extends AbstractProducerTestImpl {
+        private volatile Runnable beforeInit = () -> {};
+
+        private HookedInitProducer(
+                CProducer cProducer,
+                MockConsumer consumer,
+                KeyUtility keyUtility,
+                KeyProducer keyProducer,
+                BitHelper bitHelper,
+                RuntimeStatistics runtimeStatistics) {
+            super(cProducer, consumer, keyUtility, keyProducer, bitHelper, runtimeStatistics);
+        }
+
+        @Override
+        public void initProducer() throws Exception {
+            beforeInit.run();
+            super.initProducer();
+        }
+    }
+
+    /**
+     * Builds a fake producer that ends after one batch, bound to a mock consumer and key producer.
+     *
+     * @return the producer, not registered with any finder
+     */
+    private HookedInitProducer newHookedInitProducer() {
+        final CProducerJava cProducerJava = new CProducerJava();
+        cProducerJava.runOnce = true;
+        return new HookedInitProducer(
+                cProducerJava,
+                new MockConsumer(),
+                keyUtility,
+                new MockKeyProducer(keyUtility, new Random(1)),
+                bitHelper,
+                new RuntimeStatistics());
+    }
+
+    /**
+     * Calls {@link Finder#interrupt()} from another thread, the way the JVM shutdown hook does after a
+     * {@code Ctrl+C}, and returns once that thread is blocked (on the finder's lock, which the caller
+     * holds) or has finished.
+     *
+     * @param finder the finder to interrupt
+     * @return the started thread, for the caller to join
+     */
+    private static Thread interruptFromAnotherThread(Finder finder) {
+        Thread shutdownHook = new Thread(finder::interrupt, "shutdown-hook");
+        shutdownHook.start();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        try {
+            while (shutdownHook.isAlive()
+                    && shutdownHook.getState() != Thread.State.BLOCKED
+                    && System.nanoTime() < deadline) {
+                shutdownHook.join(10);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return shutdownHook;
+    }
+
+    /**
+     * A {@code Ctrl+C} can land while the producers are being built: after the hook's interrupt took
+     * its snapshot of the producer lists and before a producer joined them. Such a producer must not
+     * be registered, because nothing releases it afterwards (the hook has walked the lists already):
+     * it would be initialised and started with its run flag set, and the run would end only through
+     * the hook's halt. The old code registered it into the plain list, and the next steps initialised
+     * and submitted it. The producer lists after the interrupted one are not looked at either: their
+     * key producer lookup would report the key producer the interrupt freed as unknown, the error of
+     * F124, instead of the clean end of an interrupted start.
+     */
+    @Test
+    public void configureProducer_interruptedBeforeAProducerIsRegistered_producerNeitherRegisteredNorStarted()
+            throws Exception {
+        // arrange
+        CFinder cFinder = new CFinder();
+        String keyProducerId = "exampleId";
+        final CProducerJava cProducerJava = new CProducerJava();
+        cProducerJava.keyProducerId = keyProducerId;
+        cFinder.producerJava.add(cProducerJava);
+        // a producer of the next list, whose key producer lookup follows the interrupt
+        final CProducerJavaSecretsFiles cProducerJavaSecretsFiles = new CProducerJavaSecretsFiles();
+        cProducerJavaSecretsFiles.keyProducerId = keyProducerId;
+        cFinder.producerJavaSecretsFiles.add(cProducerJavaSecretsFiles);
+        configureKeyProducerJavaRandom(keyProducerId, cFinder);
+        configureConsumerJava(cFinder);
+
+        ObservableExecutorService executor = new ObservableExecutorService();
+        Finder finder = new Finder(cFinder, executor);
+        final AtomicReference<Producer> overtaken = new AtomicReference<>();
+        finder.setBeforeProducerRegistered(producer -> {
+            overtaken.set(producer);
+            // the shutdown hook's interrupt, landing right before the registration
+            finder.interrupt();
+        });
+        try {
+            finder.startKeyProducer();
+            finder.startConsumer();
+
+            // act
+            assertDoesNotThrow(finder::configureProducer);
+            finder.initProducer();
+            finder.startProducer();
+
+            // pre-assert
+            Producer producer = overtaken.get();
+            assertThat(producer, is(notNullValue()));
+
+            // assert
+            assertThat(finder.getAllProducers(), is(empty()));
+            assertThat(producer.getState(), is(equalTo(ProducerState.UNINITIALIZED)));
+            assertThat(executor.submitted.get(), is(equalTo(0)));
+        } finally {
+            finder.abortStart();
+            finder.shutdownAndAwaitTermination();
+        }
+    }
+
+    /**
+     * The same {@code Ctrl+C} while the producers are being initialised. The hook's interrupt must
+     * wait for the initialisation in progress and no producer may be initialised after it ran: the
+     * producer would build on released state (an OpenCL producer creates its context there) with
+     * nothing left to release it. The old code initialised every registered producer without a look
+     * at the flag, so the second producer was initialised after the interrupt had released it.
+     */
+    @Test
+    public void initProducer_interruptedDuringTheFirstInit_secondProducerNotInitialized() throws Exception {
+        // arrange
+        HookedInitProducer first = newHookedInitProducer();
+        HookedInitProducer second = newHookedInitProducer();
+        ObservableExecutorService executor = new ObservableExecutorService();
+        Finder finder = new Finder(new CFinder(), executor) {
+            @Override
+            public List<Producer> getAllProducers() {
+                return List.of(first, second);
+            }
+        };
+        final AtomicReference<Thread> shutdownHook = new AtomicReference<>();
+        first.beforeInit = () -> shutdownHook.set(interruptFromAnotherThread(finder));
+        try {
+            // act
+            finder.initProducer();
+
+            // pre-assert
+            Thread hook = shutdownHook.get();
+            assertThat(hook, is(notNullValue()));
+            hook.join(5_000);
+
+            // assert
+            assertThat(hook.isAlive(), is(false));
+            assertThat(first.getState(), is(equalTo(ProducerState.INITIALIZED)));
+            assertThat(second.getState(), is(equalTo(ProducerState.UNINITIALIZED)));
+        } finally {
+            executor.shutdown();
+        }
+    }
+
+    /**
+     * The same {@code Ctrl+C} while the producers are being submitted to the executor. A producer
+     * submitted after the hook's interrupt ran starts with its run flag set and nothing stops it. The
+     * old code submitted every registered producer without a look at the flag, so the second producer
+     * was started after the interrupt had released it.
+     */
+    @Test
+    public void startProducer_interruptedDuringTheFirstSubmit_secondProducerNotSubmitted() throws Exception {
+        // arrange
+        HookedInitProducer first = newHookedInitProducer();
+        HookedInitProducer second = newHookedInitProducer();
+        ObservableExecutorService executor = new ObservableExecutorService();
+        Finder finder = new Finder(new CFinder(), executor) {
+            @Override
+            public List<Producer> getAllProducers() {
+                return List.of(first, second);
+            }
+        };
+        finder.initProducer();
+        final AtomicReference<Thread> shutdownHook = new AtomicReference<>();
+        executor.beforeSubmit = () -> {
+            if (shutdownHook.get() == null) {
+                shutdownHook.set(interruptFromAnotherThread(finder));
+            }
+        };
+        try {
+            // act
+            finder.startProducer();
+
+            // pre-assert
+            Thread hook = shutdownHook.get();
+            assertThat(hook, is(notNullValue()));
+            hook.join(5_000);
+
+            // assert
+            assertThat(hook.isAlive(), is(false));
+            assertThat(executor.submitted.get(), is(equalTo(1)));
+        } finally {
+            finder.shutdownAndAwaitTermination();
+        }
+    }
     // </editor-fold>
 
     // <editor-fold defaultstate="collapsed" desc="shutdownAndAwaitTermination">
@@ -443,6 +693,38 @@ public class FinderTest {
         finder.shutdownAndAwaitTermination();
         // assert
         assertThat(injectedExecutor.isTerminated(), is(equalTo(Boolean.TRUE)));
+    }
+
+    /**
+     * A thread interrupt during the wait for the producers must not skip the teardown. The wait sat
+     * before the {@code try}, so the exception left the consumer running and the broadcasters open;
+     * their non-daemon threads (the consumer pool, a result server's accept and writer threads, the
+     * WebSocket selector) then kept the JVM alive, and the caller's {@link Finder#interrupt()} closes
+     * neither of them. The exception still propagates: the caller owns the interrupt.
+     */
+    @Test
+    public void shutdownAndAwaitTermination_interruptedWhileAwaitingTheProducers_consumerReleasedAndBroadcastersClosed()
+            throws Exception {
+        // arrange
+        CFinder cFinder = new CFinder();
+        configureConsumerJava(cFinder);
+        ObservableExecutorService executor = new ObservableExecutorService();
+        executor.interruptAwaitTermination = true;
+        Finder finder = new Finder(cFinder, executor);
+        final AtomicBoolean broadcastersClosed = new AtomicBoolean();
+        finder.setBeforeResultBroadcastersClosed(() -> broadcastersClosed.set(true));
+        try {
+            finder.startConsumer();
+
+            // act
+            assertThrows(InterruptedException.class, finder::shutdownAndAwaitTermination);
+
+            // assert
+            assertThat(finder.isConsumerRunning(), is(false));
+            assertThat(broadcastersClosed.get(), is(true));
+        } finally {
+            finder.abortStart();
+        }
     }
 
     @AwaitTimeTest

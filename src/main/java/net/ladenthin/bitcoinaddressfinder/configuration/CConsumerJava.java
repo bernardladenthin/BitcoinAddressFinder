@@ -50,6 +50,11 @@ public class CConsumerJava {
      * waits for the worker pool to drain the keys queue before giving up and logging a warning.
      * Default: 60 seconds. Tests override with a small value (e.g. {@code 20}) to keep
      * the wait-and-assert branch fast.
+     *
+     * <p>After a {@code Ctrl+C} the JVM shutdown hook of {@link net.ladenthin.bitcoinaddressfinder.cli.Main}
+     * waits this long -- plus the close bounds of the configured result broadcasters and a margin of 30
+     * seconds for the rest of the shutdown -- for the run to end before the JVM halts, so the drain is
+     * never cut short by the hook. A larger value therefore also lengthens the longest possible shutdown.
      */
     public long awaitQueueEmptySeconds = 60L;
 

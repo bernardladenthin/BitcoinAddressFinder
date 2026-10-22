@@ -4,9 +4,12 @@
 package net.ladenthin.bitcoinaddressfinder.producer;
 
 import java.math.BigInteger;
+import java.time.Duration;
+import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import lombok.ToString;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducer;
 import net.ladenthin.bitcoinaddressfinder.consumer.Consumer;
@@ -37,10 +40,26 @@ public abstract class AbstractProducer implements Producer {
     private static final String KEY_PRODUCER_CLASS_PREFIX = "KeyProducerJava";
 
     /**
+     * Grace {@link #waitTillProducerNotRunning()} adds to the shutdown deadline. A producer gives up on
+     * its pending batches exactly at the deadline and reports itself stopped right after; a wait that
+     * ended at the same instant saw it {@link ProducerState#RUNNING} a moment before it stopped, logged
+     * that and left its resources unreleased. One second is far more than that hand-over takes and far
+     * less than any sensible {@code shutdownTimeoutSeconds}.
+     */
+    static final Duration SHUTDOWN_WAIT_GRACE = Duration.ofSeconds(1);
+
+    /**
+     * Value of {@link #shutdownDeadlineNanos} while no interrupt was issued. A real deadline that lands
+     * on it (one chance in 2^64) counts as not recorded: the waits then take the whole timeout, as they
+     * do without an interrupt.
+     */
+    private static final long NO_SHUTDOWN_DEADLINE = Long.MIN_VALUE;
+
+    /**
      * Counted down once when {@link #run()} transitions to
      * {@link ProducerState#NOT_RUNNING}. {@link #waitTillProducerNotRunning()}
-     * awaits this latch with the configured shutdown timeout instead of spinning
-     * on the {@code state} field.
+     * awaits this latch until the shutdown deadline plus {@link #SHUTDOWN_WAIT_GRACE}
+     * instead of spinning on the {@code state} field.
      */
     @ToString.Exclude
     protected final CountDownLatch notRunningLatch = new CountDownLatch(1);
@@ -98,6 +117,18 @@ public abstract class AbstractProducer implements Producer {
      */
     @ToString.Exclude
     protected final AtomicBoolean shouldRun = new AtomicBoolean(true);
+
+    /**
+     * {@link System#nanoTime()} at which this producer's shutdown ends: recorded once, by the first
+     * {@link #interrupt()}, {@code shutdownTimeoutSeconds} ahead; {@link #NO_SHUTDOWN_DEADLINE} before.
+     * The wait for the pending batches and the orchestrator's wait in
+     * {@link #waitTillProducerNotRunning()} both run to it, which is what keeps them from giving up on
+     * each other.
+     *
+     * <p>Excluded from {@link ToString} -- an absolute nanosecond stamp says nothing in a log.
+     */
+    @ToString.Exclude
+    private final AtomicLong shutdownDeadlineNanos = new AtomicLong(NO_SHUTDOWN_DEADLINE);
 
     /**
      * Shared runtime metrics sink. Producers increment their per-producer batch counter
@@ -210,6 +241,51 @@ public abstract class AbstractProducer implements Producer {
     protected void awaitPendingBatches() {}
 
     /**
+     * Returns how long a wait at the end of this producer's run may still take, in nanoseconds: the time
+     * left until the deadline {@link #interrupt()} recorded, or the whole of {@code shutdownTimeoutSeconds}
+     * when no interrupt was issued (a run that ends by itself). Never negative: past the deadline it is
+     * zero, and a wait bounded by it returns at once.
+     *
+     * @return the time a wait for the pending batches may take
+     */
+    protected long remainingShutdownNanos() {
+        final long deadline = shutdownDeadlineNanos.get();
+        if (deadline == NO_SHUTDOWN_DEADLINE) {
+            return shutdownTimeoutNanos();
+        }
+        return Math.max(0L, deadline - System.nanoTime());
+    }
+
+    /**
+     * Describes, for a shutdown log line, where a wait stands relative to the interrupt, which is where
+     * {@code shutdownTimeoutSeconds} is measured from.
+     *
+     * @return {@code "<seconds> after the interrupt"}, or {@code "no interrupt was issued"}
+     */
+    protected String describeTimeSinceInterrupt() {
+        final long deadline = shutdownDeadlineNanos.get();
+        if (deadline == NO_SHUTDOWN_DEADLINE) {
+            return "no interrupt was issued";
+        }
+        final long interruptNanos = deadline - shutdownTimeoutNanos();
+        return formatSeconds(System.nanoTime() - interruptNanos) + " after the interrupt";
+    }
+
+    /**
+     * Formats a span of nanoseconds for a shutdown log line.
+     *
+     * @param nanos the span in nanoseconds
+     * @return the span in seconds with one decimal, e.g. {@code 2.0s}
+     */
+    protected static String formatSeconds(long nanos) {
+        return String.format(Locale.ROOT, "%.1fs", nanos / (double) TimeUnit.SECONDS.toNanos(1));
+    }
+
+    private long shutdownTimeoutNanos() {
+        return TimeUnit.SECONDS.toNanos(cProducer.shutdownTimeoutSeconds);
+    }
+
+    /**
      * Transitions the producer to {@link ProducerState#NOT_RUNNING} and releases
      * any thread parked in {@link #waitTillProducerNotRunning()}.
      *
@@ -319,17 +395,29 @@ public abstract class AbstractProducer implements Producer {
         LOGGER.error("No more keys in secret factory. Shutdown producer.");
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Waits until the deadline {@link #interrupt()} recorded plus {@link #SHUTDOWN_WAIT_GRACE}: the
+     * producer waits for its pending batches until exactly that deadline and reports itself stopped right
+     * after, so a wait that ended at the deadline saw it still running and left its resources unreleased.
+     * Without an interrupt the wait is {@code shutdownTimeoutSeconds} plus the grace from now.
+     */
     @Override
     public void waitTillProducerNotRunning() {
         if (state != ProducerState.RUNNING) {
             return;
         }
+        final long waitNanos = remainingShutdownNanos() + SHUTDOWN_WAIT_GRACE.toNanos();
         try {
-            if (!notRunningLatch.await(cProducer.shutdownTimeoutSeconds, TimeUnit.SECONDS)) {
+            if (!notRunningLatch.await(waitNanos, TimeUnit.NANOSECONDS)) {
                 LOGGER.error(
-                        "waitTillProducerNotRunning timed out after {}s; producer state still {}. "
-                                + "Continuing shutdown without confirming this producer stopped.",
+                        "waitTillProducerNotRunning timed out after {} ({}, shutdownTimeoutSeconds {} plus {}s grace);"
+                                + " producer state still {}. Continuing shutdown without confirming this producer stopped.",
+                        formatSeconds(waitNanos),
+                        describeTimeSinceInterrupt(),
                         cProducer.shutdownTimeoutSeconds,
+                        SHUTDOWN_WAIT_GRACE.toSeconds(),
                         state);
             }
         } catch (InterruptedException e) {
@@ -365,8 +453,16 @@ public abstract class AbstractProducer implements Producer {
         return secretBase;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The first call records the shutdown deadline, {@code shutdownTimeoutSeconds} from now; later
+     * calls keep it. It is recorded before the loop flag is cleared, so a run loop that ends because of
+     * this interrupt sees it when it waits for its pending batches.
+     */
     @Override
     public void interrupt() {
+        shutdownDeadlineNanos.compareAndSet(NO_SHUTDOWN_DEADLINE, System.nanoTime() + shutdownTimeoutNanos());
         shouldRun.set(false);
     }
 

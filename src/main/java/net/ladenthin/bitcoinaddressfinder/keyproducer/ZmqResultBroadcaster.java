@@ -63,8 +63,9 @@ public class ZmqResultBroadcaster implements ResultListener, AutoCloseable {
      * <p>The last batch messages of a run are its completion signal; a linger of zero discarded them
      * whenever a subscriber was behind at shutdown. Bounded to the same 2 s the socket broadcaster
      * drains for, so a subscriber that has stopped reading delays the shutdown by at most that much.
+     * Public because the finder counts it into the shutdown budget the JVM shutdown hook waits for.
      */
-    private static final int LINGER_MILLIS = 2_000;
+    public static final int LINGER_MILLIS = 2_000;
 
     private final BatchResultJsonFormatter formatter;
 

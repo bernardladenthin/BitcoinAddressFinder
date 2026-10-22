@@ -51,9 +51,10 @@ public class ProducerReleaser {
      *
      * <p>Each producer is interrupted, awaited and then released, in that order: releasing the
      * resources of a producer that is still running would pull them out from under it. A producer
-     * that is still running once the wait returns (it timed out after
-     * {@code shutdownTimeoutSeconds}, or was interrupted) is therefore not released at all; an error
-     * is logged and its resources are left to the process exit.
+     * that is still running once the wait returns (the wait -- {@code shutdownTimeoutSeconds} from the
+     * interrupt plus the grace of {@link Producer#waitTillProducerNotRunning()} -- timed out, or was
+     * interrupted) is therefore not released at all; an error is logged and its resources are left to
+     * the process exit.
      *
      * <p>A producer whose teardown throws does not stop the others: every producer is handled, and
      * then the first failure is rethrown with later ones attached as suppressed exceptions.

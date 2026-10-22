@@ -20,8 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     non-English mnemonic that was not in NFKD now derives *different* (the correct) keys (F120);
     `privateKeyMaxNumBits` other than 256 is rejected for BIP39 instead of truncating the keys (F51).
   - **Socket key producer:** refuses at start a negative `timeoutMillis` (F100), `port == resultPort`
-    in server mode (F155) and a port that is already bound (F157), instead of ending as a regular run
-    without a checked key; its final connection failure is logged (F101); `connectRetryCount` counts
+    in server mode (F155) and in client mode against this machine, where it read its own result
+    server's lines as secrets (F277, review of PR #395), and a port that is already bound (F157),
+    instead of ending as a regular run without a checked key; its final connection failure is logged (F101); `connectRetryCount` counts
     consecutive failures, not failures over the whole run (F22).
   - **Result broadcast:** the grid is announced per key producer, and the **smallest** `batchSizeInBits`
     wins when they differ (F153); a client connecting during the announcement gets it (F119). The socket
@@ -47,6 +48,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     checked the batches still queued, so a client gets the report for every batch drained during the
     shutdown; a report that arrives after a broadcaster was closed is logged once as a warning instead of
     being dropped without a word.
+  - **Shutdown after a Ctrl-C, from the review of PR #395 (2026-10-22):** the JVM shutdown hook waits
+    for the run as long as the configured drain can take -- `awaitQueueEmptySeconds` plus the close
+    bounds of the configured result broadcasters (2 s per socket or ZeroMQ broadcaster) plus a 30 s
+    margin, 90 s with the defaults -- instead of a flat 30 s, so the batches the consumer still checks
+    after a Ctrl-C are checked and reported with the default configuration (F273; the tuner command
+    keeps the 30 s margin alone, it broadcasts nothing); a thread interrupt of the wait for the
+    producers runs the teardown (consumer, broadcasters) before it propagates (F274); no producer is
+    registered, initialised or started after the hook's interrupt, which now waits for a producer
+    initialisation in progress (an OpenCL context) before it releases anything (F275); an OpenCL
+    producer's wait for its result readers ends at the `shutdownTimeoutSeconds` deadline measured from
+    the interrupt, and the release waits one second longer, so a stuck consumer no longer leaves the
+    producer reported as "still running" with its OpenCL context unreleased (F276; the two shutdown
+    error lines now say how long was waited since the interrupt).
   - **Ports that cannot be bound fail the start:** the WebSocket key producer's `port` (it started
     "successfully" and, with `timeoutMillis: -1`, waited forever) and the socket key producer's
     `resultPort` (it went on without serving results).
@@ -207,6 +221,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Wrong reports: interrupted exports, imports, deltas and secrets-file runs reported "done" (F46–F50);
   the tuner extended, measured and reported the wrong arm in several cases (F135, F136, F140, F152,
   F154, F164, F170).
+- **Fixes from the review of PR #395 (2026-10-22)**, F273 … F277 in `BUGHUNT-FOUND.md`, the behaviour
+  changes under "Changed": the shutdown hook's wait against the queue drain, the teardown on an
+  interrupted producer wait, the producer registered or started after the hook's interrupt, the OpenCL
+  release that gave up a grid too early, the socket client reading its own result server.
 - **CI: the GitHub `snapshot` pre-release holds exactly the current build, and the release assets
   include the pom.** `gh release upload --clobber` replaces same-named assets and never removes any
   other, so the `snapshot` release accumulated: the six 1.8.0-SNAPSHOT jars next to the 1.9.0-SNAPSHOT ones, 6

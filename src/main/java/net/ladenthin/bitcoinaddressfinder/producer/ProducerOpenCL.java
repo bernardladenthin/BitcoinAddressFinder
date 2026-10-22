@@ -337,20 +337,26 @@ public class ProducerOpenCL extends AbstractProducer {
     /**
      * Waits until every result reader has put its batch into the consumer. A reader holds one
      * {@link #submitSlot} permit until it is done, so holding all of them means none is running.
-     * Bounded by {@code shutdownTimeoutSeconds}; a reader still busy after that is logged, not waited
-     * for, so a stuck consumer cannot hold the producer forever.
+     * Bounded by {@link #remainingShutdownNanos()}: what is left of {@code shutdownTimeoutSeconds} since
+     * the interrupt, the whole of it when the run ended by itself. A reader still busy at the deadline is
+     * logged, not waited for, so a stuck consumer cannot hold the producer forever -- and the releaser,
+     * whose wait runs to the same deadline, sees the producer stop instead of giving it up a grid earlier.
      */
     @Override
     protected void awaitPendingBatches() {
         final int permits = producerOpenCL.maxResultReaderThreads;
+        final long waitNanos = remainingShutdownNanos();
         try {
-            if (submitSlot.tryAcquire(permits, producerOpenCL.shutdownTimeoutSeconds, TimeUnit.SECONDS)) {
+            if (submitSlot.tryAcquire(permits, waitNanos, TimeUnit.NANOSECONDS)) {
                 submitSlot.release(permits);
             } else {
                 LOGGER.error(
-                        "{} of {} result reader(s) still busy after {}s; their batches may not reach the consumer.",
+                        "{} of {} result reader(s) still busy after {} ({}, shutdownTimeoutSeconds {}); their batches"
+                                + " may not reach the consumer.",
                         permits - submitSlot.availablePermits(),
                         permits,
+                        formatSeconds(waitNanos),
+                        describeTimeSinceInterrupt(),
                         producerOpenCL.shutdownTimeoutSeconds);
             }
         } catch (InterruptedException e) {
@@ -422,6 +428,18 @@ public class ProducerOpenCL extends AbstractProducer {
      */
     int getFreeThreads() {
         return submitSlot.availablePermits();
+    }
+
+    /**
+     * Returns the submit-slot semaphore, so a test can hold a slot with a reader that is stuck in the
+     * consumer -- what a grid's reader does -- without a device: {@link #processSecretBase(BigInteger)}
+     * is the only other way to a held slot, and it needs an initialised OpenCL context.
+     *
+     * @return the semaphore gating the result-reader submissions
+     */
+    @VisibleForTesting
+    Semaphore getSubmitSlot() {
+        return submitSlot;
     }
 
     @Override

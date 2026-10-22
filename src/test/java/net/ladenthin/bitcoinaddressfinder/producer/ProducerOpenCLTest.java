@@ -8,9 +8,11 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.lessThan;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -21,9 +23,11 @@ import java.util.Locale;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import net.ladenthin.bitcoinaddressfinder.AwaitTimeTest;
 import net.ladenthin.bitcoinaddressfinder.MockConsumer;
 import net.ladenthin.bitcoinaddressfinder.MockKeyProducer;
 import net.ladenthin.bitcoinaddressfinder.OpenCLPlatformAssume;
@@ -31,6 +35,8 @@ import net.ladenthin.bitcoinaddressfinder.OpenCLTest;
 import net.ladenthin.bitcoinaddressfinder.configuration.CProducerOpenCL;
 import net.ladenthin.bitcoinaddressfinder.constants.Secp256k1Constants;
 import net.ladenthin.bitcoinaddressfinder.model.PublicKeyBytes;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLGridResult;
+import net.ladenthin.bitcoinaddressfinder.opencl.OpenCLGridResults;
 import net.ladenthin.bitcoinaddressfinder.statistics.RuntimeStatistics;
 import net.ladenthin.bitcoinaddressfinder.util.BitHelper;
 import net.ladenthin.bitcoinaddressfinder.util.ByteBufferUtility;
@@ -57,6 +63,21 @@ public class ProducerOpenCLTest {
 
     /** Upper bound for the consumer that never takes its batch; the test must end well before it. */
     private static final long STUCK_CONSUMER_MAX_SECONDS = 30L;
+
+    /** Result readers of the shutdown-deadline test: one, so a single stuck reader holds every slot. */
+    private static final int ONE_RESULT_READER = 1;
+
+    /** Shutdown timeout of the shutdown-deadline test; short, because the test waits it out. */
+    private static final int SHUTDOWN_TIMEOUT_SECONDS = 2;
+
+    /** Time the producer spends on its grid in progress after the interrupt, before it waits for the readers. */
+    private static final Duration GRID_AFTER_INTERRUPT = Duration.ofSeconds(1);
+
+    /** The wait for the readers has to end at the shutdown deadline; this much scheduling slack either way. */
+    private static final Duration TIMING_MARGIN = Duration.ofMillis(500);
+
+    /** Upper bound for the stuck reader to reach the consumer. */
+    private static final Duration READER_START_TIMEOUT = Duration.ofSeconds(10);
 
     // <editor-fold defaultstate="collapsed" desc="initProducer">
     @OpenCLTest
@@ -398,7 +419,7 @@ public class ProducerOpenCLTest {
     /**
      * The wait for the readers is bounded by {@code shutdownTimeoutSeconds}: a consumer that does not
      * take the batch in time must not hold the producer forever. The producer ends anyway and says that
-     * a batch may not have arrived.
+     * a batch may not have arrived. A run that ends by itself (no interrupt) waits the whole timeout.
      */
     @Test
     @OpenCLTest
@@ -435,10 +456,80 @@ public class ProducerOpenCLTest {
             assertThat(producerOpenCL.getState(), is(equalTo(ProducerState.NOT_RUNNING)));
             assertThat(elapsedSeconds < STUCK_CONSUMER_MAX_SECONDS, is(true));
             assertThat(logCaptor.getErrorLogs(), hasSize(1));
-            assertThat(logCaptor.getErrorLogs().get(0), containsString("1 of 4 result reader(s) still busy after 1s"));
+            assertThat(
+                    logCaptor.getErrorLogs().get(0),
+                    containsString("1 of 4 result reader(s) still busy after 1.0s (no interrupt was issued,"
+                            + " shutdownTimeoutSeconds 1)"));
         } finally {
             release.countDown();
             producerOpenCL.releaseProducer();
+        }
+    }
+
+    /**
+     * {@code shutdownTimeoutSeconds} is measured from the interrupt, and the wait for the result readers
+     * gets what is left of it. The releaser waits the same timeout from the interrupt; a reader wait that
+     * started the full timeout afresh at the end of the grid in progress ended after the releaser had given
+     * the producer up, so the releaser logged a producer still running and leaked its OpenCL context.
+     * No device: the slot is held by a reader stuck in the consumer, the way a grid's reader holds it, and
+     * the wait is called the way the run loop calls it, after the grid.
+     */
+    @AwaitTimeTest
+    @Test
+    public void awaitPendingBatches_interruptedDuringTheGrid_endsAtTheShutdownDeadlineOfTheInterrupt()
+            throws Exception {
+        // arrange
+        CProducerOpenCL cProducerOpenCL = new CProducerOpenCL();
+        cProducerOpenCL.maxResultReaderThreads = ONE_RESULT_READER;
+        cProducerOpenCL.shutdownTimeoutSeconds = SHUTDOWN_TIMEOUT_SECONDS;
+        final CountDownLatch readerInConsumer = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        MockConsumer stuckConsumer = new MockConsumer() {
+            @Override
+            public void consumeKeys(PublicKeyBytes[] publicKeyBytes, @Nullable BigInteger secretBase)
+                    throws InterruptedException {
+                readerInConsumer.countDown();
+                release.await(STUCK_CONSUMER_MAX_SECONDS, TimeUnit.SECONDS);
+            }
+        };
+        ThreadPoolExecutor readerPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(ONE_RESULT_READER);
+        ProducerOpenCL producerOpenCL = new ProducerOpenCL(
+                cProducerOpenCL,
+                stuckConsumer,
+                keyUtility,
+                new MockKeyProducer(keyUtility, new Random(1)),
+                bitHelper,
+                new RuntimeStatistics(),
+                readerPool);
+        OpenCLGridResult gridResult = new OpenCLGridResults().empty(BigInteger.ONE);
+        try (LogCaptor logCaptor = LogCaptor.forClass(ProducerOpenCL.class)) {
+            // the slot a grid's reader holds until its batch is in the consumer
+            Semaphore submitSlot = producerOpenCL.getSubmitSlot();
+            submitSlot.acquire();
+            readerPool.execute(new ProducerOpenCL.ResultReaderRunnable(
+                    gridResult, stuckConsumer, BigInteger.ONE, producerOpenCL, submitSlot));
+
+            // pre-assert
+            assertThat(readerInConsumer.await(READER_START_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS), is(true));
+
+            // act -- the interrupt, the grid in progress, then the wait the run loop makes
+            final long interruptNanos = System.nanoTime();
+            producerOpenCL.interrupt();
+            Thread.sleep(GRID_AFTER_INTERRUPT);
+            producerOpenCL.awaitPendingBatches();
+            final Duration sinceInterrupt = Duration.ofNanos(System.nanoTime() - interruptNanos);
+
+            // assert
+            final Duration deadline = Duration.ofSeconds(SHUTDOWN_TIMEOUT_SECONDS);
+            assertThat(sinceInterrupt, is(lessThan(deadline.plus(TIMING_MARGIN))));
+            assertThat(sinceInterrupt, is(greaterThanOrEqualTo(deadline.minus(TIMING_MARGIN))));
+            assertThat(logCaptor.getErrorLogs(), hasSize(1));
+            assertThat(logCaptor.getErrorLogs().get(0), containsString("1 of 1 result reader(s) still busy after"));
+            assertThat(logCaptor.getErrorLogs().get(0), containsString("after the interrupt"));
+        } finally {
+            // the reader ends on its own once released; an interrupt would reach its wait first and be logged
+            release.countDown();
+            readerPool.shutdown();
         }
     }
     // </editor-fold>

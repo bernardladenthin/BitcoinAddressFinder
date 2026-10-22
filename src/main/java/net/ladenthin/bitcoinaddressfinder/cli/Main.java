@@ -23,6 +23,7 @@ import net.ladenthin.bitcoinaddressfinder.command.LMDBDelta;
 import net.ladenthin.bitcoinaddressfinder.command.LMDBToAddressFile;
 import net.ladenthin.bitcoinaddressfinder.command.TuneConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.CAddressFilesToLMDB;
+import net.ladenthin.bitcoinaddressfinder.configuration.CCommand;
 import net.ladenthin.bitcoinaddressfinder.configuration.CCompactLMDB;
 import net.ladenthin.bitcoinaddressfinder.configuration.CConfiguration;
 import net.ladenthin.bitcoinaddressfinder.configuration.CFinder;
@@ -79,6 +80,14 @@ public class Main implements Runnable, Interruptable {
 
     /** The UTF-8 byte order mark as a decoded character; Windows editors write it at the start of a file. */
     private static final char BYTE_ORDER_MARK = '\uFEFF';
+
+    /**
+     * What the shutdown hook waits for the run to end besides the finder's own shutdown budget
+     * ({@link Finder#shutdownBudgetSeconds(CFinder)}): the rest of the main thread's work after a
+     * {@code Ctrl+C}, such as closing the database and logging the end of the run, and the whole wait
+     * for every other command. It used to be the whole wait for {@code Find} too.
+     */
+    private static final long SHUTDOWN_HOOK_MARGIN_SECONDS = 30L;
 
     // List of registered Interruptables — mutable list of stateful coordinators, recursive/heavy.
     @ToString.Exclude
@@ -420,20 +429,60 @@ public class Main implements Runnable, Interruptable {
         }
     }
 
+    /**
+     * How long the shutdown hook waits for {@link #run()} to end before the JVM halts.
+     *
+     * <p>The margin alone used to be the whole wait, and a {@code Find} run exceeded it by design: after
+     * the hook's {@link #interrupt()} the main thread lets the consumer check the queued batches for up
+     * to {@code awaitQueueEmptySeconds} (60 s by default) and then closes the result broadcasters, which
+     * drain for a few seconds more. The JVM halted in the middle of that, the remaining batches stayed
+     * unchecked and the reports queued for the clients never left. So a {@code Find} configuration adds
+     * the finder's budget to the margin; every other command has nothing to drain.
+     *
+     * @param configuration the loaded configuration
+     * @return the seconds the hook waits
+     */
+    @VisibleForTesting
+    static long shutdownHookTimeoutSeconds(CConfiguration configuration) {
+        final CFinder cFinder = configuration.finder;
+        if (configuration.command == CCommand.Find && cFinder != null) {
+            final long budgetSeconds = Finder.shutdownBudgetSeconds(cFinder);
+            // Saturating: awaitQueueEmptySeconds is a plain long nobody validates, and a value near its
+            // maximum ("never give up") must not wrap into a negative wait, which would halt at once.
+            if (budgetSeconds > Long.MAX_VALUE - SHUTDOWN_HOOK_MARGIN_SECONDS) {
+                return Long.MAX_VALUE;
+            }
+            return SHUTDOWN_HOOK_MARGIN_SECONDS + budgetSeconds;
+        }
+        return SHUTDOWN_HOOK_MARGIN_SECONDS;
+    }
+
+    /**
+     * Registers the JVM shutdown hook: it interrupts every registered component and then waits for
+     * {@link #run()} to end, for {@link #shutdownHookTimeoutSeconds(CConfiguration)} -- the
+     * {@link #SHUTDOWN_HOOK_MARGIN_SECONDS} plus, for a {@code Find} run, the finder's shutdown budget
+     * ({@link Finder#shutdownBudgetSeconds(CFinder)}: the consumer's queue drain and the close bounds
+     * of the result broadcasters). Once the wait is over the JVM halts whatever is still running, so
+     * the wait is computed from the configuration rather than being a flat number.
+     */
     private void addSchutdownHook() {
+        final long timeoutSeconds = shutdownHookTimeoutSeconds(configuration);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             LOGGER.info("Shutdown received via hook.");
             interrupt();
             try {
-                LOGGER.info("runLatch await");
-                if (!runLatch.await(30, TimeUnit.SECONDS)) {
-                    LOGGER.warn("runLatch did not complete within 30s shutdown timeout; "
-                            + "remaining tasks may not have finished cleanly.");
+                LOGGER.info("runLatch await (timeout: {} seconds)", timeoutSeconds);
+                if (!runLatch.await(timeoutSeconds, TimeUnit.SECONDS)) {
+                    LOGGER.warn(
+                            "runLatch did not complete within the {} s shutdown timeout; "
+                                    + "remaining tasks may not have finished cleanly.",
+                            timeoutSeconds);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new InterruptedRuntimeException(
-                        "Interrupted while awaiting runLatch during shutdown-hook (30s timeout)", e);
+                        "Interrupted while awaiting runLatch during shutdown-hook (" + timeoutSeconds + " s timeout)",
+                        e);
             }
             LOGGER.info("Finish shutdown hook.");
         }));

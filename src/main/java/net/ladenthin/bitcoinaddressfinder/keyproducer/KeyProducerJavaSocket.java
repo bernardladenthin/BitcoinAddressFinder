@@ -3,11 +3,16 @@
 // SPDX-License-Identifier: Apache-2.0
 package net.ladenthin.bitcoinaddressfinder.keyproducer;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.concurrent.ExecutorService;
@@ -62,33 +67,74 @@ public class KeyProducerJavaSocket extends AbstractKeyProducerQueueBuffered<CKey
      * @param config      the socket configuration
      * @param keyUtility  cryptographic helper
      * @param bitHelper   bit/batch-size helper (unused but kept for symmetry)
-     * @throws IllegalArgumentException if {@code config.timeoutMillis} is negative, or if in server
-     *     mode {@code config.port} is the {@code resultPort} results are broadcast on
+     * @throws IllegalArgumentException if {@code config.timeoutMillis} is negative, or if
+     *     {@code config.port} is the {@code resultPort} results are broadcast on, in server mode or in
+     *     client mode against a host that is this machine
      */
     public KeyProducerJavaSocket(CKeyProducerJavaSocket config, KeyUtility keyUtility, BitHelper bitHelper) {
         super(requireDistinctResultPort(requireNonNegativeTimeout(config)), keyUtility);
     }
 
     /**
-     * Rejects a server whose port is the one results are broadcast on. The result server is started
-     * first and takes the port, every accept attempt then fails with "Address already in use", and once
-     * {@code timeoutMillis} passed without a secret the run ended as a regular one, without a single key
-     * checked. Checked before {@code super(...)} so no partially constructed producer exists when it
-     * throws.
+     * Rejects a producer whose port is the one results are broadcast on. In server mode the result
+     * server is started first and takes the port, every accept attempt then fails with "Address already
+     * in use", and once {@code timeoutMillis} passed without a secret the run ended as a regular one,
+     * without a single key checked. In client mode against this machine the collision is silent: the
+     * result server binds every interface, so the client reaches its own result server as soon as it
+     * listens, reads that server's JSON lines as 32-byte secrets and checks nonsense keys. A client
+     * against another machine keeps its ports, and so does one against a host that does not resolve,
+     * which the connect reports later with a message of its own. Checked before {@code super(...)} so
+     * no partially constructed producer exists when it throws; the host is resolved only when the ports
+     * collide, so a regular configuration costs no lookup here.
      *
      * @param config the socket configuration
      * @return {@code config}, unchanged
      * @throws IllegalArgumentException if the two ports collide
      */
     private static CKeyProducerJavaSocket requireDistinctResultPort(CKeyProducerJavaSocket config) {
-        if (config.mode == CKeyProducerJavaSocket.Mode.SERVER
-                && config.broadcastResults
-                && config.port == config.resultPort) {
+        if (!config.broadcastResults || config.port != config.resultPort) {
+            return config;
+        }
+        if (config.mode == CKeyProducerJavaSocket.Mode.SERVER) {
             throw new IllegalArgumentException("port and resultPort of the socket key producer "
                     + config.keyProducerId + " must differ in server mode while broadcastResults is set, but"
                     + " both are " + config.port);
         }
+        if (isLocalHost(config.host)) {
+            throw new IllegalArgumentException("port and resultPort of the socket key producer "
+                    + config.keyProducerId + " must differ in client mode against the local host " + config.host
+                    + " while broadcastResults is set, but both are " + config.port);
+        }
         return config;
+    }
+
+    /**
+     * Tells whether {@code host} names this machine: a loopback or wildcard address, or an address of
+     * one of its network interfaces. A host that does not resolve is not local; the connect reports it
+     * later with a message of its own, so a constructor asking here must not fail for it. The address
+     * resolution is the only lookup that can leave the machine.
+     *
+     * @param host the host name or address a client connects to
+     * @return whether a server on {@code host} is a server on this machine
+     */
+    @VisibleForTesting
+    static boolean isLocalHost(String host) {
+        final InetAddress address;
+        try {
+            address = InetAddress.getByName(host);
+        } catch (UnknownHostException e) {
+            return false;
+        }
+        if (address.isLoopbackAddress() || address.isAnyLocalAddress()) {
+            return true;
+        }
+        try {
+            return NetworkInterface.getByInetAddress(address) != null;
+        } catch (SocketException e) {
+            // The interfaces could not be read. Without a known local address the host counts as
+            // remote; a wrong guess costs nothing but the connect's own, later message.
+            return false;
+        }
     }
 
     /**

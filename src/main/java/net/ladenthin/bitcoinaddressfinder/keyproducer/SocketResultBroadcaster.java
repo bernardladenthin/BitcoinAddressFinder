@@ -82,9 +82,11 @@ public class SocketResultBroadcaster implements ResultListener, AutoCloseable {
 
     /**
      * How long {@link #close()} lets the writers deliver what is already queued. Bounded, so a client
-     * that stopped reading cannot hold the shutdown up.
+     * that stopped reading cannot hold the shutdown up. Public because the finder counts it into the
+     * shutdown budget the JVM shutdown hook waits for; a hook that did not know it halted the JVM
+     * during this drain.
      */
-    private static final int CLOSE_DRAIN_MILLIS = 2_000;
+    public static final int CLOSE_DRAIN_MILLIS = 2_000;
 
     /** How often an idle writer looks at the stop flag, so it can leave once its queue is empty. */
     private static final int WRITER_POLL_MILLIS = 50;

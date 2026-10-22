@@ -39,6 +39,16 @@ it is done, as for every other item in this file.
   has a second half, the kernel's precondition: `OpenCLContext.createKeys` refuses an unaligned base
   before the kernel runs, and the skipped top grid is one WARN instead of an ERROR with a stack trace.
 
+**Still open (review of PR #395, 2026-10-22):**
+
+- **`TuneConfiguration` and the shutdown hook's wait.** Since F273 the hook's wait for a `Find` run
+  covers the consumer's queue drain (`awaitQueueEmptySeconds`, 60 s by default) plus the broadcaster
+  close bounds plus the 30 s margin. The tuner's `finally` runs the same drain (60 s in
+  `examples/config_TuneConfiguration.json`) while the hook still waits the 30 s margin alone for that
+  command. Nothing promised is lost there -- the tuner's lookup is `NEVER_PRESENT` and it broadcasts no
+  result -- so a halt mid-drain only cuts the tuner's own cleanup short. Give `TuneConfiguration` the same
+  budget if its cleanup ever matters (a `Finder.shutdownBudgetSeconds`-like reading of its consumer).
+
 ### Persistence backends (genuinely open work)
 
 Implementation of `BLOOM` / `HASHSET` / `TRUNCATED_LONG_64` /

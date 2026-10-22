@@ -32,8 +32,22 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class KeyProducerJavaSocketTest {
+
+    /** The IPv4 loopback address: this machine, named without a lookup. */
+    private static final String LOOPBACK_ADDRESS = "127.0.0.1";
+
+    /**
+     * An address of TEST-NET-1 (RFC 5737), reserved for documentation: it is assigned to no machine and
+     * resolved by no DNS, so a client against it is a client against another machine without a network.
+     */
+    private static final String TEST_NET_1_HOST = "192.0.2.1";
+
+    /** A name under the reserved {@code .invalid} top-level domain (RFC 2606), which never resolves. */
+    private static final String UNRESOLVABLE_HOST = "no-such-host.invalid";
 
     private final Network network = new NetworkParameterFactory().getNetwork();
     private final KeyUtility keyUtility = new KeyUtility(network, new ByteBufferUtility(false));
@@ -773,6 +787,124 @@ public class KeyProducerJavaSocketTest {
                 IllegalArgumentException.class, () -> new KeyProducerJavaSocket(config, keyUtility, bitHelper));
         assertThat(e.getMessage(), containsString("resultPort"));
         assertThat(e.getMessage(), containsString(String.valueOf(config.port)));
+    }
+
+    /**
+     * Guards the client-mode half of the port collision. The result server binds {@code resultPort} on
+     * every interface (Finder#startConsumer) before the key producer connects, so a client against this
+     * machine with {@code port == resultPort} and {@code broadcastResults} connected to its own result
+     * server, read that server's JSON lines as 32-byte secrets and checked nonsense keys without a word.
+     * The old check looked at server mode only, so the constructor accepted this configuration.
+     */
+    @Test
+    public void constructor_clientPortIsTheResultPortAgainstLocalhost_isRejectedInsteadOfReadingItsOwnResults() {
+        // arrange
+        CKeyProducerJavaSocket config = createClientConfig("localhost", findFreePort());
+        config.broadcastResults = true;
+        config.resultPort = config.port;
+
+        // act
+        IllegalArgumentException e = assertThrows(
+                IllegalArgumentException.class, () -> new KeyProducerJavaSocket(config, keyUtility, bitHelper));
+
+        // assert
+        assertThat(e.getMessage(), containsString("resultPort"));
+        assertThat(e.getMessage(), containsString(String.valueOf(config.port)));
+        assertThat(e.getMessage(), containsString("client mode against the local host localhost"));
+    }
+
+    /**
+     * Guards the same collision for a host given as the loopback address rather than by name: the
+     * decision must look at the resolved address, not at the spelling. The old check, server mode only,
+     * accepted this configuration too.
+     */
+    @Test
+    public void constructor_clientPortIsTheResultPortAgainstLoopbackAddress_isRejected() {
+        // arrange
+        CKeyProducerJavaSocket config = createClientConfig(LOOPBACK_ADDRESS, findFreePort());
+        config.broadcastResults = true;
+        config.resultPort = config.port;
+
+        // act
+        IllegalArgumentException e = assertThrows(
+                IllegalArgumentException.class, () -> new KeyProducerJavaSocket(config, keyUtility, bitHelper));
+
+        // assert
+        assertThat(e.getMessage(), containsString("resultPort"));
+        assertThat(e.getMessage(), containsString(String.valueOf(config.port)));
+    }
+
+    /**
+     * Guards the scope of the client-mode check: a client against another machine may serve results on
+     * the number it connects to, because the two sockets live on different hosts. Without this the check
+     * could be written as "client mode and both ports equal", which would refuse a valid setup.
+     */
+    @Test
+    public void constructor_clientPortIsTheResultPortAgainstAnotherMachine_isAccepted() {
+        // arrange
+        CKeyProducerJavaSocket config = createClientConfig(TEST_NET_1_HOST, findFreePort());
+        config.broadcastResults = true;
+        config.resultPort = config.port;
+
+        // act
+        KeyProducerJavaSocket producer = new KeyProducerJavaSocket(config, keyUtility, bitHelper);
+
+        // assert
+        try {
+            assertThat(producer, is(notNullValue()));
+        } finally {
+            producer.interrupt();
+        }
+    }
+
+    /**
+     * Guards the other scope boundary: {@code resultPort} is bound only while results are broadcast, so
+     * a client against this machine with equal numbers and no broadcast has nothing to collide with.
+     */
+    @Test
+    public void constructor_clientPortIsTheResultPortWithoutBroadcast_isAccepted() {
+        // arrange
+        CKeyProducerJavaSocket config = createClientConfig("localhost", findFreePort());
+        config.broadcastResults = false;
+        config.resultPort = config.port;
+
+        // act
+        KeyProducerJavaSocket producer = new KeyProducerJavaSocket(config, keyUtility, bitHelper);
+
+        // assert
+        try {
+            assertThat(producer, is(notNullValue()));
+        } finally {
+            producer.interrupt();
+        }
+    }
+
+    /**
+     * Guards the "is this host local" decision the client-mode check rests on, over the ways this
+     * machine can be named: by the loopback name, the IPv4 and IPv6 loopback addresses, and the wildcard
+     * address every result server binds. A decision by spelling would miss all but the first.
+     *
+     * @param host a host that names this machine
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"localhost", LOOPBACK_ADDRESS, "0.0.0.0", "::1"})
+    public void isLocalHost_thisMachine_returnsTrue(String host) {
+        // act, assert
+        assertThat(KeyProducerJavaSocket.isLocalHost(host), is(true));
+    }
+
+    /**
+     * Guards the two ways a host is not this machine: an address that belongs to no interface here, and
+     * a name that does not resolve at all. The second must not be local either, so a typo in the host
+     * fails on the connect with its own message instead of as a port collision that is none.
+     *
+     * @param host a host that does not name this machine
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {TEST_NET_1_HOST, UNRESOLVABLE_HOST})
+    public void isLocalHost_anotherOrUnknownHost_returnsFalse(String host) {
+        // act, assert
+        assertThat(KeyProducerJavaSocket.isLocalHost(host), is(false));
     }
 
     @Test
